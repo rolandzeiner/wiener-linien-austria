@@ -3,70 +3,96 @@
     "step": {
       "user": {
         "title": "Wiener Linien Austria",
-        "description": "Wiener Linien Austria einrichten.",
+        "description": "Eine Haltestelle nach Namen suchen.",
         "data": {
-          "name": "Name",
-          "api_key": "API-Schlüssel",
-          "scan_interval": "Aktualisierungsintervall (Minuten)"
+          "search_query": "Haltestellenname"
+        },
+        "data_description": {
+          "search_query": "Tippen und bestätigen. Beispiel: Stephansplatz"
+        }
+      },
+      "select_stop": {
+        "title": "Haltestelle auswählen",
+        "description": "Treffer für „{query}“:",
+        "data": {
+          "diva": "Haltestelle"
+        }
+      },
+      "select_lines": {
+        "title": "Linien an {stop_name}",
+        "description": "{line_count} Linien bedienen diese Haltestelle aktuell. Abwählen, was nicht verfolgt werden soll.",
+        "data": {
+          "lines": "Linien verfolgen",
+          "scan_interval": "Aktualisierungsintervall (Sekunden)"
+        },
+        "data_description": {
+          "scan_interval": "Mindestens 30 Sekunden (Wiener-Linien-Fair-Use ist 15 s; wir verdoppeln aus Sicherheitsgründen)."
         }
       },
       "reconfigure": {
-        "title": "Wiener Linien Austria neu konfigurieren",
-        "description": "Zugangsdaten oder Intervall aktualisieren. Bestehende Entitäten bleiben erhalten.",
+        "title": "{stop_name} neu konfigurieren",
+        "description": "Verfolgte Linien oder Intervall anpassen. Entitäten bleiben erhalten.",
         "data": {
-          "api_key": "API-Schlüssel",
-          "scan_interval": "Aktualisierungsintervall (Minuten)"
+          "lines": "Linien verfolgen",
+          "scan_interval": "Aktualisierungsintervall (Sekunden)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Verbindung zur API fehlgeschlagen. Zugangsdaten prüfen und erneut versuchen.",
-      "invalid_api_key": "Bitte einen gültigen API-Schlüssel eingeben."
+      "query_too_short": "Mindestens 2 Zeichen eingeben.",
+      "no_matches": "Keine Haltestelle zur Suche gefunden.",
+      "catalogue_unavailable": "Der Wiener-Linien-Haltestellenkatalog kann nicht geladen werden. Internetverbindung prüfen und erneut versuchen.",
+      "invalid_stop": "Die gewählte Haltestelle ist nicht mehr verfügbar — erneut suchen.",
+      "no_lines": "Mindestens eine Linie auswählen.",
+      "cannot_connect": "Die Wiener-Linien-Echtzeit-API ist nicht erreichbar. Gleich nochmal versuchen."
     },
     "abort": {
-      "already_configured": "Dieses Konto ist bereits konfiguriert.",
-      "reconfigure_successful": "Neukonfiguration erfolgreich abgeschlossen."
+      "already_configured": "Diese Haltestelle ist bereits konfiguriert.",
+      "reconfigure_successful": "Neukonfiguration erfolgreich abgeschlossen.",
+      "stop_gone": "Diese Haltestelle steht nicht mehr im Katalog. Eintrag löschen und neu anlegen.",
+      "catalogue_unavailable": "Der Haltestellenkatalog kann nicht geladen werden. Später erneut versuchen."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Wiener Linien Austria Optionen",
-        "description": "Wiener Linien Austria Einstellungen aktualisieren.",
+        "description": "Intervall anpassen. Linienauswahl wird über „Neu konfigurieren“ geändert.",
         "data": {
-          "api_key": "API-Schlüssel",
-          "scan_interval": "Aktualisierungsintervall (Minuten)"
+          "scan_interval": "Aktualisierungsintervall (Sekunden)"
         }
       }
-    },
-    "error": {
-      "cannot_connect": "Verbindung zur API fehlgeschlagen. Zugangsdaten prüfen und erneut versuchen.",
-      "invalid_api_key": "Bitte einen gültigen API-Schlüssel eingeben."
     }
   },
   "entity": {
     "sensor": {
-      "example": { "name": "Beispiel" }
+      "stop": { "name": "Abfahrten" }
     }
   },
   "exceptions": {
     "api_timeout": {
-      "message": "Wiener Linien Austria API: Zeitüberschreitung nach {seconds}s"
+      "message": "Wiener-Linien-API: Zeitüberschreitung nach {seconds} s"
     },
     "api_http_error": {
-      "message": "Wiener Linien Austria API lieferte HTTP {status}: {reason}"
+      "message": "Wiener-Linien-API lieferte HTTP {status}: {reason}"
     },
     "api_connection_error": {
-      "message": "Wiener Linien Austria API: Verbindungsfehler: {error_type}: {error}"
+      "message": "Wiener-Linien-API: Verbindungsfehler: {error_type}: {error}"
     },
     "api_invalid_response": {
-      "message": "Wiener Linien Austria API lieferte unerwartete Antwort (Status {status}): {error}"
+      "message": "Wiener-Linien-API lieferte unerwartete Antwort (Status {status}): {error}"
+    },
+    "api_rate_limited": {
+      "message": "Wiener-Linien-API-Rate-Limit erreicht (Fehler 316). Warten und erneut versuchen."
+    },
+    "api_upstream_error": {
+      "message": "Wiener-Linien-API meldete Fehlercode {code}: {value}"
     }
   },
   "issues": {
-    "example_degraded": {
-      "title": "Wiener Linien Austria — eingeschränkt",
-      "description": "Wiener Linien Austria auf **{entry_title}** arbeitet im eingeschränkten Modus. TODO: Zustand und Lösung beschreiben."
+    "rate_limited": {
+      "title": "Wiener-Linien-Rate-Limit erreicht",
+      "description": "Die Wiener Linien antworteten mit Fehler 316 (Rate-Limit überschritten) auf Abfragen für **{entry_title}**. Das Fair-Use-Limit beträgt 15 s; diese Integration nutzt 60 s Standard und mindestens 30 s, daher tritt das üblicherweise nur auf, wenn mehrere HA-Instanzen dieselbe Ausgangs-IP nutzen. Intervall erhöhen oder parallele Einträge reduzieren."
     }
   }
 }

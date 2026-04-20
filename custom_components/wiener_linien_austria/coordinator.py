@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Callable
-from datetime import timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp
@@ -15,97 +15,158 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     API_BASE_URL,
-    CONF_API_KEY,
+    CONF_LINES,
+    CONF_RBLS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    DOMAIN_COOLDOWN_SECONDS,
+    DOMAIN_LAST_CALL_KEY,
+    ERR_RATE_LIMIT,
+    MONITOR_ENDPOINT,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class WienerLinienAustriaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
-    """Fetch data from the upstream API on a fixed interval."""
+@dataclass(slots=True)
+class Departure:
+    """One departure row from the monitor endpoint."""
+
+    line: str
+    towards: str
+    direction: str  # "H" | "R"
+    type: str  # ptMetro | ptTram | ptBusCity | ptBusNight | …
+    countdown: int
+    time_planned: str | None
+    time_real: str | None
+    realtime: bool
+    barrier_free: bool
+    traffic_jam: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        """Render as a plain dict for HA attributes / diagnostics."""
+        return {
+            "line": self.line,
+            "towards": self.towards,
+            "direction": self.direction,
+            "type": self.type,
+            "countdown": self.countdown,
+            "time_planned": self.time_planned,
+            "time_real": self.time_real,
+            "realtime": self.realtime,
+            "barrier_free": self.barrier_free,
+            "traffic_jam": self.traffic_jam,
+        }
+
+
+@dataclass(slots=True)
+class MonitorData:
+    """Coordinator payload: sorted departures + the latest server timestamp."""
+
+    departures: list[Departure]
+    server_time: str | None
+
+
+class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
+    """Fetch departures from the Wiener Linien monitor endpoint."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialise the coordinator."""
         config = {**entry.data, **entry.options}
         self._entry = entry
-        self._api_key: str = config[CONF_API_KEY]
+        self._rbls: list[int] = [int(x) for x in config[CONF_RBLS]]
+        self._selected_lines: set[str] | None = _normalise_lines(
+            config.get(CONF_LINES)
+        )
         self._session = async_get_clientsession(hass)
+        self._rate_limited: bool = False
+        self._last_error_code: int | None = None
+        self._server_time: str | None = None
 
-        # Track whether we've raised a degraded-service issue so we only
-        # create it once and can clear it when the condition recovers.
-        self._issue_raised: bool = False
-
-        # Optional teardown hooks (listeners, scheduled callbacks, …).
-        self._unsub: list[Callable[[], None]] = []
-
-        scan = config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        scan = int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(minutes=scan),
+            update_interval=timedelta(seconds=scan),
         )
 
     def async_setup(self) -> None:
-        """Register listeners or schedulers that need setup beyond the coordinator itself."""
-        # Example: self._unsub.append(async_track_state_change_event(...))
+        """Hook for additional listeners — unused today."""
         return None
 
     @callback
     def async_teardown(self) -> None:
-        """Cancel all listeners on unload."""
-        for unsub in self._unsub:
-            unsub()
-        self._unsub.clear()
+        """No-op: no listeners to cancel."""
+        return None
 
     # ------------------------------------------------------------------
-    # Repair-issue helpers — delete the whole section if there is nothing
-    # worth surfacing to the user.
+    # Properties surfaced to diagnostics and the sensor platform
     # ------------------------------------------------------------------
 
-    def _raise_degraded_issue(self, translation_key: str, **placeholders: str) -> None:
-        """Raise a Repairs issue for a user-actionable degraded condition."""
-        if self._issue_raised:
+    @property
+    def last_error_code(self) -> int | None:
+        """Return the API errorCode of the most recent unsuccessful call."""
+        return self._last_error_code
+
+    @property
+    def server_time(self) -> str | None:
+        """Return the last `serverTime` Wiener Linien reported."""
+        return self._server_time
+
+    @property
+    def rbls(self) -> list[int]:
+        """Return the RBL list this coordinator queries."""
+        return list(self._rbls)
+
+    # ------------------------------------------------------------------
+    # Repair-issue helpers
+    # ------------------------------------------------------------------
+
+    def _raise_rate_limit_issue(self) -> None:
+        """Raise a Repairs issue the first time Wiener Linien rate-limits us."""
+        if self._rate_limited:
             return
-        self._issue_raised = True
+        self._rate_limited = True
         ir.async_create_issue(
             self.hass,
             DOMAIN,
-            f"{translation_key}_{self._entry.entry_id}",
+            f"rate_limited_{self._entry.entry_id}",
             is_fixable=False,
             severity=ir.IssueSeverity.WARNING,
-            translation_key=translation_key,
-            translation_placeholders={
-                **placeholders,
-                "entry_title": self._entry.title,
-            },
+            translation_key="rate_limited",
+            translation_placeholders={"entry_title": self._entry.title},
         )
 
-    def _clear_degraded_issue(self, translation_key: str) -> None:
-        """Clear a previously-raised Repairs issue."""
-        if not self._issue_raised:
+    def _clear_rate_limit_issue(self) -> None:
+        """Clear the rate-limit Repairs issue once the API recovers."""
+        if not self._rate_limited:
             return
-        self._issue_raised = False
+        self._rate_limited = False
         ir.async_delete_issue(
-            self.hass, DOMAIN, f"{translation_key}_{self._entry.entry_id}"
+            self.hass, DOMAIN, f"rate_limited_{self._entry.entry_id}"
         )
 
     # ------------------------------------------------------------------
-    # Core data fetch
+    # Fetch
     # ------------------------------------------------------------------
 
-    async def _async_update_data(self) -> dict[str, Any]:
-        """Fetch fresh data from the upstream API."""
-        url = API_BASE_URL
-        headers = {"Authorization": f"Bearer {self._api_key}"}
+    async def _async_update_data(self) -> MonitorData:
+        """Fetch departures and return a sorted MonitorData."""
+        await self._enforce_domain_cooldown()
+
+        url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
+        params: list[tuple[str, str]] = [
+            ("stopId", str(rbl)) for rbl in self._rbls
+        ]
         timeout = aiohttp.ClientTimeout(total=30)
+
         try:
-            resp = await self._session.get(url, headers=headers, timeout=timeout)
+            resp = await self._session.get(url, params=params, timeout=timeout)
             resp.raise_for_status()
         except asyncio.TimeoutError as err:
             raise UpdateFailed(
@@ -119,7 +180,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 translation_key="api_http_error",
                 translation_placeholders={
                     "status": str(err.status),
-                    "reason": err.message,
+                    "reason": err.message or "",
                 },
             ) from err
         except aiohttp.ClientError as err:
@@ -133,7 +194,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             ) from err
 
         try:
-            data = await resp.json()
+            body = await resp.json()
         except (aiohttp.ContentTypeError, ValueError) as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
@@ -144,14 +205,123 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 },
             ) from err
 
-        if not isinstance(data, dict):
+        if not isinstance(body, dict):
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="api_invalid_response",
                 translation_placeholders={
                     "status": str(resp.status),
-                    "error": f"expected dict, got {type(data).__name__}",
+                    "error": f"expected object, got {type(body).__name__}",
                 },
             )
 
-        return data
+        message = body.get("message") or {}
+        code = _safe_int(message.get("messageCode"))
+        self._last_error_code = code
+        self._server_time = message.get("serverTime")
+
+        if code == ERR_RATE_LIMIT:
+            self._raise_rate_limit_issue()
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="api_rate_limited",
+            )
+
+        if code is not None and code != 1:
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="api_upstream_error",
+                translation_placeholders={
+                    "code": str(code),
+                    "value": str(message.get("value") or ""),
+                },
+            )
+
+        self._clear_rate_limit_issue()
+        return _parse_monitor_body(body, self._selected_lines, self._server_time)
+
+    async def _enforce_domain_cooldown(self) -> None:
+        """Serialise outbound calls across all entries under the 15s floor."""
+        domain_data = self.hass.data.setdefault(DOMAIN, {})
+        last: datetime | None = domain_data.get(DOMAIN_LAST_CALL_KEY)
+        now = dt_util.utcnow()
+        if last is not None:
+            elapsed = (now - last).total_seconds()
+            if elapsed < DOMAIN_COOLDOWN_SECONDS:
+                await asyncio.sleep(DOMAIN_COOLDOWN_SECONDS - elapsed)
+        domain_data[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
+
+
+def _normalise_lines(raw: Any) -> set[str] | None:
+    """Coerce CONF_LINES into a set of selected line keys.
+
+    An entry missing/empty CONF_LINES means "track every line at this stop".
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        return None
+    return {str(x) for x in raw} or None
+
+
+def _line_key(line: str, direction: str, towards: str) -> str:
+    """Stable identifier for a given (line, direction, towards) triple."""
+    return f"{line}|{direction}|{towards}"
+
+
+def _parse_monitor_body(
+    body: dict[str, Any],
+    selected: set[str] | None,
+    server_time: str | None,
+) -> MonitorData:
+    """Parse a successful /monitor response into a MonitorData."""
+    departures: list[Departure] = []
+    monitors = (body.get("data") or {}).get("monitors") or []
+
+    for monitor in monitors:
+        for line in (monitor.get("lines") or []):
+            line_name = str(line.get("name") or "").strip()
+            if not line_name:
+                continue
+            towards = str(line.get("towards") or "").strip()
+            direction = str(line.get("direction") or "").strip()
+            line_type = str(line.get("type") or "").strip()
+            barrier_free = bool(line.get("barrierFree"))
+            realtime = bool(line.get("realtimeSupported"))
+            traffic_jam = bool(line.get("trafficjam"))
+
+            if selected is not None and _line_key(line_name, direction, towards) not in selected:
+                continue
+
+            for entry in (line.get("departures") or {}).get("departure") or []:
+                dep_time = entry.get("departureTime") or {}
+                countdown = _safe_int(dep_time.get("countdown"))
+                if countdown is None:
+                    continue
+                departures.append(
+                    Departure(
+                        line=line_name,
+                        towards=towards,
+                        direction=direction,
+                        type=line_type,
+                        countdown=countdown,
+                        time_planned=dep_time.get("timePlanned"),
+                        time_real=dep_time.get("timeReal"),
+                        realtime=realtime,
+                        barrier_free=barrier_free,
+                        traffic_jam=traffic_jam,
+                    )
+                )
+
+    departures.sort(key=lambda d: (d.countdown, d.line, d.towards))
+    return MonitorData(departures=departures, server_time=server_time)
+
+
+def _safe_int(value: Any) -> int | None:
+    """Best-effort integer coercion; returns None on failure."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None

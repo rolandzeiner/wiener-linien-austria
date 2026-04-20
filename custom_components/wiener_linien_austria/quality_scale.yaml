@@ -20,11 +20,11 @@ rules:
     status: exempt
     comment: No service actions.
   docs-high-level-description:
-    status: todo
+    status: done
   docs-installation-instructions:
-    status: todo
+    status: done
   docs-removal-instructions:
-    status: todo
+    status: done
   entity-event-setup:
     status: exempt
     comment: Coordinator pattern; entities don't subscribe to events directly.
@@ -50,25 +50,25 @@ rules:
   config-entry-unloading:
     status: done
   docs-configuration-parameters:
-    status: todo
+    status: done
   docs-installation-parameters:
-    status: todo
+    status: done
   entity-unavailable:
     status: done
     comment: CoordinatorEntity marks entities unavailable on coordinator failure.
   integration-owner:
     status: done
   log-when-unavailable:
-    status: todo
-    comment: Add once/info-on-recovery logging in the coordinator's first successful update path.
+    status: done
+    comment: DataUpdateCoordinator logs UpdateFailed warnings once and an info message on recovery.
   parallel-updates:
     status: done
   reauthentication-flow:
     status: exempt
     comment: TODO — flip if your API has long-lived credentials that can expire.
   test-coverage:
-    status: todo
-    comment: Expand tests as you add features.
+    status: done
+    comment: Config flow (3 steps + reconfigure), coordinator (parse, rate-limit, cooldown, partial failure), static catalogue and diagnostics are all covered.
 
   # Gold
   devices:
@@ -83,20 +83,20 @@ rules:
     status: exempt
     comment: No discovery.
   docs-data-update:
-    status: todo
+    status: done
   docs-examples:
-    status: todo
+    status: done
   docs-known-limitations:
-    status: todo
+    status: done
   docs-supported-devices:
     status: exempt
     comment: Cloud API; no physical devices. Flip to `todo` for device integrations.
   docs-supported-functions:
-    status: todo
+    status: done
   docs-troubleshooting:
-    status: todo
+    status: done
   docs-use-cases:
-    status: todo
+    status: done
   dynamic-devices:
     status: exempt
     comment: Single device per config entry; no runtime device discovery.
@@ -104,8 +104,8 @@ rules:
     status: exempt
     comment: All entities are primary data. Flip if you add diagnostic/config entities.
   entity-device-class:
-    status: todo
-    comment: Set appropriate SensorDeviceClass per sensor.
+    status: done
+    comment: Stop sensor uses SensorDeviceClass.DURATION with UnitOfTime.MINUTES.
   entity-disabled-by-default:
     status: exempt
     comment: No non-essential entities. Flip if you add rarely-used ones.
