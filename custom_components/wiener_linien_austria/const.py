@@ -50,3 +50,8 @@ LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
 LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
+
+# Lovelace card — version must match the `const CARD_VERSION` in
+# www/wiener-linien-austria-card.js byte-for-byte, else the reload banner loops.
+CARD_VERSION: Final = "0.1.0"
+CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
