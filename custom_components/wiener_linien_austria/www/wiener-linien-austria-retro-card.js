@@ -1,7 +1,8 @@
 /**
  * Wiener Linien Austria Retro Card v0.1.0
  * LED-style departure display mimicking the classic Wiener Linien platform
- * signs: amber dot-matrix text on black, green Gleis panel on the right.
+ * signs: amber dot-matrix text on black, with a platform panel (GLEIS for
+ * rail, STEIG for bus) on the left or right depending on Gleis number.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
@@ -143,14 +144,12 @@ function _normaliseConfig(config) {
 // ------------------------------------------------------------------
 
 const LED_AMBER = "#FFC700";
-const LED_GREEN = "#3DF500";
 const LED_BG = "#000";
 const LED_SUBSTRATE = "#1a0d2a";
 
 const RETRO_STYLE = `
   :host, .retro {
     --led-amber: ${LED_AMBER};
-    --led-green: ${LED_GREEN};
     --led-bg: ${LED_BG};
     --led-substrate: ${LED_SUBSTRATE};
   }

@@ -107,7 +107,7 @@ A focused single-stop, single-direction LED-display style card mimicking the cla
 - Shows the **next 2 departures** for one direction of one station.
 - Black background with a subtle violet LED-substrate dot pattern.
 - Amber `#FFC700` glyphs in a system monospace stack — no Google-Fonts fetch (GDPR-clean, no third-party request).
-- Green `#3DF500` **GLEIS** (rail) or **STEIG** (bus) panel when the API reports a platform; left-aligned for Gleis "2", right-aligned otherwise, mirroring real Wiener Linien platform signs.
+- Amber **GLEIS** (rail) or **STEIG** (bus) panel when the API reports a platform; left-aligned for Gleis "2", right-aligned otherwise, mirroring real Wiener Linien platform signs.
 - Wheelchair glyph in amber LED tone after the destination on step-free departures.
 - Alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`), matching the real LED boards.
 - Three size variants (small / medium / regular) for narrow mobile cards, tablet dashboards, or full-width wall displays.
