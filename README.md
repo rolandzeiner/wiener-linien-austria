@@ -18,7 +18,9 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 - Multi-step config flow: search → pick stop → pick lines. Live API probe during setup confirms connectivity and shows the exact lines you'll be tracking.
 - Reconfigure flow to add/remove lines at a stop without losing the entry.
 - Options flow to change the polling interval without re-doing selection.
-- Diagnostics download with attribution, coordinator state, last error code, and server time.
+- **Service disruption alerts** (`trafficInfoList`) filtered to the lines you're tracking — surfaced in the `traffic_info` sensor attribute and as a banner on the Lovelace card.
+- **Elevator outage alerts** (`Aufzugsinfo`) filtered to your stop's RBLs — surfaced in the `elevator_info` sensor attribute and as a badge on the card.
+- Diagnostics download with attribution, coordinator state, last error code, server time, and currently matched alerts.
 
 ## Requirements
 
@@ -134,7 +136,6 @@ logger:
 ## Known Limitations
 
 - **Vienna only.** The Wiener Linien API covers Wiener Linien routes; ÖBB / VOR / regional services are outside its scope.
-- **Departures only (v0.1).** Traffic info (`trafficInfoList`) and elevator status (`Aufzugsinfo`) are planned for v0.2.
 - **Polling floor of 30 s** per entry, 15 s domain-wide cooldown across all entries. You cannot go below these; they exist to respect Wiener Linien's fair-use policy.
 - **No journey planning.** The OGD monitor endpoint returns departures at a stop; it does not do routing.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search until the cache rebuilds.

@@ -13,7 +13,15 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTRIBUTION, CONF_DIVA, CONF_STOP_NAME, DOMAIN
+from .alerts import get_alerts_for
+from .const import (
+    ATTRIBUTION,
+    CONF_DIVA,
+    CONF_LINES,
+    CONF_RBLS,
+    CONF_STOP_NAME,
+    DOMAIN,
+)
 from .coordinator import Departure, MonitorData, WienerLinienAustriaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -72,7 +80,7 @@ class WienerLinienStopSensor(
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the departure board + grouped views."""
+        """Return the departure board + grouped views + matched alerts."""
         config = {**self._entry.data, **self._entry.options}
         diva = int(config[CONF_DIVA])
         stop_name = str(config.get(CONF_STOP_NAME, self._entry.title))
@@ -86,6 +94,26 @@ class WienerLinienStopSensor(
             grouped[dep.line].append(dep.to_dict())
             next_by_line.setdefault(dep.line, dep.countdown)
 
+        # Match domain-wide alert caches against this entry's lines + RBLs.
+        # Lines derived from CONF_LINES ("U1|H|Leopoldau") — the user's own
+        # selection, stable even when no departures are flowing right now.
+        # Fall back to live departures for the "all lines" case.
+        selected_line_keys = config.get(CONF_LINES) or []
+        line_names: set[str] = {
+            k.split("|", 1)[0]
+            for k in selected_line_keys
+            if isinstance(k, str) and k
+        }
+        if not line_names:
+            line_names = {d.line for d in departures if d.line}
+        rbls = {int(r) for r in config.get(CONF_RBLS) or []}
+
+        # Use the coordinator's hass reference — `self.hass` is only set after
+        # async_added_to_hass, but tests instantiate the sensor directly.
+        traffic, elevator = get_alerts_for(
+            self.coordinator.hass, line_names, rbls
+        )
+
         return {
             "attribution": ATTRIBUTION,
             "diva": diva,
@@ -94,6 +122,8 @@ class WienerLinienStopSensor(
             "departures": [d.to_dict() for d in departures],
             "departures_by_line": dict(grouped),
             "next_by_line": next_by_line,
+            "traffic_info": [t.to_dict() for t in traffic],
+            "elevator_info": [e.to_dict() for e in elevator],
         }
 
     @property

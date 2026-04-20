@@ -42,6 +42,18 @@ STATIC_CACHE_REFRESH_HOURS: Final = 24 * 7
 # Upstream API
 API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"
 MONITOR_ENDPOINT: Final = "/monitor"
+TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
+
+# Alerts (traffic disruptions + elevator outages) refresh cadence. Domain-wide,
+# shared across all entries. 5 min is plenty — these don't change any faster
+# than a few times an hour and fetching more often just eats the fair-use
+# budget that belongs to live departure polling.
+ALERTS_REFRESH_SECONDS: Final = 300
+
+# hass.data keys for the shared alert caches + scheduler unsub.
+TRAFFIC_INFO_KEY: Final = "traffic_info"
+ELEVATOR_INFO_KEY: Final = "elevator_info"
+ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
 
 STATIC_FILES: Final = {
     "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",
