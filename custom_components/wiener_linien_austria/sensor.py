@@ -20,6 +20,7 @@ from .const import (
     CONF_RBLS,
     CONF_STOP_NAME,
     DOMAIN,
+    MAX_DEPARTURES_IN_ATTRS,
 )
 from .coordinator import Departure, MonitorData, WienerLinienAustriaCoordinator
 
@@ -117,12 +118,18 @@ class WienerLinienStopSensor(
             self.coordinator.hass, line_names, rbls
         )
 
+        # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
+        # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) stay under HA's
+        # 16 KB recorder attribute cap. The card respects its own
+        # max_departures setting (≤ 20) so nothing the UI shows is lost.
+        capped = [d.to_dict() for d in departures[:MAX_DEPARTURES_IN_ATTRS]]
+
         return {
             "attribution": ATTRIBUTION,
             "diva": diva,
             "stop_name": stop_name,
             "server_time": data.server_time if data is not None else None,
-            "departures": [d.to_dict() for d in departures],
+            "departures": capped,
             "next_by_line": next_by_line,
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
