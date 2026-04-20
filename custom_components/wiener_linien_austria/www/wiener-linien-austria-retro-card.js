@@ -44,6 +44,7 @@ const TRANSLATIONS = {
     dir_h: "H",
     dir_r: "R",
     gleis: "GLEIS",
+    steig: "STEIG",
     version_update:
       "Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",
     version_reload: "Neu laden",
@@ -71,6 +72,7 @@ const TRANSLATIONS = {
     dir_h: "H",
     dir_r: "R",
     gleis: "PLATF.",
+    steig: "STAND",
     version_update:
       "Retro card updated to v{v} — please reload",
     version_reload: "Reload",
@@ -370,6 +372,11 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     // Gleis "2" sits on the left, anything else (including "1") on the
     // right — matches Wiener Linien's platform-display convention.
     const gleisLeft = platform === "2";
+    // Buses don't run on Gleise — Wiener Linien uses "Steig" for bus
+    // platform positions. Pick the label off the first row's type.
+    const type = rows[0]?.type || "";
+    const isBus = type === "ptBusCity" || type === "ptBusNight";
+    const platformLabel = this._t(isBus ? "steig" : "gleis");
 
     const banner = this._versionMismatch ? this._renderBanner() : "";
 
@@ -395,7 +402,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
         <div class="retro-rows">
           ${rows.map((d) => this._renderRow(d)).join("")}
         </div>
-        ${platform ? this._renderGleis(platform) : ""}
+        ${platform ? this._renderGleis(platform, platformLabel) : ""}
       `;
     }
 
@@ -428,10 +435,10 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     `;
   }
 
-  _renderGleis(platform) {
+  _renderGleis(platform, label) {
     return `
       <div class="retro-gleis">
-        <div class="retro-gleis-label">${_esc(this._t("gleis"))}</div>
+        <div class="retro-gleis-label">${_esc(label)}</div>
         <div class="retro-gleis-number">${_esc(platform)}</div>
       </div>
     `;
