@@ -2,7 +2,10 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.1-blue.svg)](https://www.home-assistant.io/)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
 [![Quality Scale](https://img.shields.io/badge/quality%20scale-platinum-e5e4e2.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 
 Home Assistant integration for Vienna public transport departures. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data) — no API key, no YAML editing, no manual RBL lookups.
 
@@ -32,12 +35,16 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 3. Search for "Wiener Linien Austria" and install.
 4. Restart Home Assistant.
 
+[![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=wiener-linien-austria&category=integration)
+
 ### Manual
 
 1. Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_components/`.
 2. Restart Home Assistant.
 
 ## Setup
+
+[![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=wiener_linien_austria)
 
 1. **Settings → Devices & Services → + Add Integration**.
 2. Search for **Wiener Linien Austria**.
@@ -157,6 +164,11 @@ If you build a Lovelace card or other user-facing UI on top of this integration,
 
 1. **Settings → Devices & Services** → find Wiener Linien Austria → ⋯ → **Delete**.
 2. Remove `custom_components/wiener_linien_austria/` from the HA config (manual installs only; HACS removes it automatically).
+
+## Contributors
+
+- **Roland Zeiner** — maintainer ([@rolandzeiner](https://github.com/rolandzeiner))
+- **[Claude](https://claude.com/claude-code)** (Anthropic) — pair-programming partner via Claude Code; helped shape the Platinum scaffolding, config-flow UX, and the Wiener Linien OGD client
 
 ## License
 
