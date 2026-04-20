@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
+import aiohttp
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -16,6 +17,40 @@ from custom_components.wiener_linien_austria.const import (
     CONF_STOP_NAME,
     DOMAIN,
 )
+
+DEFAULT_LINES = ["U1|H|Leopoldau", "U1|R|Alaudagasse"]
+
+
+async def _complete_flow(
+    hass: HomeAssistant,
+    *,
+    query: str = "Stephans",
+    diva: str = "60201012",
+    lines: list[str] | None = None,
+    scan_interval: int = 60,
+) -> dict:
+    """Walk the 3-step flow end-to-end and return the final result.
+
+    Used by tests that only care about the *outcome* of a successful flow;
+    tests that assert intermediate step transitions (step_id/type checks)
+    stay in-line so those assertions remain readable.
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_SEARCH_QUERY: query}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: diva}
+    )
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_LINES: lines if lines is not None else list(DEFAULT_LINES),
+            CONF_SCAN_INTERVAL: scan_interval,
+        },
+    )
 
 
 async def test_search_too_short_shows_error(hass: HomeAssistant) -> None:
@@ -79,23 +114,9 @@ async def test_full_flow_creates_entry(hass: HomeAssistant, mock_fetch) -> None:
 
 async def test_duplicate_entry_aborted(hass: HomeAssistant, mock_fetch) -> None:
     """A second entry for the same DIVA is aborted on unique_id."""
-    for _ in range(2):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-        )
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_DIVA: "60201012"}
-        )
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"],
-            {
-                CONF_LINES: ["U1|H|Leopoldau", "U1|R|Alaudagasse"],
-                CONF_SCAN_INTERVAL: 60,
-            },
-        )
+    result = await _complete_flow(hass)
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    result = await _complete_flow(hass)
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "already_configured"
 
@@ -140,23 +161,7 @@ async def test_cannot_connect_during_probe(hass: HomeAssistant) -> None:
 
 async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) -> None:
     """Reconfigure updates data, keeps unique_id + entity identity stable."""
-    # Create an entry first
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_DIVA: "60201012"}
-    )
-    await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            CONF_LINES: ["U1|H|Leopoldau", "U1|R|Alaudagasse"],
-            CONF_SCAN_INTERVAL: 60,
-        },
-    )
+    await _complete_flow(hass)
     entry = hass.config_entries.async_entries(DOMAIN)[0]
     original_unique_id = entry.unique_id
 
@@ -185,22 +190,7 @@ async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) 
 
 async def test_options_flow_updates_interval(hass: HomeAssistant, mock_fetch) -> None:
     """Options flow changes only the scan interval."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_DIVA: "60201012"}
-    )
-    await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            CONF_LINES: ["U1|H|Leopoldau", "U1|R|Alaudagasse"],
-            CONF_SCAN_INTERVAL: 60,
-        },
-    )
+    await _complete_flow(hass)
     entry = hass.config_entries.async_entries(DOMAIN)[0]
 
     result = await hass.config_entries.options.async_init(entry.entry_id)
@@ -209,3 +199,20 @@ async def test_options_flow_updates_interval(hass: HomeAssistant, mock_fetch) ->
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert entry.options[CONF_SCAN_INTERVAL] == 180
+
+
+async def test_catalogue_unavailable_during_search(hass: HomeAssistant) -> None:
+    """If the static catalogue can't be loaded, user step surfaces an error."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+        new_callable=AsyncMock,
+        side_effect=aiohttp.ClientError("upstream down"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
+        )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"]["base"] == "catalogue_unavailable"
