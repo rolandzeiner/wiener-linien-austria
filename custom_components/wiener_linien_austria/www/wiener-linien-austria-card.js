@@ -35,6 +35,7 @@ const TRANSLATIONS = {
     dir_both: "Beide",
     traffic_label: "Störung",
     elevator_label: "Aufzug außer Betrieb",
+    elevator_until: "Bis",
     devmode_title: "DEV",
     devmode_traffic_btn: "Test Störung",
     devmode_elevator_btn: "Test Aufzug",
@@ -79,6 +80,7 @@ const TRANSLATIONS = {
     dir_both: "Both",
     traffic_label: "Disruption",
     elevator_label: "Elevator out of service",
+    elevator_until: "Until",
     devmode_title: "DEV",
     devmode_traffic_btn: "Test disruption",
     devmode_elevator_btn: "Test elevator",
@@ -283,6 +285,47 @@ const CARD_STYLE = `
     font-size: 0.75em;
     font-weight: 600;
     letter-spacing: 0.2px;
+  }
+  .wl-elevator-details {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--warning-color, #ffa000) 10%, transparent);
+    border-left: 3px solid var(--warning-color, #ffa000);
+  }
+  .wl-elevator-detail {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    font-size: 0.82em;
+  }
+  .wl-elevator-detail ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--warning-color, #ffa000);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .wl-elevator-detail-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.35;
+    min-width: 0;
+  }
+  .wl-elevator-detail-location {
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+  .wl-elevator-detail-reason {
+    color: var(--secondary-text-color);
+  }
+  .wl-elevator-detail-time {
+    color: var(--secondary-text-color);
+    font-variant-numeric: tabular-nums;
+    font-size: 0.92em;
   }
   .wl-traffic-list {
     display: flex;
@@ -657,15 +700,70 @@ class WienerLinienAustriaCard extends HTMLElement {
       rowsHtml = `<div class="wl-empty">${_esc(this._t(key))}</div>`;
     }
 
+    const elevatorDetailsHtml =
+      showElevator && elevatorInfos.length
+        ? this._renderElevatorDetails(elevatorInfos)
+        : "";
+
     return `
       <div class="wl-stop">
         <div class="wl-header">
           <span>${_esc(title)}</span>
           ${elevatorBadge}
         </div>
+        ${elevatorDetailsHtml}
         ${rowsHtml}
       </div>
     `;
+  }
+
+  _renderElevatorDetails(elevatorInfos) {
+    const rows = elevatorInfos
+      .map((e) => {
+        // Prefer description (usually the specific elevator location);
+        // fall back to station name if description is missing.
+        const location = e.description || e.station || "";
+        const reason = e.reason || "";
+        const until = this._formatTime(e.time_end);
+        const timeLine = until
+          ? `<div class="wl-elevator-detail-time">${_esc(
+              `${this._t("elevator_until")} ${until}`,
+            )}</div>`
+          : "";
+        const reasonLine = reason
+          ? `<div class="wl-elevator-detail-reason">${_esc(reason)}</div>`
+          : "";
+        return `
+          <div class="wl-elevator-detail">
+            <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
+            <div class="wl-elevator-detail-body">
+              <div class="wl-elevator-detail-location">${_esc(location)}</div>
+              ${reasonLine}
+              ${timeLine}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+    return `<div class="wl-elevator-details">${rows}</div>`;
+  }
+
+  _formatTime(iso) {
+    if (!iso || typeof iso !== "string") return "";
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "";
+      const locale = this._lang() === "de" ? "de-DE" : "en-GB";
+      return d.toLocaleString(locale, {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (_) {
+      return "";
+    }
   }
 
   _renderRow(d, overrides, showA11y) {
