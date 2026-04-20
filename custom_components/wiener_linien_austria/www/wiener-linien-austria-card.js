@@ -62,6 +62,9 @@ const TRANSLATIONS = {
       show_traffic_info: "Störungen anzeigen",
       show_elevator_info: "Aufzugsinfo anzeigen",
       hide_attribution: "Datenquelle ausblenden",
+      layout_label: "Layout mehrerer Haltestellen",
+      layout_stacked: "Gestapelt",
+      layout_tabs: "Reiter",
       no_sensors_available:
         "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
       no_lines_available:
@@ -112,6 +115,9 @@ const TRANSLATIONS = {
       show_traffic_info: "Show disruption alerts",
       show_elevator_info: "Show elevator outages",
       hide_attribution: "Hide data source",
+      layout_label: "Multi-stop layout",
+      layout_stacked: "Stacked",
+      layout_tabs: "Tabs",
       no_sensors_available:
         "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
       no_lines_available:
@@ -210,6 +216,9 @@ function _normaliseConfig(config) {
   // still carries the canonical CC-BY string regardless of this flag —
   // hiding only affects the card footer on a private dashboard.
   out.hide_attribution = out.hide_attribution === true;
+  // Multi-stop layout: "stacked" (default) or "tabs". Single-stop cards
+  // ignore this — only one body ever renders anyway.
+  if (out.layout !== "tabs") out.layout = "stacked";
 
   return out;
 }
@@ -274,6 +283,32 @@ const CARD_STYLE = `
     font-weight: 600;
     cursor: pointer;
   }
+  .wl-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.08));
+    margin-bottom: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .wl-tabs::-webkit-scrollbar { display: none; }
+  .wl-tab {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--secondary-text-color);
+    font-size: 0.95em;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .wl-tab.wl-tab-active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+  }
+  .wl-tab:hover { color: var(--primary-text-color); }
   .wl-stop { margin-bottom: 14px; }
   .wl-stop:last-of-type { margin-bottom: 0; }
   .wl-header {
@@ -593,6 +628,9 @@ class WienerLinienAustriaCard extends HTMLElement {
   _hass = null;
   _versionMismatch = null;
   _lastFingerprint = null;
+  // Which selected stop is currently visible in `layout: tabs` mode.
+  // Persists across re-renders; clamped to entities.length in _render.
+  _activeTab = 0;
 
   // Dev-mode synthetic alerts. Populated by the dev-mode buttons that only
   // appear on rpi25 (or with ?wl_debug=1) — lets us visually test the
@@ -738,13 +776,31 @@ class WienerLinienAustriaCard extends HTMLElement {
       "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
 
     const trafficHtml = showTraffic ? this._renderTrafficBanner(stops) : "";
-    const body = stops.length
-      ? stops
-          .map((s) =>
-            this._renderStop(s, max, overrides, showA11y, showElevator),
-          )
-          .join("")
-      : this._renderEmpty();
+
+    // Multi-stop tabs layout: only one stop renders at a time, switched by
+    // a tab bar at the top. Below two stops the tab bar would just be a
+    // single button — not worth the clutter, so we fall through to stacked
+    // rendering in that case.
+    const useTabs = this._config.layout === "tabs" && stops.length >= 2;
+    if (useTabs) {
+      if (this._activeTab >= stops.length) this._activeTab = 0;
+    }
+
+    let body;
+    if (!stops.length) {
+      body = this._renderEmpty();
+    } else if (useTabs) {
+      const active = stops[this._activeTab];
+      body =
+        this._renderTabs(stops, this._activeTab) +
+        this._renderStop(active, max, overrides, showA11y, showElevator);
+    } else {
+      body = stops
+        .map((s) =>
+          this._renderStop(s, max, overrides, showA11y, showElevator),
+        )
+        .join("");
+    }
     const attrHtml = this._config.hide_attribution
       ? ""
       : `<div class="wl-attr">${_esc(attribution)}</div>`;
@@ -766,6 +822,19 @@ class WienerLinienAustriaCard extends HTMLElement {
     if (reloadBtn) {
       reloadBtn.addEventListener("click", () => this._reload());
     }
+
+    // Tab-bar click handler: switch active stop and re-render. We call
+    // `_render()` directly rather than flip the fingerprint so the flicker
+    // short-circuit stays intact for coordinator polls.
+    this.querySelectorAll(".wl-tab[data-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.tab, 10);
+        if (Number.isFinite(i) && i !== this._activeTab) {
+          this._activeTab = i;
+          this._render();
+        }
+      });
+    });
 
     this.querySelectorAll("[data-dev-action]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -909,6 +978,20 @@ class WienerLinienAustriaCard extends HTMLElement {
         ${chevron}
       </div>
     `;
+  }
+
+  _renderTabs(stops, activeIndex) {
+    const buttons = stops
+      .map((s, i) => {
+        const attrs = this._hass.states[s.entity]?.attributes ?? {};
+        const label = attrs.stop_name || attrs.friendly_name || s.entity;
+        const cls = i === activeIndex ? "wl-tab wl-tab-active" : "wl-tab";
+        return `<button type="button" class="${cls}" data-tab="${i}">${_esc(
+          label,
+        )}</button>`;
+      })
+      .join("");
+    return `<div class="wl-tabs">${buttons}</div>`;
   }
 
   _renderEmpty() {
@@ -1518,6 +1601,13 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     this._render();
   }
 
+  _setLayout(layout) {
+    if (layout !== "stacked" && layout !== "tabs") return;
+    this._config = { ...this._config, layout };
+    this._fireChanged();
+    this._render();
+  }
+
   _render() {
     if (!this._hass) return;
 
@@ -1530,6 +1620,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     const showTraffic = this._config.show_traffic_info !== false;
     const showElevator = this._config.show_elevator_info !== false;
     const hideAttr = this._config.hide_attribution === true;
+    const layout = this._config.layout === "tabs" ? "tabs" : "stacked";
 
     // ----- Stop chips -----
     const stopChips = available.length
@@ -1685,6 +1776,13 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
               ${hideAttr ? "checked" : ""}
             ></ha-switch>
           </div>
+          <div class="toggle-row" style="gap:12px;">
+            <span style="font-size:13px;">${_esc(this._et("layout_label"))}</span>
+            <div class="direction-buttons">
+              <button type="button" data-layout="stacked" class="${layout === "stacked" ? "active" : ""}">${_esc(this._et("layout_stacked"))}</button>
+              <button type="button" data-layout="tabs" class="${layout === "tabs" ? "active" : ""}">${_esc(this._et("layout_tabs"))}</button>
+            </div>
+          </div>
         </div>
 
         <div class="editor-section">
@@ -1761,6 +1859,11 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
         this._fireChanged();
         this._render();
       });
+    });
+
+    // Layout buttons (stacked / tabs)
+    this.querySelectorAll("button[data-layout]").forEach((btn) => {
+      btn.addEventListener("click", () => this._setLayout(btn.dataset.layout));
     });
   }
 }
