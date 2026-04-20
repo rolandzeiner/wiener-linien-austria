@@ -6,8 +6,8 @@ rules:
   appropriate-polling:
     status: done
   brands:
-    status: todo
-    comment: Submit an icon PR to https://github.com/home-assistant/brands before first release.
+    status: done
+    comment: Icons shipped in custom_components/wiener_linien_austria/brand/ (icon.png 256x256, icon@2x.png 512x512). HA 2026.3+ reads this locally; the home-assistant/brands repo no longer accepts custom-integration PRs.
   common-modules:
     status: done
   config-flow:
