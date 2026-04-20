@@ -1,0 +1,136 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: This integration does not provide any service actions.
+  appropriate-polling:
+    status: done
+  brands:
+    status: todo
+    comment: Submit an icon PR to https://github.com/home-assistant/brands before first release.
+  common-modules:
+    status: done
+  config-flow:
+    status: done
+  config-flow-test-coverage:
+    status: done
+  dependency-transparency:
+    status: done
+  docs-actions:
+    status: exempt
+    comment: No service actions.
+  docs-high-level-description:
+    status: todo
+  docs-installation-instructions:
+    status: todo
+  docs-removal-instructions:
+    status: todo
+  entity-event-setup:
+    status: exempt
+    comment: Coordinator pattern; entities don't subscribe to events directly.
+  entity-unique-id:
+    status: done
+  has-entity-name:
+    status: done
+  runtime-data:
+    status: done
+  source-code-standards:
+    status: done
+  test-before-configure:
+    status: done
+  test-before-setup:
+    status: done
+  unique-config-entry:
+    status: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: No service actions.
+  config-entry-unloading:
+    status: done
+  docs-configuration-parameters:
+    status: todo
+  docs-installation-parameters:
+    status: todo
+  entity-unavailable:
+    status: done
+    comment: CoordinatorEntity marks entities unavailable on coordinator failure.
+  integration-owner:
+    status: done
+  log-when-unavailable:
+    status: todo
+    comment: Add once/info-on-recovery logging in the coordinator's first successful update path.
+  parallel-updates:
+    status: done
+  reauthentication-flow:
+    status: exempt
+    comment: TODO — flip if your API has long-lived credentials that can expire.
+  test-coverage:
+    status: todo
+    comment: Expand tests as you add features.
+
+  # Gold
+  devices:
+    status: done
+    comment: DeviceInfo on entities + explicit dr.async_get_or_create in __init__.py.
+  diagnostics:
+    status: done
+  discovery:
+    status: exempt
+    comment: Cloud/HTTP integration with no local discoverable component.
+  discovery-update-info:
+    status: exempt
+    comment: No discovery.
+  docs-data-update:
+    status: todo
+  docs-examples:
+    status: todo
+  docs-known-limitations:
+    status: todo
+  docs-supported-devices:
+    status: exempt
+    comment: Cloud API; no physical devices. Flip to `todo` for device integrations.
+  docs-supported-functions:
+    status: todo
+  docs-troubleshooting:
+    status: todo
+  docs-use-cases:
+    status: todo
+  dynamic-devices:
+    status: exempt
+    comment: Single device per config entry; no runtime device discovery.
+  entity-category:
+    status: exempt
+    comment: All entities are primary data. Flip if you add diagnostic/config entities.
+  entity-device-class:
+    status: todo
+    comment: Set appropriate SensorDeviceClass per sensor.
+  entity-disabled-by-default:
+    status: exempt
+    comment: No non-essential entities. Flip if you add rarely-used ones.
+  entity-translations:
+    status: done
+  exception-translations:
+    status: done
+  icon-translations:
+    status: done
+  reconfiguration-flow:
+    status: done
+  repair-issues:
+    status: done
+    comment: Coordinator has raise/clear helpers; raise real issues when degraded conditions occur.
+  stale-devices:
+    status: exempt
+    comment: See dynamic-devices.
+
+  # Platinum
+  async-dependency:
+    status: done
+    comment: Only aiohttp (async) used.
+  inject-websession:
+    status: done
+    comment: async_get_clientsession(hass) in coordinator and config flow.
+  strict-typing:
+    status: done
+    comment: py.typed marker present; CI runs mypy --strict.

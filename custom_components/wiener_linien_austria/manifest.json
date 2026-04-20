@@ -1,0 +1,14 @@
+{
+  "domain": "wiener_linien_austria",
+  "name": "Wiener Linien Austria",
+  "after_dependencies": ["http"],
+  "codeowners": ["@rolandzeiner"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/rolandzeiner/wiener-linien-austria",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/rolandzeiner/wiener-linien-austria/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,72 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wiener Linien Austria",
+        "description": "Wiener Linien Austria einrichten.",
+        "data": {
+          "name": "Name",
+          "api_key": "API-Schlüssel",
+          "scan_interval": "Aktualisierungsintervall (Minuten)"
+        }
+      },
+      "reconfigure": {
+        "title": "Wiener Linien Austria neu konfigurieren",
+        "description": "Zugangsdaten oder Intervall aktualisieren. Bestehende Entitäten bleiben erhalten.",
+        "data": {
+          "api_key": "API-Schlüssel",
+          "scan_interval": "Aktualisierungsintervall (Minuten)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zur API fehlgeschlagen. Zugangsdaten prüfen und erneut versuchen.",
+      "invalid_api_key": "Bitte einen gültigen API-Schlüssel eingeben."
+    },
+    "abort": {
+      "already_configured": "Dieses Konto ist bereits konfiguriert.",
+      "reconfigure_successful": "Neukonfiguration erfolgreich abgeschlossen."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Wiener Linien Austria Optionen",
+        "description": "Wiener Linien Austria Einstellungen aktualisieren.",
+        "data": {
+          "api_key": "API-Schlüssel",
+          "scan_interval": "Aktualisierungsintervall (Minuten)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zur API fehlgeschlagen. Zugangsdaten prüfen und erneut versuchen.",
+      "invalid_api_key": "Bitte einen gültigen API-Schlüssel eingeben."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "example": { "name": "Beispiel" }
+    }
+  },
+  "exceptions": {
+    "api_timeout": {
+      "message": "Wiener Linien Austria API: Zeitüberschreitung nach {seconds}s"
+    },
+    "api_http_error": {
+      "message": "Wiener Linien Austria API lieferte HTTP {status}: {reason}"
+    },
+    "api_connection_error": {
+      "message": "Wiener Linien Austria API: Verbindungsfehler: {error_type}: {error}"
+    },
+    "api_invalid_response": {
+      "message": "Wiener Linien Austria API lieferte unerwartete Antwort (Status {status}): {error}"
+    }
+  },
+  "issues": {
+    "example_degraded": {
+      "title": "Wiener Linien Austria — eingeschränkt",
+      "description": "Wiener Linien Austria auf **{entry_title}** arbeitet im eingeschränkten Modus. TODO: Zustand und Lösung beschreiben."
+    }
+  }
+}

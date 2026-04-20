@@ -1,0 +1,72 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Wiener Linien Austria",
+        "description": "Set up Wiener Linien Austria.",
+        "data": {
+          "name": "Name",
+          "api_key": "API key",
+          "scan_interval": "Update interval (minutes)"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Wiener Linien Austria",
+        "description": "Update credentials or polling interval. Existing entities are preserved.",
+        "data": {
+          "api_key": "API key",
+          "scan_interval": "Update interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the upstream API. Check your credentials and try again.",
+      "invalid_api_key": "Please provide a valid API key."
+    },
+    "abort": {
+      "already_configured": "This account is already configured.",
+      "reconfigure_successful": "Reconfigure completed successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Wiener Linien Austria options",
+        "description": "Update Wiener Linien Austria settings.",
+        "data": {
+          "api_key": "API key",
+          "scan_interval": "Update interval (minutes)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the upstream API. Check your credentials and try again.",
+      "invalid_api_key": "Please provide a valid API key."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "example": { "name": "Example" }
+    }
+  },
+  "exceptions": {
+    "api_timeout": {
+      "message": "Wiener Linien Austria API timed out after {seconds}s"
+    },
+    "api_http_error": {
+      "message": "Wiener Linien Austria API returned HTTP {status}: {reason}"
+    },
+    "api_connection_error": {
+      "message": "Wiener Linien Austria API connection error: {error_type}: {error}"
+    },
+    "api_invalid_response": {
+      "message": "Wiener Linien Austria API returned an unexpected response (status {status}): {error}"
+    }
+  },
+  "issues": {
+    "example_degraded": {
+      "title": "Wiener Linien Austria — degraded",
+      "description": "Wiener Linien Austria on **{entry_title}** is operating in a degraded mode. TODO: describe the condition and the fix."
+    }
+  }
+}

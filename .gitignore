@@ -1,0 +1,19 @@
+# macOS
+**/.DS_Store
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.py[cod]
+.Python
+
+# Tools
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Logs / pip
+*.log
+pip-log.txt
+pip-delete-this-directory.txt

@@ -1,0 +1,7 @@
+{
+  "entity": {
+    "sensor": {
+      "example": { "default": "mdi:information-outline" }
+    }
+  }
+}
