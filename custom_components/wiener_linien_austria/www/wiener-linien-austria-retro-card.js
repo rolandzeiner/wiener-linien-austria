@@ -48,11 +48,16 @@ const TRANSLATIONS = {
     editor: {
       section_sensor: "Haltestelle",
       section_direction: "Richtung",
+      section_line: "Linie",
       sensor_hint: "Eine Haltestelle auswählen.",
       direction_hint:
         "Hin- oder Rückfahrt — die Retro-Anzeige zeigt nur eine Richtung.",
+      line_hint:
+        "Optional: nur eine Linie anzeigen. Aktiven Chip erneut antippen = alle Linien.",
       no_sensors:
         "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
+      no_lines:
+        "Für diese Haltestelle und Richtung sind aktuell keine Linien im Sensor.",
     },
   },
   en: {
@@ -67,11 +72,16 @@ const TRANSLATIONS = {
     editor: {
       section_sensor: "Stop",
       section_direction: "Direction",
+      section_line: "Line",
       sensor_hint: "Pick a single stop.",
       direction_hint:
         "Outbound or return — the retro display only shows one direction.",
+      line_hint:
+        "Optional: restrict to a single line. Tap the active chip again to show all lines.",
       no_sensors:
         "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
+      no_lines:
+        "The sensor currently reports no lines for this stop + direction.",
     },
   },
 };
@@ -87,6 +97,14 @@ function _normaliseConfig(config) {
   }
   if (out.direction !== "H" && out.direction !== "R") {
     out.direction = "H";
+  }
+  // Optional single-line filter. Empty / missing = show all lines.
+  if (typeof out.line === "string") {
+    const trimmed = out.line.trim();
+    if (trimmed) out.line = trimmed;
+    else delete out.line;
+  } else if (out.line != null) {
+    delete out.line;
   }
   return out;
 }
@@ -316,15 +334,17 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     if (!eid) return `${this._versionMismatch || ""}||no-entity`;
     const a = this._hass.states[eid]?.attributes || {};
     const dir = this._config.direction;
+    const lineFilter = this._config.line || "";
     const deps = (a.departures || [])
       .filter((d) => d && d.direction === dir)
+      .filter((d) => !lineFilter || d.line === lineFilter)
       .slice(0, 2)
       .map(
         (d) =>
           `${d.line}|${d.towards}|${d.countdown}|${d.platform || ""}`,
       )
       .join(";");
-    return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}#${deps}`;
+    return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}|${lineFilter}#${deps}`;
   }
 
   _render() {
@@ -333,8 +353,11 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const state = eid ? this._hass.states[eid] : null;
     const attrs = state?.attributes ?? {};
     const dir = this._config.direction;
+    const lineFilter = this._config.line || "";
     const matching = Array.isArray(attrs.departures)
-      ? attrs.departures.filter((d) => d && d.direction === dir)
+      ? attrs.departures
+          .filter((d) => d && d.direction === dir)
+          .filter((d) => !lineFilter || d.line === lineFilter)
       : [];
     const rows = matching.slice(0, 2);
     const platform = rows.find((d) => d.platform)?.platform || null;
@@ -553,12 +576,39 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     this._render();
   }
 
+  _pickLine(line) {
+    // Click an active chip → clear to "all lines". Otherwise set it.
+    const next = { ...this._config };
+    if (next.line === line) delete next.line;
+    else next.line = line;
+    this._config = next;
+    this._fire();
+    this._render();
+  }
+
+  _linesForCurrent() {
+    // Lines that actually have departures for the selected
+    // (entity, direction). Used to populate the line-chip picker.
+    const eid = this._config.entity;
+    const dir = this._config.direction || "H";
+    const a = eid ? this._hass?.states[eid]?.attributes : null;
+    const deps = Array.isArray(a?.departures) ? a.departures : [];
+    const seen = new Set();
+    for (const d of deps) {
+      if (d && d.direction === dir && typeof d.line === "string" && d.line) {
+        seen.add(d.line);
+      }
+    }
+    return [...seen].sort();
+  }
+
   _render() {
     if (!this._hass) return;
 
     const available = _findWienerLinienEntities(this._hass);
     const selected = this._config.entity || "";
     const direction = this._config.direction || "H";
+    const selectedLine = this._config.line || "";
 
     const chips = available.length
       ? available
@@ -580,6 +630,22 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           .join("")
       : `<div class="editor-hint">${_esc(this._et("no_sensors"))}</div>`;
 
+    const lines = this._linesForCurrent();
+    const lineChips = lines.length
+      ? lines
+          .map((line) => {
+            const isSel = line === selectedLine;
+            return `
+              <button
+                type="button"
+                class="chip ${isSel ? "selected" : ""}"
+                data-line="${_esc(line)}"
+              ><span class="stop-name">${_esc(line)}</span></button>
+            `;
+          })
+          .join("")
+      : `<div class="editor-hint">${_esc(this._et("no_lines"))}</div>`;
+
     this.innerHTML = `
       <div class="editor">
         <style>${EDITOR_STYLE}</style>
@@ -598,6 +664,12 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
             <button type="button" data-dir="R" class="${direction === "R" ? "active" : ""}">${_esc(this._t("dir_r"))}</button>
           </div>
         </div>
+
+        <div class="editor-section">
+          <div class="section-header">${_esc(this._et("section_line"))}</div>
+          <div class="editor-hint">${_esc(this._et("line_hint"))}</div>
+          <div class="entity-chips">${lineChips}</div>
+        </div>
       </div>
     `;
 
@@ -608,6 +680,11 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     });
     this.querySelectorAll(".direction-buttons button").forEach((btn) => {
       btn.addEventListener("click", () => this._setDirection(btn.dataset.dir));
+    });
+    this.querySelectorAll(".chip[data-line]").forEach((chip) => {
+      chip.addEventListener("click", () =>
+        this._pickLine(chip.dataset.line),
+      );
     });
   }
 }
