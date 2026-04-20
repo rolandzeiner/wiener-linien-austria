@@ -19,10 +19,31 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 - Reconfigure flow to add/remove lines without losing the entry; options flow to change the polling interval without re-doing selection.
 - **Service disruption alerts** (`trafficInfoList`) filtered to the lines you track — surfaced in the `traffic_info` sensor attribute.
 - **Elevator outage alerts** (`Aufzugsinfo`) filtered to your stop's RBLs — surfaced in the `elevator_info` sensor attribute; critical for users who rely on step-free access.
-- **Delay detection** — when `time_real` lags `time_planned`, the card renders "3 Minuten verspätet" inline; the raw timestamps stay on the sensor for templates.
+- **Delay detection** — when `time_real` lags `time_planned`, the modern card renders "3 Minuten verspätet" inline (toggleable in the editor); the raw timestamps always stay on the sensor for templates.
 - **Two bundled Lovelace cards** — modern full-feature + retro LED-display style. See [Lovelace Cards](#lovelace-cards).
 - **Identifying User-Agent** on every outbound request (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) so Wiener Linien can traffic-shape this integration specifically.
 - Diagnostics download with attribution, coordinator state, last error code, server time, RBLs, and currently matched alerts.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="screenshots/card.webp" height="320" alt="Modern departure card" /></td>
+    <td align="center"><img src="screenshots/card-retro.webp" height="320" alt="Retro LED-style card" /></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Modern departure card</em></td>
+    <td align="center"><em>Retro LED-style card</em></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="screenshots/card-editor.webp" height="320" alt="Visual card editor" /></td>
+    <td align="center"><img src="screenshots/config-flow.webp" height="320" alt="Config flow" /></td>
+  </tr>
+  <tr>
+    <td align="center"><em>Visual card editor</em></td>
+    <td align="center"><em>Config flow</em></td>
+  </tr>
+</table>
 
 ## Requirements
 
@@ -73,7 +94,7 @@ The everyday departure board. Dashboard → Add card → "Wiener Linien Austria"
 - **Stops** — chip picker (multi-select) of every Wiener Linien sensor on this HA instance.
 - **Per-stop filters** — for each selected stop, a second chip row lets you restrict which lines render and which direction (H / R / both).
 - **Line colours** — colour-pickers per line appearing in any selected stop's board. Metro CI defaults are built in; tram/bus lines fall back to the theme primary colour until overridden.
-- **Display** — departures-per-stop slider (1–20), and toggles for step-free icon (opt-in), disruption banner, elevator badge, and "Hide data source" (hides the attribution footer on your private dashboard — the sensor attribute keeps the CC-BY string).
+- **Display** — multi-stop layout picker (*stacked* or *tabs*), departures-per-stop slider (1–20), and toggles for step-free icon (opt-in), disruption banner, elevator badge, delay text, and "Hide data source" (hides the attribution footer on your private dashboard — the sensor attribute keeps the CC-BY string).
 
 **Row layout:**
 
@@ -102,9 +123,12 @@ A focused single-stop, single-direction LED-display style card mimicking the cla
 
 - Shows the **next 2 departures** for one direction of one station.
 - Black background with a subtle violet LED-substrate dot pattern.
-- Amber `#FFC700` glyphs in the `Jersey 25` font (Google Fonts, falls back to monospace).
-- Green `#3DF500` **GLEIS** panel on the right when the API reports a platform number.
-- Editor: one sensor chip + H/R direction toggle. That's it.
+- Amber `#FFC700` glyphs in a system monospace stack — no Google-Fonts fetch (GDPR-clean, no third-party request).
+- Green `#3DF500` **GLEIS** (rail) or **STEIG** (bus) panel when the API reports a platform; left-aligned for Gleis "2", right-aligned otherwise, mirroring real Wiener Linien platform signs.
+- Wheelchair glyph in amber LED tone after the destination on step-free departures.
+- Alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`), matching the real LED boards.
+- Three size variants (small / medium / regular) for narrow mobile cards, tablet dashboards, or full-width wall displays.
+- Editor: stop chip picker, H/R direction toggle, optional single-line filter, size picker, and a show-platform toggle.
 
 Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
 
