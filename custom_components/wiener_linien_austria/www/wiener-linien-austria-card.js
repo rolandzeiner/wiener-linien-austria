@@ -586,11 +586,6 @@ const CARD_STYLE = `
     margin-left: auto;
     color: var(--secondary-text-color);
   }
-  .wl-devmode-hb {
-    font-variant-numeric: tabular-nums;
-    color: var(--secondary-text-color);
-    opacity: 0.7;
-  }
 `;
 
 class WienerLinienAustriaCard extends HTMLElement {
@@ -612,11 +607,6 @@ class WienerLinienAustriaCard extends HTMLElement {
   _expandedTraffic = new Set();
   _expandedElevator = new Set();
 
-  // Interval handle for the client-side countdown tick. Countdowns in the
-  // API are computed at `server_time`; between polls they'd stay stale
-  // unless we recompute locally from the ISO timestamps.
-  _tickInterval = null;
-
   setConfig(config) {
     this._config = _normaliseConfig(config);
     this._lastFingerprint = null;
@@ -628,7 +618,6 @@ class WienerLinienAustriaCard extends HTMLElement {
     this._hass = hass;
     if (first) {
       this._checkCardVersion();
-      this._startTickInterval();
     }
     const fp = this._fingerprint();
     if (fp === this._lastFingerprint) return;
@@ -636,50 +625,14 @@ class WienerLinienAustriaCard extends HTMLElement {
     this._render();
   }
 
-  disconnectedCallback() {
-    if (this._tickInterval) {
-      clearInterval(this._tickInterval);
-      this._tickInterval = null;
-    }
-  }
-
-  _startTickInterval() {
-    if (this._tickInterval) return;
-    // Re-render every 15 s so countdowns drop minutes between coordinator
-    // polls. Does not trigger a fingerprint update — we call _render()
-    // directly. Cheap: same renderer the set-hass path uses.
-    this._tickInterval = setInterval(() => {
-      if (!this._hass) return;
-      this._render();
-    }, 15000);
-  }
-
-  _liveCountdown(d) {
-    // Compute countdown + delay client-side from the ISO timestamps.
-    // Falls back to the server-computed `countdown` if neither timestamp
-    // is parseable (shouldn't happen in practice).
-    const now = Date.now();
-    const realMs = d.time_real ? Date.parse(d.time_real) : NaN;
-    const plannedMs = d.time_planned ? Date.parse(d.time_planned) : NaN;
-
-    const targetMs = Number.isFinite(realMs)
-      ? realMs
-      : Number.isFinite(plannedMs)
-        ? plannedMs
-        : NaN;
-    let cd;
-    if (Number.isFinite(targetMs)) {
-      cd = Math.max(0, Math.floor((targetMs - now) / 60000));
-    } else {
-      cd = Number.isFinite(d.countdown) ? d.countdown : null;
-    }
-
-    let delay = null;
-    if (Number.isFinite(realMs) && Number.isFinite(plannedMs)) {
-      const deltaMin = Math.round((realMs - plannedMs) / 60000);
-      if (Math.abs(deltaMin) >= 1) delay = deltaMin;
-    }
-    return { cd, delay };
+  _delayMinutes(d) {
+    // Compare realtime vs planned arrival to detect lateness.
+    // Returns null when either side is missing or the delta is < 1 min.
+    const realMs = d && d.time_real ? Date.parse(d.time_real) : NaN;
+    const plannedMs = d && d.time_planned ? Date.parse(d.time_planned) : NaN;
+    if (!Number.isFinite(realMs) || !Number.isFinite(plannedMs)) return null;
+    const deltaMin = Math.round((realMs - plannedMs) / 60000);
+    return Math.abs(deltaMin) >= 1 ? deltaMin : null;
   }
 
   _delayText(delay) {
@@ -1128,13 +1081,13 @@ class WienerLinienAustriaCard extends HTMLElement {
     const line = String(d.line || "?");
     const color = _colorForLine(line, overrides);
     const towards = _esc(d.towards || "");
-    const { cd, delay } = this._liveCountdown(d);
+    const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const cdLabel =
       cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
     // Only surface delays when the train is actually running late; early
     // departures are noise. Rendered inline after the destination as
-    // muted warning text (e.g. "Alaudagasse · 3 Minuten verspätet").
-    const delayText = this._delayText(delay);
+    // muted warning text (e.g. "Alaudagasse 3 Minuten verspätet").
+    const delayText = this._delayText(this._delayMinutes(d));
     const towardsHtml = delayText
       ? `${towards} <span class="wl-delay">${_esc(delayText)}</span>`
       : towards;
@@ -1283,10 +1236,6 @@ class WienerLinienAustriaCard extends HTMLElement {
 
   _renderDevModePanel() {
     if (!this._isDevMode()) return "";
-    // Heartbeat — a fresh HH:MM:SS on every render proves the tick
-    // interval is firing without needing DevTools.
-    const now = new Date();
-    const hb = now.toLocaleTimeString("de-AT", { hour12: false });
     return `
       <div class="wl-devmode">
         <span class="wl-devmode-label">${_esc(this._t("devmode_title"))}</span>
@@ -1299,7 +1248,6 @@ class WienerLinienAustriaCard extends HTMLElement {
         <button type="button" class="wl-devmode-clear" data-dev-action="clear">${_esc(
           this._t("devmode_clear_btn"),
         )}</button>
-        <span class="wl-devmode-hb" title="Last render">${_esc(hb)}</span>
       </div>
     `;
   }
