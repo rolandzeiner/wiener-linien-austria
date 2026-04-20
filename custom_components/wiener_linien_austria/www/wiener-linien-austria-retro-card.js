@@ -198,7 +198,12 @@ const RETRO_STYLE = `
   .retro-row {
     display: grid;
     grid-template-columns: 2.5em 1fr auto;
-    align-items: center;
+    /* Baseline — not center — so plain-text cells (line, countdown) sit
+       on the same baseline as the flex-based destination cell that now
+       mixes text + a wheelchair icon. `center` used to work when every
+       cell was pure text; the flex container computes its baseline a
+       hair differently. */
+    align-items: baseline;
     gap: 12px;
     white-space: nowrap;
   }
