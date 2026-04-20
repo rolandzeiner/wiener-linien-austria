@@ -355,6 +355,34 @@ const CARD_STYLE = `
     background: color-mix(in srgb, var(--warning-color, #ffa000) 14%, transparent);
     border-left: 3px solid var(--warning-color, #ffa000);
     font-size: 0.85em;
+    cursor: pointer;
+    user-select: none;
+  }
+  .wl-traffic-chevron {
+    margin-left: auto;
+    --mdc-icon-size: 20px;
+    color: var(--secondary-text-color);
+    transition: transform 0.15s ease-out;
+    flex-shrink: 0;
+  }
+  .wl-traffic.wl-traffic-expanded .wl-traffic-chevron {
+    transform: rotate(180deg);
+  }
+  .wl-traffic-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow: hidden;
+    max-height: 600px;
+    transition: max-height 0.2s ease-out, opacity 0.15s ease-out;
+  }
+  .wl-traffic:not(.wl-traffic-expanded) .wl-traffic-detail {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .wl-traffic.wl-traffic-nodetail {
+    cursor: default;
   }
   .wl-traffic ha-icon {
     --mdc-icon-size: 18px;
@@ -502,6 +530,11 @@ class WienerLinienAustriaCard extends HTMLElement {
   // real upstream to publish something that affects our tracked stops.
   _debugTraffic = [];
   _debugElevator = [];
+
+  // Per-traffic-item expansion state. Keyed by the traffic info `name`
+  // (stable upstream id) so that survives coordinator-tick re-renders.
+  // Default = collapsed.
+  _expandedTraffic = new Set();
 
   setConfig(config) {
     this._config = _normaliseConfig(config);
@@ -654,6 +687,22 @@ class WienerLinienAustriaCard extends HTMLElement {
         else if (action === "clear") this._devClear();
       });
     });
+
+    // Toggle traffic-item expand/collapse.
+    this.querySelectorAll("[data-traffic-name]").forEach((el) => {
+      // Skip items that have no detail to reveal.
+      if (!el.querySelector(".wl-traffic-detail")) return;
+      el.addEventListener("click", () => {
+        const name = el.dataset.trafficName;
+        if (!name) return;
+        if (this._expandedTraffic.has(name)) {
+          this._expandedTraffic.delete(name);
+        } else {
+          this._expandedTraffic.add(name);
+        }
+        el.classList.toggle("wl-traffic-expanded");
+      });
+    });
   }
 
   _renderTrafficBanner(stops) {
@@ -728,15 +777,31 @@ class WienerLinienAustriaCard extends HTMLElement {
       ? `<div class="wl-traffic-meta">${metaParts.join("")}</div>`
       : "";
 
+    const hasDetail = Boolean(descBlock || metaBlock);
+    const expanded = this._expandedTraffic.has(t.name);
+    const chevron = hasDetail
+      ? `<ha-icon class="wl-traffic-chevron" icon="mdi:chevron-down"></ha-icon>`
+      : "";
+    const detailBlock = hasDetail
+      ? `<div class="wl-traffic-detail">${descBlock}${metaBlock}</div>`
+      : "";
+    const classes = [
+      "wl-traffic",
+      expanded ? "wl-traffic-expanded" : "",
+      hasDetail ? "" : "wl-traffic-nodetail",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     return `
-      <div class="wl-traffic">
+      <div class="${classes}" data-traffic-name="${_esc(t.name || "")}">
         <ha-icon icon="mdi:alert-octagon"></ha-icon>
         <div class="wl-traffic-body">
           ${linesHtml}
           <div class="wl-traffic-title">${title}</div>
-          ${descBlock}
-          ${metaBlock}
+          ${detailBlock}
         </div>
+        ${chevron}
       </div>
     `;
   }
