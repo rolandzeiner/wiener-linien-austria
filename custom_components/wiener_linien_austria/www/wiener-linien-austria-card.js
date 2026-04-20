@@ -313,7 +313,12 @@ const CARD_STYLE = `
     display: flex;
     gap: 8px;
     align-items: flex-start;
-    font-size: 0.82em;
+    font-size: 0.85em;
+    cursor: pointer;
+    user-select: none;
+  }
+  .wl-elevator-detail.wl-elevator-nodetail {
+    cursor: default;
   }
   .wl-elevator-detail ha-icon {
     --mdc-icon-size: 18px;
@@ -321,16 +326,49 @@ const CARD_STYLE = `
     flex-shrink: 0;
     margin-top: 1px;
   }
+  .wl-elevator-detail-chevron {
+    margin-left: auto;
+    --mdc-icon-size: 20px;
+    color: var(--secondary-text-color);
+    transition: transform 0.15s ease-out;
+    flex-shrink: 0;
+  }
+  .wl-elevator-detail.wl-elevator-expanded .wl-elevator-detail-chevron {
+    transform: rotate(180deg);
+  }
   .wl-elevator-detail-body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    line-height: 1.35;
+    gap: 4px;
+    line-height: 1.4;
     min-width: 0;
+    flex: 1;
+  }
+  .wl-elevator-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+  .wl-elevator-summary .wl-traffic-lines {
+    margin: 0;
   }
   .wl-elevator-detail-location {
     font-weight: 600;
     color: var(--primary-text-color);
+  }
+  .wl-elevator-detail-expand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+    max-height: 600px;
+    transition: max-height 0.2s ease-out, opacity 0.15s ease-out;
+  }
+  .wl-elevator-detail:not(.wl-elevator-expanded) .wl-elevator-detail-expand {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
   }
   .wl-elevator-detail-reason {
     color: var(--secondary-text-color);
@@ -540,6 +578,7 @@ class WienerLinienAustriaCard extends HTMLElement {
   // (stable upstream id) so that survives coordinator-tick re-renders.
   // Default = collapsed.
   _expandedTraffic = new Set();
+  _expandedElevator = new Set();
 
   setConfig(config) {
     this._config = _normaliseConfig(config);
@@ -706,6 +745,21 @@ class WienerLinienAustriaCard extends HTMLElement {
           this._expandedTraffic.add(name);
         }
         el.classList.toggle("wl-traffic-expanded");
+      });
+    });
+
+    // Toggle elevator-detail expand/collapse.
+    this.querySelectorAll("[data-elevator-name]").forEach((el) => {
+      if (!el.querySelector(".wl-elevator-detail-expand")) return;
+      el.addEventListener("click", () => {
+        const name = el.dataset.elevatorName;
+        if (!name) return;
+        if (this._expandedElevator.has(name)) {
+          this._expandedElevator.delete(name);
+        } else {
+          this._expandedElevator.add(name);
+        }
+        el.classList.toggle("wl-elevator-expanded");
       });
     });
   }
@@ -887,6 +941,7 @@ class WienerLinienAustriaCard extends HTMLElement {
   }
 
   _renderElevatorDetails(elevatorInfos) {
+    const overrides = this._config.line_colors || {};
     const rows = elevatorInfos
       .map((e) => {
         // Prefer description (usually the specific elevator location);
@@ -894,6 +949,17 @@ class WienerLinienAustriaCard extends HTMLElement {
         const location = e.description || e.station || "";
         const reason = e.reason || "";
         const until = this._formatTime(e.time_end);
+
+        const lines = Array.isArray(e.related_lines) ? e.related_lines : [];
+        const linesHtml = lines.length
+          ? `<div class="wl-traffic-lines">${lines
+              .map((l) => {
+                const color = _colorForLine(l, overrides);
+                return `<span class="wl-traffic-line-badge" style="background:${color}">${_esc(l)}</span>`;
+              })
+              .join("")}</div>`
+          : "";
+
         const timeLine = until
           ? `<div class="wl-elevator-detail-time">${_esc(
               `${this._t("elevator_until")} ${until}`,
@@ -902,14 +968,33 @@ class WienerLinienAustriaCard extends HTMLElement {
         const reasonLine = reason
           ? `<div class="wl-elevator-detail-reason">${_esc(reason)}</div>`
           : "";
+        const hasDetail = Boolean(reasonLine || timeLine);
+        const expanded = this._expandedElevator.has(e.name);
+        const chevron = hasDetail
+          ? `<ha-icon class="wl-elevator-detail-chevron" icon="mdi:chevron-down"></ha-icon>`
+          : "";
+        const expandBlock = hasDetail
+          ? `<div class="wl-elevator-detail-expand">${reasonLine}${timeLine}</div>`
+          : "";
+        const classes = [
+          "wl-elevator-detail",
+          expanded ? "wl-elevator-expanded" : "",
+          hasDetail ? "" : "wl-elevator-nodetail",
+        ]
+          .filter(Boolean)
+          .join(" ");
+
         return `
-          <div class="wl-elevator-detail">
+          <div class="${classes}" data-elevator-name="${_esc(e.name || "")}">
             <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
             <div class="wl-elevator-detail-body">
-              <div class="wl-elevator-detail-location">${_esc(location)}</div>
-              ${reasonLine}
-              ${timeLine}
+              <div class="wl-elevator-summary">
+                ${linesHtml}
+                <div class="wl-elevator-detail-location">${_esc(location)}</div>
+              </div>
+              ${expandBlock}
             </div>
+            ${chevron}
           </div>
         `;
       })
@@ -1059,15 +1144,22 @@ class WienerLinienAustriaCard extends HTMLElement {
       typeof attrs.diva === "number" ? attrs.diva : Number(attrs.diva) || 0;
     const deps = Array.isArray(attrs.departures) ? attrs.departures : [];
     const anyLine = this._randomFrom(deps)?.line || "";
+    const towards = this._randomFrom(deps)?.towards || "Unbekannt";
+    const now = new Date();
+    const startIso = new Date(now.getTime() - 45 * 60 * 1000).toISOString();
+    const endIso = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
     this._debugElevator.push({
       __debug_entity: pick.entity,
       name: `DEBUG-E-${Date.now()}`,
       station,
-      description: `Testaufzug bei ${station}`,
-      reason: "Debug-Testmeldung (Dev-Mode)",
+      description: `${anyLine || "Station"} Bahnsteig Richtung ${towards} — Ausgang ${station}`,
+      reason:
+        "AUFZUGSERNEUERUNG Voraussichtlich bis Ende Mai außer Betrieb! (Dev-Mode-Test)",
       status: "außer Betrieb",
       related_lines: anyLine ? [anyLine] : [],
       related_stops: diva ? [diva] : [],
+      time_start: startIso,
+      time_end: endIso,
     });
     this._render();
   }
