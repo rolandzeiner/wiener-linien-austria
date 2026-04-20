@@ -39,6 +39,8 @@ const TRANSLATIONS = {
     elevator_label: "Aufzug außer Betrieb",
     elevator_until: "Bis",
     open_in_maps: "In Karte öffnen",
+    delay_singular: "1 Minute verspätet",
+    delay_plural: "{n} Minuten verspätet",
     devmode_title: "DEV",
     devmode_traffic_btn: "Test Störung",
     devmode_elevator_btn: "Test Aufzug",
@@ -87,6 +89,8 @@ const TRANSLATIONS = {
     elevator_label: "Elevator out of service",
     elevator_until: "Until",
     open_in_maps: "Open in maps",
+    delay_singular: "1 minute late",
+    delay_plural: "{n} minutes late",
     devmode_title: "DEV",
     devmode_traffic_btn: "Test disruption",
     devmode_elevator_btn: "Test elevator",
@@ -539,15 +543,10 @@ const CARD_STYLE = `
     text-align: right;
   }
   .wl-delay {
-    display: inline-block;
+    color: var(--warning-color, #ffa000);
+    font-size: 0.88em;
+    font-weight: 500;
     margin-left: 4px;
-    padding: 0 4px;
-    border-radius: 3px;
-    font-size: 0.75em;
-    font-weight: 700;
-    background: var(--warning-color, #ffa000);
-    color: #fff;
-    vertical-align: middle;
   }
   .wl-attr {
     margin-top: 10px;
@@ -676,6 +675,13 @@ class WienerLinienAustriaCard extends HTMLElement {
       if (Math.abs(deltaMin) >= 1) delay = deltaMin;
     }
     return { cd, delay };
+  }
+
+  _delayText(delay) {
+    // Only render positive delays — "early" isn't "delayed", it's noise.
+    if (!Number.isFinite(delay) || delay <= 0) return "";
+    if (delay === 1) return this._t("delay_singular");
+    return this._t("delay_plural").replace("{n}", String(delay));
   }
 
   getCardSize() {
@@ -1120,10 +1126,13 @@ class WienerLinienAustriaCard extends HTMLElement {
     const { cd, delay } = this._liveCountdown(d);
     const cdLabel =
       cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
-    const delayHtml =
-      delay !== null
-        ? `<span class="wl-delay">${delay > 0 ? "+" : ""}${delay}</span>`
-        : "";
+    // Only surface delays when the train is actually running late; early
+    // departures are noise. Rendered inline after the destination as
+    // muted warning text (e.g. "Alaudagasse · 3 Minuten verspätet").
+    const delayText = this._delayText(delay);
+    const towardsHtml = delayText
+      ? `${towards} <span class="wl-delay">· ${_esc(delayText)}</span>`
+      : towards;
 
     const flags = [];
     if (d.traffic_jam) {
@@ -1147,9 +1156,9 @@ class WienerLinienAustriaCard extends HTMLElement {
     return `
       <div class="wl-row">
         <div class="wl-line" style="background:${color}">${_esc(line)}</div>
-        <div class="wl-towards">${towards}</div>
+        <div class="wl-towards">${towardsHtml}</div>
         ${flagsHtml}
-        <div class="wl-countdown">${_esc(cdLabel)}${delayHtml}</div>
+        <div class="wl-countdown">${_esc(cdLabel)}</div>
       </div>
     `;
   }
