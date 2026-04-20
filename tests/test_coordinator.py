@@ -315,14 +315,20 @@ async def test_config_entry_not_ready_on_first_refresh_failure(
 ) -> None:
     """If the first fetch fails, the config entry ends up in SETUP_RETRY state.
 
-    This is the `test-before-setup` Platinum rule.
+    This is the `test-before-setup` Platinum rule. Uses the real UpdateFailed
+    type that production code raises, so the test exercises the actual path
+    HA takes — not just "any exception becomes SETUP_RETRY".
     """
     entry = _make_entry()
     entry.add_to_hass(hass)
 
     with patch(
         "custom_components.wiener_linien_austria.coordinator.WienerLinienAustriaCoordinator._async_update_data",
-        side_effect=Exception("connection refused"),
+        side_effect=UpdateFailed(
+            translation_domain=DOMAIN,
+            translation_key="api_timeout",
+            translation_placeholders={"seconds": "30"},
+        ),
     ):
         await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -509,3 +515,68 @@ async def test_scan_interval_honours_config(hass: HomeAssistant) -> None:
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     assert coordinator.update_interval == timedelta(seconds=120)
+
+
+# ---------------------------------------------------------------------------
+# async_setup: lat/lon population from the static catalogue
+# ---------------------------------------------------------------------------
+
+
+async def test_async_setup_populates_coordinates(hass: HomeAssistant) -> None:
+    """Coordinator pulls the station's lat/lon from the cached catalogue."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    await coordinator.async_setup()
+    # Sample catalogue in conftest carries Stephansplatz @ 48.2085, 16.3726.
+    assert coordinator.latitude == 48.2085
+    assert coordinator.longitude == 16.3726
+
+
+async def test_async_setup_no_coords_when_catalogue_load_fails(
+    hass: HomeAssistant,
+) -> None:
+    """Failure loading the catalogue leaves lat/lon as None, not fatal."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_load_catalogue",
+        new_callable=AsyncMock,
+        side_effect=RuntimeError("upstream unreachable"),
+    ):
+        await coordinator.async_setup()
+
+    assert coordinator.latitude is None
+    assert coordinator.longitude is None
+
+
+async def test_async_setup_no_coords_when_diva_not_in_catalogue(
+    hass: HomeAssistant,
+) -> None:
+    """Catalogue load succeeds but the DIVA is absent → coords stay None."""
+    entry = _make_entry({CONF_DIVA: 99999999})
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    await coordinator.async_setup()
+    assert coordinator.latitude is None
+    assert coordinator.longitude is None
+
+
+# ---------------------------------------------------------------------------
+# Parser against the bus/tram fixture — guards ptBusCity + platform handling
+# ---------------------------------------------------------------------------
+
+
+def test_parse_monitor_body_handles_bus_fixture(tram_fixture) -> None:
+    """Line 4A (ptBusCity) round-trips type + platform + barrier_free."""
+    result = _parse_monitor_body(tram_fixture, None, None)
+    assert result.departures, "tram fixture should yield at least one departure"
+    first = result.departures[0]
+    assert first.line == "4A"
+    assert first.type == "ptBusCity"
+    assert first.platform == "1"
+    assert first.barrier_free is True
+    # All parsed departures are the same line/direction in this fixture.
+    assert all(d.line == "4A" and d.direction == "H" for d in result.departures)
