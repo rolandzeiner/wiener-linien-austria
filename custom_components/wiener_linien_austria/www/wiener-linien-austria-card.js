@@ -51,6 +51,7 @@ const TRANSLATIONS = {
       show_accessibility: "Barrierefrei-Symbol anzeigen",
       show_traffic_info: "Störungen anzeigen",
       show_elevator_info: "Aufzugsinfo anzeigen",
+      hide_attribution: "Datenquelle ausblenden",
       no_sensors_available:
         "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
       no_lines_available:
@@ -90,6 +91,7 @@ const TRANSLATIONS = {
       show_accessibility: "Show step-free icon",
       show_traffic_info: "Show disruption alerts",
       show_elevator_info: "Show elevator outages",
+      hide_attribution: "Hide data source",
       no_sensors_available:
         "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
       no_lines_available:
@@ -175,6 +177,10 @@ function _normaliseConfig(config) {
   // so opt-in would hide useful info without saving screen real estate.
   out.show_traffic_info = out.show_traffic_info !== false;
   out.show_elevator_info = out.show_elevator_info !== false;
+  // Attribution is shown by default. The sensor's `attribution` attribute
+  // still carries the canonical CC-BY string regardless of this flag —
+  // hiding only affects the card footer on a private dashboard.
+  out.hide_attribution = out.hide_attribution === true;
 
   return out;
 }
@@ -462,6 +468,9 @@ class WienerLinienAustriaCard extends HTMLElement {
           )
           .join("")
       : this._renderEmpty();
+    const attrHtml = this._config.hide_attribution
+      ? ""
+      : `<div class="wl-attr">${_esc(attribution)}</div>`;
 
     this.innerHTML = `
       <ha-card>
@@ -470,7 +479,7 @@ class WienerLinienAustriaCard extends HTMLElement {
           ${this._versionMismatch ? this._renderBanner() : ""}
           ${trafficHtml}
           ${body}
-          <div class="wl-attr">${_esc(attribution)}</div>
+          ${attrHtml}
         </div>
       </ha-card>
     `;
@@ -908,6 +917,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     const showA11y = this._config.show_accessibility === true;
     const showTraffic = this._config.show_traffic_info !== false;
     const showElevator = this._config.show_elevator_info !== false;
+    const hideAttr = this._config.hide_attribution === true;
 
     // ----- Stop chips -----
     const stopChips = available.length
@@ -1053,6 +1063,14 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
               id="wl-elevator-toggle"
               data-field="show_elevator_info"
               ${showElevator ? "checked" : ""}
+            ></ha-switch>
+          </div>
+          <div class="toggle-row">
+            <label for="wl-hide-attr-toggle">${_esc(this._et("hide_attribution"))}</label>
+            <ha-switch
+              id="wl-hide-attr-toggle"
+              data-field="hide_attribution"
+              ${hideAttr ? "checked" : ""}
             ></ha-switch>
           </div>
         </div>
