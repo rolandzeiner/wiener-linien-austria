@@ -48,6 +48,7 @@ class Departure:
     realtime: bool
     barrier_free: bool
     traffic_jam: bool
+    platform: str | None = None  # "1" / "2" / "A" / "B" — Gleis as published
 
     def to_dict(self) -> dict[str, Any]:
         """Render as a plain dict for HA attributes / diagnostics."""
@@ -62,6 +63,7 @@ class Departure:
             "realtime": self.realtime,
             "barrier_free": self.barrier_free,
             "traffic_jam": self.traffic_jam,
+            "platform": self.platform,
         }
 
 
@@ -324,6 +326,12 @@ def _parse_monitor_body(
             barrier_free = bool(line.get("barrierFree"))
             realtime = bool(line.get("realtimeSupported"))
             traffic_jam = bool(line.get("trafficjam"))
+            platform_raw = line.get("platform")
+            platform = (
+                str(platform_raw).strip()
+                if platform_raw is not None and str(platform_raw).strip()
+                else None
+            )
 
             if selected is not None and _line_key(line_name, direction, towards) not in selected:
                 continue
@@ -345,6 +353,7 @@ def _parse_monitor_body(
                         realtime=realtime,
                         barrier_free=barrier_free,
                         traffic_jam=traffic_jam,
+                        platform=platform,
                     )
                 )
 
