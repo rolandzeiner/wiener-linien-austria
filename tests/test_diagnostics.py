@@ -13,6 +13,7 @@ from custom_components.wiener_linien_austria.const import (
     CONF_STOP_NAME,
     DOMAIN,
 )
+from custom_components.wiener_linien_austria.coordinator import _parse_monitor_body
 from custom_components.wiener_linien_austria.diagnostics import (
     async_get_config_entry_diagnostics,
 )
@@ -27,9 +28,16 @@ BASE_DATA = {
 
 
 async def test_diagnostics_includes_attribution_and_state(
-    hass: HomeAssistant, mock_fetch
+    hass: HomeAssistant, mock_fetch, monitor_fixture
 ) -> None:
-    """Diagnostics expose attribution, RBL list, error code, and counts."""
+    """Diagnostics expose attribution, RBL list, error code, and exact count."""
+    # Derive the expected departure count from the fixture itself so the test
+    # stays honest if the captured fixture is ever refreshed.
+    expected_count = len(
+        _parse_monitor_body(monitor_fixture, None, None).departures
+    )
+    assert expected_count > 0, "fixture must have departures for the test to mean anything"
+
     entry = MockConfigEntry(
         domain=DOMAIN, data=BASE_DATA, options={}, title="Stephansplatz"
     )
@@ -46,4 +54,8 @@ async def test_diagnostics_includes_attribution_and_state(
     coord = diag["coordinator"]
     assert coord["rbls"] == [4111, 4118]
     assert coord["last_update_success"] is True
-    assert coord["departure_count"] >= 0
+    # Exact count — guards against a broken diagnostics that always returns 0.
+    # Note: server_time and last_error_code come from inside the real fetch
+    # method; mock_fetch patches it out so those stay None in this test. They
+    # are covered separately in test_coordinator (test_fetch_success_real_chain).
+    assert coord["departure_count"] == expected_count
