@@ -33,6 +33,8 @@ const TRANSLATIONS = {
     dir_h: "H",
     dir_r: "R",
     dir_both: "Beide",
+    traffic_label: "Störung",
+    elevator_label: "Aufzug außer Betrieb",
     editor: {
       section_sensors: "Haltestellen",
       sensors_hint: "Eine oder mehrere Haltestellen auswählen",
@@ -47,6 +49,8 @@ const TRANSLATIONS = {
       section_display: "Anzeige",
       max_departures: "Anzahl Abfahrten pro Haltestelle",
       show_accessibility: "Barrierefrei-Symbol anzeigen",
+      show_traffic_info: "Störungen anzeigen",
+      show_elevator_info: "Aufzugsinfo anzeigen",
       no_sensors_available:
         "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
       no_lines_available:
@@ -68,6 +72,8 @@ const TRANSLATIONS = {
     dir_h: "H",
     dir_r: "R",
     dir_both: "Both",
+    traffic_label: "Disruption",
+    elevator_label: "Elevator out of service",
     editor: {
       section_sensors: "Stops",
       sensors_hint: "Pick one or more stops to display",
@@ -82,6 +88,8 @@ const TRANSLATIONS = {
       section_display: "Display",
       max_departures: "Departures per stop",
       show_accessibility: "Show step-free icon",
+      show_traffic_info: "Show disruption alerts",
+      show_elevator_info: "Show elevator outages",
       no_sensors_available:
         "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
       no_lines_available:
@@ -163,6 +171,10 @@ function _normaliseConfig(config) {
   }
 
   out.show_accessibility = out.show_accessibility === true;
+  // Alert toggles default ON — if nothing is active, nothing renders anyway,
+  // so opt-in would hide useful info without saving screen real estate.
+  out.show_traffic_info = out.show_traffic_info !== false;
+  out.show_elevator_info = out.show_elevator_info !== false;
 
   return out;
 }
@@ -224,6 +236,43 @@ const CARD_STYLE = `
     font-size: 1.05em;
     font-weight: 600;
     margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .wl-header ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--warning-color, #ffa000);
+    cursor: help;
+  }
+  .wl-traffic-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .wl-traffic {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--warning-color, #ffa000) 14%, transparent);
+    border-left: 3px solid var(--warning-color, #ffa000);
+    font-size: 0.85em;
+  }
+  .wl-traffic ha-icon {
+    --mdc-icon-size: 18px;
+    color: var(--warning-color, #ffa000);
+    flex-shrink: 0;
+  }
+  .wl-traffic-body .wl-traffic-title {
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .wl-traffic-body .wl-traffic-desc {
+    color: var(--secondary-text-color);
+    line-height: 1.35;
   }
   .wl-empty {
     padding: 18px 0;
@@ -369,7 +418,13 @@ class WienerLinienAustriaCard extends HTMLElement {
             }|${d.barrier_free ? 1 : 0}`,
         )
         .join(";");
-      return `${s.entity}@${a.server_time || ""}#${depKey}`;
+      const trafficKey = (a.traffic_info || [])
+        .map((t) => `${t.name}:${t.status}`)
+        .join(",");
+      const elevatorKey = (a.elevator_info || [])
+        .map((e) => `${e.name}:${e.status}`)
+        .join(",");
+      return `${s.entity}@${a.server_time || ""}#${depKey}^T${trafficKey}^E${elevatorKey}`;
     });
     return `${this._versionMismatch || ""}||${cfgKey}||${stopKeys.join("|||")}`;
   }
@@ -381,6 +436,8 @@ class WienerLinienAustriaCard extends HTMLElement {
     const max = this._config.max_departures;
     const overrides = this._config.line_colors || {};
     const showA11y = this._config.show_accessibility;
+    const showTraffic = this._config.show_traffic_info;
+    const showElevator = this._config.show_elevator_info;
 
     const attribution =
       stops
@@ -388,8 +445,13 @@ class WienerLinienAustriaCard extends HTMLElement {
         .find((v) => typeof v === "string" && v.length > 0) ||
       "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
 
+    const trafficHtml = showTraffic ? this._renderTrafficBanner(stops) : "";
     const body = stops.length
-      ? stops.map((s) => this._renderStop(s, max, overrides, showA11y)).join("")
+      ? stops
+          .map((s) =>
+            this._renderStop(s, max, overrides, showA11y, showElevator),
+          )
+          .join("")
       : this._renderEmpty();
 
     this.innerHTML = `
@@ -397,6 +459,7 @@ class WienerLinienAustriaCard extends HTMLElement {
         <style>${CARD_STYLE}</style>
         <div class="wl-card">
           ${this._versionMismatch ? this._renderBanner() : ""}
+          ${trafficHtml}
           ${body}
           <div class="wl-attr">${_esc(attribution)}</div>
         </div>
@@ -409,19 +472,73 @@ class WienerLinienAustriaCard extends HTMLElement {
     }
   }
 
+  _renderTrafficBanner(stops) {
+    // Deduplicate by traffic-info name across all selected stops.
+    const seen = new Set();
+    const items = [];
+    for (const s of stops) {
+      const tis = this._hass.states[s.entity]?.attributes?.traffic_info || [];
+      for (const t of tis) {
+        if (!t || seen.has(t.name)) continue;
+        seen.add(t.name);
+        items.push(t);
+      }
+    }
+    if (!items.length) return "";
+    return `
+      <div class="wl-traffic-list">
+        ${items.map((t) => this._renderTrafficItem(t)).join("")}
+      </div>
+    `;
+  }
+
+  _renderTrafficItem(t) {
+    const title = _esc(t.title || this._t("traffic_label"));
+    const desc = _esc(t.description || "");
+    return `
+      <div class="wl-traffic">
+        <ha-icon icon="mdi:alert-octagon"></ha-icon>
+        <div class="wl-traffic-body">
+          <div class="wl-traffic-title">${title}</div>
+          ${desc ? `<div class="wl-traffic-desc">${desc}</div>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
   _renderEmpty() {
     const available = _findWienerLinienEntities(this._hass);
     const key = available.length ? "no_entities_picked" : "no_entities_available";
     return `<div class="wl-empty">${_esc(this._t(key))}</div>`;
   }
 
-  _renderStop(stopCfg, max, overrides, showA11y) {
+  _renderStop(stopCfg, max, overrides, showA11y, showElevator) {
     const state = this._hass.states[stopCfg.entity];
     const attrs = state?.attributes ?? {};
     const title = attrs.stop_name || attrs.friendly_name || stopCfg.entity;
     const allDepartures = Array.isArray(attrs.departures) ? attrs.departures : [];
     const filtered = _filterDepartures(allDepartures, stopCfg);
     const rows = filtered.slice(0, max);
+    const elevatorInfos = Array.isArray(attrs.elevator_info)
+      ? attrs.elevator_info
+      : [];
+
+    let elevatorBadge = "";
+    if (showElevator && elevatorInfos.length) {
+      const tooltip = elevatorInfos
+        .map((e) => {
+          const bits = [
+            e.station,
+            e.description,
+            e.reason,
+          ].filter((x) => typeof x === "string" && x.length > 0);
+          return bits.join(" — ");
+        })
+        .join("\n");
+      elevatorBadge = `<ha-icon icon="mdi:elevator-up" title="${_esc(
+        `${this._t("elevator_label")}:\n${tooltip}`,
+      )}"></ha-icon>`;
+    }
 
     let rowsHtml;
     if (rows.length) {
@@ -437,7 +554,10 @@ class WienerLinienAustriaCard extends HTMLElement {
 
     return `
       <div class="wl-stop">
-        <div class="wl-header">${_esc(title)}</div>
+        <div class="wl-header">
+          <span>${_esc(title)}</span>
+          ${elevatorBadge}
+        </div>
         ${rowsHtml}
       </div>
     `;
@@ -777,6 +897,8 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     const max = this._config.max_departures ?? 6;
     const overrides = this._config.line_colors || {};
     const showA11y = this._config.show_accessibility === true;
+    const showTraffic = this._config.show_traffic_info !== false;
+    const showElevator = this._config.show_elevator_info !== false;
 
     // ----- Stop chips -----
     const stopChips = available.length
@@ -915,6 +1037,24 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
               type="checkbox"
               data-field="show_accessibility"
               ${showA11y ? "checked" : ""}
+            />
+          </div>
+          <div class="toggle-row">
+            <label for="wl-traffic-toggle">${_esc(this._et("show_traffic_info"))}</label>
+            <input
+              id="wl-traffic-toggle"
+              type="checkbox"
+              data-field="show_traffic_info"
+              ${showTraffic ? "checked" : ""}
+            />
+          </div>
+          <div class="toggle-row">
+            <label for="wl-elevator-toggle">${_esc(this._et("show_elevator_info"))}</label>
+            <input
+              id="wl-elevator-toggle"
+              type="checkbox"
+              data-field="show_elevator_info"
+              ${showElevator ? "checked" : ""}
             />
           </div>
         </div>
