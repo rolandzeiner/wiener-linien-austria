@@ -35,6 +35,10 @@ const TRANSLATIONS = {
     dir_both: "Beide",
     traffic_label: "Störung",
     elevator_label: "Aufzug außer Betrieb",
+    devmode_title: "DEV",
+    devmode_traffic_btn: "Test Störung",
+    devmode_elevator_btn: "Test Aufzug",
+    devmode_clear_btn: "Löschen",
     editor: {
       section_sensors: "Haltestellen",
       sensors_hint: "Eine oder mehrere Haltestellen auswählen",
@@ -75,6 +79,10 @@ const TRANSLATIONS = {
     dir_both: "Both",
     traffic_label: "Disruption",
     elevator_label: "Elevator out of service",
+    devmode_title: "DEV",
+    devmode_traffic_btn: "Test disruption",
+    devmode_elevator_btn: "Test elevator",
+    devmode_clear_btn: "Clear",
     editor: {
       section_sensors: "Stops",
       sensors_hint: "Pick one or more stops to display",
@@ -339,6 +347,36 @@ const CARD_STYLE = `
     color: var(--secondary-text-color);
     text-align: center;
   }
+  .wl-devmode {
+    margin-top: 10px;
+    padding: 6px 8px;
+    border: 1px dashed var(--secondary-text-color, rgba(0,0,0,0.3));
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75em;
+    color: var(--secondary-text-color);
+  }
+  .wl-devmode-label {
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .wl-devmode button {
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--divider-color, rgba(0,0,0,0.2));
+    background: transparent;
+    color: var(--primary-text-color);
+    font-size: 0.95em;
+    cursor: pointer;
+  }
+  .wl-devmode button:hover { opacity: 0.8; }
+  .wl-devmode .wl-devmode-clear {
+    margin-left: auto;
+    color: var(--secondary-text-color);
+  }
 `;
 
 class WienerLinienAustriaCard extends HTMLElement {
@@ -346,6 +384,13 @@ class WienerLinienAustriaCard extends HTMLElement {
   _hass = null;
   _versionMismatch = null;
   _lastFingerprint = null;
+
+  // Dev-mode synthetic alerts. Populated by the dev-mode buttons that only
+  // appear on rpi25 (or with ?wl_debug=1) — lets us visually test the
+  // traffic-banner and elevator-badge rendering without waiting for the
+  // real upstream to publish something that affects our tracked stops.
+  _debugTraffic = [];
+  _debugElevator = [];
 
   setConfig(config) {
     this._config = _normaliseConfig(config);
@@ -480,6 +525,7 @@ class WienerLinienAustriaCard extends HTMLElement {
           ${trafficHtml}
           ${body}
           ${attrHtml}
+          ${this._renderDevModePanel()}
         </div>
       </ha-card>
     `;
@@ -488,6 +534,15 @@ class WienerLinienAustriaCard extends HTMLElement {
     if (reloadBtn) {
       reloadBtn.addEventListener("click", () => this._reload());
     }
+
+    this.querySelectorAll("[data-dev-action]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const action = btn.dataset.devAction;
+        if (action === "traffic") this._devTestTraffic();
+        else if (action === "elevator") this._devTestElevator();
+        else if (action === "clear") this._devClear();
+      });
+    });
   }
 
   _renderTrafficBanner(stops) {
@@ -501,6 +556,12 @@ class WienerLinienAustriaCard extends HTMLElement {
         seen.add(t.name);
         items.push(t);
       }
+    }
+    // Dev-mode synthetic alerts get appended after real ones.
+    for (const t of this._debugTraffic) {
+      if (!t || seen.has(t.name)) continue;
+      seen.add(t.name);
+      items.push(t);
     }
     if (!items.length) return "";
     return `
@@ -537,9 +598,13 @@ class WienerLinienAustriaCard extends HTMLElement {
     const allDepartures = Array.isArray(attrs.departures) ? attrs.departures : [];
     const filtered = _filterDepartures(allDepartures, stopCfg);
     const rows = filtered.slice(0, max);
-    const elevatorInfos = Array.isArray(attrs.elevator_info)
+    const realElevator = Array.isArray(attrs.elevator_info)
       ? attrs.elevator_info
       : [];
+    const debugElevator = this._debugElevator.filter(
+      (e) => e && e.__debug_entity === stopCfg.entity,
+    );
+    const elevatorInfos = [...realElevator, ...debugElevator];
 
     let elevatorBadge = "";
     if (showElevator && elevatorInfos.length) {
@@ -638,6 +703,98 @@ class WienerLinienAustriaCard extends HTMLElement {
       /* best-effort cache wipe */
     }
     window.location.reload();
+  }
+
+  // --- Dev-mode helpers --------------------------------------------------
+
+  _isDevMode() {
+    // Baked detection for the rpi25 dev box. `?wl_debug=1` is the escape
+    // hatch for testing from other origins (Nabu Casa, tailscale, etc.).
+    try {
+      const host = window.location.hostname || "";
+      if (host === "rpi25" || host.startsWith("rpi25.")) return true;
+      const search = window.location.search || "";
+      if (search.includes("wl_debug=1")) return true;
+    } catch (_) {
+      /* SSR / restricted ctx — default to off */
+    }
+    return false;
+  }
+
+  _randomFrom(arr) {
+    if (!Array.isArray(arr) || arr.length === 0) return null;
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  _devTestTraffic() {
+    // Pick a random line + direction from any selected stop's live board.
+    const stops = this._resolveEntities();
+    const pool = [];
+    for (const s of stops) {
+      const deps = this._hass.states[s.entity]?.attributes?.departures || [];
+      for (const d of deps) {
+        if (d && d.line && d.towards) pool.push(d);
+      }
+    }
+    const pick = this._randomFrom(pool);
+    const line = pick?.line || "U?";
+    const towards = pick?.towards || "Unbekannt";
+    this._debugTraffic.push({
+      name: `DEBUG-T-${Date.now()}`,
+      title: `${line}: Testmeldung`,
+      description: `Debug-Eintrag für Linie ${line} Richtung ${towards}.`,
+      related_lines: [line],
+      status: "active",
+    });
+    this._render();
+  }
+
+  _devTestElevator() {
+    // Pick a random selected stop and attach a fake elevator outage to it.
+    const stops = this._resolveEntities();
+    const pick = this._randomFrom(stops);
+    if (!pick) return;
+    const attrs = this._hass.states[pick.entity]?.attributes || {};
+    const station = attrs.stop_name || pick.entity;
+    const diva =
+      typeof attrs.diva === "number" ? attrs.diva : Number(attrs.diva) || 0;
+    const deps = Array.isArray(attrs.departures) ? attrs.departures : [];
+    const anyLine = this._randomFrom(deps)?.line || "";
+    this._debugElevator.push({
+      __debug_entity: pick.entity,
+      name: `DEBUG-E-${Date.now()}`,
+      station,
+      description: `Testaufzug bei ${station}`,
+      reason: "Debug-Testmeldung (Dev-Mode)",
+      status: "außer Betrieb",
+      related_lines: anyLine ? [anyLine] : [],
+      related_stops: diva ? [diva] : [],
+    });
+    this._render();
+  }
+
+  _devClear() {
+    this._debugTraffic = [];
+    this._debugElevator = [];
+    this._render();
+  }
+
+  _renderDevModePanel() {
+    if (!this._isDevMode()) return "";
+    return `
+      <div class="wl-devmode">
+        <span class="wl-devmode-label">${_esc(this._t("devmode_title"))}</span>
+        <button type="button" data-dev-action="traffic">${_esc(
+          this._t("devmode_traffic_btn"),
+        )}</button>
+        <button type="button" data-dev-action="elevator">${_esc(
+          this._t("devmode_elevator_btn"),
+        )}</button>
+        <button type="button" class="wl-devmode-clear" data-dev-action="clear">${_esc(
+          this._t("devmode_clear_btn"),
+        )}</button>
+      </div>
+    `;
   }
 }
 
