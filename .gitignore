@@ -13,6 +13,9 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
+# Claude Code
+.claude/
+
 # Logs / pip
 *.log
 pip-log.txt
