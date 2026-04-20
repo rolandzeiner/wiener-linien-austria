@@ -239,11 +239,6 @@ If you build a Lovelace card or other user-facing UI on top of this integration,
 1. **Settings → Devices & Services** → find Wiener Linien Austria → ⋯ → **Delete**.
 2. Remove `custom_components/wiener_linien_austria/` from the HA config (manual installs only; HACS removes it automatically).
 
-## Contributors
-
-- **Roland Zeiner** — maintainer ([@rolandzeiner](https://github.com/rolandzeiner))
-- **[Claude](https://claude.com/claude-code)** (Anthropic) — pair-programming partner via Claude Code; helped shape the Platinum scaffolding, config-flow UX, and the Wiener Linien OGD client
-
 ## License
 
 MIT — see [LICENSE](LICENSE). The integration code is MIT; the Wiener Linien data flowing through it is CC BY 4.0.
