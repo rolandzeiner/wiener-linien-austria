@@ -1,7 +1,7 @@
 {
   "domain": "wiener_linien_austria",
   "name": "Wiener Linien Austria",
-  "after_dependencies": ["http"],
+  "after_dependencies": ["frontend", "http", "lovelace"],
   "codeowners": ["@rolandzeiner"],
   "config_flow": true,
   "dependencies": [],
