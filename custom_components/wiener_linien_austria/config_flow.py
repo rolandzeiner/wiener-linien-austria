@@ -50,6 +50,7 @@ from .const import (
     MAX_POLL_SECONDS,
     MIN_POLL_SECONDS,
     MONITOR_ENDPOINT,
+    USER_AGENT,
 )
 from .static import Station, async_load_catalogue
 
@@ -85,7 +86,10 @@ async def _probe_monitor_lines(
     params = [("stopId", str(r)) for r in rbls]
     try:
         resp = await session.get(
-            url, params=params, timeout=aiohttp.ClientTimeout(total=10)
+            url,
+            params=params,
+            headers={"User-Agent": USER_AGENT},
+            timeout=aiohttp.ClientTimeout(total=10),
         )
         resp.raise_for_status()
         body = await resp.json()

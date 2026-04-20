@@ -27,7 +27,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, STATIC_FILES
+from .const import DOMAIN, STATIC_FILES, USER_AGENT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,7 +139,9 @@ async def _download_text(
     session: aiohttp.ClientSession, url: str, timeout: aiohttp.ClientTimeout
 ) -> str:
     """GET a CSV URL and return its UTF-8 text body."""
-    resp = await session.get(url, timeout=timeout)
+    resp = await session.get(
+        url, headers={"User-Agent": USER_AGENT}, timeout=timeout
+    )
     resp.raise_for_status()
     return await resp.text()
 
