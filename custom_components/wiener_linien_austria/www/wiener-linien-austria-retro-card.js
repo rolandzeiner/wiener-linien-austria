@@ -234,6 +234,11 @@ const RETRO_STYLE = `
     --mdc-icon-size: 1em;
     color: inherit;
     filter: drop-shadow(0 0 4px rgba(255, 199, 0, 0.7));
+    /* SVGs have no font metrics so align-items: baseline on the parent
+       flex lines up the icon's bottom edge — which reads as "too high"
+       next to text. Nudge down ~1/6 em so the icon's visual centre
+       sits on the text midline. */
+    transform: translateY(0.18em);
   }
   .retro-cd {
     font-variant-numeric: tabular-nums;
