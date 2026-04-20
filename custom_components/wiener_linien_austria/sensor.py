@@ -128,6 +128,8 @@ class WienerLinienStopSensor(
             "attribution": ATTRIBUTION,
             "diva": diva,
             "stop_name": stop_name,
+            "latitude": self.coordinator.latitude,
+            "longitude": self.coordinator.longitude,
             "server_time": data.server_time if data is not None else None,
             "departures": capped,
             "next_by_line": next_by_line,

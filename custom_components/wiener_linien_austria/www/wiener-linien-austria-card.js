@@ -1008,7 +1008,7 @@ class WienerLinienAustriaCard extends HTMLElement {
         ? this._renderElevatorDetails(elevatorInfos)
         : "";
 
-    const mapUrl = this._stopMapUrl(title);
+    const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
     const headerTitleHtml = mapUrl
       ? `<a class="wl-stop-link"
            href="${mapUrl}"
@@ -1031,12 +1031,16 @@ class WienerLinienAustriaCard extends HTMLElement {
     `;
   }
 
-  _stopMapUrl(stopName) {
+  _stopMapUrl(stopName, lat, lon) {
+    // Prefer lat/lon — text search on short names like "Ottakring"
+    // resolves to the district centroid, not the station itself.
+    // The static catalogue ships coordinates per DIVA so we use them
+    // whenever available. Fall back to a name search when a lookup
+    // didn't populate coords yet.
+    if (typeof lat === "number" && typeof lon === "number") {
+      return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+    }
     if (!stopName || typeof stopName !== "string") return null;
-    // Google Maps search URL — opens the stop on map/mobile apps,
-    // includes transit info from Google's ÖPNV feed. Safer than
-    // linking into Wiener Linien's own site since their URL scheme
-    // isn't documented for stop-specific deep links.
     const q = encodeURIComponent(`${stopName}, Wien`);
     return `https://www.google.com/maps/search/?api=1&query=${q}`;
   }
