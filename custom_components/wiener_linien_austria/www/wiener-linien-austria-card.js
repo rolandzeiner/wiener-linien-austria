@@ -1018,12 +1018,6 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
         </div>
 
         <div class="editor-section">
-          <div class="section-header">${_esc(this._et("section_colors"))}</div>
-          <div class="editor-hint">${_esc(this._et("colors_hint"))}</div>
-          ${colorRows}
-        </div>
-
-        <div class="editor-section">
           <div class="section-header">${_esc(this._et("section_display"))}</div>
           <div class="slider-row">
             <span class="slider-label">${_esc(this._et("max_departures"))}</span>
@@ -1039,31 +1033,34 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
           </div>
           <div class="toggle-row">
             <label for="wl-a11y-toggle">${_esc(this._et("show_accessibility"))}</label>
-            <input
+            <ha-switch
               id="wl-a11y-toggle"
-              type="checkbox"
               data-field="show_accessibility"
               ${showA11y ? "checked" : ""}
-            />
+            ></ha-switch>
           </div>
           <div class="toggle-row">
             <label for="wl-traffic-toggle">${_esc(this._et("show_traffic_info"))}</label>
-            <input
+            <ha-switch
               id="wl-traffic-toggle"
-              type="checkbox"
               data-field="show_traffic_info"
               ${showTraffic ? "checked" : ""}
-            />
+            ></ha-switch>
           </div>
           <div class="toggle-row">
             <label for="wl-elevator-toggle">${_esc(this._et("show_elevator_info"))}</label>
-            <input
+            <ha-switch
               id="wl-elevator-toggle"
-              type="checkbox"
               data-field="show_elevator_info"
               ${showElevator ? "checked" : ""}
-            />
+            ></ha-switch>
           </div>
+        </div>
+
+        <div class="editor-section">
+          <div class="section-header">${_esc(this._et("section_colors"))}</div>
+          <div class="editor-hint">${_esc(this._et("colors_hint"))}</div>
+          ${colorRows}
         </div>
       </div>
     `;
@@ -1126,9 +1123,9 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
       });
     });
 
-    // Accessibility toggle
-    this.querySelectorAll('input[type="checkbox"][data-field]').forEach((cb) => {
-      cb.addEventListener("change", (e) => {
+    // Display-section switches (accessibility / traffic / elevator)
+    this.querySelectorAll("ha-switch[data-field]").forEach((sw) => {
+      sw.addEventListener("change", (e) => {
         const field = e.target.dataset.field;
         this._config = { ...this._config, [field]: e.target.checked };
         this._fireChanged();
