@@ -59,6 +59,18 @@ def test_parse_monitor_body_sorts_by_countdown(monitor_fixture) -> None:
     assert result.server_time == "2026-04-20T14:00:00+0200"
 
 
+def test_parse_monitor_body_surfaces_platform(monitor_fixture) -> None:
+    """The `platform` field (Gleis, e.g. "1" / "2") round-trips through Departure."""
+    result = _parse_monitor_body(monitor_fixture, None, None)
+    # At least one departure in the fixture has a platform — capture it and
+    # confirm it also appears in the dict form surfaced to sensor attributes.
+    with_platform = [d for d in result.departures if d.platform]
+    assert with_platform, "fixture should contain at least one departure with a platform"
+    d = with_platform[0]
+    assert isinstance(d.platform, str)
+    assert d.to_dict()["platform"] == d.platform
+
+
 def test_parse_monitor_body_filters_by_selected_lines(monitor_fixture) -> None:
     """Only selected line keys are included when `selected` is provided."""
     selected = {"U1|H|Leopoldau"}
