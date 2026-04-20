@@ -220,12 +220,17 @@ const RETRO_STYLE = `
     flex: 1;
     min-width: 0;
   }
-  /* Wheelchair glyph rendered at the same weight as the destination text
-     so it blends into the LED look rather than poking out. flex-shrink
-     disabled so it never gets truncated before the destination name. */
+  /* Wheelchair icon — rendered via ha-icon (MDI path) so it inherits the
+     amber LED color via currentColor and picks up the same drop-shadow
+     glow as the text. Unicode ♿ would have rendered via the OS emoji
+     font in blue/white, breaking the retro look. */
   .retro-wheelchair {
     flex: 0 0 auto;
-    font-size: 0.85em;
+    display: inline-flex;
+    align-items: center;
+    --mdc-icon-size: 1em;
+    color: inherit;
+    filter: drop-shadow(0 0 4px rgba(255, 199, 0, 0.7));
   }
   .retro-cd {
     font-variant-numeric: tabular-nums;
@@ -517,11 +522,12 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const towards = _esc(d.towards || "");
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const cdLabel = cd === null ? "--" : String(Math.max(0, cd));
-    // ♿ (U+267F) after the destination, mirroring real Wiener Linien
-    // station boards that mark step-free departures. Renders in the
-    // same amber glow as the rest via inherited currentColor.
+    // Wheelchair icon after the destination, mirroring real Wiener Linien
+    // station boards that mark step-free departures. Using ha-icon (MDI
+    // SVG) rather than the ♿ emoji so it stays in the amber LED tone —
+    // OS emoji fonts would force blue/white and ruin the retro look.
     const wheelchairHtml = d.barrier_free
-      ? '<span class="retro-wheelchair" title="Barrierefrei">\u267F</span>'
+      ? '<ha-icon class="retro-wheelchair" icon="mdi:wheelchair-accessibility" title="Barrierefrei"></ha-icon>'
       : "";
     return `
       <div class="retro-row">
