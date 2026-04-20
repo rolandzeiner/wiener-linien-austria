@@ -3,7 +3,18 @@ from __future__ import annotations
 
 from typing import Final
 
+from homeassistant.const import __version__ as _HA_VERSION
+
 DOMAIN: Final = "wiener_linien_austria"
+
+# Integration version — must match manifest.json "version" field.
+INTEGRATION_VERSION: Final = "0.1.0"
+
+# User-Agent header sent on every outbound request. Identifying ourselves
+# beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
+# reach out to *this* integration specifically rather than blanket-blocking
+# the HA UA for everyone. HA convention: "HomeAssistant/{ver} {slug}/{ver}".
+USER_AGENT: Final = f"HomeAssistant/{_HA_VERSION} {DOMAIN}/{INTEGRATION_VERSION}"
 
 # Config entry keys
 CONF_DIVA: Final = "diva"
