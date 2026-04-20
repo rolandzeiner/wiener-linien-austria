@@ -426,7 +426,10 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       const hasR = deps.some((d) => d?.direction === "R");
       if (!hasH && hasR) direction = "R";
     }
-    return { entity: first, direction };
+    // Default to the small size — the Lovelace picker tile is narrow,
+    // and on mobile dashboards small is the most useful fit too.
+    // Users can bump it to medium / regular in the editor.
+    return { entity: first, direction, size: "small" };
   }
 
   async _checkCardVersion() {
