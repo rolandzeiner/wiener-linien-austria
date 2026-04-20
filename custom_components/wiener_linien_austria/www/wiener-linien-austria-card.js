@@ -1131,7 +1131,7 @@ class WienerLinienAustriaCard extends HTMLElement {
     // muted warning text (e.g. "Alaudagasse · 3 Minuten verspätet").
     const delayText = this._delayText(delay);
     const towardsHtml = delayText
-      ? `${towards} <span class="wl-delay">· ${_esc(delayText)}</span>`
+      ? `${towards} <span class="wl-delay">${_esc(delayText)}</span>`
       : towards;
 
     const flags = [];
