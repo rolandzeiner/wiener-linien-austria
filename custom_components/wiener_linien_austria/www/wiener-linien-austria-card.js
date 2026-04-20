@@ -61,6 +61,7 @@ const TRANSLATIONS = {
       show_accessibility: "Barrierefrei-Symbol anzeigen",
       show_traffic_info: "Störungen anzeigen",
       show_elevator_info: "Aufzugsinfo anzeigen",
+      show_delay: "Verspätungen anzeigen",
       hide_attribution: "Datenquelle ausblenden",
       layout_label: "Layout mehrerer Haltestellen",
       layout_stacked: "Gestapelt",
@@ -114,6 +115,7 @@ const TRANSLATIONS = {
       show_accessibility: "Show step-free icon",
       show_traffic_info: "Show disruption alerts",
       show_elevator_info: "Show elevator outages",
+      show_delay: "Show delays",
       hide_attribution: "Hide data source",
       layout_label: "Multi-stop layout",
       layout_stacked: "Stacked",
@@ -212,6 +214,9 @@ function _normaliseConfig(config) {
   // so opt-in would hide useful info without saving screen real estate.
   out.show_traffic_info = out.show_traffic_info !== false;
   out.show_elevator_info = out.show_elevator_info !== false;
+  // Delays default ON — matches v0.1.0 behaviour. Users who find the
+  // "3 Minuten verspätet" inline text distracting can opt out.
+  out.show_delay = out.show_delay !== false;
   // Attribution is shown by default. The sensor's `attribution` attribute
   // still carries the canonical CC-BY string regardless of this flag —
   // hiding only affects the card footer on a private dashboard.
@@ -646,6 +651,9 @@ class WienerLinienAustriaCard extends HTMLElement {
   _expandedElevator = new Set();
 
   setConfig(config) {
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+      throw new Error("wiener-linien-austria-card: config must be an object");
+    }
     this._config = _normaliseConfig(config);
     this._lastFingerprint = null;
     this._render();
@@ -1004,6 +1012,13 @@ class WienerLinienAustriaCard extends HTMLElement {
     const state = this._hass.states[stopCfg.entity];
     const attrs = state?.attributes ?? {};
     const title = attrs.stop_name || attrs.friendly_name || stopCfg.entity;
+    if (state && attrs.departures !== undefined && !Array.isArray(attrs.departures)) {
+      console.warn(
+        "[Wiener Linien Austria] unexpected 'departures' attribute shape on",
+        stopCfg.entity,
+        attrs.departures,
+      );
+    }
     const allDepartures = Array.isArray(attrs.departures) ? attrs.departures : [];
     const filtered = _filterDepartures(allDepartures, stopCfg);
     const rows = filtered.slice(0, max);
@@ -1170,7 +1185,10 @@ class WienerLinienAustriaCard extends HTMLElement {
     // Only surface delays when the train is actually running late; early
     // departures are noise. Rendered inline after the destination as
     // muted warning text (e.g. "Alaudagasse 3 Minuten verspätet").
-    const delayText = this._delayText(this._delayMinutes(d));
+    // Suppressed entirely when the user toggles `show_delay` off.
+    const delayText = this._config.show_delay !== false
+      ? this._delayText(this._delayMinutes(d))
+      : "";
     const towardsHtml = delayText
       ? `${towards} <span class="wl-delay">${_esc(delayText)}</span>`
       : towards;
@@ -1511,6 +1529,9 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
   _hass = null;
 
   setConfig(config) {
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+      throw new Error("wiener-linien-austria-card: config must be an object");
+    }
     this._config = _normaliseConfig(config);
     this._render();
   }
@@ -1619,6 +1640,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     const showA11y = this._config.show_accessibility === true;
     const showTraffic = this._config.show_traffic_info !== false;
     const showElevator = this._config.show_elevator_info !== false;
+    const showDelay = this._config.show_delay !== false;
     const hideAttr = this._config.hide_attribution === true;
     const layout = this._config.layout === "tabs" ? "tabs" : "stacked";
 
@@ -1773,6 +1795,14 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
               id="wl-elevator-toggle"
               data-field="show_elevator_info"
               ${showElevator ? "checked" : ""}
+            ></ha-switch>
+          </div>
+          <div class="toggle-row">
+            <label for="wl-delay-toggle">${_esc(this._et("show_delay"))}</label>
+            <ha-switch
+              id="wl-delay-toggle"
+              data-field="show_delay"
+              ${showDelay ? "checked" : ""}
             ></ha-switch>
           </div>
           <div class="toggle-row">

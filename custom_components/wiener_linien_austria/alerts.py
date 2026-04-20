@@ -142,8 +142,8 @@ async def _fetch_info_list(
         )
         resp.raise_for_status()
         body = await resp.json()
-    except Exception as err:  # noqa: BLE001 — alerts are advisory, never fatal.
-        _LOGGER.warning("Failed to refresh %s alerts: %s", name, err)
+    except Exception:  # noqa: BLE001 — alerts are advisory, never fatal.
+        _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
         return []
 
     if not isinstance(body, dict):

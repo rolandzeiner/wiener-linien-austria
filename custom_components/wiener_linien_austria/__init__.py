@@ -202,12 +202,12 @@ async def _async_register_one_card(
         )
         _LOGGER.info("Registered Lovelace resource %s", versioned_url)
 
-    except Exception as err:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         _LOGGER.warning(
-            "Could not register Lovelace resource (%s) – add manually: "
+            "Could not register Lovelace resource – add manually: "
             "Settings → Dashboards → Resources → %s (JavaScript module)",
-            err,
             url,
+            exc_info=True,
         )
 
 
