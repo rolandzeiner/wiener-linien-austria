@@ -28,19 +28,13 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 
 <table>
   <tr>
-    <td align="center"><img src="screenshots/card.webp" height="320" alt="Modern departure card" /></td>
-    <td align="center"><img src="screenshots/card-retro.webp" height="320" alt="Retro LED-style card" /></td>
-  </tr>
-  <tr>
-    <td align="center"><em>Modern departure card</em></td>
-    <td align="center"><em>Retro LED-style card</em></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="screenshots/card-editor.webp" height="320" alt="Visual card editor" /></td>
+    <td align="center"><img src="screenshots/card.webp" height="320" alt="Lovelace card" /></td>
+    <td align="center"><img src="screenshots/card-config.webp" height="320" alt="Card editor" /></td>
     <td align="center"><img src="screenshots/config-flow.webp" height="320" alt="Config flow" /></td>
   </tr>
   <tr>
-    <td align="center"><em>Visual card editor</em></td>
+    <td align="center"><em>Lovelace card</em></td>
+    <td align="center"><em>Card editor</em></td>
     <td align="center"><em>Config flow</em></td>
   </tr>
 </table>
