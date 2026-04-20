@@ -39,6 +39,8 @@ const TRANSLATIONS = {
   de: {
     no_entity: "Keine Haltestelle ausgewählt",
     no_data: "Keine Abfahrten",
+    no_data_wrong_direction: "Keine Abfahrten in dieser Richtung",
+    no_data_wrong_line: "Keine Abfahrten für diese Linie",
     dir_h: "H",
     dir_r: "R",
     gleis: "GLEIS",
@@ -52,6 +54,7 @@ const TRANSLATIONS = {
       sensor_hint: "Eine Haltestelle auswählen.",
       direction_hint:
         "Hin- oder Rückfahrt — die Retro-Anzeige zeigt nur eine Richtung.",
+      direction_no_data: "Keine Abfahrten in dieser Richtung",
       line_hint:
         "Optional: nur eine Linie anzeigen. Aktiven Chip erneut antippen = alle Linien.",
       no_sensors:
@@ -63,6 +66,8 @@ const TRANSLATIONS = {
   en: {
     no_entity: "No stop selected",
     no_data: "No departures",
+    no_data_wrong_direction: "No departures in this direction",
+    no_data_wrong_line: "No departures for this line",
     dir_h: "H",
     dir_r: "R",
     gleis: "PLATF.",
@@ -76,6 +81,7 @@ const TRANSLATIONS = {
       sensor_hint: "Pick a single stop.",
       direction_hint:
         "Outbound or return — the retro display only shows one direction.",
+      direction_no_data: "No departures in this direction",
       line_hint:
         "Optional: restrict to a single line. Tap the active chip again to show all lines.",
       no_sensors:
@@ -371,7 +377,19 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     if (!eid) {
       mainHtml = `<div class="retro-empty">${_esc(this._t("no_entity"))}</div>`;
     } else if (rows.length === 0) {
-      mainHtml = `<div class="retro-empty">${_esc(this._t("no_data"))}</div>`;
+      // Figure out why it's empty so we can give a useful hint:
+      // - nothing at this stop in this direction
+      // - nothing at this stop matching the line filter
+      // - or just nothing at all
+      const allDeps = Array.isArray(attrs.departures) ? attrs.departures : [];
+      const inDirection = allDeps.filter((d) => d && d.direction === dir);
+      let messageKey = "no_data";
+      if (allDeps.length > 0 && inDirection.length === 0) {
+        messageKey = "no_data_wrong_direction";
+      } else if (lineFilter && inDirection.length > 0) {
+        messageKey = "no_data_wrong_line";
+      }
+      mainHtml = `<div class="retro-empty">${_esc(this._t(messageKey))}</div>`;
     } else {
       mainHtml = `
         <div class="retro-rows">
@@ -521,6 +539,14 @@ const EDITOR_STYLE = `
     color: var(--text-primary-color, #fff);
     border-color: var(--primary-color);
   }
+  .direction-buttons button.no-data {
+    opacity: 0.45;
+  }
+  .direction-warning {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--warning-color, #ffa000);
+  }
 `;
 
 class WienerLinienAustriaRetroCardEditor extends HTMLElement {
@@ -602,6 +628,23 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     return [...seen].sort();
   }
 
+  _directionsWithData() {
+    // Returns a Set of directions ("H" / "R") that actually carry
+    // departures at the currently-selected stop. RBLs are typically
+    // one-direction platforms (especially for trams/buses), so the
+    // editor shouldn't let the user get stuck on an empty direction.
+    const eid = this._config.entity;
+    const a = eid ? this._hass?.states[eid]?.attributes : null;
+    const deps = Array.isArray(a?.departures) ? a.departures : [];
+    const seen = new Set();
+    for (const d of deps) {
+      if (d && (d.direction === "H" || d.direction === "R")) {
+        seen.add(d.direction);
+      }
+    }
+    return seen;
+  }
+
   _render() {
     if (!this._hass) return;
 
@@ -609,6 +652,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     const selected = this._config.entity || "";
     const direction = this._config.direction || "H";
     const selectedLine = this._config.line || "";
+    const directionsWithData = this._directionsWithData();
 
     const chips = available.length
       ? available
@@ -660,9 +704,20 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           <div class="section-header">${_esc(this._et("section_direction"))}</div>
           <div class="editor-hint">${_esc(this._et("direction_hint"))}</div>
           <div class="direction-buttons">
-            <button type="button" data-dir="H" class="${direction === "H" ? "active" : ""}">${_esc(this._t("dir_h"))}</button>
-            <button type="button" data-dir="R" class="${direction === "R" ? "active" : ""}">${_esc(this._t("dir_r"))}</button>
+            <button type="button" data-dir="H" class="${[
+              direction === "H" ? "active" : "",
+              directionsWithData.has("H") ? "" : "no-data",
+            ].filter(Boolean).join(" ")}">${_esc(this._t("dir_h"))}</button>
+            <button type="button" data-dir="R" class="${[
+              direction === "R" ? "active" : "",
+              directionsWithData.has("R") ? "" : "no-data",
+            ].filter(Boolean).join(" ")}">${_esc(this._t("dir_r"))}</button>
           </div>
+          ${
+            selected && !directionsWithData.has(direction)
+              ? `<div class="direction-warning">${_esc(this._et("direction_no_data"))}</div>`
+              : ""
+          }
         </div>
 
         <div class="editor-section">
