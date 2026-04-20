@@ -127,6 +127,30 @@ async def test_fetch_success_real_chain(
     assert coordinator.server_time == monitor_fixture["message"]["serverTime"]
 
 
+async def test_fetch_sends_user_agent_header(
+    hass: HomeAssistant, monitor_fixture
+) -> None:
+    """Every outbound /monitor request carries the integration UA header.
+
+    Identifying as wiener_linien_austria/{version} lets Wiener Linien
+    traffic-shape this integration specifically rather than blanket-blocking
+    the default Home Assistant UA.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    mock_resp = _ok_response(monitor_fixture)
+    mock_get = AsyncMock(return_value=mock_resp)
+    with patch.object(coordinator._session, "get", new=mock_get):
+        await coordinator._async_update_data()
+
+    _args, kwargs = mock_get.call_args
+    ua = kwargs["headers"]["User-Agent"]
+    assert ua.startswith("HomeAssistant/")
+    assert " wiener_linien_austria/" in ua
+
+
 async def test_http_error_raises_update_failed(
     hass: HomeAssistant,
 ) -> None:
