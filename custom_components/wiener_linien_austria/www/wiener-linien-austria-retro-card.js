@@ -200,7 +200,7 @@ const RETRO_STYLE = `
     grid-template-columns: 2.5em 1fr auto;
     /* Baseline — not center — so plain-text cells (line, countdown) sit
        on the same baseline as the flex-based destination cell that now
-       mixes text + a wheelchair icon. `center` used to work when every
+       mixes text + a wheelchair icon. "center" used to work when every
        cell was pure text; the flex container computes its baseline a
        hair differently. */
     align-items: baseline;
