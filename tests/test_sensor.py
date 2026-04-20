@@ -302,3 +302,76 @@ async def test_sensor_state_present_after_setup(
     assert state.attributes["attribution"] == ATTRIBUTION
     assert state.attributes["diva"] == 60201012
     assert len(state.attributes["departures"]) >= 1
+
+
+async def test_attributes_include_matched_alerts(hass: HomeAssistant) -> None:
+    """traffic_info + elevator_info attributes surface the alerts that match this stop."""
+    from custom_components.wiener_linien_austria.alerts import (
+        ElevatorInfo,
+        TrafficInfo,
+    )
+    from custom_components.wiener_linien_austria.const import (
+        ELEVATOR_INFO_KEY,
+        TRAFFIC_INFO_KEY,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [
+        TrafficInfo(
+            name="T1",
+            title="U1: Störung",
+            description="Linie U1",
+            related_lines=["U1"],
+            time_start=None,
+            time_end=None,
+            status="active",
+        ),
+        TrafficInfo(
+            name="T2",
+            title="49A: unrelated",
+            description="other line",
+            related_lines=["49A"],
+            time_start=None,
+            time_end=None,
+            status="active",
+        ),
+    ]
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = [
+        ElevatorInfo(
+            name="E1",
+            station="Stephansplatz",
+            description="U1 exit",
+            reason="maintenance",
+            status="außer Betrieb",
+            related_lines=["U1"],
+            related_stops=[4111],
+            time_start=None,
+            time_end=None,
+        ),
+        ElevatorInfo(
+            name="E2",
+            station="Tscherttegasse",
+            description="U6 platform",
+            reason="",
+            status="außer Betrieb",
+            related_lines=["U6"],
+            related_stops=[4629],
+            time_start=None,
+            time_end=None,
+        ),
+    ]
+
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    attrs = sensor.extra_state_attributes
+
+    # Only the U1-related traffic alert is surfaced (CONF_LINES filters).
+    assert [t["name"] for t in attrs["traffic_info"]] == ["T1"]
+    # Only the RBL 4111 elevator alert is surfaced (CONF_RBLS filters).
+    assert [e["name"] for e in attrs["elevator_info"]] == ["E1"]

@@ -1,0 +1,312 @@
+"""Traffic disruptions and elevator status from the Wiener Linien `/trafficInfoList` endpoint.
+
+Both user-visible alert types are surfaced by the same endpoint, just via the
+`name=` filter:
+
+- `stoerunglang` — line/route disruptions (scope: city-wide)
+- `aufzugsinfo` — elevator out-of-service notices (scope: per station + per RBL)
+
+Fetched on a slow (5 min) domain-wide cadence — these don't change any faster
+than a few times an hour and aggregating across all entries keeps the
+integration's outbound request rate trivial. Each sensor filters the cached
+lists by its own (lines, RBLs) at attribute-read time.
+"""
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+import aiohttp
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import dt as dt_util
+
+from .const import (
+    API_BASE_URL,
+    DOMAIN,
+    DOMAIN_COOLDOWN_SECONDS,
+    DOMAIN_LAST_CALL_KEY,
+    ELEVATOR_INFO_KEY,
+    TRAFFIC_INFO_ENDPOINT,
+    TRAFFIC_INFO_KEY,
+    USER_AGENT,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Data shapes
+# ---------------------------------------------------------------------------
+
+
+@dataclass(slots=True)
+class TrafficInfo:
+    """One service disruption affecting one or more lines."""
+
+    name: str  # stable upstream id, e.g. "I20260420-0032"
+    title: str  # "49A: Verkehrsunfall"
+    description: str
+    related_lines: list[str]
+    time_start: str | None
+    time_end: str | None
+    status: str  # "active" etc.
+
+    def to_dict(self) -> dict[str, Any]:
+        """Render as plain dict for sensor attributes / diagnostics."""
+        return {
+            "name": self.name,
+            "title": self.title,
+            "description": self.description,
+            "related_lines": list(self.related_lines),
+            "time_start": self.time_start,
+            "time_end": self.time_end,
+            "status": self.status,
+        }
+
+
+@dataclass(slots=True)
+class ElevatorInfo:
+    """One elevator outage."""
+
+    name: str
+    station: str
+    description: str  # usually the physical location of the elevator
+    reason: str  # free-text reason in German
+    status: str  # "außer Betrieb" etc.
+    related_lines: list[str]
+    related_stops: list[int]  # RBLs where this elevator applies
+    time_start: str | None
+    time_end: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Render as plain dict for sensor attributes / diagnostics."""
+        return {
+            "name": self.name,
+            "station": self.station,
+            "description": self.description,
+            "reason": self.reason,
+            "status": self.status,
+            "related_lines": list(self.related_lines),
+            "related_stops": list(self.related_stops),
+            "time_start": self.time_start,
+            "time_end": self.time_end,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Fetch
+# ---------------------------------------------------------------------------
+
+
+async def _enforce_domain_cooldown(hass: HomeAssistant) -> None:
+    """Serialise outbound calls across the whole integration (coordinator + alerts)."""
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    last: datetime | None = domain_data.get(DOMAIN_LAST_CALL_KEY)
+    now = dt_util.utcnow()
+    if last is not None:
+        elapsed = (now - last).total_seconds()
+        if elapsed < DOMAIN_COOLDOWN_SECONDS:
+            await asyncio.sleep(DOMAIN_COOLDOWN_SECONDS - elapsed)
+    domain_data[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
+
+
+async def _fetch_info_list(
+    hass: HomeAssistant, name: str
+) -> list[dict[str, Any]]:
+    """GET /trafficInfoList?name=<name> and return its trafficInfos array.
+
+    Returns [] on any fetch/parse failure — alerts are advisory, never fatal.
+    """
+    session = async_get_clientsession(hass)
+    url = f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}"
+    try:
+        await _enforce_domain_cooldown(hass)
+        resp = await session.get(
+            url,
+            params=[("name", name)],
+            headers={"User-Agent": USER_AGENT},
+            timeout=aiohttp.ClientTimeout(total=15),
+        )
+        resp.raise_for_status()
+        body = await resp.json()
+    except Exception as err:  # noqa: BLE001 — alerts are advisory, never fatal.
+        _LOGGER.warning("Failed to refresh %s alerts: %s", name, err)
+        return []
+
+    if not isinstance(body, dict):
+        return []
+    message = body.get("message") or {}
+    if message.get("messageCode") not in (1, None):
+        _LOGGER.debug(
+            "trafficInfoList?name=%s returned non-OK messageCode %s",
+            name,
+            message.get("messageCode"),
+        )
+        return []
+    infos = (body.get("data") or {}).get("trafficInfos") or []
+    return [x for x in infos if isinstance(x, dict)]
+
+
+async def async_refresh_alerts(hass: HomeAssistant) -> None:
+    """Refresh both traffic and elevator alerts into hass.data.
+
+    Safe to call whenever; failures keep the previous cache.
+    """
+    traffic_raw, elevator_raw = await asyncio.gather(
+        _fetch_info_list(hass, "stoerunglang"),
+        _fetch_info_list(hass, "aufzugsinfo"),
+    )
+
+    domain_data = hass.data.setdefault(DOMAIN, {})
+
+    if traffic_raw:
+        domain_data[TRAFFIC_INFO_KEY] = [_parse_traffic(x) for x in traffic_raw]
+    elif TRAFFIC_INFO_KEY not in domain_data:
+        domain_data[TRAFFIC_INFO_KEY] = []
+
+    if elevator_raw:
+        domain_data[ELEVATOR_INFO_KEY] = [_parse_elevator(x) for x in elevator_raw]
+    elif ELEVATOR_INFO_KEY not in domain_data:
+        domain_data[ELEVATOR_INFO_KEY] = []
+
+    _LOGGER.debug(
+        "Alerts refreshed: %d traffic, %d elevator",
+        len(domain_data.get(TRAFFIC_INFO_KEY, [])),
+        len(domain_data.get(ELEVATOR_INFO_KEY, [])),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Parse
+# ---------------------------------------------------------------------------
+
+
+def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
+    """Parse one trafficInfos entry for name=stoerunglang."""
+    time = raw.get("time") or {}
+    related_lines = _as_str_list(raw.get("relatedLines"))
+    return TrafficInfo(
+        name=str(raw.get("name") or ""),
+        title=str(raw.get("title") or "").strip(),
+        description=str(raw.get("description") or "").strip(),
+        related_lines=related_lines,
+        time_start=_str_or_none(time.get("start")),
+        time_end=_str_or_none(time.get("end")),
+        status=str(raw.get("status") or ""),
+    )
+
+
+def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
+    """Parse one trafficInfos entry for name=aufzugsinfo.
+
+    Shape is less regular than stoerunglang — pulls fallbacks from
+    `attributes` when top-level fields are absent.
+    """
+    attrs = raw.get("attributes") or {}
+    time = raw.get("time") or {}
+
+    related_lines = _as_str_list(raw.get("relatedLines"))
+    if not related_lines:
+        related_lines = _as_str_list(attrs.get("relatedLines"))
+
+    related_stops = _as_int_list(raw.get("relatedStops"))
+    if not related_stops:
+        related_stops = _as_int_list(attrs.get("relatedStops"))
+
+    station = str(
+        attrs.get("station") or raw.get("title") or ""
+    ).strip()
+    description = str(
+        raw.get("description") or attrs.get("location") or ""
+    ).strip()
+    reason = str(attrs.get("reason") or "").strip()
+    status = str(attrs.get("status") or "").strip()
+
+    return ElevatorInfo(
+        name=str(raw.get("name") or ""),
+        station=station,
+        description=description,
+        reason=reason,
+        status=status,
+        related_lines=related_lines,
+        related_stops=related_stops,
+        time_start=_str_or_none(time.get("start")),
+        time_end=_str_or_none(time.get("end")),
+    )
+
+
+def _as_str_list(val: Any) -> list[str]:
+    """Coerce to a list of non-empty stripped strings."""
+    if isinstance(val, list):
+        return [str(x).strip() for x in val if isinstance(x, str) and x.strip()]
+    if isinstance(val, dict):
+        return [str(k).strip() for k in val.keys() if isinstance(k, str) and k.strip()]
+    return []
+
+
+def _as_int_list(val: Any) -> list[int]:
+    """Coerce to a list of ints, dropping non-numeric entries."""
+    if not isinstance(val, list):
+        return []
+    out: list[int] = []
+    for item in val:
+        try:
+            out.append(int(item))
+        except (ValueError, TypeError):
+            continue
+    return out
+
+
+def _str_or_none(val: Any) -> str | None:
+    """Return val as a string if truthy, else None."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    return s or None
+
+
+# ---------------------------------------------------------------------------
+# Query
+# ---------------------------------------------------------------------------
+
+
+def get_alerts_for(
+    hass: HomeAssistant,
+    lines: set[str] | None,
+    rbls: set[int] | None,
+) -> tuple[list[TrafficInfo], list[ElevatorInfo]]:
+    """Return traffic + elevator alerts relevant to a given stop.
+
+    - Traffic: match if any `related_lines` overlaps `lines`. If `lines` is
+      empty/None, return all traffic alerts (fall-through).
+    - Elevator: match if any `related_stops` overlaps `rbls`. If `rbls` is
+      empty/None, return []. An elevator outage with no `related_stops` is
+      only surfaced when it also matches on `related_lines`.
+    """
+    domain_data = hass.data.get(DOMAIN, {})
+    all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
+    all_elevator: list[ElevatorInfo] = domain_data.get(ELEVATOR_INFO_KEY, []) or []
+
+    matched_traffic: list[TrafficInfo] = []
+    if lines:
+        for t in all_traffic:
+            if set(t.related_lines) & lines:
+                matched_traffic.append(t)
+    else:
+        matched_traffic = list(all_traffic)
+
+    matched_elevator: list[ElevatorInfo] = []
+    if rbls:
+        for e in all_elevator:
+            stop_hit = bool(set(e.related_stops) & rbls)
+            if stop_hit:
+                matched_elevator.append(e)
+                continue
+            # No explicit RBL match — fall back to line match if present.
+            if not e.related_stops and lines and set(e.related_lines) & lines:
+                matched_elevator.append(e)
+
+    return matched_traffic, matched_elevator

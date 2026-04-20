@@ -17,7 +17,15 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_interval
 
-from .const import CARD_URL, CARD_VERSION, DOMAIN, STATIC_CACHE_REFRESH_HOURS
+from .alerts import async_refresh_alerts
+from .const import (
+    ALERTS_REFRESH_SECONDS,
+    ALERTS_REFRESH_UNSUB_KEY,
+    CARD_URL,
+    CARD_VERSION,
+    DOMAIN,
+    STATIC_CACHE_REFRESH_HOURS,
+)
 from .coordinator import WienerLinienAustriaCoordinator
 from .static import async_refresh_catalogue
 
@@ -59,6 +67,23 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             hass,
             _periodic_refresh,
             timedelta(hours=STATIC_CACHE_REFRESH_HOURS),
+            cancel_on_shutdown=True,
+        )
+
+    if ALERTS_REFRESH_UNSUB_KEY not in domain_data:
+        async def _periodic_alerts(_now: Any) -> None:
+            await async_refresh_alerts(hass)
+
+        # No eager first fetch — the periodic timer populates the cache after
+        # ALERTS_REFRESH_SECONDS. During the warm-up window (up to 5 min after
+        # start) sensors simply expose empty traffic_info / elevator_info
+        # lists; not surfacing a possibly-stale alert during the first few
+        # minutes is a reasonable trade for keeping startup non-blocking and
+        # side-effect-free.
+        domain_data[ALERTS_REFRESH_UNSUB_KEY] = async_track_time_interval(
+            hass,
+            _periodic_alerts,
+            timedelta(seconds=ALERTS_REFRESH_SECONDS),
             cancel_on_shutdown=True,
         )
 
