@@ -90,18 +90,7 @@ The everyday departure board. Dashboard → Add card → "Wiener Linien Austria"
 - **Line colours** — colour-pickers per line appearing in any selected stop's board. Metro CI defaults are built in; tram/bus lines fall back to the theme primary colour until overridden.
 - **Display** — multi-stop layout picker (*stacked* or *tabs*), departures-per-stop slider (1–20), and toggles for step-free icon (opt-in), disruption banner, elevator badge, delay text, and "Hide data source" (hides the attribution footer on your private dashboard — the sensor attribute keeps the CC-BY string).
 
-**Row layout:**
-
-```
-U1 · Leopoldau                                            2 min
-U1 · Leopoldau 3 Minuten verspätet                        5 min
-U4 · Hütteldorf                                           6 min
-```
-
-- Line badge coloured via `METRO_COLORS` + user overrides.
-- Direction text, optional delay in warning text when `time_real` > `time_planned` by ≥ 1 min.
-- Countdown cell: `N min` or `jetzt` when ≤ 0.
-- Optional `mdi:alert-circle` for `traffic_jam`; optional `mdi:wheelchair-accessibility` for `barrier_free` (toggleable).
+**Each departure row** shows a colour-coded line badge (`METRO_COLORS` + user overrides), destination text with optional inline delay ("3 Minuten verspätet" when `time_real` > `time_planned` by ≥ 1 min), optional `mdi:alert-circle` for `traffic_jam`, optional `mdi:wheelchair-accessibility` for step-free departures, and a countdown cell showing `N min` or `jetzt` when ≤ 0.
 
 **Disruption banner** — collapsible rows above the stop list, one per unique `traffic_info`. Each row: alert icon + line badges + title always visible; click to expand full description, location chip, "Bis" and "aktualisiert" timestamps.
 
