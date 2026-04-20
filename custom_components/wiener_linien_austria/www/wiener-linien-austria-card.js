@@ -201,10 +201,19 @@ function _collectLinesInSelection(hass, entities) {
   const seen = new Set();
   for (const stop of entities) {
     const a = hass?.states[stop.entity]?.attributes;
-    const grouped = a?.departures_by_line;
-    if (grouped && typeof grouped === "object") {
-      for (const line of Object.keys(grouped)) seen.add(line);
+    const deps = Array.isArray(a?.departures) ? a.departures : [];
+    for (const d of deps) {
+      if (d && typeof d.line === "string" && d.line) seen.add(d.line);
     }
+  }
+  return [...seen].sort();
+}
+
+function _linesAtStop(attrs) {
+  const seen = new Set();
+  const deps = Array.isArray(attrs?.departures) ? attrs.departures : [];
+  for (const d of deps) {
+    if (d && typeof d.line === "string" && d.line) seen.add(d.line);
   }
   return [...seen].sort();
 }
@@ -929,9 +938,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
             const a = this._hass.states[stop.entity]?.attributes;
             if (!a) return "";
             const stopName = a.stop_name || stop.entity;
-            const linesAtStop = a.departures_by_line
-              ? Object.keys(a.departures_by_line).sort()
-              : [];
+            const linesAtStop = _linesAtStop(a);
             const picked = new Set(stop.lines || []);
             const dir = stop.direction || null;
 

@@ -194,8 +194,11 @@ async def test_attributes_full_departure_list(hass: HomeAssistant) -> None:
     assert first["traffic_jam"] is False
 
 
-async def test_attributes_grouped_views(hass: HomeAssistant) -> None:
-    """`departures_by_line` groups by line, `next_by_line` picks first countdown."""
+async def test_attributes_next_by_line_and_no_grouped_duplicate(hass: HomeAssistant) -> None:
+    """next_by_line gives cheap per-line access; we deliberately do NOT publish
+    a full `departures_by_line` grouping because it duplicates every departure
+    dict under `departures` and blows past the recorder's 16 KB attribute cap
+    at busy stops."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     data = MonitorData(departures=_make_departures(), server_time=None)
@@ -203,12 +206,13 @@ async def test_attributes_grouped_views(hass: HomeAssistant) -> None:
     sensor = WienerLinienStopSensor(coordinator, entry)
     attrs = sensor.extra_state_attributes
 
-    assert set(attrs["departures_by_line"].keys()) == {"U1"}
-    assert len(attrs["departures_by_line"]["U1"]) == 3
-
     # next_by_line uses the *first* occurrence per line, which is the earliest
     # countdown because the coordinator always feeds a sorted list.
     assert attrs["next_by_line"] == {"U1": 2}
+
+    # The grouped view is intentionally NOT published — consumers derive it
+    # from `departures` themselves.
+    assert "departures_by_line" not in attrs
 
 
 async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) -> None:

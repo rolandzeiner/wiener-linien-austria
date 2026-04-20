@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from collections import defaultdict
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -88,10 +87,14 @@ class WienerLinienStopSensor(
         data: MonitorData | None = self.coordinator.data
         departures = data.departures if data is not None else []
 
-        grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        # next_by_line is a tiny per-line → int map for cheap template access.
+        # We deliberately don't publish a full `departures_by_line` grouping
+        # because it would duplicate every departure dict under `departures`,
+        # doubling attribute size and tripping the recorder's 16 KB limit at
+        # busy stops. Consumers that need a grouped view can reduce over
+        # `departures` themselves.
         next_by_line: dict[str, int] = {}
         for dep in departures:
-            grouped[dep.line].append(dep.to_dict())
             next_by_line.setdefault(dep.line, dep.countdown)
 
         # Match domain-wide alert caches against this entry's lines + RBLs.
@@ -120,7 +123,6 @@ class WienerLinienStopSensor(
             "stop_name": stop_name,
             "server_time": data.server_time if data is not None else None,
             "departures": [d.to_dict() for d in departures],
-            "departures_by_line": dict(grouped),
             "next_by_line": next_by_line,
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
