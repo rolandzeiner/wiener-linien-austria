@@ -181,7 +181,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    coordinator.async_setup()
+    await coordinator.async_setup()
     entry.async_on_unload(coordinator.async_teardown)
     await coordinator.async_config_entry_first_refresh()
 
