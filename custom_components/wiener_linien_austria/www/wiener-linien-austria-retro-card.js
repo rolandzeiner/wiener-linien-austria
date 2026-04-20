@@ -109,8 +109,8 @@ const RETRO_STYLE = `
   }
   .retro {
     position: relative;
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: flex;
+    flex-direction: column;
     background: var(--led-bg);
     /* Faint LED-substrate dot pattern: violet dots every 4px echo the
        look of an unlit pixel between glowing ones. */
@@ -130,7 +130,15 @@ const RETRO_STYLE = `
     border-radius: var(--ha-card-border-radius, 12px);
     min-height: 110px;
   }
+  .retro-main {
+    display: flex;
+    align-items: stretch;
+    flex: 1;
+  }
+  /* Gleis "2" sits on the left per the station displays. */
+  .retro--gleis-left .retro-gleis { order: -1; }
   .retro-rows {
+    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -162,15 +170,23 @@ const RETRO_STYLE = `
     min-width: 2.5em;
   }
   .retro-gleis {
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 0 14px 0 18px;
     margin-left: 12px;
-    color: var(--led-green);
-    text-shadow: 0 0 6px rgba(61, 245, 0, 0.7);
-    border-left: 1px solid rgba(61, 245, 0, 0.25);
+    color: var(--led-amber);
+    text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
+    border-left: 1px solid rgba(255, 199, 0, 0.25);
+  }
+  .retro--gleis-left .retro-gleis {
+    padding: 0 18px 0 14px;
+    margin-left: 0;
+    margin-right: 12px;
+    border-left: none;
+    border-right: 1px solid rgba(255, 199, 0, 0.25);
   }
   .retro-gleis-label {
     font-size: 0.9em;
@@ -184,8 +200,9 @@ const RETRO_STYLE = `
     font-weight: 400;
   }
   .retro-empty {
-    grid-column: 1 / -1;
+    flex: 1;
     text-align: center;
+    align-self: center;
     color: var(--led-amber);
     text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
     font-size: 1.4em;
@@ -193,7 +210,6 @@ const RETRO_STYLE = `
     letter-spacing: 2px;
   }
   .retro-banner {
-    grid-column: 1 / -1;
     background: #ffa000;
     color: #000;
     padding: 6px 10px;
@@ -322,16 +338,19 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       : [];
     const rows = matching.slice(0, 2);
     const platform = rows.find((d) => d.platform)?.platform || null;
+    // Gleis "2" sits on the left, anything else (including "1") on the
+    // right — matches Wiener Linien's platform-display convention.
+    const gleisLeft = platform === "2";
 
     const banner = this._versionMismatch ? this._renderBanner() : "";
 
-    let body;
+    let mainHtml;
     if (!eid) {
-      body = `<div class="retro-empty">${_esc(this._t("no_entity"))}</div>`;
+      mainHtml = `<div class="retro-empty">${_esc(this._t("no_entity"))}</div>`;
     } else if (rows.length === 0) {
-      body = `<div class="retro-empty">${_esc(this._t("no_data"))}</div>`;
+      mainHtml = `<div class="retro-empty">${_esc(this._t("no_data"))}</div>`;
     } else {
-      body = `
+      mainHtml = `
         <div class="retro-rows">
           ${rows.map((d) => this._renderRow(d)).join("")}
         </div>
@@ -339,12 +358,13 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       `;
     }
 
+    const retroClass = `retro${gleisLeft ? " retro--gleis-left" : ""}`;
     this.innerHTML = `
       <ha-card style="background:${LED_BG};padding:0;overflow:hidden;">
         <style>${RETRO_STYLE}</style>
-        <div class="retro">
+        <div class="${retroClass}">
           ${banner}
-          ${body}
+          <div class="retro-main">${mainHtml}</div>
         </div>
       </ha-card>
     `;
