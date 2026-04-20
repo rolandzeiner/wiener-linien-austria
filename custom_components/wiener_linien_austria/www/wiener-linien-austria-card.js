@@ -38,6 +38,7 @@ const TRANSLATIONS = {
     traffic_updated: "aktualisiert",
     elevator_label: "Aufzug außer Betrieb",
     elevator_until: "Bis",
+    open_in_maps: "In Karte öffnen",
     devmode_title: "DEV",
     devmode_traffic_btn: "Test Störung",
     devmode_elevator_btn: "Test Aufzug",
@@ -85,6 +86,7 @@ const TRANSLATIONS = {
     traffic_updated: "updated",
     elevator_label: "Elevator out of service",
     elevator_until: "Until",
+    open_in_maps: "Open in maps",
     devmode_title: "DEV",
     devmode_traffic_btn: "Test disruption",
     devmode_elevator_btn: "Test elevator",
@@ -283,6 +285,21 @@ const CARD_STYLE = `
     color: var(--warning-color, #ffa000);
     cursor: help;
   }
+  .wl-stop-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .wl-stop-link:hover { text-decoration: underline; }
+  .wl-stop-link ha-icon {
+    --mdc-icon-size: 14px;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    opacity: 0.55;
+  }
+  .wl-stop-link:hover ha-icon { opacity: 1; }
   .wl-elevator-badge {
     display: inline-flex;
     align-items: center;
@@ -521,6 +538,17 @@ const CARD_STYLE = `
     min-width: 50px;
     text-align: right;
   }
+  .wl-delay {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 0.75em;
+    font-weight: 700;
+    background: var(--warning-color, #ffa000);
+    color: #fff;
+    vertical-align: middle;
+  }
   .wl-attr {
     margin-top: 10px;
     padding-top: 8px;
@@ -580,6 +608,11 @@ class WienerLinienAustriaCard extends HTMLElement {
   _expandedTraffic = new Set();
   _expandedElevator = new Set();
 
+  // Interval handle for the client-side countdown tick. Countdowns in the
+  // API are computed at `server_time`; between polls they'd stay stale
+  // unless we recompute locally from the ISO timestamps.
+  _tickInterval = null;
+
   setConfig(config) {
     this._config = _normaliseConfig(config);
     this._lastFingerprint = null;
@@ -591,11 +624,58 @@ class WienerLinienAustriaCard extends HTMLElement {
     this._hass = hass;
     if (first) {
       this._checkCardVersion();
+      this._startTickInterval();
     }
     const fp = this._fingerprint();
     if (fp === this._lastFingerprint) return;
     this._lastFingerprint = fp;
     this._render();
+  }
+
+  disconnectedCallback() {
+    if (this._tickInterval) {
+      clearInterval(this._tickInterval);
+      this._tickInterval = null;
+    }
+  }
+
+  _startTickInterval() {
+    if (this._tickInterval) return;
+    // Re-render every 15 s so countdowns drop minutes between coordinator
+    // polls. Does not trigger a fingerprint update — we call _render()
+    // directly. Cheap: same renderer the set-hass path uses.
+    this._tickInterval = setInterval(() => {
+      if (!this._hass) return;
+      this._render();
+    }, 15000);
+  }
+
+  _liveCountdown(d) {
+    // Compute countdown + delay client-side from the ISO timestamps.
+    // Falls back to the server-computed `countdown` if neither timestamp
+    // is parseable (shouldn't happen in practice).
+    const now = Date.now();
+    const realMs = d.time_real ? Date.parse(d.time_real) : NaN;
+    const plannedMs = d.time_planned ? Date.parse(d.time_planned) : NaN;
+
+    const targetMs = Number.isFinite(realMs)
+      ? realMs
+      : Number.isFinite(plannedMs)
+        ? plannedMs
+        : NaN;
+    let cd;
+    if (Number.isFinite(targetMs)) {
+      cd = Math.max(0, Math.floor((targetMs - now) / 60000));
+    } else {
+      cd = Number.isFinite(d.countdown) ? d.countdown : null;
+    }
+
+    let delay = null;
+    if (Number.isFinite(realMs) && Number.isFinite(plannedMs)) {
+      const deltaMin = Math.round((realMs - plannedMs) / 60000);
+      if (Math.abs(deltaMin) >= 1) delay = deltaMin;
+    }
+    return { cd, delay };
   }
 
   getCardSize() {
@@ -928,16 +1008,37 @@ class WienerLinienAustriaCard extends HTMLElement {
         ? this._renderElevatorDetails(elevatorInfos)
         : "";
 
+    const mapUrl = this._stopMapUrl(title);
+    const headerTitleHtml = mapUrl
+      ? `<a class="wl-stop-link"
+           href="${mapUrl}"
+           target="_blank"
+           rel="noopener noreferrer"
+           title="${_esc(this._t("open_in_maps"))}"
+           aria-label="${_esc(`${title} — ${this._t("open_in_maps")}`)}"
+        ><span>${_esc(title)}</span><ha-icon icon="mdi:open-in-new"></ha-icon></a>`
+      : `<span>${_esc(title)}</span>`;
+
     return `
       <div class="wl-stop">
         <div class="wl-header">
-          <span>${_esc(title)}</span>
+          ${headerTitleHtml}
           ${elevatorBadge}
         </div>
         ${elevatorDetailsHtml}
         ${rowsHtml}
       </div>
     `;
+  }
+
+  _stopMapUrl(stopName) {
+    if (!stopName || typeof stopName !== "string") return null;
+    // Google Maps search URL — opens the stop on map/mobile apps,
+    // includes transit info from Google's ÖPNV feed. Safer than
+    // linking into Wiener Linien's own site since their URL scheme
+    // isn't documented for stop-specific deep links.
+    const q = encodeURIComponent(`${stopName}, Wien`);
+    return `https://www.google.com/maps/search/?api=1&query=${q}`;
   }
 
   _renderElevatorDetails(elevatorInfos) {
@@ -1012,9 +1113,13 @@ class WienerLinienAustriaCard extends HTMLElement {
     const line = String(d.line || "?");
     const color = _colorForLine(line, overrides);
     const towards = _esc(d.towards || "");
-    const cd = Number.isFinite(d.countdown) ? d.countdown : null;
+    const { cd, delay } = this._liveCountdown(d);
     const cdLabel =
       cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
+    const delayHtml =
+      delay !== null
+        ? `<span class="wl-delay">${delay > 0 ? "+" : ""}${delay}</span>`
+        : "";
 
     const flags = [];
     if (d.traffic_jam) {
@@ -1040,7 +1145,7 @@ class WienerLinienAustriaCard extends HTMLElement {
         <div class="wl-line" style="background:${color}">${_esc(line)}</div>
         <div class="wl-towards">${towards}</div>
         ${flagsHtml}
-        <div class="wl-countdown">${_esc(cdLabel)}</div>
+        <div class="wl-countdown">${_esc(cdLabel)}${delayHtml}</div>
       </div>
     `;
   }
