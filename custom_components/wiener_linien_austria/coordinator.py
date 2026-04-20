@@ -115,7 +115,14 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         from .static import async_load_catalogue  # noqa: PLC0415
         try:
             catalogue = await async_load_catalogue(self.hass)
-        except Exception as err:  # noqa: BLE001
+        except (
+            aiohttp.ClientError,
+            asyncio.TimeoutError,
+            KeyError,
+            TypeError,
+            ValueError,
+            RuntimeError,
+        ) as err:
             _LOGGER.debug("Could not load static catalogue for coords: %s", err)
             return
         station = catalogue.stations_by_diva.get(self._diva)

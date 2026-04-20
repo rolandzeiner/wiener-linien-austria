@@ -389,6 +389,9 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
   _lastFingerprint = null;
 
   setConfig(config) {
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+      throw new Error("wiener-linien-austria-retro-card: config must be an object");
+    }
     this._config = _normaliseConfig(config);
     this._lastFingerprint = null;
     this._render();
@@ -493,6 +496,13 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const attrs = state?.attributes ?? {};
     const dir = this._config.direction;
     const lineFilter = this._config.line || "";
+    if (state && attrs.departures !== undefined && !Array.isArray(attrs.departures)) {
+      console.warn(
+        "[Wiener Linien Austria Retro] unexpected 'departures' attribute shape on",
+        eid,
+        attrs.departures,
+      );
+    }
     const matching = Array.isArray(attrs.departures)
       ? attrs.departures
           .filter((d) => d && d.direction === dir)
@@ -726,6 +736,9 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
   _hass = null;
 
   setConfig(config) {
+    if (config === null || typeof config !== "object" || Array.isArray(config)) {
+      throw new Error("wiener-linien-austria-retro-card: config must be an object");
+    }
     this._config = _normaliseConfig(config);
     this._render();
   }
