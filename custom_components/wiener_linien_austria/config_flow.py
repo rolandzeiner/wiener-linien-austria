@@ -1,9 +1,21 @@
-"""Config flow for Wiener Linien Austria."""
+"""Config flow for Wiener Linien Austria.
+
+Three-step flow:
+  1. `user`           — user types a stop-name fragment.
+  2. `select_stop`    — dropdown of matching stations from the static catalogue.
+  3. `select_lines`   — live `/monitor` call with the station's RBLs; each
+                        returned line × direction is presented as a pre-checked
+                        option. Submitting saves the entry.
+`async_step_reconfigure` re-enters `select_lines` for an existing entry,
+preserving unique_id. Options flow tweaks the scan interval only.
+"""
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
+import aiohttp
 import voluptuous as vol
 
 from homeassistant.config_entries import (
@@ -12,180 +24,387 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
+from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
     TextSelector,
 )
 
 from .const import (
-    CONF_API_KEY,
+    API_BASE_URL,
+    CONF_DIVA,
+    CONF_LINES,
+    CONF_RBLS,
+    CONF_SEARCH_QUERY,
+    CONF_STOP_NAME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    MAX_POLL_SECONDS,
+    MIN_POLL_SECONDS,
+    MONITOR_ENDPOINT,
 )
-from homeassistant.const import CONF_SCAN_INTERVAL
+from .static import Station, async_load_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
 
-async def _test_api_connection(hass: HomeAssistant, api_key: str) -> bool:
-    """Return True if the upstream API is reachable with the given credentials.
+def _line_key(line: str, direction: str, towards: str) -> str:
+    """Stable identifier for a (line, direction, towards) triple.
 
-    Replace with a real trial call for your integration. Return False on any
-    failure so the config flow surfaces a cannot_connect error to the UI.
+    Mirrors the coordinator's `_line_key` — keep them in sync.
+    """
+    return f"{line}|{direction}|{towards}"
+
+
+async def _probe_monitor_lines(
+    hass: HomeAssistant, rbls: list[int]
+) -> list[dict[str, str]]:
+    """Call /monitor once for the given RBLs and return one dict per line/direction.
+
+    Each dict: {key, line, towards, direction, type}. Empty list on any failure
+    — caller must handle by surfacing a `cannot_connect` form error.
     """
     session = async_get_clientsession(hass)
-    _ = session  # TODO: actually probe the API here.
-    return bool(api_key)
-
-
-def _build_schema(defaults: dict[str, Any], include_name: bool = False) -> vol.Schema:
-    """Build the shared config/options form schema."""
-    fields: dict[Any, Any] = {}
-    if include_name:
-        fields[vol.Required("name", default=defaults.get("name", "Wiener Linien Austria"))] = (
-            TextSelector()
+    url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
+    params = [("stopId", str(r)) for r in rbls]
+    try:
+        resp = await session.get(
+            url, params=params, timeout=aiohttp.ClientTimeout(total=10)
         )
-    fields[vol.Required(CONF_API_KEY, default=defaults.get(CONF_API_KEY, ""))] = (
-        TextSelector()
-    )
-    fields[
-        vol.Required(
-            CONF_SCAN_INTERVAL,
-            default=defaults.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-        )
-    ] = NumberSelector(
-        NumberSelectorConfig(
-            min=5,
-            max=720,
-            step=5,
-            unit_of_measurement="min",
-            mode=NumberSelectorMode.BOX,
-        )
-    )
-    return vol.Schema(fields)
+        resp.raise_for_status()
+        body = await resp.json()
+    except (asyncio.TimeoutError, aiohttp.ClientError, ValueError) as err:
+        _LOGGER.warning("Line-probe failed for RBLs %s: %s", rbls, err)
+        return []
 
+    if not isinstance(body, dict):
+        return []
+    message = body.get("message") or {}
+    if message.get("messageCode") not in (1, None):
+        return []
 
-def _validate_user_input(
-    user_input: dict[str, Any],
-) -> tuple[str, dict[str, str]]:
-    """Extract + validate required fields. Returns (api_key, errors)."""
-    errors: dict[str, str] = {}
-    api_key = user_input.get(CONF_API_KEY, "").strip()
-    if not api_key:
-        errors[CONF_API_KEY] = "invalid_api_key"
-    return api_key, errors
-
-
-def _build_entry_data(user_input: dict[str, Any], api_key: str) -> dict[str, Any]:
-    """Pack validated input into ConfigEntry.data shape."""
-    return {
-        CONF_API_KEY: api_key,
-        CONF_SCAN_INTERVAL: user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-    }
-
-
-def _compute_unique_id(api_key: str) -> str:
-    """Stable unique_id formula. NEVER CHANGE THIS after v0.1.0 — existing
-    installs are keyed by it and would be wiped.
-
-    If the upstream has a stable account ID, prefer that. Hashing the API key
-    avoids leaking it but still produces a stable key per account.
-    """
-    return f"apikey_{hash(api_key) & 0xFFFFFFFF:x}"
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+    for monitor in (body.get("data") or {}).get("monitors") or []:
+        for line in monitor.get("lines") or []:
+            name = str(line.get("name") or "").strip()
+            direction = str(line.get("direction") or "").strip()
+            towards = str(line.get("towards") or "").strip()
+            if not name or not towards:
+                continue
+            key = _line_key(name, direction, towards)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(
+                {
+                    "key": key,
+                    "line": name,
+                    "towards": towards,
+                    "direction": direction,
+                    "type": str(line.get("type") or "").strip(),
+                }
+            )
+    out.sort(key=lambda r: (r["line"], r["towards"]))
+    return out
 
 
 class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Wiener Linien Austria."""
+    """Handle a multi-step config flow for Wiener Linien Austria."""
 
     VERSION = 1
 
+    def __init__(self) -> None:
+        """Init in-flight selections."""
+        self._query: str = ""
+        self._matches: list[Station] = []
+        self._selected_station: Station | None = None
+        self._lines: list[dict[str, str]] = []
+        self._reconfigure_entry: ConfigEntry | None = None
+
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> WienerLinienAustriaOptionsFlow:
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> WienerLinienAustriaOptionsFlow:
         """Return the options flow handler."""
         return WienerLinienAustriaOptionsFlow()
+
+    # ------------------------------------------------------------------
+    # Step 1 — user: search query
+    # ------------------------------------------------------------------
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step."""
+        """Prompt for a stop-name fragment."""
         errors: dict[str, str] = {}
         if user_input is not None:
-            api_key, errors = _validate_user_input(user_input)
-            if not errors:
-                if not await _test_api_connection(self.hass, api_key):
-                    errors["base"] = "cannot_connect"
+            self._query = str(user_input.get(CONF_SEARCH_QUERY, "")).strip()
+            if len(self._query) < 2:
+                errors[CONF_SEARCH_QUERY] = "query_too_short"
+            else:
+                try:
+                    catalogue = await async_load_catalogue(self.hass)
+                except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                    _LOGGER.warning("Static catalogue load failed: %s", err)
+                    errors["base"] = "catalogue_unavailable"
                 else:
-                    await self.async_set_unique_id(_compute_unique_id(api_key))
-                    self._abort_if_unique_id_configured()
-                    title = user_input.get("name", "Wiener Linien Austria")
-                    return self.async_create_entry(
-                        title=title,
-                        data=_build_entry_data(user_input, api_key),
-                    )
+                    self._matches = catalogue.search(self._query)
+                    if not self._matches:
+                        errors[CONF_SEARCH_QUERY] = "no_matches"
+                    else:
+                        return await self.async_step_select_stop()
 
-        defaults: dict[str, Any] = {"name": "Wiener Linien Austria"}
         return self.async_show_form(
             step_id="user",
-            data_schema=_build_schema(defaults, include_name=True),
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_SEARCH_QUERY, default=self._query): TextSelector()
+                }
+            ),
             errors=errors,
         )
+
+    # ------------------------------------------------------------------
+    # Step 2 — select_stop: dropdown of matches
+    # ------------------------------------------------------------------
+
+    async def async_step_select_stop(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user pick one station from the search hits."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            diva_str = user_input.get(CONF_DIVA)
+            if diva_str == "__search_again__":
+                return await self.async_step_user()
+            try:
+                diva = int(diva_str) if diva_str is not None else None
+            except ValueError:
+                diva = None
+            station = next(
+                (s for s in self._matches if s.diva == diva), None
+            )
+            if station is None:
+                errors[CONF_DIVA] = "invalid_stop"
+            else:
+                self._selected_station = station
+                return await self.async_step_select_lines()
+
+        options: list[SelectOptionDict] = [
+            SelectOptionDict(
+                value=str(s.diva),
+                label=f"{s.name} ({s.municipality})",
+            )
+            for s in self._matches
+        ]
+        options.append(
+            SelectOptionDict(value="__search_again__", label="↩ Search again")
+        )
+
+        return self.async_show_form(
+            step_id="select_stop",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_DIVA): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options,
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    )
+                }
+            ),
+            errors=errors,
+            description_placeholders={"query": self._query},
+        )
+
+    # ------------------------------------------------------------------
+    # Step 3 — select_lines: live /monitor probe + checkbox selection
+    # ------------------------------------------------------------------
+
+    async def async_step_select_lines(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Probe /monitor for live lines at the chosen station and let the user pick."""
+        assert self._selected_station is not None
+        station = self._selected_station
+        errors: dict[str, str] = {}
+
+        if not self._lines:
+            self._lines = await _probe_monitor_lines(self.hass, station.rbls)
+            if not self._lines:
+                return self.async_show_form(
+                    step_id="select_lines",
+                    errors={"base": "cannot_connect"},
+                    data_schema=vol.Schema({}),
+                    description_placeholders={
+                        "stop_name": station.name,
+                        "line_count": "0",
+                    },
+                )
+
+        if user_input is not None:
+            picked: list[str] = [
+                str(x) for x in user_input.get(CONF_LINES, [])
+            ]
+            if not picked:
+                errors[CONF_LINES] = "no_lines"
+            else:
+                interval = int(
+                    user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+                )
+                data: dict[str, Any] = {
+                    CONF_DIVA: station.diva,
+                    CONF_STOP_NAME: station.name,
+                    CONF_RBLS: list(station.rbls),
+                    CONF_LINES: picked,
+                    CONF_SCAN_INTERVAL: interval,
+                }
+                if self._reconfigure_entry is not None:
+                    await self.async_set_unique_id(f"diva_{station.diva}")
+                    self._abort_if_unique_id_mismatch()
+                    return self.async_update_reload_and_abort(
+                        self._reconfigure_entry,
+                        data=data,
+                    )
+                await self.async_set_unique_id(f"diva_{station.diva}")
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=station.name, data=data)
+
+        line_options: list[SelectOptionDict] = [
+            SelectOptionDict(
+                value=row["key"],
+                label=_line_label(row),
+            )
+            for row in self._lines
+        ]
+        all_keys = [row["key"] for row in self._lines]
+
+        # Default scan interval comes from the existing entry if reconfiguring,
+        # otherwise the system default.
+        existing = self._reconfigure_entry
+        default_interval = (
+            int({**existing.data, **existing.options}.get(
+                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+            ))
+            if existing is not None
+            else DEFAULT_SCAN_INTERVAL
+        )
+        default_lines = (
+            [str(k) for k in {**existing.data, **existing.options}.get(CONF_LINES, all_keys)]
+            if existing is not None
+            else all_keys
+        )
+
+        return self.async_show_form(
+            step_id="select_lines",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_LINES, default=default_lines): SelectSelector(
+                        SelectSelectorConfig(
+                            options=line_options,
+                            multiple=True,
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    ),
+                    vol.Required(
+                        CONF_SCAN_INTERVAL, default=default_interval
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_POLL_SECONDS,
+                            max=MAX_POLL_SECONDS,
+                            step=5,
+                            unit_of_measurement="s",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "stop_name": station.name,
+                "line_count": str(len(self._lines)),
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Reconfigure
+    # ------------------------------------------------------------------
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle reconfiguration of an existing entry.
-
-        Lets the user change API credentials or the scan interval without
-        deleting the entry — entity unique_ids are preserved.
-        """
+        """Re-enter the line selection for an existing entry."""
         entry = self._get_reconfigure_entry()
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            api_key, errors = _validate_user_input(user_input)
-            if not errors:
-                if not await _test_api_connection(self.hass, api_key):
-                    errors["base"] = "cannot_connect"
-                else:
-                    await self.async_set_unique_id(_compute_unique_id(api_key))
-                    self._abort_if_unique_id_mismatch()
-                    return self.async_update_reload_and_abort(
-                        entry,
-                        data=_build_entry_data(user_input, api_key),
-                    )
+        self._reconfigure_entry = entry
+        data = entry.data
 
-        current = {**entry.data, **entry.options}
-        return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=_build_schema(current),
-            errors=errors,
-        )
+        try:
+            catalogue = await async_load_catalogue(self.hass)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            _LOGGER.warning("Static catalogue load failed on reconfigure: %s", err)
+            return self.async_abort(reason="catalogue_unavailable")
+
+        diva = int(data[CONF_DIVA])
+        station = catalogue.stations_by_diva.get(diva)
+        if station is None:
+            return self.async_abort(reason="stop_gone")
+        self._selected_station = station
+        return await self.async_step_select_lines(user_input)
 
 
 class WienerLinienAustriaOptionsFlow(OptionsFlow):
-    """Handle options for Wiener Linien Austria."""
+    """Options flow: scan interval only.
+
+    Stop/line changes go through `async_step_reconfigure` in the main flow so
+    the entry's unique_id stays stable and entities are preserved.
+    """
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle options."""
-        errors: dict[str, str] = {}
         config = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
-            api_key, errors = _validate_user_input(user_input)
-            if not errors:
-                if not await _test_api_connection(self.hass, api_key):
-                    errors["base"] = "cannot_connect"
-                else:
-                    return self.async_create_entry(
-                        data=_build_entry_data(user_input, api_key)
-                    )
+            interval = int(
+                user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+            )
+            return self.async_create_entry(
+                data={CONF_SCAN_INTERVAL: interval}
+            )
+
+        default_interval = int(
+            config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        )
         return self.async_show_form(
             step_id="init",
-            data_schema=_build_schema(config),
-            errors=errors,
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_SCAN_INTERVAL, default=default_interval
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=MIN_POLL_SECONDS,
+                            max=MAX_POLL_SECONDS,
+                            step=5,
+                            unit_of_measurement="s",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    )
+                }
+            ),
         )
+
+
+def _line_label(row: dict[str, str]) -> str:
+    """Render a line selection label: 'U1 → Leopoldau'."""
+    return f"{row['line']} → {row['towards']}"

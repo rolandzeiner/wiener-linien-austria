@@ -1,7 +1,7 @@
 {
   "entity": {
     "sensor": {
-      "example": { "default": "mdi:information-outline" }
+      "stop": { "default": "mdi:train-variant" }
     }
   }
 }
