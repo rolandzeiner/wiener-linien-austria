@@ -414,10 +414,19 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
 
   static getStubConfig(hass) {
     const entities = _findWienerLinienEntities(hass);
-    return {
-      entity: entities[0] || "",
-      direction: "H",
-    };
+    const first = entities[0] || "";
+    // Pick whichever direction actually has departures at the first
+    // sensor so the Lovelace "Add card" preview renders with data,
+    // not an empty "Keine Abfahrten" state. Many tram/bus RBLs are
+    // one-direction only.
+    let direction = "H";
+    const deps = hass?.states[first]?.attributes?.departures;
+    if (Array.isArray(deps)) {
+      const hasH = deps.some((d) => d?.direction === "H");
+      const hasR = deps.some((d) => d?.direction === "R");
+      if (!hasH && hasR) direction = "R";
+    }
+    return { entity: first, direction };
   }
 
   async _checkCardVersion() {
@@ -981,6 +990,6 @@ window.customCards.push({
   name: "Wiener Linien Austria Retro",
   description:
     "Retro-LED-Anzeige für eine Haltestelle und eine Richtung — Gleis inklusive.",
-  preview: false,
+  preview: true,
   documentationURL: "https://github.com/rolandzeiner/wiener-linien-austria",
 });
