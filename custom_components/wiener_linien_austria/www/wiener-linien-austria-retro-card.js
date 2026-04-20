@@ -52,12 +52,18 @@ const TRANSLATIONS = {
       section_sensor: "Haltestelle",
       section_direction: "Richtung",
       section_line: "Linie",
+      section_display: "Darstellung",
       sensor_hint: "Eine Haltestelle auswählen.",
       direction_hint:
         "Hin- oder Rückfahrt — die Retro-Anzeige zeigt nur eine Richtung.",
       direction_no_data: "Keine Abfahrten in dieser Richtung",
       line_hint:
         "Optional: nur eine Linie anzeigen. Aktiven Chip erneut antippen = alle Linien.",
+      show_platform: "Gleis/Steig anzeigen",
+      size_label: "Größe",
+      size_small: "Klein",
+      size_medium: "Mittel",
+      size_regular: "Normal",
       no_sensors:
         "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
       no_lines:
@@ -80,12 +86,18 @@ const TRANSLATIONS = {
       section_sensor: "Stop",
       section_direction: "Direction",
       section_line: "Line",
+      section_display: "Display",
       sensor_hint: "Pick a single stop.",
       direction_hint:
         "Outbound or return — the retro display only shows one direction.",
       direction_no_data: "No departures in this direction",
       line_hint:
         "Optional: restrict to a single line. Tap the active chip again to show all lines.",
+      show_platform: "Show platform",
+      size_label: "Size",
+      size_small: "Small",
+      size_medium: "Medium",
+      size_regular: "Regular",
       no_sensors:
         "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
       no_lines:
@@ -97,6 +109,8 @@ const TRANSLATIONS = {
 // ------------------------------------------------------------------
 // Config normalisation
 // ------------------------------------------------------------------
+
+const RETRO_SIZES = new Set(["small", "medium", "regular"]);
 
 function _normaliseConfig(config) {
   const out = { ...(config || {}) };
@@ -114,6 +128,13 @@ function _normaliseConfig(config) {
   } else if (out.line != null) {
     delete out.line;
   }
+  // Show Gleis/Steig panel by default (matches v0 behaviour). Explicit
+  // `false` hides it — useful on narrow mobile cards or when the user
+  // prioritises destination text width over platform info.
+  out.show_platform = out.show_platform !== false;
+  // Card size: regular = previous sizing, medium / small scale
+  // font + padding proportionally for denser or cramped layouts.
+  if (!RETRO_SIZES.has(out.size)) out.size = "regular";
   return out;
 }
 
@@ -224,6 +245,49 @@ const RETRO_STYLE = `
     font-size: 3em;
     line-height: 1;
     font-weight: 400;
+  }
+
+  /* ---- size variants ---- */
+  /* "regular" uses the base sizing above — no override needed. */
+  .retro--size-medium {
+    padding: 11px 14px;
+    min-height: 92px;
+  }
+  .retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
+  .retro--size-medium .retro-gleis { padding: 0 10px 0 14px; min-width: 48px; }
+  .retro--size-medium.retro--gleis-left .retro-gleis {
+    padding: 0 14px 0 10px;
+  }
+  .retro--size-medium .retro-gleis-number { font-size: 2.3em; }
+  .retro--size-medium .retro-gleis-label {
+    font-size: 0.8em;
+    letter-spacing: 1.5px;
+  }
+
+  .retro--size-small {
+    padding: 8px 10px;
+    min-height: 72px;
+  }
+  .retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
+  .retro--size-small .retro-row {
+    grid-template-columns: 2em 1fr auto;
+    gap: 8px;
+  }
+  .retro--size-small .retro-gleis {
+    padding: 0 8px 0 10px;
+    min-width: 38px;
+    margin-left: 8px;
+  }
+  .retro--size-small.retro--gleis-left .retro-gleis {
+    padding: 0 10px 0 8px;
+    margin-left: 0;
+    margin-right: 8px;
+  }
+  .retro--size-small .retro-gleis-number { font-size: 1.75em; }
+  .retro--size-small .retro-gleis-label {
+    font-size: 0.68em;
+    letter-spacing: 1px;
+    margin-bottom: 0;
   }
   .retro-empty {
     flex: 1;
@@ -368,7 +432,9 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
           .filter((d) => !lineFilter || d.line === lineFilter)
       : [];
     const rows = matching.slice(0, 2);
-    const platform = rows.find((d) => d.platform)?.platform || null;
+    const showPlatform = this._config.show_platform !== false;
+    const rawPlatform = rows.find((d) => d.platform)?.platform || null;
+    const platform = showPlatform ? rawPlatform : null;
     // Gleis "2" sits on the left, anything else (including "1") on the
     // right — matches Wiener Linien's platform-display convention.
     const gleisLeft = platform === "2";
@@ -377,6 +443,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const type = rows[0]?.type || "";
     const isBus = type === "ptBusCity" || type === "ptBusNight";
     const platformLabel = this._t(isBus ? "steig" : "gleis");
+    const size = this._config.size || "regular";
 
     const banner = this._versionMismatch ? this._renderBanner() : "";
 
@@ -406,7 +473,13 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       `;
     }
 
-    const retroClass = `retro${gleisLeft ? " retro--gleis-left" : ""}`;
+    const retroClass = [
+      "retro",
+      gleisLeft ? "retro--gleis-left" : "",
+      size !== "regular" ? `retro--size-${size}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     this.innerHTML = `
       <ha-card style="background:${LED_BG};padding:0;overflow:hidden;">
         <style>${RETRO_STYLE}</style>
@@ -554,6 +627,16 @@ const EDITOR_STYLE = `
     font-size: 12px;
     color: var(--warning-color, #ffa000);
   }
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .toggle-row label {
+    font-size: 13px;
+    color: var(--primary-text-color);
+    cursor: pointer;
+  }
 `;
 
 class WienerLinienAustriaRetroCardEditor extends HTMLElement {
@@ -619,6 +702,19 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     this._render();
   }
 
+  _setShowPlatform(on) {
+    this._config = { ...this._config, show_platform: !!on };
+    this._fire();
+    this._render();
+  }
+
+  _setSize(size) {
+    if (!RETRO_SIZES.has(size)) return;
+    this._config = { ...this._config, size };
+    this._fire();
+    this._render();
+  }
+
   _linesForCurrent() {
     // Lines that actually have departures for the selected
     // (entity, direction). Used to populate the line-chip picker.
@@ -660,6 +756,10 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     const direction = this._config.direction || "H";
     const selectedLine = this._config.line || "";
     const directionsWithData = this._directionsWithData();
+    const showPlatform = this._config.show_platform !== false;
+    const size = RETRO_SIZES.has(this._config.size)
+      ? this._config.size
+      : "regular";
 
     const chips = available.length
       ? available
@@ -732,6 +832,26 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           <div class="editor-hint">${_esc(this._et("line_hint"))}</div>
           <div class="entity-chips">${lineChips}</div>
         </div>
+
+        <div class="editor-section">
+          <div class="section-header">${_esc(this._et("section_display"))}</div>
+          <div class="toggle-row">
+            <label for="retro-show-platform">${_esc(this._et("show_platform"))}</label>
+            <ha-switch
+              id="retro-show-platform"
+              data-field="show_platform"
+              ${showPlatform ? "checked" : ""}
+            ></ha-switch>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;">
+            <span style="font-size:13px;">${_esc(this._et("size_label"))}</span>
+            <div class="direction-buttons">
+              <button type="button" data-size="small" class="${size === "small" ? "active" : ""}">${_esc(this._et("size_small"))}</button>
+              <button type="button" data-size="medium" class="${size === "medium" ? "active" : ""}">${_esc(this._et("size_medium"))}</button>
+              <button type="button" data-size="regular" class="${size === "regular" ? "active" : ""}">${_esc(this._et("size_regular"))}</button>
+            </div>
+          </div>
+        </div>
       </div>
     `;
 
@@ -747,6 +867,16 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
       chip.addEventListener("click", () =>
         this._pickLine(chip.dataset.line),
       );
+    });
+    this.querySelectorAll("ha-switch[data-field='show_platform']").forEach(
+      (sw) => {
+        sw.addEventListener("change", (e) =>
+          this._setShowPlatform(e.target.checked),
+        );
+      },
+    );
+    this.querySelectorAll("button[data-size]").forEach((btn) => {
+      btn.addEventListener("click", () => this._setSize(btn.dataset.size));
     });
   }
 }
