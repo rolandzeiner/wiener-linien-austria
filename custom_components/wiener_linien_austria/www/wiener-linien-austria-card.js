@@ -586,6 +586,11 @@ const CARD_STYLE = `
     margin-left: auto;
     color: var(--secondary-text-color);
   }
+  .wl-devmode-hb {
+    font-variant-numeric: tabular-nums;
+    color: var(--secondary-text-color);
+    opacity: 0.7;
+  }
 `;
 
 class WienerLinienAustriaCard extends HTMLElement {
@@ -1278,6 +1283,10 @@ class WienerLinienAustriaCard extends HTMLElement {
 
   _renderDevModePanel() {
     if (!this._isDevMode()) return "";
+    // Heartbeat — a fresh HH:MM:SS on every render proves the tick
+    // interval is firing without needing DevTools.
+    const now = new Date();
+    const hb = now.toLocaleTimeString("de-AT", { hour12: false });
     return `
       <div class="wl-devmode">
         <span class="wl-devmode-label">${_esc(this._t("devmode_title"))}</span>
@@ -1290,6 +1299,7 @@ class WienerLinienAustriaCard extends HTMLElement {
         <button type="button" class="wl-devmode-clear" data-dev-action="clear">${_esc(
           this._t("devmode_clear_btn"),
         )}</button>
+        <span class="wl-devmode-hb" title="Last render">${_esc(hb)}</span>
       </div>
     `;
   }
