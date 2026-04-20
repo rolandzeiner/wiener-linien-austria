@@ -34,6 +34,8 @@ const TRANSLATIONS = {
     dir_r: "R",
     dir_both: "Beide",
     traffic_label: "Störung",
+    traffic_until: "Bis",
+    traffic_updated: "aktualisiert",
     elevator_label: "Aufzug außer Betrieb",
     elevator_until: "Bis",
     devmode_title: "DEV",
@@ -79,6 +81,8 @@ const TRANSLATIONS = {
     dir_r: "R",
     dir_both: "Both",
     traffic_label: "Disruption",
+    traffic_until: "Until",
+    traffic_updated: "updated",
     elevator_label: "Elevator out of service",
     elevator_until: "Until",
     devmode_title: "DEV",
@@ -116,6 +120,15 @@ const _esc = (s) =>
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+
+// Escape everything, then re-allow only <br> variants (<br>, <br/>, <br />).
+// Wiener Linien's descriptionHTML uses <br> for paragraph breaks and nothing
+// else; keeping the allowlist minimal is defense-in-depth against upstream
+// ever embedding a <script> or similar.
+function _safeTrafficHtml(html) {
+  if (typeof html !== "string" || !html) return "";
+  return _esc(html).replace(/&lt;br\s*\/?&gt;/gi, "<br>");
+}
 
 function _findWienerLinienEntities(hass) {
   if (!hass || !hass.states) return [];
@@ -348,13 +361,52 @@ const CARD_STYLE = `
     color: var(--warning-color, #ffa000);
     flex-shrink: 0;
   }
-  .wl-traffic-body .wl-traffic-title {
-    font-weight: 600;
+  .wl-traffic-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+  }
+  .wl-traffic-lines {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
     margin-bottom: 2px;
   }
-  .wl-traffic-body .wl-traffic-desc {
+  .wl-traffic-line-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #fff;
+    background: var(--primary-color);
+  }
+  .wl-traffic-title {
+    font-weight: 600;
+  }
+  .wl-traffic-desc {
     color: var(--secondary-text-color);
-    line-height: 1.35;
+    line-height: 1.4;
+  }
+  .wl-traffic-meta {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    color: var(--secondary-text-color);
+    font-size: 0.9em;
+    font-variant-numeric: tabular-nums;
+  }
+  .wl-traffic-location-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .wl-traffic-location-chip ha-icon {
+    --mdc-icon-size: 14px;
+    color: var(--secondary-text-color);
   }
   .wl-empty {
     padding: 18px 0;
@@ -631,14 +683,59 @@ class WienerLinienAustriaCard extends HTMLElement {
   }
 
   _renderTrafficItem(t) {
+    const overrides = this._config.line_colors || {};
+    const lines = Array.isArray(t.related_lines) ? t.related_lines : [];
+    const linesHtml = lines.length
+      ? `<div class="wl-traffic-lines">${lines
+          .map((l) => {
+            const color = _colorForLine(l, overrides);
+            return `<span class="wl-traffic-line-badge" style="background:${color}">${_esc(l)}</span>`;
+          })
+          .join("")}</div>`
+      : "";
+
     const title = _esc(t.title || this._t("traffic_label"));
-    const desc = _esc(t.description || "");
+
+    // Prefer HTML body (preserves paragraph breaks via <br>); fall back
+    // to plaintext escaped.
+    const descHtml = t.description_html
+      ? _safeTrafficHtml(t.description_html)
+      : _esc(t.description || "");
+    const descBlock = descHtml
+      ? `<div class="wl-traffic-desc">${descHtml}</div>`
+      : "";
+
+    // Meta row: location chip + time window + last-update stamp.
+    const metaParts = [];
+    if (t.location) {
+      metaParts.push(
+        `<span class="wl-traffic-location-chip"><ha-icon icon="mdi:map-marker"></ha-icon>${_esc(t.location)}</span>`,
+      );
+    }
+    const until = this._formatTime(t.time_end);
+    if (until) {
+      metaParts.push(
+        `<span>${_esc(`${this._t("traffic_until")} ${until}`)}</span>`,
+      );
+    }
+    const updated = this._formatTime(t.time_last_update);
+    if (updated && updated !== this._formatTime(t.time_created)) {
+      metaParts.push(
+        `<span>${_esc(`${this._t("traffic_updated")} ${updated}`)}</span>`,
+      );
+    }
+    const metaBlock = metaParts.length
+      ? `<div class="wl-traffic-meta">${metaParts.join("")}</div>`
+      : "";
+
     return `
       <div class="wl-traffic">
         <ha-icon icon="mdi:alert-octagon"></ha-icon>
         <div class="wl-traffic-body">
+          ${linesHtml}
           <div class="wl-traffic-title">${title}</div>
-          ${desc ? `<div class="wl-traffic-desc">${desc}</div>` : ""}
+          ${descBlock}
+          ${metaBlock}
         </div>
       </div>
     `;
@@ -859,11 +956,21 @@ class WienerLinienAustriaCard extends HTMLElement {
     const pick = this._randomFrom(pool);
     const line = pick?.line || "U?";
     const towards = pick?.towards || "Unbekannt";
+    const now = new Date();
+    const endIso = new Date(now.getTime() + 3 * 60 * 60 * 1000).toISOString();
+    const startIso = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
     this._debugTraffic.push({
       name: `DEBUG-T-${Date.now()}`,
       title: `${line}: Testmeldung`,
       description: `Debug-Eintrag für Linie ${line} Richtung ${towards}.`,
+      description_html: `Debug-Eintrag für Linie ${line} Richtung ${towards}.<br><br>Grund: Dev-Mode-Test.`,
+      location: "Debug-Stelle",
       related_lines: [line],
+      line_types: {},
+      time_start: startIso,
+      time_end: endIso,
+      time_created: startIso,
+      time_last_update: now.toISOString(),
       status: "active",
     });
     this._render();
