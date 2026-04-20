@@ -245,6 +245,25 @@ const RETRO_STYLE = `
     text-align: right;
     min-width: 2.5em;
   }
+  /* Alternating-asterisk "train at platform" indicator — replaces the
+     digit 0. Two spans run the same on/off animation, second one offset
+     by half the cycle, so you get the alternating blink real WL LED
+     boards use. */
+  .retro-stars {
+    display: inline-flex;
+    gap: 0.08em;
+    justify-content: flex-end;
+  }
+  .retro-stars > span {
+    animation: retroStarBlink 1s infinite;
+  }
+  .retro-stars > span:nth-child(2) {
+    animation-delay: 0.5s;
+  }
+  @keyframes retroStarBlink {
+    0%, 49.99% { opacity: 1; }
+    50%, 100%  { opacity: 0; }
+  }
   .retro-gleis {
     flex: 0 0 auto;
     display: flex;
@@ -529,7 +548,15 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const line = _esc(d.line || "?");
     const towards = _esc(d.towards || "");
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
-    const cdLabel = cd === null ? "--" : String(Math.max(0, cd));
+    // When a train is at the platform (countdown ≤ 0) real WL LED
+    // boards flash two alternating asterisks instead of a digit.
+    // Mirror that here via a small CSS animation.
+    const isAtPlatform = cd !== null && cd <= 0;
+    const cdInner = cd === null
+      ? "--"
+      : isAtPlatform
+        ? '<span class="retro-stars"><span>*</span><span>*</span></span>'
+        : _esc(String(cd));
     // Wheelchair icon after the destination, mirroring real Wiener Linien
     // station boards that mark step-free departures. Using ha-icon (MDI
     // SVG) rather than the ♿ emoji so it stays in the amber LED tone —
@@ -541,7 +568,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       <div class="retro-row">
         <div class="retro-line">${line}</div>
         <div class="retro-dest"><span class="retro-dest-text">${towards}</span>${wheelchairHtml}</div>
-        <div class="retro-cd">${_esc(cdLabel)}</div>
+        <div class="retro-cd">${cdInner}</div>
       </div>
     `;
   }
