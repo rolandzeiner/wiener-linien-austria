@@ -55,6 +55,14 @@ from .static import Station, async_load_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
+# SelectOptionDict labels bypass HA's selector translation system, so we
+# pick the right locale at runtime. English is the fallback for anything
+# not explicitly listed.
+_SEARCH_AGAIN_LABELS: dict[str, str] = {
+    "en": "↩ Search again",
+    "de": "↩ Erneut suchen",
+}
+
 
 def _line_key(line: str, direction: str, towards: str) -> str:
     """Stable identifier for a (line, direction, towards) triple.
@@ -207,8 +215,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             for s in self._matches
         ]
+        lang = self.hass.config.language
+        search_again_label = _SEARCH_AGAIN_LABELS.get(
+            lang, _SEARCH_AGAIN_LABELS["en"]
+        )
         options.append(
-            SelectOptionDict(value="__search_again__", label="↩ Search again")
+            SelectOptionDict(value="__search_again__", label=search_again_label)
         )
 
         return self.async_show_form(
