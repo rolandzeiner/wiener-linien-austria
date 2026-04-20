@@ -222,19 +222,6 @@ logger:
 - **No journey planning.** The OGD monitor endpoint returns departures at a stop; it does not do routing.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search until the cache rebuilds.
 
-## U-Bahn Line Colors (reference)
-
-For users building dashboards / custom cards. Wiener Linien doesn't publish a standalone CI PDF, but the hex values match in-station signage and every community reference:
-
-| Line | Hex | Name |
-|---|---|---|
-| U1 | `#E3000F` | red |
-| U2 | `#A862A4` | violet |
-| U3 | `#EF7C00` | orange |
-| U4 | `#00963F` | green |
-| U5 | `#008F95` | turquoise (opening phased) |
-| U6 | `#9D6830` | brown / ochre |
-
 ## Attribution
 
 All live data is © Wiener Linien and published under the [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license. The integration emits this attribution on every sensor (`attribution` attribute) and in every diagnostics download:
