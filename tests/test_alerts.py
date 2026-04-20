@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
@@ -31,16 +32,29 @@ def test_parse_traffic_extracts_core_fields() -> None:
         "name": "I20260420-0032",
         "title": "49A: Verkehrsunfall",
         "description": "Linie 49A: Unregelmäßige Intervalle.",
+        "descriptionHTML": "Linie 49A:<br>Unregelmäßige Intervalle.",
+        "location": "Stadionallee",
         "status": "active",
-        "time": {"start": "2026-04-20T16:42:00+0200", "end": "2026-04-20T23:55:00+0200"},
+        "time": {
+            "start": "2026-04-20T16:42:00+0200",
+            "end": "2026-04-20T23:55:00+0200",
+            "created": "2026-04-20T16:42:00+0200",
+            "lastUpdate": "2026-04-20T17:00:00+0200",
+        },
         "relatedLines": ["49A"],
+        "attributes": {"relatedLineTypes": {"49A": "ptBusCity"}},
     }
     t = _parse_traffic(raw)
     assert t.name == "I20260420-0032"
     assert t.title == "49A: Verkehrsunfall"
     assert t.related_lines == ["49A"]
+    assert t.line_types == {"49A": "ptBusCity"}
+    assert t.location == "Stadionallee"
+    assert t.description_html == "Linie 49A:<br>Unregelmäßige Intervalle."
     assert t.time_start == "2026-04-20T16:42:00+0200"
     assert t.time_end == "2026-04-20T23:55:00+0200"
+    assert t.time_created == "2026-04-20T16:42:00+0200"
+    assert t.time_last_update == "2026-04-20T17:00:00+0200"
     assert t.status == "active"
 
 
@@ -228,6 +242,56 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     assert [t.name for t in traffic] == ["T1"]
     assert [e.name for e in elevator] == ["E1"]
     assert elevator[0].related_stops == [4111]
+
+
+async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None:
+    """`status: resolved` entries must not reach the cache."""
+    traffic_body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "trafficInfos": [
+                {
+                    "name": "ACTIVE",
+                    "title": "U4: disrupt",
+                    "description": "x",
+                    "relatedLines": ["U4"],
+                    "status": "active",
+                    "time": {},
+                },
+                {
+                    "name": "DONE",
+                    "title": "U1: over",
+                    "description": "y",
+                    "relatedLines": ["U1"],
+                    "status": "resolved",
+                    "time": {},
+                },
+            ]
+        },
+    }
+    elevator_body = {"message": {"messageCode": 1}, "data": {"trafficInfos": []}}
+
+    def _resp(body: dict[str, Any]) -> MagicMock:
+        r = MagicMock()
+        r.raise_for_status = MagicMock()
+        r.json = AsyncMock(return_value=body)
+        return r
+
+    async def fake_get(url: str, **kwargs: object) -> MagicMock:
+        name = next((v for k, v in kwargs["params"] if k == "name"), None)
+        return _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=fake_get)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        await async_refresh_alerts(hass)
+
+    names = [t.name for t in hass.data[DOMAIN][TRAFFIC_INFO_KEY]]
+    assert names == ["ACTIVE"]
 
 
 async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -52,7 +52,12 @@ class TrafficInfo:
     related_lines: list[str]
     time_start: str | None
     time_end: str | None
-    status: str  # "active" etc.
+    status: str  # "active", "resolved", ...
+    description_html: str = ""  # same text but with <br> breaks preserved
+    line_types: dict[str, str] = field(default_factory=dict)
+    location: str | None = None  # free-text locality, e.g. "Stadionallee"
+    time_created: str | None = None  # when the alert was first posted
+    time_last_update: str | None = None  # when the alert was last edited
 
     def to_dict(self) -> dict[str, Any]:
         """Render as plain dict for sensor attributes / diagnostics."""
@@ -60,9 +65,14 @@ class TrafficInfo:
             "name": self.name,
             "title": self.title,
             "description": self.description,
+            "description_html": self.description_html,
             "related_lines": list(self.related_lines),
+            "line_types": dict(self.line_types),
+            "location": self.location,
             "time_start": self.time_start,
             "time_end": self.time_end,
+            "time_created": self.time_created,
+            "time_last_update": self.time_last_update,
             "status": self.status,
         }
 
@@ -163,7 +173,11 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     domain_data = hass.data.setdefault(DOMAIN, {})
 
     if traffic_raw:
-        domain_data[TRAFFIC_INFO_KEY] = [_parse_traffic(x) for x in traffic_raw]
+        parsed = [_parse_traffic(x) for x in traffic_raw]
+        # Drop resolved entries — upstream keeps them in the feed for a
+        # while after the disruption ends, but users don't want them on
+        # the card.
+        domain_data[TRAFFIC_INFO_KEY] = [t for t in parsed if t.status == "active"]
     elif TRAFFIC_INFO_KEY not in domain_data:
         domain_data[TRAFFIC_INFO_KEY] = []
 
@@ -188,13 +202,25 @@ def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
     """Parse one trafficInfos entry for name=stoerunglang."""
     time = raw.get("time") or {}
     related_lines = _as_str_list(raw.get("relatedLines"))
+    attrs = raw.get("attributes") or {}
+    line_types_raw = attrs.get("relatedLineTypes") or {}
+    line_types: dict[str, str] = {}
+    if isinstance(line_types_raw, dict):
+        for k, v in line_types_raw.items():
+            if isinstance(k, str) and isinstance(v, str):
+                line_types[k] = v
     return TrafficInfo(
         name=str(raw.get("name") or ""),
         title=str(raw.get("title") or "").strip(),
         description=str(raw.get("description") or "").strip(),
+        description_html=str(raw.get("descriptionHTML") or "").strip(),
         related_lines=related_lines,
+        line_types=line_types,
+        location=_str_or_none(raw.get("location")),
         time_start=_str_or_none(time.get("start")),
         time_end=_str_or_none(time.get("end")),
+        time_created=_str_or_none(time.get("created")),
+        time_last_update=_str_or_none(time.get("lastUpdate")),
         status=str(raw.get("status") or ""),
     )
 
