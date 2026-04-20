@@ -691,13 +691,9 @@ class WienerLinienAustriaCard extends HTMLElement {
 
   static getStubConfig(hass) {
     const entities = _findWienerLinienEntities(hass);
-    // Preview + newly-placed-card seed. Exactly one sensor (first one
-    // discovered) and a compact 4-row departure list so the Lovelace
-    // picker tile doesn't stack a dozen rows at low resolution. Users
-    // bump max_departures / add more stops in the editor afterwards.
     return {
       entities: entities.length ? [entities[0]] : [],
-      max_departures: 4,
+      max_departures: 6,
     };
   }
 
@@ -731,10 +727,6 @@ class WienerLinienAustriaCard extends HTMLElement {
       ? this._config.entities.filter((s) => this._hass?.states[s.entity])
       : [];
     if (picked.length) return picked;
-    // Fallback when config.entities is empty / all invalid: pick only the
-    // FIRST available Wiener Linien sensor. Never auto-expand to every
-    // installed stop — stacking every configured stop into a preview
-    // tile or an otherwise-unconfigured card reads as noise, not default.
     const available = _findWienerLinienEntities(this._hass);
     return available.length ? [{ entity: available[0] }] : [];
   }
