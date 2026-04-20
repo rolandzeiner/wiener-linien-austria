@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -9,19 +10,39 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.event import async_track_time_interval
 
-from .const import DOMAIN
+from .const import DOMAIN, STATIC_CACHE_REFRESH_HOURS
 from .coordinator import WienerLinienAustriaCoordinator
+from .static import async_refresh_catalogue
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
+STATIC_REFRESH_UNSUB_KEY = "static_refresh_unsub"
+
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
-    """Set up the Wiener Linien Austria component."""
-    hass.data.setdefault(DOMAIN, {})
+    """Set up the Wiener Linien Austria component.
+
+    Schedules a weekly refresh of the stop catalogue. First fetch happens
+    lazily on first config-flow use — no need to eagerly download at startup.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+
+    if STATIC_REFRESH_UNSUB_KEY not in domain_data:
+        async def _periodic_refresh(_now: Any) -> None:
+            await async_refresh_catalogue(hass)
+
+        domain_data[STATIC_REFRESH_UNSUB_KEY] = async_track_time_interval(
+            hass,
+            _periodic_refresh,
+            timedelta(hours=STATIC_CACHE_REFRESH_HOURS),
+            cancel_on_shutdown=True,
+        )
+
     return True
 
 
@@ -34,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.runtime_data = coordinator
 
-    # Register a device explicitly so the Devices panel shows the entry
+    # Register the device up-front so the Devices panel shows the entry
     # even before any entity reports state.
     dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -58,3 +79,13 @@ async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Placeholder for future schema migrations.
+
+    v0.1.0 ships with `entry.version = 1`. When we change the schema we bump
+    the version and fill this function in. Returning True lets HA load the
+    entry unmodified.
+    """
+    return True
