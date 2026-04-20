@@ -1732,6 +1732,13 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
 
         <div class="editor-section">
           <div class="section-header">${_esc(this._et("section_display"))}</div>
+          <div class="toggle-row" style="gap:12px;">
+            <span style="font-size:13px;">${_esc(this._et("layout_label"))}</span>
+            <div class="direction-buttons">
+              <button type="button" data-layout="stacked" class="${layout === "stacked" ? "active" : ""}">${_esc(this._et("layout_stacked"))}</button>
+              <button type="button" data-layout="tabs" class="${layout === "tabs" ? "active" : ""}">${_esc(this._et("layout_tabs"))}</button>
+            </div>
+          </div>
           <div class="slider-row">
             <span class="slider-label">${_esc(this._et("max_departures"))}</span>
             <input
@@ -1775,13 +1782,6 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
               data-field="hide_attribution"
               ${hideAttr ? "checked" : ""}
             ></ha-switch>
-          </div>
-          <div class="toggle-row" style="gap:12px;">
-            <span style="font-size:13px;">${_esc(this._et("layout_label"))}</span>
-            <div class="direction-buttons">
-              <button type="button" data-layout="stacked" class="${layout === "stacked" ? "active" : ""}">${_esc(this._et("layout_stacked"))}</button>
-              <button type="button" data-layout="tabs" class="${layout === "tabs" ? "active" : ""}">${_esc(this._et("layout_tabs"))}</button>
-            </div>
           </div>
         </div>
 
