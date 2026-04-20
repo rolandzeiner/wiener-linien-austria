@@ -396,11 +396,16 @@ const CARD_STYLE = `
     min-width: 0;
     flex: 1;
   }
+  .wl-traffic-summary {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
   .wl-traffic-lines {
     display: inline-flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-bottom: 2px;
   }
   .wl-traffic-line-badge {
     display: inline-block;
@@ -797,8 +802,10 @@ class WienerLinienAustriaCard extends HTMLElement {
       <div class="${classes}" data-traffic-name="${_esc(t.name || "")}">
         <ha-icon icon="mdi:alert-octagon"></ha-icon>
         <div class="wl-traffic-body">
-          ${linesHtml}
-          <div class="wl-traffic-title">${title}</div>
+          <div class="wl-traffic-summary">
+            ${linesHtml}
+            <div class="wl-traffic-title">${title}</div>
+          </div>
           ${detailBlock}
         </div>
         ${chevron}
