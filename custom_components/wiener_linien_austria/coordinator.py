@@ -27,6 +27,7 @@ from .const import (
     DOMAIN_LAST_CALL_KEY,
     ERR_RATE_LIMIT,
     MONITOR_ENDPOINT,
+    USER_AGENT,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -163,10 +164,13 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         params: list[tuple[str, str]] = [
             ("stopId", str(rbl)) for rbl in self._rbls
         ]
+        headers = {"User-Agent": USER_AGENT}
         timeout = aiohttp.ClientTimeout(total=30)
 
         try:
-            resp = await self._session.get(url, params=params, timeout=timeout)
+            resp = await self._session.get(
+                url, params=params, headers=headers, timeout=timeout
+            )
             resp.raise_for_status()
         except asyncio.TimeoutError as err:
             raise UpdateFailed(
