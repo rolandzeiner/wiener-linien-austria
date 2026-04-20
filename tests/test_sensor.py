@@ -125,6 +125,31 @@ async def test_native_value_none_when_coordinator_has_no_data(hass: HomeAssistan
     assert sensor.native_value is None
 
 
+async def test_available_tolerates_transient_failures(hass: HomeAssistant) -> None:
+    """A single failed poll must NOT flip the sensor to unavailable while
+    the coordinator still holds prior data — otherwise the card blanks
+    out between polls on transient hiccups."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    assert sensor.available is True
+
+    # Simulate a failed poll — CoordinatorEntity.available would now be
+    # False under the HA default, but our relaxed rule keeps us available
+    # as long as we still have cached data to serve.
+    coordinator.last_update_success = False
+    assert sensor.available is True
+
+    # Having no data at all (never successfully fetched) is the only case
+    # that legitimately renders the sensor unavailable.
+    coordinator.data = None
+    assert sensor.available is False
+
+
 async def test_unit_and_device_class(hass: HomeAssistant) -> None:
     """Unit = minutes, device_class = duration."""
     entry = _make_entry()
@@ -245,8 +270,10 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     assert next_by_line == {"U1": 2, "71": 4}
 
 
-async def test_availability_follows_coordinator(hass: HomeAssistant) -> None:
-    """Sensor is available iff the coordinator's last_update_success is True."""
+async def test_availability_requires_any_cached_data(hass: HomeAssistant) -> None:
+    """Sensor is available whenever the coordinator has ANY cached data,
+    even an empty one — transient fetch failures no longer flip us to
+    unavailable (see test_available_tolerates_transient_failures)."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = _make_coordinator(
@@ -254,7 +281,8 @@ async def test_availability_follows_coordinator(hass: HomeAssistant) -> None:
     )
     sensor = WienerLinienStopSensor(coordinator, entry)
     assert sensor.available is True
-    coordinator.last_update_success = False
+    # Only "no data at all" renders unavailable.
+    coordinator.data = None
     assert sensor.available is False
 
 

@@ -145,6 +145,8 @@ All outbound calls share a **15 s domain-wide cooldown** so multi-entry setups n
 
 Alert caches are shared across all entries — even with five configured stops, total traffic + elevator fetch traffic is just two requests every five minutes for the whole integration.
 
+**Transient failures serve stale data.** A single failed poll (timeout, 5xx, temporary rate-limit) does NOT flip the sensor to `unavailable` — the coordinator keeps the last successful departure board visible until the next good fetch. Templates can still detect staleness via the `server_time` attribute. Only a never-successful integration (fresh install with a broken API) stays unavailable.
+
 ## Use Cases
 
 - **Leave-now notifications** — "if the next U1 towards Leopoldau is < 3 min, notify me".

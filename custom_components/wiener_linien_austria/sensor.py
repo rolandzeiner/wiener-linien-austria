@@ -139,12 +139,19 @@ class WienerLinienStopSensor(
 
     @property
     def available(self) -> bool:
-        """Match the coordinator's availability.
+        """Stay available while we have any cached data.
 
-        Even when the stop has no departures right now (e.g. overnight) we
-        stay available — native_value just reports None.
+        HA's default `CoordinatorEntity.available` follows
+        `last_update_success`, which flips to False on any single fetch
+        failure. That would blank the card between polls for transient
+        hiccups (one-off timeouts, brief 5xx's, momentary rate-limits).
+        We relax it: as long as the coordinator has prior data from any
+        past successful fetch, keep serving it. Templates can still
+        detect staleness via the `server_time` attribute if they care.
+        If we've never had a successful fetch, the coordinator's
+        `data` is None and we stay unavailable — nothing to show.
         """
-        return self.coordinator.last_update_success
+        return self.coordinator.data is not None
 
 
 # Explicit re-export so mypy sees the full type contract.
