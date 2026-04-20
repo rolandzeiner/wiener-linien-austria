@@ -3,70 +3,96 @@
     "step": {
       "user": {
         "title": "Wiener Linien Austria",
-        "description": "Set up Wiener Linien Austria.",
+        "description": "Search for a stop by name.",
         "data": {
-          "name": "Name",
-          "api_key": "API key",
-          "scan_interval": "Update interval (minutes)"
+          "search_query": "Stop name"
+        },
+        "data_description": {
+          "search_query": "Start typing and hit submit. Example: Stephansplatz"
+        }
+      },
+      "select_stop": {
+        "title": "Pick a stop",
+        "description": "Matches for \"{query}\":",
+        "data": {
+          "diva": "Stop"
+        }
+      },
+      "select_lines": {
+        "title": "Lines at {stop_name}",
+        "description": "Found {line_count} lines currently serving this stop. Deselect any you do not want to track.",
+        "data": {
+          "lines": "Lines to track",
+          "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "Minimum 30 seconds (Wiener Linien fair-use is 15 s; we double it for safety)."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure Wiener Linien Austria",
-        "description": "Update credentials or polling interval. Existing entities are preserved.",
+        "title": "Reconfigure {stop_name}",
+        "description": "Update the tracked lines or the polling interval. Entities are preserved.",
         "data": {
-          "api_key": "API key",
-          "scan_interval": "Update interval (minutes)"
+          "lines": "Lines to track",
+          "scan_interval": "Update interval (seconds)"
         }
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to the upstream API. Check your credentials and try again.",
-      "invalid_api_key": "Please provide a valid API key."
+      "query_too_short": "Enter at least 2 characters.",
+      "no_matches": "No stops match this search.",
+      "catalogue_unavailable": "Cannot load the Wiener Linien stop catalogue. Check your internet connection and retry.",
+      "invalid_stop": "The selected stop is no longer available — search again.",
+      "no_lines": "Select at least one line.",
+      "cannot_connect": "Cannot reach the Wiener Linien real-time API. Try again in a minute."
     },
     "abort": {
-      "already_configured": "This account is already configured.",
-      "reconfigure_successful": "Reconfigure completed successfully."
+      "already_configured": "This stop is already configured.",
+      "reconfigure_successful": "Reconfigure completed successfully.",
+      "stop_gone": "This stop is no longer in the Wiener Linien catalogue. Delete and re-add.",
+      "catalogue_unavailable": "Cannot load the Wiener Linien stop catalogue. Try again later."
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Wiener Linien Austria options",
-        "description": "Update Wiener Linien Austria settings.",
+        "description": "Change the polling interval. Line selection is changed via Reconfigure.",
         "data": {
-          "api_key": "API key",
-          "scan_interval": "Update interval (minutes)"
+          "scan_interval": "Update interval (seconds)"
         }
       }
-    },
-    "error": {
-      "cannot_connect": "Cannot connect to the upstream API. Check your credentials and try again.",
-      "invalid_api_key": "Please provide a valid API key."
     }
   },
   "entity": {
     "sensor": {
-      "example": { "name": "Example" }
+      "stop": { "name": "Departures" }
     }
   },
   "exceptions": {
     "api_timeout": {
-      "message": "Wiener Linien Austria API timed out after {seconds}s"
+      "message": "Wiener Linien API timed out after {seconds} s"
     },
     "api_http_error": {
-      "message": "Wiener Linien Austria API returned HTTP {status}: {reason}"
+      "message": "Wiener Linien API returned HTTP {status}: {reason}"
     },
     "api_connection_error": {
-      "message": "Wiener Linien Austria API connection error: {error_type}: {error}"
+      "message": "Wiener Linien API connection error: {error_type}: {error}"
     },
     "api_invalid_response": {
-      "message": "Wiener Linien Austria API returned an unexpected response (status {status}): {error}"
+      "message": "Wiener Linien API returned an unexpected response (status {status}): {error}"
+    },
+    "api_rate_limited": {
+      "message": "Wiener Linien API rate limit hit (error 316). Back off and retry."
+    },
+    "api_upstream_error": {
+      "message": "Wiener Linien API reported error code {code}: {value}"
     }
   },
   "issues": {
-    "example_degraded": {
-      "title": "Wiener Linien Austria — degraded",
-      "description": "Wiener Linien Austria on **{entry_title}** is operating in a degraded mode. TODO: describe the condition and the fix."
+    "rate_limited": {
+      "title": "Wiener Linien rate limit hit",
+      "description": "Wiener Linien replied with error 316 (rate limit exceeded) to polls for **{entry_title}**. The fair-use policy is a minimum 15 s interval; this integration defaults to 60 s and enforces a 30 s floor, so normally this issue only appears when many HA instances share the same outbound IP. Raise the scan interval or reduce the number of concurrent entries."
     }
   }
 }
