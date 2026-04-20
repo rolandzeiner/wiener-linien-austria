@@ -268,6 +268,22 @@ const CARD_STYLE = `
     color: var(--warning-color, #ffa000);
     cursor: help;
   }
+  .wl-elevator-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--warning-color, #ffa000) 14%, transparent);
+    color: var(--warning-color, #ffa000);
+    cursor: help;
+  }
+  .wl-elevator-badge-text {
+    font-size: 0.75em;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
   .wl-traffic-list {
     display: flex;
     flex-direction: column;
@@ -618,9 +634,15 @@ class WienerLinienAustriaCard extends HTMLElement {
           return bits.join(" — ");
         })
         .join("\n");
-      elevatorBadge = `<ha-icon icon="mdi:elevator-passenger-off" title="${_esc(
-        `${this._t("elevator_label")}:\n${tooltip}`,
-      )}"></ha-icon>`;
+      const label = this._t("elevator_label");
+      elevatorBadge = `
+        <span class="wl-elevator-badge" title="${_esc(
+          `${label}:\n${tooltip}`,
+        )}">
+          <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
+          <span class="wl-elevator-badge-text">${_esc(label)}</span>
+        </span>
+      `;
     }
 
     let rowsHtml;
