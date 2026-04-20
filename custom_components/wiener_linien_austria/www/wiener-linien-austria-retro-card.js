@@ -217,7 +217,10 @@ const RETRO_STYLE = `
   .retro-dest-text {
     overflow: hidden;
     text-overflow: ellipsis;
-    flex: 1;
+    /* flex: 0 1 auto — stay at natural width so the wheelchair packs
+       right up against the destination name; shrink with ellipsis only
+       if the cell is too narrow for the full text + icon combo. */
+    flex: 0 1 auto;
     min-width: 0;
   }
   /* Wheelchair icon — rendered via ha-icon (MDI path) so it inherits the
