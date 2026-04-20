@@ -941,7 +941,6 @@ class WienerLinienAustriaCard extends HTMLElement {
   }
 
   _renderElevatorDetails(elevatorInfos) {
-    const overrides = this._config.line_colors || {};
     const rows = elevatorInfos
       .map((e) => {
         // Prefer description (usually the specific elevator location);
@@ -949,16 +948,6 @@ class WienerLinienAustriaCard extends HTMLElement {
         const location = e.description || e.station || "";
         const reason = e.reason || "";
         const until = this._formatTime(e.time_end);
-
-        const lines = Array.isArray(e.related_lines) ? e.related_lines : [];
-        const linesHtml = lines.length
-          ? `<div class="wl-traffic-lines">${lines
-              .map((l) => {
-                const color = _colorForLine(l, overrides);
-                return `<span class="wl-traffic-line-badge" style="background:${color}">${_esc(l)}</span>`;
-              })
-              .join("")}</div>`
-          : "";
 
         const timeLine = until
           ? `<div class="wl-elevator-detail-time">${_esc(
@@ -989,7 +978,6 @@ class WienerLinienAustriaCard extends HTMLElement {
             <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
             <div class="wl-elevator-detail-body">
               <div class="wl-elevator-summary">
-                ${linesHtml}
                 <div class="wl-elevator-detail-location">${_esc(location)}</div>
               </div>
               ${expandBlock}
