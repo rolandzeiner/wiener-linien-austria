@@ -618,7 +618,7 @@ class WienerLinienAustriaCard extends HTMLElement {
           return bits.join(" — ");
         })
         .join("\n");
-      elevatorBadge = `<ha-icon icon="mdi:elevator-up" title="${_esc(
+      elevatorBadge = `<ha-icon icon="mdi:elevator-passenger-off" title="${_esc(
         `${this._t("elevator_label")}:\n${tooltip}`,
       )}"></ha-icon>`;
     }
