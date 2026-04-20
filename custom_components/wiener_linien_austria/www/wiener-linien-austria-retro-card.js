@@ -207,9 +207,25 @@ const RETRO_STYLE = `
     text-align: left;
   }
   .retro-dest {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35em;
+    overflow: hidden;
+    text-transform: uppercase;
+    min-width: 0;
+  }
+  .retro-dest-text {
     overflow: hidden;
     text-overflow: ellipsis;
-    text-transform: uppercase;
+    flex: 1;
+    min-width: 0;
+  }
+  /* Wheelchair glyph rendered at the same weight as the destination text
+     so it blends into the LED look rather than poking out. flex-shrink
+     disabled so it never gets truncated before the destination name. */
+  .retro-wheelchair {
+    flex: 0 0 auto;
+    font-size: 0.85em;
   }
   .retro-cd {
     font-variant-numeric: tabular-nums;
@@ -413,7 +429,9 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       .slice(0, 2)
       .map(
         (d) =>
-          `${d.line}|${d.towards}|${d.countdown}|${d.platform || ""}`,
+          `${d.line}|${d.towards}|${d.countdown}|${d.platform || ""}|${
+            d.barrier_free ? 1 : 0
+          }`,
       )
       .join(";");
     return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}|${lineFilter}#${deps}`;
@@ -499,10 +517,16 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const towards = _esc(d.towards || "");
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const cdLabel = cd === null ? "--" : String(Math.max(0, cd));
+    // ♿ (U+267F) after the destination, mirroring real Wiener Linien
+    // station boards that mark step-free departures. Renders in the
+    // same amber glow as the rest via inherited currentColor.
+    const wheelchairHtml = d.barrier_free
+      ? '<span class="retro-wheelchair" title="Barrierefrei">\u267F</span>'
+      : "";
     return `
       <div class="retro-row">
         <div class="retro-line">${line}</div>
-        <div class="retro-dest">${towards}</div>
+        <div class="retro-dest"><span class="retro-dest-text">${towards}</span>${wheelchairHtml}</div>
         <div class="retro-cd">${_esc(cdLabel)}</div>
       </div>
     `;
