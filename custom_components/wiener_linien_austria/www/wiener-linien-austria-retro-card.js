@@ -98,7 +98,12 @@ function _normaliseConfig(config) {
 const LED_AMBER = "#FFC700";
 const LED_GREEN = "#3DF500";
 const LED_BG = "#000";
-const LED_SUBSTRATE = "#1a0d2a";
+const LED_SUBSTRATE = "#2a1a4a";  // violet LED substrate (unlit cell colour)
+
+// Number of character cells per row. 18 fits a line code + destination +
+// countdown with a few empty cells in the middle for visual breathing room
+// (matches the density of the reference photo).
+const RETRO_CELLS_PER_ROW = 18;
 
 const RETRO_STYLE = `
   :host, .retro {
@@ -108,104 +113,103 @@ const RETRO_STYLE = `
     --led-substrate: ${LED_SUBSTRATE};
   }
   .retro {
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: flex;
+    align-items: stretch;
     background: var(--led-bg);
-    /* Faint LED-substrate dot pattern: violet dots every 4px echo the
-       look of an unlit pixel between glowing ones. */
-    background-image: radial-gradient(
-      circle, var(--led-substrate) 0.5px, transparent 1px
-    );
-    background-size: 4px 4px;
-    padding: 14px 18px;
-    /* Pure system monospace stack — avoids a Google-Fonts CDN fetch
-       (GDPR) and the @import-inside-Lovelace flakiness. Bold + wider
-       letter-spacing gives the retro fixed-pitch LED feel without a
-       custom font file. */
-    font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    padding: 10px 12px;
     overflow: hidden;
     border-radius: var(--ha-card-border-radius, 12px);
+    font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
+    font-weight: 700;
+    gap: 10px;
     min-height: 110px;
   }
+  /* When platform == "2", the Gleis panel swaps to the left via order. */
+  .retro--gleis-left .retro-gleis { order: -1; }
+
+  /* ---- character-cell grid for the two departure rows ---- */
   .retro-rows {
+    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 8px;
-    color: var(--led-amber);
-    text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
-    font-size: 1.9em;
-    line-height: 1;
+    gap: 4px;
   }
   .retro-row {
     display: grid;
-    grid-template-columns: 2.5em 1fr auto;
+    grid-template-columns: repeat(${RETRO_CELLS_PER_ROW}, 1fr);
+    gap: 2px;
+  }
+  .retro-cell {
+    aspect-ratio: 0.6;
+    display: flex;
     align-items: center;
-    gap: 12px;
-    white-space: nowrap;
+    justify-content: center;
+    background: var(--led-substrate);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: transparent;
+    font-size: calc(0.85 * 100% / ${RETRO_CELLS_PER_ROW} * 10);
+    line-height: 1;
   }
-  .retro-line {
-    font-weight: 400;
-    text-align: left;
+  /* Slightly smaller container — scale char to roughly match cell height. */
+  .retro-row {
+    font-size: 1.05em;
   }
-  .retro-dest {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
+  .retro-cell--lit {
+    color: var(--led-amber);
+    text-shadow: 0 0 4px currentColor, 0 0 1px rgba(255, 255, 255, 0.4);
   }
-  .retro-cd {
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-    min-width: 2.5em;
-  }
+
+  /* ---- green Gleis panel ---- */
   .retro-gleis {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 0 14px 0 18px;
-    margin-left: 12px;
+    padding: 4px 10px;
     color: var(--led-green);
     text-shadow: 0 0 6px rgba(61, 245, 0, 0.7);
-    border-left: 1px solid rgba(61, 245, 0, 0.25);
+    background: var(--led-substrate);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 2px;
+    min-width: 58px;
   }
   .retro-gleis-label {
-    font-size: 0.9em;
+    font-size: 0.72em;
     letter-spacing: 2px;
-    margin-bottom: 2px;
-    opacity: 0.9;
+    margin-bottom: 4px;
+    opacity: 0.95;
   }
   .retro-gleis-number {
-    font-size: 3em;
+    font-size: 2.2em;
     line-height: 1;
-    font-weight: 400;
   }
+
+  /* ---- empty/fallback states ---- */
   .retro-empty {
-    grid-column: 1 / -1;
+    flex: 1;
     text-align: center;
+    align-self: center;
     color: var(--led-amber);
     text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
-    font-size: 1.4em;
-    padding: 20px 0;
+    font-size: 1.2em;
+    padding: 18px 0;
     letter-spacing: 2px;
   }
+
+  /* ---- version-reload banner ---- */
   .retro-banner {
-    grid-column: 1 / -1;
     background: #ffa000;
     color: #000;
     padding: 6px 10px;
-    margin-bottom: 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
     font-family: sans-serif;
     border-radius: 4px;
-    letter-spacing: normal;
     font-size: 0.75em;
+    font-weight: 500;
   }
   .retro-banner button {
     background: #000;
@@ -216,6 +220,12 @@ const RETRO_STYLE = `
     font-weight: 600;
     cursor: pointer;
     font-family: sans-serif;
+  }
+  .retro-banner-wrap {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 6px;
   }
 `;
 
@@ -323,6 +333,10 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const rows = matching.slice(0, 2);
     const platform = rows.find((d) => d.platform)?.platform || null;
 
+    // Gleis "2" sits on the left per the reference photo; "1" and all
+    // other values default to the right.
+    const gleisLeft = platform === "2";
+
     const banner = this._versionMismatch ? this._renderBanner() : "";
 
     let body;
@@ -331,21 +345,24 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     } else if (rows.length === 0) {
       body = `<div class="retro-empty">${_esc(this._t("no_data"))}</div>`;
     } else {
-      body = `
+      const rowsHtml = `
         <div class="retro-rows">
           ${rows.map((d) => this._renderRow(d)).join("")}
         </div>
-        ${platform ? this._renderGleis(platform) : ""}
       `;
+      const gleisHtml = platform ? this._renderGleis(platform) : "";
+      body = `${rowsHtml}${gleisHtml}`;
     }
+
+    const innerClass = `retro${gleisLeft ? " retro--gleis-left" : ""}`;
+    const wrapped = banner
+      ? `<div class="retro-banner-wrap">${banner}<div class="${innerClass}">${body}</div></div>`
+      : `<div class="${innerClass}">${body}</div>`;
 
     this.innerHTML = `
       <ha-card style="background:${LED_BG};padding:0;overflow:hidden;">
         <style>${RETRO_STYLE}</style>
-        <div class="retro">
-          ${banner}
-          ${body}
-        </div>
+        ${wrapped}
       </ha-card>
     `;
 
@@ -354,17 +371,38 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
   }
 
   _renderRow(d) {
-    const line = _esc(d.line || "?");
-    const towards = _esc(d.towards || "");
+    const line = String(d.line || "?").toUpperCase();
+    const towards = String(d.towards || "").toUpperCase();
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
-    const cdLabel = cd === null ? "--" : String(Math.max(0, cd));
-    return `
-      <div class="retro-row">
-        <div class="retro-line">${line}</div>
-        <div class="retro-dest">${towards}</div>
-        <div class="retro-cd">${_esc(cdLabel)}</div>
-      </div>
-    `;
+    // Countdown takes the rightmost 1-3 cells. Empty / zero renders as
+    // a single "0" (we already collapse the whole card to "no data"
+    // when there are no departures at all).
+    const cdStr = cd === null ? "" : String(Math.max(0, cd));
+
+    // Left segment: "U4 HÜTTELDORF" style — line code, one space, then
+    // as much destination as fits before the countdown.
+    const reserved = cdStr.length; // right-reserved cells for countdown
+    const leftBudget = RETRO_CELLS_PER_ROW - reserved;
+    const prefix = `${line} ${towards}`.slice(0, leftBudget);
+
+    // Build cell array: fill leftBudget with prefix chars + spaces, then
+    // right-align the countdown in the remaining cells.
+    const cells = new Array(RETRO_CELLS_PER_ROW).fill("");
+    for (let i = 0; i < prefix.length; i++) cells[i] = prefix[i];
+    for (let i = 0; i < cdStr.length; i++) {
+      cells[RETRO_CELLS_PER_ROW - cdStr.length + i] = cdStr[i];
+    }
+
+    const cellsHtml = cells
+      .map((ch) => {
+        // Space between words isn't lit; empty cells either.
+        const lit = ch && ch !== " ";
+        const cls = lit ? "retro-cell retro-cell--lit" : "retro-cell";
+        return `<span class="${cls}">${_esc(ch || "")}</span>`;
+      })
+      .join("");
+
+    return `<div class="retro-row">${cellsHtml}</div>`;
   }
 
   _renderGleis(platform) {
