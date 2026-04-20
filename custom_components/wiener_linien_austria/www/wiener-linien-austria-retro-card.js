@@ -101,7 +101,6 @@ const LED_BG = "#000";
 const LED_SUBSTRATE = "#1a0d2a";
 
 const RETRO_STYLE = `
-  @import url('https://fonts.googleapis.com/css2?family=Jersey+25&display=swap');
   :host, .retro {
     --led-amber: ${LED_AMBER};
     --led-green: ${LED_GREEN};
@@ -120,8 +119,13 @@ const RETRO_STYLE = `
     );
     background-size: 4px 4px;
     padding: 14px 18px;
-    font-family: 'Jersey 25', 'Courier New', monospace;
-    letter-spacing: 1px;
+    /* Pure system monospace stack — avoids a Google-Fonts CDN fetch
+       (GDPR) and the @import-inside-Lovelace flakiness. Bold + wider
+       letter-spacing gives the retro fixed-pitch LED feel without a
+       custom font file. */
+    font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
+    font-weight: 700;
+    letter-spacing: 0.08em;
     overflow: hidden;
     border-radius: var(--ha-card-border-radius, 12px);
     min-height: 110px;
