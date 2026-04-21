@@ -19,6 +19,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     API_BASE_URL,
+    CONF_DIVA,
     CONF_LINES,
     CONF_RBLS,
     DEFAULT_SCAN_INTERVAL,
@@ -47,6 +48,7 @@ class Departure:
     realtime: bool
     barrier_free: bool
     traffic_jam: bool
+    platform: str | None = None  # "1" / "2" / "A" / "B" — Gleis as published
 
     def to_dict(self) -> dict[str, Any]:
         """Render as a plain dict for HA attributes / diagnostics."""
@@ -61,6 +63,7 @@ class Departure:
             "realtime": self.realtime,
             "barrier_free": self.barrier_free,
             "traffic_jam": self.traffic_jam,
+            "platform": self.platform,
         }
 
 
@@ -87,6 +90,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
+        self._diva: int = int(config[CONF_DIVA])
+        self._latitude: float | None = None
+        self._longitude: float | None = None
 
         scan = int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
         super().__init__(
@@ -96,9 +102,33 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             update_interval=timedelta(seconds=scan),
         )
 
-    def async_setup(self) -> None:
-        """Hook for additional listeners — unused today."""
-        return None
+    async def async_setup(self) -> None:
+        """Load the cached static catalogue and pluck this stop's coords.
+
+        Failure is non-fatal — coords stay None and the sensor falls back to
+        a text-based Google Maps query instead of lat/lon. The catalogue is
+        usually already in hass storage from the config flow, so this is a
+        memory read, not a network call.
+        """
+        # Local import to avoid pulling static.py into coordinator import
+        # cycles; static.py is a leaf that doesn't import this module.
+        from .static import async_load_catalogue  # noqa: PLC0415
+        try:
+            catalogue = await async_load_catalogue(self.hass)
+        except (
+            aiohttp.ClientError,
+            asyncio.TimeoutError,
+            KeyError,
+            TypeError,
+            ValueError,
+            RuntimeError,
+        ) as err:
+            _LOGGER.debug("Could not load static catalogue for coords: %s", err)
+            return
+        station = catalogue.stations_by_diva.get(self._diva)
+        if station is not None:
+            self._latitude = station.latitude
+            self._longitude = station.longitude
 
     @callback
     def async_teardown(self) -> None:
@@ -123,6 +153,16 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
     def rbls(self) -> list[int]:
         """Return the RBL list this coordinator queries."""
         return list(self._rbls)
+
+    @property
+    def latitude(self) -> float | None:
+        """Stop latitude from the static catalogue (None if lookup failed)."""
+        return self._latitude
+
+    @property
+    def longitude(self) -> float | None:
+        """Stop longitude from the static catalogue (None if lookup failed)."""
+        return self._longitude
 
     # ------------------------------------------------------------------
     # Repair-issue helpers
@@ -293,6 +333,12 @@ def _parse_monitor_body(
             barrier_free = bool(line.get("barrierFree"))
             realtime = bool(line.get("realtimeSupported"))
             traffic_jam = bool(line.get("trafficjam"))
+            platform_raw = line.get("platform")
+            platform = (
+                str(platform_raw).strip()
+                if platform_raw is not None and str(platform_raw).strip()
+                else None
+            )
 
             if selected is not None and _line_key(line_name, direction, towards) not in selected:
                 continue
@@ -314,6 +360,7 @@ def _parse_monitor_body(
                         realtime=realtime,
                         barrier_free=barrier_free,
                         traffic_jam=traffic_jam,
+                        platform=platform,
                     )
                 )
 

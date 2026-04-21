@@ -216,3 +216,69 @@ async def test_catalogue_unavailable_during_search(hass: HomeAssistant) -> None:
         )
     assert result["type"] == FlowResultType.FORM
     assert result["errors"]["base"] == "catalogue_unavailable"
+
+
+async def test_search_again_returns_to_user_step(hass: HomeAssistant) -> None:
+    """Picking the `__search_again__` sentinel on select_stop reopens search."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
+    )
+    assert result["step_id"] == "select_stop"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "__search_again__"}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "user"
+
+
+async def test_reconfigure_aborts_when_catalogue_unavailable(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Reconfigure with a failing catalogue load aborts with a clear reason."""
+    await _complete_flow(hass)
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+        new_callable=AsyncMock,
+        side_effect=aiohttp.ClientError("upstream down"),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "catalogue_unavailable"
+
+
+async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Reconfigure aborts with `stop_gone` if the DIVA vanished upstream."""
+    from custom_components.wiener_linien_austria.static import StaticCatalogue
+
+    await _complete_flow(hass)
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    empty = StaticCatalogue(stations_by_diva={}, last_fetched="t")
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+        new_callable=AsyncMock,
+        return_value=empty,
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={
+                "source": config_entries.SOURCE_RECONFIGURE,
+                "entry_id": entry.entry_id,
+            },
+        )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "stop_gone"
