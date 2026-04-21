@@ -14,6 +14,7 @@ from custom_components.wiener_linien_austria.const import (
     CONF_RBLS,
     CONF_STOP_NAME,
     DOMAIN,
+    MAX_DEPARTURES_IN_ATTRS,
 )
 from custom_components.wiener_linien_austria.coordinator import (
     Departure,
@@ -123,6 +124,31 @@ async def test_native_value_none_when_coordinator_has_no_data(hass: HomeAssistan
     coordinator = _make_coordinator(hass, entry, None)
     sensor = WienerLinienStopSensor(coordinator, entry)
     assert sensor.native_value is None
+
+
+async def test_available_tolerates_transient_failures(hass: HomeAssistant) -> None:
+    """A single failed poll must NOT flip the sensor to unavailable while
+    the coordinator still holds prior data — otherwise the card blanks
+    out between polls on transient hiccups."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    assert sensor.available is True
+
+    # Simulate a failed poll — CoordinatorEntity.available would now be
+    # False under the HA default, but our relaxed rule keeps us available
+    # as long as we still have cached data to serve.
+    coordinator.last_update_success = False
+    assert sensor.available is True
+
+    # Having no data at all (never successfully fetched) is the only case
+    # that legitimately renders the sensor unavailable.
+    coordinator.data = None
+    assert sensor.available is False
 
 
 async def test_unit_and_device_class(hass: HomeAssistant) -> None:
@@ -245,8 +271,10 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     assert next_by_line == {"U1": 2, "71": 4}
 
 
-async def test_availability_follows_coordinator(hass: HomeAssistant) -> None:
-    """Sensor is available iff the coordinator's last_update_success is True."""
+async def test_availability_requires_any_cached_data(hass: HomeAssistant) -> None:
+    """Sensor is available whenever the coordinator has ANY cached data,
+    even an empty one — transient fetch failures no longer flip us to
+    unavailable (see test_available_tolerates_transient_failures)."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = _make_coordinator(
@@ -254,7 +282,8 @@ async def test_availability_follows_coordinator(hass: HomeAssistant) -> None:
     )
     sensor = WienerLinienStopSensor(coordinator, entry)
     assert sensor.available is True
-    coordinator.last_update_success = False
+    # Only "no data at all" renders unavailable.
+    coordinator.data = None
     assert sensor.available is False
 
 
@@ -306,6 +335,38 @@ async def test_sensor_state_present_after_setup(
     assert state.attributes["attribution"] == ATTRIBUTION
     assert state.attributes["diva"] == 60201012
     assert len(state.attributes["departures"]) >= 1
+
+
+async def test_attributes_cap_at_max_departures(hass: HomeAssistant) -> None:
+    """`departures` is capped at MAX_DEPARTURES_IN_ATTRS to stay under the
+    recorder's 16 KB attribute limit at busy multi-line stops (Stephansplatz
+    tracks U1/U3/U4 ≈ ~40 entries). If this cap regresses the recorder
+    silently truncates and state history goes weird — this is the canary."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    many = [
+        Departure(
+            line="U1",
+            towards="Leopoldau",
+            direction="H",
+            type="ptMetro",
+            countdown=i,
+            time_planned=None,
+            time_real=None,
+            realtime=True,
+            barrier_free=True,
+            traffic_jam=False,
+        )
+        for i in range(MAX_DEPARTURES_IN_ATTRS + 10)
+    ]
+    data = MonitorData(departures=many, server_time=None)
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    attrs = sensor.extra_state_attributes
+    assert len(attrs["departures"]) == MAX_DEPARTURES_IN_ATTRS
+    # The cap keeps the *earliest* departures — check the countdown order.
+    assert attrs["departures"][0]["countdown"] == 0
+    assert attrs["departures"][-1]["countdown"] == MAX_DEPARTURES_IN_ATTRS - 1
 
 
 async def test_attributes_include_matched_alerts(hass: HomeAssistant) -> None:

@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiohttp
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
     TrafficInfo,
+    _fetch_info_list,
     _parse_elevator,
     _parse_traffic,
     async_refresh_alerts,
@@ -31,16 +34,29 @@ def test_parse_traffic_extracts_core_fields() -> None:
         "name": "I20260420-0032",
         "title": "49A: Verkehrsunfall",
         "description": "Linie 49A: Unregelmäßige Intervalle.",
+        "descriptionHTML": "Linie 49A:<br>Unregelmäßige Intervalle.",
+        "location": "Stadionallee",
         "status": "active",
-        "time": {"start": "2026-04-20T16:42:00+0200", "end": "2026-04-20T23:55:00+0200"},
+        "time": {
+            "start": "2026-04-20T16:42:00+0200",
+            "end": "2026-04-20T23:55:00+0200",
+            "created": "2026-04-20T16:42:00+0200",
+            "lastUpdate": "2026-04-20T17:00:00+0200",
+        },
         "relatedLines": ["49A"],
+        "attributes": {"relatedLineTypes": {"49A": "ptBusCity"}},
     }
     t = _parse_traffic(raw)
     assert t.name == "I20260420-0032"
     assert t.title == "49A: Verkehrsunfall"
     assert t.related_lines == ["49A"]
+    assert t.line_types == {"49A": "ptBusCity"}
+    assert t.location == "Stadionallee"
+    assert t.description_html == "Linie 49A:<br>Unregelmäßige Intervalle."
     assert t.time_start == "2026-04-20T16:42:00+0200"
     assert t.time_end == "2026-04-20T23:55:00+0200"
+    assert t.time_created == "2026-04-20T16:42:00+0200"
+    assert t.time_last_update == "2026-04-20T17:00:00+0200"
     assert t.status == "active"
 
 
@@ -230,6 +246,56 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     assert elevator[0].related_stops == [4111]
 
 
+async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None:
+    """`status: resolved` entries must not reach the cache."""
+    traffic_body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "trafficInfos": [
+                {
+                    "name": "ACTIVE",
+                    "title": "U4: disrupt",
+                    "description": "x",
+                    "relatedLines": ["U4"],
+                    "status": "active",
+                    "time": {},
+                },
+                {
+                    "name": "DONE",
+                    "title": "U1: over",
+                    "description": "y",
+                    "relatedLines": ["U1"],
+                    "status": "resolved",
+                    "time": {},
+                },
+            ]
+        },
+    }
+    elevator_body = {"message": {"messageCode": 1}, "data": {"trafficInfos": []}}
+
+    def _resp(body: dict[str, Any]) -> MagicMock:
+        r = MagicMock()
+        r.raise_for_status = MagicMock()
+        r.json = AsyncMock(return_value=body)
+        return r
+
+    async def fake_get(url: str, **kwargs: object) -> MagicMock:
+        name = next((v for k, v in kwargs["params"] if k == "name"), None)
+        return _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=fake_get)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        await async_refresh_alerts(hass)
+
+    names = [t.name for t in hass.data[DOMAIN][TRAFFIC_INFO_KEY]]
+    assert names == ["ACTIVE"]
+
+
 async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None:
     """Fetch failures must not raise — alerts are advisory."""
     fake_session = MagicMock()
@@ -245,3 +311,159 @@ async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None
     # Caches are empty lists, not missing keys.
     assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == []
     assert hass.data[DOMAIN][ELEVATOR_INFO_KEY] == []
+
+
+async def test_async_refresh_alerts_swallows_generic_errors(
+    hass: HomeAssistant,
+) -> None:
+    """The broad `except Exception` really is broad — not just timeouts.
+
+    Guards against a regression where the except-list narrows to a few
+    specific types and e.g. a bare RuntimeError would suddenly bubble
+    through the 5-min periodic refresh and crash the scheduler.
+    """
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=RuntimeError("unexpected"))
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        await async_refresh_alerts(hass)
+
+    assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == []
+    assert hass.data[DOMAIN][ELEVATOR_INFO_KEY] == []
+
+
+# ---------------------------------------------------------------------------
+# _fetch_info_list: direct tests of the per-name helper's error branches
+# ---------------------------------------------------------------------------
+
+
+def _mock_session(resp: MagicMock) -> MagicMock:
+    """Build a fake aiohttp session whose .get() returns `resp`."""
+    fake = MagicMock()
+    fake.get = AsyncMock(return_value=resp)
+    return fake
+
+
+async def test_fetch_info_list_http_error_returns_empty(
+    hass: HomeAssistant,
+) -> None:
+    """A 5xx from upstream yields []; advisory alerts never raise up."""
+    req_info = MagicMock()
+    req_info.real_url = "https://example/trafficInfoList"
+    err = aiohttp.ClientResponseError(
+        request_info=req_info, history=(), status=503, message="boom"
+    )
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock(side_effect=err)
+    resp.json = AsyncMock()
+    fake_session = _mock_session(resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        result = await _fetch_info_list(hass, "stoerunglang")
+    assert result == []
+
+
+async def test_fetch_info_list_non_ok_message_code_returns_empty(
+    hass: HomeAssistant,
+) -> None:
+    """messageCode ≠ 1 drops the payload even if trafficInfos is populated."""
+    body = {
+        "message": {"messageCode": 316, "value": "Rate limit"},
+        "data": {"trafficInfos": [{"name": "T1", "title": "x"}]},
+    }
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    fake_session = _mock_session(resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        result = await _fetch_info_list(hass, "stoerunglang")
+    assert result == []
+
+
+async def test_fetch_info_list_non_dict_body_returns_empty(
+    hass: HomeAssistant,
+) -> None:
+    """JSON that decodes to a non-object falls through to []."""
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=["not", "a", "dict"])
+    fake_session = _mock_session(resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        result = await _fetch_info_list(hass, "stoerunglang")
+    assert result == []
+
+
+async def test_fetch_info_list_filters_non_dict_entries(
+    hass: HomeAssistant,
+) -> None:
+    """trafficInfos items that aren't dicts are silently filtered out."""
+    body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "trafficInfos": [
+                {"name": "good", "title": "y"},
+                "not-a-dict",
+                None,
+                42,
+            ]
+        },
+    }
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    fake_session = _mock_session(resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        result = await _fetch_info_list(hass, "stoerunglang")
+    assert result == [{"name": "good", "title": "y"}]
+
+
+# ---------------------------------------------------------------------------
+# get_alerts_for: elevator line-fallback branch (related_stops empty,
+# matches via related_lines). This branch was previously untested.
+# ---------------------------------------------------------------------------
+
+
+async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> None:
+    """An elevator outage with no RBL mapping still matches via related_lines.
+
+    Upstream sometimes publishes elevator alerts that carry a line list but
+    no `relatedStops` — e.g. "elevators on U1 in general". The line-fallback
+    branch of `get_alerts_for` surfaces those when any of the user's tracked
+    RBLs is set AND a line matches. Without this branch, the user would see
+    no elevator warning at all for line-scoped outages.
+    """
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = []
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = [
+        ElevatorInfo(
+            name="LINE_ONLY",
+            station="U1",
+            description="line-wide note",
+            reason="",
+            status="außer Betrieb",
+            related_lines=["U1"],
+            related_stops=[],  # no RBL mapping
+            time_start=None,
+            time_end=None,
+        ),
+    ]
+    _traffic, elevator = get_alerts_for(hass, {"U1"}, {4111})
+    assert [e.name for e in elevator] == ["LINE_ONLY"]

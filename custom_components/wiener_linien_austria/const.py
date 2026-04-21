@@ -8,7 +8,7 @@ from homeassistant.const import __version__ as _HA_VERSION
 DOMAIN: Final = "wiener_linien_austria"
 
 # Integration version — must match manifest.json "version" field.
-INTEGRATION_VERSION: Final = "0.1.0"
+INTEGRATION_VERSION: Final = "1.0.0"
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
@@ -74,7 +74,19 @@ LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
 LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 
-# Lovelace card — version must match the `const CARD_VERSION` in
-# www/wiener-linien-austria-card.js byte-for-byte, else the reload banner loops.
-CARD_VERSION: Final = "0.1.0"
+# Lovelace cards — each JS file carries a `const CARD_VERSION` that must
+# match the corresponding Python constant below byte-for-byte, else the
+# reload banner loops. Retro card iterates independently from the modern
+# one so the two can rev at different paces without spurious reloads.
+CARD_VERSION: Final = "1.0.0"
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
+RETRO_CARD_VERSION: Final = "1.0.0"
+RETRO_CARD_URL: Final = (
+    "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
+)
+
+# Cap on how many departures we surface in sensor attributes. The card maxes
+# out at 20 per stop; 30 gives buffer for diagnostics and templates while
+# keeping the full payload comfortably under HA's 16 KB recorder attribute
+# cap at busy multi-line stops (Stephansplatz tracks U1/U3/U4).
+MAX_DEPARTURES_IN_ATTRS: Final = 30

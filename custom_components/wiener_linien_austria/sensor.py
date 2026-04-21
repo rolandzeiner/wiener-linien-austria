@@ -20,6 +20,7 @@ from .const import (
     CONF_RBLS,
     CONF_STOP_NAME,
     DOMAIN,
+    MAX_DEPARTURES_IN_ATTRS,
 )
 from .coordinator import Departure, MonitorData, WienerLinienAustriaCoordinator
 
@@ -117,12 +118,20 @@ class WienerLinienStopSensor(
             self.coordinator.hass, line_names, rbls
         )
 
+        # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
+        # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) stay under HA's
+        # 16 KB recorder attribute cap. The card respects its own
+        # max_departures setting (≤ 20) so nothing the UI shows is lost.
+        capped = [d.to_dict() for d in departures[:MAX_DEPARTURES_IN_ATTRS]]
+
         return {
             "attribution": ATTRIBUTION,
             "diva": diva,
             "stop_name": stop_name,
+            "latitude": self.coordinator.latitude,
+            "longitude": self.coordinator.longitude,
             "server_time": data.server_time if data is not None else None,
-            "departures": [d.to_dict() for d in departures],
+            "departures": capped,
             "next_by_line": next_by_line,
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
@@ -130,12 +139,19 @@ class WienerLinienStopSensor(
 
     @property
     def available(self) -> bool:
-        """Match the coordinator's availability.
+        """Stay available while we have any cached data.
 
-        Even when the stop has no departures right now (e.g. overnight) we
-        stay available — native_value just reports None.
+        HA's default `CoordinatorEntity.available` follows
+        `last_update_success`, which flips to False on any single fetch
+        failure. That would blank the card between polls for transient
+        hiccups (one-off timeouts, brief 5xx's, momentary rate-limits).
+        We relax it: as long as the coordinator has prior data from any
+        past successful fetch, keep serving it. Templates can still
+        detect staleness via the `server_time` attribute if they care.
+        If we've never had a successful fetch, the coordinator's
+        `data` is None and we stay unavailable — nothing to show.
         """
-        return self.coordinator.last_update_success
+        return self.coordinator.data is not None
 
 
 # Explicit re-export so mypy sees the full type contract.

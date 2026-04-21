@@ -24,10 +24,21 @@ from .const import (
     CARD_URL,
     CARD_VERSION,
     DOMAIN,
+    RETRO_CARD_URL,
+    RETRO_CARD_VERSION,
     STATIC_CACHE_REFRESH_HOURS,
 )
 from .coordinator import WienerLinienAustriaCoordinator
 from .static import async_refresh_catalogue
+
+# Registered Lovelace cards shipped with this integration. Each tuple is
+# (lovelace-served URL, version string, on-disk filename in www/).
+# `_async_register_card` iterates over this list; adding a third card is
+# just an append here.
+_CARDS: tuple[tuple[str, str, str], ...] = (
+    (CARD_URL, CARD_VERSION, "wiener-linien-austria-card.js"),
+    (RETRO_CARD_URL, RETRO_CARD_VERSION, "wiener-linien-austria-retro-card.js"),
+)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -46,8 +57,21 @@ async def _websocket_card_version(
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Return the current card version so the frontend can detect mismatches."""
+    """Return the modern card version so the frontend can detect mismatches."""
     connection.send_result(msg["id"], {"version": CARD_VERSION})
+
+
+@websocket_api.websocket_command(  # type: ignore[attr-defined]
+    {vol.Required("type"): "wiener_linien_austria/retro_card_version"}
+)
+@websocket_api.async_response  # type: ignore[attr-defined]
+async def _websocket_retro_card_version(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return the retro card version so its frontend can detect mismatches."""
+    connection.send_result(msg["id"], {"version": RETRO_CARD_VERSION})
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
@@ -88,9 +112,10 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
         )
 
     websocket_api.async_register_command(hass, _websocket_card_version)
+    websocket_api.async_register_command(hass, _websocket_retro_card_version)
 
     async def _register_frontend(_event: Event | None = None) -> None:
-        await _async_register_card(hass)
+        await _async_register_cards(hass)
 
     if hass.state == CoreState.running:
         await _register_frontend()
@@ -100,19 +125,27 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     return True
 
 
-async def _async_register_card(hass: HomeAssistant) -> None:
-    """Serve the card JS and add it to Lovelace resources."""
-    card_path = Path(__file__).parent / "www" / "wiener-linien-austria-card.js"
+async def _async_register_cards(hass: HomeAssistant) -> None:
+    """Register every bundled Lovelace card JS + its storage resource."""
+    for url, version, filename in _CARDS:
+        await _async_register_one_card(hass, url, version, filename)
+
+
+async def _async_register_one_card(
+    hass: HomeAssistant, url: str, version: str, filename: str
+) -> None:
+    """Serve one card JS and upsert its Lovelace resource with ?v=version."""
+    card_path = Path(__file__).parent / "www" / filename
     if not card_path.is_file():
         _LOGGER.warning("Card JS not found at %s", card_path)
         return
 
     try:
         await hass.http.async_register_static_paths(
-            [StaticPathConfig(CARD_URL, str(card_path), False)]
+            [StaticPathConfig(url, str(card_path), False)]
         )
     except Exception:  # noqa: BLE001
-        _LOGGER.debug("Static path already registered or unavailable")
+        _LOGGER.debug("Static path already registered or unavailable: %s", url)
 
     try:
         lovelace = hass.data.get("lovelace")
@@ -140,11 +173,11 @@ async def _async_register_card(hass: HomeAssistant) -> None:
             return
         await resources.async_load()
 
-        versioned_url = f"{CARD_URL}?v={CARD_VERSION}"
+        versioned_url = f"{url}?v={version}"
 
         for item in resources.async_items():
             existing_base = item.get("url", "").split("?")[0]
-            if existing_base == CARD_URL:
+            if existing_base == url:
                 if item.get("url") == versioned_url:
                     return  # already up to date
                 try:
@@ -169,19 +202,19 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         )
         _LOGGER.info("Registered Lovelace resource %s", versioned_url)
 
-    except Exception as err:  # noqa: BLE001
+    except Exception:  # noqa: BLE001
         _LOGGER.warning(
-            "Could not register Lovelace resource (%s) – add manually: "
+            "Could not register Lovelace resource – add manually: "
             "Settings → Dashboards → Resources → %s (JavaScript module)",
-            err,
-            CARD_URL,
+            url,
+            exc_info=True,
         )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    coordinator.async_setup()
+    await coordinator.async_setup()
     entry.async_on_unload(coordinator.async_teardown)
     await coordinator.async_config_entry_first_refresh()
 

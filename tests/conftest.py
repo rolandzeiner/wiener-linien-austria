@@ -89,6 +89,12 @@ def monitor_fixture() -> dict:
 
 
 @pytest.fixture
+def tram_fixture() -> dict:
+    """Canonical /monitor response for a bus stop (line 4A, ptBusCity)."""
+    return _load_fixture("monitor_tram.json")
+
+
+@pytest.fixture
 def mock_fetch(monitor_fixture):
     """Stub the coordinator's fetch + the config-flow live probe."""
     parsed_lines = [

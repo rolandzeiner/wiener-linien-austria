@@ -68,7 +68,7 @@ rules:
     comment: TODO — flip if your API has long-lived credentials that can expire.
   test-coverage:
     status: done
-    comment: Config flow (3 steps + reconfigure), coordinator (parse, rate-limit, cooldown, partial failure), static catalogue and diagnostics are all covered.
+    comment: Config flow (3 steps + reconfigure + search-again + abort reasons), coordinator (parse, rate-limit, cooldown, async_setup coord population, tram/bus fixture), sensor (MAX_DEPARTURES cap, alerts matching, availability), static catalogue loader (cache hit / corrupt / refresh-on-failure), alerts (_fetch_info_list error branches + line-fallback), and diagnostics are all covered.
 
   # Gold
   devices:
