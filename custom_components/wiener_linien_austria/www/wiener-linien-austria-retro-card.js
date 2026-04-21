@@ -1,12 +1,12 @@
 /**
- * Wiener Linien Austria Retro Card v1.1.0
+ * Wiener Linien Austria Retro Card v1.1.1
  * LED-style departure display mimicking the classic Wiener Linien platform
  * signs: amber dot-matrix text on black, with a platform panel (GLEIS for
  * rail, STEIG for bus) on the left or right depending on Gleis number.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1";
 
 // ------------------------------------------------------------------
 // Shared helpers. Duplicated from the modern card so the two files
@@ -530,6 +530,14 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
   _versionMismatch = null;
   _lastFingerprint = null;
 
+  constructor() {
+    super();
+    // Shadow DOM scopes our CSS — without it, every class name (.retro-row,
+    // .retro-line, .retro-station, .chip, …) leaks into the global page
+    // scope and collides with sibling custom cards rendered into light DOM.
+    this.attachShadow({ mode: "open" });
+  }
+
   setConfig(config) {
     if (config === null || typeof config !== "object" || Array.isArray(config)) {
       throw new Error("wiener-linien-austria-retro-card: config must be an object");
@@ -738,7 +746,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     ]
       .filter(Boolean)
       .join(" ");
-    this.innerHTML = `
+    this.shadowRoot.innerHTML =`
       <ha-card style="background:${LED_BG};padding:0;overflow:hidden;">
         <style>${RETRO_STYLE}</style>
         <div class="${retroClass}">
@@ -749,7 +757,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       </ha-card>
     `;
 
-    const reloadBtn = this.querySelector(".retro-banner button");
+    const reloadBtn = this.shadowRoot.querySelector(".retro-banner button");
     if (reloadBtn) reloadBtn.addEventListener("click", () => this._reload());
   }
 
@@ -984,6 +992,11 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
   _config = {};
   _hass = null;
 
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
   setConfig(config) {
     if (config === null || typeof config !== "object" || Array.isArray(config)) {
       throw new Error("wiener-linien-austria-retro-card: config must be an object");
@@ -1016,9 +1029,13 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
   }
 
   _fire() {
+    // bubbles + composed required so the event crosses our shadow boundary
+    // and reaches the dashboard's card editor listener.
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: { ...this._config } },
+        bubbles: true,
+        composed: true,
       }),
     );
   }
@@ -1232,7 +1249,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           .join("")
       : `<div class="editor-hint">${_esc(this._et("walk_time_no_data"))}</div>`;
 
-    this.innerHTML = `
+    this.shadowRoot.innerHTML =`
       <div class="editor">
         <style>${EDITOR_STYLE}</style>
 
@@ -1319,45 +1336,45 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
       </div>
     `;
 
-    this.querySelectorAll(".chip[data-entity]").forEach((chip) => {
+    this.shadowRoot.querySelectorAll(".chip[data-entity]").forEach((chip) => {
       chip.addEventListener("click", () =>
         this._pickEntity(chip.dataset.entity),
       );
     });
-    this.querySelectorAll(".direction-buttons button").forEach((btn) => {
+    this.shadowRoot.querySelectorAll(".direction-buttons button").forEach((btn) => {
       btn.addEventListener("click", () => this._setDirection(btn.dataset.dir));
     });
-    this.querySelectorAll(".chip[data-line]").forEach((chip) => {
+    this.shadowRoot.querySelectorAll(".chip[data-line]").forEach((chip) => {
       chip.addEventListener("click", () =>
         this._pickLine(chip.dataset.line),
       );
     });
-    this.querySelectorAll("ha-switch[data-field='show_platform']").forEach(
+    this.shadowRoot.querySelectorAll("ha-switch[data-field='show_platform']").forEach(
       (sw) => {
         sw.addEventListener("change", (e) =>
           this._setShowPlatform(e.target.checked),
         );
       },
     );
-    this.querySelectorAll("ha-switch[data-field='show_station_name']").forEach(
+    this.shadowRoot.querySelectorAll("ha-switch[data-field='show_station_name']").forEach(
       (sw) => {
         sw.addEventListener("change", (e) =>
           this._setShowStationName(e.target.checked),
         );
       },
     );
-    this.querySelectorAll("button[data-station-bg]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("button[data-station-bg]").forEach((btn) => {
       btn.addEventListener("click", () =>
         this._setStationBg(btn.dataset.stationBg),
       );
     });
-    this.querySelectorAll("button[data-size]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("button[data-size]").forEach((btn) => {
       btn.addEventListener("click", () => this._setSize(btn.dataset.size));
     });
     // Walk-time number inputs. Fire on `change` (blur / Enter) so typing
     // "10" doesn't briefly commit "1" and re-render with the wrong value
     // under the cursor.
-    this.querySelectorAll("input[data-walk-key]").forEach((input) => {
+    this.shadowRoot.querySelectorAll("input[data-walk-key]").forEach((input) => {
       ["keydown", "keyup", "keypress"].forEach((evt) => {
         input.addEventListener(evt, (e) => e.stopPropagation());
       });
