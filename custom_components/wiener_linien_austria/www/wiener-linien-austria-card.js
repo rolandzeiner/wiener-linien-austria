@@ -1,10 +1,10 @@
 /**
- * Wiener Linien Austria Card v1.0.0
+ * Wiener Linien Austria Card v1.0.1
  * Custom Lovelace card for Wiener Linien departure boards.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.0.1";
 
 // Metro line colours (authoritative per Wiener Linien CI). Non-metro lines
 // stay neutral until the user supplies overrides via `line_colors`.
