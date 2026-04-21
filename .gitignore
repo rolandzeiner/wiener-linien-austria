@@ -1,17 +1,50 @@
 # macOS
 **/.DS_Store
 
-# Python
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Python — compiled + packaging
 __pycache__/
 **/__pycache__/
 *.pyc
 *.py[cod]
 .Python
+*.egg-info/
+dist/
+build/
 
-# Tools
+# Python — virtual envs
+.venv/
+venv/
+env/
+ENV/
+
+# Python — coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Secrets / env files (never commit these, even by mistake)
+.env
+.env.local
+.env.*.local
+secrets.yaml
+
+# Tool caches
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# IDEs / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # Claude Code
 .claude/
