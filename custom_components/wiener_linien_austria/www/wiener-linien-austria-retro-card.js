@@ -1,12 +1,12 @@
 /**
- * Wiener Linien Austria Retro Card v1.1.0
+ * Wiener Linien Austria Retro Card v1.1.1
  * LED-style departure display mimicking the classic Wiener Linien platform
  * signs: amber dot-matrix text on black, with a platform panel (GLEIS for
  * rail, STEIG for bus) on the left or right depending on Gleis number.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1";
 
 // ------------------------------------------------------------------
 // Shared helpers. Duplicated from the modern card so the two files
@@ -244,12 +244,14 @@ const RETRO_STYLE = `
       circle, var(--led-substrate) 0.5px, transparent 1px
     );
     background-size: 4px 4px;
-    padding: 14px 14px;
-    /* Slightly roomier gutter on the left so line badges (U6, N25…)
-       don't sit flush against the card edge. Right side is snugged in
-       a further 4px compared to the base so the countdown sits closer
-       to the card edge. */
-    padding-left: 22px;
+    /* 22px gutter on edges without the Gleis/Steig panel, 14px on the
+       edge that has it. The panel has its own separator (border +
+       margin), so extra card-edge air there would read as a gap rather
+       than breathing room. Specific sides are trimmed by the
+       .retro--gleis-{left,right} modifiers below; when the panel is
+       hidden, both sides keep the 22px air so the line badge and
+       countdown both get room. */
+    padding: 14px 22px;
     /* Pure system monospace stack — avoids a Google-Fonts CDN fetch
        (GDPR) and the @import-inside-Lovelace flakiness. Bold + wider
        letter-spacing gives the retro fixed-pitch LED feel without a
@@ -268,6 +270,12 @@ const RETRO_STYLE = `
   }
   /* Gleis "2" sits on the left per the station displays. */
   .retro--gleis-left .retro-gleis { order: -1; }
+  /* Trim the card-edge gutter on the side that carries the Gleis/Steig
+     panel — that side has its own separator, so the card-edge air
+     would read as a gap. .retro--no-gleis skips the trim entirely
+     (symmetric 22px on both sides). */
+  .retro--gleis-right { padding-right: 14px; }
+  .retro--gleis-left { padding-left: 14px; }
   .retro-rows {
     flex: 1;
     display: flex;
@@ -387,10 +395,11 @@ const RETRO_STYLE = `
   /* ---- size variants ---- */
   /* "regular" uses the base sizing above — no override needed. */
   .retro--size-medium {
-    padding: 11px 10px;
-    padding-left: 18px;
+    padding: 11px 18px;
     min-height: 92px;
   }
+  .retro--size-medium.retro--gleis-right { padding-right: 10px; }
+  .retro--size-medium.retro--gleis-left { padding-left: 10px; }
   .retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
   .retro--size-medium .retro-gleis { padding: 0 10px 0 14px; min-width: 48px; }
   .retro--size-medium.retro--gleis-left .retro-gleis {
@@ -403,10 +412,11 @@ const RETRO_STYLE = `
   }
 
   .retro--size-small {
-    padding: 8px 6px;
-    padding-left: 14px;
+    padding: 8px 14px;
     min-height: 72px;
   }
+  .retro--size-small.retro--gleis-right { padding-right: 6px; }
+  .retro--size-small.retro--gleis-left { padding-left: 6px; }
   .retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
   .retro--size-small .retro-row {
     grid-template-columns: 2em 1fr auto;
@@ -448,11 +458,11 @@ const RETRO_STYLE = `
     align-items: center;
     justify-content: center;
     text-align: center;
-    margin: -14px -14px 10px;
-    /* Match the asymmetric padding on .retro so the panel still bleeds
-       to the card edge on both sides. */
-    margin-left: -22px;
-    padding: 16px 16px;
+    /* Mirrors the .retro padding so the panel still bleeds exactly to
+       the card edges on both sides. The gleis-side modifiers below
+       nudge the trimmed side back to -14px to match. */
+    margin: -14px -22px 10px;
+    padding: 11px 16px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                  Helvetica, Arial, sans-serif;
     font-weight: 700;
@@ -465,19 +475,25 @@ const RETRO_STYLE = `
   .retro-station-name {
     text-shadow: none;
   }
-  /* Size variants scale the station panel alongside the LED display */
+  /* Size variants scale the station panel alongside the LED display.
+     Base margins mirror the symmetric-air padding; gleis-side modifiers
+     trim the matching edge back. */
   .retro--size-medium .retro-station {
-    margin: -11px -10px 8px;
-    margin-left: -18px;
-    padding: 13px 14px;
+    margin: -11px -18px 8px;
+    padding: 9px 14px;
     font-size: 1.65em;
   }
   .retro--size-small .retro-station {
-    margin: -8px -6px 6px;
-    margin-left: -14px;
-    padding: 10px 10px;
+    margin: -8px -14px 6px;
+    padding: 7px 10px;
     font-size: 1.35em;
   }
+  .retro--gleis-right .retro-station { margin-right: -14px; }
+  .retro--gleis-left .retro-station { margin-left: -14px; }
+  .retro--size-medium.retro--gleis-right .retro-station { margin-right: -10px; }
+  .retro--size-medium.retro--gleis-left .retro-station { margin-left: -10px; }
+  .retro--size-small.retro--gleis-right .retro-station { margin-right: -6px; }
+  .retro--size-small.retro--gleis-left .retro-station { margin-left: -6px; }
   .retro-banner {
     background: #ffa000;
     color: #000;
@@ -513,6 +529,14 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
   _hass = null;
   _versionMismatch = null;
   _lastFingerprint = null;
+
+  constructor() {
+    super();
+    // Shadow DOM scopes our CSS — without it, every class name (.retro-row,
+    // .retro-line, .retro-station, .chip, …) leaks into the global page
+    // scope and collides with sibling custom cards rendered into light DOM.
+    this.attachShadow({ mode: "open" });
+  }
 
   setConfig(config) {
     if (config === null || typeof config !== "object" || Array.isArray(config)) {
@@ -713,12 +737,16 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
 
     const retroClass = [
       "retro",
-      gleisLeft ? "retro--gleis-left" : "",
+      platform
+        ? gleisLeft
+          ? "retro--gleis-left"
+          : "retro--gleis-right"
+        : "retro--no-gleis",
       size !== "regular" ? `retro--size-${size}` : "",
     ]
       .filter(Boolean)
       .join(" ");
-    this.innerHTML = `
+    this.shadowRoot.innerHTML =`
       <ha-card style="background:${LED_BG};padding:0;overflow:hidden;">
         <style>${RETRO_STYLE}</style>
         <div class="${retroClass}">
@@ -729,7 +757,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       </ha-card>
     `;
 
-    const reloadBtn = this.querySelector(".retro-banner button");
+    const reloadBtn = this.shadowRoot.querySelector(".retro-banner button");
     if (reloadBtn) reloadBtn.addEventListener("click", () => this._reload());
   }
 
@@ -964,6 +992,11 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
   _config = {};
   _hass = null;
 
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
   setConfig(config) {
     if (config === null || typeof config !== "object" || Array.isArray(config)) {
       throw new Error("wiener-linien-austria-retro-card: config must be an object");
@@ -996,9 +1029,13 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
   }
 
   _fire() {
+    // bubbles + composed required so the event crosses our shadow boundary
+    // and reaches the dashboard's card editor listener.
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: { ...this._config } },
+        bubbles: true,
+        composed: true,
       }),
     );
   }
@@ -1212,7 +1249,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           .join("")
       : `<div class="editor-hint">${_esc(this._et("walk_time_no_data"))}</div>`;
 
-    this.innerHTML = `
+    this.shadowRoot.innerHTML =`
       <div class="editor">
         <style>${EDITOR_STYLE}</style>
 
@@ -1265,6 +1302,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
               ${showStationName ? "checked" : ""}
             ></ha-switch>
           </div>
+          ${showStationName ? `
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;flex-wrap:wrap;">
             <span style="font-size:13px;">${_esc(this._et("station_bg_label"))}</span>
             <div class="direction-buttons">
@@ -1273,6 +1311,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
               <button type="button" data-station-bg="black" class="${stationBg === "black" ? "active" : ""}">${_esc(this._et("station_bg_black"))}</button>
             </div>
           </div>
+          ` : ""}
         </div>
 
         <div class="editor-section">
@@ -1297,45 +1336,45 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
       </div>
     `;
 
-    this.querySelectorAll(".chip[data-entity]").forEach((chip) => {
+    this.shadowRoot.querySelectorAll(".chip[data-entity]").forEach((chip) => {
       chip.addEventListener("click", () =>
         this._pickEntity(chip.dataset.entity),
       );
     });
-    this.querySelectorAll(".direction-buttons button").forEach((btn) => {
+    this.shadowRoot.querySelectorAll(".direction-buttons button").forEach((btn) => {
       btn.addEventListener("click", () => this._setDirection(btn.dataset.dir));
     });
-    this.querySelectorAll(".chip[data-line]").forEach((chip) => {
+    this.shadowRoot.querySelectorAll(".chip[data-line]").forEach((chip) => {
       chip.addEventListener("click", () =>
         this._pickLine(chip.dataset.line),
       );
     });
-    this.querySelectorAll("ha-switch[data-field='show_platform']").forEach(
+    this.shadowRoot.querySelectorAll("ha-switch[data-field='show_platform']").forEach(
       (sw) => {
         sw.addEventListener("change", (e) =>
           this._setShowPlatform(e.target.checked),
         );
       },
     );
-    this.querySelectorAll("ha-switch[data-field='show_station_name']").forEach(
+    this.shadowRoot.querySelectorAll("ha-switch[data-field='show_station_name']").forEach(
       (sw) => {
         sw.addEventListener("change", (e) =>
           this._setShowStationName(e.target.checked),
         );
       },
     );
-    this.querySelectorAll("button[data-station-bg]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("button[data-station-bg]").forEach((btn) => {
       btn.addEventListener("click", () =>
         this._setStationBg(btn.dataset.stationBg),
       );
     });
-    this.querySelectorAll("button[data-size]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("button[data-size]").forEach((btn) => {
       btn.addEventListener("click", () => this._setSize(btn.dataset.size));
     });
     // Walk-time number inputs. Fire on `change` (blur / Enter) so typing
     // "10" doesn't briefly commit "1" and re-render with the wrong value
     // under the cursor.
-    this.querySelectorAll("input[data-walk-key]").forEach((input) => {
+    this.shadowRoot.querySelectorAll("input[data-walk-key]").forEach((input) => {
       ["keydown", "keyup", "keypress"].forEach((evt) => {
         input.addEventListener(evt, (e) => e.stopPropagation());
       });

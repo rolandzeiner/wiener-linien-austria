@@ -1,10 +1,10 @@
 /**
- * Wiener Linien Austria Card v1.1.0
+ * Wiener Linien Austria Card v1.1.1
  * Custom Lovelace card for Wiener Linien departure boards.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.1.0";
+const CARD_VERSION = "1.1.1";
 
 // Metro line colours (authoritative per Wiener Linien CI). Non-metro lines
 // stay neutral until the user supplies overrides via `line_colors`.
@@ -706,6 +706,15 @@ class WienerLinienAustriaCard extends HTMLElement {
   _expandedTraffic = new Set();
   _expandedElevator = new Set();
 
+  constructor() {
+    super();
+    // Shadow DOM scopes our CSS — without it, every class name (.wl-row,
+    // .wl-stop, .stop-name, .chip, .tab, .editor, …) leaks into the global
+    // page scope and collides with sibling custom cards rendered into
+    // light DOM.
+    this.attachShadow({ mode: "open" });
+  }
+
   setConfig(config) {
     if (config === null || typeof config !== "object" || Array.isArray(config)) {
       throw new Error("wiener-linien-austria-card: config must be an object");
@@ -869,7 +878,7 @@ class WienerLinienAustriaCard extends HTMLElement {
       ? ""
       : `<div class="wl-attr">${_esc(attribution)}</div>`;
 
-    this.innerHTML = `
+    this.shadowRoot.innerHTML =`
       <ha-card>
         <style>${CARD_STYLE}</style>
         <div class="wl-card">
@@ -882,7 +891,7 @@ class WienerLinienAustriaCard extends HTMLElement {
       </ha-card>
     `;
 
-    const reloadBtn = this.querySelector(".wl-banner button");
+    const reloadBtn = this.shadowRoot.querySelector(".wl-banner button");
     if (reloadBtn) {
       reloadBtn.addEventListener("click", () => this._reload());
     }
@@ -890,7 +899,7 @@ class WienerLinienAustriaCard extends HTMLElement {
     // Tab-bar click handler: switch active stop and re-render. We call
     // `_render()` directly rather than flip the fingerprint so the flicker
     // short-circuit stays intact for coordinator polls.
-    this.querySelectorAll(".wl-tab[data-tab]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll(".wl-tab[data-tab]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const i = parseInt(btn.dataset.tab, 10);
         if (Number.isFinite(i) && i !== this._activeTab) {
@@ -900,7 +909,7 @@ class WienerLinienAustriaCard extends HTMLElement {
       });
     });
 
-    this.querySelectorAll("[data-dev-action]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("[data-dev-action]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const action = btn.dataset.devAction;
         if (action === "traffic") this._devTestTraffic();
@@ -910,7 +919,7 @@ class WienerLinienAustriaCard extends HTMLElement {
     });
 
     // Toggle traffic-item expand/collapse.
-    this.querySelectorAll("[data-traffic-name]").forEach((el) => {
+    this.shadowRoot.querySelectorAll("[data-traffic-name]").forEach((el) => {
       // Skip items that have no detail to reveal.
       if (!el.querySelector(".wl-traffic-detail")) return;
       el.addEventListener("click", () => {
@@ -926,7 +935,7 @@ class WienerLinienAustriaCard extends HTMLElement {
     });
 
     // Toggle elevator-detail expand/collapse.
-    this.querySelectorAll("[data-elevator-name]").forEach((el) => {
+    this.shadowRoot.querySelectorAll("[data-elevator-name]").forEach((el) => {
       if (!el.querySelector(".wl-elevator-detail-expand")) return;
       el.addEventListener("click", () => {
         const name = el.dataset.elevatorName;
@@ -1625,6 +1634,11 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
   _config = {};
   _hass = null;
 
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+  }
+
   setConfig(config) {
     if (config === null || typeof config !== "object" || Array.isArray(config)) {
       throw new Error("wiener-linien-austria-card: config must be an object");
@@ -1657,9 +1671,13 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
   }
 
   _fireChanged() {
+    // bubbles + composed required so the event crosses our shadow boundary
+    // and reaches the dashboard's card editor listener.
     this.dispatchEvent(
       new CustomEvent("config-changed", {
         detail: { config: { ...this._config } },
+        bubbles: true,
+        composed: true,
       }),
     );
   }
@@ -1897,7 +1915,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
           .join("")
       : `<div class="editor-hint">${_esc(this._et("no_lines_available"))}</div>`;
 
-    this.innerHTML = `
+    this.shadowRoot.innerHTML =`
       <div class="editor">
         <style>${EDITOR_STYLE}</style>
 
@@ -1989,19 +2007,19 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
 
   _attachListeners() {
     // Stop toggle
-    this.querySelectorAll('[data-action="toggle-stop"]').forEach((chip) => {
+    this.shadowRoot.querySelectorAll('[data-action="toggle-stop"]').forEach((chip) => {
       chip.addEventListener("click", () => this._toggleStop(chip.dataset.entity));
     });
 
     // Line filter toggle
-    this.querySelectorAll('[data-action="toggle-line"]').forEach((chip) => {
+    this.shadowRoot.querySelectorAll('[data-action="toggle-line"]').forEach((chip) => {
       chip.addEventListener("click", () =>
         this._toggleLine(chip.dataset.entity, chip.dataset.line),
       );
     });
 
     // Direction buttons
-    this.querySelectorAll(".direction-buttons").forEach((grp) => {
+    this.shadowRoot.querySelectorAll(".direction-buttons").forEach((grp) => {
       const eid = grp.dataset.entity;
       grp.querySelectorAll("button").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -2014,7 +2032,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     // Walk-time number inputs. Fire on `change` (blur / Enter), not `input`,
     // so typing "10" doesn't briefly commit "1" and re-render with the
     // wrong value under the cursor.
-    this.querySelectorAll('input[data-action="set-walk-time"]').forEach((input) => {
+    this.shadowRoot.querySelectorAll('input[data-action="set-walk-time"]').forEach((input) => {
       // Don't let HA's card-editor keyboard handling (e.g. Esc to close)
       // swallow arrow keys the user wants for the number input.
       ["keydown", "keyup", "keypress"].forEach((evt) => {
@@ -2030,12 +2048,12 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     });
 
     // Colour pickers
-    this.querySelectorAll('input[type="color"][data-line]').forEach((input) => {
+    this.shadowRoot.querySelectorAll('input[type="color"][data-line]').forEach((input) => {
       input.addEventListener("change", (e) => {
         this._setLineColor(input.dataset.line, e.target.value);
       });
     });
-    this.querySelectorAll("[data-reset-line]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("[data-reset-line]").forEach((btn) => {
       btn.addEventListener("click", () => {
         if (btn.disabled) return;
         this._resetLineColor(btn.dataset.resetLine);
@@ -2043,7 +2061,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     });
 
     // Max-departures slider
-    this.querySelectorAll('input[type="range"]').forEach((input) => {
+    this.shadowRoot.querySelectorAll('input[type="range"]').forEach((input) => {
       ["keydown", "keyup", "keypress"].forEach((evt) => {
         input.addEventListener(evt, (e) => e.stopPropagation());
       });
@@ -2061,7 +2079,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     });
 
     // Display-section switches (accessibility / traffic / elevator)
-    this.querySelectorAll("ha-switch[data-field]").forEach((sw) => {
+    this.shadowRoot.querySelectorAll("ha-switch[data-field]").forEach((sw) => {
       sw.addEventListener("change", (e) => {
         const field = e.target.dataset.field;
         this._config = { ...this._config, [field]: e.target.checked };
@@ -2071,7 +2089,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     });
 
     // Layout buttons (stacked / tabs)
-    this.querySelectorAll("button[data-layout]").forEach((btn) => {
+    this.shadowRoot.querySelectorAll("button[data-layout]").forEach((btn) => {
       btn.addEventListener("click", () => this._setLayout(btn.dataset.layout));
     });
   }
