@@ -1915,7 +1915,7 @@ try {
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "wiener-linien-austria-card",
-  name: "Wiener Linien Austria",
+  name: "Wiener Linien Austria Card",
   description: "Abfahrtsmonitor für Wiener Linien Stationen.",
   preview: true,
   documentationURL: "https://github.com/rolandzeiner/wiener-linien-austria",
