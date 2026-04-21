@@ -1,12 +1,12 @@
 /**
- * Wiener Linien Austria Retro Card v1.0.1
+ * Wiener Linien Austria Retro Card v1.0.0
  * LED-style departure display mimicking the classic Wiener Linien platform
  * signs: amber dot-matrix text on black, with a platform panel (GLEIS for
  * rail, STEIG for bus) on the left or right depending on Gleis number.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.0.1";
+const CARD_VERSION = "1.0.0";
 
 // ------------------------------------------------------------------
 // Shared helpers. Duplicated from the modern card so the two files
