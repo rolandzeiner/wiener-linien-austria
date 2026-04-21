@@ -20,7 +20,7 @@
       },
       "select_lines": {
         "title": "Linien an {stop_name}",
-        "description": "{line_count} Linien bedienen diese Haltestelle aktuell. Abwählen, was nicht verfolgt werden soll.",
+        "description": "{line_count} Linien bedienen diese Haltestelle aktuell. Wähle die Linien aus, die du verfolgen möchtest.",
         "data": {
           "lines": "Linien verfolgen",
           "scan_interval": "Aktualisierungsintervall (Sekunden)"

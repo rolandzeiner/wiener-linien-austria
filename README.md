@@ -68,7 +68,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 2. Search for **Wiener Linien Austria**.
 3. Type part of a stop name (e.g. `Stephans`) and submit.
 4. Pick the matching stop from the dropdown.
-5. The integration calls the live `/monitor` endpoint and shows every line currently serving that stop. All pre-selected. Deselect any you don't care about.
+5. The integration calls the live `/monitor` endpoint and shows every line currently serving that stop. Pick the one or two you want to track — busy stops list 20+ lines.
 6. Set a polling interval (default 60 s, minimum 30 s) and save.
 
 Change tracked lines later via **Reconfigure**; change polling interval via **Configure** (options).
