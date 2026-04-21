@@ -244,12 +244,14 @@ const RETRO_STYLE = `
       circle, var(--led-substrate) 0.5px, transparent 1px
     );
     background-size: 4px 4px;
-    padding: 14px 14px;
-    /* Slightly roomier gutter on the left so line badges (U6, N25…)
-       don't sit flush against the card edge. Right side is snugged in
-       a further 4px compared to the base so the countdown sits closer
-       to the card edge. */
-    padding-left: 22px;
+    /* 22px gutter on edges without the Gleis/Steig panel, 14px on the
+       edge that has it. The panel has its own separator (border +
+       margin), so extra card-edge air there would read as a gap rather
+       than breathing room. Specific sides are trimmed by the
+       .retro--gleis-{left,right} modifiers below; when the panel is
+       hidden, both sides keep the 22px air so the line badge and
+       countdown both get room. */
+    padding: 14px 22px;
     /* Pure system monospace stack — avoids a Google-Fonts CDN fetch
        (GDPR) and the @import-inside-Lovelace flakiness. Bold + wider
        letter-spacing gives the retro fixed-pitch LED feel without a
@@ -268,6 +270,12 @@ const RETRO_STYLE = `
   }
   /* Gleis "2" sits on the left per the station displays. */
   .retro--gleis-left .retro-gleis { order: -1; }
+  /* Trim the card-edge gutter on the side that carries the Gleis/Steig
+     panel — that side has its own separator, so the card-edge air
+     would read as a gap. .retro--no-gleis skips the trim entirely
+     (symmetric 22px on both sides). */
+  .retro--gleis-right { padding-right: 14px; }
+  .retro--gleis-left { padding-left: 14px; }
   .retro-rows {
     flex: 1;
     display: flex;
@@ -387,10 +395,11 @@ const RETRO_STYLE = `
   /* ---- size variants ---- */
   /* "regular" uses the base sizing above — no override needed. */
   .retro--size-medium {
-    padding: 11px 10px;
-    padding-left: 18px;
+    padding: 11px 18px;
     min-height: 92px;
   }
+  .retro--size-medium.retro--gleis-right { padding-right: 10px; }
+  .retro--size-medium.retro--gleis-left { padding-left: 10px; }
   .retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
   .retro--size-medium .retro-gleis { padding: 0 10px 0 14px; min-width: 48px; }
   .retro--size-medium.retro--gleis-left .retro-gleis {
@@ -403,10 +412,11 @@ const RETRO_STYLE = `
   }
 
   .retro--size-small {
-    padding: 8px 6px;
-    padding-left: 14px;
+    padding: 8px 14px;
     min-height: 72px;
   }
+  .retro--size-small.retro--gleis-right { padding-right: 6px; }
+  .retro--size-small.retro--gleis-left { padding-left: 6px; }
   .retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
   .retro--size-small .retro-row {
     grid-template-columns: 2em 1fr auto;
@@ -448,11 +458,11 @@ const RETRO_STYLE = `
     align-items: center;
     justify-content: center;
     text-align: center;
-    margin: -14px -14px 10px;
-    /* Match the asymmetric padding on .retro so the panel still bleeds
-       to the card edge on both sides. */
-    margin-left: -22px;
-    padding: 16px 16px;
+    /* Mirrors the .retro padding so the panel still bleeds exactly to
+       the card edges on both sides. The gleis-side modifiers below
+       nudge the trimmed side back to -14px to match. */
+    margin: -14px -22px 10px;
+    padding: 11px 16px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                  Helvetica, Arial, sans-serif;
     font-weight: 700;
@@ -465,19 +475,25 @@ const RETRO_STYLE = `
   .retro-station-name {
     text-shadow: none;
   }
-  /* Size variants scale the station panel alongside the LED display */
+  /* Size variants scale the station panel alongside the LED display.
+     Base margins mirror the symmetric-air padding; gleis-side modifiers
+     trim the matching edge back. */
   .retro--size-medium .retro-station {
-    margin: -11px -10px 8px;
-    margin-left: -18px;
-    padding: 13px 14px;
+    margin: -11px -18px 8px;
+    padding: 9px 14px;
     font-size: 1.65em;
   }
   .retro--size-small .retro-station {
-    margin: -8px -6px 6px;
-    margin-left: -14px;
-    padding: 10px 10px;
+    margin: -8px -14px 6px;
+    padding: 7px 10px;
     font-size: 1.35em;
   }
+  .retro--gleis-right .retro-station { margin-right: -14px; }
+  .retro--gleis-left .retro-station { margin-left: -14px; }
+  .retro--size-medium.retro--gleis-right .retro-station { margin-right: -10px; }
+  .retro--size-medium.retro--gleis-left .retro-station { margin-left: -10px; }
+  .retro--size-small.retro--gleis-right .retro-station { margin-right: -6px; }
+  .retro--size-small.retro--gleis-left .retro-station { margin-left: -6px; }
   .retro-banner {
     background: #ffa000;
     color: #000;
@@ -713,7 +729,11 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
 
     const retroClass = [
       "retro",
-      gleisLeft ? "retro--gleis-left" : "",
+      platform
+        ? gleisLeft
+          ? "retro--gleis-left"
+          : "retro--gleis-right"
+        : "retro--no-gleis",
       size !== "regular" ? `retro--size-${size}` : "",
     ]
       .filter(Boolean)
@@ -1265,6 +1285,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
               ${showStationName ? "checked" : ""}
             ></ha-switch>
           </div>
+          ${showStationName ? `
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;flex-wrap:wrap;">
             <span style="font-size:13px;">${_esc(this._et("station_bg_label"))}</span>
             <div class="direction-buttons">
@@ -1273,6 +1294,7 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
               <button type="button" data-station-bg="black" class="${stationBg === "black" ? "active" : ""}">${_esc(this._et("station_bg_black"))}</button>
             </div>
           </div>
+          ` : ""}
         </div>
 
         <div class="editor-section">
