@@ -1,10 +1,10 @@
 /**
- * Wiener Linien Austria Card v1.0.1
+ * Wiener Linien Austria Card v1.1.0
  * Custom Lovelace card for Wiener Linien departure boards.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.0.1";
+const CARD_VERSION = "1.1.0";
 
 // Metro line colours (authoritative per Wiener Linien CI). Non-metro lines
 // stay neutral until the user supplies overrides via `line_colors`.
@@ -52,6 +52,10 @@ const TRANSLATIONS = {
       filters_hint: "Linien und/oder Richtung pro Haltestelle einschränken",
       lines_label: "Linien",
       direction_label: "Richtung",
+      walk_time_label: "Fußweg (min)",
+      walk_time_hint:
+        "Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",
+      walk_time_placeholder: "–",
       section_colors: "Linienfarben",
       colors_hint:
         "Optional: Farben überschreiben. U-Bahn-Standardwerte sind gesetzt.",
@@ -106,6 +110,10 @@ const TRANSLATIONS = {
       filters_hint: "Optionally restrict lines or direction per stop",
       lines_label: "Lines",
       direction_label: "Direction",
+      walk_time_label: "Walking time (min)",
+      walk_time_hint:
+        "Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",
+      walk_time_placeholder: "–",
       section_colors: "Line colours",
       colors_hint:
         "Optional overrides. Metro defaults are already set.",
@@ -176,6 +184,19 @@ function _normaliseStopEntry(raw) {
   if (raw.direction === "H" || raw.direction === "R") {
     out.direction = raw.direction;
   }
+  // Per-(line,direction,towards) walking-time overrides. Keys match the
+  // departure's `${line}|${direction}|${towards}` fingerprint; values are
+  // positive integer minutes. Zero / blank / non-numeric means "no filter"
+  // and is dropped so the normalised config never carries dead entries.
+  if (raw.walk_times && typeof raw.walk_times === "object" && !Array.isArray(raw.walk_times)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(raw.walk_times)) {
+      if (typeof k !== "string" || !k) continue;
+      const n = parseInt(v, 10);
+      if (Number.isFinite(n) && n > 0) clean[k] = n;
+    }
+    if (Object.keys(clean).length) out.walk_times = clean;
+  }
   return out;
 }
 
@@ -239,9 +260,20 @@ function _filterDepartures(departures, stopCfg) {
   if (!Array.isArray(departures)) return [];
   const wantLines = stopCfg.lines && stopCfg.lines.length ? new Set(stopCfg.lines) : null;
   const wantDir = stopCfg.direction || null;
+  const walk = stopCfg.walk_times || null;
   return departures.filter((d) => {
     if (wantLines && !wantLines.has(d.line)) return false;
     if (wantDir && d.direction !== wantDir) return false;
+    if (walk) {
+      const key = `${d.line || ""}|${d.direction || ""}|${d.towards || ""}`;
+      const min = walk[key];
+      // Inclusive: countdown == walk ⇒ still reachable if you hurry. When the
+      // sensor hasn't reported a countdown yet we err on the side of keeping
+      // the row rather than hiding data the user might need.
+      if (Number.isFinite(min) && min > 0 && Number.isFinite(d.countdown) && d.countdown < min) {
+        return false;
+      }
+    }
     return true;
   });
 }
@@ -265,6 +297,30 @@ function _linesAtStop(attrs) {
     if (d && typeof d.line === "string" && d.line) seen.add(d.line);
   }
   return [...seen].sort();
+}
+
+function _tripletsAtStop(attrs) {
+  // Unique (line, direction, towards) triples at this stop, keyed the same
+  // way the filter / config-flow store them. Used to drive the editor's
+  // walk-time rows — one input per triple so users can set a different
+  // value for each platform direction at a station.
+  const seen = new Map();
+  const deps = Array.isArray(attrs?.departures) ? attrs.departures : [];
+  for (const d of deps) {
+    if (!d || typeof d.line !== "string" || !d.line) continue;
+    const direction = typeof d.direction === "string" ? d.direction : "";
+    const towards = typeof d.towards === "string" ? d.towards : "";
+    const key = `${d.line}|${direction}|${towards}`;
+    if (!seen.has(key)) {
+      seen.set(key, { key, line: d.line, direction, towards });
+    }
+  }
+  return [...seen.values()].sort((a, b) => {
+    if (a.line !== b.line) return a.line < b.line ? -1 : 1;
+    if (a.direction !== b.direction) return a.direction < b.direction ? -1 : 1;
+    if (a.towards === b.towards) return 0;
+    return a.towards < b.towards ? -1 : 1;
+  });
 }
 
 const CARD_STYLE = `
@@ -1522,6 +1578,47 @@ const EDITOR_STYLE = `
     color: var(--primary-text-color);
     cursor: pointer;
   }
+  .walk-time-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .walk-time-row {
+    display: grid;
+    grid-template-columns: 44px 1fr 72px;
+    align-items: center;
+    gap: 8px;
+  }
+  .walk-time-badge {
+    text-align: center;
+    font-weight: 700;
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.9em;
+  }
+  .walk-time-towards {
+    font-size: 13px;
+    color: var(--primary-text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .walk-time-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    background: var(--card-background-color, transparent);
+    color: var(--primary-text-color);
+    font-size: 13px;
+    text-align: right;
+  }
+  .walk-time-input::-webkit-outer-spin-button,
+  .walk-time-input::-webkit-inner-spin-button {
+    margin: 0;
+  }
 `;
 
 class WienerLinienAustriaCardEditor extends HTMLElement {
@@ -1606,6 +1703,22 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
     });
   }
 
+  _setWalkTime(eid, key, rawValue) {
+    // Empty / zero / non-numeric → remove the override so the card falls
+    // back to default (show everything). Clamp positive values to 120min
+    // to keep the fingerprint stable against typos (no "1500min" entries).
+    const n = parseInt(rawValue, 10);
+    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
+    this._updateStop(eid, (s) => {
+      const cur = { ...(s.walk_times || {}) };
+      if (clean === null) delete cur[key];
+      else cur[key] = clean;
+      if (Object.keys(cur).length) s.walk_times = cur;
+      else delete s.walk_times;
+      return s;
+    });
+  }
+
   _setLineColor(line, color) {
     const colors = { ...(this._config.line_colors || {}) };
     colors[line.toUpperCase()] = color;
@@ -1674,8 +1787,16 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
             if (!a) return "";
             const stopName = a.stop_name || stop.entity;
             const linesAtStop = _linesAtStop(a);
+            const walkTimes = stop.walk_times || {};
             const picked = new Set(stop.lines || []);
             const dir = stop.direction || null;
+            // Walk-time rows mirror the direction chip: if the user locked
+            // the card to H or R, the inverse direction's triples are
+            // irrelevant and hiding them avoids confusion. "Both" (dir=null)
+            // keeps the full list.
+            const triplets = _tripletsAtStop(a).filter(
+              (t) => !dir || t.direction === dir,
+            );
 
             const lineChips = linesAtStop.length
               ? linesAtStop
@@ -1696,6 +1817,45 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
                   .join("")
               : `<div class="editor-hint">${_esc(this._et("no_lines_available"))}</div>`;
 
+            const walkRows = triplets.length
+              ? triplets
+                  .map((t) => {
+                    const color = _colorForLine(t.line, overrides);
+                    const val = walkTimes[t.key];
+                    const arrow = t.towards ? `→ ${t.towards}` : "";
+                    return `
+                      <div class="walk-time-row">
+                        <span class="walk-time-badge" style="background:${color}">${_esc(t.line)}</span>
+                        <span class="walk-time-towards" title="${_esc(t.towards)}">${_esc(arrow)}</span>
+                        <input
+                          type="number"
+                          class="walk-time-input"
+                          min="0"
+                          max="120"
+                          step="1"
+                          inputmode="numeric"
+                          data-action="set-walk-time"
+                          data-entity="${_esc(stop.entity)}"
+                          data-key="${_esc(t.key)}"
+                          placeholder="${_esc(this._et("walk_time_placeholder"))}"
+                          value="${Number.isFinite(val) ? val : ""}"
+                        />
+                      </div>
+                    `;
+                  })
+                  .join("")
+              : "";
+
+            const walkBlock = triplets.length
+              ? `
+                <div class="stop-filter-row">
+                  <div class="stop-filter-row-label">${_esc(this._et("walk_time_label"))}</div>
+                  <div class="editor-hint">${_esc(this._et("walk_time_hint"))}</div>
+                  <div class="walk-time-list">${walkRows}</div>
+                </div>
+              `
+              : "";
+
             return `
               <div class="stop-filter">
                 <div class="stop-filter-header">${_esc(stopName)}</div>
@@ -1711,6 +1871,7 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
                     <button type="button" data-dir="" class="${dir === null ? "active" : ""}">${_esc(this._t("dir_both"))}</button>
                   </div>
                 </div>
+                ${walkBlock}
               </div>
             `;
           })
@@ -1847,6 +2008,24 @@ class WienerLinienAustriaCardEditor extends HTMLElement {
           const dir = btn.dataset.dir;
           this._setDirection(eid, dir === "" ? null : dir);
         });
+      });
+    });
+
+    // Walk-time number inputs. Fire on `change` (blur / Enter), not `input`,
+    // so typing "10" doesn't briefly commit "1" and re-render with the
+    // wrong value under the cursor.
+    this.querySelectorAll('input[data-action="set-walk-time"]').forEach((input) => {
+      // Don't let HA's card-editor keyboard handling (e.g. Esc to close)
+      // swallow arrow keys the user wants for the number input.
+      ["keydown", "keyup", "keypress"].forEach((evt) => {
+        input.addEventListener(evt, (e) => e.stopPropagation());
+      });
+      input.addEventListener("change", (e) => {
+        this._setWalkTime(
+          e.target.dataset.entity,
+          e.target.dataset.key,
+          e.target.value,
+        );
       });
     });
 
