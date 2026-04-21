@@ -1,12 +1,12 @@
 /**
- * Wiener Linien Austria Retro Card v1.0.0
+ * Wiener Linien Austria Retro Card v1.1.0
  * LED-style departure display mimicking the classic Wiener Linien platform
  * signs: amber dot-matrix text on black, with a platform panel (GLEIS for
  * rail, STEIG for bus) on the left or right depending on Gleis number.
  * https://github.com/rolandzeiner/wiener-linien-austria
  */
 
-const CARD_VERSION = "1.0.0";
+const CARD_VERSION = "1.1.0";
 
 // ------------------------------------------------------------------
 // Shared helpers. Duplicated from the modern card so the two files
@@ -72,6 +72,12 @@ const TRANSLATIONS = {
       direction_no_data: "Keine Abfahrten in dieser Richtung",
       line_hint:
         "Optional: nur eine Linie anzeigen. Aktiven Chip erneut antippen = alle Linien.",
+      section_walk_time: "Fußweg zur Haltestelle",
+      walk_time_hint:
+        "Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",
+      walk_time_no_data:
+        "Keine Abfahrten in dieser Richtung. Richtung wechseln oder warten, bis der Sensor Linien meldet.",
+      walk_time_placeholder: "–",
       show_platform: "Gleis/Steig anzeigen",
       show_station_name: "Stationsnamen anzeigen",
       section_station: "Stationsnamen-Schild",
@@ -114,6 +120,12 @@ const TRANSLATIONS = {
       direction_no_data: "No departures in this direction",
       line_hint:
         "Optional: restrict to a single line. Tap the active chip again to show all lines.",
+      section_walk_time: "Walking time to stop",
+      walk_time_hint:
+        "Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",
+      walk_time_no_data:
+        "No departures in this direction. Switch direction or wait until the sensor reports lines.",
+      walk_time_placeholder: "–",
       show_platform: "Show platform",
       show_station_name: "Show station name",
       section_station: "Station name sign",
@@ -173,7 +185,38 @@ function _normaliseConfig(config) {
   // Card size: regular = previous sizing, medium / small scale
   // font + padding proportionally for denser or cramped layouts.
   if (!RETRO_SIZES.has(out.size)) out.size = "regular";
+  // Walking-time overrides per `${line}|${direction}|${towards}` triple.
+  // Integer minutes > 0 only; anything else is dropped so empty inputs
+  // don't accumulate dead keys.
+  if (out.walk_times && typeof out.walk_times === "object" && !Array.isArray(out.walk_times)) {
+    const clean = {};
+    for (const [k, v] of Object.entries(out.walk_times)) {
+      if (typeof k !== "string" || !k) continue;
+      const n = parseInt(v, 10);
+      if (Number.isFinite(n) && n > 0) clean[k] = n;
+    }
+    if (Object.keys(clean).length) out.walk_times = clean;
+    else delete out.walk_times;
+  } else {
+    delete out.walk_times;
+  }
   return out;
+}
+
+function _retroWalkFilter(walk) {
+  // Returns a predicate that drops departures whose countdown is below
+  // the user-configured walking time for their triple. Inclusive: walk=5
+  // and countdown=5 ⇒ still kept (run if you need to). Missing countdown
+  // passes through — we don't penalise the user for a half-populated row.
+  if (!walk) return () => true;
+  return (d) => {
+    if (!d) return false;
+    const key = `${d.line || ""}|${d.direction || ""}|${d.towards || ""}`;
+    const min = walk[key];
+    if (!Number.isFinite(min) || min <= 0) return true;
+    if (!Number.isFinite(d.countdown)) return true;
+    return d.countdown >= min;
+  };
 }
 
 // ------------------------------------------------------------------
@@ -558,9 +601,12 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const a = this._hass.states[eid]?.attributes || {};
     const dir = this._config.direction;
     const lineFilter = this._config.line || "";
+    const walk = this._config.walk_times || null;
+    const walkFilter = _retroWalkFilter(walk);
     const deps = (a.departures || [])
       .filter((d) => d && d.direction === dir)
       .filter((d) => !lineFilter || d.line === lineFilter)
+      .filter(walkFilter)
       .slice(0, 2)
       .map(
         (d) =>
@@ -572,7 +618,15 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const stn = this._config.show_station_name ? "1" : "0";
     const stnBg = this._config.station_bg || "white";
     const stopName = a.stop_name || a.friendly_name || "";
-    return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}|${lineFilter}|s${stn}|${stnBg}|${stopName}#${deps}`;
+    // Walking-time config is included so edits that hide/show a row trigger
+    // a re-render even when the raw departures themselves are unchanged.
+    const walkKey = walk
+      ? Object.keys(walk)
+          .sort()
+          .map((k) => `${k}=${walk[k]}`)
+          .join(",")
+      : "";
+    return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}|${lineFilter}|s${stn}|${stnBg}|${stopName}|w[${walkKey}]#${deps}`;
   }
 
   _render() {
@@ -589,10 +643,12 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
         attrs.departures,
       );
     }
+    const walkFilter = _retroWalkFilter(this._config.walk_times || null);
     const matching = Array.isArray(attrs.departures)
       ? attrs.departures
           .filter((d) => d && d.direction === dir)
           .filter((d) => !lineFilter || d.line === lineFilter)
+          .filter(walkFilter)
       : [];
     const rows = matching.slice(0, 2);
     const showPlatform = this._config.show_platform !== false;
@@ -864,6 +920,44 @@ const EDITOR_STYLE = `
     color: var(--primary-text-color);
     cursor: pointer;
   }
+  .walk-time-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .walk-time-row {
+    display: grid;
+    grid-template-columns: 44px 1fr 72px;
+    align-items: center;
+    gap: 8px;
+  }
+  .walk-time-badge {
+    text-align: center;
+    font-weight: 700;
+    color: #fff;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 0.9em;
+    background: var(--primary-color);
+  }
+  .walk-time-towards {
+    font-size: 13px;
+    color: var(--primary-text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .walk-time-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: 1px solid var(--divider-color);
+    border-radius: 4px;
+    background: var(--card-background-color, transparent);
+    color: var(--primary-text-color);
+    font-size: 13px;
+    text-align: right;
+  }
 `;
 
 class WienerLinienAustriaRetroCardEditor extends HTMLElement {
@@ -958,6 +1052,46 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     this._render();
   }
 
+  _setWalkTime(key, rawValue) {
+    // Empty / zero / non-numeric → remove the override. Clamp to 120min so
+    // a stray keypress ("500") can't push the filter far beyond the
+    // upstream's ~60-minute departure horizon.
+    const n = parseInt(rawValue, 10);
+    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
+    const cur = { ...(this._config.walk_times || {}) };
+    if (clean === null) delete cur[key];
+    else cur[key] = clean;
+    const next = { ...this._config };
+    if (Object.keys(cur).length) next.walk_times = cur;
+    else delete next.walk_times;
+    this._config = next;
+    this._fire();
+    this._render();
+  }
+
+  _tripletsForStop() {
+    // All (line, direction, towards) triples at the currently selected stop
+    // regardless of the direction / line filter. We list both directions so
+    // the walk-time config survives toggling H↔R later.
+    const eid = this._config.entity;
+    const a = eid ? this._hass?.states[eid]?.attributes : null;
+    const deps = Array.isArray(a?.departures) ? a.departures : [];
+    const seen = new Map();
+    for (const d of deps) {
+      if (!d || typeof d.line !== "string" || !d.line) continue;
+      const direction = typeof d.direction === "string" ? d.direction : "";
+      const towards = typeof d.towards === "string" ? d.towards : "";
+      const key = `${d.line}|${direction}|${towards}`;
+      if (!seen.has(key)) seen.set(key, { key, line: d.line, direction, towards });
+    }
+    return [...seen.values()].sort((a, b) => {
+      if (a.line !== b.line) return a.line < b.line ? -1 : 1;
+      if (a.direction !== b.direction) return a.direction < b.direction ? -1 : 1;
+      if (a.towards === b.towards) return 0;
+      return a.towards < b.towards ? -1 : 1;
+    });
+  }
+
   _linesForCurrent() {
     // Lines that actually have departures for the selected
     // (entity, direction). Used to populate the line-chip picker.
@@ -1046,6 +1180,38 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           .join("")
       : `<div class="editor-hint">${_esc(this._et("no_lines"))}</div>`;
 
+    const walkTimes = this._config.walk_times || {};
+    // Only show walk-time inputs for the currently-selected direction;
+    // retro is single-direction by design, so listing the inverse just
+    // creates dead inputs.
+    const triplets = selected
+      ? this._tripletsForStop().filter((t) => t.direction === direction)
+      : [];
+    const walkRows = triplets.length
+      ? triplets
+          .map((t) => {
+            const val = walkTimes[t.key];
+            return `
+              <div class="walk-time-row">
+                <span class="walk-time-badge">${_esc(t.line)}</span>
+                <span class="walk-time-towards" title="${_esc(t.towards)}">→ ${_esc(t.towards)}</span>
+                <input
+                  type="number"
+                  class="walk-time-input"
+                  min="0"
+                  max="120"
+                  step="1"
+                  inputmode="numeric"
+                  data-walk-key="${_esc(t.key)}"
+                  placeholder="${_esc(this._et("walk_time_placeholder"))}"
+                  value="${Number.isFinite(val) ? val : ""}"
+                />
+              </div>
+            `;
+          })
+          .join("")
+      : `<div class="editor-hint">${_esc(this._et("walk_time_no_data"))}</div>`;
+
     this.innerHTML = `
       <div class="editor">
         <style>${EDITOR_STYLE}</style>
@@ -1080,6 +1246,12 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
           <div class="section-header">${_esc(this._et("section_line"))}</div>
           <div class="editor-hint">${_esc(this._et("line_hint"))}</div>
           <div class="entity-chips">${lineChips}</div>
+        </div>
+
+        <div class="editor-section">
+          <div class="section-header">${_esc(this._et("section_walk_time"))}</div>
+          <div class="editor-hint">${_esc(this._et("walk_time_hint"))}</div>
+          <div class="walk-time-list">${walkRows}</div>
         </div>
 
         <div class="editor-section">
@@ -1159,6 +1331,17 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     });
     this.querySelectorAll("button[data-size]").forEach((btn) => {
       btn.addEventListener("click", () => this._setSize(btn.dataset.size));
+    });
+    // Walk-time number inputs. Fire on `change` (blur / Enter) so typing
+    // "10" doesn't briefly commit "1" and re-render with the wrong value
+    // under the cursor.
+    this.querySelectorAll("input[data-walk-key]").forEach((input) => {
+      ["keydown", "keyup", "keypress"].forEach((evt) => {
+        input.addEventListener(evt, (e) => e.stopPropagation());
+      });
+      input.addEventListener("change", (e) => {
+        this._setWalkTime(e.target.dataset.walkKey, e.target.value);
+      });
     });
   }
 }
