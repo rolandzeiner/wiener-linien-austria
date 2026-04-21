@@ -20,7 +20,7 @@
       },
       "select_lines": {
         "title": "Lines at {stop_name}",
-        "description": "Found {line_count} lines currently serving this stop. Deselect any you do not want to track.",
+        "description": "Found {line_count} lines currently serving this stop. Pick the ones you want to track.",
         "data": {
           "lines": "Lines to track",
           "scan_interval": "Update interval (seconds)"

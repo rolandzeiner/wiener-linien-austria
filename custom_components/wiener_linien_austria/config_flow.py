@@ -303,8 +303,6 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             for row in self._lines
         ]
-        all_keys = [row["key"] for row in self._lines]
-
         # Default scan interval comes from the existing entry if reconfiguring,
         # otherwise the system default.
         existing = self._reconfigure_entry
@@ -315,10 +313,14 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             if existing is not None
             else DEFAULT_SCAN_INTERVAL
         )
+        # New entries start with nothing pre-selected — busy stops have
+        # 20+ lines and users typically only want one or two, so opt-in
+        # is the cheaper interaction. Reconfigure preserves whatever the
+        # user had before.
         default_lines = (
-            [str(k) for k in {**existing.data, **existing.options}.get(CONF_LINES, all_keys)]
+            [str(k) for k in {**existing.data, **existing.options}.get(CONF_LINES, [])]
             if existing is not None
-            else all_keys
+            else []
         )
 
         return self.async_show_form(
