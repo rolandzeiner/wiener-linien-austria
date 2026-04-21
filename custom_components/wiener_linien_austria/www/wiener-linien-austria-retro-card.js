@@ -21,6 +21,18 @@ const _esc = (s) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+// U-Bahn CI colours. Duplicated from the modern card — see the file-header
+// duplication note. Used by the station-name panel to pick the bullet
+// colour when the stop is served by a metro line.
+const METRO_COLORS = {
+  U1: "#E3000F",
+  U2: "#A862A4",
+  U3: "#EF7C00",
+  U4: "#00963F",
+  U5: "#008F95",
+  U6: "#9D6830",
+};
+
 function _findWienerLinienEntities(hass) {
   if (!hass || !hass.states) return [];
   return Object.keys(hass.states).filter((eid) => {
@@ -61,6 +73,14 @@ const TRANSLATIONS = {
       line_hint:
         "Optional: nur eine Linie anzeigen. Aktiven Chip erneut antippen = alle Linien.",
       show_platform: "Gleis/Steig anzeigen",
+      show_station_name: "Stationsnamen anzeigen",
+      section_station: "Stationsnamen-Schild",
+      station_bg_label: "Hintergrund",
+      station_bg_default: "Standard",
+      station_bg_white: "Weiß",
+      station_bg_black: "Schwarz",
+      station_hint:
+        "„Standard“ zeigt U-Bahn-Stationen in der Linienfarbe und alle anderen auf weiß. Oder wähle fix Weiß oder Schwarz.",
       size_label: "Größe",
       size_small: "Klein",
       size_medium: "Mittel",
@@ -95,6 +115,14 @@ const TRANSLATIONS = {
       line_hint:
         "Optional: restrict to a single line. Tap the active chip again to show all lines.",
       show_platform: "Show platform",
+      show_station_name: "Show station name",
+      section_station: "Station name sign",
+      station_bg_label: "Background",
+      station_bg_default: "Default",
+      station_bg_white: "White",
+      station_bg_black: "Black",
+      station_hint:
+        "“Default” uses the line colour for U-Bahn stops and white for everything else. Or force white or black for all stops.",
       size_label: "Size",
       size_small: "Small",
       size_medium: "Medium",
@@ -133,6 +161,15 @@ function _normaliseConfig(config) {
   // `false` hides it — useful on narrow mobile cards or when the user
   // prioritises destination text width over platform info.
   out.show_platform = out.show_platform !== false;
+  // Station-name panel (Erben-style above the LED). Default OFF so
+  // existing setups keep their minimal look; users opt in.
+  out.show_station_name = out.show_station_name === true;
+  // Background colour for the station panel.
+  //  - "default" → U-Bahn uses the line colour, everything else white
+  //  - "white" / "black" → fixed background for all stops, text inverts
+  if (out.station_bg !== "white" && out.station_bg !== "black") {
+    out.station_bg = "default";
+  }
   // Card size: regular = previous sizing, medium / small scale
   // font + padding proportionally for denser or cramped layouts.
   if (!RETRO_SIZES.has(out.size)) out.size = "regular";
@@ -164,7 +201,12 @@ const RETRO_STYLE = `
       circle, var(--led-substrate) 0.5px, transparent 1px
     );
     background-size: 4px 4px;
-    padding: 14px 18px;
+    padding: 14px 14px;
+    /* Slightly roomier gutter on the left so line badges (U6, N25…)
+       don't sit flush against the card edge. Right side is snugged in
+       a further 4px compared to the base so the countdown sits closer
+       to the card edge. */
+    padding-left: 22px;
     /* Pure system monospace stack — avoids a Google-Fonts CDN fetch
        (GDPR) and the @import-inside-Lovelace flakiness. Bold + wider
        letter-spacing gives the retro fixed-pitch LED feel without a
@@ -302,7 +344,8 @@ const RETRO_STYLE = `
   /* ---- size variants ---- */
   /* "regular" uses the base sizing above — no override needed. */
   .retro--size-medium {
-    padding: 11px 14px;
+    padding: 11px 10px;
+    padding-left: 18px;
     min-height: 92px;
   }
   .retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
@@ -317,7 +360,8 @@ const RETRO_STYLE = `
   }
 
   .retro--size-small {
-    padding: 8px 10px;
+    padding: 8px 6px;
+    padding-left: 14px;
     min-height: 72px;
   }
   .retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
@@ -350,6 +394,46 @@ const RETRO_STYLE = `
     font-size: 1.4em;
     padding: 20px 0;
     letter-spacing: 2px;
+  }
+  /* Wiener Linien Leitsystem (Erben) style sign above the LED. Full
+     line-colour background for U-Bahn, user-picked white/black for
+     tram/bus. Station name centered, always-readable white text (or
+     black on white). Bleeds to the card edges via negative margins
+     so it looks like a real station panel rather than a floating chip. */
+  .retro-station {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin: -14px -14px 10px;
+    /* Match the asymmetric padding on .retro so the panel still bleeds
+       to the card edge on both sides. */
+    margin-left: -22px;
+    padding: 16px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                 Helvetica, Arial, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.05;
+    font-size: 1.95em;
+    border-radius: var(--ha-card-border-radius, 12px)
+                   var(--ha-card-border-radius, 12px) 0 0;
+  }
+  .retro-station-name {
+    text-shadow: none;
+  }
+  /* Size variants scale the station panel alongside the LED display */
+  .retro--size-medium .retro-station {
+    margin: -11px -10px 8px;
+    margin-left: -18px;
+    padding: 13px 14px;
+    font-size: 1.65em;
+  }
+  .retro--size-small .retro-station {
+    margin: -8px -6px 6px;
+    margin-left: -14px;
+    padding: 10px 10px;
+    font-size: 1.35em;
   }
   .retro-banner {
     background: #ffa000;
@@ -485,7 +569,10 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
           }`,
       )
       .join(";");
-    return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}|${lineFilter}#${deps}`;
+    const stn = this._config.show_station_name ? "1" : "0";
+    const stnBg = this._config.station_bg || "white";
+    const stopName = a.stop_name || a.friendly_name || "";
+    return `${this._versionMismatch || ""}||${eid}@${a.server_time || ""}|${dir}|${lineFilter}|s${stn}|${stnBg}|${stopName}#${deps}`;
   }
 
   _render() {
@@ -520,6 +607,25 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
     const isBus = type === "ptBusCity" || type === "ptBusNight";
     const platformLabel = this._t(isBus ? "steig" : "gleis");
     const size = this._config.size || "regular";
+
+    // Station-name panel above the LED. Metro detection picks up the
+    // first visible metro departure across (matching → allDeps) so we
+    // can pick a line colour even when no rows render right now.
+    const showStationName = this._config.show_station_name === true;
+    const stopName = attrs.stop_name || attrs.friendly_name || "";
+    let stationHtml = "";
+    if (showStationName && stopName) {
+      const allDepsForType = Array.isArray(attrs.departures)
+        ? attrs.departures
+        : [];
+      const metroDep =
+        (matching.length ? matching : allDepsForType).find(
+          (d) => d && d.type === "ptMetro",
+        ) || null;
+      const metroLine = metroDep?.line || null;
+      const bgChoice = this._config.station_bg || "default";
+      stationHtml = this._renderStationName(stopName, metroLine, bgChoice);
+    }
 
     const banner = this._versionMismatch ? this._renderBanner() : "";
 
@@ -561,6 +667,7 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
         <style>${RETRO_STYLE}</style>
         <div class="${retroClass}">
           ${banner}
+          ${stationHtml}
           <div class="retro-main">${mainHtml}</div>
         </div>
       </ha-card>
@@ -604,6 +711,35 @@ class WienerLinienAustriaRetroCard extends HTMLElement {
       <div class="retro-gleis">
         <div class="retro-gleis-label">${_esc(label)}</div>
         <div class="retro-gleis-number">${_esc(platform)}</div>
+      </div>
+    `;
+  }
+
+  _renderStationName(stopName, metroLine, bgChoice) {
+    if (!stopName) return "";
+    // Resolve colours per user choice:
+    //  - "default" → U-Bahn gets the line colour (white text),
+    //                everything else gets a white panel (black text)
+    //  - "white"  → forced white panel regardless of stop type (black text)
+    //  - "black"  → forced black panel regardless of stop type (white text)
+    let bg;
+    let fg;
+    if (bgChoice === "white") {
+      bg = "#fff";
+      fg = "#000";
+    } else if (bgChoice === "black") {
+      bg = "#000";
+      fg = "#fff";
+    } else if (metroLine) {
+      bg = METRO_COLORS[metroLine.toUpperCase()] || "var(--primary-color)";
+      fg = "#fff";
+    } else {
+      bg = "#fff";
+      fg = "#000";
+    }
+    return `
+      <div class="retro-station" style="background:${bg};color:${fg};">
+        <div class="retro-station-name">${_esc(stopName)}</div>
       </div>
     `;
   }
@@ -809,6 +945,19 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     this._render();
   }
 
+  _setShowStationName(on) {
+    this._config = { ...this._config, show_station_name: !!on };
+    this._fire();
+    this._render();
+  }
+
+  _setStationBg(bg) {
+    if (bg !== "default" && bg !== "white" && bg !== "black") return;
+    this._config = { ...this._config, station_bg: bg };
+    this._fire();
+    this._render();
+  }
+
   _linesForCurrent() {
     // Lines that actually have departures for the selected
     // (entity, direction). Used to populate the line-chip picker.
@@ -851,6 +1000,12 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
     const selectedLine = this._config.line || "";
     const directionsWithData = this._directionsWithData();
     const showPlatform = this._config.show_platform !== false;
+    const showStationName = this._config.show_station_name === true;
+    const stationBg =
+      this._config.station_bg === "white" ||
+      this._config.station_bg === "black"
+        ? this._config.station_bg
+        : "default";
     const size = RETRO_SIZES.has(this._config.size)
       ? this._config.size
       : "regular";
@@ -928,6 +1083,27 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
         </div>
 
         <div class="editor-section">
+          <div class="section-header">${_esc(this._et("section_station"))}</div>
+          <div class="editor-hint">${_esc(this._et("station_hint"))}</div>
+          <div class="toggle-row">
+            <label for="retro-show-station">${_esc(this._et("show_station_name"))}</label>
+            <ha-switch
+              id="retro-show-station"
+              data-field="show_station_name"
+              ${showStationName ? "checked" : ""}
+            ></ha-switch>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px;flex-wrap:wrap;">
+            <span style="font-size:13px;">${_esc(this._et("station_bg_label"))}</span>
+            <div class="direction-buttons">
+              <button type="button" data-station-bg="default" class="${stationBg === "default" ? "active" : ""}">${_esc(this._et("station_bg_default"))}</button>
+              <button type="button" data-station-bg="white" class="${stationBg === "white" ? "active" : ""}">${_esc(this._et("station_bg_white"))}</button>
+              <button type="button" data-station-bg="black" class="${stationBg === "black" ? "active" : ""}">${_esc(this._et("station_bg_black"))}</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="editor-section">
           <div class="section-header">${_esc(this._et("section_display"))}</div>
           <div class="toggle-row">
             <label for="retro-show-platform">${_esc(this._et("show_platform"))}</label>
@@ -969,6 +1145,18 @@ class WienerLinienAustriaRetroCardEditor extends HTMLElement {
         );
       },
     );
+    this.querySelectorAll("ha-switch[data-field='show_station_name']").forEach(
+      (sw) => {
+        sw.addEventListener("change", (e) =>
+          this._setShowStationName(e.target.checked),
+        );
+      },
+    );
+    this.querySelectorAll("button[data-station-bg]").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        this._setStationBg(btn.dataset.stationBg),
+      );
+    });
     this.querySelectorAll("button[data-size]").forEach((btn) => {
       btn.addEventListener("click", () => this._setSize(btn.dataset.size));
     });
@@ -1002,7 +1190,7 @@ try {
 window.customCards = window.customCards || [];
 window.customCards.push({
   type: "wiener-linien-austria-retro-card",
-  name: "Wiener Linien Austria Retro",
+  name: "Wiener Linien Austria Retro Card",
   description:
     "Retro-LED-Anzeige für eine Haltestelle und eine Richtung — Gleis inklusive.",
   preview: true,
