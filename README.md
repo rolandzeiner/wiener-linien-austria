@@ -2,7 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.1-blue.svg)](https://www.home-assistant.io/)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 
@@ -68,7 +68,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 2. Search for **Wiener Linien Austria**.
 3. Type part of a stop name (e.g. `Stephans`) and submit.
 4. Pick the matching stop from the dropdown.
-5. The integration calls the live `/monitor` endpoint and shows every line currently serving that stop. All pre-selected. Deselect any you don't care about.
+5. The integration calls the live `/monitor` endpoint and shows every line currently serving that stop. Pick the one or two you want to track — busy stops list 20+ lines.
 6. Set a polling interval (default 60 s, minimum 30 s) and save.
 
 Change tracked lines later via **Reconfigure**; change polling interval via **Configure** (options).
@@ -85,7 +85,7 @@ The everyday departure board. Dashboard → Add card → "Wiener Linien Austria"
 
 **Editor (visual):**
 - **Stops** — chip picker (multi-select) of every Wiener Linien sensor on this HA instance.
-- **Per-stop filters** — for each selected stop, a second chip row lets you restrict which lines render and which direction (H / R / both).
+- **Per-stop filters** — for each selected stop, a second chip row lets you restrict which lines render and which direction (H / R / both). *(1.1.0)* Under each stop's filter row, a **Walking time** input per line-direction hides departures that would already be gone by the time you reach the platform — inclusive (`countdown ≥ walk`), so you can run for the last minute. Leave blank for no filter.
 - **Line colours** — colour-pickers per line appearing in any selected stop's board. Metro CI defaults are built in; tram/bus lines fall back to the theme primary colour until overridden.
 - **Display** — multi-stop layout picker (*stacked* or *tabs*), departures-per-stop slider (1–20), and toggles for step-free icon (opt-in), disruption banner, elevator badge, delay text, and "Hide data source" (hides the attribution footer on your private dashboard — the sensor attribute keeps the CC-BY string).
 
@@ -110,7 +110,7 @@ A focused single-stop, single-direction LED-display style card mimicking the cla
 - Wheelchair glyph in amber LED tone after the destination on step-free departures.
 - Alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`), matching the real LED boards.
 - Three size variants (small / medium / regular) for narrow mobile cards, tablet dashboards, or full-width wall displays.
-- Editor: stop chip picker, H/R direction toggle, optional single-line filter, size picker, and a show-platform toggle.
+- Editor: stop chip picker, H/R direction toggle, optional single-line filter, size picker, and a show-platform toggle. *(1.1.0)* A **Walking time** section lists every line-direction at the stop with a per-row minute input — departures leaving before you could reach the platform are hidden (inclusive: `countdown ≥ walk`).
 
 Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
 
