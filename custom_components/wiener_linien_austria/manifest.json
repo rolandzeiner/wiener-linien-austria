@@ -9,6 +9,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/rolandzeiner/wiener-linien-austria/issues",
+  "loggers": ["custom_components.wiener_linien_austria"],
   "requirements": [],
   "version": "1.0.1"
 }
