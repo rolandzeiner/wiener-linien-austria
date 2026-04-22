@@ -148,6 +148,7 @@ export interface NormalisedRetroConfig {
   size: RetroSize;
   style: RetroStyle;
   flicker: boolean;
+  wheelchair_race: boolean;
   walk_times?: WalkTimes;
 }
 
@@ -171,6 +172,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     size,
     style,
     flicker: raw.flicker === true,
+    wheelchair_race: raw.wheelchair_race === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
   };
 }

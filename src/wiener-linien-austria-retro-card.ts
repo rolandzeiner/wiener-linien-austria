@@ -19,6 +19,12 @@ console.info(
   "color: #000; background: #FFC700; font-weight: 700;",
 );
 
+type RaceState = "idle" | "racing" | "victory";
+const RACE_DURATION_MS = 3300;
+const VICTORY_DURATION_MS = 4000;
+const NEXT_RACE_MIN_MS = 60_000;
+const NEXT_RACE_MAX_MS = 180_000;
+
 (window as unknown as { customCards?: unknown[] }).customCards =
   (window as unknown as { customCards?: unknown[] }).customCards ?? [];
 (window as unknown as { customCards: Array<Record<string, unknown>> }).customCards.push({
@@ -34,8 +40,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   @state() private _config?: NormalisedRetroConfig;
   @state() private _versionMismatch: string | null = null;
+  @state() private _raceState: RaceState = "idle";
 
   private _versionCheckDone = false;
+  private _raceTimers: Array<ReturnType<typeof setTimeout>> = [];
+  // Wall-clock target times so state transitions survive the disconnect/
+  // reconnect cycles HA triggers during dashboard rebuilds.
+  private _raceEndAt: number | null = null;
+  private _victoryEndAt: number | null = null;
 
   public setConfig(config: WienerLinienRetroCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -80,16 +92,52 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._versionCheckDone = true;
       void this._checkCardVersion();
     }
+    // HA rebuilds the dashboard on load — the card gets detached and
+    // re-attached mid-race. Re-arm transitions against wall-clock time.
+    if (this._raceState !== "idle") {
+      this._armStateTransitions();
+    }
+  }
+
+  public disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._clearRaceTimers();
   }
 
   protected shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    if (changed.has("_config") || changed.has("_versionMismatch")) return true;
+    if (
+      changed.has("_config") ||
+      changed.has("_versionMismatch") ||
+      changed.has("_raceState")
+    ) {
+      return true;
+    }
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
     const eid = this._resolveEntity();
     if (!eid) return false;
     return prev.states[eid] !== this.hass.states[eid];
+  }
+
+  protected updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (!changed.has("_config")) return;
+    const prev = changed.get("_config") as NormalisedRetroConfig | undefined;
+    const wasOn = prev?.wheelchair_race === true;
+    const isOn = this._config?.wheelchair_race === true;
+    if (isOn && !wasOn) {
+      // Fire immediately whenever the toggle flips to on — covers both
+      // editor-preview remounts (prev undefined) and a same-instance
+      // toggle. Subsequent races fall back to the "sometimes" interval.
+      this._clearRaceTimers();
+      this._startRace();
+    } else if (!isOn && wasOn) {
+      this._clearRaceTimers();
+      this._raceState = "idle";
+      this._raceEndAt = null;
+      this._victoryEndAt = null;
+    }
   }
 
   private _lang(): string {
@@ -119,6 +167,80 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     const available = findWienerLinienEntities(this.hass);
     return available[0] ?? null;
+  }
+
+  // ------------------------------------------------------------------
+  // Wheelchair race scheduler
+  // ------------------------------------------------------------------
+
+  private _clearRaceTimers(): void {
+    for (const t of this._raceTimers) clearTimeout(t);
+    this._raceTimers = [];
+  }
+
+  private _scheduleRace(delayMs: number): void {
+    const t = setTimeout(() => this._startRace(), delayMs);
+    this._raceTimers.push(t);
+  }
+
+  private _startRace(): void {
+    if (!this._config?.wheelchair_race) return;
+    if (this._currentBarrierFreeCount() < 2) {
+      this._scheduleRace(this._nextRaceDelay());
+      return;
+    }
+    this._raceState = "racing";
+    const now = Date.now();
+    this._raceEndAt = now + RACE_DURATION_MS;
+    this._victoryEndAt = this._raceEndAt + VICTORY_DURATION_MS;
+    this._armStateTransitions();
+  }
+
+  // Arms timers for whichever transition is pending next, based on the
+  // wall-clock target times stored in _raceEndAt / _victoryEndAt. Safe to
+  // call repeatedly — clears prior timers first.
+  private _armStateTransitions(): void {
+    this._clearRaceTimers();
+    const now = Date.now();
+    if (this._raceState === "racing" && this._raceEndAt !== null) {
+      const delay = Math.max(0, this._raceEndAt - now);
+      this._raceTimers.push(
+        setTimeout(() => {
+          this._raceState = "victory";
+          this._raceEndAt = null;
+          this._armStateTransitions();
+        }, delay),
+      );
+    } else if (this._raceState === "victory" && this._victoryEndAt !== null) {
+      const delay = Math.max(0, this._victoryEndAt - now);
+      this._raceTimers.push(
+        setTimeout(() => {
+          this._raceState = "idle";
+          this._victoryEndAt = null;
+          if (this._config?.wheelchair_race) {
+            this._scheduleRace(this._nextRaceDelay());
+          }
+        }, delay),
+      );
+    }
+  }
+
+  private _nextRaceDelay(): number {
+    return NEXT_RACE_MIN_MS + Math.random() * (NEXT_RACE_MAX_MS - NEXT_RACE_MIN_MS);
+  }
+
+  private _currentBarrierFreeCount(): number {
+    if (!this._config) return 0;
+    const eid = this._resolveEntity();
+    if (!eid || !this.hass) return 0;
+    const attrs = (this.hass.states[eid]?.attributes ?? {}) as WienerLinienAttrs;
+    const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
+    const matching = filterDepartures(departures, {
+      direction: this._config.direction,
+      lines: this._config.line ? [this._config.line] : undefined,
+      walk_times: this._config.walk_times,
+    });
+    return matching.slice(0, 2).filter((r) => r.barrier_free).length;
   }
 
   // ------------------------------------------------------------------
@@ -152,6 +274,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       ? this._renderStationName(stopName, matching, departures, cfg.station_bg)
       : nothing;
 
+    const raceActive = cfg.wheelchair_race && this._raceState === "racing";
+    const raceVictory = cfg.wheelchair_race && this._raceState === "victory";
     const retroClasses = {
       retro: true,
       "retro--gleis-left": !!platform && gleisLeft,
@@ -160,6 +284,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       [`retro--size-${cfg.size}`]: cfg.size !== "regular",
       [`retro--style-${cfg.style}`]: cfg.style !== "classic",
       "retro--flicker": cfg.flicker,
+      "retro--race-active": raceActive,
+      "retro--race-victory": raceVictory,
     };
 
     return html`
@@ -170,6 +296,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           <div class="retro-main">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel)}
           </div>
+          ${raceVictory
+            ? html`<div class="retro-victory" aria-hidden="true">
+                <div class="retro-victory-flag"></div>
+              </div>`
+            : nothing}
         </div>
       </ha-card>
     `;
@@ -317,6 +448,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-edge: 1px;
       --led-dot-pitch: 4px;
 
+      /* Establish a container so the race exit animation can translate
+         wheelchairs by 100cqw (= full card width) regardless of size. */
+      container-type: inline-size;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -373,6 +507,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-line {
       font-weight: 400;
       text-align: left;
+      transition: opacity 0.15s ease-out;
     }
     .retro-dest {
       display: flex;
@@ -381,6 +516,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       overflow: hidden;
       text-transform: uppercase;
       min-width: 0;
+      transition: opacity 0.15s ease-out;
     }
     .retro-dest-text {
       overflow: hidden;
@@ -401,6 +537,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-variant-numeric: tabular-nums;
       text-align: right;
       min-width: 2.5em;
+      transition: opacity 0.4s ease-out;
     }
     .retro-stars {
       display: inline-flex;
@@ -450,6 +587,88 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         animation-delay: -2.4s;
       }
     }
+    /* Wheelchair race — same distance, same duration, different keyframes
+       so leadership swaps mid-lap. Both finish past the right edge of the
+       card (100cqw + 60px) so they exit visually before the victory fires.
+       Keyframes keep the 0.18em baseline offset so the icon doesn't jump
+       vertically when the animation starts. */
+    @keyframes retroWheelExitA {
+      0%   { transform: translate(0, 0.18em); }
+      20%  { transform: translate(18px, 0.18em); }              /* early lead */
+      55%  { transform: translate(calc(45cqw - 20px), 0.18em); } /* coasting */
+      100% { transform: translate(calc(100cqw + 60px), 0.18em); }
+    }
+    @keyframes retroWheelExitB {
+      0%   { transform: translate(0, 0.18em); }
+      20%  { transform: translate(6px, 0.18em); }               /* sluggish start */
+      55%  { transform: translate(calc(55cqw - 10px), 0.18em); } /* overtakes */
+      100% { transform: translate(calc(100cqw + 60px), 0.18em); }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .retro--race-active .retro-dest {
+        overflow: visible;
+      }
+      .retro--race-active .retro-cd,
+      .retro--race-active .retro-gleis {
+        opacity: 0;
+      }
+      .retro--race-active .retro-row:nth-child(1) .retro-wheelchair {
+        animation: retroWheelExitA 3.3s cubic-bezier(0.3, 0.1, 0.5, 0.95) forwards;
+      }
+      .retro--race-active .retro-row:nth-child(2) .retro-wheelchair {
+        animation: retroWheelExitB 3.3s cubic-bezier(0.3, 0.1, 0.5, 0.95) forwards;
+      }
+      /* Victory holds the racers off-screen until the idle reset. */
+      .retro--race-victory .retro-wheelchair {
+        opacity: 0;
+      }
+    }
+    /* Hide all row text during victory so nothing bleeds through the
+       (slightly transparent) checker flag. */
+    .retro--race-victory .retro-line,
+    .retro--race-victory .retro-dest,
+    .retro--race-victory .retro-cd,
+    .retro--race-victory .retro-gleis {
+      opacity: 0;
+    }
+    /* Victory overlay: 90s-racing-sim checkered flag scrolling horizontally
+       with a pulsing trophy centered on top. */
+    .retro-victory {
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      overflow: hidden;
+      border-radius: inherit;
+      opacity: 1;
+      isolation: isolate;
+      animation: retroVictoryAppear 0.22s ease-out both;
+    }
+    .retro-victory-flag {
+      position: absolute;
+      inset: 0;
+      background-color: var(--led-amber);
+      background-image: conic-gradient(
+        #000 0deg 90deg,
+        var(--led-amber) 90deg 180deg,
+        #000 180deg 270deg,
+        var(--led-amber) 270deg 360deg
+      );
+      background-size: 48px 48px;
+      opacity: 0.85;
+      animation: retroVictoryFlag 0.4s linear infinite;
+    }
+    @keyframes retroVictoryAppear {
+      0%   { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    @keyframes retroVictoryFlag {
+      0%   { background-position: 0 0; }
+      100% { background-position: 96px 0; }
+    }
     .retro-gleis {
       flex: 0 0 auto;
       display: flex;
@@ -461,6 +680,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       color: var(--led-amber);
       text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
       border-left: 1px solid rgb(var(--led-glow-rgb) / 0.25);
+      transition: opacity 0.4s ease-out;
     }
     .retro--gleis-left .retro-gleis {
       padding: 0 18px 0 14px;

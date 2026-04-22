@@ -126,5 +126,6 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   size?: RetroSize;
   style?: RetroStyle;
   flicker?: boolean;
+  wheelchair_race?: boolean;
   walk_times?: WalkTimes;
 }

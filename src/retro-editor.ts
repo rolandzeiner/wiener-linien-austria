@@ -128,6 +128,11 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     this._fire({ ...this._config, flicker: on });
   }
 
+  private _setWheelchairRace(on: boolean): void {
+    if (!this._config) return;
+    this._fire({ ...this._config, wheelchair_race: on });
+  }
+
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
     const n = parseInt(raw, 10);
@@ -158,7 +163,13 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
         ${this._renderLineSection()}
         ${this._renderWalkTimeSection()}
         ${this._renderStationSection(cfg.show_station_name, cfg.station_bg)}
-        ${this._renderDisplaySection(cfg.show_platform, cfg.size, cfg.style, cfg.flicker)}
+        ${this._renderDisplaySection(
+          cfg.show_platform,
+          cfg.size,
+          cfg.style,
+          cfg.flicker,
+          cfg.wheelchair_race,
+        )}
       </div>
     `;
   }
@@ -335,6 +346,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     size: RetroSize,
     style: RetroStyle,
     flicker: boolean,
+    wheelchairRace: boolean,
   ): TemplateResult {
     return html`
       <div class="editor-section">
@@ -355,6 +367,15 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
             .checked=${flicker}
             @change=${(ev: Event) =>
               this._setFlicker((ev.target as HTMLInputElement).checked)}
+          ></ha-switch>
+        </div>
+        <div class="toggle-row">
+          <label for="retro-wheelchair-race">${this._et("wheelchair_race_label")}</label>
+          <ha-switch
+            id="retro-wheelchair-race"
+            .checked=${wheelchairRace}
+            @change=${(ev: Event) =>
+              this._setWheelchairRace((ev.target as HTMLInputElement).checked)}
           ></ha-switch>
         </div>
         <div class="segmented-row">

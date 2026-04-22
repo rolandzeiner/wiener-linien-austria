@@ -92,6 +92,7 @@
       "style_classic": "Klassisch",
       "style_warm": "Warm",
       "flicker_label": "Linien-Flimmern",
+      "wheelchair_race_label": "Rollstuhl-Rennen",
       "no_sensors": "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
       "no_lines": "Für diese Haltestelle und Richtung sind aktuell keine Linien im Sensor."
     }
