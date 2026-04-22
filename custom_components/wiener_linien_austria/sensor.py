@@ -22,7 +22,12 @@ from .const import (
     DOMAIN,
     MAX_DEPARTURES_IN_ATTRS,
 )
-from .coordinator import Departure, MonitorData, WienerLinienAustriaCoordinator
+from .coordinator import (
+    Departure,
+    MonitorData,
+    WienerLinienAustriaCoordinator,
+    WienerLinienConfigEntry,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,11 +36,11 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: WienerLinienConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the single stop sensor for this entry."""
-    coordinator: WienerLinienAustriaCoordinator = entry.runtime_data
+    coordinator = entry.runtime_data
     async_add_entities([WienerLinienStopSensor(coordinator, entry)])
 
 
