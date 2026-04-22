@@ -53,3 +53,7 @@ secrets.yaml
 *.log
 pip-log.txt
 pip-delete-this-directory.txt
+
+# Local dev tooling — dev-push scripts are personal, not shared repo code
+scripts/
+dev-push.sh
