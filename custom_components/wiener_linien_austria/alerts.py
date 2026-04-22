@@ -16,24 +16,21 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
 from typing import Any
 
 import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.util import dt as dt_util
 
 from .const import (
     API_BASE_URL,
     DOMAIN,
-    DOMAIN_COOLDOWN_SECONDS,
-    DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
     TRAFFIC_INFO_ENDPOINT,
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
+from .rate_limit import async_enforce_domain_cooldown
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -111,18 +108,6 @@ class ElevatorInfo:
 # ---------------------------------------------------------------------------
 
 
-async def _enforce_domain_cooldown(hass: HomeAssistant) -> None:
-    """Serialise outbound calls across the whole integration (coordinator + alerts)."""
-    domain_data = hass.data.setdefault(DOMAIN, {})
-    last: datetime | None = domain_data.get(DOMAIN_LAST_CALL_KEY)
-    now = dt_util.utcnow()
-    if last is not None:
-        elapsed = (now - last).total_seconds()
-        if elapsed < DOMAIN_COOLDOWN_SECONDS:
-            await asyncio.sleep(DOMAIN_COOLDOWN_SECONDS - elapsed)
-    domain_data[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
-
-
 async def _fetch_info_list(
     hass: HomeAssistant, name: str
 ) -> list[dict[str, Any]]:
@@ -133,7 +118,7 @@ async def _fetch_info_list(
     session = async_get_clientsession(hass)
     url = f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}"
     try:
-        await _enforce_domain_cooldown(hass)
+        await async_enforce_domain_cooldown(hass)
         resp = await session.get(
             url,
             params=[("name", name)],

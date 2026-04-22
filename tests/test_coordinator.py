@@ -462,7 +462,7 @@ async def test_domain_cooldown_serialises_calls(
             new=AsyncMock(return_value=mock_resp),
         ),
         patch(
-            "custom_components.wiener_linien_austria.coordinator.asyncio.sleep",
+            "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
             new_callable=AsyncMock,
         ) as mock_sleep,
     ):
@@ -501,7 +501,7 @@ async def test_domain_cooldown_no_sleep_when_elapsed(
             new=AsyncMock(return_value=mock_resp),
         ),
         patch(
-            "custom_components.wiener_linien_austria.coordinator.asyncio.sleep",
+            "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
             new_callable=AsyncMock,
         ) as mock_sleep,
     ):
