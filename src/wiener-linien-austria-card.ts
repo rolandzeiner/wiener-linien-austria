@@ -640,26 +640,32 @@ export class WienerLinienAustriaCard extends LitElement {
       font-weight: 600;
       cursor: pointer;
     }
+    /* Tab bar — full-width evenly-distributed tabs, matching the
+       tankstellen-austria card. Each tab takes an equal share of the
+       row (flex: 1), with ellipsis on overflow so long stop names
+       don't break layout. Ports the tankstellen pattern verbatim
+       except for the min-width: 0 + text-overflow pair. */
     .wl-tabs {
       display: flex;
-      border-bottom: 1px solid var(--divider-color, rgba(0,0,0,0.08));
+      border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12));
       margin-bottom: 10px;
-      overflow-x: auto;
-      scrollbar-width: none;
     }
-    .wl-tabs::-webkit-scrollbar { display: none; }
     .wl-tab {
-      flex: 0 0 auto;
-      padding: 8px 14px;
+      flex: 1;
+      min-width: 0;
+      padding: 12px 8px;
       background: none;
       border: none;
       border-bottom: 2px solid transparent;
       color: var(--secondary-text-color);
-      font-size: 0.95em;
+      font-size: 14px;
       font-weight: 500;
       cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      font-family: inherit;
       white-space: nowrap;
-      transition: color 0.15s, border-color 0.15s;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .wl-tab.wl-tab-active {
       color: var(--primary-color);
