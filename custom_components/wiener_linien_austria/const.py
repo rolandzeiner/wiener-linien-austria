@@ -8,7 +8,7 @@ from homeassistant.const import __version__ as _HA_VERSION
 DOMAIN: Final = "wiener_linien_austria"
 
 # Integration version — must match manifest.json "version" field.
-INTEGRATION_VERSION: Final = "1.1.0"
+INTEGRATION_VERSION: Final = "1.1.1"
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
