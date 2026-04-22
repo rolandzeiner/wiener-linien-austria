@@ -54,6 +54,12 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
 }
 
 export interface NormalisedModernConfig {
+  // HA's Lovelace editor wrapper re-validates every `config-changed` payload
+  // against `type` — omit it and HA flags the card with "Kein Typ angegeben"
+  // / "No type specified" and refuses to render. Preserve whatever the raw
+  // config carried (including the `custom:` prefix) instead of hardcoding it
+  // here so stripped/yaml-registered installs still round-trip cleanly.
+  type: string;
   entities: NormalisedModernStop[];
   max_departures: number;
   line_colors: Record<string, string>;
@@ -65,7 +71,7 @@ export interface NormalisedModernConfig {
   layout: "stacked" | "tabs";
 }
 
-const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors"> = {
+const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
   show_traffic_info: true,
@@ -114,6 +120,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   }
 
   return {
+    type: raw.type || "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
     line_colors: lineColors,
@@ -127,6 +134,9 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
 }
 
 export interface NormalisedRetroConfig {
+  // See NormalisedModernConfig.type — HA requires `type` on every config
+  // in the `config-changed` payload or it flags "Kein Typ angegeben".
+  type: string;
   entity: string | undefined;
   direction: "H" | "R";
   line?: string;
@@ -144,6 +154,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     ? (raw.station_bg as RetroStationBg)
     : "default";
   return {
+    type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
     line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
