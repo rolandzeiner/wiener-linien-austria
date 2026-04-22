@@ -1,0 +1,26 @@
+{
+  "name": "wiener-linien-austria-card",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Lovelace custom cards for the Wiener Linien Austria HA integration",
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "build:push": "rollup -c && ./scripts/dev-push.sh --quiet"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@rollup/plugin-typescript": "^12.1.0",
+    "rollup": "^4.24.0",
+    "tslib": "^2.8.0",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "custom-card-helpers": "^2.0.0",
+    "lit": "^3.3.0"
+  }
+}
