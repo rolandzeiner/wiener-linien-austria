@@ -88,6 +88,10 @@
       "size_small": "Small",
       "size_medium": "Medium",
       "size_regular": "Regular",
+      "style_label": "Style",
+      "style_classic": "Classic",
+      "style_warm": "Warm",
+      "flicker_label": "Line badge flicker",
       "no_sensors": "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
       "no_lines": "The sensor currently reports no lines for this stop + direction."
     }

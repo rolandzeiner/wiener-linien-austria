@@ -113,6 +113,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 
 export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
+export type RetroStyle = "classic" | "warm";
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
@@ -123,5 +124,7 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_station_name?: boolean;
   station_bg?: RetroStationBg;
   size?: RetroSize;
+  style?: RetroStyle;
+  flicker?: boolean;
   walk_times?: WalkTimes;
 }

@@ -3,6 +3,7 @@ import type {
   ModernStopConfig,
   RetroSize,
   RetroStationBg,
+  RetroStyle,
   WalkTimes,
   WienerLinienCardConfig,
   WienerLinienRetroCardConfig,
@@ -14,6 +15,7 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "white",
   "black",
 ] as const);
+const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm"] as const);
 
 function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -144,6 +146,8 @@ export interface NormalisedRetroConfig {
   show_station_name: boolean;
   station_bg: RetroStationBg;
   size: RetroSize;
+  style: RetroStyle;
+  flicker: boolean;
   walk_times?: WalkTimes;
 }
 
@@ -153,6 +157,9 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   const station_bg: RetroStationBg = RETRO_STATION_BG.has(raw.station_bg as RetroStationBg)
     ? (raw.station_bg as RetroStationBg)
     : "default";
+  const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
+    ? (raw.style as RetroStyle)
+    : "classic";
   return {
     type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
@@ -162,6 +169,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_station_name: raw.show_station_name ?? false,
     station_bg,
     size,
+    style,
+    flicker: raw.flicker === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
   };
 }

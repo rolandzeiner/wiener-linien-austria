@@ -158,6 +158,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       "retro--gleis-right": !!platform && !gleisLeft,
       "retro--no-gleis": !platform,
       [`retro--size-${cfg.size}`]: cfg.size !== "regular",
+      [`retro--style-${cfg.style}`]: cfg.style !== "classic",
+      "retro--flicker": cfg.flicker,
     };
 
     return html`
@@ -304,19 +306,27 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   static styles = css`
     :host {
       display: block;
+    }
+    .retro {
+      /* Classic defaults — swapped wholesale by .retro--style-warm below. */
       --led-amber: #FFC700;
       --led-bg: #000;
       --led-substrate: #1a0d2a;
-    }
-    .retro {
+      --led-glow-rgb: 255 199 0;
+      --led-dot-size: 0.5px;
+      --led-dot-edge: 1px;
+      --led-dot-pitch: 4px;
+
       position: relative;
       display: flex;
       flex-direction: column;
       background: var(--led-bg);
       background-image: radial-gradient(
-        circle, var(--led-substrate) 0.5px, transparent 1px
+        circle,
+        var(--led-substrate) var(--led-dot-size),
+        transparent var(--led-dot-edge)
       );
-      background-size: 4px 4px;
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
       padding: 14px 22px;
       font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
       font-weight: 700;
@@ -324,6 +334,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       overflow: hidden;
       border-radius: var(--ha-card-border-radius, 12px);
       min-height: 110px;
+    }
+    .retro--style-warm {
+      --led-amber: #FFB000;
+      --led-bg: #050302;
+      --led-substrate: #2a1805;
+      --led-glow-rgb: 255 176 0;
+      --led-dot-size: 0.9px;
+      --led-dot-edge: 1.4px;
+      --led-dot-pitch: 3px;
     }
     .retro-main {
       display: flex;
@@ -340,7 +359,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       justify-content: center;
       gap: 8px;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
+      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
       font-size: 1.9em;
       line-height: 1;
     }
@@ -375,7 +394,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       align-items: center;
       --mdc-icon-size: 1em;
       color: inherit;
-      filter: drop-shadow(0 0 4px rgba(255, 199, 0, 0.7));
+      filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.7));
       transform: translateY(0.18em);
     }
     .retro-cd {
@@ -398,6 +417,39 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       0%, 49.99% { opacity: 1; }
       50%, 100%  { opacity: 0; }
     }
+    /* Irregular, mostly-on flicker — brief dips and rare blackouts on the
+       line badge. Keeps full opacity ~95% of the loop so it reads as a
+       struggling bulb rather than a blinking sign. */
+    @keyframes retroLineFlicker {
+      0%, 6.9%   { opacity: 1; }
+      7.1%       { opacity: 0.38; }
+      7.5%       { opacity: 1; }
+      22.9%      { opacity: 1; }
+      23.1%      { opacity: 0.08; }
+      23.35%     { opacity: 1; }
+      23.7%      { opacity: 0.55; }
+      24%        { opacity: 1; }
+      51.9%      { opacity: 1; }
+      52.15%     { opacity: 0.45; }
+      52.4%      { opacity: 1; }
+      75.9%      { opacity: 1; }
+      76.1%      { opacity: 0.15; }
+      76.35%     { opacity: 1; }
+      77%        { opacity: 0.6; }
+      77.3%      { opacity: 1; }
+      100%       { opacity: 1; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .retro--flicker .retro-line {
+        animation: retroLineFlicker 7.3s infinite;
+        will-change: opacity;
+      }
+      /* Offset the second row so the two badges don't flicker in lockstep. */
+      .retro--flicker .retro-row:nth-child(2) .retro-line {
+        animation-duration: 8.1s;
+        animation-delay: -2.4s;
+      }
+    }
     .retro-gleis {
       flex: 0 0 auto;
       display: flex;
@@ -407,15 +459,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       padding: 0 14px 0 18px;
       margin-left: 12px;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
-      border-left: 1px solid rgba(255, 199, 0, 0.25);
+      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      border-left: 1px solid rgb(var(--led-glow-rgb) / 0.25);
     }
     .retro--gleis-left .retro-gleis {
       padding: 0 18px 0 14px;
       margin-left: 0;
       margin-right: 12px;
       border-left: none;
-      border-right: 1px solid rgba(255, 199, 0, 0.25);
+      border-right: 1px solid rgb(var(--led-glow-rgb) / 0.25);
     }
     .retro-gleis-label {
       font-size: 0.9em;
@@ -479,7 +531,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-align: center;
       align-self: center;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgba(255, 199, 0, 0.7);
+      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
       font-size: 1.4em;
       padding: 20px 0;
       letter-spacing: 2px;

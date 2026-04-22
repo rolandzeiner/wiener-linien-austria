@@ -4,13 +4,20 @@ import { classMap } from "lit/directives/class-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
 import { translate } from "./localize/localize.js";
-import type { RetroSize, RetroStationBg, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
+import type {
+  RetroSize,
+  RetroStationBg,
+  RetroStyle,
+  WienerLinienAttrs,
+  WienerLinienRetroCardConfig,
+} from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { lineKey, tripletsAtStop } from "./utils/departures.js";
 import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
 const SIZES: readonly RetroSize[] = ["small", "medium", "regular"] as const;
 const STATION_BGS: readonly RetroStationBg[] = ["default", "white", "black"] as const;
+const STYLES: readonly RetroStyle[] = ["classic", "warm"] as const;
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor extends LitElement implements LovelaceCardEditor {
@@ -111,6 +118,16 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     this._fire({ ...this._config, size });
   }
 
+  private _setStyle(style: RetroStyle): void {
+    if (!this._config || this._config.style === style) return;
+    this._fire({ ...this._config, style });
+  }
+
+  private _setFlicker(on: boolean): void {
+    if (!this._config) return;
+    this._fire({ ...this._config, flicker: on });
+  }
+
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
     const n = parseInt(raw, 10);
@@ -141,7 +158,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
         ${this._renderLineSection()}
         ${this._renderWalkTimeSection()}
         ${this._renderStationSection(cfg.show_station_name, cfg.station_bg)}
-        ${this._renderDisplaySection(cfg.show_platform, cfg.size)}
+        ${this._renderDisplaySection(cfg.show_platform, cfg.size, cfg.style, cfg.flicker)}
       </div>
     `;
   }
@@ -313,7 +330,12 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     `;
   }
 
-  private _renderDisplaySection(showPlatform: boolean, size: RetroSize): TemplateResult {
+  private _renderDisplaySection(
+    showPlatform: boolean,
+    size: RetroSize,
+    style: RetroStyle,
+    flicker: boolean,
+  ): TemplateResult {
     return html`
       <div class="editor-section">
         <div class="section-header">${this._et("section_display")}</div>
@@ -326,6 +348,15 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
               this._setShowPlatform((ev.target as HTMLInputElement).checked)}
           ></ha-switch>
         </div>
+        <div class="toggle-row">
+          <label for="retro-flicker">${this._et("flicker_label")}</label>
+          <ha-switch
+            id="retro-flicker"
+            .checked=${flicker}
+            @change=${(ev: Event) =>
+              this._setFlicker((ev.target as HTMLInputElement).checked)}
+          ></ha-switch>
+        </div>
         <div class="segmented-row">
           <span class="segmented-label">${this._et("size_label")}</span>
           <div class="direction-buttons">
@@ -336,6 +367,20 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
                   class=${classMap({ active: size === s })}
                   @click=${() => this._setSize(s)}
                 >${this._et(`size_${s}`)}</button>
+              `,
+            )}
+          </div>
+        </div>
+        <div class="segmented-row">
+          <span class="segmented-label">${this._et("style_label")}</span>
+          <div class="direction-buttons">
+            ${STYLES.map(
+              (s) => html`
+                <button
+                  type="button"
+                  class=${classMap({ active: style === s })}
+                  @click=${() => this._setStyle(s)}
+                >${this._et(`style_${s}`)}</button>
               `,
             )}
           </div>
