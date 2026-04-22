@@ -98,6 +98,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=scan),
         )
@@ -376,3 +377,10 @@ def _safe_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+# Threaded through every signature that reads `entry.runtime_data` — required
+# by Platinum `runtime-data` + `strict-typing`. Signatures that only use the
+# entry for construction (coordinator __init__) or for IDs/title (sensor
+# __init__, options-flow staticmethod) keep plain `ConfigEntry`.
+type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]

@@ -4,12 +4,11 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .alerts import get_alerts_for
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS
-from .coordinator import WienerLinienAustriaCoordinator
+from .coordinator import WienerLinienConfigEntry
 
 # No credentials to redact (Wiener Linien OGD has no API key), and RBL/DIVA
 # values are public station identifiers, not PII. Keep the set defensive in
@@ -18,10 +17,10 @@ TO_REDACT: set[str] = set()
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: WienerLinienConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator: WienerLinienAustriaCoordinator = entry.runtime_data
+    coordinator = entry.runtime_data
     data = coordinator.data
 
     config = {**entry.data, **entry.options}

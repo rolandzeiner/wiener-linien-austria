@@ -10,7 +10,6 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import CoreState, Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
@@ -28,7 +27,7 @@ from .const import (
     RETRO_CARD_VERSION,
     STATIC_CACHE_REFRESH_HOURS,
 )
-from .coordinator import WienerLinienAustriaCoordinator
+from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
 from .static import async_refresh_catalogue
 
 # Registered Lovelace cards shipped with this integration. Each tuple is
@@ -211,7 +210,7 @@ async def _async_register_one_card(
         )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     await coordinator.async_setup()
@@ -236,17 +235,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> None:
     """Reload the config entry when options are updated."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Unload a config entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_migrate_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Placeholder for future schema migrations.
 
     v0.1.0 ships with `entry.version = 1`. When we change the schema we bump
