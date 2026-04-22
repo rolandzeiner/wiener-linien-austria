@@ -78,9 +78,9 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 # match the corresponding Python constant below byte-for-byte, else the
 # reload banner loops. Retro card iterates independently from the modern
 # one so the two can rev at different paces without spurious reloads.
-CARD_VERSION: Final = "1.1.1"
+CARD_VERSION: Final = "1.2.0-beta-1"
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
-RETRO_CARD_VERSION: Final = "1.1.1"
+RETRO_CARD_VERSION: Final = "1.2.0-beta-1"
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
