@@ -102,6 +102,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_traffic_info?: boolean;
   show_elevator_info?: boolean;
   show_delay?: boolean;
+  show_type_icon?: boolean;
   hide_attribution?: boolean;
 
   layout?: "stacked" | "tabs";

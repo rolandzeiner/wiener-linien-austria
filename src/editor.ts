@@ -25,6 +25,7 @@ type ToggleField =
   | "show_traffic_info"
   | "show_elevator_info"
   | "show_delay"
+  | "show_type_icon"
   | "hide_attribution";
 
 @customElement("wiener-linien-austria-card-editor")
@@ -351,6 +352,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
         </div>
 
         ${this._renderSwitch("show_accessibility", cfg.show_accessibility)}
+        ${this._renderSwitch("show_type_icon", cfg.show_type_icon)}
         ${this._renderSwitch("show_traffic_info", cfg.show_traffic_info)}
         ${this._renderSwitch("show_elevator_info", cfg.show_elevator_info)}
         ${this._renderSwitch("show_delay", cfg.show_delay)}

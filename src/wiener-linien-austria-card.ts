@@ -5,7 +5,13 @@ import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
-import { CARD_VERSION } from "./const.js";
+import {
+  CARD_VERSION,
+  LINE_TYPE_BUS_DAY,
+  LINE_TYPE_BUS_NIGHT,
+  LINE_TYPE_METRO,
+  LINE_TYPE_TRAM,
+} from "./const.js";
 import { translate } from "./localize/localize.js";
 import type {
   DepartureAttr,
@@ -45,6 +51,20 @@ console.info(
   description: "Abfahrtsmonitor mit Störungen und Aufzugsinfo",
   preview: true,
 });
+
+function iconForType(type: string | undefined): string | null {
+  switch (type) {
+    case LINE_TYPE_METRO:
+      return "mdi:subway-variant";
+    case LINE_TYPE_TRAM:
+      return "mdi:tram";
+    case LINE_TYPE_BUS_DAY:
+    case LINE_TYPE_BUS_NIGHT:
+      return "mdi:bus";
+    default:
+      return null;
+  }
+}
 
 @customElement("wiener-linien-austria-card")
 export class WienerLinienAustriaCard extends LitElement {
@@ -454,11 +474,15 @@ export class WienerLinienAustriaCard extends LitElement {
     const showA11y = this._config!.show_accessibility;
     const hasFlags = Boolean(d.traffic_jam || (showA11y && d.barrier_free));
 
+    const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
+
     return html`
       <div class="wl-row">
         <div class="wl-line" style=${styleMap({ background: color })}>${line}</div>
         <div class="wl-towards">
-          ${d.towards || ""}${delayText
+          ${typeIcon
+            ? html`<ha-icon class="wl-type" icon=${typeIcon}></ha-icon>`
+            : nothing}${d.towards || ""}${delayText
             ? html` <span class="wl-delay">${delayText}</span>`
             : nothing}
         </div>
@@ -915,6 +939,12 @@ export class WienerLinienAustriaCard extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .wl-type {
+      --mdc-icon-size: 16px;
+      color: var(--secondary-text-color);
+      margin-right: 4px;
+      vertical-align: -3px;
     }
     .wl-flags {
       display: inline-flex;

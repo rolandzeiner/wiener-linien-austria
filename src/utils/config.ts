@@ -69,6 +69,7 @@ export interface NormalisedModernConfig {
   show_traffic_info: boolean;
   show_elevator_info: boolean;
   show_delay: boolean;
+  show_type_icon: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
 }
@@ -79,6 +80,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" |
   show_traffic_info: true,
   show_elevator_info: true,
   show_delay: true,
+  show_type_icon: false,
   hide_attribution: false,
   layout: "stacked",
 };
@@ -130,6 +132,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     show_traffic_info: raw.show_traffic_info ?? MODERN_DEFAULTS.show_traffic_info,
     show_elevator_info: raw.show_elevator_info ?? MODERN_DEFAULTS.show_elevator_info,
     show_delay: raw.show_delay ?? MODERN_DEFAULTS.show_delay,
+    show_type_icon: raw.show_type_icon ?? MODERN_DEFAULTS.show_type_icon,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
   };
