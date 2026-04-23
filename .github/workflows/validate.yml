@@ -49,3 +49,25 @@ jobs:
         run: mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
       - name: Run tests
         run: pytest tests/ -v
+
+  validate-card:
+    # Rebuilds both Lovelace card bundles from src/ and verifies each
+    # output is valid JS. Catches TS errors and missing deps before they
+    # reach the served www/*.js.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - name: Install card deps
+        run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Build card bundles
+        run: npm run build
+      - name: Syntax-check modern bundle
+        run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-card.js
+      - name: Syntax-check retro bundle
+        run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-retro-card.js

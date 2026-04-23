@@ -1,7 +1,7 @@
 """Tests for the Wiener Linien Austria config flow."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 from homeassistant import config_entries
@@ -16,6 +16,7 @@ from custom_components.wiener_linien_austria.const import (
     CONF_SEARCH_QUERY,
     CONF_STOP_NAME,
     DOMAIN,
+    USER_AGENT,
 )
 
 DEFAULT_LINES = ["U1|H|Leopoldau", "U1|R|Alaudagasse"]
@@ -282,3 +283,37 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
         )
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "stop_gone"
+
+
+async def test_probe_sends_canonical_user_agent(hass: HomeAssistant) -> None:
+    """Config-flow's /monitor trial probe sends the canonical USER_AGENT.
+
+    Regression guard paired with the coordinator-side check in
+    test_coordinator.py::test_fetch_sends_user_agent_header. Malformed UA
+    is silent — nothing on the client side breaks — but Wiener Linien's
+    log parsers rely on the RFC-9110 slash-separated format to attribute
+    and contact this integration specifically. Bypass the `mock_fetch`
+    fixture (which stubs `_probe_monitor_lines` wholesale) and patch at
+    the session layer so the real code path runs.
+    """
+    from custom_components.wiener_linien_austria.config_flow import (
+        _probe_monitor_lines,
+    )
+
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(
+        return_value={"message": {"messageCode": 1}, "data": {"monitors": []}}
+    )
+    session = MagicMock()
+    session.get = AsyncMock(return_value=resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        await _probe_monitor_lines(hass, [4111, 4118])
+
+    assert session.get.await_count == 1
+    headers = session.get.call_args.kwargs["headers"]
+    assert headers == {"User-Agent": USER_AGENT}

@@ -54,6 +54,13 @@ secrets.yaml
 pip-log.txt
 pip-delete-this-directory.txt
 
+# Card build — source-of-truth is src/; bundle in www/ is tracked.
+node_modules/
+*.js.map
+
+# Local reference copies during in-flight refactors
+*.bak
+
 # Local dev tooling — dev-push scripts are personal, not shared repo code
 scripts/
 dev-push.sh

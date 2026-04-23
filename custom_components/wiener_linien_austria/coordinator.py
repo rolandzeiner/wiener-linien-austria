@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import aiohttp
@@ -15,7 +15,6 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
 
 from .const import (
     API_BASE_URL,
@@ -24,12 +23,11 @@ from .const import (
     CONF_RBLS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    DOMAIN_COOLDOWN_SECONDS,
-    DOMAIN_LAST_CALL_KEY,
     ERR_RATE_LIMIT,
     MONITOR_ENDPOINT,
     USER_AGENT,
 )
+from .rate_limit import async_enforce_domain_cooldown
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -98,6 +96,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name=DOMAIN,
             update_interval=timedelta(seconds=scan),
         )
@@ -198,7 +197,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
 
     async def _async_update_data(self) -> MonitorData:
         """Fetch departures and return a sorted MonitorData."""
-        await self._enforce_domain_cooldown()
+        await async_enforce_domain_cooldown(self.hass)
 
         url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
         params: list[tuple[str, str]] = [
@@ -284,17 +283,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._clear_rate_limit_issue()
         return _parse_monitor_body(body, self._selected_lines, self._server_time)
 
-    async def _enforce_domain_cooldown(self) -> None:
-        """Serialise outbound calls across all entries under the 15s floor."""
-        domain_data = self.hass.data.setdefault(DOMAIN, {})
-        last: datetime | None = domain_data.get(DOMAIN_LAST_CALL_KEY)
-        now = dt_util.utcnow()
-        if last is not None:
-            elapsed = (now - last).total_seconds()
-            if elapsed < DOMAIN_COOLDOWN_SECONDS:
-                await asyncio.sleep(DOMAIN_COOLDOWN_SECONDS - elapsed)
-        domain_data[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
-
 
 def _normalise_lines(raw: Any) -> set[str] | None:
     """Coerce CONF_LINES into a set of selected line keys.
@@ -376,3 +364,10 @@ def _safe_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+# Threaded through every signature that reads `entry.runtime_data` — required
+# by Platinum `runtime-data` + `strict-typing`. Signatures that only use the
+# entry for construction (coordinator __init__) or for IDs/title (sensor
+# __init__, options-flow staticmethod) keep plain `ConfigEntry`.
+type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]
