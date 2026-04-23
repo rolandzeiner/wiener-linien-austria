@@ -8,7 +8,7 @@ from homeassistant.const import __version__ as _HA_VERSION
 DOMAIN: Final = "wiener_linien_austria"
 
 # Integration version — must match manifest.json "version" field.
-INTEGRATION_VERSION: Final = "1.2.0"
+INTEGRATION_VERSION: Final = "1.2.1"
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
@@ -78,9 +78,9 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 # match the corresponding Python constant below byte-for-byte, else the
 # reload banner loops. Retro card iterates independently from the modern
 # one so the two can rev at different paces without spurious reloads.
-CARD_VERSION: Final = "1.2.0"
+CARD_VERSION: Final = "1.2.1"
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
-RETRO_CARD_VERSION: Final = "1.2.0"
+RETRO_CARD_VERSION: Final = "1.2.1"
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )

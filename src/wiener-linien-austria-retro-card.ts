@@ -369,17 +369,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         <div class=${classMap(retroClasses)}>
           ${this._versionMismatch ? this._renderBanner() : nothing}
           ${stationPanel}
-          <div class="retro-main">
+          <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
+            ${raceActive
+              ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
+              : nothing}
+            ${raceVictory
+              ? html`<div class="retro-victory" aria-hidden="true">
+                  <div class="retro-victory-flag"></div>
+                </div>`
+              : nothing}
           </div>
-          ${raceActive
-            ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
-            : nothing}
-          ${raceVictory
-            ? html`<div class="retro-victory" aria-hidden="true">
-                <div class="retro-victory-flag"></div>
-              </div>`
-            : nothing}
         </div>
       </ha-card>
     `;
@@ -532,12 +532,33 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-edge: 1px;
       --led-dot-pitch: 4px;
 
+      /* LED area inner padding. Lives on the LED element; declared here so
+         size/gleis variants can override via the .retro cascade. */
+      --retro-pad-y: 14px;
+      --retro-pad-r: 22px;
+      --retro-pad-l: 22px;
+
       /* Establish a container so the race exit animation can translate
          wheelchairs by 100cqw (= full card width) regardless of size. */
       container-type: inline-size;
       position: relative;
       display: flex;
       flex-direction: column;
+      font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      overflow: hidden;
+      border-radius: var(--ha-card-border-radius, 12px);
+      min-height: 110px;
+    }
+    .retro-led {
+      /* The actual LED display area — own positioning context so the
+         race finish-line and victory overlay fill it edge-to-edge with a
+         simple inset:0, no negative-margin gymnastics. */
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: stretch;
       background: var(--led-bg);
       background-image: radial-gradient(
         circle,
@@ -545,13 +566,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         transparent var(--led-dot-edge)
       );
       background-size: var(--led-dot-pitch) var(--led-dot-pitch);
-      padding: 14px 22px;
-      font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      overflow: hidden;
-      border-radius: var(--ha-card-border-radius, 12px);
-      min-height: 110px;
+      padding: var(--retro-pad-y) var(--retro-pad-r) var(--retro-pad-y) var(--retro-pad-l);
     }
     .retro--style-warm {
       --led-amber: #FFB000;
@@ -562,14 +577,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-edge: 1.4px;
       --led-dot-pitch: 3px;
     }
-    .retro-main {
-      display: flex;
-      align-items: stretch;
-      flex: 1;
-    }
     .retro--gleis-left .retro-gleis { order: -1; }
-    .retro--gleis-right { padding-right: 14px; }
-    .retro--gleis-left { padding-left: 14px; }
+    .retro--gleis-right { --retro-pad-r: 14px; }
+    .retro--gleis-left { --retro-pad-l: 14px; }
     .retro-rows {
       flex: 1;
       display: flex;
@@ -842,11 +852,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
     /* ---- size variants ---- */
     .retro--size-medium {
-      padding: 11px 18px;
+      --retro-pad-y: 11px;
+      --retro-pad-r: 18px;
+      --retro-pad-l: 18px;
       min-height: 92px;
     }
-    .retro--size-medium.retro--gleis-right { padding-right: 10px; }
-    .retro--size-medium.retro--gleis-left { padding-left: 10px; }
+    .retro--size-medium.retro--gleis-right { --retro-pad-r: 10px; }
+    .retro--size-medium.retro--gleis-left { --retro-pad-l: 10px; }
     .retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
     .retro--size-medium .retro-gleis { padding: 0 10px 0 14px; min-width: 48px; }
     .retro--size-medium.retro--gleis-left .retro-gleis {
@@ -859,11 +871,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
 
     .retro--size-small {
-      padding: 8px 14px;
+      --retro-pad-y: 8px;
+      --retro-pad-r: 14px;
+      --retro-pad-l: 14px;
       min-height: 72px;
     }
-    .retro--size-small.retro--gleis-right { padding-right: 6px; }
-    .retro--size-small.retro--gleis-left { padding-left: 6px; }
+    .retro--size-small.retro--gleis-right { --retro-pad-r: 6px; }
+    .retro--size-small.retro--gleis-left { --retro-pad-l: 6px; }
     .retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
     .retro--size-small .retro-row {
       grid-template-columns: 2em 1fr auto;
@@ -900,7 +914,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       align-items: center;
       justify-content: center;
       text-align: center;
-      margin: -14px -22px 10px;
       padding: 11px 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
                    Helvetica, Arial, sans-serif;
@@ -915,21 +928,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-shadow: none;
     }
     .retro--size-medium .retro-station {
-      margin: -11px -18px 8px;
       padding: 9px 14px;
       font-size: 1.65em;
     }
     .retro--size-small .retro-station {
-      margin: -8px -14px 6px;
       padding: 7px 10px;
       font-size: 1.35em;
     }
-    .retro--gleis-right .retro-station { margin-right: -14px; }
-    .retro--gleis-left .retro-station { margin-left: -14px; }
-    .retro--size-medium.retro--gleis-right .retro-station { margin-right: -10px; }
-    .retro--size-medium.retro--gleis-left .retro-station { margin-left: -10px; }
-    .retro--size-small.retro--gleis-right .retro-station { margin-right: -6px; }
-    .retro--size-small.retro--gleis-left .retro-station { margin-left: -6px; }
     .retro-banner {
       background: #ffa000;
       color: #000;
