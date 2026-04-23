@@ -57,6 +57,7 @@
     "no_data": "No departures",
     "no_data_wrong_direction": "No departures in this direction",
     "no_data_wrong_line": "No departures for this line",
+    "betriebsschluss": "End of service",
     "dir_h": "H",
     "dir_r": "R",
     "gleis": "PLATF.",

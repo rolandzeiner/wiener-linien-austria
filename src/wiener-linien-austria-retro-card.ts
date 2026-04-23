@@ -294,7 +294,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${this._versionMismatch ? this._renderBanner() : nothing}
           ${stationPanel}
           <div class="retro-main">
-            ${this._renderMain(eid, rows, matching, departures, platform, platformLabel)}
+            ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
           </div>
           ${raceVictory
             ? html`<div class="retro-victory" aria-hidden="true">
@@ -313,16 +313,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     allDepartures: DepartureAttr[],
     platform: string | null,
     platformLabel: string,
+    serverTime: string | null | undefined,
   ): TemplateResult {
     if (!eid) return html`<div class="retro-empty">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
       // Diagnose the empty state so users know whether to flip direction,
-      // drop the line filter, or just wait for data.
+      // drop the line filter, or just wait for data. If the API is still
+      // responding (server_time present) but the stop has nothing left,
+      // that's end-of-service, not a data outage.
       const dir = this._config!.direction;
       const lineFilter = this._config!.line;
       const inDirection = allDepartures.filter((d) => d.direction === dir);
       let key = "no_data";
-      if (allDepartures.length > 0 && inDirection.length === 0) {
+      if (allDepartures.length === 0 && serverTime) {
+        key = "betriebsschluss";
+      } else if (allDepartures.length > 0 && inDirection.length === 0) {
         key = "no_data_wrong_direction";
       } else if (lineFilter && inDirection.length > 0) {
         key = "no_data_wrong_line";
@@ -530,7 +535,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       align-items: center;
       --mdc-icon-size: 1em;
       color: inherit;
-      filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.7));
+      filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
       transform: translateY(0.18em);
     }
     .retro-cd {
@@ -608,8 +613,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       .retro--race-active .retro-dest {
         overflow: visible;
       }
-      .retro--race-active .retro-cd,
-      .retro--race-active .retro-gleis {
+      .retro--race-active .retro-cd {
+        opacity: 0;
+      }
+      /* Only fade Gleis/Steig during the race when it's on the right —
+         that's the wheelchairs' path. Left-side Gleis stays lit. */
+      .retro--race-active.retro--gleis-right .retro-gleis {
         opacity: 0;
       }
       .retro--race-active .retro-row:nth-child(1) .retro-wheelchair {
@@ -650,15 +659,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-victory-flag {
       position: absolute;
       inset: 0;
-      background-color: var(--led-amber);
+      /* Transparent "dark" tiles let the LED substrate dot pattern of the
+         card show through; only the amber rectangles are painted, then the
+         drop-shadow filter gives each one the same glow as the row text. */
       background-image: conic-gradient(
-        #000 0deg 90deg,
+        transparent 0deg 90deg,
         var(--led-amber) 90deg 180deg,
-        #000 180deg 270deg,
+        transparent 180deg 270deg,
         var(--led-amber) 270deg 360deg
       );
-      background-size: 48px 48px;
-      opacity: 0.85;
+      /* Width stays pixel-fixed; height divides the card into 2 tile rows
+         (= 4 rectangle rows) so the last row always fits flush regardless
+         of card size. */
+      background-size: 48px 50%;
+      filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
       animation: retroVictoryFlag 0.4s linear infinite;
     }
     @keyframes retroVictoryAppear {
