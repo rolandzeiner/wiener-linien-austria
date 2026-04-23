@@ -944,7 +944,7 @@ export class WienerLinienAustriaCard extends LitElement {
       --mdc-icon-size: 16px;
       color: var(--secondary-text-color);
       margin-right: 4px;
-      vertical-align: -3px;
+      vertical-align: 0;
     }
     .wl-flags {
       display: inline-flex;
