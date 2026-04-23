@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/rolandzeiner/wiener-linien-austria/issues",
   "loggers": ["custom_components.wiener_linien_austria"],
   "requirements": [],
-  "version": "1.1.1"
+  "version": "1.2.0"
 }

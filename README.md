@@ -2,7 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.1-blue.svg)](https://www.home-assistant.io/)
-[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 
@@ -109,8 +109,10 @@ A focused single-stop, single-direction LED-display style card mimicking the cla
 - Amber **GLEIS** (rail) or **STEIG** (bus) panel when the API reports a platform; left-aligned for Gleis "2", right-aligned otherwise, mirroring real Wiener Linien platform signs.
 - Wheelchair glyph in amber LED tone after the destination on step-free departures.
 - Alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`), matching the real LED boards.
+- **Betriebsschluss handling** — when the API still responds but the board is empty, renders "Betriebsschluss" / "End of service" instead of a generic no-data message; differentiated empty-state hints also cover wrong-direction and wrong-line-filter cases.
 - Three size variants (small / medium / regular) for narrow mobile cards, tablet dashboards, or full-width wall displays.
-- Editor: stop chip picker, H/R direction toggle, optional single-line filter, size picker, and a show-platform toggle. *(1.1.0)* A **Walking time** section lists every line-direction at the stop with a per-row minute input — departures leaving before you could reach the platform are hidden (inclusive: `countdown ≥ walk`).
+- *(1.2.0)* **Two style variants** — *classic* (cool amber on deep violet LED substrate, the default) and *warm* (warmer amber on a darker brown substrate, for cosier ambient displays). Pick in the editor's style toggle.
+- Editor: stop chip picker, H/R direction toggle, optional single-line filter, size picker, style picker, and a show-platform toggle. *(1.1.0)* A **Walking time** section lists every line-direction at the stop with a per-row minute input — departures leaving before you could reach the platform are hidden (inclusive: `countdown ≥ walk`).
 
 Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
 

@@ -20,10 +20,35 @@ console.info(
 );
 
 type RaceState = "idle" | "racing" | "victory";
-const RACE_DURATION_MS = 3300;
 const VICTORY_DURATION_MS = 4000;
 const NEXT_RACE_MIN_MS = 60_000;
 const NEXT_RACE_MAX_MS = 180_000;
+// Nailbiter racing — each race picks a lead-change pattern (who's ahead
+// at 25%, 50%, 75%) so there's at least one overtake per race. Winner of
+// the last checkpoint gets the shorter duration.
+type Racer = "A" | "B";
+const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
+  ["A", "A", "B"], ["B", "B", "A"],   // single late swap
+  ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
+  ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
+];
+const RACE_END_OFFSET_MIN_PX = 40;
+const RACE_END_OFFSET_MAX_PX = 120;
+// Winner duration range (shorter), loser runs 150-400ms longer so the
+// finish reads as "close but decisive".
+const RACE_WINNER_MIN_MS = 2900;
+const RACE_WINNER_MAX_MS = 3100;
+const RACE_LOSER_LAG_MIN_MS = 150;
+const RACE_LOSER_LAG_MAX_MS = 400;
+// Checkpoint x positions in cqw. Leader is ahead, trailer is behind;
+// the gap is big enough that overtakes read clearly without making the
+// slope change at each waypoint look like a pause. Positions are near-
+// proportional to time so adjacent-segment slopes stay similar.
+const RACE_CHECKPOINTS: ReadonlyArray<readonly [number, number]> = [
+  [28, 22], // 25%: [lead, trail]
+  [53, 48], // 50%
+  [78, 73], // 75%
+];
 
 (window as unknown as { customCards?: unknown[] }).customCards =
   (window as unknown as { customCards?: unknown[] }).customCards ?? [];
@@ -189,11 +214,62 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._scheduleRace(this._nextRaceDelay());
       return;
     }
+    const maxDur = this._randomizeRaceParams();
     this._raceState = "racing";
     const now = Date.now();
-    this._raceEndAt = now + RACE_DURATION_MS;
+    this._raceEndAt = now + maxDur;
     this._victoryEndAt = this._raceEndAt + VICTORY_DURATION_MS;
     this._armStateTransitions();
+  }
+
+  // Picks a random lead-change pattern plus per-racer duration and end
+  // offset, then writes them as CSS custom properties on the host so the
+  // keyframes can read them via var(). Winner is the racer leading at the
+  // 75% checkpoint; winner gets the shorter duration and bigger end
+  // offset so they visibly cross the finish first. Returns the longer of
+  // the two durations so the state machine waits for the slower racer to
+  // exit before flipping to victory.
+  private _randomizeRaceParams(): number {
+    const rand = (min: number, max: number): number =>
+      min + Math.random() * (max - min);
+    const jitter = (base: number, amount: number): number =>
+      base + (Math.random() * 2 - 1) * amount;
+
+    const pattern = RACE_PATTERNS[Math.floor(Math.random() * RACE_PATTERNS.length)]!;
+    const winner = pattern[2];
+
+    const winnerDur = rand(RACE_WINNER_MIN_MS, RACE_WINNER_MAX_MS);
+    const loserDur = winnerDur + rand(RACE_LOSER_LAG_MIN_MS, RACE_LOSER_LAG_MAX_MS);
+    const durA = winner === "A" ? winnerDur : loserDur;
+    const durB = winner === "B" ? winnerDur : loserDur;
+
+    // Winner gets the larger end offset so the exit frame reads as
+    // "pulled away at the line". Loser gets a more modest one.
+    const endSpan = RACE_END_OFFSET_MAX_PX - RACE_END_OFFSET_MIN_PX;
+    const endA = winner === "A"
+      ? rand(RACE_END_OFFSET_MIN_PX + endSpan * 0.6, RACE_END_OFFSET_MAX_PX)
+      : rand(RACE_END_OFFSET_MIN_PX, RACE_END_OFFSET_MIN_PX + endSpan * 0.4);
+    const endB = winner === "B"
+      ? rand(RACE_END_OFFSET_MIN_PX + endSpan * 0.6, RACE_END_OFFSET_MAX_PX)
+      : rand(RACE_END_OFFSET_MIN_PX, RACE_END_OFFSET_MIN_PX + endSpan * 0.4);
+
+    const posFor = (racer: Racer, idx: 0 | 1 | 2): number => {
+      const [lead, trail] = RACE_CHECKPOINTS[idx]!;
+      const base = pattern[idx] === racer ? lead : trail;
+      return jitter(base, 1);
+    };
+
+    this.style.setProperty("--race-a-duration", `${durA}ms`);
+    this.style.setProperty("--race-b-duration", `${durB}ms`);
+    this.style.setProperty("--race-a-end", `${endA}px`);
+    this.style.setProperty("--race-b-end", `${endB}px`);
+    this.style.setProperty("--race-a-x-25", `${posFor("A", 0)}cqw`);
+    this.style.setProperty("--race-a-x-50", `${posFor("A", 1)}cqw`);
+    this.style.setProperty("--race-a-x-75", `${posFor("A", 2)}cqw`);
+    this.style.setProperty("--race-b-x-25", `${posFor("B", 0)}cqw`);
+    this.style.setProperty("--race-b-x-50", `${posFor("B", 1)}cqw`);
+    this.style.setProperty("--race-b-x-75", `${posFor("B", 2)}cqw`);
+    return Math.max(durA, durB);
   }
 
   // Arms timers for whichever transition is pending next, based on the
@@ -296,6 +372,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           <div class="retro-main">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
           </div>
+          ${raceActive
+            ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
+            : nothing}
           ${raceVictory
             ? html`<div class="retro-victory" aria-hidden="true">
                 <div class="retro-victory-flag"></div>
@@ -592,22 +671,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         animation-delay: -2.4s;
       }
     }
-    /* Wheelchair race — same distance, same duration, different keyframes
-       so leadership swaps mid-lap. Both finish past the right edge of the
-       card (100cqw + 60px) so they exit visually before the victory fires.
-       Keyframes keep the 0.18em baseline offset so the icon doesn't jump
-       vertically when the animation starts. */
-    @keyframes retroWheelExitA {
-      0%   { transform: translate(0, 0.18em); }
-      20%  { transform: translate(18px, 0.18em); }              /* early lead */
-      55%  { transform: translate(calc(45cqw - 20px), 0.18em); } /* coasting */
-      100% { transform: translate(calc(100cqw + 60px), 0.18em); }
-    }
-    @keyframes retroWheelExitB {
-      0%   { transform: translate(0, 0.18em); }
-      20%  { transform: translate(6px, 0.18em); }               /* sluggish start */
-      55%  { transform: translate(calc(55cqw - 10px), 0.18em); } /* overtakes */
-      100% { transform: translate(calc(100cqw + 60px), 0.18em); }
+    /* Wheelchair race — per-race pattern encodes who's ahead at 25/50/
+       75%, so each run has at least one overtake. Per-racer waypoints
+       (--race-x-25/50/75), end offset, and duration come from CSS
+       custom properties that JS sets at race start. Keyframe preserves
+       the 0.18em baseline offset so the icon doesn't jump vertically.
+       Per-keyframe timing-functions keep the middle segments linear so
+       the motion doesn't visibly decelerate approaching each waypoint;
+       only the launch eases out of rest. */
+    @keyframes retroWheelExit {
+      0%   { transform: translate(0, 0.18em); animation-timing-function: ease-out; }
+      25%  { transform: translate(var(--race-x-25, 25cqw), 0.18em); animation-timing-function: linear; }
+      50%  { transform: translate(var(--race-x-50, 50cqw), 0.18em); animation-timing-function: linear; }
+      75%  { transform: translate(var(--race-x-75, 75cqw), 0.18em); animation-timing-function: linear; }
+      100% { transform: translate(calc(100cqw + var(--race-end, 60px)), 0.18em); }
     }
     @media (prefers-reduced-motion: no-preference) {
       .retro--race-active .retro-dest {
@@ -622,10 +699,24 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         opacity: 0;
       }
       .retro--race-active .retro-row:nth-child(1) .retro-wheelchair {
-        animation: retroWheelExitA 3.3s cubic-bezier(0.3, 0.1, 0.5, 0.95) forwards;
+        --race-end: var(--race-a-end, 60px);
+        --race-x-25: var(--race-a-x-25, 25cqw);
+        --race-x-50: var(--race-a-x-50, 50cqw);
+        --race-x-75: var(--race-a-x-75, 75cqw);
+        animation: retroWheelExit var(--race-a-duration, 3.3s) linear forwards;
       }
       .retro--race-active .retro-row:nth-child(2) .retro-wheelchair {
-        animation: retroWheelExitB 3.3s cubic-bezier(0.3, 0.1, 0.5, 0.95) forwards;
+        --race-end: var(--race-b-end, 60px);
+        --race-x-25: var(--race-b-x-25, 25cqw);
+        --race-x-50: var(--race-b-x-50, 50cqw);
+        --race-x-75: var(--race-b-x-75, 75cqw);
+        animation: retroWheelExit var(--race-b-duration, 3.3s) linear forwards;
+      }
+      /* Pass wheelchairs in front of the finish-line strip so the
+         crossing reads as "through" rather than "behind the barrier". */
+      .retro--race-active .retro-wheelchair {
+        position: relative;
+        z-index: 4;
       }
       /* Victory holds the racers off-screen until the idle reset. */
       .retro--race-victory .retro-wheelchair {
@@ -639,6 +730,37 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro--race-victory .retro-cd,
     .retro--race-victory .retro-gleis {
       opacity: 0;
+    }
+    /* Pixelated finish-line strip on the right edge during the race.
+       Same conic-gradient checker technique as the victory flag, but
+       as a narrow 14px column so ~2 squares wide read as chunky "8-bit
+       goal posts". Clipped by the card's border-radius via overflow. */
+    .retro-finish-line {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 14px;
+      z-index: 3;
+      pointer-events: none;
+      background-image: conic-gradient(
+        transparent 0deg 90deg,
+        var(--led-amber) 90deg 180deg,
+        transparent 180deg 270deg,
+        var(--led-amber) 270deg 360deg
+      );
+      background-size: 14px 14px;
+      filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.7));
+      animation: retroFinishLineAppear 0.3s ease-out both;
+    }
+    @keyframes retroFinishLineAppear {
+      0%   { opacity: 0; transform: scaleX(0.2); transform-origin: right; }
+      100% { opacity: 1; transform: scaleX(1); }
+    }
+    /* Smaller strip on the small variant so it doesn't dominate. */
+    .retro--size-small .retro-finish-line {
+      width: 10px;
+      background-size: 10px 10px;
     }
     /* Victory overlay: 90s-racing-sim checkered flag scrolling horizontally
        with a pulsing trophy centered on top. */
@@ -654,6 +776,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       border-radius: inherit;
       opacity: 1;
       isolation: isolate;
+      /* Size container so the flag can query card height via cqh and
+         keep its checker squares actually square regardless of size. */
+      container-type: size;
       animation: retroVictoryAppear 0.22s ease-out both;
     }
     .retro-victory-flag {
@@ -668,10 +793,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         transparent 180deg 270deg,
         var(--led-amber) 270deg 360deg
       );
-      /* Width stays pixel-fixed; height divides the card into 2 tile rows
-         (= 4 rectangle rows) so the last row always fits flush regardless
-         of card size. */
-      background-size: 48px 50%;
+      /* Tile = 50cqh × 50cqh — square, so height divides the card into
+         2 tile rows (= 4 rectangle rows) and the individual rectangles
+         stay square at every card size. */
+      background-size: 50cqh 50cqh;
       filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
       animation: retroVictoryFlag 0.4s linear infinite;
     }
@@ -681,7 +806,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     @keyframes retroVictoryFlag {
       0%   { background-position: 0 0; }
-      100% { background-position: 96px 0; }
+      100% { background-position: 100cqh 0; }
     }
     .retro-gleis {
       flex: 0 0 auto;
