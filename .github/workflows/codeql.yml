@@ -41,6 +41,10 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          config: |
+            paths-ignore:
+              - 'custom_components/wiener_linien_austria/www/**/*.js'
+              - 'node_modules/**'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
