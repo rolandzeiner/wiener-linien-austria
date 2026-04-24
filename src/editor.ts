@@ -391,10 +391,11 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
               const hasOverride = Boolean(overrides[line.toUpperCase()]);
               return html`
                 <div class="color-row">
-                  <div class="line-preview" style=${styleMap({ background: current })}>${line}</div>
+                  <div class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</div>
                   <span>${line}</span>
                   <input
                     type="color"
+                    aria-label=${this._et("pick_color_for_line").replace("{line}", line)}
                     .value=${hex}
                     @change=${(ev: Event) =>
                       this._setLineColor(line, (ev.target as HTMLInputElement).value)}

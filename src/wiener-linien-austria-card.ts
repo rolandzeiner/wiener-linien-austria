@@ -92,6 +92,20 @@ export class WienerLinienAustriaCard extends LitElement {
     return Math.min(12, 3 + n * 3);
   }
 
+  public getGridOptions(): {
+    columns: number | "full";
+    rows: number | "auto";
+    min_columns: number;
+    min_rows: number;
+  } {
+    return {
+      columns: 12,
+      rows: "auto",
+      min_columns: 6,
+      min_rows: 3,
+    };
+  }
+
   public static getConfigElement(): LovelaceCardEditor {
     return document.createElement("wiener-linien-austria-card-editor");
   }
@@ -232,15 +246,21 @@ export class WienerLinienAustriaCard extends LitElement {
 
   private _renderTabs(stops: NormalisedModernStop[], activeIndex: number): TemplateResult {
     return html`
-      <div class="wl-tabs">
+      <div class="wl-tabs" role="tablist">
         ${stops.map((s, i) => {
           const attrs = this._attrs(s.entity);
           const label = attrs.stop_name || attrs.friendly_name || s.entity;
           const classes = { "wl-tab": true, "wl-tab-active": i === activeIndex };
+          const selected = i === activeIndex;
           return html`<button
             type="button"
+            role="tab"
             class=${classMap(classes)}
+            aria-selected=${selected ? "true" : "false"}
+            tabindex=${selected ? "0" : "-1"}
             @click=${() => this._setActiveTab(i)}
+            @keydown=${(ev: KeyboardEvent) =>
+              this._onTabKeydown(ev, i, stops.length)}
           >${label}</button>`;
         })}
       </div>
@@ -251,6 +271,34 @@ export class WienerLinienAustriaCard extends LitElement {
     if (Number.isFinite(i) && i !== this._activeTab) {
       this._activeTab = i;
     }
+  }
+
+  private _onTabKeydown(ev: KeyboardEvent, index: number, count: number): void {
+    let next = index;
+    switch (ev.key) {
+      case "ArrowRight":
+        next = (index + 1) % count;
+        break;
+      case "ArrowLeft":
+        next = (index - 1 + count) % count;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = count - 1;
+        break;
+      default:
+        return;
+    }
+    ev.preventDefault();
+    this._setActiveTab(next);
+    this.updateComplete.then(() => {
+      const tabs = this.shadowRoot?.querySelectorAll<HTMLButtonElement>(
+        '.wl-tabs [role="tab"]',
+      );
+      tabs?.[next]?.focus();
+    });
   }
 
   private _renderStop(stopCfg: NormalisedModernStop): TemplateResult {
@@ -328,7 +376,15 @@ export class WienerLinienAustriaCard extends LitElement {
     return html`
       <div
         class=${classMap(classes)}
+        role=${hasDetail ? "button" : "group"}
+        tabindex=${hasDetail ? "0" : "-1"}
+        aria-expanded=${hasDetail ? (expanded ? "true" : "false") : nothing}
+        aria-label=${location}
         @click=${() => hasDetail && this._toggleElevator(e.name)}
+        @keydown=${(ev: KeyboardEvent) =>
+          this._onExpanderKeydown(ev, hasDetail, () =>
+            this._toggleElevator(e.name),
+          )}
       >
         <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
         <div class="wl-elevator-detail-body">
@@ -358,6 +414,22 @@ export class WienerLinienAustriaCard extends LitElement {
     if (next.has(name)) next.delete(name);
     else next.add(name);
     this._expandedElevator = next;
+  }
+
+  // Shared Enter/Space handler for expander rows whose parent element is
+  // a <div role="button"> rather than a real <button>. The nested markup
+  // of elevator and traffic rows (icons + description spans) is stable
+  // with a div, but keyboard users still need activation — Enter and
+  // Space both trigger the click-equivalent.
+  private _onExpanderKeydown(
+    ev: KeyboardEvent,
+    hasDetail: boolean,
+    activate: () => void,
+  ): void {
+    if (!hasDetail) return;
+    if (ev.key !== "Enter" && ev.key !== " ") return;
+    ev.preventDefault();
+    activate();
   }
 
   private _renderTrafficBanner(stops: NormalisedModernStop[]): TemplateResult | typeof nothing {
@@ -403,10 +475,19 @@ export class WienerLinienAustriaCard extends LitElement {
       "wl-traffic-expanded": expanded,
       "wl-traffic-nodetail": !hasDetail,
     };
+    const trafficAriaLabel = t.title || this._t("traffic_label");
     return html`
       <div
         class=${classMap(classes)}
+        role=${hasDetail ? "button" : "group"}
+        tabindex=${hasDetail ? "0" : "-1"}
+        aria-expanded=${hasDetail ? (expanded ? "true" : "false") : nothing}
+        aria-label=${trafficAriaLabel}
         @click=${() => hasDetail && this._toggleTraffic(t.name)}
+        @keydown=${(ev: KeyboardEvent) =>
+          this._onExpanderKeydown(ev, hasDetail, () =>
+            this._toggleTraffic(t.name),
+          )}
       >
         <ha-icon icon="mdi:alert-octagon"></ha-icon>
         <div class="wl-traffic-body">
@@ -643,7 +724,14 @@ export class WienerLinienAustriaCard extends LitElement {
   // ------------------------------------------------------------------
 
   static styles = css`
-    :host { display: block; }
+    :host {
+      display: block;
+      /* Card responds to its own column width, not the viewport — a
+         narrow dashboard column triggers the compact layout even on a
+         desktop screen. */
+      container-type: inline-size;
+      container-name: wlcard;
+    }
     .wl-card { padding: 12px 16px; }
     .wl-banner {
       background: var(--warning-color, #ffa000);
@@ -673,11 +761,17 @@ export class WienerLinienAustriaCard extends LitElement {
       display: flex;
       border-bottom: 1px solid var(--divider-color, rgba(255,255,255,0.12));
       margin-bottom: 10px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .wl-tabs::-webkit-scrollbar {
+      display: none;
     }
     .wl-tab {
-      flex: 1;
+      flex: 1 0 auto;
       min-width: 0;
-      padding: 12px 8px;
+      min-height: 44px;
+      padding: 12px 12px;
       background: none;
       border: none;
       border-bottom: 2px solid transparent;
@@ -919,7 +1013,7 @@ export class WienerLinienAustriaCard extends LitElement {
     }
     .wl-row {
       display: grid;
-      grid-template-columns: 44px 1fr auto auto;
+      grid-template-columns: max-content 1fr auto auto;
       align-items: center;
       gap: 8px;
       padding: 5px 0;
@@ -931,7 +1025,8 @@ export class WienerLinienAustriaCard extends LitElement {
       font-weight: 700;
       color: #fff;
       border-radius: 4px;
-      padding: 2px 4px;
+      padding: 2px 6px;
+      min-width: 2.5em;
       font-size: 0.9em;
       background: var(--primary-color);
     }
@@ -1003,6 +1098,56 @@ export class WienerLinienAustriaCard extends LitElement {
     .wl-devmode .wl-devmode-clear {
       margin-left: auto;
       color: var(--secondary-text-color);
+    }
+
+    /* Narrow-card layout: tightens paddings and lets destination names
+       wrap so long stop names still fit without clipping the countdown.
+       Kicks in when a dashboard column is narrow even on a desktop
+       viewport. */
+    @container wlcard (inline-size < 380px) {
+      .wl-card {
+        padding: 10px 12px;
+      }
+      .wl-banner {
+        margin: -10px -12px 10px;
+      }
+      .wl-tab {
+        padding: 12px 10px;
+        font-size: 13px;
+      }
+      .wl-row {
+        gap: 6px;
+      }
+      .wl-towards {
+        white-space: normal;
+      }
+      .wl-elevator-detail,
+      .wl-traffic {
+        padding-right: 8px;
+      }
+    }
+
+    /* Accessibility: visible focus ring for keyboard users. */
+    .wl-tab:focus-visible,
+    .wl-elevator:focus-visible,
+    .wl-traffic:focus-visible,
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+
+    /* Accessibility: honour user motion preference. */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
   `;
 }

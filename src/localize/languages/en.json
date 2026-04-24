@@ -38,6 +38,7 @@
       "section_colors": "Line colours",
       "colors_hint": "Optional overrides. Metro defaults are already set.",
       "reset_color": "Reset",
+      "pick_color_for_line": "Pick colour for line {line}",
       "section_display": "Display",
       "max_departures": "Departures per stop",
       "show_accessibility": "Show step-free icon",
@@ -65,6 +66,10 @@
     "steig": "STAND",
     "version_update": "Retro card updated to v{v} — please reload",
     "version_reload": "Reload",
+    "departures_list": "Upcoming departures",
+    "at_platform": "At platform",
+    "countdown_minutes": "{n} minutes",
+    "race_finished": "Accessibility race finished",
     "editor": {
       "section_sensor": "Stop",
       "section_direction": "Direction",

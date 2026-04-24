@@ -85,6 +85,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return 2;
   }
 
+  public getGridOptions(): {
+    columns: number | "full";
+    rows: number | "auto";
+    min_columns: number;
+    min_rows: number;
+  } {
+    return {
+      columns: 6,
+      rows: "auto",
+      min_columns: 4,
+      min_rows: 2,
+    };
+  }
+
   public static getConfigElement(): LovelaceCardEditor {
     return document.createElement("wiener-linien-austria-retro-card-editor");
   }
@@ -210,6 +224,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   private _startRace(): void {
     if (!this._config?.wheelchair_race) return;
+    // Respect `prefers-reduced-motion: reduce` at the scheduler level.
+    // Without this, the CSS animations would be suppressed but the state
+    // machine would still flip briefly to "racing" → "victory" — giving
+    // motion-sensitive users an abrupt checkered-flag appearance instead
+    // of a race. Re-schedule so the loop resumes if the preference
+    // changes later.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      this._scheduleRace(this._nextRaceDelay());
+      return;
+    }
     if (this._currentBarrierFreeCount() < 2) {
       this._scheduleRace(this._nextRaceDelay());
       return;
@@ -375,8 +402,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
               ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
               : nothing}
             ${raceVictory
-              ? html`<div class="retro-victory" aria-hidden="true">
-                  <div class="retro-victory-flag"></div>
+              ? html`<div class="retro-victory" role="status" aria-live="polite">
+                  <div class="retro-victory-flag" aria-hidden="true"></div>
+                  <span class="retro-victory-sr">
+                    ${this._t("race_finished")}
+                  </span>
                 </div>`
               : nothing}
           </div>
@@ -416,9 +446,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Silence the noop-var warning until used.
     void matching;
     return html`
-      <div class="retro-rows">
+      <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
         ${rows.map((d) => this._renderRow(d))}
-      </div>
+      </ul>
       ${platform ? this._renderGleis(platform, platformLabel) : nothing}
     `;
   }
@@ -426,11 +456,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderRow(d: DepartureAttr): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
+    const line = d.line || "?";
+    const towards = d.towards || "";
+    const cdLabel =
+      cd === null
+        ? this._t("no_data")
+        : isAtPlatform
+          ? this._t("at_platform")
+          : this._t("countdown_minutes", { n: String(cd) });
+    const rowLabel = [line, towards, cdLabel].filter(Boolean).join(" — ");
     return html`
-      <div class="retro-row">
-        <div class="retro-line">${d.line || "?"}</div>
-        <div class="retro-dest">
-          <span class="retro-dest-text">${d.towards || ""}</span>
+      <li class="retro-row" aria-label=${rowLabel}>
+        <div class="retro-line" aria-hidden="true">${line}</div>
+        <div class="retro-dest" aria-hidden="true">
+          <span class="retro-dest-text">${towards}</span>
           ${d.barrier_free
             ? html`<ha-icon
                 class="retro-wheelchair"
@@ -439,14 +478,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
               ></ha-icon>`
             : nothing}
         </div>
-        <div class="retro-cd">
+        <div class="retro-cd" aria-hidden="true">
           ${cd === null
             ? "--"
             : isAtPlatform
               ? html`<span class="retro-stars"><span>*</span><span>*</span></span>`
               : String(cd)}
         </div>
-      </div>
+      </li>
     `;
   }
 
@@ -590,6 +629,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
       font-size: 1.9em;
       line-height: 1;
+      /* Was a <div>; now a <ul> for semantic departure list. Reset the
+         default user-agent list chrome so layout is unchanged. */
+      list-style: none;
+      margin: 0;
+      padding: 0;
     }
     .retro-row {
       display: grid;
@@ -791,6 +835,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       container-type: size;
       animation: retroVictoryAppear 0.22s ease-out both;
     }
+    /* Screen-reader-only label inside the victory overlay. The overlay
+       is purely visual (checkered flag animation) so we ship a hidden
+       text announcement in a role="status"/aria-live region — screen
+       readers speak it when the race finishes, sighted users see the
+       animation. */
+    .retro-victory-sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     .retro-victory-flag {
       position: absolute;
       inset: 0;
@@ -958,6 +1018,29 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-weight: 600;
       cursor: pointer;
       font-family: sans-serif;
+    }
+
+    /* Accessibility: visible focus ring for keyboard users. */
+    a:focus-visible,
+    button:focus-visible {
+      outline: 2px solid var(--led-amber, #ffa000);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* Accessibility: honour user motion preference.
+       Catch-all: nukes any animation/transition the feature-gated
+       @media (prefers-reduced-motion: no-preference) blocks above
+       don't already exclude. */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
     }
   `;
 }

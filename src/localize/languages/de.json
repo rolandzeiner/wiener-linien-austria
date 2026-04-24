@@ -38,6 +38,7 @@
       "section_colors": "Linienfarben",
       "colors_hint": "Optional: Farben überschreiben. U-Bahn-Standardwerte sind gesetzt.",
       "reset_color": "Zurücksetzen",
+      "pick_color_for_line": "Farbe für Linie {line} wählen",
       "section_display": "Anzeige",
       "max_departures": "Anzahl Abfahrten pro Haltestelle",
       "show_accessibility": "Barrierefrei-Symbol anzeigen",
@@ -65,6 +66,10 @@
     "steig": "STEIG",
     "version_update": "Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",
     "version_reload": "Neu laden",
+    "departures_list": "Kommende Abfahrten",
+    "at_platform": "Einfahrt",
+    "countdown_minutes": "{n} Minuten",
+    "race_finished": "Barrierefreiheits-Rennen beendet",
     "editor": {
       "section_sensor": "Haltestelle",
       "section_direction": "Richtung",
