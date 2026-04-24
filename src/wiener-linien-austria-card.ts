@@ -52,6 +52,15 @@ console.info(
   preview: true,
 });
 
+// Wrap API-sourced German strings (station names, destinations, disturbance
+// text) so assistive tech pronounces them correctly even when HA's dashboard
+// locale is not German. ASCII fallbacks like the raw entity ID are rendered
+// unwrapped — the lang hint would be inaccurate and AT handles ASCII fine.
+function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
+  if (raw) return html`<span lang="de">${raw}</span>`;
+  return fallback ?? "";
+}
+
 function iconForType(type: string | undefined): string | null {
   switch (type) {
     case LINE_TYPE_METRO:
@@ -232,7 +241,7 @@ export class WienerLinienAustriaCard extends LitElement {
       const active = stops[this._activeTab];
       return html`
         ${this._renderTabs(stops, this._activeTab)}
-        ${this._renderStop(active)}
+        ${this._renderStop(active, this._activeTab)}
       `;
     }
     return html`${stops.map((s) => this._renderStop(s))}`;
@@ -241,7 +250,7 @@ export class WienerLinienAustriaCard extends LitElement {
   private _renderEmpty(): TemplateResult {
     const available = findWienerLinienEntities(this.hass);
     const key = available.length ? "no_entities_picked" : "no_entities_available";
-    return html`<div class="wl-empty">${this._t(key)}</div>`;
+    return html`<div class="wl-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
   }
 
   private _renderTabs(stops: NormalisedModernStop[], activeIndex: number): TemplateResult {
@@ -255,6 +264,8 @@ export class WienerLinienAustriaCard extends LitElement {
           return html`<button
             type="button"
             role="tab"
+            id=${`wl-tab-${i}`}
+            aria-controls=${`wl-tabpanel-${i}`}
             class=${classMap(classes)}
             aria-selected=${selected ? "true" : "false"}
             tabindex=${selected ? "0" : "-1"}
@@ -301,9 +312,10 @@ export class WienerLinienAustriaCard extends LitElement {
     });
   }
 
-  private _renderStop(stopCfg: NormalisedModernStop): TemplateResult {
+  private _renderStop(stopCfg: NormalisedModernStop, tabIndex?: number): TemplateResult {
     const attrs = this._attrs(stopCfg.entity);
-    const title = attrs.stop_name || attrs.friendly_name || stopCfg.entity;
+    const apiName = attrs.stop_name || attrs.friendly_name;
+    const title = apiName || stopCfg.entity;
     const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
     const filtered = filterDepartures(departures, stopCfg);
     const rows = filtered.slice(0, this._config!.max_departures);
@@ -316,8 +328,15 @@ export class WienerLinienAustriaCard extends LitElement {
     const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
     const openInMaps = this._t("open_in_maps");
 
+    const isPanel = tabIndex !== undefined;
     return html`
-      <div class="wl-stop">
+      <div
+        class="wl-stop"
+        id=${isPanel ? `wl-tabpanel-${tabIndex}` : nothing}
+        role=${isPanel ? "tabpanel" : nothing}
+        aria-labelledby=${isPanel ? `wl-tab-${tabIndex}` : nothing}
+        tabindex=${isPanel ? "0" : nothing}
+      >
         <div class="wl-header">
           ${mapUrl
             ? html`<a
@@ -327,14 +346,16 @@ export class WienerLinienAustriaCard extends LitElement {
                 rel="noopener noreferrer"
                 title=${openInMaps}
                 aria-label="${title} — ${openInMaps}"
-              ><span>${title}</span><ha-icon icon="mdi:open-in-new"></ha-icon></a>`
-            : html`<span>${title}</span>`}
+              ><span>${deText(apiName, stopCfg.entity)}</span><ha-icon icon="mdi:open-in-new" aria-hidden="true"></ha-icon></a>`
+            : html`<span>${deText(apiName, stopCfg.entity)}</span>`}
           ${showElevator ? this._renderElevatorBadge(elevatorInfos) : nothing}
         </div>
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
         ${rows.length
-          ? rows.map((d) => this._renderRow(d))
-          : html`<div class="wl-empty">
+          ? html`<ul class="wl-rows" role="list" aria-label=${this._t("departures_list")}>
+              ${rows.map((d) => this._renderRow(d))}
+            </ul>`
+          : html`<div class="wl-empty" role="status" aria-live="polite">
               ${this._t(attrs.server_time ? "betriebsschluss" : "no_data")}
             </div>`}
       </div>
@@ -348,7 +369,7 @@ export class WienerLinienAustriaCard extends LitElement {
       .join("\n");
     return html`
       <span class="wl-elevator-badge" title="${label}:\n${tooltip}">
-        <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
+        <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
         <span class="wl-elevator-badge-text">${label}</span>
       </span>
     `;
@@ -386,14 +407,14 @@ export class WienerLinienAustriaCard extends LitElement {
             this._toggleElevator(e.name),
           )}
       >
-        <ha-icon icon="mdi:elevator-passenger-off"></ha-icon>
+        <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
         <div class="wl-elevator-detail-body">
           <div class="wl-elevator-summary">
-            <div class="wl-elevator-detail-location">${location}</div>
+            <div class="wl-elevator-detail-location">${deText(location)}</div>
           </div>
           ${hasDetail
             ? html`<div class="wl-elevator-detail-expand">
-                ${reason ? html`<div class="wl-elevator-detail-reason">${reason}</div>` : nothing}
+                ${reason ? html`<div class="wl-elevator-detail-reason">${deText(reason)}</div>` : nothing}
                 ${until
                   ? html`<div class="wl-elevator-detail-time">
                       ${this._t("elevator_until")} ${until}
@@ -403,7 +424,7 @@ export class WienerLinienAustriaCard extends LitElement {
             : nothing}
         </div>
         ${hasDetail
-          ? html`<ha-icon class="wl-elevator-detail-chevron" icon="mdi:chevron-down"></ha-icon>`
+          ? html`<ha-icon class="wl-elevator-detail-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`
           : nothing}
       </div>
     `;
@@ -489,7 +510,7 @@ export class WienerLinienAustriaCard extends LitElement {
             this._toggleTraffic(t.name),
           )}
       >
-        <ha-icon icon="mdi:alert-octagon"></ha-icon>
+        <ha-icon icon="mdi:alert-octagon" aria-hidden="true"></ha-icon>
         <div class="wl-traffic-body">
           <div class="wl-traffic-summary">
             ${lines.length
@@ -502,7 +523,7 @@ export class WienerLinienAustriaCard extends LitElement {
                   )}
                 </div>`
               : nothing}
-            <div class="wl-traffic-title">${t.title || this._t("traffic_label")}</div>
+            <div class="wl-traffic-title">${t.title ? deText(t.title) : this._t("traffic_label")}</div>
           </div>
           ${hasDetail
             ? html`<div class="wl-traffic-detail">
@@ -511,7 +532,7 @@ export class WienerLinienAustriaCard extends LitElement {
                   ? html`<div class="wl-traffic-meta">
                       ${t.location
                         ? html`<span class="wl-traffic-location-chip">
-                            <ha-icon icon="mdi:map-marker"></ha-icon>${t.location}
+                            <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>${deText(t.location)}
                           </span>`
                         : nothing}
                       ${until ? html`<span>${this._t("traffic_until")} ${until}</span>` : nothing}
@@ -524,7 +545,7 @@ export class WienerLinienAustriaCard extends LitElement {
             : nothing}
         </div>
         ${hasDetail
-          ? html`<ha-icon class="wl-traffic-chevron" icon="mdi:chevron-down"></ha-icon>`
+          ? html`<ha-icon class="wl-traffic-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`
           : nothing}
       </div>
     `;
@@ -558,12 +579,12 @@ export class WienerLinienAustriaCard extends LitElement {
     const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
 
     return html`
-      <div class="wl-row">
+      <li class="wl-row">
         <div class="wl-line" style=${styleMap({ background: color })}>${line}</div>
         <div class="wl-towards">
           ${typeIcon
-            ? html`<ha-icon class="wl-type" icon=${typeIcon}></ha-icon>`
-            : nothing}${d.towards || ""}${delayText
+            ? html`<ha-icon class="wl-type" icon=${typeIcon} aria-hidden="true"></ha-icon>`
+            : nothing}${deText(d.towards)}${delayText
             ? html` <span class="wl-delay">${delayText}</span>`
             : nothing}
         </div>
@@ -573,6 +594,8 @@ export class WienerLinienAustriaCard extends LitElement {
                 ? html`<ha-icon
                     class="disturbance"
                     icon="mdi:alert-circle"
+                    role="img"
+                    aria-label=${this._t("disturbance_title")}
                     title=${this._t("disturbance_title")}
                   ></ha-icon>`
                 : nothing}
@@ -580,13 +603,15 @@ export class WienerLinienAustriaCard extends LitElement {
                 ? html`<ha-icon
                     class="a11y"
                     icon="mdi:wheelchair-accessibility"
+                    role="img"
+                    aria-label=${this._t("barrier_free_title")}
                     title=${this._t("barrier_free_title")}
                   ></ha-icon>`
                 : nothing}
             </span>`
           : html`<span></span>`}
         <div class="wl-countdown">${cdLabel}</div>
-      </div>
+      </li>
     `;
   }
 
@@ -776,7 +801,7 @@ export class WienerLinienAustriaCard extends LitElement {
       border: none;
       border-bottom: 2px solid transparent;
       color: var(--secondary-text-color);
-      font-size: 14px;
+      font-size: 0.875rem;
       font-weight: 500;
       cursor: pointer;
       transition: color 0.2s, border-color 0.2s;
@@ -1011,6 +1036,11 @@ export class WienerLinienAustriaCard extends LitElement {
       color: var(--secondary-text-color);
       text-align: center;
     }
+    .wl-rows {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
     .wl-row {
       display: grid;
       grid-template-columns: max-content 1fr auto auto;
@@ -1113,7 +1143,7 @@ export class WienerLinienAustriaCard extends LitElement {
       }
       .wl-tab {
         padding: 12px 10px;
-        font-size: 13px;
+        font-size: 0.8125rem;
       }
       .wl-row {
         gap: 6px;
@@ -1129,7 +1159,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     /* Accessibility: visible focus ring for keyboard users. */
     .wl-tab:focus-visible,
-    .wl-elevator:focus-visible,
+    .wl-elevator-detail:focus-visible,
     .wl-traffic:focus-visible,
     a:focus-visible,
     button:focus-visible {

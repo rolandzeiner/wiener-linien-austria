@@ -289,6 +289,9 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
                       step="1"
                       inputmode="numeric"
                       placeholder=${this._et("walk_time_placeholder")}
+                      aria-label=${this._et("walk_time_aria")
+                        .replace("{line}", t.line)
+                        .replace("{towards}", t.towards)}
                       .value=${val !== undefined ? String(val) : ""}
                       @keydown=${this._swallowKeys}
                       @keyup=${this._swallowKeys}
@@ -427,14 +430,14 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       gap: 10px;
     }
     .section-header {
-      font-size: 11px;
+      font-size: 0.6875rem;
       font-weight: 600;
       letter-spacing: 0.6px;
       text-transform: uppercase;
       color: var(--secondary-text-color);
     }
     .editor-hint {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--secondary-text-color);
       line-height: 1.4;
     }
@@ -447,9 +450,10 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 12px;
-      border-radius: 16px;
-      font-size: 13px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 22px;
+      font-size: 0.8125rem;
       cursor: pointer;
       transition: all 0.15s;
       border: 1px solid var(--divider-color);
@@ -464,7 +468,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     .chip:hover { opacity: 0.85; }
     .chip .stop-name { font-weight: 500; }
     .chip .eid {
-      font-size: 11px;
+      font-size: 0.6875rem;
       opacity: 0.7;
     }
     .direction-buttons {
@@ -473,14 +477,15 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       flex-wrap: wrap;
     }
     .direction-buttons button {
-      padding: 6px 16px;
-      border-radius: 16px;
+      padding: 10px 16px;
+      border-radius: 22px;
       border: 1px solid var(--divider-color);
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       cursor: pointer;
       min-width: 48px;
+      min-height: 44px;
     }
     .direction-buttons button.active {
       background: var(--primary-color);
@@ -492,7 +497,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     }
     .direction-warning {
       margin-top: 4px;
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--warning-color, #ffa000);
     }
     .toggle-row {
@@ -501,7 +506,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       justify-content: space-between;
     }
     .toggle-row label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       cursor: pointer;
     }
@@ -514,7 +519,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       flex-wrap: wrap;
     }
     .segmented-label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
     }
     .walk-time-list {
@@ -538,7 +543,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       background: var(--primary-color);
     }
     .walk-time-towards {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -552,7 +557,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       border-radius: 4px;
       background: var(--card-background-color, transparent);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       text-align: right;
     }
   `;

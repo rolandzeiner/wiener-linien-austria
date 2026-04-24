@@ -50,6 +50,13 @@ const RACE_CHECKPOINTS: ReadonlyArray<readonly [number, number]> = [
   [78, 73], // 75%
 ];
 
+// Wrap API-sourced German strings so assistive tech pronounces them correctly
+// under non-German HA locales. ASCII fallbacks stay unwrapped.
+function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
+  if (raw) return html`<span lang="de">${raw}</span>`;
+  return fallback ?? "";
+}
+
 (window as unknown as { customCards?: unknown[] }).customCards =
   (window as unknown as { customCards?: unknown[] }).customCards ?? [];
 (window as unknown as { customCards: Array<Record<string, unknown>> }).customCards.push({
@@ -424,7 +431,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     platformLabel: string,
     serverTime: string | null | undefined,
   ): TemplateResult {
-    if (!eid) return html`<div class="retro-empty">${this._t("no_entity")}</div>`;
+    if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
       // Diagnose the empty state so users know whether to flip direction,
       // drop the line filter, or just wait for data. If the API is still
@@ -441,7 +448,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       } else if (lineFilter && inDirection.length > 0) {
         key = "no_data_wrong_line";
       }
-      return html`<div class="retro-empty">${this._t(key)}</div>`;
+      return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
     }
     // Silence the noop-var warning until used.
     void matching;
@@ -464,17 +471,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         : isAtPlatform
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
-    const rowLabel = [line, towards, cdLabel].filter(Boolean).join(" — ");
+    const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
+    const rowLabel = [line, towards, cdLabel, a11yLabel].filter(Boolean).join(" — ");
     return html`
       <li class="retro-row" aria-label=${rowLabel}>
         <div class="retro-line" aria-hidden="true">${line}</div>
         <div class="retro-dest" aria-hidden="true">
-          <span class="retro-dest-text">${towards}</span>
+          <span class="retro-dest-text">${deText(towards)}</span>
           ${d.barrier_free
             ? html`<ha-icon
                 class="retro-wheelchair"
                 icon="mdi:wheelchair-accessibility"
-                title="Barrierefrei"
+                title=${this._t("barrier_free_title")}
               ></ha-icon>`
             : nothing}
         </div>
@@ -526,7 +534,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
     return html`
       <div class="retro-station" style=${styleMap({ background: bg, color: fg })}>
-        <div class="retro-station-name">${stopName}</div>
+        <div class="retro-station-name">${deText(stopName)}</div>
       </div>
     `;
   }

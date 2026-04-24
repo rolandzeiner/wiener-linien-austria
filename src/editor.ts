@@ -290,6 +290,9 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
                           step="1"
                           inputmode="numeric"
                           placeholder=${this._et("walk_time_placeholder")}
+                          aria-label=${this._et("walk_time_aria")
+                            .replace("{line}", t.line)
+                            .replace("{towards}", t.towards || "")}
                           .value=${val !== undefined ? String(val) : ""}
                           @keydown=${this._swallowKeys}
                           @keyup=${this._swallowKeys}
@@ -319,7 +322,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
         <div class="section-header">${this._et("section_display")}</div>
 
         <div class="toggle-row" style="gap:12px;">
-          <span style="font-size:13px;">${this._et("layout_label")}</span>
+          <span style="font-size:0.8125rem;">${this._et("layout_label")}</span>
           <div class="direction-buttons">
             <button
               type="button"
@@ -431,14 +434,14 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 10px;
     }
     .section-header {
-      font-size: 11px;
+      font-size: 0.6875rem;
       font-weight: 600;
       letter-spacing: 0.6px;
       text-transform: uppercase;
       color: var(--secondary-text-color);
     }
     .editor-hint {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--secondary-text-color);
       line-height: 1.4;
     }
@@ -451,9 +454,10 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 12px;
-      border-radius: 16px;
-      font-size: 13px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 22px;
+      font-size: 0.8125rem;
       cursor: pointer;
       transition: all 0.15s;
       border: 1px solid var(--divider-color);
@@ -468,7 +472,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     .chip:hover { opacity: 0.85; }
     .chip .stop-name { font-weight: 500; }
     .chip .eid {
-      font-size: 11px;
+      font-size: 0.6875rem;
       opacity: 0.7;
     }
     .stop-filter {
@@ -480,7 +484,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 8px;
     }
     .stop-filter-header {
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 500;
     }
     .stop-filter-row {
@@ -489,7 +493,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 4px;
     }
     .stop-filter-row-label {
-      font-size: 11px;
+      font-size: 0.6875rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--secondary-text-color);
@@ -499,13 +503,14 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 4px;
     }
     .direction-buttons button {
-      padding: 4px 12px;
-      border-radius: 14px;
+      padding: 10px 16px;
+      border-radius: 22px;
       border: 1px solid var(--divider-color);
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       cursor: pointer;
+      min-height: 44px;
     }
     .direction-buttons button.active {
       background: var(--primary-color);
@@ -536,7 +541,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       cursor: pointer;
     }
     .color-row .reset-btn {
-      font-size: 11px;
+      font-size: 0.6875rem;
       padding: 4px 8px;
       border-radius: 4px;
       border: 1px solid var(--divider-color);
@@ -558,7 +563,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       accent-color: var(--primary-color);
     }
     .slider-row .slider-label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       min-width: 180px;
     }
@@ -566,7 +571,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       min-width: 24px;
       text-align: center;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 0.875rem;
       color: var(--primary-color);
     }
     .toggle-row {
@@ -575,7 +580,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       justify-content: space-between;
     }
     .toggle-row label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       cursor: pointer;
     }
@@ -599,7 +604,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       font-size: 0.9em;
     }
     .walk-time-towards {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -613,7 +618,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       border-radius: 4px;
       background: var(--card-background-color, transparent);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       text-align: right;
     }
     .walk-time-input::-webkit-outer-spin-button,
