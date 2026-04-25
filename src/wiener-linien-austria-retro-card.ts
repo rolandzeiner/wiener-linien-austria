@@ -110,8 +110,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     min_columns: number;
     min_rows: number;
   } {
+    // 12 = full width by default. The LED board is wide-format and
+    // looks cramped at half-width; users can shrink it manually if they
+    // want it narrower.
     return {
-      columns: 6,
+      columns: 12,
       rows: "auto",
       min_columns: 4,
       min_rows: 2,
