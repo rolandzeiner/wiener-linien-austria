@@ -16,7 +16,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 - Multi-step config flow (search → pick stop → pick lines) with a live `/monitor` probe so you only see lines actually serving the stop.
 - Reconfigure flow to add/remove lines without losing the entry; options flow to change the polling interval.
 - **Service disruption alerts** (`trafficInfoList`) and **elevator outage alerts** (`Aufzugsinfo`) filtered to your tracked lines and stop RBLs — surfaced as `traffic_info` / `elevator_info` sensor attributes and rendered inline by both bundled cards.
-- **Two bundled Lovelace cards** — modern full-feature board + retro LED-display style. Both auto-register as Lovelace resources.
+- **Two bundled Lovelace cards** — modern full-feature board + retro LED-display style.
 
 ## Screenshots
 
@@ -136,7 +136,7 @@ All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry f
 ## Use Cases
 
 - **Leave-now notifications** — "if the next U1 towards Leopoldau is < 3 min, notify me".
-- **Dashboard departure board** — multi-line attribute-driven card shows the next 5 departures per stop.
+- **Dashboard departure board** — bundled card or your own attribute-driven card shows the upcoming departures per stop.
 - **Automations triggered by specific lines** — e.g. turn on the entrance light when the tram arrives.
 - **Travel time comparison** — track two stops (home + alternate) and let a template sensor pick whichever has the sooner departure.
 
@@ -148,14 +148,14 @@ Notify when the next train is close:
 alias: "Train coming — leave now"
 trigger:
   - platform: numeric_state
-    entity_id: sensor.stephansplatz_departures
+    entity_id: sensor.stephansplatz_abfahrten
     below: 3
 action:
   - service: notify.mobile_app_phone
     data:
       title: "Next departure at Stephansplatz"
       message: >
-        {% set next = state_attr('sensor.stephansplatz_departures', 'departures')[0] %}
+        {% set next = state_attr('sensor.stephansplatz_abfahrten', 'departures')[0] %}
         {{ next.line }} → {{ next.towards }} in {{ next.countdown }} min
 ```
 
@@ -166,7 +166,7 @@ template:
   - sensor:
       - name: "Next U1 Leopoldau"
         state: >
-          {% set board = state_attr('sensor.stephansplatz_departures', 'departures') or [] %}
+          {% set board = state_attr('sensor.stephansplatz_abfahrten', 'departures') or [] %}
           {% set matches = board
                | selectattr('line', 'eq', 'U1')
                | selectattr('towards', 'eq', 'Leopoldau') | list %}
