@@ -316,4 +316,5 @@ async def test_probe_sends_canonical_user_agent(hass: HomeAssistant) -> None:
 
     assert session.get.await_count == 1
     headers = session.get.call_args.kwargs["headers"]
-    assert headers == {"User-Agent": USER_AGENT}
+    assert headers.get("User-Agent") == USER_AGENT
+    assert headers.get("Accept-Encoding") == "gzip"

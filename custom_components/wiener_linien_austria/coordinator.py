@@ -11,13 +11,14 @@ import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
     API_BASE_URL,
+    BACKOFF_CAP_SECONDS,
     CONF_DIVA,
     CONF_LINES,
     CONF_RBLS,
@@ -27,6 +28,7 @@ from .const import (
     MONITOR_ENDPOINT,
     USER_AGENT,
 )
+from .http import CacheValidators, base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
 
 _LOGGER = logging.getLogger(__name__)
@@ -91,14 +93,26 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._diva: int = int(config[CONF_DIVA])
         self._latitude: float | None = None
         self._longitude: float | None = None
+        # Conditional-GET validators captured from the previous /monitor
+        # response. The CDN sets ETag + Last-Modified on every reply; we
+        # echo them back as If-None-Match / If-Modified-Since so unchanged
+        # ticks come back as 304 (no body) and cost only headers.
+        self._monitor_cache = CacheValidators()
+        # Exponential-backoff bookkeeping for sustained API outages. We
+        # leave self._normal_interval immutable as the user-configured
+        # cadence; self.update_interval is what HA actually reads, and we
+        # bump it temporarily after consecutive UpdateFailed.
+        self._consecutive_failures = 0
+        self._normal_interval = timedelta(
+            seconds=int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+        )
 
-        scan = int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=timedelta(seconds=scan),
+            update_interval=self._normal_interval,
         )
 
     async def async_setup(self) -> None:
@@ -128,11 +142,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         if station is not None:
             self._latitude = station.latitude
             self._longitude = station.longitude
-
-    @callback
-    def async_teardown(self) -> None:
-        """No-op: no listeners to cancel."""
-        return None
 
     # ------------------------------------------------------------------
     # Properties surfaced to diagnostics and the sensor platform
@@ -197,19 +206,36 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
 
     async def _async_update_data(self) -> MonitorData:
         """Fetch departures and return a sorted MonitorData."""
+        try:
+            data = await self._fetch_monitor_data()
+        except UpdateFailed:
+            self._note_failure()
+            raise
+        self._note_success()
+        return data
+
+    async def _fetch_monitor_data(self) -> MonitorData:
+        """Inner fetch — separated so backoff bookkeeping can wrap it."""
         await async_enforce_domain_cooldown(self.hass)
 
         url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
         params: list[tuple[str, str]] = [
             ("stopId", str(rbl)) for rbl in self._rbls
         ]
-        headers = {"User-Agent": USER_AGENT}
+        headers = base_request_headers(USER_AGENT)
+        headers.update(self._monitor_cache.to_request_headers())
         timeout = aiohttp.ClientTimeout(total=30)
 
         try:
             resp = await self._session.get(
                 url, params=params, headers=headers, timeout=timeout
             )
+            # 304 = our cached data is still fresh. Return the previous
+            # MonitorData unchanged; HA's coordinator handles "same value"
+            # by not re-emitting state changes to entities.
+            if resp.status == 304 and self.data is not None:
+                self._monitor_cache.update_from_response(resp)
+                return self.data
             resp.raise_for_status()
         except asyncio.TimeoutError as err:
             raise UpdateFailed(
@@ -281,7 +307,40 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             )
 
         self._clear_rate_limit_issue()
+        # Capture validators only on a fully-validated 200 response —
+        # never store them for an error reply, else next tick would
+        # send If-None-Match against a payload we never accepted.
+        self._monitor_cache.update_from_response(resp)
         return _parse_monitor_body(body, self._selected_lines, self._server_time)
+
+    def _note_success(self) -> None:
+        """Reset the consecutive-failure counter and restore normal cadence."""
+        if self._consecutive_failures == 0:
+            return
+        self._consecutive_failures = 0
+        if self.update_interval != self._normal_interval:
+            self.update_interval = self._normal_interval
+
+    def _note_failure(self) -> None:
+        """Bump the consecutive-failure counter and apply exponential backoff.
+
+        First failure stays at the user-configured cadence (transient hiccups
+        shouldn't slow down the loop). From the second failure onwards, the
+        update interval doubles each time, capped at BACKOFF_CAP_SECONDS so
+        a sustained outage settles into a slow poll instead of hammering
+        the API every minute. The next successful tick resets it.
+        """
+        self._consecutive_failures += 1
+        if self._consecutive_failures < 2:
+            return
+        normal_secs = self._normal_interval.total_seconds()
+        backoff_secs = min(
+            normal_secs * (2 ** (self._consecutive_failures - 1)),
+            BACKOFF_CAP_SECONDS,
+        )
+        new_interval = timedelta(seconds=backoff_secs)
+        if self.update_interval != new_interval:
+            self.update_interval = new_interval
 
 
 def _normalise_lines(raw: Any) -> set[str] | None:

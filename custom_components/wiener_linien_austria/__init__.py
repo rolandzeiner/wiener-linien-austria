@@ -18,14 +18,19 @@ from homeassistant.helpers.event import async_track_time_interval
 
 from .alerts import async_refresh_alerts
 from .const import (
+    ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_SECONDS,
     ALERTS_REFRESH_UNSUB_KEY,
     CARD_URL,
     CARD_VERSION,
     DOMAIN,
+    DOMAIN_LAST_CALL_KEY,
+    ELEVATOR_INFO_KEY,
+    ENTRY_COUNT_KEY,
     RETRO_CARD_URL,
     RETRO_CARD_VERSION,
     STATIC_CACHE_REFRESH_HOURS,
+    TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
 from .static import async_refresh_catalogue
@@ -214,7 +219,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     await coordinator.async_setup()
-    entry.async_on_unload(coordinator.async_teardown)
     await coordinator.async_config_entry_first_refresh()
 
     entry.runtime_data = coordinator
@@ -232,6 +236,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+
+    # Reference-count active entries so the *last* unload tears down the
+    # domain-wide refresh timers and in-memory caches. Without this, the
+    # alerts/static timers keep firing after the user removes every entry.
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data[ENTRY_COUNT_KEY] = domain_data.get(ENTRY_COUNT_KEY, 0) + 1
     return True
 
 
@@ -241,8 +251,34 @@ async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntr
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
-    """Unload a config entry."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    """Unload a config entry.
+
+    When the *last* entry is removed, also tear down the domain-wide
+    refresh timers and drop the in-memory caches so HA isn't left
+    polling Wiener Linien for an integration that no longer exists.
+    """
+    unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if not unloaded:
+        return False
+
+    domain_data = hass.data.get(DOMAIN, {})
+    remaining = max(0, domain_data.get(ENTRY_COUNT_KEY, 1) - 1)
+    domain_data[ENTRY_COUNT_KEY] = remaining
+    if remaining == 0:
+        for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
+            unsub = domain_data.pop(unsub_key, None)
+            if callable(unsub):
+                unsub()
+        # Drop the rest of the domain-wide state — caches and validators
+        # are stale by definition once no entry is around to consume them.
+        for stale_key in (
+            TRAFFIC_INFO_KEY,
+            ELEVATOR_INFO_KEY,
+            ALERT_CACHE_VALIDATORS_KEY,
+            DOMAIN_LAST_CALL_KEY,
+        ):
+            domain_data.pop(stale_key, None)
+    return True
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:

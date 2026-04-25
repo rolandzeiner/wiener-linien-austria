@@ -6,6 +6,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.alerts import (
@@ -313,14 +314,16 @@ async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None
     assert hass.data[DOMAIN][ELEVATOR_INFO_KEY] == []
 
 
-async def test_async_refresh_alerts_swallows_generic_errors(
+async def test_fetch_info_list_propagates_unexpected_errors(
     hass: HomeAssistant,
 ) -> None:
-    """The broad `except Exception` really is broad — not just timeouts.
+    """Unexpected exceptions (programming errors) must propagate.
 
-    Guards against a regression where the except-list narrows to a few
-    specific types and e.g. a bare RuntimeError would suddenly bubble
-    through the 5-min periodic refresh and crash the scheduler.
+    The except-list in `_fetch_info_list` is deliberately narrow
+    (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError,
+    ValueError) so real bugs surface during development instead of being
+    silently swallowed by the 5-min periodic refresh. HA's
+    async_track_time_interval logs the traceback for us.
     """
     fake_session = MagicMock()
     fake_session.get = AsyncMock(side_effect=RuntimeError("unexpected"))
@@ -329,10 +332,8 @@ async def test_async_refresh_alerts_swallows_generic_errors(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        await async_refresh_alerts(hass)
-
-    assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == []
-    assert hass.data[DOMAIN][ELEVATOR_INFO_KEY] == []
+        with pytest.raises(RuntimeError):
+            await _fetch_info_list(hass, "stoerunglang")
 
 
 # ---------------------------------------------------------------------------

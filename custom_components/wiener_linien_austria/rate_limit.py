@@ -19,7 +19,20 @@ _LOCK_KEY = "cooldown_lock"
 
 
 async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
-    """Serialise outbound calls across all entries under the 15s floor."""
+    """Serialise outbound calls across all entries under the 15s floor.
+
+    The `asyncio.sleep` runs *inside* the lock — that's by design. Concurrent
+    callers queue up and each waits its full 15s slice, so N simultaneous
+    callers take ~N × 15s to drain. This is exactly the fair-use floor we
+    promised Wiener Linien; it's not a bug.
+
+    Practical implication: at the default 60s `update_interval` the queue
+    drains comfortably for ~3 entries (3 × 15s = 45s < 60s). With more
+    entries the slowest coordinator's wait may exceed its 30s monitor
+    timeout — users with 4+ stops should bump the interval. The
+    coordinator's exponential backoff handles sustained queue overruns
+    by widening the cadence on consecutive failures.
+    """
     domain_data = hass.data.setdefault(DOMAIN, {})
     lock: asyncio.Lock = domain_data.setdefault(_LOCK_KEY, asyncio.Lock())
     async with lock:

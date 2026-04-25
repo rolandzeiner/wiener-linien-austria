@@ -52,6 +52,7 @@ from .const import (
     MONITOR_ENDPOINT,
     USER_AGENT,
 )
+from .http import base_request_headers
 from .static import Station, async_load_catalogue
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ async def _probe_monitor_lines(
         resp = await session.get(
             url,
             params=params,
-            headers={"User-Agent": USER_AGENT},
+            headers=base_request_headers(USER_AGENT),
             timeout=aiohttp.ClientTimeout(total=10),
         )
         resp.raise_for_status()

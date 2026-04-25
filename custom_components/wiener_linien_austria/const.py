@@ -7,8 +7,9 @@ from homeassistant.const import __version__ as _HA_VERSION
 
 DOMAIN: Final = "wiener_linien_austria"
 
-# Integration version — must match manifest.json "version" field.
-INTEGRATION_VERSION: Final = "1.2.1"
+# Integration version — manifest.json carries the clean target ("1.3.0");
+# this constant is allowed to carry a "-beta-N" suffix during development.
+INTEGRATION_VERSION: Final = "1.3.0-beta-1"
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
@@ -35,6 +36,13 @@ MAX_POLL_SECONDS: Final = 600
 DOMAIN_LAST_CALL_KEY: Final = "last_call_ts"
 DOMAIN_COOLDOWN_SECONDS: Final = 15
 
+# Exponential-backoff ceiling for the per-entry monitor coordinator.
+# Sustained API outages settle at this cadence instead of hammering at
+# the user-configured interval. Cap chosen to keep an outage visible
+# without amplifying load — 30 min is comfortably below "user thinks
+# the integration is broken" and well above any realistic transient hiccup.
+BACKOFF_CAP_SECONDS: Final = 1800
+
 # Static cache refresh interval (weekly is plenty for Wiener Linien's
 # stop catalogue; it changes only when routes do).
 STATIC_CACHE_REFRESH_HOURS: Final = 24 * 7
@@ -54,6 +62,14 @@ ALERTS_REFRESH_SECONDS: Final = 300
 TRAFFIC_INFO_KEY: Final = "traffic_info"
 ELEVATOR_INFO_KEY: Final = "elevator_info"
 ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
+# Cache validators (ETag / Last-Modified) per alert feed, captured from
+# the previous /trafficInfoList response so unchanged feeds come back
+# as 304 Not Modified instead of full bodies.
+ALERT_CACHE_VALIDATORS_KEY: Final = "alert_cache_validators"
+# Reference-count of live config entries — used to drive the domain-wide
+# cleanup (cancelling the alerts + static refresh timers, dropping the
+# in-memory caches) when the *last* entry is removed.
+ENTRY_COUNT_KEY: Final = "entry_count"
 
 STATIC_FILES: Final = {
     "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",
@@ -78,9 +94,9 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 # match the corresponding Python constant below byte-for-byte, else the
 # reload banner loops. Retro card iterates independently from the modern
 # one so the two can rev at different paces without spurious reloads.
-CARD_VERSION: Final = "1.2.1"
+CARD_VERSION: Final = "1.3.0-beta-1"
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
-RETRO_CARD_VERSION: Final = "1.2.1"
+RETRO_CARD_VERSION: Final = "1.3.0-beta-1"
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
