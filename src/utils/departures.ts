@@ -55,6 +55,10 @@ export function collectLinesInSelection(
 export interface ModernStopFilter {
   lines?: string[];
   direction?: "H" | "R";
+  // Per-line direction override. Takes precedence over `direction`.
+  // Absence of an entry for a line falls back to `direction`, then to
+  // "no direction filter" if `direction` is also unset.
+  line_directions?: Record<string, "H" | "R">;
   walk_times?: WalkTimes;
 }
 
@@ -64,11 +68,14 @@ export function filterDepartures(
   departures: DepartureAttr[],
   filter: ModernStopFilter,
 ): DepartureAttr[] {
-  const { lines, direction, walk_times } = filter;
+  const { lines, direction, line_directions, walk_times } = filter;
   const lineSet = lines && lines.length ? new Set(lines) : null;
   return departures.filter((d) => {
     if (lineSet && !lineSet.has(d.line)) return false;
-    if (direction && d.direction !== direction) return false;
+    // Per-line direction wins; fall back to stop-wide; "no override and
+    // no stop-wide setting" means show all directions for this line.
+    const effectiveDir = line_directions?.[d.line] ?? direction;
+    if (effectiveDir && d.direction !== effectiveDir) return false;
     if (walk_times) {
       const min = walk_times[lineKey(d.line, String(d.direction ?? ""), d.towards)];
       if (typeof min === "number" && d.countdown < min) return false;

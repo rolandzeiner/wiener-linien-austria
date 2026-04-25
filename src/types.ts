@@ -82,6 +82,11 @@ export interface ModernStopConfig {
   entity: string;
   lines?: string[];
   direction?: "H" | "R" | "";
+  // Per-line direction override. Absence of an entry for a given line
+  // means the stop-wide `direction` (or "Both" if that's also unset)
+  // applies to it. Allows mixed routing: "U1 toward city, U3 toward
+  // home" at the same stop.
+  line_directions?: Record<string, "H" | "R">;
   walk_times?: WalkTimes;
 }
 

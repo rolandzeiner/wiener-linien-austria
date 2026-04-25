@@ -100,6 +100,17 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     });
   }
 
+  private _setLineDirection(eid: string, line: string, dir: "H" | "R" | null): void {
+    this._updateStop(eid, (s) => {
+      const cur = { ...(s.line_directions ?? {}) };
+      if (dir === null) delete cur[line];
+      else cur[line] = dir;
+      if (Object.keys(cur).length) s.line_directions = cur;
+      else delete s.line_directions;
+      return s;
+    });
+  }
+
   private _setWalkTime(eid: string, key: string, raw: string): void {
     const n = parseInt(raw, 10);
     const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
@@ -219,9 +230,50 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     const lines = linesAtStop(attrs);
     const picked = new Set(stop.lines ?? []);
     const dir = stop.direction ?? null;
-    // Walk-time rows track the selected direction so the editor doesn't
-    // show irrelevant rows when the user locks to H or R.
-    const triplets = tripletsAtStop(attrs).filter((t) => !dir || t.direction === dir);
+    const lineDirs = stop.line_directions ?? {};
+
+    // "Effectively visible" lines = whitelist if set, else all lines.
+    const effectiveLines = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
+    const showPerLineDir = effectiveLines.length >= 2;
+
+    // Walk-time triplets: drop any whose line is filtered out by the
+    // whitelist OR whose direction is filtered out by the *effective*
+    // direction for that line (per-line override beats stop-wide).
+    const allTriplets = tripletsAtStop(attrs);
+    const triplets = allTriplets.filter((t) => {
+      if (picked.size > 0 && !picked.has(t.line)) return false;
+      const effDir = lineDirs[t.line] ?? dir;
+      if (effDir && t.direction !== effDir) return false;
+      return true;
+    });
+
+    // Available directions per scope. A line that only runs in one
+    // direction at this stop (e.g. terminus) gets the unavailable
+    // direction button disabled, and the available one shows as
+    // "active" by default — even when the user hasn't explicitly
+    // picked it — so the UI never offers a meaningless choice.
+    const dirsForLine = (line: string): Set<"H" | "R"> => {
+      const out = new Set<"H" | "R">();
+      for (const t of allTriplets) {
+        if (t.line !== line) continue;
+        if (t.direction === "H" || t.direction === "R") out.add(t.direction);
+      }
+      return out;
+    };
+    const stopAvailableDirs = new Set<"H" | "R">();
+    for (const t of allTriplets) {
+      if (t.direction === "H" || t.direction === "R") stopAvailableDirs.add(t.direction);
+    }
+    const stopHasH = stopAvailableDirs.has("H");
+    const stopHasR = stopAvailableDirs.has("R");
+    const stopOnlyOne = stopAvailableDirs.size === 1;
+    // Stop-wide effective active state: explicit pick wins; otherwise
+    // pre-highlight the only-available direction so the user sees the
+    // truth at a glance. Encoded as 3 booleans (not a tagged union) so
+    // TypeScript can't accidentally narrow them across template uses.
+    const stopActiveH = dir === "H" || (dir === null && stopOnlyOne && stopHasH);
+    const stopActiveR = dir === "R" || (dir === null && stopOnlyOne && stopHasR);
+    const stopActiveBoth = dir === null && !stopOnlyOne;
 
     return html`
       <div class="stop-filter">
@@ -253,21 +305,82 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <div class="direction-buttons">
             <button
               type="button"
-              class=${classMap({ active: dir === "H" })}
-              @click=${() => this._setDirection(stop.entity, "H")}
+              class=${classMap({ active: stopActiveH })}
+              ?disabled=${!stopHasH}
+              title=${!stopHasH ? this._et("direction_unavailable") : ""}
+              @click=${() => stopHasH && this._setDirection(stop.entity, "H")}
             >${this._t("dir_h")}</button>
             <button
               type="button"
-              class=${classMap({ active: dir === "R" })}
-              @click=${() => this._setDirection(stop.entity, "R")}
+              class=${classMap({ active: stopActiveR })}
+              ?disabled=${!stopHasR}
+              title=${!stopHasR ? this._et("direction_unavailable") : ""}
+              @click=${() => stopHasR && this._setDirection(stop.entity, "R")}
             >${this._t("dir_r")}</button>
             <button
               type="button"
-              class=${classMap({ active: dir === null })}
-              @click=${() => this._setDirection(stop.entity, null)}
+              class=${classMap({ active: stopActiveBoth })}
+              ?disabled=${stopOnlyOne}
+              title=${stopOnlyOne ? this._et("direction_unavailable") : ""}
+              @click=${() => !stopOnlyOne && this._setDirection(stop.entity, null)}
             >${this._t("dir_both")}</button>
           </div>
         </div>
+
+        ${showPerLineDir
+          ? html`
+              <div class="stop-filter-row">
+                <div class="stop-filter-row-label">${this._et("per_line_direction_label")}</div>
+                <div class="editor-hint">${this._et("per_line_direction_hint")}</div>
+                <div class="per-line-dir-list">
+                  ${effectiveLines.map((l) => {
+                    const color = colorForLine(l, overrides);
+                    const lineDir = lineDirs[l] ?? null;
+                    const lineAvail = dirsForLine(l);
+                    const lineHasH = lineAvail.has("H");
+                    const lineHasR = lineAvail.has("R");
+                    const lineOnlyOne = lineAvail.size === 1;
+                    const lineActiveH = lineDir === "H" || (lineDir === null && lineOnlyOne && lineHasH);
+                    const lineActiveR = lineDir === "R" || (lineDir === null && lineOnlyOne && lineHasR);
+                    const lineActiveBoth = lineDir === null && !lineOnlyOne;
+                    const ariaLabel = this._et("per_line_direction_aria").replace("{line}", l);
+                    const dirUnavailable = this._et("direction_unavailable");
+                    return html`
+                      <div class="per-line-dir-row" role="group" aria-label=${ariaLabel}>
+                        <span class="per-line-dir-badge" style=${styleMap({ background: color })}>${l}</span>
+                        <div class="direction-buttons">
+                          <button
+                            type="button"
+                            class=${classMap({ active: lineActiveH })}
+                            aria-pressed=${lineActiveH ? "true" : "false"}
+                            ?disabled=${!lineHasH}
+                            title=${!lineHasH ? dirUnavailable : ""}
+                            @click=${() => lineHasH && this._setLineDirection(stop.entity, l, "H")}
+                          >${this._t("dir_h")}</button>
+                          <button
+                            type="button"
+                            class=${classMap({ active: lineActiveR })}
+                            aria-pressed=${lineActiveR ? "true" : "false"}
+                            ?disabled=${!lineHasR}
+                            title=${!lineHasR ? dirUnavailable : ""}
+                            @click=${() => lineHasR && this._setLineDirection(stop.entity, l, "R")}
+                          >${this._t("dir_r")}</button>
+                          <button
+                            type="button"
+                            class=${classMap({ active: lineActiveBoth })}
+                            aria-pressed=${lineActiveBoth ? "true" : "false"}
+                            ?disabled=${lineOnlyOne}
+                            title=${lineOnlyOne ? dirUnavailable : ""}
+                            @click=${() => !lineOnlyOne && this._setLineDirection(stop.entity, l, null)}
+                          >${this._t("dir_both")}</button>
+                        </div>
+                      </div>
+                    `;
+                  })}
+                </div>
+              </div>
+            `
+          : nothing}
 
         ${triplets.length
           ? html`
@@ -533,6 +646,13 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       color: var(--text-primary-color, #fff);
       border-color: var(--primary-color);
     }
+    .direction-buttons button[disabled] {
+      opacity: 0.35;
+      cursor: not-allowed;
+      background: var(--card-background-color, #fff);
+      color: var(--secondary-text-color);
+      border-color: var(--divider-color);
+    }
     .color-row {
       display: grid;
       grid-template-columns: 44px 1fr auto;
@@ -676,6 +796,26 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     .walk-time-input::-webkit-outer-spin-button,
     .walk-time-input::-webkit-inner-spin-button {
       margin: 0;
+    }
+    .per-line-dir-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .per-line-dir-row {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      align-items: center;
+      gap: 10px;
+    }
+    .per-line-dir-badge {
+      text-align: center;
+      font-weight: 700;
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.85rem;
+      box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     }
   `;
 }

@@ -33,7 +33,22 @@ export interface NormalisedModernStop {
   entity: string;
   lines?: string[];
   direction?: "H" | "R";
+  line_directions?: Record<string, "H" | "R">;
   walk_times?: WalkTimes;
+}
+
+function normaliseLineDirections(
+  raw: unknown,
+): Record<string, "H" | "R"> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, "H" | "R"> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof k !== "string" || !k.length) continue;
+    if (v === "H" || v === "R") out[k] = v;
+    // Any other value (including "Both" / "" / undefined) means
+    // "no override" — which is encoded as the absence of the key.
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
@@ -50,6 +65,8 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
     if (lines.length) stop.lines = lines;
   }
   if (r.direction === "H" || r.direction === "R") stop.direction = r.direction;
+  const lineDirs = normaliseLineDirections(r.line_directions);
+  if (lineDirs) stop.line_directions = lineDirs;
   const walk = normaliseWalkTimes(r.walk_times);
   if (walk) stop.walk_times = walk;
   return stop;
