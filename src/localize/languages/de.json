@@ -78,6 +78,8 @@
     "at_platform": "Einfahrt",
     "countdown_minutes": "{n} Minuten",
     "race_finished": "Barrierefreiheits-Rennen beendet",
+    "race_starting_in": "Rennen startet in {n}",
+    "race_winner_announce": "Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",
     "barrier_free_title": "Barrierefrei zugänglich",
     "editor": {
       "section_sensor": "Haltestelle",

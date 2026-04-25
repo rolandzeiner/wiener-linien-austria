@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
@@ -19,10 +20,16 @@ console.info(
   "color: #000; background: #FFC700; font-weight: 700;",
 );
 
-type RaceState = "idle" | "racing" | "victory";
+type RaceState = "idle" | "countdown" | "racing" | "victory";
 const VICTORY_DURATION_MS = 4000;
 const NEXT_RACE_MIN_MS = 60_000;
 const NEXT_RACE_MAX_MS = 180_000;
+// 90s game-show pre-race countdown: "3", "2", "1" — each digit held for
+// COUNTDOWN_DIGIT_MS, total = COUNTDOWN_TOTAL_MS. Punching the digits in
+// before the racers leave the gate gives the race a bigger sense of
+// "starting" than just appearing mid-screen.
+const COUNTDOWN_DIGIT_MS = 800;
+const COUNTDOWN_TOTAL_MS = COUNTDOWN_DIGIT_MS * 3;
 // Nailbiter racing — each race picks a lead-change pattern (who's ahead
 // at 25%, 50%, 75%) so there's at least one overtake per race. Winner of
 // the last checkpoint gets the shorter duration.
@@ -73,11 +80,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   @state() private _config?: NormalisedRetroConfig;
   @state() private _versionMismatch: string | null = null;
   @state() private _raceState: RaceState = "idle";
+  // Currently displayed countdown digit (3, 2, or 1) — null when not in
+  // the countdown phase. Reactive so the digit overlay re-renders.
+  @state() private _countdownDigit: 1 | 2 | 3 | null = null;
+  // Winner of the most recently completed race ("A" = top row, "B" =
+  // bottom row). Drives the circular winner badge on the victory
+  // overlay. null while idle or during the first race ever.
+  @state() private _raceWinner: Racer | null = null;
 
   private _versionCheckDone = false;
   private _raceTimers: Array<ReturnType<typeof setTimeout>> = [];
   // Wall-clock target times so state transitions survive the disconnect/
   // reconnect cycles HA triggers during dashboard rebuilds.
+  private _countdownStartAt: number | null = null;
   private _raceEndAt: number | null = null;
   private _victoryEndAt: number | null = null;
 
@@ -172,7 +187,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
-      changed.has("_raceState")
+      changed.has("_raceState") ||
+      changed.has("_countdownDigit") ||
+      changed.has("_raceWinner")
     ) {
       return true;
     }
@@ -198,8 +215,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     } else if (!isOn && wasOn) {
       this._clearRaceTimers();
       this._raceState = "idle";
+      this._countdownStartAt = null;
+      this._countdownDigit = null;
       this._raceEndAt = null;
       this._victoryEndAt = null;
+      this._raceWinner = null;
     }
   }
 
@@ -265,11 +285,53 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._scheduleRace(this._nextRaceDelay());
       return;
     }
+    // Pre-race countdown: "3, 2, 1" punched onto the LED before the
+    // racers leave the gate. Random params get rolled now so the winner
+    // is decided by the time the gate opens — the badge on the victory
+    // overlay already knows who'll win.
     const maxDur = this._randomizeRaceParams();
-    this._raceState = "racing";
     const now = Date.now();
-    this._raceEndAt = now + maxDur;
+    this._raceState = "countdown";
+    this._countdownStartAt = now;
+    this._countdownDigit = 3;
+    this._raceEndAt = now + COUNTDOWN_TOTAL_MS + maxDur;
     this._victoryEndAt = this._raceEndAt + VICTORY_DURATION_MS;
+    this._scheduleCountdownTick();
+  }
+
+  // Countdown ticker: walks the visible digit from 3 → 2 → 1 → race.
+  // Computes the digit from elapsed wall-clock time so a disconnect/
+  // reconnect mid-countdown lands on the correct digit instead of
+  // restarting from 3.
+  private _scheduleCountdownTick(): void {
+    if (this._raceState !== "countdown" || this._countdownStartAt === null) return;
+    const now = Date.now();
+    const elapsed = now - this._countdownStartAt;
+    if (elapsed >= COUNTDOWN_TOTAL_MS) {
+      this._beginRacing();
+      return;
+    }
+    const digit = Math.max(
+      1,
+      Math.min(3, 3 - Math.floor(elapsed / COUNTDOWN_DIGIT_MS)),
+    ) as 1 | 2 | 3;
+    if (this._countdownDigit !== digit) this._countdownDigit = digit;
+    const nextDigitAt =
+      this._countdownStartAt +
+      (Math.floor(elapsed / COUNTDOWN_DIGIT_MS) + 1) * COUNTDOWN_DIGIT_MS;
+    const wait = Math.max(50, nextDigitAt - now);
+    this._raceTimers.push(setTimeout(() => this._scheduleCountdownTick(), wait));
+  }
+
+  // Flips countdown → racing. Called from the countdown ticker once the
+  // total countdown duration has elapsed. The race-end / victory-end
+  // wall-clock targets were already computed in _startRace so this
+  // doesn't recompute them — guarantees the winner badge matches the
+  // animation that just played.
+  private _beginRacing(): void {
+    this._raceState = "racing";
+    this._countdownDigit = null;
+    this._countdownStartAt = null;
     this._armStateTransitions();
   }
 
@@ -288,6 +350,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
     const pattern = RACE_PATTERNS[Math.floor(Math.random() * RACE_PATTERNS.length)]!;
     const winner = pattern[2];
+    // Surface the winner so the victory overlay can render the
+    // circular "1" or "2" badge for the winning row.
+    this._raceWinner = winner;
 
     const winnerDur = rand(RACE_WINNER_MIN_MS, RACE_WINNER_MAX_MS);
     const loserDur = winnerDur + rand(RACE_LOSER_LAG_MIN_MS, RACE_LOSER_LAG_MAX_MS);
@@ -329,7 +394,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _armStateTransitions(): void {
     this._clearRaceTimers();
     const now = Date.now();
-    if (this._raceState === "racing" && this._raceEndAt !== null) {
+    if (this._raceState === "countdown" && this._countdownStartAt !== null) {
+      // Reconnect-mid-countdown: resume ticking from wherever we left
+      // off. _scheduleCountdownTick computes the right digit and the
+      // right next-tick delay from elapsed wall-clock time.
+      this._scheduleCountdownTick();
+    } else if (this._raceState === "racing" && this._raceEndAt !== null) {
       const delay = Math.max(0, this._raceEndAt - now);
       this._raceTimers.push(
         setTimeout(() => {
@@ -401,8 +471,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       ? this._renderStationName(stopName, matching, departures, cfg.station_bg)
       : nothing;
 
+    const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
     const raceActive = cfg.wheelchair_race && this._raceState === "racing";
     const raceVictory = cfg.wheelchair_race && this._raceState === "victory";
+    const winnerLane = this._raceWinner === "A" ? 1 : this._raceWinner === "B" ? 2 : null;
     const retroClasses = {
       retro: true,
       "retro--gleis-left": !!platform && gleisLeft,
@@ -411,6 +483,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       [`retro--size-${cfg.size}`]: cfg.size !== "regular",
       [`retro--style-${cfg.style}`]: cfg.style !== "classic",
       "retro--flicker": cfg.flicker,
+      "retro--race-countdown": raceCountdown,
       "retro--race-active": raceActive,
       "retro--race-victory": raceVictory,
     };
@@ -422,14 +495,33 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
-            ${raceActive
+            ${raceCountdown && this._countdownDigit !== null
+              ? html`<div class="retro-countdown" role="status" aria-live="polite">
+                  ${keyed(
+                    this._countdownDigit,
+                    html`<span class="retro-countdown-digit" aria-hidden="true">${this._countdownDigit}</span>`,
+                  )}
+                  <span class="retro-victory-sr">
+                    ${this._t("race_starting_in", { n: this._countdownDigit })}
+                  </span>
+                </div>`
+              : nothing}
+            ${raceCountdown || raceActive
               ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
               : nothing}
             ${raceVictory
               ? html`<div class="retro-victory" role="status" aria-live="polite">
                   <div class="retro-victory-flag" aria-hidden="true"></div>
+                  ${winnerLane !== null
+                    ? html`<div class="retro-victory-winner" aria-hidden="true">
+                        <ha-icon class="retro-winner-trophy" icon="mdi:trophy"></ha-icon>
+                        <span class="retro-winner-num">${winnerLane}</span>
+                      </div>`
+                    : nothing}
                   <span class="retro-victory-sr">
-                    ${this._t("race_finished")}
+                    ${winnerLane !== null
+                      ? this._t("race_winner_announce", { n: winnerLane })
+                      : this._t("race_finished")}
                   </span>
                 </div>`
               : nothing}
@@ -766,14 +858,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       100% { transform: translate(calc(100cqw + var(--race-end, 60px)), 0.18em); }
     }
     @media (prefers-reduced-motion: no-preference) {
+      /* LED prep: both during countdown ("3, 2, 1" — the panel is
+         clearing for the race) and during the race itself. The
+         wheelchair-exit animations below stay scoped to .retro--race-active
+         only — countdown shouldn't move the racers. */
+      .retro--race-countdown .retro-dest,
       .retro--race-active .retro-dest {
         overflow: visible;
       }
+      .retro--race-countdown .retro-cd,
       .retro--race-active .retro-cd {
         opacity: 0;
       }
-      /* Only fade Gleis/Steig during the race when it's on the right —
+      /* Only fade Gleis/Steig during the prep when it's on the right —
          that's the wheelchairs' path. Left-side Gleis stays lit. */
+      .retro--race-countdown.retro--gleis-right .retro-gleis,
       .retro--race-active.retro--gleis-right .retro-gleis {
         opacity: 0;
       }
@@ -903,6 +1002,131 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       0%   { background-position: 0 0; }
       100% { background-position: 100cqh 0; }
     }
+
+    /* Pre-race countdown overlay — "3, 2, 1" punch-in over the LED
+       panel before the racers leave the gate. Single big chunky
+       monospace numeral in LED-amber, glowing, with a punch-scale
+       animation per digit (Lit re-mounts the <span> via keyed() so
+       the keyframe re-fires each tick). The overlay dims the LED
+       behind it slightly so the digit reads cleanly. */
+    .retro-countdown {
+      position: absolute;
+      inset: 0;
+      z-index: 18;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      background: rgba(0, 0, 0, 0.6);
+      border-radius: inherit;
+      overflow: hidden;
+      isolation: isolate;
+      container-type: size;
+      animation: retroCountdownAppear 0.18s ease-out both;
+    }
+    @keyframes retroCountdownAppear {
+      0%   { opacity: 0; }
+      100% { opacity: 1; }
+    }
+    .retro-countdown-digit {
+      display: block;
+      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-weight: 900;
+      font-size: 60cqh;
+      line-height: 1;
+      color: var(--led-amber);
+      letter-spacing: -0.04em;
+      text-shadow:
+        0 0 10px rgb(var(--led-glow-rgb) / 0.9),
+        0 0 24px rgb(var(--led-glow-rgb) / 0.7),
+        0 0 40px rgb(var(--led-glow-rgb) / 0.4);
+      animation: retroCountdownPunch 0.8s ease-out both;
+      will-change: transform, opacity;
+    }
+    @keyframes retroCountdownPunch {
+      0%   { opacity: 0; transform: scale(0.4); }
+      18%  { opacity: 1; transform: scale(1.18); }
+      30%  {              transform: scale(1); }
+      72%  { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.85); }
+    }
+
+    /* Winner badge — circular cut-out centered on the victory checker
+       flag. Background = the card's LED substrate (--led-bg, black in
+       classic, dark warm-amber in warm mode) so the badge reads as
+       "punched through" the checker flag rather than sitting on top of
+       it. Amber LED ring + glow gives it the same lit-from-within
+       feel as the rest of the LED panel. mdi:trophy is the visual
+       anchor; the lane number sits on its plinth. */
+    .retro-victory-winner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: 22;
+      width: 41cqmin;
+      height: 41cqmin;
+      min-width: 82px;
+      min-height: 82px;
+      max-width: 172px;
+      max-height: 172px;
+      border-radius: 50%;
+      background-color: var(--led-bg);
+      background-image: radial-gradient(
+        circle,
+        var(--led-substrate) var(--led-dot-size),
+        transparent var(--led-dot-edge)
+      );
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--led-amber);
+      box-shadow:
+        0 0 12px rgb(var(--led-glow-rgb) / 0.85),
+        0 0 28px rgb(var(--led-glow-rgb) / 0.55),
+        inset 0 0 10px rgb(var(--led-glow-rgb) / 0.25);
+      transform: translate(-50%, -50%) scale(0.2);
+      opacity: 0;
+      animation: retroWinnerBadgeAppear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s forwards;
+    }
+    @keyframes retroWinnerBadgeAppear {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    .retro-winner-trophy {
+      --mdc-icon-size: 57cqmin;
+      color: var(--led-amber);
+      filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.85))
+              drop-shadow(0 0 10px rgb(var(--led-glow-rgb) / 0.45));
+    }
+    /* Lane number overlaid on the trophy. Colored to match the LED
+       background so it reads as "engraved" into the amber trophy face
+       — punched out, not sitting on top. */
+    .retro-winner-num {
+      position: absolute;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-weight: 900;
+      font-size: 15cqmin;
+      line-height: 1;
+      color: #000;
+      letter-spacing: -0.02em;
+      pointer-events: none;
+      /* Belt-and-suspenders bold: the monospace stack falls back to
+         700 on systems without a 900 cut, so an explicit text-stroke
+         keeps the engraving thick at every size. */
+      -webkit-text-stroke: 0.5px #000;
+    }
+    /* Tighter on the small variant so trophy + number still fit. */
+    .retro--size-small .retro-winner-trophy {
+      --mdc-icon-size: 51cqmin;
+    }
+    .retro--size-small .retro-winner-num {
+      font-size: 13cqmin;
+    }
+
     .retro-gleis {
       flex: 0 0 auto;
       display: flex;

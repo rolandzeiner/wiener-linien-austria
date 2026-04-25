@@ -78,6 +78,8 @@
     "at_platform": "At platform",
     "countdown_minutes": "{n} minutes",
     "race_finished": "Accessibility race finished",
+    "race_starting_in": "Race starting in {n}",
+    "race_winner_announce": "Wheelchair {n} wins the accessibility race",
     "barrier_free_title": "Step-free access",
     "editor": {
       "section_sensor": "Stop",
