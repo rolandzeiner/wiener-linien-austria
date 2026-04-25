@@ -48,6 +48,8 @@
       "show_traffic_info": "Störungen anzeigen",
       "show_elevator_info": "Aufzugsinfo anzeigen",
       "show_delay": "Verspätungen anzeigen",
+      "show_hero_metric": "Countdown zur nächsten Abfahrt anzeigen",
+      "show_departures": "Abfahrtsliste anzeigen",
       "hide_attribution": "Datenquelle ausblenden",
       "layout_label": "Layout mehrerer Haltestellen",
       "layout_stacked": "Gestapelt",

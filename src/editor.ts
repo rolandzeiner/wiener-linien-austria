@@ -26,6 +26,8 @@ type ToggleField =
   | "show_elevator_info"
   | "show_delay"
   | "show_type_icon"
+  | "show_hero_metric"
+  | "show_departures"
   | "hide_attribution";
 
 @customElement("wiener-linien-austria-card-editor")
@@ -354,6 +356,8 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <span class="slider-value">${cfg.max_departures}</span>
         </div>
 
+        ${this._renderSwitch("show_hero_metric", cfg.show_hero_metric)}
+        ${this._renderSwitch("show_departures", cfg.show_departures)}
         ${this._renderSwitch("show_accessibility", cfg.show_accessibility)}
         ${this._renderSwitch("show_type_icon", cfg.show_type_icon)}
         ${this._renderSwitch("show_traffic_info", cfg.show_traffic_info)}
@@ -392,17 +396,29 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
               const current = colorForLine(line, overrides, "#888888");
               const hex = current.startsWith("#") ? current : "#888888";
               const hasOverride = Boolean(overrides[line.toUpperCase()]);
+              const ariaPick = this._et("pick_color_for_line").replace("{line}", line);
               return html`
                 <div class="color-row">
-                  <div class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</div>
-                  <span>${line}</span>
-                  <input
-                    type="color"
-                    aria-label=${this._et("pick_color_for_line").replace("{line}", line)}
-                    .value=${hex}
-                    @change=${(ev: Event) =>
-                      this._setLineColor(line, (ev.target as HTMLInputElement).value)}
-                  />
+                  <span class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</span>
+                  <label
+                    class="color-swatch"
+                    style=${`--swatch-color: ${hex};`}
+                    title=${ariaPick}
+                  >
+                    <ha-icon icon="mdi:palette-swatch-variant" aria-hidden="true"></ha-icon>
+                    <span class="color-swatch-hex">${hex.toUpperCase()}</span>
+                    <input
+                      type="color"
+                      class="color-swatch-input"
+                      .value=${hex}
+                      .configValue=${`color_${line}`}
+                      aria-label=${ariaPick}
+                      @input=${(ev: Event) =>
+                        this._setLineColor(line, (ev.target as HTMLInputElement).value)}
+                      @change=${(ev: Event) =>
+                        this._setLineColor(line, (ev.target as HTMLInputElement).value)}
+                    />
+                  </label>
                   <button
                     type="button"
                     class="reset-btn"
@@ -519,31 +535,67 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     }
     .color-row {
       display: grid;
-      grid-template-columns: 44px 1fr auto auto;
+      grid-template-columns: 44px 1fr auto;
       align-items: center;
       gap: 10px;
     }
     .color-row .line-preview {
+      display: inline-block;
       text-align: center;
       font-weight: 700;
       color: #fff;
-      border-radius: 4px;
-      padding: 2px 4px;
-      font-size: 0.9em;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.85rem;
+      box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     }
-    .color-row input[type="color"] {
-      width: 40px;
-      height: 28px;
-      padding: 0;
-      border: 1px solid var(--divider-color);
-      border-radius: 4px;
-      background: transparent;
+    .color-swatch {
+      --swatch-color: var(--primary-color);
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--swatch-color) 18%, transparent);
+      color: var(--primary-text-color);
+      font-size: 0.8125rem;
+      font-weight: 500;
       cursor: pointer;
+      transition: background-color 0.16s ease, transform 0.06s ease;
+    }
+    .color-swatch:hover {
+      background: color-mix(in srgb, var(--swatch-color) 26%, transparent);
+    }
+    .color-swatch:active {
+      transform: translateY(1px);
+    }
+    .color-swatch ha-icon {
+      --mdc-icon-size: 20px;
+      color: var(--swatch-color);
+      flex-shrink: 0;
+    }
+    .color-swatch-hex {
+      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+    .color-swatch-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      overflow: hidden;
     }
     .color-row .reset-btn {
       font-size: 0.6875rem;
-      padding: 4px 8px;
-      border-radius: 4px;
+      padding: 6px 10px;
+      border-radius: 999px;
       border: 1px solid var(--divider-color);
       background: transparent;
       color: var(--secondary-text-color);

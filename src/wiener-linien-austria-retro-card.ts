@@ -85,6 +85,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (!config || typeof config !== "object") {
       throw new Error("wiener-linien-austria-retro-card: config must be an object");
     }
+    // Validate the *shape*, not just the type. Without an entity the
+    // retro display has nothing to render; surface that as a Lovelace
+    // error card instead of a silently-empty LED panel. Allow an empty
+    // string (the picker's stub state) so the editor still loads.
+    if (
+      config.entity !== undefined &&
+      typeof config.entity !== "string"
+    ) {
+      throw new Error(
+        "wiener-linien-austria-retro-card: 'entity' must be a string",
+      );
+    }
     this._config = normaliseRetroConfig(config);
   }
 
@@ -110,7 +122,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return document.createElement("wiener-linien-austria-retro-card-editor");
   }
 
-  public static getStubConfig(hass: HomeAssistant): WienerLinienRetroCardConfig {
+  // getStubConfig must NOT include `type:` — HA prepends it. Returning
+  // Record<string, unknown> sidesteps the WienerLinienRetroCardConfig
+  // contract which marks `type` as required.
+  public static getStubConfig(hass: HomeAssistant): Record<string, unknown> {
     const entities = findWienerLinienEntities(hass);
     const first = entities[0] || "";
     // Default direction: prefer whichever side has departures right now so
@@ -125,7 +140,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       if (!hasH && hasR) direction = "R";
     }
     return {
-      type: "custom:wiener-linien-austria-retro-card",
       entity: first,
       direction,
       size: "small",
