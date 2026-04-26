@@ -915,6 +915,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   static styles = css`
     :host {
       display: block;
+      /* Create a stacking context on the host so the high z-indexes
+         inside (screen-door overlay z=30, victory overlay z=20,
+         winner badge z=22, etc.) only compete with other elements
+         inside this card. Without this, race overlays and the LED
+         dot pattern can render above HA's dashboard chrome. */
+      isolation: isolate;
     }
     .retro {
       /* Classic defaults — swapped wholesale by .retro--style-warm below. */
