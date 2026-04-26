@@ -1,7 +1,7 @@
 """Tests for the Wiener Linien Austria static catalogue layer."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -214,28 +214,18 @@ async def test_async_load_catalogue_no_cache_fetches_and_saves(
 # ---------------------------------------------------------------------------
 
 
-def _csv_response(text: str, *, etag: str = '"v1"', status: int = 200) -> "MagicMock":
-    from unittest.mock import MagicMock as _MM
-    resp = _MM()
+def _csv_response(text: str, *, etag: str = '"v1"', status: int = 200) -> MagicMock:
+    resp = MagicMock()
     resp.status = status
     resp.headers = {"ETag": etag, "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
-    resp.raise_for_status = _MM()
+    resp.raise_for_status = MagicMock()
     resp.text = AsyncMock(return_value=text)
     return resp
-
-
-def _patch_session_with(responses: list) -> AsyncMock:
-    """Build an AsyncMock session whose .get() returns each response in order."""
-    from unittest.mock import MagicMock as _MM
-    session = _MM()
-    session.get = AsyncMock(side_effect=responses)
-    return session
 
 
 async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     """Cold-start: both CSVs come back 200, parse + merge into a catalogue."""
     from custom_components.wiener_linien_austria import static as static_mod
-    from unittest.mock import MagicMock
 
     haltestellen_resp = _csv_response(HALTESTELLEN_CSV, etag='"halte-v1"')
     haltepunkte_resp = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v1"')
@@ -262,7 +252,6 @@ async def test_fetch_and_build_both_304_returns_prior_unchanged(
     """Both CSVs unchanged → return prior catalogue object verbatim, no rewrite."""
     from custom_components.wiener_linien_austria import static as static_mod
     from custom_components.wiener_linien_austria.http import CacheValidators
-    from unittest.mock import MagicMock
 
     prior = _sample()
     prior.validators = {
@@ -301,7 +290,6 @@ async def test_fetch_and_build_one_304_one_fresh(
     """
     from custom_components.wiener_linien_austria import static as static_mod
     from custom_components.wiener_linien_austria.http import CacheValidators
-    from unittest.mock import MagicMock
 
     # Prior already has Stephansplatz with RBLs [9999] (intentionally weird so
     # we can detect whether the merge correctly REPLACED them with [4111, 4118]).

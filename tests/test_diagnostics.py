@@ -1,8 +1,6 @@
 """Tests for the Wiener Linien Austria diagnostics module."""
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.alerts import (
