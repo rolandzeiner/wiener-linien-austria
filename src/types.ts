@@ -122,7 +122,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 
 export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
-export type RetroStyle = "classic" | "warm";
+export type RetroStyle = "classic" | "warm" | "pixel";
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;

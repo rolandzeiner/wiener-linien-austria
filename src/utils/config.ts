@@ -15,7 +15,7 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "white",
   "black",
 ] as const);
-const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm"] as const);
+const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
 
 function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;

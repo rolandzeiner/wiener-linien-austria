@@ -17,7 +17,7 @@ import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
 const SIZES: readonly RetroSize[] = ["small", "medium", "regular"] as const;
 const STATION_BGS: readonly RetroStationBg[] = ["default", "white", "black"] as const;
-const STYLES: readonly RetroStyle[] = ["classic", "warm"] as const;
+const STYLES: readonly RetroStyle[] = ["classic", "warm", "pixel"] as const;
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor extends LitElement implements LovelaceCardEditor {

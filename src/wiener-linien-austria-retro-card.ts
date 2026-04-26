@@ -962,10 +962,38 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       background-size: var(--led-dot-pitch) var(--led-dot-pitch);
       padding: var(--retro-pad-y) var(--retro-pad-r) var(--retro-pad-y) var(--retro-pad-l);
     }
+    /* Pixel style — vintage LED-dot-matrix departure-board look. A
+       layer above all panel content is transparent at the substrate-
+       dot positions and opaque LED-bg between them, so amber text +
+       glow + race choreography (wheelchairs, finish strip, countdown
+       digit, victory flag, trophy badge) all show through *only* at
+       dot positions — aligned with the substrate dot pattern beneath.
+       Everything in the LED area becomes discrete "lit LED dots" for a
+       consistently dotty panel material.
+       Pixel inherits the warm color palette (3px dot pitch) because
+       the classic style's 4px pitch is too coarse for the screen-door
+       and small text becomes illegible. z-index 30 sits above the
+       wheelchair (4), finish strip (3), countdown (18), victory (20)
+       — and the trophy badge inside victory's isolated stacking
+       context (which appears at z=20 from .retro-led's perspective). */
+    .retro--style-pixel .retro-led::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(
+        circle,
+        transparent var(--led-dot-size),
+        var(--led-bg) var(--led-dot-edge)
+      );
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+      pointer-events: none;
+      z-index: 30;
+    }
     .retro--clickable {
       cursor: pointer;
     }
-    .retro--style-warm {
+    .retro--style-warm,
+    .retro--style-pixel {
       --led-amber: #FFB000;
       --led-bg: #050302;
       --led-substrate: #2a1805;
@@ -1370,8 +1398,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-winner-num {
       position: absolute;
       top: 40%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      left: 0;
+      right: 0;
+      transform: translateY(-50%);
+      text-align: center;
       font-family: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-weight: 900;
       font-size: 22cqmin;
@@ -1390,6 +1420,51 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     .retro--size-small .retro-winner-num {
       font-size: 19cqmin;
+      /* On small the badge hits its 82px min-width while the trophy
+         icon scales down independently — so the cup ends up a touch
+         higher in the badge than on regular/medium. Nudge the number
+         up the same amount so it lands on the cup body, not below it. */
+      top: 33%;
+    }
+    /* Pixel style: both the trophy icon and the number are screened
+       by the LED dot overlay above. Color the number with
+       --led-substrate (the same tone the rest of the panel uses for
+       its substrate dots) so the letter's dots match the substrate
+       dots of the surrounding panel — the number reads as "unlit
+       pixels" within the trophy's lit amber, not as a darker hole
+       below the panel background. The embossed shadow stack stops
+       making sense once everything is dotty, so drop it. */
+    .retro--style-pixel .retro-winner-num {
+      color: var(--led-substrate);
+      text-shadow: none;
+      -webkit-text-stroke: 0;
+    }
+    /* Pixel mode alignment fix: drop the trophy badge's own substrate
+       gradient. The badge's gradient origin doesn't coregister with
+       the panel-wide screen-door overlay, so its dots fight the
+       overlay's dots inside the badge area. Without it, the trophy
+       circle is a clean solid LED-bg cutout from the dotted panel —
+       a dark frame around the dotted trophy icon and number. */
+    .retro--style-pixel .retro-victory-winner {
+      background-image: none;
+    }
+    /* Pixel style: add 1px of breathing room between the countdown
+       digits and the gleis indicator. The screen-door overlay can
+       make the dotted digits feel jammed against the gleis dots, so
+       a single extra pixel of separation reads cleanly. Covers
+       gleis-right (default), gleis-left (platform 2), and the small
+       size variant where the base margin starts smaller. */
+    .retro--style-pixel .retro-gleis {
+      margin-left: 13px;
+    }
+    .retro--style-pixel.retro--gleis-left .retro-gleis {
+      margin-right: 13px;
+    }
+    .retro--style-pixel.retro--size-small .retro-gleis {
+      margin-left: 9px;
+    }
+    .retro--style-pixel.retro--size-small.retro--gleis-left .retro-gleis {
+      margin-right: 9px;
     }
 
     .retro-gleis {

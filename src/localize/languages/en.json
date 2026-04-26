@@ -111,6 +111,7 @@
       "style_label": "Style",
       "style_classic": "Classic",
       "style_warm": "Warm",
+      "style_pixel": "Dot matrix",
       "flicker_label": "Line badge flicker",
       "wheelchair_race_label": "Wheelchair race",
       "accessibility_only": "Only show step-free departures",
