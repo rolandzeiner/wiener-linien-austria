@@ -29,10 +29,8 @@ from custom_components.wiener_linien_austria import (
     async_unload_entry,
 )
 from custom_components.wiener_linien_austria.const import (
-    CARD_URL,
     CARD_VERSION,
     DOMAIN,
-    RETRO_CARD_URL,
     RETRO_CARD_VERSION,
 )
 
@@ -237,7 +235,6 @@ async def test_register_one_card_outer_exception_is_logged_not_raised(
 ) -> None:
     """Any unexpected error inside the resource block must be swallowed."""
     fname = _ensure_card_file_exists()
-    lovelace = SimpleNamespace()  # missing .mode and .resources, etc.
     # Make the lovelace lookup itself blow up inside the try.
     bad_data = MagicMock()
     bad_data.get.side_effect = RuntimeError("unexpected")
