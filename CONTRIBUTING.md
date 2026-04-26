@@ -26,14 +26,6 @@ npm run build           # produces custom_components/wiener_linien_austria/www/w
 
 `README.md` badge + `manifest.json` stay at the clean (non-beta) version; `const.py` + the TS constants can carry a `-beta-N` suffix during development.
 
-## Local iteration against a live HA box
-
-`./scripts/dev-push.sh` rsyncs the integration to a dev HA Docker container over SSH. The script auto-runs `npm run build` first (skip with `--no-build`), so you can never push stale `www/*.js` by accident. See the script header for prereqs.
-
-After a push:
-- **Card JS change** → hard-refresh the browser (⌘⇧R / Ctrl⇧R).
-- **Python change** → restart the HA container.
-
 ## Verification gate (must pass before pushing)
 
 ```bash
