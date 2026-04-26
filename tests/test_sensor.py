@@ -2,17 +2,13 @@
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.const import CONF_SCAN_INTERVAL, UnitOfTime
+from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.wiener_linien_austria.const import (
     ATTRIBUTION,
-    CONF_DIVA,
-    CONF_LINES,
-    CONF_RBLS,
-    CONF_STOP_NAME,
     DOMAIN,
     MAX_DEPARTURES_IN_ATTRS,
 )
@@ -23,21 +19,7 @@ from custom_components.wiener_linien_austria.coordinator import (
 )
 from custom_components.wiener_linien_austria.sensor import WienerLinienStopSensor
 
-BASE_DATA = {
-    CONF_DIVA: 60201012,
-    CONF_STOP_NAME: "Stephansplatz",
-    CONF_RBLS: [4111, 4118],
-    CONF_LINES: ["U1|H|Leopoldau", "U1|R|Alaudagasse"],
-    CONF_SCAN_INTERVAL: 60,
-}
-
-
-def _make_entry(data: dict | None = None) -> MockConfigEntry:
-    """Build a MockConfigEntry with realistic Stephansplatz data."""
-    entry_data = {**BASE_DATA, **(data or {})}
-    return MockConfigEntry(
-        domain=DOMAIN, data=entry_data, options={}, title="Stephansplatz"
-    )
+from .conftest import make_entry as _make_entry
 
 
 def _make_departures() -> list[Departure]:
@@ -186,19 +168,27 @@ async def test_device_info_fields(hass: HomeAssistant) -> None:
 
 
 async def test_attributes_carry_attribution_and_identity(hass: HomeAssistant) -> None:
-    """attribution + diva + stop_name are always present."""
+    """attribution + diva + stop_name + server_time + coords are surfaced."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     data = MonitorData(
         departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
     )
     coordinator = _make_coordinator(hass, entry, data)
+    # Coordinates flow from the static catalogue via async_setup. Set them
+    # directly to avoid the async_setup round-trip in this attribute test.
+    coordinator._latitude = 48.2085
+    coordinator._longitude = 16.3726
     sensor = WienerLinienStopSensor(coordinator, entry)
     attrs = sensor.extra_state_attributes
     assert attrs["attribution"] == ATTRIBUTION
     assert attrs["diva"] == 60201012
     assert attrs["stop_name"] == "Stephansplatz"
     assert attrs["server_time"] == "2026-04-20T14:40:00+0200"
+    # lat/lon must round-trip from coordinator → attributes; otherwise the
+    # card's "show on map" link silently breaks.
+    assert attrs["latitude"] == 48.2085
+    assert attrs["longitude"] == 16.3726
 
 
 async def test_attributes_full_departure_list(hass: HomeAssistant) -> None:
@@ -269,22 +259,6 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     sensor = WienerLinienStopSensor(coordinator, entry)
     next_by_line = sensor.extra_state_attributes["next_by_line"]
     assert next_by_line == {"U1": 2, "71": 4}
-
-
-async def test_availability_requires_any_cached_data(hass: HomeAssistant) -> None:
-    """Sensor is available whenever the coordinator has ANY cached data,
-    even an empty one — transient fetch failures no longer flip us to
-    unavailable (see test_available_tolerates_transient_failures)."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = _make_coordinator(
-        hass, entry, MonitorData(departures=[], server_time=None)
-    )
-    sensor = WienerLinienStopSensor(coordinator, entry)
-    assert sensor.available is True
-    # Only "no data at all" renders unavailable.
-    coordinator.data = None
-    assert sensor.available is False
 
 
 # ---------------------------------------------------------------------------

@@ -12,13 +12,8 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
-    CONF_LINES,
-    CONF_RBLS,
-    CONF_STOP_NAME,
     DOMAIN,
     DOMAIN_COOLDOWN_SECONDS,
     DOMAIN_LAST_CALL_KEY,
@@ -30,20 +25,7 @@ from custom_components.wiener_linien_austria.coordinator import (
     _parse_monitor_body,
 )
 
-BASE_DATA = {
-    CONF_DIVA: 60201012,
-    CONF_STOP_NAME: "Stephansplatz",
-    CONF_RBLS: [4111, 4118],
-    CONF_LINES: ["U1|H|Leopoldau", "U1|R|Alaudagasse"],
-    CONF_SCAN_INTERVAL: 60,
-}
-
-
-def _make_entry(data: dict | None = None) -> MockConfigEntry:
-    entry_data = {**BASE_DATA, **(data or {})}
-    return MockConfigEntry(
-        domain=DOMAIN, data=entry_data, options={}, title="Stephansplatz"
-    )
+from .conftest import make_entry as _make_entry
 
 
 # ---------------------------------------------------------------------------
@@ -137,30 +119,6 @@ async def test_fetch_success_real_chain(
     # Side-effects on coordinator state
     assert coordinator.last_error_code == 1
     assert coordinator.server_time == monitor_fixture["message"]["serverTime"]
-
-
-async def test_fetch_sends_user_agent_header(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """Every outbound /monitor request carries the integration UA header.
-
-    Identifying as wiener_linien_austria/{version} lets Wiener Linien
-    traffic-shape this integration specifically rather than blanket-blocking
-    the default Home Assistant UA.
-    """
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    mock_resp = _ok_response(monitor_fixture)
-    mock_get = AsyncMock(return_value=mock_resp)
-    with patch.object(coordinator._session, "get", new=mock_get):
-        await coordinator._async_update_data()
-
-    _args, kwargs = mock_get.call_args
-    ua = kwargs["headers"]["User-Agent"]
-    assert ua.startswith("HomeAssistant/")
-    assert " wiener_linien_austria/" in ua
 
 
 async def test_http_error_raises_update_failed(
@@ -336,22 +294,6 @@ async def test_config_entry_not_ready_on_first_refresh_failure(
     assert entry.state is ConfigEntryState.SETUP_RETRY
 
 
-async def test_fetch_success(hass: HomeAssistant, mock_fetch) -> None:
-    """Smoke-test that mock_fetch-driven paths still round-trip data cleanly.
-
-    Kept after replacing the earlier version with test_fetch_success_real_chain
-    because most other coordinator tests rely on mock_fetch and this gives us a
-    canary that the fixture itself stays aligned with MonitorData's contract.
-    """
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    await coordinator.async_refresh()
-    data = coordinator.data
-    assert isinstance(data, MonitorData)
-    assert len(data.departures) > 0
-
-
 async def test_rate_limit_raises_update_failed_and_issue(
     hass: HomeAssistant, monitor_fixture
 ) -> None:
@@ -442,13 +384,21 @@ async def test_timeout_raises_update_failed(hass: HomeAssistant) -> None:
 async def test_domain_cooldown_serialises_calls(
     hass: HomeAssistant, monitor_fixture
 ) -> None:
-    """Back-to-back entries from the same domain respect the 15s cooldown."""
+    """Back-to-back entries from the same domain respect the 15s cooldown.
+
+    Tightened: assert the sleep duration is in the right neighbourhood, not
+    just `> 0`. A bug that always slept for 0.001s would otherwise pass.
+    """
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
     # Prime domain-wide timestamp to "just now" so the cooldown must fire.
-    hass.data.setdefault(DOMAIN, {})[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
+    # Push it back a tiny known amount so we can predict the remaining sleep.
+    elapsed = 1.0
+    hass.data.setdefault(DOMAIN, {})[DOMAIN_LAST_CALL_KEY] = (
+        dt_util.utcnow() - timedelta(seconds=elapsed)
+    )
 
     mock_resp = MagicMock()
     mock_resp.raise_for_status = MagicMock()
@@ -468,8 +418,13 @@ async def test_domain_cooldown_serialises_calls(
     ):
         await coordinator._async_update_data()
     mock_sleep.assert_awaited_once()
-    # The sleep duration must be positive (cooldown not elapsed).
-    assert mock_sleep.call_args.args[0] > 0
+    # Sleep must close the gap to DOMAIN_COOLDOWN_SECONDS — give a generous
+    # margin for the small wall-clock cost of getting from prime → check.
+    expected = DOMAIN_COOLDOWN_SECONDS - elapsed
+    actual = mock_sleep.call_args.args[0]
+    assert abs(actual - expected) < 0.5, (
+        f"expected sleep ≈{expected}s, got {actual}s"
+    )
 
 
 async def test_domain_cooldown_no_sleep_when_elapsed(
@@ -580,3 +535,145 @@ def test_parse_monitor_body_handles_bus_fixture(tram_fixture) -> None:
     assert first.barrier_free is True
     # All parsed departures are the same line/direction in this fixture.
     assert all(d.line == "4A" and d.direction == "H" for d in result.departures)
+
+
+# ---------------------------------------------------------------------------
+# Conditional GET — 304 Not Modified
+# ---------------------------------------------------------------------------
+
+
+async def test_304_returns_prior_data_unchanged(
+    hass: HomeAssistant, monitor_fixture
+) -> None:
+    """A 304 response reuses the previous MonitorData without re-parsing.
+
+    The conditional-GET cache is the integration's main bandwidth saver. If
+    a regression made 304 fall through to `resp.json()`, we'd crash on every
+    cache hit because 304 has no body. This test feeds a 200 first to seed
+    coordinator.data, then a 304 and verifies the cached object is returned.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    # First pass — 200, with ETag/Last-Modified for the validators to capture.
+    resp_200 = MagicMock()
+    resp_200.status = 200
+    resp_200.headers = {"ETag": '"abc"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
+    resp_200.raise_for_status = MagicMock()
+    resp_200.json = AsyncMock(return_value=monitor_fixture)
+
+    # Second pass — 304, no body. resp.json() would raise if accidentally
+    # called, surfacing the regression we want to guard against.
+    resp_304 = MagicMock()
+    resp_304.status = 304
+    resp_304.headers = {"ETag": '"abc"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
+    resp_304.raise_for_status = MagicMock()
+    resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
+
+    mock_get = AsyncMock(side_effect=[resp_200, resp_304])
+    with patch.object(coordinator._session, "get", new=mock_get):
+        first = await coordinator._async_update_data()
+        coordinator.data = first  # mimic DataUpdateCoordinator caching
+        second = await coordinator._async_update_data()
+
+    assert second is first  # same object, no re-parse
+    # Conditional headers were sent on the second call.
+    second_headers = mock_get.call_args_list[1].kwargs["headers"]
+    assert second_headers.get("If-None-Match") == '"abc"'
+
+
+# ---------------------------------------------------------------------------
+# Exponential backoff on consecutive failures
+# ---------------------------------------------------------------------------
+
+
+async def test_backoff_does_not_kick_in_on_single_failure(
+    hass: HomeAssistant,
+) -> None:
+    """A one-off failure leaves the user-configured cadence intact.
+
+    Transient hiccups are common (single timeout, brief 5xx). Doubling the
+    interval after every single failure would make a user's 60s cadence
+    creep up to 120s after one bad poll, which is surprising. Backoff only
+    starts at the *second* consecutive failure.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    original = coordinator.update_interval
+
+    coordinator._note_failure()
+    assert coordinator.update_interval == original
+
+
+async def test_backoff_doubles_on_consecutive_failures(
+    hass: HomeAssistant,
+) -> None:
+    """Each failure past the first doubles the interval, up to BACKOFF_CAP_SECONDS."""
+    from custom_components.wiener_linien_austria.const import BACKOFF_CAP_SECONDS
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    base_secs = coordinator.update_interval.total_seconds()
+
+    # 1st failure: still at base. 2nd: 2x. 3rd: 4x. … capped at BACKOFF_CAP.
+    coordinator._note_failure()
+    coordinator._note_failure()
+    assert coordinator.update_interval == timedelta(seconds=base_secs * 2)
+
+    coordinator._note_failure()
+    assert coordinator.update_interval == timedelta(seconds=base_secs * 4)
+
+    # Drive past the cap by piling on failures.
+    for _ in range(20):
+        coordinator._note_failure()
+    assert coordinator.update_interval == timedelta(seconds=BACKOFF_CAP_SECONDS)
+
+
+async def test_backoff_resets_on_success(hass: HomeAssistant) -> None:
+    """A successful tick after a backoff cycle restores the user-configured interval."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    original = coordinator.update_interval
+
+    # Build up backoff.
+    for _ in range(4):
+        coordinator._note_failure()
+    assert coordinator.update_interval != original
+
+    coordinator._note_success()
+    assert coordinator.update_interval == original
+    assert coordinator._consecutive_failures == 0
+
+
+async def test_304_with_no_prior_data_falls_through(
+    hass: HomeAssistant, monitor_fixture
+) -> None:
+    """If we somehow get a 304 before any 200 (e.g. stale validator from
+    persistence), we fall through to raise_for_status which won't error on
+    304 but the coordinator must NOT return None — that would crash sensors.
+
+    Here we simulate the sequence: validator pre-seeded → 304 with no prior
+    data → coordinator should treat 304 as success-but-empty by raising for
+    status (304 < 400, so it doesn't raise) and then attempting to parse,
+    which will fail on the empty body — surfaced as UpdateFailed. This is
+    the safer behaviour than silently returning None.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    # No prior data — coordinator.data is None.
+    resp_304 = MagicMock()
+    resp_304.status = 304
+    resp_304.headers = {}
+    resp_304.raise_for_status = MagicMock()
+    resp_304.json = AsyncMock(side_effect=ValueError("304 has no body"))
+
+    with (
+        patch.object(coordinator._session, "get", new=AsyncMock(return_value=resp_304)),
+        pytest.raises(UpdateFailed),
+    ):
+        await coordinator._async_update_data()

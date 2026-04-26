@@ -6,12 +6,39 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.const import CONF_SCAN_INTERVAL
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.wiener_linien_austria.const import (
+    CONF_DIVA,
+    CONF_LINES,
+    CONF_RBLS,
+    CONF_STOP_NAME,
+    DOMAIN,
+)
 from custom_components.wiener_linien_austria.static import Station, StaticCatalogue
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# Canonical entry data used by every test that builds a MockConfigEntry.
+# Stephansplatz with two RBLs (4111 inbound, 4118 outbound) carrying U1.
+BASE_ENTRY_DATA: dict = {
+    CONF_DIVA: 60201012,
+    CONF_STOP_NAME: "Stephansplatz",
+    CONF_RBLS: [4111, 4118],
+    CONF_LINES: ["U1|H|Leopoldau", "U1|R|Alaudagasse"],
+    CONF_SCAN_INTERVAL: 60,
+}
+
+
+def make_entry(data: dict | None = None) -> MockConfigEntry:
+    """Build a MockConfigEntry with realistic Stephansplatz data."""
+    entry_data = {**BASE_ENTRY_DATA, **(data or {})}
+    return MockConfigEntry(
+        domain=DOMAIN, data=entry_data, options={}, title="Stephansplatz"
+    )
 
 
 def _load_fixture(name: str) -> dict:

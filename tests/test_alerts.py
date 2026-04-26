@@ -442,6 +442,88 @@ async def test_fetch_info_list_filters_non_dict_entries(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Conditional GET — 304 Not Modified
+# ---------------------------------------------------------------------------
+
+
+async def test_async_refresh_alerts_304_keeps_existing_cache(
+    hass: HomeAssistant,
+) -> None:
+    """A 304 from `/trafficInfoList` must leave the existing parsed cache alone.
+
+    Regression guard for the conditional-GET path. If 304 incorrectly fell
+    through to `resp.json()` we'd either crash (304 has no body) or wipe
+    the existing cache. The fix: detect status==304 and return the
+    `_NOT_MODIFIED` sentinel, which `async_refresh_alerts` interprets as
+    "don't touch the cache".
+    """
+    # Pre-seed the cache so we can assert it survives.
+    pre_existing_traffic = TrafficInfo(
+        name="PRE", title="U1: prior", description="x",
+        related_lines=["U1"], time_start=None, time_end=None, status="active",
+    )
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [pre_existing_traffic]
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = []
+
+    resp_304 = MagicMock()
+    resp_304.status = 304
+    resp_304.headers = {"ETag": '"abc"'}
+    resp_304.raise_for_status = MagicMock()
+    resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(return_value=resp_304)
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        await async_refresh_alerts(hass)
+
+    # Cache survives 304 untouched.
+    assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == [pre_existing_traffic]
+
+
+async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
+    hass: HomeAssistant,
+) -> None:
+    """After a 200 captures ETag/Last-Modified, the next call sends them back."""
+    body = {
+        "message": {"messageCode": 1},
+        "data": {"trafficInfos": [{"name": "T1", "title": "U1: x", "relatedLines": ["U1"], "status": "active", "time": {}}]},
+    }
+    resp_first = MagicMock()
+    resp_first.status = 200
+    resp_first.headers = {"ETag": '"v1"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
+    resp_first.raise_for_status = MagicMock()
+    resp_first.json = AsyncMock(return_value=body)
+
+    resp_second = MagicMock()
+    resp_second.status = 200
+    resp_second.headers = {}
+    resp_second.raise_for_status = MagicMock()
+    resp_second.json = AsyncMock(return_value=body)
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=[resp_first, resp_first, resp_second, resp_second])
+
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        await async_refresh_alerts(hass)
+        await async_refresh_alerts(hass)
+
+    # Find the third call (start of the second refresh, stoerunglang again).
+    second_pass_calls = fake_session.get.call_args_list[2:]
+    assert any(
+        c.kwargs["headers"].get("If-None-Match") == '"v1"'
+        for c in second_pass_calls
+    ), "second refresh must echo the ETag captured on first response"
+
+
 async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> None:
     """An elevator outage with no RBL mapping still matches via related_lines.
 

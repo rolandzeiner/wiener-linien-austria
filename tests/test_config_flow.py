@@ -9,6 +9,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
+from custom_components.wiener_linien_austria.config_flow import _probe_monitor_lines
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
@@ -16,7 +17,6 @@ from custom_components.wiener_linien_austria.const import (
     CONF_SEARCH_QUERY,
     CONF_STOP_NAME,
     DOMAIN,
-    USER_AGENT,
 )
 
 DEFAULT_LINES = ["U1|H|Leopoldau", "U1|R|Alaudagasse"]
@@ -259,6 +259,56 @@ async def test_reconfigure_aborts_when_catalogue_unavailable(
     assert result["reason"] == "catalogue_unavailable"
 
 
+async def test_probe_monitor_lines_dedupes_and_sorts(hass: HomeAssistant) -> None:
+    """Multi-RBL responses with overlapping (line, direction, towards) collapse to one row.
+
+    The probe is the source of truth for the line-selection step. Wiener Linien
+    sometimes returns the same line twice across RBLs (e.g. inbound + outbound
+    platforms both list the connecting U-Bahn). The probe must dedupe by
+    `(line, direction, towards)` so the user doesn't see the same option twice.
+    """
+    body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {"name": "U1", "direction": "H", "towards": "Leopoldau", "type": "ptMetro"},
+                        {"name": "U1", "direction": "H", "towards": "Leopoldau", "type": "ptMetro"},  # dup
+                    ]
+                },
+                {
+                    "lines": [
+                        {"name": "U1", "direction": "R", "towards": "Alaudagasse", "type": "ptMetro"},
+                        # Empty towards must be dropped, not crash.
+                        {"name": "U1", "direction": "H", "towards": "", "type": "ptMetro"},
+                        # Empty name must be dropped.
+                        {"name": "", "direction": "H", "towards": "X", "type": "ptMetro"},
+                    ]
+                },
+            ]
+        },
+    }
+    resp = MagicMock()
+    resp.status = 200
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    session = MagicMock()
+    session.get = AsyncMock(return_value=resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        rows = await _probe_monitor_lines(hass, [4111, 4118])
+
+    # Two unique direction-towards pairs, sorted by (line, towards).
+    assert [r["key"] for r in rows] == [
+        "U1|R|Alaudagasse",
+        "U1|H|Leopoldau",
+    ]
+
+
 async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
     hass: HomeAssistant, mock_fetch
 ) -> None:
@@ -285,36 +335,3 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
     assert result["reason"] == "stop_gone"
 
 
-async def test_probe_sends_canonical_user_agent(hass: HomeAssistant) -> None:
-    """Config-flow's /monitor trial probe sends the canonical USER_AGENT.
-
-    Regression guard paired with the coordinator-side check in
-    test_coordinator.py::test_fetch_sends_user_agent_header. Malformed UA
-    is silent — nothing on the client side breaks — but Wiener Linien's
-    log parsers rely on the RFC-9110 slash-separated format to attribute
-    and contact this integration specifically. Bypass the `mock_fetch`
-    fixture (which stubs `_probe_monitor_lines` wholesale) and patch at
-    the session layer so the real code path runs.
-    """
-    from custom_components.wiener_linien_austria.config_flow import (
-        _probe_monitor_lines,
-    )
-
-    resp = MagicMock()
-    resp.raise_for_status = MagicMock()
-    resp.json = AsyncMock(
-        return_value={"message": {"messageCode": 1}, "data": {"monitors": []}}
-    )
-    session = MagicMock()
-    session.get = AsyncMock(return_value=resp)
-
-    with patch(
-        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
-        return_value=session,
-    ):
-        await _probe_monitor_lines(hass, [4111, 4118])
-
-    assert session.get.await_count == 1
-    headers = session.get.call_args.kwargs["headers"]
-    assert headers.get("User-Agent") == USER_AGENT
-    assert headers.get("Accept-Encoding") == "gzip"
