@@ -133,6 +133,8 @@ async def _probe_monitor_lines(
 class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a multi-step config flow for Wiener Linien Austria."""
 
+    # Bump + add async_migrate_entry when entry.data shape changes.
+    # Tracks the config-entry schema, NOT the integration release version.
     VERSION = 1
 
     def __init__(self) -> None:

@@ -63,6 +63,8 @@ jobs:
           cache: "npm"
       - name: Install card deps
         run: npm ci
+      - name: Audit production deps
+        run: npm audit --omit=dev --audit-level=high
       - name: Type-check
         run: npx tsc --noEmit
       - name: Build card bundles
