@@ -20,8 +20,16 @@ console.info(
   "color: #000; background: #FFC700; font-weight: 700;",
 );
 
-type RaceState = "idle" | "countdown" | "racing" | "victory";
+type RaceState = "idle" | "countdown" | "racing" | "freeze" | "victory";
 const VICTORY_DURATION_MS = 4000;
+// Hold both wheelchair animations paused for this long after the winner
+// crosses the finish line. Gives the viewer a still frame of the photo
+// finish — winner at the strip, loser caught a step behind — before
+// the trophy badge appears. Delay accounts for the ~30ms drift between
+// the linear cross-time math and the actual cubic-bezier eased motion
+// so the freeze still lands AFTER the wheelchair has visibly crossed.
+const FREEZE_DELAY_AFTER_WINNER_MS = 150;
+const FREEZE_DURATION_MS = 1500;
 const NEXT_RACE_MIN_MS = 60_000;
 const NEXT_RACE_MAX_MS = 180_000;
 // 90s game-show pre-race countdown: "3", "2", "1" — each digit held for
@@ -39,23 +47,55 @@ const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
   ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
   ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
 ];
-const RACE_END_OFFSET_MIN_PX = 40;
-const RACE_END_OFFSET_MAX_PX = 120;
-// Winner duration range (shorter), loser runs 150-400ms longer so the
-// finish reads as "close but decisive".
-const RACE_WINNER_MIN_MS = 2900;
-const RACE_WINNER_MAX_MS = 3100;
-const RACE_LOSER_LAG_MIN_MS = 150;
-const RACE_LOSER_LAG_MAX_MS = 400;
-// Checkpoint x positions in cqw. Leader is ahead, trailer is behind;
-// the gap is big enough that overtakes read clearly without making the
-// slope change at each waypoint look like a pause. Positions are near-
-// proportional to time so adjacent-segment slopes stay similar.
-const RACE_CHECKPOINTS: ReadonlyArray<readonly [number, number]> = [
-  [28, 22], // 25%: [lead, trail]
-  [53, 48], // 50%
-  [78, 73], // 75%
-];
+// Wheelchair race — the WINNER is whoever crosses the finish line
+// (RACE_FINISH_X_CQW) first, computed from each racer's trajectory
+// post-clamp. The swap-pattern only choreographs mid-race overtakes
+// for visual fun; it doesn't decide the outcome anymore. See
+// _randomizeRaceParams() for the full algorithm.
+//
+// When the winner crosses the finish line (ms from race start). The
+// winner duration runs slightly longer so the wheelchair smoothly
+// exits past the right edge after the cross.
+const RACE_CROSS_BASE_MIN_MS = 2400;
+const RACE_CROSS_BASE_MAX_MS = 2700;
+// Animation duration / cross time — the after-finish-line tail.
+const RACE_DUR_TAIL_MIN = 1.08;
+const RACE_DUR_TAIL_MAX = 1.15;
+// Finish-margin distribution (ms between winner's and loser's crossing
+// of the finish line). Mix of close (photo finish), medium and decisive
+// finishes so consecutive races feel different. Close minimum is set
+// high enough that even the photo finish has a clear visual gap (~6cqw
+// at 580px card width) — sub-100ms gaps were too tight to call by eye.
+const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [100, 250];
+const RACE_MARGIN_MEDIUM_MS: readonly [number, number] = [200, 500];
+const RACE_MARGIN_DECISIVE_MS: readonly [number, number] = [500, 900];
+const RACE_PROB_CLOSE = 0.4;
+const RACE_PROB_MEDIUM = 0.35;
+// (rest = decisive)
+// Probability the swap pattern's 75% leader is actually the LOSER —
+// i.e. the winner pulls ahead in the home stretch. Drives the
+// "comeback" feel; the rest are led-from-front finishes.
+const RACE_PROB_COMEBACK = 0.3;
+// Race "track" geometry, in cqw (relative to card width). Each
+// wheelchair starts at its natural position after its destination text
+// (preserving the gag that the wheelchair sits *on* the departure),
+// and we back out per-racer translate values from absolute checkpoint
+// targets. Targets are anchored to whichever racer starts furthest
+// right (`maxStart`) so both racers always move forward.
+const RACE_TRACK_END_CQW = 92;
+const RACE_TRACK_MIN_LENGTH_CQW = 20;
+const RACE_CHECKPOINT_FRACS = [0.25, 0.5, 0.75] as const;
+const RACE_CHECKPOINT_HALF_GAPS_CQW = [3, 2.5, 2.5] as const;
+// Fallback finish-line x (cqw) if the live strip position can't be
+// measured. The real value is the .retro-finish-line's left edge,
+// computed per race from card width — keeps the math glued to the
+// thing the user actually watches.
+const RACE_FINISH_X_FALLBACK_CQW = 96;
+// Absolute exit position bounds (cqw). Outside this band the
+// finish-margin math is approximate; the announced winner is still
+// reconciled from the actual post-clamp trajectories.
+const RACE_EXIT_MIN_CQW = 102;
+const RACE_EXIT_MAX_CQW = 135;
 
 // Wrap API-sourced German strings so assistive tech pronounces them correctly
 // under non-German HA locales. ASCII fallbacks stay unwrapped.
@@ -94,6 +134,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // reconnect cycles HA triggers during dashboard rebuilds.
   private _countdownStartAt: number | null = null;
   private _raceEndAt: number | null = null;
+  private _freezeEndAt: number | null = null;
   private _victoryEndAt: number | null = null;
 
   public setConfig(config: WienerLinienRetroCardConfig): void {
@@ -218,6 +259,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._countdownStartAt = null;
       this._countdownDigit = null;
       this._raceEndAt = null;
+      this._freezeEndAt = null;
       this._victoryEndAt = null;
       this._raceWinner = null;
     }
@@ -266,6 +308,23 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._raceTimers.push(t);
   }
 
+  // Click-to-race: tapping the card while idle kicks off a race
+  // immediately, cancelling any pending auto-scheduled race. No-op
+  // if the toggle is off, a race is already in progress, or
+  // prefers-reduced-motion is set (matches the auto-loop's gating).
+  private _handleCardClick = (): void => {
+    if (!this._config?.wheelchair_race) return;
+    if (this._raceState !== "idle") return;
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    this._clearRaceTimers();
+    this._startRace();
+  };
+
   private _startRace(): void {
     if (!this._config?.wheelchair_race) return;
     // Respect `prefers-reduced-motion: reduce` at the scheduler level.
@@ -289,13 +348,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // racers leave the gate. Random params get rolled now so the winner
     // is decided by the time the gate opens — the badge on the victory
     // overlay already knows who'll win.
-    const maxDur = this._randomizeRaceParams();
+    const { winnerCrossT } = this._randomizeRaceParams();
     const now = Date.now();
     this._raceState = "countdown";
     this._countdownStartAt = now;
     this._countdownDigit = 3;
-    this._raceEndAt = now + COUNTDOWN_TOTAL_MS + maxDur;
-    this._victoryEndAt = this._raceEndAt + VICTORY_DURATION_MS;
+    // Schedule the photo-finish freeze at winner cross + small delta,
+    // then victory after the freeze. This gives the viewer a still
+    // frame of the wheelchairs at the line before the trophy appears.
+    this._raceEndAt =
+      now +
+      COUNTDOWN_TOTAL_MS +
+      winnerCrossT +
+      FREEZE_DELAY_AFTER_WINNER_MS;
+    this._freezeEndAt = this._raceEndAt + FREEZE_DURATION_MS;
+    this._victoryEndAt = this._freezeEndAt + VICTORY_DURATION_MS;
     this._scheduleCountdownTick();
   }
 
@@ -335,57 +402,211 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._armStateTransitions();
   }
 
-  // Picks a random lead-change pattern plus per-racer duration and end
-  // offset, then writes them as CSS custom properties on the host so the
-  // keyframes can read them via var(). Winner is the racer leading at the
-  // 75% checkpoint; winner gets the shorter duration and bigger end
-  // offset so they visibly cross the finish first. Returns the longer of
-  // the two durations so the state machine waits for the slower racer to
-  // exit before flipping to victory.
-  private _randomizeRaceParams(): number {
+  // Measures each wheelchair's natural starting x AND the live finish-
+  // line position, all in cqw relative to the card width. Returns null
+  // if the DOM isn't ready or there aren't two racers — caller falls
+  // back to sensible defaults.
+  //
+  // finishCqw is the x where the wheelchair's LEFT edge needs to be so
+  // that its RIGHT edge (the leading edge in the direction of motion)
+  // touches the strip's left edge — that's the "wheelchair hits the
+  // line" moment a viewer naturally calls the finish. Without the
+  // wheelchair-width offset, the math considers "crossed" when the
+  // wheelchair body is already fully past the strip's left edge —
+  // visibly half a wheelchair width late.
+  private _measureRaceStartPositions(): {
+    a: number;
+    b: number;
+    finishCqw: number;
+  } | null {
+    const card = this.shadowRoot?.querySelector(".retro") as HTMLElement | null;
+    if (!card) return null;
+    const cardRect = card.getBoundingClientRect();
+    if (cardRect.width <= 0) return null;
+    const wheels = this.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".retro-row .retro-wheelchair",
+    );
+    if (!wheels || wheels.length < 2) return null;
+    const aRect = wheels[0].getBoundingClientRect();
+    const bRect = wheels[1].getBoundingClientRect();
+    const aLeft = aRect.left - cardRect.left;
+    const bLeft = bRect.left - cardRect.left;
+    const stripWidthPx = this._config?.size === "small" ? 10 : 14;
+    const stripLeftCqw = 100 - (stripWidthPx / cardRect.width) * 100;
+    const wheelWidthCqw = (aRect.width / cardRect.width) * 100;
+    const finishCqw = stripLeftCqw - wheelWidthCqw;
+    return {
+      a: (aLeft / cardRect.width) * 100,
+      b: (bLeft / cardRect.width) * 100,
+      finishCqw,
+    };
+  }
+
+  // Race-engine: derives every per-racer trajectory parameter from a
+  // chosen "intended winner" + finish-margin + comeback flag, then
+  // reconciles the announced winner from the actual post-clamp
+  // trajectories so the visible cross order can never disagree with the
+  // victory badge.
+  //
+  // Algorithm:
+  //   1. Pick the intended finish-line winner (A or B, 50/50).
+  //   2. Pick a finish margin: close / medium / decisive (weighted).
+  //   3. Pick whether this race is a "comeback" — the swap pattern's
+  //      75% leader is the LOSER, and the winner pulls ahead in the
+  //      home stretch.
+  //   4. Pick a swap pattern matching that constraint (the pattern
+  //      still drives mid-race overtakes for visual storytelling).
+  //   5. Measure each wheelchair's natural start x (cqw).
+  //   6. Compute absolute target x at each checkpoint per racer.
+  //   7. Solve for each racer's exit position so they cross
+  //      RACE_FINISH_X_CQW at their target time. Clamped — extremes
+  //      just under-/overshoot the intended margin.
+  //   8. Recompute actual cross times from the clamped trajectories
+  //      and assign _raceWinner from those, so announced == visible.
+  //
+  // Returns the time (ms from race start) at which the WINNER crosses
+  // the finish line. The state machine uses that to schedule the
+  // freeze (DEBUG) and then victory.
+  private _randomizeRaceParams(): { winnerCrossT: number } {
     const rand = (min: number, max: number): number =>
       min + Math.random() * (max - min);
     const jitter = (base: number, amount: number): number =>
       base + (Math.random() * 2 - 1) * amount;
 
-    const pattern = RACE_PATTERNS[Math.floor(Math.random() * RACE_PATTERNS.length)]!;
-    const winner = pattern[2];
-    // Surface the winner so the victory overlay can render the
-    // circular "1" or "2" badge for the winning row.
-    this._raceWinner = winner;
+    // (1)(3)(4) Pick intended winner + comeback flag + swap pattern.
+    const intendedWinner: Racer = Math.random() < 0.5 ? "A" : "B";
+    const isComeback = Math.random() < RACE_PROB_COMEBACK;
+    const patternLeader: Racer = isComeback
+      ? intendedWinner === "A"
+        ? "B"
+        : "A"
+      : intendedWinner;
+    const patternPool = RACE_PATTERNS.filter((p) => p[2] === patternLeader);
+    const pattern =
+      patternPool[Math.floor(Math.random() * patternPool.length)]!;
 
-    const winnerDur = rand(RACE_WINNER_MIN_MS, RACE_WINNER_MAX_MS);
-    const loserDur = winnerDur + rand(RACE_LOSER_LAG_MIN_MS, RACE_LOSER_LAG_MAX_MS);
-    const durA = winner === "A" ? winnerDur : loserDur;
-    const durB = winner === "B" ? winnerDur : loserDur;
+    // (2) Pick finish margin (ms between winner and loser crossings).
+    const marginRoll = Math.random();
+    const margin =
+      marginRoll < RACE_PROB_CLOSE
+        ? rand(RACE_MARGIN_CLOSE_MS[0], RACE_MARGIN_CLOSE_MS[1])
+        : marginRoll < RACE_PROB_CLOSE + RACE_PROB_MEDIUM
+          ? rand(RACE_MARGIN_MEDIUM_MS[0], RACE_MARGIN_MEDIUM_MS[1])
+          : rand(RACE_MARGIN_DECISIVE_MS[0], RACE_MARGIN_DECISIVE_MS[1]);
 
-    // Winner gets the larger end offset so the exit frame reads as
-    // "pulled away at the line". Loser gets a more modest one.
-    const endSpan = RACE_END_OFFSET_MAX_PX - RACE_END_OFFSET_MIN_PX;
-    const endA = winner === "A"
-      ? rand(RACE_END_OFFSET_MIN_PX + endSpan * 0.6, RACE_END_OFFSET_MAX_PX)
-      : rand(RACE_END_OFFSET_MIN_PX, RACE_END_OFFSET_MIN_PX + endSpan * 0.4);
-    const endB = winner === "B"
-      ? rand(RACE_END_OFFSET_MIN_PX + endSpan * 0.6, RACE_END_OFFSET_MAX_PX)
-      : rand(RACE_END_OFFSET_MIN_PX, RACE_END_OFFSET_MIN_PX + endSpan * 0.4);
+    // Cross times + total animation durations. Each racer's animation
+    // runs slightly past their cross time (the "tail") so the
+    // wheelchair smoothly exits past the right edge after winning.
+    const winnerCrossT = rand(RACE_CROSS_BASE_MIN_MS, RACE_CROSS_BASE_MAX_MS);
+    const loserCrossT = winnerCrossT + margin;
+    const winnerDur = winnerCrossT * rand(RACE_DUR_TAIL_MIN, RACE_DUR_TAIL_MAX);
+    const loserDur = loserCrossT * rand(RACE_DUR_TAIL_MIN, RACE_DUR_TAIL_MAX);
+    const durA = intendedWinner === "A" ? winnerDur : loserDur;
+    const durB = intendedWinner === "B" ? winnerDur : loserDur;
+    const crossTargetA = intendedWinner === "A" ? winnerCrossT : loserCrossT;
+    const crossTargetB = intendedWinner === "B" ? winnerCrossT : loserCrossT;
 
-    const posFor = (racer: Racer, idx: 0 | 1 | 2): number => {
-      const [lead, trail] = RACE_CHECKPOINTS[idx]!;
-      const base = pattern[idx] === racer ? lead : trail;
-      return jitter(base, 1);
+    // (5)(6) Measure starts + live finish line, then compute per-
+    // checkpoint absolute targets. finishX matches the actual left
+    // edge of the visible checkered strip — math winner == strip-
+    // crossing winner the user observes.
+    const measured = this._measureRaceStartPositions();
+    const startA = measured?.a ?? 0;
+    const startB = measured?.b ?? 0;
+    const finishX = measured?.finishCqw ?? RACE_FINISH_X_FALLBACK_CQW;
+    const maxStart = Math.max(startA, startB);
+    const trackLength = Math.max(
+      RACE_TRACK_MIN_LENGTH_CQW,
+      RACE_TRACK_END_CQW - maxStart,
+    );
+    const targetXAbs = (racer: Racer, idx: 0 | 1 | 2): number => {
+      const center = maxStart + RACE_CHECKPOINT_FRACS[idx] * trackLength;
+      const isLead = pattern[idx] === racer;
+      const halfGap = RACE_CHECKPOINT_HALF_GAPS_CQW[idx];
+      return jitter(center + (isLead ? halfGap : -halfGap), 0.6);
     };
+    const t25A = targetXAbs("A", 0);
+    const t50A = targetXAbs("A", 1);
+    const t75A = targetXAbs("A", 2);
+    const t25B = targetXAbs("B", 0);
+    const t50B = targetXAbs("B", 1);
+    const t75B = targetXAbs("B", 2);
 
+    // (7) Solve the linear interp 75%→100% segment for `exit` so this
+    // racer crosses finishX at their target time:
+    //   crossT = 0.75*dur + 0.25*dur * (finishX - t75) / (exit - t75)
+    //   => exit = t75 + (finishX - t75) * 0.25*dur / (crossT - 0.75*dur)
+    const computeExit = (
+      crossT: number,
+      dur: number,
+      t75: number,
+    ): number => {
+      const distance = finishX - t75;
+      const segmentTime = crossT - 0.75 * dur;
+      if (distance <= 0 || segmentTime <= 1) {
+        // Edge case: finish line was already passed by the 75%
+        // checkpoint. Let the racer exit naturally with a small offset.
+        return Math.max(t75 + 5, RACE_EXIT_MIN_CQW);
+      }
+      const exit = t75 + (distance * 0.25 * dur) / segmentTime;
+      return Math.max(RACE_EXIT_MIN_CQW, Math.min(RACE_EXIT_MAX_CQW, exit));
+    };
+    const exitA = computeExit(crossTargetA, durA, t75A);
+    const exitB = computeExit(crossTargetB, durB, t75B);
+
+    // (8) Recompute actual cross times by walking every animation
+    // segment in time order. Necessary because on the smaller card
+    // variants — where row font size is 1.25em vs 1.9em — long
+    // destination text pushes maxStart high enough that the wheelchair
+    // can already be past finishX by the 75% checkpoint. In that case
+    // the cross happens in the 50→75% segment (or earlier), and a
+    // hardcoded 75→100% formula collapses both racers to the same
+    // 0.75*dur, breaking winner reconciliation. Visible-on-screen
+    // winner is whoever crosses first; assign _raceWinner from that so
+    // the trophy badge always matches what the user just watched.
+    //
+    // Segment 0→25% actually uses ease-out (not linear), so the cross
+    // time in that segment is approximate — but a cross that early
+    // requires extreme maxStart values that don't occur in practice.
+    const actualCrossT = (
+      startX: number,
+      t25: number,
+      t50: number,
+      t75: number,
+      exit: number,
+      dur: number,
+    ): number => {
+      const segments: ReadonlyArray<readonly [number, number, number, number]> = [
+        [0, 0.25, startX, t25],
+        [0.25, 0.5, t25, t50],
+        [0.5, 0.75, t50, t75],
+        [0.75, 1.0, t75, exit],
+      ];
+      for (const [tStart, tEnd, xStart, xEnd] of segments) {
+        if (xStart >= finishX) return tStart * dur;
+        if (xEnd >= finishX) {
+          const frac = (finishX - xStart) / (xEnd - xStart);
+          return (tStart + frac * (tEnd - tStart)) * dur;
+        }
+      }
+      return Number.POSITIVE_INFINITY;
+    };
+    const crossA = actualCrossT(startA, t25A, t50A, t75A, exitA, durA);
+    const crossB = actualCrossT(startB, t25B, t50B, t75B, exitB, durB);
+    this._raceWinner = crossA <= crossB ? "A" : "B";
+
+    // Per-racer translate (cqw) = absolute target - measured start.
     this.style.setProperty("--race-a-duration", `${durA}ms`);
     this.style.setProperty("--race-b-duration", `${durB}ms`);
-    this.style.setProperty("--race-a-end", `${endA}px`);
-    this.style.setProperty("--race-b-end", `${endB}px`);
-    this.style.setProperty("--race-a-x-25", `${posFor("A", 0)}cqw`);
-    this.style.setProperty("--race-a-x-50", `${posFor("A", 1)}cqw`);
-    this.style.setProperty("--race-a-x-75", `${posFor("A", 2)}cqw`);
-    this.style.setProperty("--race-b-x-25", `${posFor("B", 0)}cqw`);
-    this.style.setProperty("--race-b-x-50", `${posFor("B", 1)}cqw`);
-    this.style.setProperty("--race-b-x-75", `${posFor("B", 2)}cqw`);
-    return Math.max(durA, durB);
+    this.style.setProperty("--race-a-end", `${exitA - startA}cqw`);
+    this.style.setProperty("--race-b-end", `${exitB - startB}cqw`);
+    this.style.setProperty("--race-a-x-25", `${t25A - startA}cqw`);
+    this.style.setProperty("--race-a-x-50", `${t50A - startA}cqw`);
+    this.style.setProperty("--race-a-x-75", `${t75A - startA}cqw`);
+    this.style.setProperty("--race-b-x-25", `${t25B - startB}cqw`);
+    this.style.setProperty("--race-b-x-50", `${t50B - startB}cqw`);
+    this.style.setProperty("--race-b-x-75", `${t75B - startB}cqw`);
+    return { winnerCrossT: Math.min(crossA, crossB) };
   }
 
   // Arms timers for whichever transition is pending next, based on the
@@ -403,8 +624,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       const delay = Math.max(0, this._raceEndAt - now);
       this._raceTimers.push(
         setTimeout(() => {
-          this._raceState = "victory";
+          this._raceState = "freeze";
           this._raceEndAt = null;
+          this._armStateTransitions();
+        }, delay),
+      );
+    } else if (this._raceState === "freeze" && this._freezeEndAt !== null) {
+      const delay = Math.max(0, this._freezeEndAt - now);
+      this._raceTimers.push(
+        setTimeout(() => {
+          this._raceState = "victory";
+          this._freezeEndAt = null;
           this._armStateTransitions();
         }, delay),
       );
@@ -436,6 +666,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       direction: this._config.direction,
       lines: this._config.line ? [this._config.line] : undefined,
       walk_times: this._config.walk_times,
+      accessibility_only: this._config.accessibility_only,
     });
     return matching.slice(0, 2).filter((r) => r.barrier_free).length;
   }
@@ -455,6 +686,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       direction: cfg.direction,
       lines: cfg.line ? [cfg.line] : undefined,
       walk_times: cfg.walk_times,
+      accessibility_only: cfg.accessibility_only,
     });
     const rows = matching.slice(0, 2);
 
@@ -473,7 +705,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
     const raceActive = cfg.wheelchair_race && this._raceState === "racing";
+    const raceFreeze = cfg.wheelchair_race && this._raceState === "freeze";
     const raceVictory = cfg.wheelchair_race && this._raceState === "victory";
+    const clickable = cfg.wheelchair_race && this._raceState === "idle";
     const winnerLane = this._raceWinner === "A" ? 1 : this._raceWinner === "B" ? 2 : null;
     const retroClasses = {
       retro: true,
@@ -485,12 +719,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       "retro--flicker": cfg.flicker,
       "retro--race-countdown": raceCountdown,
       "retro--race-active": raceActive,
+      "retro--race-freeze": raceFreeze,
       "retro--race-victory": raceVictory,
+      "retro--clickable": clickable,
     };
 
     return html`
       <ha-card style="background:#000;padding:0;overflow:hidden;">
-        <div class=${classMap(retroClasses)}>
+        <div
+          class=${classMap(retroClasses)}
+          @click=${this._handleCardClick}>
           ${this._versionMismatch ? this._renderBanner() : nothing}
           ${stationPanel}
           <div class="retro-led">
@@ -506,7 +744,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
                   </span>
                 </div>`
               : nothing}
-            ${raceCountdown || raceActive
+            ${raceCountdown || raceActive || raceFreeze
               ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
               : nothing}
             ${raceVictory
@@ -724,6 +962,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       background-size: var(--led-dot-pitch) var(--led-dot-pitch);
       padding: var(--retro-pad-y) var(--retro-pad-r) var(--retro-pad-y) var(--retro-pad-l);
     }
+    .retro--clickable {
+      cursor: pointer;
+    }
     .retro--style-warm {
       --led-amber: #FFB000;
       --led-bg: #050302;
@@ -847,52 +1088,72 @@ export class WienerLinienAustriaRetroCard extends LitElement {
        (--race-x-25/50/75), end offset, and duration come from CSS
        custom properties that JS sets at race start. Keyframe preserves
        the 0.18em baseline offset so the icon doesn't jump vertically.
-       Per-keyframe timing-functions keep the middle segments linear so
-       the motion doesn't visibly decelerate approaching each waypoint;
-       only the launch eases out of rest. */
+       Per-keyframe timing-functions: ease-out for the launch (burst
+       out of the gate) and a symmetric cubic-bezier for every middle
+       segment. The cubic-bezier (0.4, 0.2, 0.6, 0.8) has endpoint
+       slopes of ~0.5× the segment's average velocity, peaking ~1.5×
+       in the middle — so when the swap pattern flips lead/trail at a
+       checkpoint, the velocity transition reads as a smooth ease
+       instead of an abrupt lurch. */
     @keyframes retroWheelExit {
       0%   { transform: translate(0, 0.18em); animation-timing-function: ease-out; }
-      25%  { transform: translate(var(--race-x-25, 25cqw), 0.18em); animation-timing-function: linear; }
-      50%  { transform: translate(var(--race-x-50, 50cqw), 0.18em); animation-timing-function: linear; }
-      75%  { transform: translate(var(--race-x-75, 75cqw), 0.18em); animation-timing-function: linear; }
-      100% { transform: translate(calc(100cqw + var(--race-end, 60px)), 0.18em); }
+      25%  { transform: translate(var(--race-x-25, 25cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
+      50%  { transform: translate(var(--race-x-50, 50cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
+      75%  { transform: translate(var(--race-x-75, 75cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
+      100% { transform: translate(var(--race-end, 110cqw), 0.18em); }
     }
     @media (prefers-reduced-motion: no-preference) {
-      /* LED prep: both during countdown ("3, 2, 1" — the panel is
-         clearing for the race) and during the race itself. The
-         wheelchair-exit animations below stay scoped to .retro--race-active
-         only — countdown shouldn't move the racers. */
+      /* LED prep: countdown, racing, and the DEBUG freeze (paused mid-
+         race for visual verification) all share the same row-clearing
+         + overflow-visible setup. */
       .retro--race-countdown .retro-dest,
-      .retro--race-active .retro-dest {
+      .retro--race-active .retro-dest,
+      .retro--race-freeze .retro-dest {
         overflow: visible;
       }
       .retro--race-countdown .retro-cd,
-      .retro--race-active .retro-cd {
+      .retro--race-active .retro-cd,
+      .retro--race-freeze .retro-cd {
         opacity: 0;
       }
       /* Only fade Gleis/Steig during the prep when it's on the right —
          that's the wheelchairs' path. Left-side Gleis stays lit. */
       .retro--race-countdown.retro--gleis-right .retro-gleis,
-      .retro--race-active.retro--gleis-right .retro-gleis {
+      .retro--race-active.retro--gleis-right .retro-gleis,
+      .retro--race-freeze.retro--gleis-right .retro-gleis {
         opacity: 0;
       }
-      .retro--race-active .retro-row:nth-child(1) .retro-wheelchair {
-        --race-end: var(--race-a-end, 60px);
+      /* Animation declarations apply during both active and freeze so
+         the in-flight animation keeps its identity across the state
+         flip — animation-play-state: paused below freezes the frame
+         instead of restarting from 0%. */
+      .retro--race-active .retro-row:nth-child(1) .retro-wheelchair,
+      .retro--race-freeze .retro-row:nth-child(1) .retro-wheelchair {
+        --race-end: var(--race-a-end, 110cqw);
         --race-x-25: var(--race-a-x-25, 25cqw);
         --race-x-50: var(--race-a-x-50, 50cqw);
         --race-x-75: var(--race-a-x-75, 75cqw);
         animation: retroWheelExit var(--race-a-duration, 3.3s) linear forwards;
       }
-      .retro--race-active .retro-row:nth-child(2) .retro-wheelchair {
-        --race-end: var(--race-b-end, 60px);
+      .retro--race-active .retro-row:nth-child(2) .retro-wheelchair,
+      .retro--race-freeze .retro-row:nth-child(2) .retro-wheelchair {
+        --race-end: var(--race-b-end, 110cqw);
         --race-x-25: var(--race-b-x-25, 25cqw);
         --race-x-50: var(--race-b-x-50, 50cqw);
         --race-x-75: var(--race-b-x-75, 75cqw);
         animation: retroWheelExit var(--race-b-duration, 3.3s) linear forwards;
       }
+      /* Photo-finish freeze: pauses both wheelchair animations at
+         the moment shortly after the winner crosses the finish line.
+         The viewer gets a clear still frame — winner at the strip,
+         loser caught a step behind — before the trophy appears. */
+      .retro--race-freeze .retro-wheelchair {
+        animation-play-state: paused;
+      }
       /* Pass wheelchairs in front of the finish-line strip so the
          crossing reads as "through" rather than "behind the barrier". */
-      .retro--race-active .retro-wheelchair {
+      .retro--race-active .retro-wheelchair,
+      .retro--race-freeze .retro-wheelchair {
         position: relative;
         z-index: 4;
       }
@@ -1099,32 +1360,36 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.85))
               drop-shadow(0 0 10px rgb(var(--led-glow-rgb) / 0.45));
     }
-    /* Lane number overlaid on the trophy. Colored to match the LED
-       background so it reads as "engraved" into the amber trophy face
-       — punched out, not sitting on top. */
+    /* Lane number on the trophy cup. Amber so it reads as part of the
+       trophy material. Embossed via a subtle highlight on top-left
+       (light from above) + soft shadow on bottom-right (depth), plus
+       a faint LED glow to tie it to the rest of the panel. No heavy
+       drop-shadow extrusion or thick stroke — those read as a
+       separate label sitting on top of the trophy, not as letters
+       pressed into the metal. */
     .retro-winner-num {
       position: absolute;
-      top: 45%;
+      top: 40%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-family: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-weight: 900;
-      font-size: 15cqmin;
+      font-size: 22cqmin;
       line-height: 1;
-      color: #000;
-      letter-spacing: -0.02em;
+      color: var(--led-amber);
+      letter-spacing: -0.04em;
       pointer-events: none;
-      /* Belt-and-suspenders bold: the monospace stack falls back to
-         700 on systems without a 900 cut, so an explicit text-stroke
-         keeps the engraving thick at every size. */
-      -webkit-text-stroke: 0.5px #000;
+      text-shadow:
+        -1px -1px 0 rgba(255, 240, 180, 0.55),
+        1px 1px 1px rgba(0, 0, 0, 0.4),
+        0 0 6px rgb(var(--led-glow-rgb) / 0.35);
     }
     /* Tighter on the small variant so trophy + number still fit. */
     .retro--size-small .retro-winner-trophy {
       --mdc-icon-size: 51cqmin;
     }
     .retro--size-small .retro-winner-num {
-      font-size: 13cqmin;
+      font-size: 19cqmin;
     }
 
     .retro-gleis {

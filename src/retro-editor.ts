@@ -133,6 +133,11 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     this._fire({ ...this._config, wheelchair_race: on });
   }
 
+  private _setAccessibilityOnly(on: boolean): void {
+    if (!this._config) return;
+    this._fire({ ...this._config, accessibility_only: on });
+  }
+
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
     const n = parseInt(raw, 10);
@@ -169,6 +174,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
           cfg.style,
           cfg.flicker,
           cfg.wheelchair_race,
+          cfg.accessibility_only,
         )}
       </div>
     `;
@@ -350,6 +356,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     style: RetroStyle,
     flicker: boolean,
     wheelchairRace: boolean,
+    accessibilityOnly: boolean,
   ): TemplateResult {
     return html`
       <div class="editor-section">
@@ -361,6 +368,15 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
             .checked=${showPlatform}
             @change=${(ev: Event) =>
               this._setShowPlatform((ev.target as HTMLInputElement).checked)}
+          ></ha-switch>
+        </div>
+        <div class="toggle-row">
+          <label for="retro-accessibility-only">${this._et("accessibility_only")}</label>
+          <ha-switch
+            id="retro-accessibility-only"
+            .checked=${accessibilityOnly}
+            @change=${(ev: Event) =>
+              this._setAccessibilityOnly((ev.target as HTMLInputElement).checked)}
           ></ha-switch>
         </div>
         <div class="toggle-row">

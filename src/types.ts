@@ -104,6 +104,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   line_colors?: Record<string, string>;
 
   show_accessibility?: boolean;
+  accessibility_only?: boolean;
   show_traffic_info?: boolean;
   show_elevator_info?: boolean;
   show_delay?: boolean;
@@ -135,5 +136,6 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   style?: RetroStyle;
   flicker?: boolean;
   wheelchair_race?: boolean;
+  accessibility_only?: boolean;
   walk_times?: WalkTimes;
 }

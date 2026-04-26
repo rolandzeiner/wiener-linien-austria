@@ -83,6 +83,7 @@ export interface NormalisedModernConfig {
   max_departures: number;
   line_colors: Record<string, string>;
   show_accessibility: boolean;
+  accessibility_only: boolean;
   show_traffic_info: boolean;
   show_elevator_info: boolean;
   show_delay: boolean;
@@ -96,6 +97,7 @@ export interface NormalisedModernConfig {
 const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
+  accessibility_only: false,
   show_traffic_info: true,
   show_elevator_info: true,
   show_delay: true,
@@ -150,6 +152,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     max_departures: maxClamped,
     line_colors: lineColors,
     show_accessibility: raw.show_accessibility ?? MODERN_DEFAULTS.show_accessibility,
+    accessibility_only: raw.accessibility_only ?? MODERN_DEFAULTS.accessibility_only,
     show_traffic_info: raw.show_traffic_info ?? MODERN_DEFAULTS.show_traffic_info,
     show_elevator_info: raw.show_elevator_info ?? MODERN_DEFAULTS.show_elevator_info,
     show_delay: raw.show_delay ?? MODERN_DEFAULTS.show_delay,
@@ -175,6 +178,7 @@ export interface NormalisedRetroConfig {
   style: RetroStyle;
   flicker: boolean;
   wheelchair_race: boolean;
+  accessibility_only: boolean;
   walk_times?: WalkTimes;
 }
 
@@ -199,6 +203,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     style,
     flicker: raw.flicker === true,
     wheelchair_race: raw.wheelchair_race === true,
+    accessibility_only: raw.accessibility_only === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
   };
 }

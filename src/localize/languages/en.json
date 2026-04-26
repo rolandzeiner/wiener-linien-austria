@@ -48,6 +48,7 @@
       "section_display": "Display",
       "max_departures": "Departures per stop",
       "show_accessibility": "Show step-free icon",
+      "accessibility_only": "Only show step-free departures",
       "show_type_icon": "Show vehicle-type icon",
       "show_traffic_info": "Show disruption alerts",
       "show_elevator_info": "Show elevator outages",
@@ -112,6 +113,7 @@
       "style_warm": "Warm",
       "flicker_label": "Line badge flicker",
       "wheelchair_race_label": "Wheelchair race",
+      "accessibility_only": "Only show step-free departures",
       "no_sensors": "No Wiener Linien sensors available. Add a stop first via Settings → Devices & Services.",
       "no_lines": "The sensor currently reports no lines for this stop + direction."
     }

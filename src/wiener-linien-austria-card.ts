@@ -364,7 +364,10 @@ export class WienerLinienAustriaCard extends LitElement {
     const apiName = attrs.stop_name || attrs.friendly_name;
     const title = apiName || stopCfg.entity;
     const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
-    const filtered = filterDepartures(departures, stopCfg);
+    const filtered = filterDepartures(departures, {
+      ...stopCfg,
+      accessibility_only: this._config!.accessibility_only,
+    });
     const rows = filtered.slice(0, this._config!.max_departures);
 
     const realElevator = Array.isArray(attrs.elevator_info) ? attrs.elevator_info : [];

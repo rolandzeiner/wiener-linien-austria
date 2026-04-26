@@ -60,6 +60,10 @@ export interface ModernStopFilter {
   // "no direction filter" if `direction` is also unset.
   line_directions?: Record<string, "H" | "R">;
   walk_times?: WalkTimes;
+  // When true, drop any departure whose `barrier_free` flag isn't set —
+  // wheelchair-only view. Card-wide on the modern card, card-wide on
+  // retro; both pass it through this filter.
+  accessibility_only?: boolean;
 }
 
 // Apply line/direction/walk-time filters to a departure list, preserving
@@ -68,7 +72,7 @@ export function filterDepartures(
   departures: DepartureAttr[],
   filter: ModernStopFilter,
 ): DepartureAttr[] {
-  const { lines, direction, line_directions, walk_times } = filter;
+  const { lines, direction, line_directions, walk_times, accessibility_only } = filter;
   const lineSet = lines && lines.length ? new Set(lines) : null;
   return departures.filter((d) => {
     if (lineSet && !lineSet.has(d.line)) return false;
@@ -80,6 +84,7 @@ export function filterDepartures(
       const min = walk_times[lineKey(d.line, String(d.direction ?? ""), d.towards)];
       if (typeof min === "number" && d.countdown < min) return false;
     }
+    if (accessibility_only && !d.barrier_free) return false;
     return true;
   });
 }

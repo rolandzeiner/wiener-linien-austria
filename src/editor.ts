@@ -22,6 +22,7 @@ import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
 type ToggleField =
   | "show_accessibility"
+  | "accessibility_only"
   | "show_traffic_info"
   | "show_elevator_info"
   | "show_delay"
@@ -472,6 +473,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
         ${this._renderSwitch("show_hero_metric", cfg.show_hero_metric)}
         ${this._renderSwitch("show_departures", cfg.show_departures)}
         ${this._renderSwitch("show_accessibility", cfg.show_accessibility)}
+        ${this._renderSwitch("accessibility_only", cfg.accessibility_only)}
         ${this._renderSwitch("show_type_icon", cfg.show_type_icon)}
         ${this._renderSwitch("show_traffic_info", cfg.show_traffic_info)}
         ${this._renderSwitch("show_elevator_info", cfg.show_elevator_info)}

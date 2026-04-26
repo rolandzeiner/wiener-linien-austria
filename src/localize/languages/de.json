@@ -48,6 +48,7 @@
       "section_display": "Anzeige",
       "max_departures": "Anzahl Abfahrten pro Haltestelle",
       "show_accessibility": "Barrierefrei-Symbol anzeigen",
+      "accessibility_only": "Nur barrierefreie Abfahrten anzeigen",
       "show_type_icon": "Verkehrsmittel-Symbol anzeigen",
       "show_traffic_info": "Störungen anzeigen",
       "show_elevator_info": "Aufzugsinfo anzeigen",
@@ -112,6 +113,7 @@
       "style_warm": "Warm",
       "flicker_label": "Linien-Flimmern",
       "wheelchair_race_label": "Rollstuhl-Rennen",
+      "accessibility_only": "Nur barrierefreie Abfahrten anzeigen",
       "no_sensors": "Keine Wiener-Linien-Sensoren verfügbar. Erst eine Haltestelle über Einstellungen → Geräte & Dienste hinzufügen.",
       "no_lines": "Für diese Haltestelle und Richtung sind aktuell keine Linien im Sensor."
     }
