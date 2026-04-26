@@ -26,6 +26,28 @@ npm run build           # produces custom_components/wiener_linien_austria/www/w
 
 `README.md` badge + `manifest.json` stay at the clean (non-beta) version; `const.py` + the TS constants can carry a `-beta-N` suffix during development.
 
+## Tooling & config
+
+- `pyproject.toml` — source of truth for ruff (target-version, line-length), mypy (strict, ignore_missing_imports, files), and coverage config. Change rules here, not in CI flags.
+- `pytest.ini` — pytest config and the **`--cov-fail-under=90` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~96%.
+- `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes (and keep `const.ATTRIBUTION` in sync).
+
+View per-file coverage locally:
+
+```bash
+pytest tests/ --cov-report=term-missing
+```
+
+## Snapshot tests
+
+Diagnostics output is pinned via `syrupy`. Snapshots live under `tests/snapshots/`. After an intentional change to the diagnostics shape (new field, redaction-set drift), regenerate:
+
+```bash
+pytest tests/test_diagnostics.py --snapshot-update
+```
+
+Commit the updated `.ambr` file alongside the code change so the diff is reviewable.
+
 ## Verification gate (must pass before pushing)
 
 ```bash
