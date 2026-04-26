@@ -666,6 +666,13 @@ function e(e,t,i,r){var s,n=arguments.length,o=n<3?t:null===r?r=Object.getOwnPro
     .retro--race-victory .retro-gleis {
       opacity: 0;
     }
+    /* Flicker keyframes set their own opacity values, which win over
+       the static opacity:0 above while the animation is running.
+       Disable the flicker entirely during victory so the line badge
+       hides cleanly with the rest of the row text. */
+    .retro--race-victory.retro--flicker .retro-line {
+      animation: none;
+    }
     /* Pixelated finish-line strip on the right edge during the race.
        Same conic-gradient checker technique as the victory flag, but
        as a narrow 14px column so ~2 squares wide read as chunky "8-bit
