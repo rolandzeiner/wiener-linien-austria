@@ -1,0 +1,42 @@
+# serializer version: 1
+# name: test_diagnostics_snapshot
+  dict({
+    'alerts': dict({
+      'elevator_info': list([
+      ]),
+      'traffic_info': list([
+      ]),
+    }),
+    'attribution': 'Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0',
+    'coordinator': dict({
+      'departure_count': 45,
+      'last_error_code': None,
+      'last_update_success': True,
+      'rbls': list([
+        4111,
+        4118,
+      ]),
+      'server_time': None,
+      'update_interval': '0:01:00',
+    }),
+    'entry': dict({
+      'data': dict({
+        'diva': 60201012,
+        'lines': list([
+          'U1|H|Leopoldau',
+          'U1|R|Alaudagasse',
+        ]),
+        'rbls': list([
+          4111,
+          4118,
+        ]),
+        'scan_interval': 60,
+        'stop_name': 'Stephansplatz',
+      }),
+      'options': dict({
+      }),
+      'title': 'Stephansplatz',
+      'version': 1,
+    }),
+  })
+# ---

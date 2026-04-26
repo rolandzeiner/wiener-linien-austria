@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
@@ -116,6 +117,24 @@ async def test_diagnostics_includes_matched_alerts(
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert [t["name"] for t in diag["alerts"]["traffic_info"]] == ["T1"]
     assert [e["name"] for e in diag["alerts"]["elevator_info"]] == ["E1"]
+
+
+async def test_diagnostics_snapshot(
+    hass: HomeAssistant, mock_fetch, snapshot: SnapshotAssertion
+) -> None:
+    """Pin the full redacted diagnostics shape so silent format changes surface.
+
+    A failing diff usually means: a field was added to the entry/coordinator
+    payload, or the redaction set changed. Update the snapshot
+    (`pytest --snapshot-update`) only after confirming the change is intentional.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag == snapshot
 
 
 async def test_diagnostics_handles_no_coordinator_data(hass: HomeAssistant) -> None:

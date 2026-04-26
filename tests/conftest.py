@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from homeassistant.const import CONF_SCAN_INTERVAL
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
@@ -19,6 +21,16 @@ from custom_components.wiener_linien_austria.const import (
 from custom_components.wiener_linien_austria.static import Station, StaticCatalogue
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Use the HA snapshot extension so diagnostics / state dumps diff cleanly.
+
+    Create/update snapshots with: pytest --snapshot-update
+    Stored under tests/snapshots/ next to the test module.
+    """
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

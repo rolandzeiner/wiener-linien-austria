@@ -1,0 +1,25 @@
+# Config home for ruff, mypy, and coverage. Pytest config stays in pytest.ini.
+# Pre-commit and CI may still pass equivalent CLI flags — they are now
+# redundant with this file but harmless. Trim them as confidence grows.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
+files = ["custom_components/wiener_linien_austria"]
+
+[tool.coverage.run]
+source = ["custom_components/wiener_linien_austria"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "\\.\\.\\.",
+]
+show_missing = true
+skip_empty = true
