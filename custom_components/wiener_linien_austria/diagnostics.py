@@ -11,9 +11,11 @@ from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS
 from .coordinator import WienerLinienConfigEntry
 
 # No credentials to redact (Wiener Linien OGD has no API key), and RBL/DIVA
-# values are public station identifiers, not PII. Keep the set defensive in
-# case a future field needs redaction.
-TO_REDACT: set[str] = set()
+# values are public station identifiers, not PII. Coordinates are not
+# currently surfaced in the diagnostics output, but redact them defensively:
+# the user's *chosen* stop coords reveal location, so a future field
+# addition that exposes lat/lon would otherwise leak it silently.
+TO_REDACT: set[str] = {"lat", "lon", "latitude", "longitude"}
 
 
 async def async_get_config_entry_diagnostics(
