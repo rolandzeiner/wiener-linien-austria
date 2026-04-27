@@ -576,12 +576,14 @@ export const cardStyles = css`
 
   /* Footer: attribution timestamp / etc. Right-pin via margin-left:auto.
      Padding + margin mirror linz-linien-austria so a stacked dashboard
-     reads as one visual family. Linz uses `margin: 0 var(--linz-pad-x);
-     padding: 8px 0;` because its .foot is a direct <ha-card> child with
-     no wrapper to provide outer inset. Wiener's .foot lives inside
-     .wrap (which already pads horizontally), so the equivalent here is
-     padding: 8px 0 with no extra horizontal margin — divider line ends
-     up at the same horizontal inset as the row content above. */
+     reads as one visual family. Linz uses margin: 0 var(--linz-pad-x)
+     plus padding: 8px 0 because its .foot is a direct <ha-card> child
+     with no wrapper to provide outer inset. Wiener's .foot lives
+     inside .wrap (which already pads horizontally), so the equivalent
+     here is padding: 8px 0 with no extra horizontal margin — divider
+     line ends up at the same horizontal inset as the row content
+     above. (No backticks in this comment — the whole stylesheet is a
+     css tagged template, an inner backtick terminates the literal.) */
   .foot {
     display: flex;
     align-items: center;
