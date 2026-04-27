@@ -368,7 +368,6 @@ export class WienerLinienAustriaCard extends LitElement {
       ...stopCfg,
       accessibility_only: this._config!.accessibility_only,
     });
-    const rows = filtered.slice(0, this._config!.max_departures);
 
     const realElevator = Array.isArray(attrs.elevator_info) ? attrs.elevator_info : [];
     const debugElevator = this._debugElevator.filter((e) => e.__debug_entity === stopCfg.entity);
@@ -378,31 +377,39 @@ export class WienerLinienAustriaCard extends LitElement {
     const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
     const openInMaps = this._t("open_in_maps");
 
-    // Per-station accent + header icon both derive from the hero
-    // departure: the next row whose countdown is > 0. Skipping the
-    // "now" rows in the hero keeps the big number actionable — there's
-    // no point staring at a giant "0 min" you've already missed. The
-    // full row list still renders all rows including 0-countdown ones.
-    const heroDep =
-      rows.find((d) => Number.isFinite(d.countdown) && d.countdown > 0) ??
-      rows[0];
-    const accent = heroDep
-      ? colorForLine(heroDep.line || "", this._config!.line_colors)
+    // Hero group — the set of departures shown in the big hero block.
+    // Mirrors linz-linien-austria's _computeHeroGroup with one Wiener
+    // tweak: prefer the soonest *future* (cd > 0) departure as the
+    // lead. The Wiener Linien API can keep a bus at countdown 0 for
+    // longer than its tick resolution while it dwells at the platform,
+    // and the user already missed any "0 min" so the actionable info
+    // is the next one coming. Once we have a lead, group every other
+    // departure that ties on the exact same countdown.
+    const heroGroup = this._computeHeroGroup(filtered);
+    const heroLead = heroGroup[0];
+
+    // When show_hero_metric is on, drop any departure that's already
+    // surfaced in the hero from the row list below. Object identity
+    // works as the dedupe key because heroGroup members are references
+    // into the same `filtered` array. After dedupe, cap at max_departures
+    // so "max 6" continues to mean "6 rendered rows" rather than "6
+    // rows including any duplicates of the hero".
+    const heroDedupe = this._config!.show_hero_metric
+      ? new Set<DepartureAttr>(heroGroup)
+      : new Set<DepartureAttr>();
+    const remaining = filtered.filter((d) => !heroDedupe.has(d));
+    const rows = remaining.slice(0, this._config!.max_departures);
+
+    const accent = heroLead
+      ? colorForLine(heroLead.line || "", this._config!.line_colors)
       : "var(--primary-color)";
-    const headerIcon = headerIconForType(heroDep?.type);
+    const headerIcon = headerIconForType(heroLead?.type);
 
     const cd =
-      heroDep && Number.isFinite(heroDep.countdown) ? heroDep.countdown : null;
+      heroLead && Number.isFinite(heroLead.countdown) ? heroLead.countdown : null;
     const heroValue =
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
-    const heroPlatform = heroDep?.platform ? String(heroDep.platform) : null;
-    // Show the wheelchair flag in the hero only if the user has
-    // accessibility info enabled AND this departure is actually
-    // barrier-free. The realtime/live distinction the Wiener Linien
-    // API doesn't expose so we don't surface it in the hero.
-    const heroIsBarrierFree =
-      !!heroDep?.barrier_free && this._config!.show_accessibility;
 
     const isPanel = tabIndex !== undefined;
     return html`
@@ -421,8 +428,8 @@ export class WienerLinienAustriaCard extends LitElement {
           </span>
           <div class="title-block">
             <h3 class="title">${deText(apiName, stopCfg.entity)}</h3>
-            ${heroDep?.line
-              ? html`<p class="subtitle">${deText(heroDep.towards)}</p>`
+            ${heroLead?.line
+              ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
               : nothing}
           </div>
           ${mapUrl
@@ -439,7 +446,7 @@ export class WienerLinienAustriaCard extends LitElement {
             : nothing}
         </header>
 
-        ${this._config!.show_hero_metric && heroDep
+        ${this._config!.show_hero_metric && heroLead
           ? html`<div class="hero">
               <div class="hero-time" aria-live="polite" aria-atomic="true">
                 <span class="hero-min">${heroValue}</span>
@@ -448,31 +455,7 @@ export class WienerLinienAustriaCard extends LitElement {
                   : nothing}
               </div>
               <div class="hero-meta">
-                <div class="hero-entry">
-                  <span
-                    class="line-badge"
-                    style=${styleMap({ background: accent })}
-                  >${heroDep.line}</span>
-                  <span class="hero-direction">${deText(heroDep.towards)}</span>
-                  ${heroPlatform
-                    ? html`<span class="hero-platform"
-                        >${this._t("platform_short")} ${heroPlatform}</span
-                      >`
-                    : nothing}
-                  ${heroIsBarrierFree
-                    ? html`<span
-                        class="hero-a11y"
-                        role="img"
-                        aria-label=${this._t("barrier_free_title")}
-                        title=${this._t("barrier_free_title")}
-                      >
-                        <ha-icon
-                          icon="mdi:wheelchair-accessibility"
-                          aria-hidden="true"
-                        ></ha-icon>
-                      </span>`
-                    : nothing}
-                </div>
+                ${heroGroup.map((d) => this._renderHeroEntry(d))}
               </div>
             </div>`
           : nothing}
@@ -675,6 +658,79 @@ export class WienerLinienAustriaCard extends LitElement {
     if (next.has(name)) next.delete(name);
     else next.add(name);
     this._expandedTraffic = next;
+  }
+
+  /**
+   * Compute the hero group: the lead departure plus any others tied
+   * on the exact same countdown. Mirrors linz-linien-austria's
+   * _computeHeroGroup with one Wiener-specific tweak — prefer the
+   * soonest *future* (cd > 0) departure as the lead, since the
+   * Wiener Linien API can keep a bus at countdown 0 longer than its
+   * tick resolution while it dwells at the platform, and the user
+   * already missed any "0 min" entry. Returns [] if there are no
+   * usable departures.
+   */
+  private _computeHeroGroup(filtered: DepartureAttr[]): DepartureAttr[] {
+    if (filtered.length === 0) return [];
+    const cdOf = (d: DepartureAttr): number =>
+      Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
+
+    // Prefer future departures: smallest cd > 0.
+    let leadCd = Number.POSITIVE_INFINITY;
+    for (const d of filtered) {
+      const cd = cdOf(d);
+      if (cd > 0 && cd < leadCd) leadCd = cd;
+    }
+
+    if (Number.isFinite(leadCd)) {
+      // Group everyone tied at exactly leadCd minutes.
+      return filtered.filter((d) => cdOf(d) === leadCd);
+    }
+
+    // Fallback: no future departures. Show the first row as a
+    // single-item hero so the block doesn't go empty when only Jetzt
+    // entries remain.
+    const first = filtered[0];
+    return first ? [first] : [];
+  }
+
+  /**
+   * Render one hero-entry row (line badge + direction + optional
+   * platform pill + optional wheelchair pill). Used inside the
+   * hero-meta column; one entry per departure in the hero group.
+   */
+  private _renderHeroEntry(d: DepartureAttr): TemplateResult {
+    const accent = colorForLine(d.line || "", this._config!.line_colors);
+    const platform = d.platform ? String(d.platform) : null;
+    const isBarrierFree =
+      !!d.barrier_free && this._config!.show_accessibility;
+    return html`
+      <div class="hero-entry">
+        <span
+          class="line-badge"
+          style=${styleMap({ background: accent })}
+        >${d.line}</span>
+        <span class="hero-direction">${deText(d.towards)}</span>
+        ${platform
+          ? html`<span class="hero-platform"
+              >${this._t("platform_short")} ${platform}</span
+            >`
+          : nothing}
+        ${isBarrierFree
+          ? html`<span
+              class="hero-a11y"
+              role="img"
+              aria-label=${this._t("barrier_free_title")}
+              title=${this._t("barrier_free_title")}
+            >
+              <ha-icon
+                icon="mdi:wheelchair-accessibility"
+                aria-hidden="true"
+              ></ha-icon>
+            </span>`
+          : nothing}
+      </div>
+    `;
   }
 
   private _renderRow(d: DepartureAttr): TemplateResult {
