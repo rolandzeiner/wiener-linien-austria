@@ -193,8 +193,13 @@ export const cardStyles = css`
     grid-template-columns: auto 1fr;
     gap: var(--ha-spacing-3, 12px);
     align-items: center;
-    padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
-    margin: 0 calc(-1 * var(--nb-pad-x));
+    /* Internal padding only. .wrap (the .station's parent) already
+       provides --nb-pad-x on the outside, so the hero just needs
+       comfortable inner padding for the tinted surface. Earlier
+       negative-margin trick (mirroring Linz's bleed-out pattern) was
+       wrong here because Linz's card has no equivalent .wrap wrapper —
+       it stamps --linz-pad-x directly on each block. */
+    padding: var(--ha-spacing-3, 12px);
     background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
     border-radius: var(--nb-radius-lg);
   }
