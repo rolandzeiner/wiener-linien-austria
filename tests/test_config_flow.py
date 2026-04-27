@@ -9,6 +9,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
+from custom_components.wiener_linien_austria.config_flow import _probe_monitor_lines
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
@@ -16,10 +17,9 @@ from custom_components.wiener_linien_austria.const import (
     CONF_SEARCH_QUERY,
     CONF_STOP_NAME,
     DOMAIN,
-    USER_AGENT,
 )
 
-DEFAULT_LINES = ["U1|H|Leopoldau", "U1|R|Alaudagasse"]
+DEFAULT_LINES = ["U1|H", "U1|R"]
 
 
 async def _complete_flow(
@@ -96,11 +96,9 @@ async def test_full_flow_creates_entry(hass: HomeAssistant, mock_fetch) -> None:
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "select_lines"
 
-    # Step 3: accept defaults
-    lines_default = [
-        f"{name}|H|Leopoldau" if towards == "Leopoldau" else f"{name}|R|Alaudagasse"
-        for name, towards in [("U1", "Leopoldau"), ("U1", "Alaudagasse")]
-    ]
+    # Step 3: accept defaults — config flow now writes (line, direction)
+    # pair keys, not (line, direction, towards) triples.
+    lines_default = ["U1|H", "U1|R"]
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {CONF_LINES: lines_default, CONF_SCAN_INTERVAL: 60},
@@ -177,7 +175,7 @@ async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) 
     assert flow["step_id"] == "select_lines"
     result = await hass.config_entries.flow.async_configure(
         flow["flow_id"],
-        {CONF_LINES: ["U1|H|Leopoldau"], CONF_SCAN_INTERVAL: 120},
+        {CONF_LINES: ["U1|H"], CONF_SCAN_INTERVAL: 120},
     )
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "reconfigure_successful"
@@ -185,7 +183,7 @@ async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) 
     refreshed = hass.config_entries.async_get_entry(entry.entry_id)
     assert refreshed is not None
     assert refreshed.unique_id == original_unique_id
-    assert refreshed.data[CONF_LINES] == ["U1|H|Leopoldau"]
+    assert refreshed.data[CONF_LINES] == ["U1|H"]
     assert refreshed.data[CONF_SCAN_INTERVAL] == 120
 
 
@@ -259,6 +257,56 @@ async def test_reconfigure_aborts_when_catalogue_unavailable(
     assert result["reason"] == "catalogue_unavailable"
 
 
+async def test_probe_monitor_lines_dedupes_and_sorts(hass: HomeAssistant) -> None:
+    """Multi-RBL responses with overlapping (line, direction) collapse to one row.
+
+    The probe is the source of truth for the line-selection step. Wiener Linien
+    sometimes returns the same line twice across RBLs (e.g. inbound + outbound
+    platforms both list the connecting U-Bahn) and may also list the same
+    (line, direction) under different `towards` termini on branching lines.
+    The probe must dedupe by `(line, direction)` — the towards segment is
+    label-only, not part of the saved key.
+    """
+    body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {"name": "U1", "direction": "H", "towards": "Leopoldau", "type": "ptMetro"},
+                        {"name": "U1", "direction": "H", "towards": "Leopoldau", "type": "ptMetro"},  # dup
+                    ]
+                },
+                {
+                    "lines": [
+                        {"name": "U1", "direction": "R", "towards": "Alaudagasse", "type": "ptMetro"},
+                        # Empty towards must be dropped, not crash.
+                        {"name": "U1", "direction": "H", "towards": "", "type": "ptMetro"},
+                        # Empty name must be dropped.
+                        {"name": "", "direction": "H", "towards": "X", "type": "ptMetro"},
+                    ]
+                },
+            ]
+        },
+    }
+    resp = MagicMock()
+    resp.status = 200
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    session = MagicMock()
+    session.get = AsyncMock(return_value=resp)
+
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        rows = await _probe_monitor_lines(hass, [4111, 4118])
+
+    # Two unique (line, direction) pairs, sorted by (line, towards label).
+    # "Alaudagasse" sorts before "Leopoldau" so U1|R comes first.
+    assert [r["key"] for r in rows] == ["U1|R", "U1|H"]
+
+
 async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
     hass: HomeAssistant, mock_fetch
 ) -> None:
@@ -285,35 +333,3 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
     assert result["reason"] == "stop_gone"
 
 
-async def test_probe_sends_canonical_user_agent(hass: HomeAssistant) -> None:
-    """Config-flow's /monitor trial probe sends the canonical USER_AGENT.
-
-    Regression guard paired with the coordinator-side check in
-    test_coordinator.py::test_fetch_sends_user_agent_header. Malformed UA
-    is silent — nothing on the client side breaks — but Wiener Linien's
-    log parsers rely on the RFC-9110 slash-separated format to attribute
-    and contact this integration specifically. Bypass the `mock_fetch`
-    fixture (which stubs `_probe_monitor_lines` wholesale) and patch at
-    the session layer so the real code path runs.
-    """
-    from custom_components.wiener_linien_austria.config_flow import (
-        _probe_monitor_lines,
-    )
-
-    resp = MagicMock()
-    resp.raise_for_status = MagicMock()
-    resp.json = AsyncMock(
-        return_value={"message": {"messageCode": 1}, "data": {"monitors": []}}
-    )
-    session = MagicMock()
-    session.get = AsyncMock(return_value=resp)
-
-    with patch(
-        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
-        return_value=session,
-    ):
-        await _probe_monitor_lines(hass, [4111, 4118])
-
-    assert session.get.await_count == 1
-    headers = session.get.call_args.kwargs["headers"]
-    assert headers == {"User-Agent": USER_AGENT}

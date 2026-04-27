@@ -1,0 +1,34 @@
+Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0
+
+Data source
+-----------
+Wiener Linien OGD real-time API
+https://www.wienerlinien.at/open-data
+
+License
+-------
+All live departure, stop, and disruption data is © Wiener Linien GmbH & Co KG
+and published under the Creative Commons Attribution 4.0 International license
+(CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
+
+Required attribution string
+---------------------------
+This integration emits the following attribution on every sensor (via the
+`attribution` state attribute) and in every diagnostics download:
+
+    Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0
+
+If you build a Lovelace card or any other user-facing UI on top of this
+integration, please keep this attribution visible.
+
+Disclaimer
+----------
+This integration is not affiliated with or endorsed by Wiener Linien
+GmbH & Co KG. The developer assumes no liability for the accuracy,
+completeness, or timeliness of the displayed data — including delays,
+cancellations, or service disruptions. Use at your own risk.
+
+Diese Integration steht in keiner Verbindung zur Wiener Linien GmbH & Co KG
+und wird von dieser nicht unterstützt. Für die Richtigkeit, Vollständigkeit
+und Aktualität der angezeigten Daten wird keine Haftung übernommen.
+Nutzung auf eigene Verantwortung.

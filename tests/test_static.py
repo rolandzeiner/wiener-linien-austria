@@ -1,7 +1,7 @@
 """Tests for the Wiener Linien Austria static catalogue layer."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -72,14 +72,28 @@ def test_merge_haltepunkte_populates_rbls() -> None:
 
 
 def test_search_is_case_insensitive_and_prefers_prefix() -> None:
-    """Search returns prefix matches first, then substring matches."""
-    stations = _parse_haltestellen(HALTESTELLEN_CSV)
-    catalogue = StaticCatalogue(stations_by_diva=stations, last_fetched="t")
-    results = catalogue.search("steph")
-    assert results and results[0].name == "Stephansplatz"
+    """Search returns prefix matches first, then substring matches.
 
-    # Case-insensitive substring
-    assert catalogue.search("STEPH")[0].name == "Stephansplatz"
+    A station that *contains* the needle as a substring but doesn't start
+    with it must rank below a station that starts with the needle, even
+    when the substring-match would sort earlier alphabetically.
+    """
+    # "Westbahnhof" sorts before "ZZZ Westbahnhof Areal" alphabetically; the
+    # second station only matches via substring, so the *first* must rank
+    # higher even though it sorts later by name.
+    stations = {
+        1: Station(diva=1, name="ZZZ Westbahnhof Areal", municipality="Wien",
+                   longitude=0, latitude=0),
+        2: Station(diva=2, name="Westbahnhof", municipality="Wien",
+                   longitude=0, latitude=0),
+    }
+    catalogue = StaticCatalogue(stations_by_diva=stations, last_fetched="t")
+
+    results = catalogue.search("west")
+    assert [s.name for s in results] == ["Westbahnhof", "ZZZ Westbahnhof Areal"]
+
+    # Case-insensitive
+    assert catalogue.search("WEST")[0].name == "Westbahnhof"
     # No hits
     assert catalogue.search("XYZ-nope") == []
 
@@ -193,6 +207,123 @@ async def test_async_load_catalogue_no_cache_fetches_and_saves(
     saved = await store.async_load()
     assert saved is not None
     assert any(s["diva"] == 12345 for s in saved["stations"])
+
+
+# ---------------------------------------------------------------------------
+# _fetch_and_build: live network simulation, conditional GET branches
+# ---------------------------------------------------------------------------
+
+
+def _csv_response(text: str, *, etag: str = '"v1"', status: int = 200) -> MagicMock:
+    resp = MagicMock()
+    resp.status = status
+    resp.headers = {"ETag": etag, "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
+    resp.raise_for_status = MagicMock()
+    resp.text = AsyncMock(return_value=text)
+    return resp
+
+
+async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
+    """Cold-start: both CSVs come back 200, parse + merge into a catalogue."""
+    from custom_components.wiener_linien_austria import static as static_mod
+
+    haltestellen_resp = _csv_response(HALTESTELLEN_CSV, etag='"halte-v1"')
+    haltepunkte_resp = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v1"')
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=[haltestellen_resp, haltepunkte_resp])
+
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        catalogue = await static_mod._fetch_and_build(hass, prior=None)
+
+    assert sorted(catalogue.stations_by_diva.keys()) == [60200123, 60201012]
+    assert sorted(catalogue.stations_by_diva[60201012].rbls) == [4111, 4118]
+    # Validators captured for the next conditional GET.
+    assert catalogue.validators["haltestellen"].etag == '"halte-v1"'
+    assert catalogue.validators["haltepunkte"].etag == '"punkte-v1"'
+
+
+async def test_fetch_and_build_both_304_returns_prior_unchanged(
+    hass: HomeAssistant,
+) -> None:
+    """Both CSVs unchanged → return prior catalogue object verbatim, no rewrite."""
+    from custom_components.wiener_linien_austria import static as static_mod
+    from custom_components.wiener_linien_austria.http import CacheValidators
+
+    prior = _sample()
+    prior.validators = {
+        "haltestellen": CacheValidators(etag='"halte-v1"'),
+        "haltepunkte": CacheValidators(etag='"punkte-v1"'),
+    }
+
+    not_modified = MagicMock()
+    not_modified.status = 304
+    not_modified.headers = {}
+    not_modified.raise_for_status = MagicMock()
+    not_modified.text = AsyncMock(side_effect=AssertionError("must not call .text() on 304"))
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=[not_modified, not_modified])
+
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        result = await static_mod._fetch_and_build(hass, prior=prior)
+
+    # Same object — identity check, the optimisation we want to lock in.
+    assert result is prior
+
+
+async def test_fetch_and_build_one_304_one_fresh(
+    hass: HomeAssistant,
+) -> None:
+    """Half-and-half: haltestellen 304, haltepunkte fresh — re-merge correctly.
+
+    This is the trickiest branch in static._fetch_and_build (lines 165-191).
+    The prior station list is reused, but RBLs are rebuilt from the freshly-
+    fetched haltepunkte CSV. A bug here would either drop stations entirely
+    or duplicate RBLs across loads.
+    """
+    from custom_components.wiener_linien_austria import static as static_mod
+    from custom_components.wiener_linien_austria.http import CacheValidators
+
+    # Prior already has Stephansplatz with RBLs [9999] (intentionally weird so
+    # we can detect whether the merge correctly REPLACED them with [4111, 4118]).
+    prior_stations = _parse_haltestellen(HALTESTELLEN_CSV)
+    prior_stations[60201012].rbls = [9999]  # placeholder
+    prior = StaticCatalogue(
+        stations_by_diva=prior_stations,
+        last_fetched="2026-04-20T12:00:00+00:00",
+        validators={
+            "haltestellen": CacheValidators(etag='"halte-v1"'),
+            "haltepunkte": CacheValidators(etag='"punkte-v1"'),
+        },
+    )
+
+    halte_304 = MagicMock()
+    halte_304.status = 304
+    halte_304.headers = {}
+    halte_304.raise_for_status = MagicMock()
+    halte_304.text = AsyncMock(side_effect=AssertionError("304 has no body"))
+
+    punkte_fresh = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v2"')
+
+    fake_session = MagicMock()
+    fake_session.get = AsyncMock(side_effect=[halte_304, punkte_fresh])
+
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        result = await static_mod._fetch_and_build(hass, prior=prior)
+
+    # Stations preserved (haltestellen 304), RBLs rebuilt from fresh haltepunkte.
+    assert sorted(result.stations_by_diva.keys()) == [60200123, 60201012]
+    assert sorted(result.stations_by_diva[60201012].rbls) == [4111, 4118]
 
 
 async def test_async_refresh_catalogue_keeps_cache_on_failure(

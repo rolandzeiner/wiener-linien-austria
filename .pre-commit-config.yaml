@@ -1,0 +1,24 @@
+# Run the same lint + type checks as CI before each commit.
+# Install once per clone: `pre-commit install`.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.13.0
+    hooks:
+      - id: mypy
+        additional_dependencies: [homeassistant, voluptuous]
+        args: [--strict, --ignore-missing-imports]
+        files: ^custom_components/wiener_linien_austria/.*\.py$
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict

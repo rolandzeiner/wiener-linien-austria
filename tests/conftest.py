@@ -6,12 +6,55 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.const import CONF_SCAN_INTERVAL
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
+from syrupy.assertion import SnapshotAssertion
 
+from custom_components.wiener_linien_austria.const import (
+    CONF_DIVA,
+    CONF_LINES,
+    CONF_RBLS,
+    CONF_STOP_NAME,
+    DOMAIN,
+)
 from custom_components.wiener_linien_austria.static import Station, StaticCatalogue
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Use the HA snapshot extension so diagnostics / state dumps diff cleanly.
+
+    Create/update snapshots with: pytest --snapshot-update
+    Stored under tests/snapshots/ next to the test module.
+    """
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
+
 FIXTURES = Path(__file__).parent / "fixtures"
+
+# Canonical entry data used by every test that builds a MockConfigEntry.
+# Stephansplatz with two RBLs (4111 inbound, 4118 outbound) carrying U1.
+BASE_ENTRY_DATA: dict = {
+    CONF_DIVA: 60201012,
+    CONF_STOP_NAME: "Stephansplatz",
+    CONF_RBLS: [4111, 4118],
+    CONF_LINES: ["U1|H", "U1|R"],
+    CONF_SCAN_INTERVAL: 60,
+}
+
+
+def make_entry(data: dict | None = None) -> MockConfigEntry:
+    """Build a MockConfigEntry with realistic Stephansplatz data."""
+    entry_data = {**BASE_ENTRY_DATA, **(data or {})}
+    return MockConfigEntry(
+        domain=DOMAIN,
+        data=entry_data,
+        options={},
+        title="Stephansplatz",
+        version=2,
+    )
 
 
 def _load_fixture(name: str) -> dict:
@@ -97,17 +140,25 @@ def tram_fixture() -> dict:
 @pytest.fixture
 def mock_fetch(monitor_fixture):
     """Stub the coordinator's fetch + the config-flow live probe."""
-    parsed_lines = [
-        {
-            "key": f"{line['name']}|{line['direction']}|{line['towards']}",
-            "line": line["name"],
-            "towards": line["towards"],
-            "direction": line["direction"],
-            "type": line["type"],
-        }
-        for monitor in monitor_fixture["data"]["monitors"]
-        for line in monitor["lines"]
-    ]
+    # Mirror _probe_monitor_lines: dedupe on (line, direction) pair and
+    # keep the first-seen `towards` as a display-only label.
+    parsed_lines: list[dict] = []
+    seen: set[str] = set()
+    for monitor in monitor_fixture["data"]["monitors"]:
+        for line in monitor["lines"]:
+            key = f"{line['name']}|{line['direction']}"
+            if key in seen:
+                continue
+            seen.add(key)
+            parsed_lines.append(
+                {
+                    "key": key,
+                    "line": line["name"],
+                    "towards": line["towards"],
+                    "direction": line["direction"],
+                    "type": line["type"],
+                }
+            )
     from custom_components.wiener_linien_austria.coordinator import _parse_monitor_body
 
     parsed = _parse_monitor_body(

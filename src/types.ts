@@ -82,6 +82,11 @@ export interface ModernStopConfig {
   entity: string;
   lines?: string[];
   direction?: "H" | "R" | "";
+  // Per-line direction override. Absence of an entry for a given line
+  // means the stop-wide `direction` (or "Both" if that's also unset)
+  // applies to it. Allows mixed routing: "U1 toward city, U3 toward
+  // home" at the same stop.
+  line_directions?: Record<string, "H" | "R">;
   walk_times?: WalkTimes;
 }
 
@@ -99,10 +104,15 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   line_colors?: Record<string, string>;
 
   show_accessibility?: boolean;
+  accessibility_only?: boolean;
   show_traffic_info?: boolean;
   show_elevator_info?: boolean;
   show_delay?: boolean;
   show_type_icon?: boolean;
+  show_platform?: boolean;
+  show_hero_metric?: boolean;
+  show_departures?: boolean;
+  hide_header?: boolean;
   hide_attribution?: boolean;
 
   layout?: "stacked" | "tabs";
@@ -114,7 +124,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 
 export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
-export type RetroStyle = "classic" | "warm";
+export type RetroStyle = "classic" | "warm" | "pixel";
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
@@ -128,5 +138,6 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   style?: RetroStyle;
   flicker?: boolean;
   wheelchair_race?: boolean;
+  accessibility_only?: boolean;
   walk_times?: WalkTimes;
 }

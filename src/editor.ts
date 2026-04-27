@@ -14,18 +14,24 @@ import {
 } from "./utils/config.js";
 import {
   collectLinesInSelection,
-  lineKey,
+  lineDirKey,
   linesAtStop,
+  pairsAtStop,
   tripletsAtStop,
 } from "./utils/departures.js";
 import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
 type ToggleField =
   | "show_accessibility"
+  | "accessibility_only"
   | "show_traffic_info"
   | "show_elevator_info"
   | "show_delay"
   | "show_type_icon"
+  | "show_platform"
+  | "show_hero_metric"
+  | "show_departures"
+  | "hide_header"
   | "hide_attribution";
 
 @customElement("wiener-linien-austria-card-editor")
@@ -98,6 +104,17 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     });
   }
 
+  private _setLineDirection(eid: string, line: string, dir: "H" | "R" | null): void {
+    this._updateStop(eid, (s) => {
+      const cur = { ...(s.line_directions ?? {}) };
+      if (dir === null) delete cur[line];
+      else cur[line] = dir;
+      if (Object.keys(cur).length) s.line_directions = cur;
+      else delete s.line_directions;
+      return s;
+    });
+  }
+
   private _setWalkTime(eid: string, key: string, raw: string): void {
     const n = parseInt(raw, 10);
     const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
@@ -130,8 +147,10 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
   }
 
   private _setMaxDepartures(v: number): void {
+    // Lower bound 0 — hero-only mode (no row list). Mirrors the
+    // normalise clamp in utils/config.ts.
     if (!this._config) return;
-    const max_departures = Math.max(1, Math.min(20, Math.round(v)));
+    const max_departures = Math.max(0, Math.min(20, Math.round(v)));
     if (max_departures === this._config.max_departures) return;
     this._fire({ ...this._config, max_departures });
   }
@@ -217,9 +236,50 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     const lines = linesAtStop(attrs);
     const picked = new Set(stop.lines ?? []);
     const dir = stop.direction ?? null;
-    // Walk-time rows track the selected direction so the editor doesn't
-    // show irrelevant rows when the user locks to H or R.
-    const triplets = tripletsAtStop(attrs).filter((t) => !dir || t.direction === dir);
+    const lineDirs = stop.line_directions ?? {};
+
+    // "Effectively visible" lines = whitelist if set, else all lines.
+    const effectiveLines = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
+    const showPerLineDir = effectiveLines.length >= 2;
+
+    // Walk-time triplets: drop any whose line is filtered out by the
+    // whitelist OR whose direction is filtered out by the *effective*
+    // direction for that line (per-line override beats stop-wide).
+    const allTriplets = tripletsAtStop(attrs);
+    const triplets = allTriplets.filter((t) => {
+      if (picked.size > 0 && !picked.has(t.line)) return false;
+      const effDir = lineDirs[t.line] ?? dir;
+      if (effDir && t.direction !== effDir) return false;
+      return true;
+    });
+
+    // Available directions per scope. A line that only runs in one
+    // direction at this stop (e.g. terminus) gets the unavailable
+    // direction button disabled, and the available one shows as
+    // "active" by default — even when the user hasn't explicitly
+    // picked it — so the UI never offers a meaningless choice.
+    const dirsForLine = (line: string): Set<"H" | "R"> => {
+      const out = new Set<"H" | "R">();
+      for (const t of allTriplets) {
+        if (t.line !== line) continue;
+        if (t.direction === "H" || t.direction === "R") out.add(t.direction);
+      }
+      return out;
+    };
+    const stopAvailableDirs = new Set<"H" | "R">();
+    for (const t of allTriplets) {
+      if (t.direction === "H" || t.direction === "R") stopAvailableDirs.add(t.direction);
+    }
+    const stopHasH = stopAvailableDirs.has("H");
+    const stopHasR = stopAvailableDirs.has("R");
+    const stopOnlyOne = stopAvailableDirs.size === 1;
+    // Stop-wide effective active state: explicit pick wins; otherwise
+    // pre-highlight the only-available direction so the user sees the
+    // truth at a glance. Encoded as 3 booleans (not a tagged union) so
+    // TypeScript can't accidentally narrow them across template uses.
+    const stopActiveH = dir === "H" || (dir === null && stopOnlyOne && stopHasH);
+    const stopActiveR = dir === "R" || (dir === null && stopOnlyOne && stopHasR);
+    const stopActiveBoth = dir === null && !stopOnlyOne;
 
     return html`
       <div class="stop-filter">
@@ -251,56 +311,75 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <div class="direction-buttons">
             <button
               type="button"
-              class=${classMap({ active: dir === "H" })}
-              @click=${() => this._setDirection(stop.entity, "H")}
+              class=${classMap({ active: stopActiveH })}
+              ?disabled=${!stopHasH}
+              title=${!stopHasH ? this._et("direction_unavailable") : ""}
+              @click=${() => stopHasH && this._setDirection(stop.entity, "H")}
             >${this._t("dir_h")}</button>
             <button
               type="button"
-              class=${classMap({ active: dir === "R" })}
-              @click=${() => this._setDirection(stop.entity, "R")}
+              class=${classMap({ active: stopActiveR })}
+              ?disabled=${!stopHasR}
+              title=${!stopHasR ? this._et("direction_unavailable") : ""}
+              @click=${() => stopHasR && this._setDirection(stop.entity, "R")}
             >${this._t("dir_r")}</button>
             <button
               type="button"
-              class=${classMap({ active: dir === null })}
-              @click=${() => this._setDirection(stop.entity, null)}
+              class=${classMap({ active: stopActiveBoth })}
+              ?disabled=${stopOnlyOne}
+              title=${stopOnlyOne ? this._et("direction_unavailable") : ""}
+              @click=${() => !stopOnlyOne && this._setDirection(stop.entity, null)}
             >${this._t("dir_both")}</button>
           </div>
         </div>
 
-        ${triplets.length
+        ${showPerLineDir
           ? html`
               <div class="stop-filter-row">
-                <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
-                <div class="editor-hint">${this._et("walk_time_hint")}</div>
-                <div class="walk-time-list">
-                  ${triplets.map((t) => {
-                    const color = colorForLine(t.line, overrides);
-                    const key = lineKey(t.line, t.direction, t.towards);
-                    const val = stop.walk_times?.[key];
-                    const arrow = t.towards ? `→ ${t.towards}` : "";
+                <div class="stop-filter-row-label">${this._et("per_line_direction_label")}</div>
+                <div class="editor-hint">${this._et("per_line_direction_hint")}</div>
+                <div class="per-line-dir-list">
+                  ${effectiveLines.map((l) => {
+                    const color = colorForLine(l, overrides);
+                    const lineDir = lineDirs[l] ?? null;
+                    const lineAvail = dirsForLine(l);
+                    const lineHasH = lineAvail.has("H");
+                    const lineHasR = lineAvail.has("R");
+                    const lineOnlyOne = lineAvail.size === 1;
+                    const lineActiveH = lineDir === "H" || (lineDir === null && lineOnlyOne && lineHasH);
+                    const lineActiveR = lineDir === "R" || (lineDir === null && lineOnlyOne && lineHasR);
+                    const lineActiveBoth = lineDir === null && !lineOnlyOne;
+                    const ariaLabel = this._et("per_line_direction_aria").replace("{line}", l);
+                    const dirUnavailable = this._et("direction_unavailable");
                     return html`
-                      <div class="walk-time-row">
-                        <span class="walk-time-badge" style=${styleMap({ background: color })}>${t.line}</span>
-                        <span class="walk-time-towards" title=${t.towards}>${arrow}</span>
-                        <input
-                          type="number"
-                          class="walk-time-input"
-                          min="0"
-                          max="120"
-                          step="1"
-                          inputmode="numeric"
-                          placeholder=${this._et("walk_time_placeholder")}
-                          .value=${val !== undefined ? String(val) : ""}
-                          @keydown=${this._swallowKeys}
-                          @keyup=${this._swallowKeys}
-                          @keypress=${this._swallowKeys}
-                          @change=${(ev: Event) =>
-                            this._setWalkTime(
-                              stop.entity,
-                              key,
-                              (ev.target as HTMLInputElement).value,
-                            )}
-                        />
+                      <div class="per-line-dir-row" role="group" aria-label=${ariaLabel}>
+                        <span class="per-line-dir-badge" style=${styleMap({ background: color })}>${l}</span>
+                        <div class="direction-buttons">
+                          <button
+                            type="button"
+                            class=${classMap({ active: lineActiveH })}
+                            aria-pressed=${lineActiveH ? "true" : "false"}
+                            ?disabled=${!lineHasH}
+                            title=${!lineHasH ? dirUnavailable : ""}
+                            @click=${() => lineHasH && this._setLineDirection(stop.entity, l, "H")}
+                          >${this._t("dir_h")}</button>
+                          <button
+                            type="button"
+                            class=${classMap({ active: lineActiveR })}
+                            aria-pressed=${lineActiveR ? "true" : "false"}
+                            ?disabled=${!lineHasR}
+                            title=${!lineHasR ? dirUnavailable : ""}
+                            @click=${() => lineHasR && this._setLineDirection(stop.entity, l, "R")}
+                          >${this._t("dir_r")}</button>
+                          <button
+                            type="button"
+                            class=${classMap({ active: lineActiveBoth })}
+                            aria-pressed=${lineActiveBoth ? "true" : "false"}
+                            ?disabled=${lineOnlyOne}
+                            title=${lineOnlyOne ? dirUnavailable : ""}
+                            @click=${() => !lineOnlyOne && this._setLineDirection(stop.entity, l, null)}
+                          >${this._t("dir_both")}</button>
+                        </div>
                       </div>
                     `;
                   })}
@@ -308,6 +387,68 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
               </div>
             `
           : nothing}
+
+        ${(() => {
+          // Walk-time rows: one per (line, direction) pair, not per
+          // (line, direction, towards) triple. The /monitor API flips
+          // line.towards across polls on branching termini, so a triple
+          // key would silently miss the threshold whenever the API
+          // labelled the same line with a different terminus. The pair
+          // key is what filterDepartures actually looks up.
+          const allPairs = pairsAtStop(attrs);
+          const pairs = allPairs.filter((p) => {
+            if (picked.size > 0 && !picked.has(p.line)) return false;
+            const effDir = lineDirs[p.line] ?? dir;
+            if (effDir && p.direction !== effDir) return false;
+            return true;
+          });
+          if (!pairs.length) return nothing;
+          return html`
+            <div class="stop-filter-row">
+              <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
+              <div class="editor-hint">${this._et("walk_time_hint")}</div>
+              <div class="walk-time-list">
+                ${pairs.map((p) => {
+                  const color = colorForLine(p.line, overrides);
+                  const key = lineDirKey(p.line, p.direction);
+                  const val = stop.walk_times?.[key];
+                  const terminusLabel = p.termini.join(" / ");
+                  const arrow = terminusLabel ? `→ ${terminusLabel}` : "";
+                  const branchingHint =
+                    p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
+                  return html`
+                    <div class="walk-time-row">
+                      <span class="walk-time-badge" style=${styleMap({ background: color })}>${p.line}</span>
+                      <span class="walk-time-towards" title=${branchingHint || terminusLabel}>${arrow}</span>
+                      <input
+                        type="number"
+                        class="walk-time-input"
+                        min="0"
+                        max="120"
+                        step="1"
+                        inputmode="numeric"
+                        placeholder=${this._et("walk_time_placeholder")}
+                        aria-label=${this._et("walk_time_aria")
+                          .replace("{line}", p.line)
+                          .replace("{towards}", terminusLabel)}
+                        .value=${val !== undefined ? String(val) : ""}
+                        @keydown=${this._swallowKeys}
+                        @keyup=${this._swallowKeys}
+                        @keypress=${this._swallowKeys}
+                        @change=${(ev: Event) =>
+                          this._setWalkTime(
+                            stop.entity,
+                            key,
+                            (ev.target as HTMLInputElement).value,
+                          )}
+                      />
+                    </div>
+                  `;
+                })}
+              </div>
+            </div>
+          `;
+        })()}
       </div>
     `;
   }
@@ -319,7 +460,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
         <div class="section-header">${this._et("section_display")}</div>
 
         <div class="toggle-row" style="gap:12px;">
-          <span style="font-size:13px;">${this._et("layout_label")}</span>
+          <span style="font-size:0.8125rem;">${this._et("layout_label")}</span>
           <div class="direction-buttons">
             <button
               type="button"
@@ -338,7 +479,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <span class="slider-label">${this._et("max_departures")}</span>
           <input
             type="range"
-            min="1"
+            min="0"
             max="20"
             step="1"
             .value=${String(cfg.max_departures)}
@@ -351,7 +492,12 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <span class="slider-value">${cfg.max_departures}</span>
         </div>
 
+        ${this._renderSwitch("hide_header", cfg.hide_header)}
+        ${this._renderSwitch("show_hero_metric", cfg.show_hero_metric)}
+        ${this._renderSwitch("show_departures", cfg.show_departures)}
+        ${this._renderSwitch("show_platform", cfg.show_platform)}
         ${this._renderSwitch("show_accessibility", cfg.show_accessibility)}
+        ${this._renderSwitch("accessibility_only", cfg.accessibility_only)}
         ${this._renderSwitch("show_type_icon", cfg.show_type_icon)}
         ${this._renderSwitch("show_traffic_info", cfg.show_traffic_info)}
         ${this._renderSwitch("show_elevator_info", cfg.show_elevator_info)}
@@ -389,16 +535,29 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
               const current = colorForLine(line, overrides, "#888888");
               const hex = current.startsWith("#") ? current : "#888888";
               const hasOverride = Boolean(overrides[line.toUpperCase()]);
+              const ariaPick = this._et("pick_color_for_line").replace("{line}", line);
               return html`
                 <div class="color-row">
-                  <div class="line-preview" style=${styleMap({ background: current })}>${line}</div>
-                  <span>${line}</span>
-                  <input
-                    type="color"
-                    .value=${hex}
-                    @change=${(ev: Event) =>
-                      this._setLineColor(line, (ev.target as HTMLInputElement).value)}
-                  />
+                  <span class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</span>
+                  <label
+                    class="color-swatch"
+                    style=${`--swatch-color: ${hex};`}
+                    title=${ariaPick}
+                  >
+                    <ha-icon icon="mdi:palette-swatch-variant" aria-hidden="true"></ha-icon>
+                    <span class="color-swatch-hex">${hex.toUpperCase()}</span>
+                    <input
+                      type="color"
+                      class="color-swatch-input"
+                      .value=${hex}
+                      .configValue=${`color_${line}`}
+                      aria-label=${ariaPick}
+                      @input=${(ev: Event) =>
+                        this._setLineColor(line, (ev.target as HTMLInputElement).value)}
+                      @change=${(ev: Event) =>
+                        this._setLineColor(line, (ev.target as HTMLInputElement).value)}
+                    />
+                  </label>
                   <button
                     type="button"
                     class="reset-btn"
@@ -430,14 +589,14 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 10px;
     }
     .section-header {
-      font-size: 11px;
+      font-size: 0.6875rem;
       font-weight: 600;
       letter-spacing: 0.6px;
       text-transform: uppercase;
       color: var(--secondary-text-color);
     }
     .editor-hint {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--secondary-text-color);
       line-height: 1.4;
     }
@@ -450,9 +609,10 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 12px;
-      border-radius: 16px;
-      font-size: 13px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 22px;
+      font-size: 0.8125rem;
       cursor: pointer;
       transition: all 0.15s;
       border: 1px solid var(--divider-color);
@@ -467,7 +627,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     .chip:hover { opacity: 0.85; }
     .chip .stop-name { font-weight: 500; }
     .chip .eid {
-      font-size: 11px;
+      font-size: 0.6875rem;
       opacity: 0.7;
     }
     .stop-filter {
@@ -479,7 +639,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 8px;
     }
     .stop-filter-header {
-      font-size: 13px;
+      font-size: 0.8125rem;
       font-weight: 500;
     }
     .stop-filter-row {
@@ -488,7 +648,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 4px;
     }
     .stop-filter-row-label {
-      font-size: 11px;
+      font-size: 0.6875rem;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       color: var(--secondary-text-color);
@@ -498,46 +658,90 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       gap: 4px;
     }
     .direction-buttons button {
-      padding: 4px 12px;
-      border-radius: 14px;
+      padding: 10px 16px;
+      border-radius: 22px;
       border: 1px solid var(--divider-color);
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       cursor: pointer;
+      min-height: 44px;
     }
     .direction-buttons button.active {
       background: var(--primary-color);
       color: var(--text-primary-color, #fff);
       border-color: var(--primary-color);
     }
+    .direction-buttons button[disabled] {
+      opacity: 0.35;
+      cursor: not-allowed;
+      background: var(--card-background-color, #fff);
+      color: var(--secondary-text-color);
+      border-color: var(--divider-color);
+    }
     .color-row {
       display: grid;
-      grid-template-columns: 44px 1fr auto auto;
+      grid-template-columns: 44px 1fr auto;
       align-items: center;
       gap: 10px;
     }
     .color-row .line-preview {
+      display: inline-block;
       text-align: center;
       font-weight: 700;
       color: #fff;
-      border-radius: 4px;
-      padding: 2px 4px;
-      font-size: 0.9em;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.85rem;
+      box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     }
-    .color-row input[type="color"] {
-      width: 40px;
-      height: 28px;
-      padding: 0;
-      border: 1px solid var(--divider-color);
-      border-radius: 4px;
-      background: transparent;
+    .color-swatch {
+      --swatch-color: var(--primary-color);
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--swatch-color) 18%, transparent);
+      color: var(--primary-text-color);
+      font-size: 0.8125rem;
+      font-weight: 500;
       cursor: pointer;
+      transition: background-color 0.16s ease, transform 0.06s ease;
+    }
+    .color-swatch:hover {
+      background: color-mix(in srgb, var(--swatch-color) 26%, transparent);
+    }
+    .color-swatch:active {
+      transform: translateY(1px);
+    }
+    .color-swatch ha-icon {
+      --mdc-icon-size: 20px;
+      color: var(--swatch-color);
+      flex-shrink: 0;
+    }
+    .color-swatch-hex {
+      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+    .color-swatch-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      cursor: pointer;
+      overflow: hidden;
     }
     .color-row .reset-btn {
-      font-size: 11px;
-      padding: 4px 8px;
-      border-radius: 4px;
+      font-size: 0.6875rem;
+      padding: 6px 10px;
+      border-radius: 999px;
       border: 1px solid var(--divider-color);
       background: transparent;
       color: var(--secondary-text-color);
@@ -557,7 +761,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       accent-color: var(--primary-color);
     }
     .slider-row .slider-label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       min-width: 180px;
     }
@@ -565,7 +769,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       min-width: 24px;
       text-align: center;
       font-weight: 600;
-      font-size: 14px;
+      font-size: 0.875rem;
       color: var(--primary-color);
     }
     .toggle-row {
@@ -574,7 +778,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       justify-content: space-between;
     }
     .toggle-row label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       cursor: pointer;
     }
@@ -598,7 +802,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       font-size: 0.9em;
     }
     .walk-time-towards {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -612,12 +816,32 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       border-radius: 4px;
       background: var(--card-background-color, transparent);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       text-align: right;
     }
     .walk-time-input::-webkit-outer-spin-button,
     .walk-time-input::-webkit-inner-spin-button {
       margin: 0;
+    }
+    .per-line-dir-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .per-line-dir-row {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      align-items: center;
+      gap: 10px;
+    }
+    .per-line-dir-badge {
+      text-align: center;
+      font-weight: 700;
+      color: #fff;
+      border-radius: 6px;
+      padding: 4px 6px;
+      font-size: 0.85rem;
+      box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     }
   `;
 }

@@ -15,7 +15,7 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "white",
   "black",
 ] as const);
-const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm"] as const);
+const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
 
 function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -24,7 +24,17 @@ function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
     const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
     if (!Number.isFinite(n)) continue;
     if (n < 0 || n > 120) continue;
-    out[k] = Math.round(n);
+    // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the
+    // current shape is a (line, direction) pair ("U1|R") so the
+    // threshold applies to every train on that direction regardless of
+    // which terminus the API currently labels them with. Collapse any
+    // surviving triple keys to pairs and, on collision, keep the
+    // larger value (more conservative for the user).
+    const parts = k.split("|");
+    const key = parts.length >= 3 ? `${parts[0]}|${parts[1]}` : k;
+    const rounded = Math.round(n);
+    const prev = out[key];
+    out[key] = prev === undefined ? rounded : Math.max(prev, rounded);
   }
   return Object.keys(out).length ? out : undefined;
 }
@@ -33,7 +43,22 @@ export interface NormalisedModernStop {
   entity: string;
   lines?: string[];
   direction?: "H" | "R";
+  line_directions?: Record<string, "H" | "R">;
   walk_times?: WalkTimes;
+}
+
+function normaliseLineDirections(
+  raw: unknown,
+): Record<string, "H" | "R"> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, "H" | "R"> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof k !== "string" || !k.length) continue;
+    if (v === "H" || v === "R") out[k] = v;
+    // Any other value (including "Both" / "" / undefined) means
+    // "no override" — which is encoded as the absence of the key.
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
@@ -50,6 +75,8 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
     if (lines.length) stop.lines = lines;
   }
   if (r.direction === "H" || r.direction === "R") stop.direction = r.direction;
+  const lineDirs = normaliseLineDirections(r.line_directions);
+  if (lineDirs) stop.line_directions = lineDirs;
   const walk = normaliseWalkTimes(r.walk_times);
   if (walk) stop.walk_times = walk;
   return stop;
@@ -66,10 +93,15 @@ export interface NormalisedModernConfig {
   max_departures: number;
   line_colors: Record<string, string>;
   show_accessibility: boolean;
+  accessibility_only: boolean;
   show_traffic_info: boolean;
   show_elevator_info: boolean;
   show_delay: boolean;
   show_type_icon: boolean;
+  show_platform: boolean;
+  show_hero_metric: boolean;
+  show_departures: boolean;
+  hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
 }
@@ -77,10 +109,15 @@ export interface NormalisedModernConfig {
 const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
+  accessibility_only: false,
   show_traffic_info: true,
   show_elevator_info: true,
   show_delay: true,
   show_type_icon: false,
+  show_platform: true,
+  show_hero_metric: true,
+  show_departures: true,
+  hide_header: false,
   hide_attribution: false,
   layout: "stacked",
 };
@@ -112,7 +149,12 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   }
 
   const maxRaw = Number(raw.max_departures);
-  const maxClamped = Number.isFinite(maxRaw) ? Math.max(1, Math.min(20, Math.round(maxRaw))) : MODERN_DEFAULTS.max_departures;
+  // Lower bound 0 enables hero-only mode: user sees the upcoming
+  // departure(s) in the hero block and no row list. Useful for tight
+  // dashboards where the next bus/tram is the only thing the user
+  // cares about. Upper bound 20 stays — pragmatic limit before the
+  // row list becomes a wall of text.
+  const maxClamped = Number.isFinite(maxRaw) ? Math.max(0, Math.min(20, Math.round(maxRaw))) : MODERN_DEFAULTS.max_departures;
 
   const lineColors: Record<string, string> = {};
   if (raw.line_colors && typeof raw.line_colors === "object") {
@@ -129,10 +171,15 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     max_departures: maxClamped,
     line_colors: lineColors,
     show_accessibility: raw.show_accessibility ?? MODERN_DEFAULTS.show_accessibility,
+    accessibility_only: raw.accessibility_only ?? MODERN_DEFAULTS.accessibility_only,
     show_traffic_info: raw.show_traffic_info ?? MODERN_DEFAULTS.show_traffic_info,
     show_elevator_info: raw.show_elevator_info ?? MODERN_DEFAULTS.show_elevator_info,
     show_delay: raw.show_delay ?? MODERN_DEFAULTS.show_delay,
     show_type_icon: raw.show_type_icon ?? MODERN_DEFAULTS.show_type_icon,
+    show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
+    show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
+    show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
+    hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
   };
@@ -152,6 +199,7 @@ export interface NormalisedRetroConfig {
   style: RetroStyle;
   flicker: boolean;
   wheelchair_race: boolean;
+  accessibility_only: boolean;
   walk_times?: WalkTimes;
 }
 
@@ -176,6 +224,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     style,
     flicker: raw.flicker === true,
     wheelchair_race: raw.wheelchair_race === true,
+    accessibility_only: raw.accessibility_only === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
   };
 }

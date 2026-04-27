@@ -12,12 +12,12 @@ import type {
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
-import { lineKey, tripletsAtStop } from "./utils/departures.js";
+import { lineDirKey, pairsAtStop } from "./utils/departures.js";
 import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
 const SIZES: readonly RetroSize[] = ["small", "medium", "regular"] as const;
 const STATION_BGS: readonly RetroStationBg[] = ["default", "white", "black"] as const;
-const STYLES: readonly RetroStyle[] = ["classic", "warm"] as const;
+const STYLES: readonly RetroStyle[] = ["classic", "warm", "pixel"] as const;
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor extends LitElement implements LovelaceCardEditor {
@@ -133,6 +133,11 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     this._fire({ ...this._config, wheelchair_race: on });
   }
 
+  private _setAccessibilityOnly(on: boolean): void {
+    if (!this._config) return;
+    this._fire({ ...this._config, accessibility_only: on });
+  }
+
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
     const n = parseInt(raw, 10);
@@ -169,6 +174,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
           cfg.style,
           cfg.flicker,
           cfg.wheelchair_race,
+          cfg.accessibility_only,
         )}
       </div>
     `;
@@ -263,8 +269,12 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
   private _renderWalkTimeSection(): TemplateResult {
     const cfg = this._config!;
     const attrs = this._attrs(cfg.entity);
-    const triplets = cfg.entity
-      ? tripletsAtStop(attrs).filter((t) => t.direction === cfg.direction)
+    // One row per (line, direction) pair, not per (line, direction,
+    // towards) triple — line.towards flips poll-to-poll on branching
+    // termini, so a triple-keyed threshold would silently miss every
+    // train labelled with the "other" terminus. See lineDirKey docs.
+    const pairs = cfg.entity
+      ? pairsAtStop(attrs).filter((p) => p.direction === cfg.direction)
       : [];
     const walkTimes = cfg.walk_times ?? {};
 
@@ -273,14 +283,17 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
         <div class="section-header">${this._et("section_walk_time")}</div>
         <div class="editor-hint">${this._et("walk_time_hint")}</div>
         <div class="walk-time-list">
-          ${triplets.length
-            ? triplets.map((t) => {
-                const key = lineKey(t.line, t.direction, t.towards);
+          ${pairs.length
+            ? pairs.map((p) => {
+                const key = lineDirKey(p.line, p.direction);
                 const val = walkTimes[key];
+                const terminusLabel = p.termini.join(" / ");
+                const branchingHint =
+                  p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
                 return html`
                   <div class="walk-time-row">
-                    <span class="walk-time-badge">${t.line}</span>
-                    <span class="walk-time-towards" title=${t.towards}>→ ${t.towards}</span>
+                    <span class="walk-time-badge">${p.line}</span>
+                    <span class="walk-time-towards" title=${branchingHint || terminusLabel}>→ ${terminusLabel}</span>
                     <input
                       type="number"
                       class="walk-time-input"
@@ -289,6 +302,9 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
                       step="1"
                       inputmode="numeric"
                       placeholder=${this._et("walk_time_placeholder")}
+                      aria-label=${this._et("walk_time_aria")
+                        .replace("{line}", p.line)
+                        .replace("{towards}", terminusLabel)}
                       .value=${val !== undefined ? String(val) : ""}
                       @keydown=${this._swallowKeys}
                       @keyup=${this._swallowKeys}
@@ -347,6 +363,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     style: RetroStyle,
     flicker: boolean,
     wheelchairRace: boolean,
+    accessibilityOnly: boolean,
   ): TemplateResult {
     return html`
       <div class="editor-section">
@@ -358,6 +375,15 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
             .checked=${showPlatform}
             @change=${(ev: Event) =>
               this._setShowPlatform((ev.target as HTMLInputElement).checked)}
+          ></ha-switch>
+        </div>
+        <div class="toggle-row">
+          <label for="retro-accessibility-only">${this._et("accessibility_only")}</label>
+          <ha-switch
+            id="retro-accessibility-only"
+            .checked=${accessibilityOnly}
+            @change=${(ev: Event) =>
+              this._setAccessibilityOnly((ev.target as HTMLInputElement).checked)}
           ></ha-switch>
         </div>
         <div class="toggle-row">
@@ -427,14 +453,14 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       gap: 10px;
     }
     .section-header {
-      font-size: 11px;
+      font-size: 0.6875rem;
       font-weight: 600;
       letter-spacing: 0.6px;
       text-transform: uppercase;
       color: var(--secondary-text-color);
     }
     .editor-hint {
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--secondary-text-color);
       line-height: 1.4;
     }
@@ -447,9 +473,10 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 5px 12px;
-      border-radius: 16px;
-      font-size: 13px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 22px;
+      font-size: 0.8125rem;
       cursor: pointer;
       transition: all 0.15s;
       border: 1px solid var(--divider-color);
@@ -464,7 +491,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     .chip:hover { opacity: 0.85; }
     .chip .stop-name { font-weight: 500; }
     .chip .eid {
-      font-size: 11px;
+      font-size: 0.6875rem;
       opacity: 0.7;
     }
     .direction-buttons {
@@ -473,14 +500,15 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       flex-wrap: wrap;
     }
     .direction-buttons button {
-      padding: 6px 16px;
-      border-radius: 16px;
+      padding: 10px 16px;
+      border-radius: 22px;
       border: 1px solid var(--divider-color);
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       cursor: pointer;
       min-width: 48px;
+      min-height: 44px;
     }
     .direction-buttons button.active {
       background: var(--primary-color);
@@ -492,7 +520,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
     }
     .direction-warning {
       margin-top: 4px;
-      font-size: 12px;
+      font-size: 0.75rem;
       color: var(--warning-color, #ffa000);
     }
     .toggle-row {
@@ -501,7 +529,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       justify-content: space-between;
     }
     .toggle-row label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       cursor: pointer;
     }
@@ -514,7 +542,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       flex-wrap: wrap;
     }
     .segmented-label {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
     }
     .walk-time-list {
@@ -538,7 +566,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       background: var(--primary-color);
     }
     .walk-time-towards {
-      font-size: 13px;
+      font-size: 0.8125rem;
       color: var(--primary-text-color);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -552,7 +580,7 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
       border-radius: 4px;
       background: var(--card-background-color, transparent);
       color: var(--primary-text-color);
-      font-size: 13px;
+      font-size: 0.8125rem;
       text-align: right;
     }
   `;
