@@ -256,16 +256,22 @@ export const cardStyles = css`
       transparent
     );
   }
-  .rt-pill {
-    font-size: 0.6875rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+  /* Hero accessibility flag — small icon-only pill in the same slot
+     the rt-pill used to occupy. Only rendered when the next departure
+     is barrier-free AND the user has show_accessibility enabled. */
+  .hero-a11y {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: #fff;
-    background: var(--nb-rt);
-    padding: 2px 8px;
+    background: var(--nb-info);
+    padding: 2px 6px;
     border-radius: 999px;
-    letter-spacing: 0.04em;
     flex-shrink: 0;
     forced-color-adjust: none;
+  }
+  .hero-a11y ha-icon {
+    --mdc-icon-size: 16px;
   }
   .hero-chips {
     display: inline-flex;
@@ -552,37 +558,13 @@ export const cardStyles = css`
   }
   /* State colours — Linz parity. now / late / early class lights up
      the countdown so the user catches the schedule deviation at a
-     glance without parsing the delay text. */
+     glance without parsing the delay text. The Wiener Linien API does
+     not expose a realtime-vs-scheduled distinction, so the live-pulse
+     dot Linz uses isn't applicable here — countdowns are coloured
+     purely by their delay state. */
   .countdown.now   { color: var(--nb-accent); }
   .countdown.late  { color: var(--nb-error); }
   .countdown.early { color: var(--nb-info); }
-
-  /* Realtime cue — leading green bullet on the countdown of any row
-     marked .row-rt. Pairs with the row's existing realtime semantics
-     (delay text already labels the row "live") so the colour-only cue
-     satisfies WCAG 1.4.1. The pulse animation is suppressed by the
-     prefers-reduced-motion catch-all near the end of this stylesheet
-     and by the .no-pulse opt-out class on ha-card. */
-  .dep-row.row-rt .countdown::before {
-    content: "•";
-    color: var(--nb-rt);
-    margin-right: 4px;
-    font-size: 1.1em;
-    line-height: 1;
-    vertical-align: middle;
-    display: inline-block;
-    transform-origin: center;
-    animation: wlLivePulse 2s ease-in-out infinite;
-  }
-  @keyframes wlLivePulse {
-    0%, 100% { opacity: 0.55; transform: scale(1); }
-    50%      { opacity: 1;    transform: scale(1.18); }
-  }
-  ha-card.no-pulse .dep-row.row-rt .countdown::before {
-    animation: none;
-    opacity: 1;
-    transform: none;
-  }
 
   /* Empty / fallback states */
   .empty {

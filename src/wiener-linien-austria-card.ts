@@ -397,7 +397,12 @@ export class WienerLinienAustriaCard extends LitElement {
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
     const heroPlatform = heroDep?.platform ? String(heroDep.platform) : null;
-    const heroIsRealtime = !!heroDep?.realtime;
+    // Show the wheelchair flag in the hero only if the user has
+    // accessibility info enabled AND this departure is actually
+    // barrier-free. The realtime/live distinction the Wiener Linien
+    // API doesn't expose so we don't surface it in the hero.
+    const heroIsBarrierFree =
+      !!heroDep?.barrier_free && this._config!.show_accessibility;
 
     const isPanel = tabIndex !== undefined;
     return html`
@@ -454,9 +459,17 @@ export class WienerLinienAustriaCard extends LitElement {
                         >${this._t("platform_short")} ${heroPlatform}</span
                       >`
                     : nothing}
-                  ${heroIsRealtime
-                    ? html`<span class="rt-pill" title=${this._t("realtime_short")}>
-                        ${this._t("realtime_short")}
+                  ${heroIsBarrierFree
+                    ? html`<span
+                        class="hero-a11y"
+                        role="img"
+                        aria-label=${this._t("barrier_free_title")}
+                        title=${this._t("barrier_free_title")}
+                      >
+                        <ha-icon
+                          icon="mdi:wheelchair-accessibility"
+                          aria-hidden="true"
+                        ></ha-icon>
                       </span>`
                     : nothing}
                 </div>
@@ -716,12 +729,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
 
     return html`
-      <li
-        class=${classMap({
-          "dep-row": true,
-          "row-rt": !!d.realtime,
-        })}
-      >
+      <li class="dep-row">
         <div class="line-badge" style=${styleMap({ background: color })}>${line}</div>
         <div class="towards">
           ${typeIcon

@@ -5,7 +5,6 @@
     "min": "min",
     "now": "Now",
     "platform_short": "Pl.",
-    "realtime_short": "Live",
     "version_update": "Wiener Linien Austria updated to v{v} — please reload",
     "version_reload": "Reload",
     "no_entities_picked": "No stop selected",
