@@ -83,6 +83,22 @@ function headerIconForType(type: string | undefined): string {
   return iconForType(type) ?? "mdi:bus-stop";
 }
 
+// Platform-prefix translation key by vehicle type. Wien distinguishes
+// "Gleis" for rail-bound transport (U-Bahn, tram) from "Steig" for bus
+// stops; mixing them up reads wrong to native speakers. Unknown types
+// fall back to the bus prefix because most Wien stops are bus stops.
+function platformLabelKey(type: string | undefined): string {
+  switch (type) {
+    case LINE_TYPE_METRO:
+    case LINE_TYPE_TRAM:
+      return "platform_short_rail";
+    case LINE_TYPE_BUS_DAY:
+    case LINE_TYPE_BUS_NIGHT:
+    default:
+      return "platform_short_bus";
+  }
+}
+
 @customElement("wiener-linien-austria-card")
 export class WienerLinienAustriaCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -710,7 +726,7 @@ export class WienerLinienAustriaCard extends LitElement {
         <span class="hero-direction">${deText(d.towards)}</span>
         ${platform
           ? html`<span class="hero-platform"
-              >${this._t("platform_short")} ${platform}</span
+              >${this._t(platformLabelKey(d.type))} ${platform}</span
             >`
           : nothing}
         ${isBarrierFree
