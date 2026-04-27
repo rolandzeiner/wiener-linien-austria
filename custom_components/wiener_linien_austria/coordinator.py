@@ -369,12 +369,23 @@ def _parse_monitor_body(
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
 
+    # Match the user's selection on (line, direction) only — `line.towards`
+    # is unstable for branching termini (e.g. U1/R reports "Oberlaa" or
+    # "Alaudagasse" depending on which vehicle is next), so a strict triple
+    # match would intermittently drop the whole line block. Each departure
+    # keeps its own `vehicle.towards` so the actual destination is preserved.
+    selected_pairs: set[tuple[str, str]] | None = (
+        {tuple(k.split("|", 2)[:2]) for k in selected}  # type: ignore[misc]
+        if selected is not None
+        else None
+    )
+
     for monitor in monitors:
         for line in (monitor.get("lines") or []):
             line_name = str(line.get("name") or "").strip()
             if not line_name:
                 continue
-            towards = str(line.get("towards") or "").strip()
+            line_towards = str(line.get("towards") or "").strip()
             direction = str(line.get("direction") or "").strip()
             line_type = str(line.get("type") or "").strip()
             barrier_free = bool(line.get("barrierFree"))
@@ -387,7 +398,7 @@ def _parse_monitor_body(
                 else None
             )
 
-            if selected is not None and _line_key(line_name, direction, towards) not in selected:
+            if selected_pairs is not None and (line_name, direction) not in selected_pairs:
                 continue
 
             for entry in (line.get("departures") or {}).get("departure") or []:
@@ -395,10 +406,12 @@ def _parse_monitor_body(
                 countdown = _safe_int(dep_time.get("countdown"))
                 if countdown is None:
                     continue
+                vehicle = entry.get("vehicle") or {}
+                vehicle_towards = str(vehicle.get("towards") or "").strip()
                 departures.append(
                     Departure(
                         line=line_name,
-                        towards=towards,
+                        towards=vehicle_towards or line_towards,
                         direction=direction,
                         type=line_type,
                         countdown=countdown,

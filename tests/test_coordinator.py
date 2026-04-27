@@ -70,6 +70,87 @@ def test_parse_monitor_body_empty_returns_empty() -> None:
     assert result.server_time is None
 
 
+def test_parse_monitor_body_preserves_vehicle_towards_on_branching_lines() -> None:
+    """Each departure keeps its own `vehicle.towards`, not the line's.
+
+    Regression for #18: U1 stop "Taubstummengasse" — the API returns one
+    line block with `line.towards` set to whichever terminus the *next*
+    vehicle is heading to (Oberlaa or Alaudagasse), but individual
+    departures within that block carry their actual `vehicle.towards`.
+    The parser must surface those per-vehicle destinations and must not
+    drop the whole block when `line.towards` differs from the user's
+    saved selection key.
+    """
+    body = {
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U1",
+                            "towards": "Alaudagasse",
+                            "direction": "R",
+                            "type": "ptMetro",
+                            "barrierFree": True,
+                            "realtimeSupported": True,
+                            "trafficjam": False,
+                            "departures": {
+                                "departure": [
+                                    {
+                                        "departureTime": {"countdown": 0},
+                                        "vehicle": {"towards": "Oberlaa"},
+                                    },
+                                    {
+                                        "departureTime": {"countdown": 3},
+                                        "vehicle": {"towards": "Alaudagasse"},
+                                    },
+                                ]
+                            },
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    # User selected the OTHER terminus (Oberlaa) at config-flow time.
+    selected = {"U1|R|Oberlaa"}
+    result = _parse_monitor_body(body, selected, None)
+    # Line block is not dropped, both departures kept, towards reflects
+    # the actual vehicle destination.
+    assert {d.towards for d in result.departures} == {"Oberlaa", "Alaudagasse"}
+    assert all(d.line == "U1" and d.direction == "R" for d in result.departures)
+
+
+def test_parse_monitor_body_falls_back_to_line_towards_when_vehicle_missing() -> None:
+    """If `vehicle.towards` is absent, fall back to `line.towards`."""
+    body = {
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U2",
+                            "towards": "Seestadt",
+                            "direction": "H",
+                            "type": "ptMetro",
+                            "barrierFree": True,
+                            "realtimeSupported": True,
+                            "trafficjam": False,
+                            "departures": {
+                                "departure": [
+                                    {"departureTime": {"countdown": 1}},
+                                ]
+                            },
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    result = _parse_monitor_body(body, None, None)
+    assert [d.towards for d in result.departures] == ["Seestadt"]
+
+
 # ---------------------------------------------------------------------------
 # Fetch behaviour
 # ---------------------------------------------------------------------------
