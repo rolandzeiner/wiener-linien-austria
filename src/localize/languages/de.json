@@ -2,8 +2,8 @@
   "modern": {
     "no_data": "Keine Abfahrten verfügbar",
     "betriebsschluss": "Betriebsschluss",
-    "min": "min",
-    "now": "jetzt",
+    "min": "Min",
+    "now": "Jetzt",
     "version_update": "Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden",
     "version_reload": "Neu laden",
     "no_entities_picked": "Keine Haltestelle ausgewählt",

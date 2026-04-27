@@ -203,7 +203,12 @@ export const cardStyles = css`
     font-size: var(--nb-metric-size);
     font-weight: 600;
     line-height: 1;
-    color: var(--primary-text-color);
+    /* Tint the hero countdown with the per-station accent (set inline
+       on .station via style="--nb-accent: …;"). Matches Linz-Linien's
+       hero pattern where the big number reads in the mode-of-transport
+       brand colour rather than neutral text — gives the user a
+       glanceable "this is the next bus from THIS line" cue. */
+    color: var(--nb-accent);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.5px;
   }

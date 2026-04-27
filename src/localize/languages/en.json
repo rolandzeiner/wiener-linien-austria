@@ -3,7 +3,7 @@
     "no_data": "No departures available",
     "betriebsschluss": "End of service",
     "min": "min",
-    "now": "now",
+    "now": "Now",
     "version_update": "Wiener Linien Austria updated to v{v} — please reload",
     "version_reload": "Reload",
     "no_entities_picked": "No stop selected",
