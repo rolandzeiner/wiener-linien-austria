@@ -9,7 +9,7 @@ DOMAIN: Final = "wiener_linien_austria"
 
 # Integration version — manifest.json carries the clean target ("1.3.0");
 # this constant is allowed to carry a "-beta-N" suffix during development.
-INTEGRATION_VERSION: Final = "1.3.0-beta-2"
+INTEGRATION_VERSION: Final = "1.3.0-beta-3"
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
@@ -94,9 +94,9 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 # match the corresponding Python constant below byte-for-byte, else the
 # reload banner loops. Retro card iterates independently from the modern
 # one so the two can rev at different paces without spurious reloads.
-CARD_VERSION: Final = "1.3.0-beta-2"
+CARD_VERSION: Final = "1.3.0-beta-3"
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
-RETRO_CARD_VERSION: Final = "1.3.0-beta-2"
+RETRO_CARD_VERSION: Final = "1.3.0-beta-3"
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
