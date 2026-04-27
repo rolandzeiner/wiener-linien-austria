@@ -59,6 +59,7 @@
       "show_delay": "Show delays",
       "show_hero_metric": "Show next-departure countdown",
       "show_departures": "Show departure list",
+      "hide_header": "Hide header",
       "hide_attribution": "Hide data source",
       "layout_label": "Multi-stop layout",
       "layout_stacked": "Stacked",

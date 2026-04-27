@@ -438,29 +438,31 @@ export class WienerLinienAustriaCard extends LitElement {
         tabindex=${isPanel ? "0" : nothing}
         aria-label=${title}
       >
-        <header class="head">
-          <span class="icon-tile" aria-hidden="true">
-            <ha-icon icon=${headerIcon}></ha-icon>
-          </span>
-          <div class="title-block">
-            <h3 class="title">${deText(apiName, stopCfg.entity)}</h3>
-            ${heroLead?.line
-              ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
-              : nothing}
-          </div>
-          ${mapUrl
-            ? html`<div class="head-actions">
-                <a
-                  class="icon-action"
-                  href=${mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title=${openInMaps}
-                  aria-label="${openInMaps}: ${title}"
-                ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>
-              </div>`
-            : nothing}
-        </header>
+        ${this._config!.hide_header
+          ? nothing
+          : html`<header class="head">
+              <span class="icon-tile" aria-hidden="true">
+                <ha-icon icon=${headerIcon}></ha-icon>
+              </span>
+              <div class="title-block">
+                <h3 class="title">${deText(apiName, stopCfg.entity)}</h3>
+                ${heroLead?.line
+                  ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
+                  : nothing}
+              </div>
+              ${mapUrl
+                ? html`<div class="head-actions">
+                    <a
+                      class="icon-action"
+                      href=${mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title=${openInMaps}
+                      aria-label="${openInMaps}: ${title}"
+                    ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>
+                  </div>`
+                : nothing}
+            </header>`}
 
         ${this._config!.show_hero_metric && heroLead
           ? html`<div class="hero">

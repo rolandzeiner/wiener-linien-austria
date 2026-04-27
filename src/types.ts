@@ -112,6 +112,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_platform?: boolean;
   show_hero_metric?: boolean;
   show_departures?: boolean;
+  hide_header?: boolean;
   hide_attribution?: boolean;
 
   layout?: "stacked" | "tabs";

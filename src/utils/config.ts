@@ -101,6 +101,7 @@ export interface NormalisedModernConfig {
   show_platform: boolean;
   show_hero_metric: boolean;
   show_departures: boolean;
+  hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
 }
@@ -116,6 +117,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" |
   show_platform: true,
   show_hero_metric: true,
   show_departures: true,
+  hide_header: false,
   hide_attribution: false,
   layout: "stacked",
 };
@@ -177,6 +179,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
     show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
     show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
+    hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
   };

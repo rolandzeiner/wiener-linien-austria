@@ -31,6 +31,7 @@ type ToggleField =
   | "show_platform"
   | "show_hero_metric"
   | "show_departures"
+  | "hide_header"
   | "hide_attribution";
 
 @customElement("wiener-linien-austria-card-editor")
@@ -491,6 +492,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <span class="slider-value">${cfg.max_departures}</span>
         </div>
 
+        ${this._renderSwitch("hide_header", cfg.hide_header)}
         ${this._renderSwitch("show_hero_metric", cfg.show_hero_metric)}
         ${this._renderSwitch("show_departures", cfg.show_departures)}
         ${this._renderSwitch("show_platform", cfg.show_platform)}
