@@ -1350,7 +1350,7 @@ function e(e,t,i,r){var n,s=arguments.length,o=s<3?t:null===r?r=Object.getOwnPro
         </div>
         ${c?W`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:K}
       </div>
-    `}_toggleTraffic(e){const t=new Set(this._expandedTraffic);t.has(e)?t.delete(e):t.add(e),this._expandedTraffic=t}_computeHeroGroup(e){if(0===e.length)return[];const t=e=>Number.isFinite(e.countdown)?e.countdown:Number.POSITIVE_INFINITY;let i=Number.POSITIVE_INFINITY;for(const r of e){const e=t(r);e>0&&e<i&&(i=e)}if(Number.isFinite(i))return e.filter(e=>t(e)===i);const r=e[0];return r?[r]:[]}_renderHeroEntry(e){const t=Ge(e.line||"",this._config.line_colors),i=e.platform?String(e.platform):null,r=!!e.barrier_free&&this._config.show_accessibility;return W`
+    `}_toggleTraffic(e){const t=new Set(this._expandedTraffic);t.has(e)?t.delete(e):t.add(e),this._expandedTraffic=t}_computeHeroGroup(e){if(0===e.length)return[];const t=e=>Number.isFinite(e.countdown)?e.countdown:Number.POSITIVE_INFINITY;let i=Number.POSITIVE_INFINITY;for(const r of e){const e=t(r);e<i&&(i=e)}if(!Number.isFinite(i)){const t=e[0];return t?[t]:[]}return i<=0?e.filter(e=>t(e)<=0):e.filter(e=>t(e)===i)}_renderHeroEntry(e){const t=Ge(e.line||"",this._config.line_colors),i=e.platform?String(e.platform):null,r=!!e.barrier_free&&this._config.show_accessibility;return W`
       <div class="hero-entry">
         <span
           class="line-badge"

@@ -378,13 +378,13 @@ export class WienerLinienAustriaCard extends LitElement {
     const openInMaps = this._t("open_in_maps");
 
     // Hero group — the set of departures shown in the big hero block.
-    // Mirrors linz-linien-austria's _computeHeroGroup with one Wiener
-    // tweak: prefer the soonest *future* (cd > 0) departure as the
-    // lead. The Wiener Linien API can keep a bus at countdown 0 for
-    // longer than its tick resolution while it dwells at the platform,
-    // and the user already missed any "0 min" so the actionable info
-    // is the next one coming. Once we have a lead, group every other
-    // departure that ties on the exact same countdown.
+    // Mirrors linz-linien-austria's _computeHeroGroup verbatim: the
+    // soonest departure leads, and any others tied on the exact same
+    // countdown ride along. When the lead is at "Jetzt" (cd <= 0), we
+    // group every other Jetzt departure too — a tram and a bus both
+    // showing as Jetzt simultaneously is the case where surfacing
+    // both is most useful, even though either has technically already
+    // arrived.
     const heroGroup = this._computeHeroGroup(filtered);
     const heroLead = heroGroup[0];
 
@@ -663,35 +663,32 @@ export class WienerLinienAustriaCard extends LitElement {
   /**
    * Compute the hero group: the lead departure plus any others tied
    * on the exact same countdown. Mirrors linz-linien-austria's
-   * _computeHeroGroup with one Wiener-specific tweak — prefer the
-   * soonest *future* (cd > 0) departure as the lead, since the
-   * Wiener Linien API can keep a bus at countdown 0 longer than its
-   * tick resolution while it dwells at the platform, and the user
-   * already missed any "0 min" entry. Returns [] if there are no
-   * usable departures.
+   * _computeHeroGroup verbatim. When the lead is at Jetzt (cd <= 0),
+   * group every entry that's also at Jetzt — multiple lines all
+   * arriving simultaneously is precisely the case where surfacing all
+   * of them in the hero is most useful. Outside the Jetzt case, fall
+   * back to strict tie-only grouping so a 5-min lead doesn't pull a
+   * 6-min entry into the hero. Returns [] if there are no usable
+   * departures.
    */
   private _computeHeroGroup(filtered: DepartureAttr[]): DepartureAttr[] {
     if (filtered.length === 0) return [];
     const cdOf = (d: DepartureAttr): number =>
       Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
 
-    // Prefer future departures: smallest cd > 0.
-    let leadCd = Number.POSITIVE_INFINITY;
+    let minCd = Number.POSITIVE_INFINITY;
     for (const d of filtered) {
       const cd = cdOf(d);
-      if (cd > 0 && cd < leadCd) leadCd = cd;
+      if (cd < minCd) minCd = cd;
     }
-
-    if (Number.isFinite(leadCd)) {
-      // Group everyone tied at exactly leadCd minutes.
-      return filtered.filter((d) => cdOf(d) === leadCd);
+    if (!Number.isFinite(minCd)) {
+      const first = filtered[0];
+      return first ? [first] : [];
     }
-
-    // Fallback: no future departures. Show the first row as a
-    // single-item hero so the block doesn't go empty when only Jetzt
-    // entries remain.
-    const first = filtered[0];
-    return first ? [first] : [];
+    if (minCd <= 0) {
+      return filtered.filter((d) => cdOf(d) <= 0);
+    }
+    return filtered.filter((d) => cdOf(d) === minCd);
   }
 
   /**
