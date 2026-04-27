@@ -536,6 +536,31 @@ export const cardStyles = css`
     font-weight: 500;
     margin-left: 4px;
   }
+  /* Trailing column container — holds the optional platform pill and
+     the optional flags icons in one grid cell. Inline-flex so platform
+     sits left of flags (and thus left of the wheelchair icon, per the
+     portfolio convention). */
+  .row-end {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  /* Platform pill — small, muted, monospace digits so "Steig 7" /
+     "Gleis 12" line up visually across rows. Same shape as Linz's
+     .row-platform with the wiener-namespace tokens. */
+  .row-platform {
+    font-size: var(--ha-font-size-xs, 0.7rem);
+    color: var(--secondary-text-color);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: color-mix(
+      in srgb,
+      var(--secondary-text-color) 12%,
+      transparent
+    );
+  }
   .row-flags {
     display: inline-flex;
     align-items: center;

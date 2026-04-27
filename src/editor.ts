@@ -28,6 +28,7 @@ type ToggleField =
   | "show_elevator_info"
   | "show_delay"
   | "show_type_icon"
+  | "show_platform"
   | "show_hero_metric"
   | "show_departures"
   | "hide_attribution";
@@ -490,6 +491,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
 
         ${this._renderSwitch("show_hero_metric", cfg.show_hero_metric)}
         ${this._renderSwitch("show_departures", cfg.show_departures)}
+        ${this._renderSwitch("show_platform", cfg.show_platform)}
         ${this._renderSwitch("show_accessibility", cfg.show_accessibility)}
         ${this._renderSwitch("accessibility_only", cfg.accessibility_only)}
         ${this._renderSwitch("show_type_icon", cfg.show_type_icon)}

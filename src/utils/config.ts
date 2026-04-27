@@ -98,6 +98,7 @@ export interface NormalisedModernConfig {
   show_elevator_info: boolean;
   show_delay: boolean;
   show_type_icon: boolean;
+  show_platform: boolean;
   show_hero_metric: boolean;
   show_departures: boolean;
   hide_attribution: boolean;
@@ -112,6 +113,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" |
   show_elevator_info: true,
   show_delay: true,
   show_type_icon: false,
+  show_platform: true,
   show_hero_metric: true,
   show_departures: true,
   hide_attribution: false,
@@ -167,6 +169,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     show_elevator_info: raw.show_elevator_info ?? MODERN_DEFAULTS.show_elevator_info,
     show_delay: raw.show_delay ?? MODERN_DEFAULTS.show_delay,
     show_type_icon: raw.show_type_icon ?? MODERN_DEFAULTS.show_type_icon,
+    show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
     show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
     show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,

@@ -53,6 +53,7 @@
       "show_accessibility": "Barrierefrei-Symbol anzeigen",
       "accessibility_only": "Nur barrierefreie Abfahrten anzeigen",
       "show_type_icon": "Verkehrsmittel-Symbol anzeigen",
+      "show_platform": "Steig/Gleis anzeigen",
       "show_traffic_info": "Störungen anzeigen",
       "show_elevator_info": "Aufzugsinfo anzeigen",
       "show_delay": "Verspätungen anzeigen",

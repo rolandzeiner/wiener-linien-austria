@@ -714,7 +714,8 @@ export class WienerLinienAustriaCard extends LitElement {
    */
   private _renderHeroEntry(d: DepartureAttr): TemplateResult {
     const accent = colorForLine(d.line || "", this._config!.line_colors);
-    const platform = d.platform ? String(d.platform) : null;
+    const platform =
+      this._config!.show_platform && d.platform ? String(d.platform) : null;
     const isBarrierFree =
       !!d.barrier_free && this._config!.show_accessibility;
     return html`
@@ -777,6 +778,8 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const showA11y = this._config!.show_accessibility;
     const hasFlags = Boolean(d.traffic_jam || (showA11y && d.barrier_free));
+    const rowPlatform =
+      this._config!.show_platform && d.platform ? String(d.platform) : null;
 
     const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
 
@@ -790,25 +793,34 @@ export class WienerLinienAustriaCard extends LitElement {
             ? html` <span class="delay">${delayText}</span>`
             : nothing}
         </div>
-        ${hasFlags
-          ? html`<span class="row-flags">
-              ${d.traffic_jam
-                ? html`<ha-icon
-                    class="disturbance"
-                    icon="mdi:alert-circle"
-                    role="img"
-                    aria-label=${this._t("disturbance_title")}
-                    title=${this._t("disturbance_title")}
-                  ></ha-icon>`
+        ${rowPlatform || hasFlags
+          ? html`<span class="row-end">
+              ${rowPlatform
+                ? html`<span class="row-platform"
+                    >${this._t(platformLabelKey(d.type))} ${rowPlatform}</span
+                  >`
                 : nothing}
-              ${showA11y && d.barrier_free
-                ? html`<ha-icon
-                    class="a11y"
-                    icon="mdi:wheelchair-accessibility"
-                    role="img"
-                    aria-label=${this._t("barrier_free_title")}
-                    title=${this._t("barrier_free_title")}
-                  ></ha-icon>`
+              ${hasFlags
+                ? html`<span class="row-flags">
+                    ${d.traffic_jam
+                      ? html`<ha-icon
+                          class="disturbance"
+                          icon="mdi:alert-circle"
+                          role="img"
+                          aria-label=${this._t("disturbance_title")}
+                          title=${this._t("disturbance_title")}
+                        ></ha-icon>`
+                      : nothing}
+                    ${showA11y && d.barrier_free
+                      ? html`<ha-icon
+                          class="a11y"
+                          icon="mdi:wheelchair-accessibility"
+                          role="img"
+                          aria-label=${this._t("barrier_free_title")}
+                          title=${this._t("barrier_free_title")}
+                        ></ha-icon>`
+                      : nothing}
+                  </span>`
                 : nothing}
             </span>`
           : html`<span></span>`}
