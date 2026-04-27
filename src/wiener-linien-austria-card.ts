@@ -396,9 +396,8 @@ export class WienerLinienAustriaCard extends LitElement {
     const heroValue =
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
-    const heroLabel = heroDep?.line && heroDep?.towards
-      ? `${heroDep.line} → ${heroDep.towards}`
-      : this._t("departures_list");
+    const heroPlatform = heroDep?.platform ? String(heroDep.platform) : null;
+    const heroIsRealtime = !!heroDep?.realtime;
 
     const isPanel = tabIndex !== undefined;
     return html`
@@ -435,25 +434,38 @@ export class WienerLinienAustriaCard extends LitElement {
             : nothing}
         </header>
 
-        ${this._config!.show_hero_metric
+        ${this._config!.show_hero_metric && heroDep
           ? html`<div class="hero">
-              <div class="metric">
-                <div class="metric-row">
-                  <span
-                    class="metric-value"
-                    aria-live="polite"
-                    aria-atomic="true"
-                  >${heroValue}${heroUnit ? html` <span class="metric-of">${heroUnit}</span>` : nothing}</span>
-                </div>
-                <span class="metric-label" aria-hidden="true">${heroLabel}</span>
+              <div class="hero-time" aria-live="polite" aria-atomic="true">
+                <span class="hero-min">${heroValue}</span>
+                ${heroUnit
+                  ? html`<span class="hero-unit">${heroUnit}</span>`
+                  : nothing}
               </div>
-              ${showElevator
-                ? html`<div class="hero-chips">${this._renderElevatorFlag(elevatorInfos)}</div>`
-                : nothing}
+              <div class="hero-meta">
+                <div class="hero-entry">
+                  <span
+                    class="line-badge"
+                    style=${styleMap({ background: accent })}
+                  >${heroDep.line}</span>
+                  <span class="hero-direction">${deText(heroDep.towards)}</span>
+                  ${heroPlatform
+                    ? html`<span class="hero-platform"
+                        >${this._t("platform_short")} ${heroPlatform}</span
+                      >`
+                    : nothing}
+                  ${heroIsRealtime
+                    ? html`<span class="rt-pill" title=${this._t("realtime_short")}>
+                        ${this._t("realtime_short")}
+                      </span>`
+                    : nothing}
+                </div>
+              </div>
             </div>`
-          : showElevator
-            ? html`<div class="hero-chips">${this._renderElevatorFlag(elevatorInfos)}</div>`
-            : nothing}
+          : nothing}
+        ${showElevator
+          ? html`<div class="hero-chips">${this._renderElevatorFlag(elevatorInfos)}</div>`
+          : nothing}
 
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
         ${this._config!.show_departures
@@ -676,13 +688,27 @@ export class WienerLinienAustriaCard extends LitElement {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const cdLabel = cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
 
-    const delay = this._config!.show_delay ? delayMinutes(d.time_planned, d.time_real) : null;
+    // Signed delay (positive = late, negative = early). Computed
+    // independently of show_delay so the state-colour classes still
+    // light up even when the verbose "1 Minute verspätet" text is off.
+    const signedDelay = delayMinutes(d.time_planned, d.time_real);
+    const showDelayText = this._config!.show_delay;
     const delayText =
-      delay !== null && delay >= 1
-        ? delay === 1
+      showDelayText && signedDelay !== null && signedDelay >= 1
+        ? signedDelay === 1
           ? this._t("delay_singular")
-          : this._t("delay_plural", { n: delay })
+          : this._t("delay_plural", { n: signedDelay })
         : "";
+
+    // Row state — Linz parity. `now` overrides late/early when cd<=0.
+    const cdState =
+      cd !== null && cd <= 0
+        ? "now"
+        : signedDelay !== null && signedDelay >= 1
+          ? "late"
+          : signedDelay !== null && signedDelay <= -1
+            ? "early"
+            : "";
 
     const showA11y = this._config!.show_accessibility;
     const hasFlags = Boolean(d.traffic_jam || (showA11y && d.barrier_free));
@@ -690,7 +716,12 @@ export class WienerLinienAustriaCard extends LitElement {
     const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
 
     return html`
-      <li class="dep-row">
+      <li
+        class=${classMap({
+          "dep-row": true,
+          "row-rt": !!d.realtime,
+        })}
+      >
         <div class="line-badge" style=${styleMap({ background: color })}>${line}</div>
         <div class="towards">
           ${typeIcon
@@ -721,7 +752,7 @@ export class WienerLinienAustriaCard extends LitElement {
                 : nothing}
             </span>`
           : html`<span></span>`}
-        <div class="countdown">${cdLabel}</div>
+        <div class=${classMap({ countdown: true, [cdState]: !!cdState })}>${cdLabel}</div>
       </li>
     `;
   }

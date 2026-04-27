@@ -181,57 +181,92 @@ export const cardStyles = css`
     --mdc-icon-size: 20px;
   }
 
-  /* Hero metric: stacked numerals + UPPERCASE label, with a chip row
-     pinned to the bottom-right. */
+  /* Hero block — Linz-Linien-aligned layout: tinted background, big
+     countdown on the left, line-badge + direction column on the right.
+     Matches linz-linien-austria so a stacked dashboard reads as one
+     visual family. The per-station --nb-accent (set inline on .station)
+     drives the tint and the big-number colour; the row beside lists
+     the next departure's line, direction, platform, and a realtime
+     pill if applicable. */
   .hero {
-    display: flex;
-    align-items: flex-end;
-    flex-wrap: wrap;
-    gap: 8px 12px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--ha-spacing-3, 12px);
+    align-items: center;
+    padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
+    margin: 0 calc(-1 * var(--nb-pad-x));
+    background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
+    border-radius: var(--nb-radius-lg);
   }
-  .metric {
+  .hero-time {
     display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-  .metric-row {
-    display: inline-flex;
     align-items: baseline;
-    gap: 6px;
-  }
-  .metric-value {
-    font-size: var(--nb-metric-size);
-    font-weight: 600;
-    line-height: 1;
-    /* Tint the hero countdown with the per-station accent (set inline
-       on .station via style="--nb-accent: …;"). Matches Linz-Linien's
-       hero pattern where the big number reads in the mode-of-transport
-       brand colour rather than neutral text — gives the user a
-       glanceable "this is the next bus from THIS line" cue. */
+    gap: 4px;
     color: var(--nb-accent);
+  }
+  .hero-min {
+    font-size: var(--nb-metric-size);
+    font-weight: var(--ha-font-weight-bold, 600);
     font-variant-numeric: tabular-nums;
+    line-height: 1;
     letter-spacing: -0.5px;
   }
-  .metric-of {
-    font-size: var(--ha-font-size-m, 0.9375rem);
-    font-weight: 500;
-    color: var(--secondary-text-color);
-    font-variant-numeric: tabular-nums;
-  }
-  .metric-label {
-    margin-top: 4px;
-    font-size: 0.75rem;
+  .hero-unit {
+    font-size: var(--ha-font-size-m, 1rem);
     font-weight: 600;
-    letter-spacing: 0.2px;
-    text-transform: uppercase;
     color: var(--secondary-text-color);
+  }
+  /* Hero meta column — line badge + direction + platform pill + rt
+     pill. Wraps onto a second visual row at narrow widths. */
+  .hero-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .hero-entry {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+  .hero-direction {
+    font-weight: 500;
+    color: var(--primary-text-color);
+    overflow-wrap: anywhere;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .hero-platform {
+    font-size: var(--ha-font-size-xs, 0.75rem);
+    font-weight: 500;
+    color: var(--primary-text-color);
+    font-variant-numeric: tabular-nums;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(
+      in srgb,
+      var(--primary-text-color) 10%,
+      transparent
+    );
+  }
+  .rt-pill {
+    font-size: 0.6875rem;
+    font-weight: var(--ha-font-weight-bold, 600);
+    color: #fff;
+    background: var(--nb-rt);
+    padding: 2px 8px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+    forced-color-adjust: none;
   }
   .hero-chips {
     display: inline-flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    margin-left: auto;
   }
 
   /* Chips: tablet-style pill, tabular numerals so countdowns don't
@@ -507,7 +542,41 @@ export const cardStyles = css`
     font-weight: 600;
     min-width: 50px;
     text-align: right;
-    color: var(--primary-text-color);
+    color: var(--secondary-text-color);
+    white-space: nowrap;
+  }
+  /* State colours — Linz parity. now / late / early class lights up
+     the countdown so the user catches the schedule deviation at a
+     glance without parsing the delay text. */
+  .countdown.now   { color: var(--nb-accent); }
+  .countdown.late  { color: var(--nb-error); }
+  .countdown.early { color: var(--nb-info); }
+
+  /* Realtime cue — leading green bullet on the countdown of any row
+     marked .row-rt. Pairs with the row's existing realtime semantics
+     (delay text already labels the row "live") so the colour-only cue
+     satisfies WCAG 1.4.1. The pulse animation is suppressed by the
+     prefers-reduced-motion catch-all near the end of this stylesheet
+     and by the .no-pulse opt-out class on ha-card. */
+  .dep-row.row-rt .countdown::before {
+    content: "•";
+    color: var(--nb-rt);
+    margin-right: 4px;
+    font-size: 1.1em;
+    line-height: 1;
+    vertical-align: middle;
+    display: inline-block;
+    transform-origin: center;
+    animation: wlLivePulse 2s ease-in-out infinite;
+  }
+  @keyframes wlLivePulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50%      { opacity: 1;    transform: scale(1.18); }
+  }
+  ha-card.no-pulse .dep-row.row-rt .countdown::before {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 
   /* Empty / fallback states */
