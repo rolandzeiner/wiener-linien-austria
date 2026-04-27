@@ -239,9 +239,15 @@ export const cardStyles = css`
   .hero-direction {
     font-weight: 500;
     color: var(--primary-text-color);
-    overflow-wrap: anywhere;
-    flex: 1 1 auto;
+    /* Single-line ellipsis. Long Wiener Linien direction names like
+       "Floridsdorf, U-Bahn-Station" otherwise wrap onto a 2nd or 3rd
+       line and inflate the hero's vertical footprint. min-width: 0 is
+       required for text-overflow: ellipsis to work inside flex. */
+    flex: 1 1 0;
     min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .hero-platform {
     font-size: var(--ha-font-size-xs, 0.75rem);
@@ -272,12 +278,6 @@ export const cardStyles = css`
   }
   .hero-a11y ha-icon {
     --mdc-icon-size: 16px;
-  }
-  .hero-chips {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
   }
 
   /* Chips: tablet-style pill, tabular numerals so countdowns don't

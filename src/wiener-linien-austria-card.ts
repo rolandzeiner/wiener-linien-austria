@@ -476,10 +476,6 @@ export class WienerLinienAustriaCard extends LitElement {
               </div>
             </div>`
           : nothing}
-        ${showElevator
-          ? html`<div class="hero-chips">${this._renderElevatorFlag(elevatorInfos)}</div>`
-          : nothing}
-
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
         ${this._config!.show_departures
           ? rows.length
@@ -491,19 +487,6 @@ export class WienerLinienAustriaCard extends LitElement {
               </div>`
           : nothing}
       </section>
-    `;
-  }
-
-  private _renderElevatorFlag(infos: ElevatorInfoAttr[]): TemplateResult {
-    const label = this._t("elevator_label");
-    const tooltip = infos
-      .map((e) => [e.station, e.description, e.reason].filter((x): x is string => !!x).join(" — "))
-      .join("\n");
-    return html`
-      <span class="flag warning" title="${label}:\n${tooltip}">
-        <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
-        ${label}
-      </span>
     `;
   }
 
