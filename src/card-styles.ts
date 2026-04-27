@@ -589,6 +589,13 @@ export const cardStyles = css`
     align-items: center;
     gap: 10px;
     padding: 8px 0;
+    /* Eat .wrap's bottom padding so .foot bottoms-out at the card
+       edge, matching linz-linien (where .foot is a direct ha-card
+       child). Without this the timestamp looks offset upward —
+       8px below it plus another --nb-pad-y from .wrap before the
+       card edge — instead of vertically centred between the
+       divider and the bottom of the card. */
+    margin-bottom: calc(-1 * var(--nb-pad-y));
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     font-size: 0.7rem;
     color: var(--secondary-text-color);
