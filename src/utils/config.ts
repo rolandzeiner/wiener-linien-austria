@@ -104,6 +104,11 @@ export interface NormalisedModernConfig {
   hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
+  // Passthrough fields HA injects on the card config itself — section-view
+  // grid sizing, legacy view layout, conditional visibility. The editor
+  // must round-trip these unchanged on every config-changed payload, else
+  // HA writes back the stripped config and the user's column choice resets.
+  [key: string]: unknown;
 }
 
 const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" | "type"> = {
@@ -166,6 +171,10 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   }
 
   return {
+    // Spread raw first so dashboard passthrough fields (grid_options,
+    // view_layout, visibility, layout_options) survive the round-trip.
+    // Validated keys below override anything raw carried for them.
+    ...(raw as Record<string, unknown>),
     type: raw.type || "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
@@ -201,6 +210,9 @@ export interface NormalisedRetroConfig {
   wheelchair_race: boolean;
   accessibility_only: boolean;
   walk_times?: WalkTimes;
+  // See NormalisedModernConfig — same passthrough rule for dashboard
+  // layout fields injected onto the card config.
+  [key: string]: unknown;
 }
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
@@ -213,6 +225,9 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     ? (raw.style as RetroStyle)
     : "classic";
   return {
+    // Spread raw first so dashboard passthrough fields (grid_options,
+    // view_layout, visibility, layout_options) survive the round-trip.
+    ...(raw as Record<string, unknown>),
     type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
