@@ -589,12 +589,15 @@ export const cardStyles = css`
     align-items: center;
     gap: 10px;
     padding: 8px 0;
-    /* Eat .wrap's bottom padding so .foot bottoms-out at the card
-       edge, matching linz-linien (where .foot is a direct ha-card
-       child). Without this the timestamp looks offset upward —
-       8px below it plus another --nb-pad-y from .wrap before the
-       card edge — instead of vertically centred between the
-       divider and the bottom of the card. */
+    /* Eat .wrap's flex gap above and bottom padding below, so .foot
+       butts up against the last row's bottom edge AND bottoms-out at
+       the card edge — matching linz-linien (where .foot is a direct
+       ha-card child with no gap above and no padding below). Without
+       margin-top, .wrap's --nb-row-gap pushes the divider 12px below
+       the last row; without margin-bottom, the timestamp sits 8px +
+       --nb-pad-y above the card edge instead of being vertically
+       centred between divider and edge. */
+    margin-top: calc(-1 * var(--nb-row-gap));
     margin-bottom: calc(-1 * var(--nb-pad-y));
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     font-size: 0.7rem;
