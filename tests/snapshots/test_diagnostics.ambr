@@ -23,8 +23,8 @@
       'data': dict({
         'diva': 60201012,
         'lines': list([
-          'U1|H|Leopoldau',
-          'U1|R|Alaudagasse',
+          'U1|H',
+          'U1|R',
         ]),
         'rbls': list([
           4111,
@@ -36,7 +36,7 @@
       'options': dict({
       }),
       'title': 'Stephansplatz',
-      'version': 1,
+      'version': 2,
     }),
   })
 # ---

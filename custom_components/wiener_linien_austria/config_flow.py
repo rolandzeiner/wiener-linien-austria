@@ -66,12 +66,15 @@ _SEARCH_AGAIN_LABELS: dict[str, str] = {
 }
 
 
-def _line_key(line: str, direction: str, towards: str) -> str:
-    """Stable identifier for a (line, direction, towards) triple.
+def _line_key(line: str, direction: str) -> str:
+    """Stable identifier for a (line, direction) pair.
 
-    Mirrors the coordinator's `_line_key` — keep them in sync.
+    Mirrors how the coordinator's `_parse_monitor_body` filters
+    departures — `line.towards` flips on branching termini, so saved
+    selections must not include it. The `towards` value is still shown
+    to the user as a label in the dropdown but is not part of the key.
     """
-    return f"{line}|{direction}|{towards}"
+    return f"{line}|{direction}"
 
 
 async def _probe_monitor_lines(
@@ -113,7 +116,11 @@ async def _probe_monitor_lines(
             towards = str(line.get("towards") or "").strip()
             if not name or not towards:
                 continue
-            key = _line_key(name, direction, towards)
+            key = _line_key(name, direction)
+            # Multiple `line.towards` values can appear under the same
+            # (line, direction) pair on branching termini (e.g. U1/R
+            # reports both "Oberlaa" and "Alaudagasse"). Show the first
+            # seen as the picker label; the saved key collapses them.
             if key in seen:
                 continue
             seen.add(key)
@@ -135,7 +142,11 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     # Bump + add async_migrate_entry when entry.data shape changes.
     # Tracks the config-entry schema, NOT the integration release version.
-    VERSION = 1
+    # v2 (1.3.0-beta-3): CONF_LINES stores `{line}|{direction}` pairs
+    #     instead of `{line}|{direction}|{towards}` triples. The
+    #     line.towards value is unstable across polls on branching
+    #     termini, so it's no longer part of the saved selection key.
+    VERSION = 2
 
     def __init__(self) -> None:
         """Init in-flight selections."""

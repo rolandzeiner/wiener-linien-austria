@@ -12,7 +12,7 @@ import type {
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
-import { lineKey, tripletsAtStop } from "./utils/departures.js";
+import { lineDirKey, pairsAtStop } from "./utils/departures.js";
 import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
 const SIZES: readonly RetroSize[] = ["small", "medium", "regular"] as const;
@@ -269,8 +269,12 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
   private _renderWalkTimeSection(): TemplateResult {
     const cfg = this._config!;
     const attrs = this._attrs(cfg.entity);
-    const triplets = cfg.entity
-      ? tripletsAtStop(attrs).filter((t) => t.direction === cfg.direction)
+    // One row per (line, direction) pair, not per (line, direction,
+    // towards) triple — line.towards flips poll-to-poll on branching
+    // termini, so a triple-keyed threshold would silently miss every
+    // train labelled with the "other" terminus. See lineDirKey docs.
+    const pairs = cfg.entity
+      ? pairsAtStop(attrs).filter((p) => p.direction === cfg.direction)
       : [];
     const walkTimes = cfg.walk_times ?? {};
 
@@ -279,14 +283,17 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
         <div class="section-header">${this._et("section_walk_time")}</div>
         <div class="editor-hint">${this._et("walk_time_hint")}</div>
         <div class="walk-time-list">
-          ${triplets.length
-            ? triplets.map((t) => {
-                const key = lineKey(t.line, t.direction, t.towards);
+          ${pairs.length
+            ? pairs.map((p) => {
+                const key = lineDirKey(p.line, p.direction);
                 const val = walkTimes[key];
+                const terminusLabel = p.termini.join(" / ");
+                const branchingHint =
+                  p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
                 return html`
                   <div class="walk-time-row">
-                    <span class="walk-time-badge">${t.line}</span>
-                    <span class="walk-time-towards" title=${t.towards}>→ ${t.towards}</span>
+                    <span class="walk-time-badge">${p.line}</span>
+                    <span class="walk-time-towards" title=${branchingHint || terminusLabel}>→ ${terminusLabel}</span>
                     <input
                       type="number"
                       class="walk-time-input"
@@ -296,8 +303,8 @@ export class WienerLinienAustriaRetroCardEditor extends LitElement implements Lo
                       inputmode="numeric"
                       placeholder=${this._et("walk_time_placeholder")}
                       aria-label=${this._et("walk_time_aria")
-                        .replace("{line}", t.line)
-                        .replace("{towards}", t.towards)}
+                        .replace("{line}", p.line)
+                        .replace("{towards}", terminusLabel)}
                       .value=${val !== undefined ? String(val) : ""}
                       @keydown=${this._swallowKeys}
                       @keyup=${this._swallowKeys}

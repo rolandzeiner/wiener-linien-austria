@@ -14,8 +14,9 @@ import {
 } from "./utils/config.js";
 import {
   collectLinesInSelection,
-  lineKey,
+  lineDirKey,
   linesAtStop,
+  pairsAtStop,
   tripletsAtStop,
 } from "./utils/departures.js";
 import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
@@ -383,50 +384,67 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
             `
           : nothing}
 
-        ${triplets.length
-          ? html`
-              <div class="stop-filter-row">
-                <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
-                <div class="editor-hint">${this._et("walk_time_hint")}</div>
-                <div class="walk-time-list">
-                  ${triplets.map((t) => {
-                    const color = colorForLine(t.line, overrides);
-                    const key = lineKey(t.line, t.direction, t.towards);
-                    const val = stop.walk_times?.[key];
-                    const arrow = t.towards ? `→ ${t.towards}` : "";
-                    return html`
-                      <div class="walk-time-row">
-                        <span class="walk-time-badge" style=${styleMap({ background: color })}>${t.line}</span>
-                        <span class="walk-time-towards" title=${t.towards}>${arrow}</span>
-                        <input
-                          type="number"
-                          class="walk-time-input"
-                          min="0"
-                          max="120"
-                          step="1"
-                          inputmode="numeric"
-                          placeholder=${this._et("walk_time_placeholder")}
-                          aria-label=${this._et("walk_time_aria")
-                            .replace("{line}", t.line)
-                            .replace("{towards}", t.towards || "")}
-                          .value=${val !== undefined ? String(val) : ""}
-                          @keydown=${this._swallowKeys}
-                          @keyup=${this._swallowKeys}
-                          @keypress=${this._swallowKeys}
-                          @change=${(ev: Event) =>
-                            this._setWalkTime(
-                              stop.entity,
-                              key,
-                              (ev.target as HTMLInputElement).value,
-                            )}
-                        />
-                      </div>
-                    `;
-                  })}
-                </div>
+        ${(() => {
+          // Walk-time rows: one per (line, direction) pair, not per
+          // (line, direction, towards) triple. The /monitor API flips
+          // line.towards across polls on branching termini, so a triple
+          // key would silently miss the threshold whenever the API
+          // labelled the same line with a different terminus. The pair
+          // key is what filterDepartures actually looks up.
+          const allPairs = pairsAtStop(attrs);
+          const pairs = allPairs.filter((p) => {
+            if (picked.size > 0 && !picked.has(p.line)) return false;
+            const effDir = lineDirs[p.line] ?? dir;
+            if (effDir && p.direction !== effDir) return false;
+            return true;
+          });
+          if (!pairs.length) return nothing;
+          return html`
+            <div class="stop-filter-row">
+              <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
+              <div class="editor-hint">${this._et("walk_time_hint")}</div>
+              <div class="walk-time-list">
+                ${pairs.map((p) => {
+                  const color = colorForLine(p.line, overrides);
+                  const key = lineDirKey(p.line, p.direction);
+                  const val = stop.walk_times?.[key];
+                  const terminusLabel = p.termini.join(" / ");
+                  const arrow = terminusLabel ? `→ ${terminusLabel}` : "";
+                  const branchingHint =
+                    p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
+                  return html`
+                    <div class="walk-time-row">
+                      <span class="walk-time-badge" style=${styleMap({ background: color })}>${p.line}</span>
+                      <span class="walk-time-towards" title=${branchingHint || terminusLabel}>${arrow}</span>
+                      <input
+                        type="number"
+                        class="walk-time-input"
+                        min="0"
+                        max="120"
+                        step="1"
+                        inputmode="numeric"
+                        placeholder=${this._et("walk_time_placeholder")}
+                        aria-label=${this._et("walk_time_aria")
+                          .replace("{line}", p.line)
+                          .replace("{towards}", terminusLabel)}
+                        .value=${val !== undefined ? String(val) : ""}
+                        @keydown=${this._swallowKeys}
+                        @keyup=${this._swallowKeys}
+                        @keypress=${this._swallowKeys}
+                        @change=${(ev: Event) =>
+                          this._setWalkTime(
+                            stop.entity,
+                            key,
+                            (ev.target as HTMLInputElement).value,
+                          )}
+                      />
+                    </div>
+                  `;
+                })}
               </div>
-            `
-          : nothing}
+            </div>
+          `;
+        })()}
       </div>
     `;
   }

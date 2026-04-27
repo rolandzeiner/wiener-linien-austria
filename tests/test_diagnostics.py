@@ -44,7 +44,7 @@ async def test_diagnostics_includes_attribution_and_state(
 
     assert diag["attribution"] == ATTRIBUTION
     assert diag["entry"]["title"] == "Stephansplatz"
-    assert diag["entry"]["version"] == 1
+    assert diag["entry"]["version"] == 2
     assert diag["entry"]["data"][CONF_DIVA] == 60201012
     coord = diag["coordinator"]
     assert coord["rbls"] == [4111, 4118]

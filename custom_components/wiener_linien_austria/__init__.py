@@ -23,6 +23,7 @@ from .const import (
     ALERTS_REFRESH_UNSUB_KEY,
     CARD_URL,
     CARD_VERSION,
+    CONF_LINES,
     DOMAIN,
     DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
@@ -282,10 +283,44 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
-    """Placeholder for future schema migrations.
+    """Migrate legacy entry data to the current schema.
 
-    v0.1.0 ships with `entry.version = 1`. When we change the schema we bump
-    the version and fill this function in. Returning True lets HA load the
-    entry unmodified.
+    v1 → v2: collapse `CONF_LINES` triples (`line|direction|towards`) to
+    `(line|direction)` pairs. The `line.towards` segment is unstable
+    across /monitor polls on branching termini (e.g. U1/R alternates
+    between Oberlaa and Alaudagasse), so it must not participate in the
+    saved selection key — it survived only as a now-meaningless label.
     """
+    if entry.version > 2:
+        return False
+    if entry.version < 2:
+        config = {**entry.data, **entry.options}
+        raw = config.get(CONF_LINES)
+        if isinstance(raw, list):
+            collapsed: list[str] = []
+            seen: set[str] = set()
+            for item in raw:
+                if not isinstance(item, str) or not item:
+                    continue
+                parts = item.split("|", 2)
+                key = "|".join(parts[:2]) if len(parts) >= 2 else item
+                if key in seen:
+                    continue
+                seen.add(key)
+                collapsed.append(key)
+            new_data = {**entry.data}
+            new_options = {**entry.options}
+            # CONF_LINES may live in either bucket depending on whether
+            # the user set it via initial flow (data) or reconfigure
+            # (options). Update wherever it currently is, leaving the
+            # other bucket alone.
+            if CONF_LINES in entry.options:
+                new_options[CONF_LINES] = collapsed
+            if CONF_LINES in entry.data:
+                new_data[CONF_LINES] = collapsed
+            hass.config_entries.async_update_entry(
+                entry, data=new_data, options=new_options, version=2
+            )
+        else:
+            hass.config_entries.async_update_entry(entry, version=2)
     return True

@@ -24,7 +24,17 @@ function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
     const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
     if (!Number.isFinite(n)) continue;
     if (n < 0 || n > 120) continue;
-    out[k] = Math.round(n);
+    // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the
+    // current shape is a (line, direction) pair ("U1|R") so the
+    // threshold applies to every train on that direction regardless of
+    // which terminus the API currently labels them with. Collapse any
+    // surviving triple keys to pairs and, on collision, keep the
+    // larger value (more conservative for the user).
+    const parts = k.split("|");
+    const key = parts.length >= 3 ? `${parts[0]}|${parts[1]}` : k;
+    const rounded = Math.round(n);
+    const prev = out[key];
+    out[key] = prev === undefined ? rounded : Math.max(prev, rounded);
   }
   return Object.keys(out).length ? out : undefined;
 }

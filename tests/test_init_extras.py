@@ -294,10 +294,125 @@ async def test_unload_entry_returns_false_when_platforms_fail(
 
 
 # ---------------------------------------------------------------------------
-# async_migrate_entry — placeholder always returns True
+# async_migrate_entry — v1 → v2 collapses CONF_LINES triples to pairs
 # ---------------------------------------------------------------------------
 
 
-async def test_migrate_entry_returns_true(hass: HomeAssistant) -> None:
-    entry = _make_entry()
+async def test_migrate_entry_v2_is_noop(hass: HomeAssistant) -> None:
+    """An already-current entry passes through unchanged."""
+    entry = _make_entry()  # version=2 by default in conftest
     assert await async_migrate_entry(hass, entry) is True
+
+
+async def test_migrate_entry_collapses_v1_triples_to_pairs(
+    hass: HomeAssistant,
+) -> None:
+    """v1 triples ("U1|R|Oberlaa") are rewritten to pairs ("U1|R")."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from homeassistant.const import CONF_SCAN_INTERVAL
+
+    from custom_components.wiener_linien_austria.const import (
+        CONF_DIVA,
+        CONF_LINES,
+        CONF_RBLS,
+        CONF_STOP_NAME,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        data={
+            CONF_DIVA: 60201012,
+            CONF_STOP_NAME: "Stephansplatz",
+            CONF_RBLS: [4111, 4118],
+            # Two triples for the same (line, direction) — must dedupe to one.
+            CONF_LINES: ["U1|R|Oberlaa", "U1|R|Alaudagasse", "U1|H|Leopoldau"],
+            CONF_SCAN_INTERVAL: 60,
+        },
+        title="Stephansplatz",
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    # Order preserved (first-seen), duplicates collapsed.
+    assert entry.data[CONF_LINES] == ["U1|R", "U1|H"]
+
+
+async def test_migrate_entry_handles_options_bucket(hass: HomeAssistant) -> None:
+    """CONF_LINES living in entry.options (reconfigure path) is migrated too."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from homeassistant.const import CONF_SCAN_INTERVAL
+
+    from custom_components.wiener_linien_austria.const import (
+        CONF_DIVA,
+        CONF_LINES,
+        CONF_RBLS,
+        CONF_STOP_NAME,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        data={
+            CONF_DIVA: 60201012,
+            CONF_STOP_NAME: "Stephansplatz",
+            CONF_RBLS: [4111],
+            CONF_SCAN_INTERVAL: 60,
+        },
+        options={CONF_LINES: ["U1|H|Leopoldau"]},
+        title="Stephansplatz",
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+    assert entry.options[CONF_LINES] == ["U1|H"]
+
+
+async def test_migrate_entry_v1_without_lines_just_bumps_version(
+    hass: HomeAssistant,
+) -> None:
+    """Old entries without CONF_LINES still get the version bump."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from homeassistant.const import CONF_SCAN_INTERVAL
+
+    from custom_components.wiener_linien_austria.const import (
+        CONF_DIVA,
+        CONF_RBLS,
+        CONF_STOP_NAME,
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        data={
+            CONF_DIVA: 60201012,
+            CONF_STOP_NAME: "Stephansplatz",
+            CONF_RBLS: [4111],
+            CONF_SCAN_INTERVAL: 60,
+        },
+        title="Stephansplatz",
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is True
+    assert entry.version == 2
+
+
+async def test_migrate_entry_rejects_future_version(hass: HomeAssistant) -> None:
+    """An entry created by a future schema cannot be downgraded."""
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        version=99,
+        data={},
+        title="Future",
+    )
+    entry.add_to_hass(hass)
+
+    assert await async_migrate_entry(hass, entry) is False
