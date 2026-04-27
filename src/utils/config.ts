@@ -147,7 +147,12 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   }
 
   const maxRaw = Number(raw.max_departures);
-  const maxClamped = Number.isFinite(maxRaw) ? Math.max(1, Math.min(20, Math.round(maxRaw))) : MODERN_DEFAULTS.max_departures;
+  // Lower bound 0 enables hero-only mode: user sees the upcoming
+  // departure(s) in the hero block and no row list. Useful for tight
+  // dashboards where the next bus/tram is the only thing the user
+  // cares about. Upper bound 20 stays — pragmatic limit before the
+  // row list becomes a wall of text.
+  const maxClamped = Number.isFinite(maxRaw) ? Math.max(0, Math.min(20, Math.round(maxRaw))) : MODERN_DEFAULTS.max_departures;
 
   const lineColors: Record<string, string> = {};
   if (raw.line_colors && typeof raw.line_colors === "object") {

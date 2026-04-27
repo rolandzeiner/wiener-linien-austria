@@ -146,8 +146,10 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
   }
 
   private _setMaxDepartures(v: number): void {
+    // Lower bound 0 — hero-only mode (no row list). Mirrors the
+    // normalise clamp in utils/config.ts.
     if (!this._config) return;
-    const max_departures = Math.max(1, Math.min(20, Math.round(v)));
+    const max_departures = Math.max(0, Math.min(20, Math.round(v)));
     if (max_departures === this._config.max_departures) return;
     this._fire({ ...this._config, max_departures });
   }
@@ -476,7 +478,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
           <span class="slider-label">${this._et("max_departures")}</span>
           <input
             type="range"
-            min="1"
+            min="0"
             max="20"
             step="1"
             .value=${String(cfg.max_departures)}

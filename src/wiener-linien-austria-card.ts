@@ -476,7 +476,7 @@ export class WienerLinienAustriaCard extends LitElement {
             </div>`
           : nothing}
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
-        ${this._config!.show_departures
+        ${this._config!.show_departures && this._config!.max_departures > 0
           ? rows.length
             ? html`<ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
                 ${rows.map((d) => this._renderRow(d))}
