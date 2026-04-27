@@ -14,6 +14,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -113,6 +114,24 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             config_entry=entry,
             name=DOMAIN,
             update_interval=self._normal_interval,
+            # Absorb request storms (options-flow save, manual reload,
+            # dashboard edit-mode flip) so the /monitor endpoint isn't
+            # hit 3-4× in quick succession. Even though the integration
+            # already does conditional GET (ETag / If-Modified-Since),
+            # collapsing redundant requests still saves CDN round-trips
+            # on 304 responses. Cooldown matches the existing fair-use
+            # floor — first call goes through, subsequent calls within
+            # the window piggy-back on the scheduled refresh. immediate
+            # =False so the FIRST call also waits for the debouncer
+            # window to settle, important during config-flow setup
+            # where test-before-configure + first-refresh land
+            # back-to-back.
+            request_refresh_debouncer=Debouncer(
+                hass,
+                _LOGGER,
+                cooldown=15,
+                immediate=False,
+            ),
         )
 
     async def async_setup(self) -> None:
