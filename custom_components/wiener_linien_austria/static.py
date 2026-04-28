@@ -35,9 +35,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
+    MAX_STOPS_AHEAD,
     STATIC_FILES,
-    STOPS_AHEAD_HEAD_COUNT,
-    STOPS_AHEAD_MAX_FULL,
     USER_AGENT,
 )
 from .http import CacheValidators, base_request_headers
@@ -92,13 +91,18 @@ class TripPatternIndex:
     PatternID variant (both directions, branching termini, short turns).
     `lines_by_label` resolves the live `/monitor` `line.name` ("U1") to its
     LineID. `means_by_line` carries the authoritative MeansOfTransport per
-    line for diagnostics consumers; the coordinator does not currently rely
-    on it.
+    line for diagnostics consumers.
+    `lines_at_diva` powers the per-stop changeover badges: for every
+    DIVA, the sorted set of line labels (e.g. "U1", "13A", "71") of every
+    line whose schedule passes through that station. Built at parse time
+    by walking every pattern's RBLs, resolving each to its parent DIVA via
+    the haltepunkte index, and aggregating the line labels.
     """
 
     patterns_by_line: dict[int, list[TripPattern]] = field(default_factory=dict)
     lines_by_label: dict[str, int] = field(default_factory=dict)
     means_by_line: dict[int, str] = field(default_factory=dict)
+    lines_at_diva: dict[int, tuple[str, ...]] = field(default_factory=dict)
 
     @property
     def line_count(self) -> int:
@@ -415,7 +419,9 @@ async def _fetch_and_build(
             # will catch any change.
             if linien_text is not None and fahr_text is not None:
                 try:
-                    trip_patterns = _parse_trip_patterns(linien_text, fahr_text)
+                    trip_patterns = _parse_trip_patterns(
+                        linien_text, fahr_text, stations
+                    )
                     pattern_status = "fresh"
                 except (KeyError, ValueError) as err:
                     _LOGGER.warning(
@@ -549,7 +555,9 @@ def _merge_haltepunkte(
 
 
 def _parse_trip_patterns(
-    linien_text: str, fahr_text: str
+    linien_text: str,
+    fahr_text: str,
+    stations: dict[int, Station] | None = None,
 ) -> TripPatternIndex:
     """Build a TripPatternIndex from linien.csv + fahrwegverlaeufe.csv.
 
@@ -560,6 +568,10 @@ def _parse_trip_patterns(
     materialised as immutable RBL tuples. Real-world data has gaps in
     StopSeqCount (e.g. 0,1,3,4) — we sort by the value, the gaps don't
     affect the resulting order.
+
+    When `stations` is provided, also builds the `lines_at_diva` index that
+    powers the per-stop changeover-line badges on the card. Without it the
+    feature is silently disabled (an empty dict).
     """
     lines_by_label: dict[str, int] = {}
     means_by_line: dict[int, str] = {}
@@ -576,9 +588,22 @@ def _parse_trip_patterns(
         if means:
             means_by_line[line_id] = means
 
+    label_for_line: dict[int, str] = {v: k for k, v in lines_by_label.items()}
+
+    # RBL → parent DIVA, derived once from the stations index. Skipped
+    # when stations is None — the feature degrades to no transfer chips.
+    rbl_to_diva: dict[int, int] = {}
+    if stations is not None:
+        for diva, station in stations.items():
+            for rbl in station.rbls:
+                rbl_to_diva[rbl] = diva
+
     # Group fahrwegverlaeufe rows by (line_id, pattern_id) and collect
     # (sequence, rbl, direction) tuples. We sort by sequence at the end.
+    # Concurrently aggregate `lines_at_diva`: per DIVA, the set of line
+    # labels of every line whose pattern visits that station.
     grouped: dict[tuple[int, int], list[tuple[int, int, int]]] = {}
+    lines_per_diva: dict[int, set[str]] = {}
     fahr_reader = csv.DictReader(io.StringIO(fahr_text), delimiter=";")
     for row in fahr_reader:
         try:
@@ -592,6 +617,11 @@ def _parse_trip_patterns(
         grouped.setdefault((line_id, pattern_id), []).append(
             (seq, rbl, direction)
         )
+        if rbl_to_diva:
+            label = label_for_line.get(line_id)
+            stop_diva = rbl_to_diva.get(rbl)
+            if label and stop_diva is not None:
+                lines_per_diva.setdefault(stop_diva, set()).add(label)
 
     patterns_by_line: dict[int, list[TripPattern]] = {}
     for (line_id, pattern_id), entries in grouped.items():
@@ -610,10 +640,14 @@ def _parse_trip_patterns(
             )
         )
 
+    lines_at_diva: dict[int, tuple[str, ...]] = {
+        diva: tuple(sorted(labels)) for diva, labels in lines_per_diva.items()
+    }
     return TripPatternIndex(
         patterns_by_line=patterns_by_line,
         lines_by_label=lines_by_label,
         means_by_line=means_by_line,
+        lines_at_diva=lines_at_diva,
     )
 
 
@@ -713,28 +747,48 @@ def stops_ahead_for_match(
     if not tail:
         return []  # We're at the terminus on this pattern.
 
-    # Build full dict list, then apply hybrid truncation.
+    # Build the full ordered list. Each stop carries its name, an optional
+    # `is_terminus` flag on the last entry, and an optional `lines` list
+    # of OTHER lines (excluding the one we're on) that pass through that
+    # stop — sourced from the trip-pattern index's `lines_at_diva`. The
+    # `diva` key is dropped from the attribute on purpose: keeping the
+    # per-stop dict small lets MAX_STOPS_AHEAD-bounded full routes fit
+    # under the 16 KB recorder cap on busy multi-line stops.
+    current_label = next(
+        (
+            label
+            for label, lid in catalogue.trip_patterns.lines_by_label.items()
+            if lid == best.line_id
+        ),
+        None,
+    )
+    lines_at_diva = catalogue.trip_patterns.lines_at_diva
+
     full: list[dict[str, Any]] = []
     last_idx = len(tail) - 1
     for i, rbl in enumerate(tail):
         name = _station_name_for_rbl(catalogue, rbl) or ""
         diva = _diva_for_rbl(catalogue, rbl)
-        if diva is None:
+        if diva is None or not name:
             # An unknown RBL would render as an empty bullet; skip it
             # rather than poison the list.
             continue
-        entry: dict[str, Any] = {"diva": diva, "name": name}
+        entry: dict[str, Any] = {"name": name}
         if i == last_idx:
             entry["is_terminus"] = True
+        # Transfer chips: every line at this DIVA except the one we're
+        # already on. Skipped silently when the index is empty (e.g. a
+        # cache built without stations passed through).
+        transfers = lines_at_diva.get(diva)
+        if transfers:
+            other = [t for t in transfers if t != current_label]
+            if other:
+                entry["lines"] = other
         full.append(entry)
+        if len(full) >= MAX_STOPS_AHEAD:
+            break
 
-    if len(full) <= STOPS_AHEAD_MAX_FULL:
-        return full
-
-    head = full[:STOPS_AHEAD_HEAD_COUNT]
-    terminus = full[-1]
-    ellipsis: dict[str, Any] = {"diva": None, "name": "…", "is_ellipsis": True}
-    return [*head, ellipsis, terminus]
+    return full
 
 
 def _first_index_in_pattern(
@@ -801,6 +855,9 @@ def _trip_patterns_to_store(index: TripPatternIndex) -> dict[str, Any]:
     return {
         "lines_by_label": dict(index.lines_by_label),
         "means_by_line": {str(k): v for k, v in index.means_by_line.items()},
+        "lines_at_diva": {
+            str(diva): list(labels) for diva, labels in index.lines_at_diva.items()
+        },
         "patterns": [
             {
                 "line_id": p.line_id,
@@ -827,6 +884,10 @@ def _trip_patterns_from_store(
         means_by_line = {
             int(k): str(v) for k, v in (raw.get("means_by_line") or {}).items()
         }
+        lines_at_diva = {
+            int(k): tuple(str(label) for label in (v or []))
+            for k, v in (raw.get("lines_at_diva") or {}).items()
+        }
         patterns_by_line: dict[int, list[TripPattern]] = {}
         for entry in raw.get("patterns") or []:
             line_id = int(entry["line_id"])
@@ -849,6 +910,7 @@ def _trip_patterns_from_store(
         patterns_by_line=patterns_by_line,
         lines_by_label=lines_by_label,
         means_by_line=means_by_line,
+        lines_at_diva=lines_at_diva,
     )
 
 

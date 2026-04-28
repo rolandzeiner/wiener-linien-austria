@@ -875,14 +875,16 @@ export class WienerLinienAustriaCard extends LitElement {
       return rowTpl;
     }
 
-    return [rowTpl, this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded)];
+    return [rowTpl, this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded, line)];
   }
 
   private _renderStopsAheadPanel(
     stops: NonNullable<DepartureAttr["stops_ahead"]>,
     panelId: string,
     expanded: boolean,
+    currentLine: string,
   ): TemplateResult {
+    const overrides = this._config!.line_colors;
     return html`
       <li
         class=${classMap({ "dep-row-detail": true, expanded })}
@@ -891,13 +893,32 @@ export class WienerLinienAustriaCard extends LitElement {
         aria-hidden=${expanded ? "false" : "true"}
       >
         <div class="dep-row-detail-inner">
-          <ol class="stops-ahead">
+          <ol
+            class="stops-ahead"
+            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides) })}
+          >
             ${stops.map((s) => {
               const classes = {
+                "stops-ahead-stop": true,
                 terminus: !!s.is_terminus,
-                ellipsis: !!s.is_ellipsis,
               };
-              return html`<li class=${classMap(classes)}>${deText(s.name)}</li>`;
+              return html`
+                <li class=${classMap(classes)}>
+                  <span class="stops-ahead-dot" aria-hidden="true"></span>
+                  <span class="stops-ahead-name">${deText(s.name)}</span>
+                  ${s.lines && s.lines.length
+                    ? html`<span class="stops-ahead-transfers" aria-label=${this._t("stops_ahead_transfer_aria", { lines: s.lines.join(", ") })}>
+                        ${s.lines.map(
+                          (line) => html`<span
+                            class="stops-ahead-line-chip"
+                            style=${styleMap({ background: colorForLine(line, overrides) })}
+                            >${line}</span
+                          >`,
+                        )}
+                      </span>`
+                    : nothing}
+                </li>
+              `;
             })}
           </ol>
         </div>

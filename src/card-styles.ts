@@ -555,43 +555,103 @@ export const cardStyles = css`
   .dep-row-detail.expanded {
     grid-template-rows: 1fr;
   }
+  /* Metro-map style trail: a vertical line in the line's brand colour
+     with one filled dot per stop. Indent matches the row's line-badge
+     (min-width 2.4em) + gap (8px) so the line visually descends from
+     under the badge. The connecting line is drawn as a 3px-wide pseudo-
+     element under the dot column; dots overlap it so they appear "on"
+     the line. The terminus stop highlights with a hollow ring + bold
+     name to anchor the destination. */
   .stops-ahead {
+    --stops-ahead-line: var(--primary-color);
+    --stops-ahead-dot-size: 10px;
+    --stops-ahead-line-width: 3px;
     list-style: none;
     margin: 0;
-    padding: 6px 8px 8px calc(2.4em + 16px);
-    /* indent matches line-badge (min-width 2.4em) + gap (8px) so the
-       trail visually starts under the towards text, not under the badge. */
+    padding: 8px 10px 10px calc(2.4em + 8px);
+    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 8px;
     color: var(--secondary-text-color);
-    font-size: 0.82rem;
-    line-height: 1.4;
+    font-size: 0.85rem;
+    line-height: 1.3;
   }
-  .stops-ahead li {
+  /* The vertical line. Sits behind the dots (they have higher z-index)
+     and stops at the centre of the first/last dot via a clip on the
+     containing list — easiest done by pinning top/bottom to half the
+     dot size. */
+  .stops-ahead::before {
+    content: "";
+    position: absolute;
+    left: calc(2.4em + 8px + var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
+    top: calc(8px + var(--stops-ahead-dot-size) / 2);
+    bottom: calc(10px + var(--stops-ahead-dot-size) / 2);
+    width: var(--stops-ahead-line-width);
+    background: var(--stops-ahead-line);
+    border-radius: 2px;
+  }
+  .stops-ahead-stop {
     position: relative;
-    padding-left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: calc(var(--stops-ahead-dot-size) + 10px);
+    min-height: var(--stops-ahead-dot-size);
   }
-  .stops-ahead li::before {
-    content: "›";
+  .stops-ahead-dot {
     position: absolute;
     left: 0;
-    color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent);
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--stops-ahead-dot-size);
+    height: var(--stops-ahead-dot-size);
+    border-radius: 50%;
+    background: var(--stops-ahead-line);
+    box-shadow: 0 0 0 2px var(--card-background-color, var(--ha-card-background, #fff));
+    z-index: 1;
+    forced-color-adjust: none;
   }
-  .stops-ahead li.terminus {
+  .stops-ahead-name {
     color: var(--primary-text-color);
-    font-weight: 500;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .stops-ahead li.terminus::before {
-    content: "»";
-    color: var(--primary-color);
+  .stops-ahead-stop.terminus .stops-ahead-name {
+    font-weight: 600;
   }
-  .stops-ahead li.ellipsis {
-    color: color-mix(in srgb, var(--secondary-text-color) 60%, transparent);
-    font-style: italic;
+  .stops-ahead-stop.terminus .stops-ahead-dot {
+    /* Hollow ring at the terminus, anchoring "this is where you end up". */
+    background: var(--card-background-color, var(--ha-card-background, #fff));
+    box-shadow:
+      0 0 0 2px var(--card-background-color, var(--ha-card-background, #fff)),
+      inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
   }
-  .stops-ahead li.ellipsis::before {
-    content: "";
+  /* Transfer-line chips: small pill badges showing the OTHER lines that
+     pass through this stop, coloured per-line so U-Bahn lines retain
+     their brand colour and trams/buses stay neutral until the user
+     supplies overrides. Sits at the row end, wraps when the row is
+     narrow. */
+  .stops-ahead-transfers {
+    margin-left: auto;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .stops-ahead-line-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: var(--ha-font-weight-bold, 600);
+    color: #fff;
+    background: var(--primary-color);
+    line-height: 1.4;
+    forced-color-adjust: none;
   }
   .line-badge {
     text-align: center;

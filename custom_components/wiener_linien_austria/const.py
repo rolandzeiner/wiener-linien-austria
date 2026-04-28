@@ -106,16 +106,12 @@ RETRO_CARD_URL: Final = (
 )
 
 # Cap on how many departures we surface in sensor attributes. The card maxes
-# out at 20 per stop; 30 gives buffer for diagnostics and templates while
-# keeping the full payload comfortably under HA's 16 KB recorder attribute
+# out at 20 per stop; matching that here keeps the per-departure stops_ahead
+# trail (now full route, not truncated) within HA's 16 KB recorder attribute
 # cap at busy multi-line stops (Stephansplatz tracks U1/U3/U4).
-MAX_DEPARTURES_IN_ATTRS: Final = 30
+MAX_DEPARTURES_IN_ATTRS: Final = 20
 
-# Hybrid truncation for per-departure `stops_ahead`: when the route from the
-# current stop to the terminus has more than (HEAD + 1 ellipsis + terminus)
-# entries, surface only the first HEAD + an ellipsis marker + the terminus.
-# Keeps the recorder attribute payload bounded on long lines (U6 end-to-end
-# is ~24 stops) while preserving the user's mental anchor (the destination)
-# and immediate next stops.
-STOPS_AHEAD_HEAD_COUNT: Final = 4
-STOPS_AHEAD_MAX_FULL: Final = STOPS_AHEAD_HEAD_COUNT + 1 + 1  # head + ellipsis + terminus
+# Hard safety cap on `stops_ahead` length per departure. The longest Wiener
+# Linien lines are ~25 stops end-to-end; 30 gives generous headroom while
+# still protecting against runaway data on a future schema surprise.
+MAX_STOPS_AHEAD: Final = 30

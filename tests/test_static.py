@@ -524,10 +524,8 @@ def test_stops_ahead_for_match_returns_empty_at_terminus() -> None:
     assert result == []
 
 
-def test_stops_ahead_hybrid_truncation_keeps_head_plus_terminus() -> None:
-    """When the tail exceeds STOPS_AHEAD_MAX_FULL, truncate to head + … + end."""
-    # Build a long line: 8 stops ahead of our position. That's more than
-    # STOPS_AHEAD_MAX_FULL (4 + 1 + 1 = 6) so the truncator kicks in.
+def test_stops_ahead_full_route_no_truncation() -> None:
+    """Full path is returned (no head+ellipsis+terminus truncation)."""
     stations = {
         i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i])
         for i in range(1, 11)
@@ -548,13 +546,65 @@ def test_stops_ahead_hybrid_truncation_keeps_head_plus_terminus() -> None:
     )
     result = stops_ahead_for_match(catalogue, "X1", [1], "Stop10")
     assert result is not None
-    # 4 head + 1 ellipsis + 1 terminus
-    assert len(result) == 6
-    assert [s["name"] for s in result[:4]] == ["Stop2", "Stop3", "Stop4", "Stop5"]
-    assert result[4].get("is_ellipsis") is True
-    assert result[4]["name"] == "…"
-    assert result[5]["name"] == "Stop10"
-    assert result[5].get("is_terminus") is True
+    # All 9 downstream stops, no ellipsis marker.
+    assert [s["name"] for s in result] == [f"Stop{i}" for i in range(2, 11)]
+    assert result[-1].get("is_terminus") is True
+    assert all("is_ellipsis" not in s for s in result)
+
+
+def test_stops_ahead_capped_at_max_stops_ahead() -> None:
+    """The hard MAX_STOPS_AHEAD safety cap bounds runaway data."""
+    from custom_components.wiener_linien_austria.const import MAX_STOPS_AHEAD
+
+    # Build a pattern longer than MAX_STOPS_AHEAD.
+    n = MAX_STOPS_AHEAD + 5
+    stations = {
+        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i])
+        for i in range(0, n + 1)
+    }
+    long_pattern = TripPattern(
+        line_id=999,
+        pattern_id=1,
+        direction=1,
+        stops=tuple(range(0, n + 1)),
+    )
+    catalogue = StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={999: [long_pattern]},
+            lines_by_label={"X1": 999},
+        ),
+    )
+    result = stops_ahead_for_match(catalogue, "X1", [0], f"Stop{n}")
+    assert result is not None
+    assert len(result) == MAX_STOPS_AHEAD
+
+
+def test_stops_ahead_includes_transfer_lines() -> None:
+    """Stops carry a `lines` list of OTHER lines that pass through."""
+    catalogue = _u1_catalogue()
+    # Inject a transfer entry: Stephansplatz also has U3 + U4 in the index.
+    catalogue.trip_patterns.lines_at_diva = {
+        60201012: ("U1", "U3", "U4"),  # Stephansplatz transfer hub
+    }
+    result = stops_ahead_for_match(
+        catalogue, "U1", [4001], "Leopoldau", live_direction="H"
+    )
+    assert result is not None
+    stephansplatz = next(s for s in result if s["name"] == "Stephansplatz")
+    # Current line (U1) excluded; only U3 + U4 surface as transfers.
+    assert stephansplatz.get("lines") == ["U3", "U4"]
+
+
+def test_stops_ahead_omits_lines_when_no_transfers() -> None:
+    """Stops without transfer data don't add an empty `lines` field."""
+    catalogue = _u1_catalogue()  # lines_at_diva empty by default
+    result = stops_ahead_for_match(
+        catalogue, "U1", [4001], "Leopoldau", live_direction="H"
+    )
+    assert result is not None
+    assert all("lines" not in s for s in result)
 
 
 def test_stops_ahead_direction_filter_picks_right_branch() -> None:
@@ -583,14 +633,15 @@ def test_stops_ahead_direction_filter_picks_right_branch() -> None:
     assert result[-1].get("is_terminus") is True
 
 
-def test_stops_ahead_no_truncation_when_short() -> None:
-    """Lists at or below the cap come back fully."""
+def test_stops_ahead_short_route_returned_intact() -> None:
+    """Short lists come back fully."""
     catalogue = _u1_catalogue()
-    # H pattern from Stephansplatz has 2 stops ahead — no truncation.
+    # H pattern from Stephansplatz has 2 stops ahead.
     result = stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau")
     assert result is not None
     assert len(result) == 2
-    assert all(not s.get("is_ellipsis") for s in result)
+    assert "diva" not in result[0]  # diva field dropped from output
+    assert all("is_ellipsis" not in s for s in result)
 
 
 # ---------------------------------------------------------------------------

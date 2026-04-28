@@ -17,15 +17,15 @@ declare global {
 
 export type DepartureDirection = "H" | "R";
 
-// One entry on the per-departure "stops ahead" trail. `is_terminus` only
-// appears on the final stop; `is_ellipsis` only appears on the truncation
-// marker emitted by the hybrid head-plus-terminus layout. The card treats
-// any item with `is_ellipsis: true` as "render '…' and skip linking".
+// One entry on the per-departure "stops ahead" trail. `is_terminus`
+// only appears on the final stop. `lines` is the list of OTHER lines
+// (excluding the one this departure runs on) that pass through this
+// stop — sourced from the static trip-pattern index. Stops with no
+// transfers omit the field entirely.
 export interface StopAheadAttr {
-  diva: number | null;
   name: string;
   is_terminus?: boolean;
-  is_ellipsis?: boolean;
+  lines?: string[];
 }
 
 export interface DepartureAttr {

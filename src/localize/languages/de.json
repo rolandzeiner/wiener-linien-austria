@@ -15,6 +15,7 @@
     "disturbance_title": "Verkehrsbehinderung gemeldet",
     "stops_ahead_aria_show": "Streckenverlauf für {line} Richtung {towards} anzeigen",
     "stops_ahead_aria_hide": "Streckenverlauf für {line} Richtung {towards} ausblenden",
+    "stops_ahead_transfer_aria": "Umsteigen auf {lines}",
     "dir_h": "H",
     "dir_r": "R",
     "dir_both": "Beide",
