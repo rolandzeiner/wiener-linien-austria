@@ -103,12 +103,19 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _versionMismatch: string | null = null;
   @state() private _expandedTraffic = new Set<string>();
   @state() private _expandedElevator = new Set<string>();
-  // Per-row expanded state for the stops_ahead collapsible. Keyed by a
-  // stable per-row identifier (entity + line + direction + countdown +
-  // planned-time) so re-renders that re-sort the list keep the right row
-  // open. Naturally invalidates when a row's countdown changes — closing
-  // the panel as the row "ages out" is the right UX.
+  // Per-row expanded state for the stops_ahead collapsible. Keyed by
+  // `entity|line|direction|towards|time_planned` — `time_planned` is
+  // the schedule clock, fixed for the life of a given departure, so
+  // panels survive every realtime poll and only "close" when the
+  // departure ages out of the board entirely. Falls back to countdown
+  // when time_planned is unavailable.
   @state() private _expandedRows = new Set<string>();
+  // Per-stop "show non-metro transfers" toggle inside an expanded panel.
+  // Keyed by `${rowKey}|${stopIndex}` so each stop on each panel keeps
+  // its own state. Hub stops (Karlsplatz, Praterstern) have many
+  // tram/bus transfers; collapsing them by default keeps the trail
+  // readable, U-Bahn chips always stay inline.
+  @state() private _expandedTransfers = new Set<string>();
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
 
@@ -204,6 +211,7 @@ export class WienerLinienAustriaCard extends LitElement {
       changed.has("_expandedTraffic") ||
       changed.has("_expandedElevator") ||
       changed.has("_expandedRows") ||
+      changed.has("_expandedTransfers") ||
       changed.has("_debugTraffic") ||
       changed.has("_debugElevator")
     ) {
@@ -795,7 +803,11 @@ export class WienerLinienAustriaCard extends LitElement {
     // (head + ellipsis + terminus) renders the same affordance as a full
     // short list.
     const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
-    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.countdown}|${d.time_planned ?? ""}`;
+    // Use `time_planned` (or countdown fallback) as the stable
+    // identifier so panels stay open across polls — countdown alone
+    // ticks every minute and would re-key + collapse the panel.
+    const rowStableId = d.time_planned ?? `cd${d.countdown}`;
+    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
     const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
     const panelId = `wl-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
     const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
@@ -875,7 +887,10 @@ export class WienerLinienAustriaCard extends LitElement {
       return rowTpl;
     }
 
-    return [rowTpl, this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded, line)];
+    return [
+      rowTpl,
+      this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded, line, rowKey),
+    ];
   }
 
   private _renderStopsAheadPanel(
@@ -883,6 +898,7 @@ export class WienerLinienAustriaCard extends LitElement {
     panelId: string,
     expanded: boolean,
     currentLine: string,
+    rowKey: string,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
     return html`
@@ -897,33 +913,106 @@ export class WienerLinienAustriaCard extends LitElement {
             class="stops-ahead"
             style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides) })}
           >
-            ${stops.map((s) => {
-              const classes = {
-                "stops-ahead-stop": true,
-                terminus: !!s.is_terminus,
-              };
-              return html`
-                <li class=${classMap(classes)}>
-                  <span class="stops-ahead-dot" aria-hidden="true"></span>
-                  <span class="stops-ahead-name">${deText(s.name)}</span>
-                  ${s.lines && s.lines.length
-                    ? html`<span class="stops-ahead-transfers" aria-label=${this._t("stops_ahead_transfer_aria", { lines: s.lines.join(", ") })}>
-                        ${s.lines.map(
-                          (line) => html`<span
-                            class="stops-ahead-line-chip"
-                            style=${styleMap({ background: colorForLine(line, overrides) })}
-                            >${line}</span
-                          >`,
-                        )}
-                      </span>`
-                    : nothing}
-                </li>
-              `;
-            })}
+            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides))}
           </ol>
         </div>
       </li>
     `;
+  }
+
+  private _renderStopAhead(
+    s: NonNullable<DepartureAttr["stops_ahead"]>[number],
+    idx: number,
+    rowKey: string,
+    overrides: Record<string, string>,
+  ): TemplateResult {
+    // Split transfers into U-Bahn (always inline, immediately after the
+    // station name) and "everything else" (tram, bus, night). The
+    // non-metro group is collapsed behind a small chevron-count chip
+    // on the right; clicking expands it inline. Keeps hub stops like
+    // Karlsplatz (~5+ transfer lines) readable.
+    const allLines = s.lines ?? [];
+    const metroLines: string[] = [];
+    const otherLines: string[] = [];
+    for (const l of allLines) {
+      if (/^U\d/.test(l)) metroLines.push(l);
+      else otherLines.push(l);
+    }
+    const transferKey = `${rowKey}|${idx}`;
+    const transfersExpanded = this._expandedTransfers.has(transferKey);
+    const stopClasses = {
+      "stops-ahead-stop": true,
+      terminus: !!s.is_terminus,
+      "transfers-expanded": transfersExpanded,
+    };
+
+    const metroChips = metroLines.length
+      ? html`<span class="stops-ahead-metros">
+          ${metroLines.map(
+            (line) => html`<span
+              class="stops-ahead-line-chip"
+              style=${styleMap({ background: colorForLine(line, overrides) })}
+              >${line}</span
+            >`,
+          )}
+        </span>`
+      : nothing;
+
+    const otherToggle = otherLines.length
+      ? html`<button
+          type="button"
+          class="stops-ahead-other-toggle"
+          aria-expanded=${transfersExpanded ? "true" : "false"}
+          aria-label=${this._t(
+            transfersExpanded ? "stops_ahead_other_hide" : "stops_ahead_other_show",
+            { count: otherLines.length, stop: s.name },
+          )}
+          @click=${(ev: MouseEvent) => {
+            // Prevent the click from bubbling to the row's collapse handler.
+            ev.stopPropagation();
+            this._toggleTransfers(transferKey);
+          }}
+          @keydown=${(ev: KeyboardEvent) => {
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.stopPropagation();
+            }
+          }}
+        >
+          <span class="stops-ahead-other-count">+${otherLines.length}</span>
+          <ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
+        </button>`
+      : nothing;
+
+    const otherPanel =
+      otherLines.length && transfersExpanded
+        ? html`<div class="stops-ahead-others">
+            ${otherLines.map(
+              (line) => html`<span
+                class="stops-ahead-line-chip stops-ahead-line-chip--other"
+                style=${styleMap({ background: colorForLine(line, overrides) })}
+                >${line}</span
+              >`,
+            )}
+          </div>`
+        : nothing;
+
+    return html`
+      <li class=${classMap(stopClasses)}>
+        <div class="stops-ahead-row">
+          <span class="stops-ahead-dot" aria-hidden="true"></span>
+          <span class="stops-ahead-name">${deText(s.name)}</span>
+          ${metroChips} ${otherToggle}
+        </div>
+        ${otherPanel}
+      </li>
+    `;
+  }
+
+  private _toggleTransfers(key: string): void {
+    const next = new Set(this._expandedTransfers);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    this._expandedTransfers = next;
   }
 
   private _toggleRow(key: string): void {

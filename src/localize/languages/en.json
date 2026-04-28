@@ -16,6 +16,8 @@
     "stops_ahead_aria_show": "Show stops ahead for {line} towards {towards}",
     "stops_ahead_aria_hide": "Hide stops ahead for {line} towards {towards}",
     "stops_ahead_transfer_aria": "Change to {lines}",
+    "stops_ahead_other_show": "Show {count} more lines at {stop}",
+    "stops_ahead_other_hide": "Hide other lines at {stop}",
     "dir_h": "H",
     "dir_r": "R",
     "dir_both": "Both",

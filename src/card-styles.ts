@@ -594,9 +594,15 @@ export const cardStyles = css`
   .stops-ahead-stop {
     position: relative;
     display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: calc(var(--stops-ahead-dot-size) + 10px);
+    min-height: var(--stops-ahead-dot-size);
+  }
+  .stops-ahead-row {
+    display: flex;
     align-items: center;
     gap: 8px;
-    padding-left: calc(var(--stops-ahead-dot-size) + 10px);
     min-height: var(--stops-ahead-dot-size);
   }
   .stops-ahead-dot {
@@ -627,13 +633,12 @@ export const cardStyles = css`
     background: var(--card-background-color, var(--ha-card-background, #fff));
     box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
   }
-  /* Transfer-line chips: small pill badges showing the OTHER lines that
-     pass through this stop, coloured per-line so U-Bahn lines retain
-     their brand colour and trams/buses stay neutral until the user
-     supplies overrides. Sits at the row end, wraps when the row is
-     narrow. */
-  .stops-ahead-transfers {
-    margin-left: auto;
+  /* Transfer-line chips: small pill badges. U-Bahn chips sit inline
+     immediately after the station name (always visible, brand-coloured).
+     Tram/bus/night transfers sit behind the right-aligned toggle button
+     ("+N" with a chevron) and wrap to a second row inside the same
+     stop entry when expanded. */
+  .stops-ahead-metros {
     display: inline-flex;
     flex-wrap: wrap;
     gap: 4px;
@@ -649,6 +654,51 @@ export const cardStyles = css`
     background: var(--primary-color);
     line-height: 1.4;
     forced-color-adjust: none;
+  }
+  /* "+N ▾" toggle button: pill-shaped, neutral background, chevron
+     rotates when the non-metro chip group below is expanded. Pinned
+     to the right via margin-left:auto. */
+  .stops-ahead-other-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px 1px 6px;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(
+      in srgb,
+      var(--secondary-text-color) 14%,
+      transparent
+    );
+    color: var(--secondary-text-color);
+    font-size: 0.7rem;
+    font-weight: var(--ha-font-weight-bold, 600);
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+  .stops-ahead-other-toggle ha-icon {
+    --mdc-icon-size: 14px;
+    transition: transform
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .stops-ahead-stop.transfers-expanded .stops-ahead-other-toggle ha-icon {
+    transform: rotate(180deg);
+  }
+  /* Second-row container for non-metro chips. Wraps freely; sits below
+     the station-name row so its width never pushes the layout. */
+  .stops-ahead-others {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  /* Non-metro chips render slightly lighter so the inline U-Bahn chips
+     stay the dominant signal. */
+  .stops-ahead-line-chip--other {
+    opacity: 0.92;
   }
   .line-badge {
     text-align: center;
@@ -849,6 +899,7 @@ export const cardStyles = css`
   .tab:focus-visible,
   .alert:focus-visible,
   .dep-row.expandable:focus-visible,
+  .stops-ahead-other-toggle:focus-visible,
   .icon-action:focus-visible,
   a:focus-visible,
   button:focus-visible {
