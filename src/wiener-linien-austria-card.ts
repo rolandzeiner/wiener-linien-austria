@@ -494,16 +494,25 @@ export class WienerLinienAustriaCard extends LitElement {
             </header>`}
 
         ${this._config!.show_hero_metric && heroLead
-          ? html`<div class="hero">
-              <div class="hero-time" aria-live="polite" aria-atomic="true">
-                <span class="hero-min">${heroValue}</span>
-                ${heroUnit
-                  ? html`<span class="hero-unit">${heroUnit}</span>`
-                  : nothing}
+          ? html`<div class="hero-host">
+              <div class="hero">
+                <div class="hero-time" aria-live="polite" aria-atomic="true">
+                  <span class="hero-min">${heroValue}</span>
+                  ${heroUnit
+                    ? html`<span class="hero-unit">${heroUnit}</span>`
+                    : nothing}
+                </div>
+                <div class="hero-meta">
+                  ${heroGroup.map((d) => this._renderHeroEntry(d, stopCfg.entity))}
+                </div>
               </div>
-              <div class="hero-meta">
-                ${heroGroup.map((d) => this._renderHeroEntry(d, stopCfg.entity))}
-              </div>
+              ${heroGroup.some(
+                (d) => Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0,
+              )
+                ? html`<div class="hero-panels">
+                    ${heroGroup.map((d) => this._renderHeroPanelForEntry(d, stopCfg.entity))}
+                  </div>`
+                : nothing}
             </div>`
           : nothing}
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
@@ -773,54 +782,69 @@ export class WienerLinienAustriaCard extends LitElement {
     const line = d.line || "?";
 
     return html`
-      <div class="hero-block">
-        <div
-          class=${classMap(entryClasses)}
-          role=${hasStopsAhead ? "button" : nothing}
-          tabindex=${hasStopsAhead ? "0" : nothing}
-          aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
-          aria-controls=${hasStopsAhead ? panelId : nothing}
-          aria-label=${hasStopsAhead ? ariaLabel : nothing}
-          @click=${() => hasStopsAhead && this._toggleRow(rowKey)}
-          @keydown=${(ev: KeyboardEvent) =>
-            this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
-        >
-          <span
-            class="line-badge"
-            style=${styleMap(accentStyle)}
-          >${line}</span>
-          <span class="hero-direction">${deText(d.towards)}</span>
-          ${platform
-            ? html`<span class="hero-platform"
-                >${this._t(platformLabelKey(d.type))} ${platform}</span
-              >`
-            : nothing}
-          ${isBarrierFree
-            ? html`<span
-                class="hero-a11y"
-                role="img"
-                aria-label=${this._t("barrier_free_title")}
-                title=${this._t("barrier_free_title")}
-              >
-                <ha-icon
-                  icon="mdi:wheelchair-accessibility"
-                  aria-hidden="true"
-                ></ha-icon>
-              </span>`
-            : nothing}
-          ${hasStopsAhead
-            ? html`<ha-icon
-                class="hero-chevron"
-                icon="mdi:chevron-down"
+      <div
+        class=${classMap(entryClasses)}
+        role=${hasStopsAhead ? "button" : nothing}
+        tabindex=${hasStopsAhead ? "0" : nothing}
+        aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
+        aria-controls=${hasStopsAhead ? panelId : nothing}
+        aria-label=${hasStopsAhead ? ariaLabel : nothing}
+        @click=${() => hasStopsAhead && this._toggleRow(rowKey)}
+        @keydown=${(ev: KeyboardEvent) =>
+          this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
+      >
+        <span
+          class="line-badge"
+          style=${styleMap(accentStyle)}
+        >${line}</span>
+        <span class="hero-direction">${deText(d.towards)}</span>
+        ${platform
+          ? html`<span class="hero-platform"
+              >${this._t(platformLabelKey(d.type))} ${platform}</span
+            >`
+          : nothing}
+        ${isBarrierFree
+          ? html`<span
+              class="hero-a11y"
+              role="img"
+              aria-label=${this._t("barrier_free_title")}
+              title=${this._t("barrier_free_title")}
+            >
+              <ha-icon
+                icon="mdi:wheelchair-accessibility"
                 aria-hidden="true"
-              ></ha-icon>`
-            : nothing}
-        </div>
+              ></ha-icon>
+            </span>`
+          : nothing}
         ${hasStopsAhead
-          ? this._renderHeroStopsAheadPanel(d.stops_ahead!, panelId, expanded, line, rowKey)
+          ? html`<ha-icon
+              class="hero-chevron"
+              icon="mdi:chevron-down"
+              aria-hidden="true"
+            ></ha-icon>`
           : nothing}
       </div>
     `;
+  }
+
+  private _renderHeroPanelForEntry(
+    d: DepartureAttr,
+    entityId: string,
+  ): TemplateResult | typeof nothing {
+    const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
+    if (!hasStopsAhead) return nothing;
+    const rowStableId = d.time_planned ?? `cd${d.countdown}`;
+    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
+    const expanded = this._expandedRows.has(rowKey);
+    const panelId = `wl-hero-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
+    const line = d.line || "?";
+    return this._renderHeroStopsAheadPanel(
+      d.stops_ahead!,
+      panelId,
+      expanded,
+      line,
+      rowKey,
+    );
   }
 
   private _renderHeroStopsAheadPanel(

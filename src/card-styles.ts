@@ -228,28 +228,22 @@ export const cardStyles = css`
     flex-direction: column;
     gap: 6px;
     min-width: 0;
-    /* Anchor to the top of the .hero grid row so the meta column's
-       top edge never moves: when the stops_ahead panel expands and
-       the column grows taller than the hero-time countdown, the row
-       grows downward without the meta's existing entries appearing
-       to "jump up". The hero-time stays vertically centred (default
-       align-items: center on .hero) and instead drifts down as the
-       row grows — a subtler, more expected motion. */
-    align-self: start;
   }
-  /* hero-block wraps an entry + its (optional) collapsible stops_ahead
-     panel. Stays a flex column so the panel slides out below the entry
-     without disturbing the line-badge row layout. The hero-meta gap
-     separates blocks; entry-and-panel inside one block sit flush.
-     The contain:layout below isolates the panel's expand/collapse
-     animation from the entry above it — without it, the chevron
-     rotation + hero-direction flex shrink can micro-reflow the entry
-     row during the transition. */
-  .hero-block {
+  /* hero-host wraps the .hero grid + all expanded stops_ahead panels
+     in a single visual block. Panels render BELOW the grid (not
+     nested inside .hero-meta) so the meta column's height stays
+     bound to the entries only. align-items: center on .hero can
+     then keep the big "1 Min" countdown vertically aligned with
+     the entry row regardless of which panel is open. */
+  .hero-host {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    contain: layout;
+  }
+  .hero-panels {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
   }
   .hero-entry {
     display: flex;
