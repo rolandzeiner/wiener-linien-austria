@@ -83,13 +83,14 @@ function headerIconForType(type: string | undefined): string {
   return iconForType(type) ?? "mdi:bus-stop";
 }
 
-// Platform-prefix translation key by vehicle type. Wiener Linien
-// signage uses "Steig" universally for U-Bahn, tram, and bus —
-// "Gleis" is the ÖBB convention and Wiener Linien doesn't operate
-// heavy rail. Always returns the Steig key; the function is kept
-// (rather than inlined) so the rail/heavy-rail split can be
-// reintroduced if a future API source ever surfaces ÖBB rows.
-function platformLabelKey(_type: string | undefined): string {
+// Platform-prefix translation key by vehicle type. U-Bahn stations use
+// "Gleis" on platform signage; tram and bus stops use "Steig". Unknown
+// types fall back to the bus prefix because most Wien stops are bus
+// stops.
+function platformLabelKey(type: string | undefined): string {
+  if (type === LINE_TYPE_METRO) {
+    return "platform_short_rail";
+  }
   return "platform_short_bus";
 }
 

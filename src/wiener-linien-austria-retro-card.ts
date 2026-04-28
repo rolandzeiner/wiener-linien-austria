@@ -693,11 +693,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
     const platform = cfg.show_platform ? rawPlatform : null;
     const gleisLeft = platform === "2";
-    // Wiener Linien signage uses "Steig" universally for U-Bahn, tram,
-    // and bus — "Gleis" is the ÖBB convention and Wiener Linien doesn't
-    // operate heavy rail. Internal layout class names (retro--gleis-*)
-    // stay as-is; only the user-facing label switches.
-    const platformLabel = this._t("steig");
+    const type = rows[0]?.type ?? "";
+    const isMetro = type === LINE_TYPE_METRO;
+    const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
     const stopName = attrs.stop_name || attrs.friendly_name || "";
     const showStationName = cfg.show_station_name && !!stopName;
