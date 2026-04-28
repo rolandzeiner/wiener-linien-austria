@@ -49,6 +49,19 @@ async def async_get_config_entry_diagnostics(
     rbls = {int(r) for r in config.get(CONF_RBLS) or []}
     traffic, elevator = get_alerts_for(hass, line_names, rbls)
 
+    # Surface trip-pattern index health so user-reported "stops_ahead is
+    # missing" issues can be triaged from a redacted dump alone — the
+    # signal is "did the static layer actually load the index for this
+    # session" not "is the data correct for stop X".
+    catalogue = getattr(coordinator, "_catalogue", None)
+    trip_patterns = getattr(catalogue, "trip_patterns", None) if catalogue else None
+    trip_pattern_summary: dict[str, Any] = {
+        "loaded": trip_patterns is not None,
+    }
+    if trip_patterns is not None:
+        trip_pattern_summary["line_count"] = trip_patterns.line_count
+        trip_pattern_summary["pattern_count"] = trip_patterns.pattern_count
+
     return {
         "attribution": ATTRIBUTION,
         "entry": {
@@ -65,6 +78,7 @@ async def async_get_config_entry_diagnostics(
             "rbls": list(coordinator.rbls),
             "departure_count": len(data.departures) if data is not None else 0,
         },
+        "trip_patterns": trip_pattern_summary,
         "alerts": {
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],

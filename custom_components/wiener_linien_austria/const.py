@@ -74,6 +74,10 @@ ENTRY_COUNT_KEY: Final = "entry_count"
 STATIC_FILES: Final = {
     "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",
     "haltepunkte": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltepunkte.csv",
+    "linien": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-linien.csv",
+    "fahrwegverlaeufe": (
+        f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-fahrwegverlaeufe.csv"
+    ),
 }
 
 # Response attribution (CC-BY mandated)
@@ -106,3 +110,12 @@ RETRO_CARD_URL: Final = (
 # keeping the full payload comfortably under HA's 16 KB recorder attribute
 # cap at busy multi-line stops (Stephansplatz tracks U1/U3/U4).
 MAX_DEPARTURES_IN_ATTRS: Final = 30
+
+# Hybrid truncation for per-departure `stops_ahead`: when the route from the
+# current stop to the terminus has more than (HEAD + 1 ellipsis + terminus)
+# entries, surface only the first HEAD + an ellipsis marker + the terminus.
+# Keeps the recorder attribute payload bounded on long lines (U6 end-to-end
+# is ~24 stops) while preserving the user's mental anchor (the destination)
+# and immediate next stops.
+STOPS_AHEAD_HEAD_COUNT: Final = 4
+STOPS_AHEAD_MAX_FULL: Final = STOPS_AHEAD_HEAD_COUNT + 1 + 1  # head + ellipsis + terminus

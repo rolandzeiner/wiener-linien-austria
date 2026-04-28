@@ -50,10 +50,15 @@ class Departure:
     barrier_free: bool
     traffic_jam: bool
     platform: str | None = None  # "1" / "2" / "A" / "B" — Gleis as published
+    # Ordered list of upcoming stops on the trip the vehicle is running.
+    # None when the static trip-pattern index hasn't loaded or no pattern
+    # matches the row (replacement service, short-turn variant, etc.). The
+    # card treats None and missing-key as identical: render no chevron.
+    stops_ahead: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Render as a plain dict for HA attributes / diagnostics."""
-        return {
+        out: dict[str, Any] = {
             "line": self.line,
             "towards": self.towards,
             "direction": self.direction,
@@ -66,6 +71,9 @@ class Departure:
             "traffic_jam": self.traffic_jam,
             "platform": self.platform,
         }
+        if self.stops_ahead is not None:
+            out["stops_ahead"] = self.stops_ahead
+        return out
 
 
 @dataclass(slots=True)
@@ -94,6 +102,10 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._diva: int = int(config[CONF_DIVA])
         self._latitude: float | None = None
         self._longitude: float | None = None
+        # Static catalogue reference held for stops_ahead enrichment in
+        # _parse_monitor_body. Populated in async_setup; left None on any
+        # static-layer failure so the parser silently skips enrichment.
+        self._catalogue: Any = None
         # Conditional-GET validators captured from the previous /monitor
         # response. The CDN sets ETag + Last-Modified on every reply; we
         # echo them back as If-None-Match / If-Modified-Since so unchanged
@@ -157,6 +169,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         ) as err:
             _LOGGER.debug("Could not load static catalogue for coords: %s", err)
             return
+        self._catalogue = catalogue
         station = catalogue.stations_by_diva.get(self._diva)
         if station is not None:
             self._latitude = station.latitude
@@ -330,7 +343,13 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # never store them for an error reply, else next tick would
         # send If-None-Match against a payload we never accepted.
         self._monitor_cache.update_from_response(resp)
-        return _parse_monitor_body(body, self._selected_lines, self._server_time)
+        return _parse_monitor_body(
+            body,
+            self._selected_lines,
+            self._server_time,
+            catalogue=self._catalogue,
+            entry_rbls=self._rbls,
+        )
 
     def _note_success(self) -> None:
         """Reset the consecutive-failure counter and restore normal cadence."""
@@ -383,10 +402,23 @@ def _parse_monitor_body(
     body: dict[str, Any],
     selected: set[str] | None,
     server_time: str | None,
+    *,
+    catalogue: Any = None,
+    entry_rbls: list[int] | None = None,
 ) -> MonitorData:
-    """Parse a successful /monitor response into a MonitorData."""
+    """Parse a successful /monitor response into a MonitorData.
+
+    `catalogue` and `entry_rbls`, when provided, drive the per-row
+    `stops_ahead` enrichment via `static.stops_ahead_for_match`. Both are
+    optional: tests construct MonitorData directly and this parser is
+    re-used in fixtures that don't carry the static layer.
+    """
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
+    # Resolve once per parse — cheap, but no point doing it per row.
+    _trip_patterns_loaded = (
+        catalogue is not None and getattr(catalogue, "trip_patterns", None) is not None
+    )
 
     # Match the user's selection on (line, direction) only — `line.towards`
     # is unstable for branching termini (e.g. U1/R reports "Oberlaa" or
@@ -427,10 +459,36 @@ def _parse_monitor_body(
                     continue
                 vehicle = entry.get("vehicle") or {}
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
+                resolved_towards = vehicle_towards or line_towards
+                stops_ahead: list[dict[str, Any]] | None = None
+                if _trip_patterns_loaded and entry_rbls:
+                    # Lazy-import to avoid a circular reference (static.py is
+                    # a leaf module that doesn't import coordinator).
+                    try:
+                        from .static import (  # noqa: PLC0415
+                            stops_ahead_for_match,
+                        )
+                        stops_ahead = stops_ahead_for_match(
+                            catalogue,
+                            line_name,
+                            entry_rbls,
+                            resolved_towards,
+                        )
+                    except Exception:  # noqa: BLE001
+                        # Fail-soft: a single matcher hiccup must not poison
+                        # the rest of the parse. Logged at debug because
+                        # stops_ahead is non-essential.
+                        _LOGGER.debug(
+                            "stops_ahead lookup failed for %s towards %s",
+                            line_name,
+                            resolved_towards,
+                            exc_info=True,
+                        )
+                        stops_ahead = None
                 departures.append(
                     Departure(
                         line=line_name,
-                        towards=vehicle_towards or line_towards,
+                        towards=resolved_towards,
                         direction=direction,
                         type=line_type,
                         countdown=countdown,
@@ -440,6 +498,7 @@ def _parse_monitor_body(
                         barrier_free=barrier_free,
                         traffic_jam=traffic_jam,
                         platform=platform,
+                        stops_ahead=stops_ahead,
                     )
                 )
 

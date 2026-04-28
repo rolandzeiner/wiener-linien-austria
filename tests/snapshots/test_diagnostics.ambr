@@ -38,5 +38,8 @@
       'title': 'Stephansplatz',
       'version': 2,
     }),
+    'trip_patterns': dict({
+      'loaded': False,
+    }),
   })
 # ---

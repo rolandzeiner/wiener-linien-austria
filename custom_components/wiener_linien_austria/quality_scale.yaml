@@ -68,7 +68,7 @@ rules:
     comment: TODO — flip if your API has long-lived credentials that can expire.
   test-coverage:
     status: done
-    comment: Config flow (3 steps + reconfigure + search-again + abort reasons), coordinator (parse, rate-limit, cooldown, async_setup coord population, tram/bus fixture), sensor (MAX_DEPARTURES cap, alerts matching, availability), static catalogue loader (cache hit / corrupt / refresh-on-failure), alerts (_fetch_info_list error branches + line-fallback), and diagnostics are all covered.
+    comment: Config flow (3 steps + reconfigure + search-again + abort reasons), coordinator (parse, rate-limit, cooldown, async_setup coord population, tram/bus fixture, stops_ahead enrichment + fail-soft + unknown-line + no-catalogue branches), sensor (MAX_DEPARTURES cap, alerts matching, availability), static catalogue loader (cache hit / corrupt / refresh-on-failure, four-CSV gather, all-304 fast path, one-304 mixed branch, trip-pattern parsing, hybrid truncation, terminus substring match, Store v1 backwards compat for the additive trip_patterns field), alerts (_fetch_info_list error branches + line-fallback), and diagnostics are all covered.
 
   # Gold
   devices:

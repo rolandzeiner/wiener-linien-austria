@@ -13,6 +13,8 @@
     "departures_list": "Upcoming departures",
     "barrier_free_title": "Step-free access",
     "disturbance_title": "Traffic disruption reported",
+    "stops_ahead_aria_show": "Show stops ahead for {line} towards {towards}",
+    "stops_ahead_aria_hide": "Hide stops ahead for {line} towards {towards}",
     "dir_h": "H",
     "dir_r": "R",
     "dir_both": "Both",

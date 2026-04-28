@@ -103,6 +103,12 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _versionMismatch: string | null = null;
   @state() private _expandedTraffic = new Set<string>();
   @state() private _expandedElevator = new Set<string>();
+  // Per-row expanded state for the stops_ahead collapsible. Keyed by a
+  // stable per-row identifier (entity + line + direction + countdown +
+  // planned-time) so re-renders that re-sort the list keep the right row
+  // open. Naturally invalidates when a row's countdown changes — closing
+  // the panel as the row "ages out" is the right UX.
+  @state() private _expandedRows = new Set<string>();
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
 
@@ -197,6 +203,7 @@ export class WienerLinienAustriaCard extends LitElement {
       changed.has("_versionMismatch") ||
       changed.has("_expandedTraffic") ||
       changed.has("_expandedElevator") ||
+      changed.has("_expandedRows") ||
       changed.has("_debugTraffic") ||
       changed.has("_debugElevator")
     ) {
@@ -476,7 +483,7 @@ export class WienerLinienAustriaCard extends LitElement {
         ${this._config!.show_departures && this._config!.max_departures > 0
           ? rows.length
             ? html`<ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
-                ${rows.map((d) => this._renderRow(d))}
+                ${rows.map((d) => this._renderRow(d, stopCfg.entity))}
               </ul>`
             : html`<div class="empty" role="status" aria-live="polite">
                 ${this._t(attrs.server_time ? "betriebsschluss" : "no_data")}
@@ -744,7 +751,10 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
-  private _renderRow(d: DepartureAttr): TemplateResult {
+  private _renderRow(
+    d: DepartureAttr,
+    entityId: string,
+  ): TemplateResult | TemplateResult[] {
     const overrides = this._config!.line_colors;
     const line = d.line || "?";
     const color = colorForLine(line, overrides);
@@ -780,8 +790,37 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
 
-    return html`
-      <li class="dep-row">
+    // Stops-ahead expandability: an empty list means "we matched but you
+    // are at the terminus" — still no panel, no chevron. A truncated list
+    // (head + ellipsis + terminus) renders the same affordance as a full
+    // short list.
+    const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
+    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.countdown}|${d.time_planned ?? ""}`;
+    const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
+    const panelId = `wl-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
+    const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
+    const ariaLabel = hasStopsAhead
+      ? this._t(ariaLabelKey, { line, towards: d.towards || "" })
+      : "";
+
+    const rowClasses = {
+      "dep-row": true,
+      expandable: hasStopsAhead,
+      expanded,
+    };
+
+    const rowTpl = html`
+      <li
+        class=${classMap(rowClasses)}
+        role=${hasStopsAhead ? "button" : nothing}
+        tabindex=${hasStopsAhead ? "0" : nothing}
+        aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
+        aria-controls=${hasStopsAhead ? panelId : nothing}
+        aria-label=${hasStopsAhead ? ariaLabel : nothing}
+        @click=${() => hasStopsAhead && this._toggleRow(rowKey)}
+        @keydown=${(ev: KeyboardEvent) =>
+          this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
+      >
         <div class="line-badge" style=${styleMap({ background: color })}>${line}</div>
         <div class="towards">
           ${typeIcon
@@ -822,8 +861,55 @@ export class WienerLinienAustriaCard extends LitElement {
             </span>`
           : html`<span></span>`}
         <div class=${classMap({ countdown: true, [cdState]: !!cdState })}>${cdLabel}</div>
+        ${hasStopsAhead
+          ? html`<ha-icon
+              class="row-chevron"
+              icon="mdi:chevron-down"
+              aria-hidden="true"
+            ></ha-icon>`
+          : nothing}
       </li>
     `;
+
+    if (!hasStopsAhead) {
+      return rowTpl;
+    }
+
+    return [rowTpl, this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded)];
+  }
+
+  private _renderStopsAheadPanel(
+    stops: NonNullable<DepartureAttr["stops_ahead"]>,
+    panelId: string,
+    expanded: boolean,
+  ): TemplateResult {
+    return html`
+      <li
+        class=${classMap({ "dep-row-detail": true, expanded })}
+        id=${panelId}
+        role="region"
+        aria-hidden=${expanded ? "false" : "true"}
+      >
+        <div class="dep-row-detail-inner">
+          <ol class="stops-ahead">
+            ${stops.map((s) => {
+              const classes = {
+                terminus: !!s.is_terminus,
+                ellipsis: !!s.is_ellipsis,
+              };
+              return html`<li class=${classMap(classes)}>${deText(s.name)}</li>`;
+            })}
+          </ol>
+        </div>
+      </li>
+    `;
+  }
+
+  private _toggleRow(key: string): void {
+    const next = new Set(this._expandedRows);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    this._expandedRows = next;
   }
 
   private _stopMapUrl(

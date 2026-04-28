@@ -17,6 +17,17 @@ declare global {
 
 export type DepartureDirection = "H" | "R";
 
+// One entry on the per-departure "stops ahead" trail. `is_terminus` only
+// appears on the final stop; `is_ellipsis` only appears on the truncation
+// marker emitted by the hybrid head-plus-terminus layout. The card treats
+// any item with `is_ellipsis: true` as "render '…' and skip linking".
+export interface StopAheadAttr {
+  diva: number | null;
+  name: string;
+  is_terminus?: boolean;
+  is_ellipsis?: boolean;
+}
+
 export interface DepartureAttr {
   line: string;
   towards: string;
@@ -29,6 +40,9 @@ export interface DepartureAttr {
   barrier_free?: boolean;
   traffic_jam?: boolean;
   platform?: string | null;
+  // Optional per-departure list of upcoming stops on this trip. Absent
+  // (or empty) means "no panel" — the row renders without a chevron.
+  stops_ahead?: StopAheadAttr[];
 }
 
 export interface TrafficInfoAttr {

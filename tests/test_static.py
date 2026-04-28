@@ -13,12 +13,16 @@ from custom_components.wiener_linien_austria.static import (
     STORE_VERSION,
     Station,
     StaticCatalogue,
+    TripPattern,
+    TripPatternIndex,
     _catalogue_from_store,
     _catalogue_to_store,
     _merge_haltepunkte,
     _parse_haltestellen,
+    _parse_trip_patterns,
     async_load_catalogue,
     async_refresh_catalogue,
+    stops_ahead_for_match,
 )
 
 
@@ -49,6 +53,37 @@ HALTEPUNKTE_CSV = (
     # RBL with unknown DIVA — should be skipped, not error.
     "9999;99999999;Orphan;Wien;49000001;0;0\n"
 )
+
+# Subset of linien.csv covering U1 + a tram (71). Real columns:
+# LineID;LineText;SortingHelp;Realtime;MeansOfTransport
+LINIEN_CSV = (
+    "LineID;LineText;SortingHelp;Realtime;MeansOfTransport\n"
+    "301;U1;1;1;ptMetro\n"
+    "771;71;71;1;ptTram\n"
+)
+
+# Subset of fahrwegverlaeufe.csv. PatternID 1 = U1 H (forward),
+# PatternID 2 = U1 R (return), PatternID 3 = a hypothetical U1 short-turn.
+# RBL 4111 is U1/H/Stephansplatz; the H-pattern goes 4001 → 4111 → 4222 → 4333.
+# Sequence has gaps to mimic real CSV (rows 0/1/3/4) — sort key is the value.
+FAHR_CSV = (
+    "LineID;PatternID;StopSeqCount;StopID;Direction\n"
+    # U1 H — Reumannplatz → Stephansplatz → Praterstern → Leopoldau
+    "301;1;0;4001;1\n"
+    "301;1;1;4111;1\n"
+    "301;1;3;4222;1\n"
+    "301;1;4;4333;1\n"
+    # U1 R — reverse
+    "301;2;0;4333;2\n"
+    "301;2;1;4222;2\n"
+    "301;2;2;4118;2\n"
+    "301;2;3;4001;2\n"
+)
+
+
+def _build_sample_index() -> TripPatternIndex:
+    """Helper: build a TripPatternIndex matching the LINIEN_CSV + FAHR_CSV."""
+    return _parse_trip_patterns(LINIEN_CSV, FAHR_CSV)
 
 
 def test_parse_haltestellen() -> None:
@@ -224,14 +259,18 @@ def _csv_response(text: str, *, etag: str = '"v1"', status: int = 200) -> MagicM
 
 
 async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
-    """Cold-start: both CSVs come back 200, parse + merge into a catalogue."""
+    """Cold-start: every CSV comes back 200, parse + merge into a catalogue."""
     from custom_components.wiener_linien_austria import static as static_mod
 
     haltestellen_resp = _csv_response(HALTESTELLEN_CSV, etag='"halte-v1"')
     haltepunkte_resp = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v1"')
+    linien_resp = _csv_response(LINIEN_CSV, etag='"linien-v1"')
+    fahr_resp = _csv_response(FAHR_CSV, etag='"fahr-v1"')
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=[haltestellen_resp, haltepunkte_resp])
+    fake_session.get = AsyncMock(
+        side_effect=[haltestellen_resp, haltepunkte_resp, linien_resp, fahr_resp]
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_clientsession",
@@ -244,12 +283,17 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     # Validators captured for the next conditional GET.
     assert catalogue.validators["haltestellen"].etag == '"halte-v1"'
     assert catalogue.validators["haltepunkte"].etag == '"punkte-v1"'
+    assert catalogue.validators["linien"].etag == '"linien-v1"'
+    assert catalogue.validators["fahrwegverlaeufe"].etag == '"fahr-v1"'
+    # Trip-pattern index built from the fresh linien + fahrwegverlaeufe.
+    assert catalogue.trip_patterns is not None
+    assert catalogue.trip_patterns.lines_by_label["U1"] == 301
 
 
-async def test_fetch_and_build_both_304_returns_prior_unchanged(
+async def test_fetch_and_build_all_304_returns_prior_unchanged(
     hass: HomeAssistant,
 ) -> None:
-    """Both CSVs unchanged → return prior catalogue object verbatim, no rewrite."""
+    """Every CSV unchanged → return prior catalogue verbatim, no rewrite."""
     from custom_components.wiener_linien_austria import static as static_mod
     from custom_components.wiener_linien_austria.http import CacheValidators
 
@@ -257,16 +301,25 @@ async def test_fetch_and_build_both_304_returns_prior_unchanged(
     prior.validators = {
         "haltestellen": CacheValidators(etag='"halte-v1"'),
         "haltepunkte": CacheValidators(etag='"punkte-v1"'),
+        "linien": CacheValidators(etag='"linien-v1"'),
+        "fahrwegverlaeufe": CacheValidators(etag='"fahr-v1"'),
     }
+    prior.trip_patterns = _build_sample_index()
 
-    not_modified = MagicMock()
-    not_modified.status = 304
-    not_modified.headers = {}
-    not_modified.raise_for_status = MagicMock()
-    not_modified.text = AsyncMock(side_effect=AssertionError("must not call .text() on 304"))
+    def _not_modified() -> MagicMock:
+        nm = MagicMock()
+        nm.status = 304
+        nm.headers = {}
+        nm.raise_for_status = MagicMock()
+        nm.text = AsyncMock(
+            side_effect=AssertionError("must not call .text() on 304")
+        )
+        return nm
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=[not_modified, not_modified])
+    fake_session.get = AsyncMock(
+        side_effect=[_not_modified(), _not_modified(), _not_modified(), _not_modified()]
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_clientsession",
@@ -283,10 +336,11 @@ async def test_fetch_and_build_one_304_one_fresh(
 ) -> None:
     """Half-and-half: haltestellen 304, haltepunkte fresh — re-merge correctly.
 
-    This is the trickiest branch in static._fetch_and_build (lines 165-191).
-    The prior station list is reused, but RBLs are rebuilt from the freshly-
-    fetched haltepunkte CSV. A bug here would either drop stations entirely
-    or duplicate RBLs across loads.
+    This is the trickiest branch in static._fetch_and_build. The prior
+    station list is reused, but RBLs are rebuilt from the freshly-fetched
+    haltepunkte CSV. A bug here would either drop stations entirely or
+    duplicate RBLs across loads. The trip-pattern CSVs are 304 too so
+    the prior trip-pattern index carries forward unchanged.
     """
     from custom_components.wiener_linien_austria import static as static_mod
     from custom_components.wiener_linien_austria.http import CacheValidators
@@ -301,19 +355,24 @@ async def test_fetch_and_build_one_304_one_fresh(
         validators={
             "haltestellen": CacheValidators(etag='"halte-v1"'),
             "haltepunkte": CacheValidators(etag='"punkte-v1"'),
+            "linien": CacheValidators(etag='"linien-v1"'),
+            "fahrwegverlaeufe": CacheValidators(etag='"fahr-v1"'),
         },
+        trip_patterns=_build_sample_index(),
     )
 
-    halte_304 = MagicMock()
-    halte_304.status = 304
-    halte_304.headers = {}
-    halte_304.raise_for_status = MagicMock()
-    halte_304.text = AsyncMock(side_effect=AssertionError("304 has no body"))
+    def _304() -> MagicMock:
+        nm = MagicMock()
+        nm.status = 304
+        nm.headers = {}
+        nm.raise_for_status = MagicMock()
+        nm.text = AsyncMock(side_effect=AssertionError("304 has no body"))
+        return nm
 
     punkte_fresh = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v2"')
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=[halte_304, punkte_fresh])
+    fake_session.get = AsyncMock(side_effect=[_304(), punkte_fresh, _304(), _304()])
 
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_clientsession",
@@ -324,6 +383,9 @@ async def test_fetch_and_build_one_304_one_fresh(
     # Stations preserved (haltestellen 304), RBLs rebuilt from fresh haltepunkte.
     assert sorted(result.stations_by_diva.keys()) == [60200123, 60201012]
     assert sorted(result.stations_by_diva[60201012].rbls) == [4111, 4118]
+    # Trip-pattern index carried forward from prior (both pattern CSVs 304).
+    assert result.trip_patterns is not None
+    assert "U1" in result.trip_patterns.lines_by_label
 
 
 async def test_async_refresh_catalogue_keeps_cache_on_failure(
@@ -344,3 +406,185 @@ async def test_async_refresh_catalogue_keeps_cache_on_failure(
     saved = await store.async_load()
     assert saved is not None
     assert any(s["name"] == "Keep" for s in saved["stations"])
+
+
+# ---------------------------------------------------------------------------
+# Trip-pattern index: parsing, lookup, hybrid truncation, fail-soft branches
+# ---------------------------------------------------------------------------
+
+
+def _u1_catalogue() -> StaticCatalogue:
+    """Build a catalogue spanning U1 H + R with named station fixtures.
+
+    Each station carries the RBLs the FAHR_CSV references so
+    `stops_ahead_for_match` can resolve them back to display names.
+    """
+    stations: dict[int, Station] = {
+        62000001: Station(62000001, "Reumannplatz", "Wien", 16.37, 48.18, [4001]),
+        60201012: Station(60201012, "Stephansplatz", "Wien", 16.37, 48.21, [4111, 4118]),
+        62000002: Station(62000002, "Praterstern", "Wien", 16.39, 48.22, [4222]),
+        62000003: Station(62000003, "Leopoldau", "Wien", 16.47, 48.27, [4333]),
+    }
+    return StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="2026-04-28T12:00:00+00:00",
+        trip_patterns=_build_sample_index(),
+    )
+
+
+def test_parse_trip_patterns_builds_line_label_lookup() -> None:
+    """linien.csv yields LineText → LineID + MeansOfTransport mappings."""
+    index = _parse_trip_patterns(LINIEN_CSV, FAHR_CSV)
+    assert index.lines_by_label == {"U1": 301, "71": 771}
+    assert index.means_by_line[301] == "ptMetro"
+    assert index.means_by_line[771] == "ptTram"
+
+
+def test_parse_trip_patterns_orders_stops_by_seq_count() -> None:
+    """Sequence gaps are tolerated; sort is by StopSeqCount value."""
+    index = _parse_trip_patterns(LINIEN_CSV, FAHR_CSV)
+    h_pattern = next(
+        p for p in index.patterns_by_line[301] if p.pattern_id == 1
+    )
+    # H pattern: Reumannplatz(0) → Stephansplatz(1) → Praterstern(3) → Leopoldau(4)
+    assert h_pattern.stops == (4001, 4111, 4222, 4333)
+    assert h_pattern.direction == 1
+
+
+def test_stops_ahead_for_match_returns_tail_after_current_rbl() -> None:
+    """From Stephansplatz on U1/H, the next stops are Praterstern + Leopoldau."""
+    catalogue = _u1_catalogue()
+    result = stops_ahead_for_match(
+        catalogue,
+        line_label="U1",
+        entry_rbls=[4111, 4118],  # both H and R RBLs at our DIVA
+        towards="Leopoldau",
+    )
+    assert result is not None
+    names = [s["name"] for s in result]
+    assert names == ["Praterstern", "Leopoldau"]
+    assert result[-1].get("is_terminus") is True
+    assert "is_terminus" not in result[0]
+
+
+def test_stops_ahead_for_match_excludes_current_stop() -> None:
+    """The current stop is never in the returned tail."""
+    catalogue = _u1_catalogue()
+    result = stops_ahead_for_match(
+        catalogue, "U1", [4111, 4118], "Leopoldau"
+    )
+    assert result is not None
+    assert all(s["name"] != "Stephansplatz" for s in result)
+
+
+def test_stops_ahead_for_match_unknown_line_returns_none() -> None:
+    """Replacement service / unmatched line → None (card hides chevron)."""
+    catalogue = _u1_catalogue()
+    assert (
+        stops_ahead_for_match(catalogue, "U99", [4111], "Wherever") is None
+    )
+
+
+def test_stops_ahead_for_match_no_trip_patterns_returns_none() -> None:
+    """Catalogue without a trip-pattern index → None."""
+    stations = _u1_catalogue().stations_by_diva
+    catalogue = StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=None
+    )
+    assert stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau") is None
+
+
+def test_stops_ahead_for_match_terminus_substring_picks_branch() -> None:
+    """Branching termini: substring match selects the right pattern.
+
+    U1/H ends at Leopoldau. Even with a fuzzy `towards` like "Leopoldau"
+    or "Leopoldau S+U", the substring matcher resolves to the H pattern
+    rather than the R pattern (which terminates at Reumannplatz).
+    """
+    catalogue = _u1_catalogue()
+    result = stops_ahead_for_match(
+        catalogue, "U1", [4111, 4118], "Leopoldau S+U"
+    )
+    assert result is not None
+    assert result[-1]["name"] == "Leopoldau"
+
+
+def test_stops_ahead_for_match_returns_empty_at_terminus() -> None:
+    """When our RBL IS the terminus, return an empty list (not None)."""
+    catalogue = _u1_catalogue()
+    # Approach Leopoldau (RBL 4333) as if we're already there.
+    result = stops_ahead_for_match(catalogue, "U1", [4333], "Leopoldau")
+    assert result == []
+
+
+def test_stops_ahead_hybrid_truncation_keeps_head_plus_terminus() -> None:
+    """When the tail exceeds STOPS_AHEAD_MAX_FULL, truncate to head + … + end."""
+    # Build a long line: 8 stops ahead of our position. That's more than
+    # STOPS_AHEAD_MAX_FULL (4 + 1 + 1 = 6) so the truncator kicks in.
+    stations = {
+        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i])
+        for i in range(1, 11)
+    }
+    long_pattern = TripPattern(
+        line_id=999,
+        pattern_id=1,
+        direction=1,
+        stops=tuple(range(1, 11)),  # 1..10
+    )
+    catalogue = StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={999: [long_pattern]},
+            lines_by_label={"X1": 999},
+        ),
+    )
+    result = stops_ahead_for_match(catalogue, "X1", [1], "Stop10")
+    assert result is not None
+    # 4 head + 1 ellipsis + 1 terminus
+    assert len(result) == 6
+    assert [s["name"] for s in result[:4]] == ["Stop2", "Stop3", "Stop4", "Stop5"]
+    assert result[4].get("is_ellipsis") is True
+    assert result[4]["name"] == "…"
+    assert result[5]["name"] == "Stop10"
+    assert result[5].get("is_terminus") is True
+
+
+def test_stops_ahead_no_truncation_when_short() -> None:
+    """Lists at or below the cap come back fully."""
+    catalogue = _u1_catalogue()
+    # H pattern from Stephansplatz has 2 stops ahead — no truncation.
+    result = stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau")
+    assert result is not None
+    assert len(result) == 2
+    assert all(not s.get("is_ellipsis") for s in result)
+
+
+# ---------------------------------------------------------------------------
+# Store v1 → v1+trip_patterns roundtrip + backwards compat
+# ---------------------------------------------------------------------------
+
+
+def test_store_roundtrip_with_trip_patterns() -> None:
+    """A catalogue with trip_patterns serialises and re-loads losslessly."""
+    catalogue = _u1_catalogue()
+    payload = _catalogue_to_store(catalogue)
+    rebuilt = _catalogue_from_store(payload)
+    assert rebuilt.trip_patterns is not None
+    assert rebuilt.trip_patterns.lines_by_label["U1"] == 301
+    h_pattern = next(
+        p for p in rebuilt.trip_patterns.patterns_by_line[301] if p.pattern_id == 1
+    )
+    assert h_pattern.stops == (4001, 4111, 4222, 4333)
+
+
+def test_store_load_pre_trip_pattern_payload_treats_field_as_missing() -> None:
+    """Old caches without `trip_patterns` deserialise with None — no crash."""
+    catalogue = _sample()
+    payload = _catalogue_to_store(catalogue)
+    # Simulate a v1.3 cache: strip the new key entirely.
+    payload.pop("trip_patterns", None)
+    rebuilt = _catalogue_from_store(payload)
+    assert rebuilt.trip_patterns is None
+    # Stations + RBLs preserved as before.
+    assert 60201012 in rebuilt.stations_by_diva

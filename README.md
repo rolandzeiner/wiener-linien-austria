@@ -16,6 +16,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 - Multi-step config flow (search → pick stop → pick lines) with a live `/monitor` probe so you only see lines actually serving the stop.
 - Reconfigure flow to add/remove lines without losing the entry; options flow to change the polling interval.
 - **Service disruption alerts** (`trafficInfoList`) and **elevator outage alerts** (`Aufzugsinfo`) filtered to your tracked lines and stop RBLs — surfaced as `traffic_info` / `elevator_info` sensor attributes and rendered inline by both bundled cards.
+- **Stops-ahead trail** *(1.4.0)* — each departure on the modern card can be expanded to show the upcoming stops on that exact trip down to the terminus. Sourced from the static `fahrwegverlaeufe.csv` (CC BY 4.0) and joined against the existing stop catalogue.
 - **Two bundled Lovelace cards** — modern full-feature board + retro LED-display style.
 
 ## Screenshots
@@ -121,13 +122,14 @@ The 30-departure cap keeps busy multi-line stops under HA's 16 KB recorder attri
 
 ## Data Updates
 
-Three Wiener Linien OGD endpoints, on different cadences:
+Four Wiener Linien OGD endpoints, on different cadences:
 
 | What | Endpoint | Cadence |
 |---|---|---|
 | Live departures per stop | `/monitor?stopId=…` | Per-entry, default 60 s (min 30 s, max 600 s) |
 | Traffic + elevator alerts | `/trafficInfoList` (×2) | Domain-wide, 5 min — shared across all entries |
 | Static stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
+| Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 
 All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — both within Wiener Linien's fair-use policy. Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the previously-parsed payload, halving steady-state bandwidth without changing freshness. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
@@ -199,6 +201,7 @@ logger:
 - **Vienna only.** ÖBB / VOR / regional services are out of scope.
 - **No journey planning.** The OGD monitor endpoint returns departures at a stop; routing is not provided.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
+- **Stops-ahead is best effort.** Short-turn services may show the full scheduled path (the short-turn pattern often isn't published as its own variant). Replacement-bus services (SEV) and unscheduled detours produce no panel — the row stays as today, no chevron.
 
 ## Attribution
 

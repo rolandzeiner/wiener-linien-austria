@@ -496,7 +496,7 @@ export const cardStyles = css`
   }
   .dep-row {
     display: grid;
-    grid-template-columns: max-content 1fr auto auto;
+    grid-template-columns: max-content 1fr auto auto auto;
     align-items: center;
     gap: 8px;
     padding: 6px 2px;
@@ -518,6 +518,80 @@ export const cardStyles = css`
       var(--primary-text-color) 4%,
       transparent
     );
+  }
+  /* When the row carries a stops_ahead panel, the entire row becomes a
+     button-like surface. Cursor and user-select cues mirror the alert
+     pattern (.alert) so the affordance is consistent across the card. */
+  .dep-row.expandable {
+    cursor: pointer;
+    user-select: none;
+  }
+  .row-chevron {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+    transition: transform
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .dep-row.expanded .row-chevron {
+    transform: rotate(180deg);
+  }
+  /* Detail panel: sibling <li> rendered immediately below an expandable
+     .dep-row. The 0fr ↔ 1fr trick mirrors .alert-detail and animates to
+     intrinsic height so the stop list never clips. The panel is always
+     in the DOM (inside aria-hidden) so screen readers can step into it
+     when expanded; collapse just zeroes the row track. */
+  .dep-row-detail {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+    list-style: none;
+  }
+  .dep-row-detail-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .dep-row-detail.expanded {
+    grid-template-rows: 1fr;
+  }
+  .stops-ahead {
+    list-style: none;
+    margin: 0;
+    padding: 6px 8px 8px calc(2.4em + 16px);
+    /* indent matches line-badge (min-width 2.4em) + gap (8px) so the
+       trail visually starts under the towards text, not under the badge. */
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--secondary-text-color);
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+  .stops-ahead li {
+    position: relative;
+    padding-left: 14px;
+  }
+  .stops-ahead li::before {
+    content: "›";
+    position: absolute;
+    left: 0;
+    color: color-mix(in srgb, var(--secondary-text-color) 70%, transparent);
+  }
+  .stops-ahead li.terminus {
+    color: var(--primary-text-color);
+    font-weight: 500;
+  }
+  .stops-ahead li.terminus::before {
+    content: "»";
+    color: var(--primary-color);
+  }
+  .stops-ahead li.ellipsis {
+    color: color-mix(in srgb, var(--secondary-text-color) 60%, transparent);
+    font-style: italic;
+  }
+  .stops-ahead li.ellipsis::before {
+    content: "";
   }
   .line-badge {
     text-align: center;
@@ -717,6 +791,7 @@ export const cardStyles = css`
   /* Accessibility primitives — verbatim from the project spec. */
   .tab:focus-visible,
   .alert:focus-visible,
+  .dep-row.expandable:focus-visible,
   .icon-action:focus-visible,
   a:focus-visible,
   button:focus-visible {
