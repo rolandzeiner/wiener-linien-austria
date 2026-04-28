@@ -7,7 +7,7 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from .alerts import get_alerts_for
-from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS
+from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
 from .coordinator import WienerLinienConfigEntry
 
 # No credentials to redact today (Wiener Linien OGD has no API key), and
@@ -52,9 +52,14 @@ async def async_get_config_entry_diagnostics(
     # Surface trip-pattern index health so user-reported "stops_ahead is
     # missing" issues can be triaged from a redacted dump alone — the
     # signal is "did the static layer actually load the index for this
-    # session" not "is the data correct for stop X".
-    catalogue = getattr(coordinator, "_catalogue", None)
-    trip_patterns = getattr(catalogue, "trip_patterns", None) if catalogue else None
+    # session" not "is the data correct for stop X". Read the live
+    # shared catalogue ref so a background refresh that hasn't been
+    # picked up by the coordinator yet still reports as loaded.
+    from .static import StaticCatalogue  # noqa: PLC0415
+    cached = hass.data.get(DOMAIN, {}).get("static_catalogue")
+    trip_patterns = (
+        cached.trip_patterns if isinstance(cached, StaticCatalogue) else None
+    )
     trip_pattern_summary: dict[str, Any] = {
         "loaded": trip_patterns is not None,
     }

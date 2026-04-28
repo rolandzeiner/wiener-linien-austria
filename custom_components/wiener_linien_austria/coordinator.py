@@ -102,10 +102,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._diva: int = int(config[CONF_DIVA])
         self._latitude: float | None = None
         self._longitude: float | None = None
-        # Static catalogue reference held for stops_ahead enrichment in
-        # _parse_monitor_body. Populated in async_setup; left None on any
-        # static-layer failure so the parser silently skips enrichment.
-        self._catalogue: Any = None
         # Conditional-GET validators captured from the previous /monitor
         # response. The CDN sets ETag + Last-Modified on every reply; we
         # echo them back as If-None-Match / If-Modified-Since so unchanged
@@ -169,7 +165,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         ) as err:
             _LOGGER.debug("Could not load static catalogue for coords: %s", err)
             return
-        self._catalogue = catalogue
         station = catalogue.stations_by_diva.get(self._diva)
         if station is not None:
             self._latitude = station.latitude
@@ -343,13 +338,33 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # never store them for an error reply, else next tick would
         # send If-None-Match against a payload we never accepted.
         self._monitor_cache.update_from_response(resp)
+        # Read the shared catalogue ref live so a background trip-pattern
+        # refresh that lands after this coordinator's setup is picked up
+        # on the very next parse — no restart needed.
+        catalogue = self._current_catalogue()
         return _parse_monitor_body(
             body,
             self._selected_lines,
             self._server_time,
-            catalogue=self._catalogue,
+            catalogue=catalogue,
             entry_rbls=self._rbls,
         )
+
+    def _current_catalogue(self) -> Any:
+        """Fetch the live catalogue ref from hass.data, or None.
+
+        The catalogue may be a `StaticCatalogue` (resolved), an
+        `asyncio.Task` (still loading on a fresh start), or absent
+        (load hasn't been triggered yet). Only the resolved form is
+        useful for enrichment; the others fall through to None and
+        the parser skips stops_ahead.
+        """
+        from .static import StaticCatalogue  # noqa: PLC0415
+        domain_data = self.hass.data.get(DOMAIN, {})
+        cached = domain_data.get("static_catalogue")
+        if isinstance(cached, StaticCatalogue):
+            return cached
+        return None
 
     def _note_success(self) -> None:
         """Reset the consecutive-failure counter and restore normal cadence."""
@@ -473,6 +488,7 @@ def _parse_monitor_body(
                             line_name,
                             entry_rbls,
                             resolved_towards,
+                            live_direction=direction,
                         )
                     except Exception:  # noqa: BLE001
                         # Fail-soft: a single matcher hiccup must not poison

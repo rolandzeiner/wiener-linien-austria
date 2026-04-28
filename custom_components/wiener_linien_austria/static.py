@@ -202,10 +202,13 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     If both cache and network are unavailable, raises RuntimeError.
 
     When the cache predates the additive `trip_patterns` field (1.4.0),
-    forces an inline refetch so users get the stops-ahead feature on the
-    first entry-load instead of waiting for the next weekly refresh
-    (which would otherwise be up to 7 days away). Network failure falls
-    back to the stale cache so the integration still works.
+    schedules a *background* refetch and returns the stale cache
+    immediately so coordinator setup never blocks on the multi-MB
+    fahrwegverlaeufe.csv download. The background task updates the
+    shared catalogue ref via `async_set_cached_catalogue` when it
+    completes; running coordinators that read the ref live (rather than
+    capturing it once at setup) pick up the refreshed data without a
+    restart.
     """
     store: Store[dict[str, Any]] = Store(hass, STORE_VERSION, STORE_KEY)
     cached = await store.async_load()
@@ -219,29 +222,56 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
             )
         else:
             if catalogue.trip_patterns is None:
-                _LOGGER.info(
-                    "Static cache predates trip_patterns; refetching to populate it"
+                _LOGGER.warning(
+                    "Static cache predates trip_patterns; "
+                    "scheduling background refresh"
                 )
-                try:
-                    refreshed = await _fetch_and_build(hass, prior=catalogue)
-                except (
-                    aiohttp.ClientError,
-                    asyncio.TimeoutError,
-                    ValueError,
-                ) as err:
-                    _LOGGER.warning(
-                        "Could not refresh trip_patterns (%s); using stale cache",
-                        err,
-                    )
-                    return catalogue
-                if refreshed is not catalogue:
-                    await store.async_save(_catalogue_to_store(refreshed))
-                return refreshed
+                hass.async_create_background_task(
+                    _async_background_refresh(hass, prior=catalogue, store=store),
+                    name=f"{DOMAIN}_trip_patterns_migration",
+                )
             return catalogue
 
     catalogue = await _fetch_and_build(hass, prior=None)
     await store.async_save(_catalogue_to_store(catalogue))
     return catalogue
+
+
+async def _async_background_refresh(
+    hass: HomeAssistant,
+    prior: StaticCatalogue,
+    store: Store[dict[str, Any]],
+) -> None:
+    """Background-task helper: refresh + persist + publish the catalogue.
+
+    Catches every refresh failure mode (network, timeout, parse, cancel)
+    and logs at WARNING. On success, writes the new payload to Store and
+    swaps the shared catalogue ref so coordinators that read it live see
+    the refreshed data on their next parse.
+    """
+    try:
+        refreshed = await _fetch_and_build(hass, prior=prior)
+    except asyncio.CancelledError:
+        # HA stopping or task explicitly cancelled — don't log noisily.
+        raise
+    except Exception as err:  # noqa: BLE001
+        # Network, parse, schema-surprise — none should crash the
+        # integration. Log + retry on the next weekly tick.
+        _LOGGER.warning(
+            "Background refresh failed (%s: %s); will retry on the next weekly tick",
+            type(err).__name__,
+            err,
+        )
+        return
+    if refreshed is not prior:
+        await store.async_save(_catalogue_to_store(refreshed))
+    async_set_cached_catalogue(hass, refreshed)
+    if refreshed.trip_patterns is not None:
+        _LOGGER.warning(
+            "Trip-pattern refresh complete: %d lines, %d patterns",
+            refreshed.trip_patterns.line_count,
+            refreshed.trip_patterns.pattern_count,
+        )
 
 
 async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None:
@@ -486,7 +516,7 @@ def _parse_haltestellen(csv_text: str) -> dict[int, Station]:
             diva = int(row["DIVA"])
             lon = float(row["Longitude"])
             lat = float(row["Latitude"])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             continue
         stations[diva] = Station(
             diva=diva,
@@ -511,7 +541,7 @@ def _merge_haltepunkte(
         try:
             rbl = int(row["StopID"])
             diva = int(row["DIVA"])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             continue
         station = stations.get(diva)
         if station is not None:
@@ -537,7 +567,7 @@ def _parse_trip_patterns(
     for row in line_reader:
         try:
             line_id = int(row["LineID"])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             continue
         label = (row.get("LineText") or "").strip()
         if label:
@@ -557,7 +587,7 @@ def _parse_trip_patterns(
             seq = int(row["StopSeqCount"])
             rbl = int(row["StopID"])
             direction = int(row["Direction"])
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError):
             continue
         grouped.setdefault((line_id, pattern_id), []).append(
             (seq, rbl, direction)
@@ -592,8 +622,17 @@ def stops_ahead_for_match(
     line_label: str,
     entry_rbls: Iterable[int],
     towards: str,
+    live_direction: str | None = None,
 ) -> list[dict[str, Any]] | None:
     """Resolve the next-stops list for a live monitor row.
+
+    `live_direction` is the `/monitor` row's "H" / "R" string; when given,
+    we filter candidate patterns to the matching numeric Direction (Wiener
+    Linien convention: H=1, R=2) BEFORE the RBL-containment match. Without
+    this filter, an entry that tracks both platforms at one DIVA (e.g.
+    Taubstummengasse RBLs [4107 north, 4122 south]) would match patterns
+    in both directions and the longest-tail tiebreaker could pick the
+    wrong one for branching termini.
 
     Returns None when no pattern matched (unknown line, replacement service,
     short-turn variant not in the schedule), an empty list when the matched
@@ -614,6 +653,15 @@ def stops_ahead_for_match(
     candidates = catalogue.trip_patterns.patterns_by_line.get(line_id)
     if not candidates:
         return None
+
+    # Direction filter: H="hin" maps to CSV Direction 1, R="retour" to 2.
+    # Fall back to the unfiltered candidate list if the filter empties it
+    # (lines that buck the convention still match by terminus below).
+    if live_direction in ("H", "R"):
+        target_dir = 1 if live_direction == "H" else 2
+        dir_filtered = [p for p in candidates if p.direction == target_dir]
+        if dir_filtered:
+            candidates = dir_filtered
 
     rbl_set = {int(r) for r in entry_rbls}
     # First-pass filter: patterns that contain one of our RBLs.

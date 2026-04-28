@@ -557,6 +557,32 @@ def test_stops_ahead_hybrid_truncation_keeps_head_plus_terminus() -> None:
     assert result[5].get("is_terminus") is True
 
 
+def test_stops_ahead_direction_filter_picks_right_branch() -> None:
+    """H/R direction filter resolves the right pattern when both H+R match.
+
+    Regression: the U1/Taubstummengasse entry tracks both platforms (4107
+    H and 4122 R). Without the direction filter, an R departure towards
+    Alaudagasse matched the H pattern (which contains 4107) and rendered
+    northbound stops. The filter restricts candidates to patterns whose
+    numeric Direction matches the live row's H/R before the RBL search.
+    """
+    catalogue = _u1_catalogue()
+    # Live row: U1, direction R, towards Reumannplatz — entry has both H
+    # (RBL 4111) and R (RBL 4118) RBLs at this DIVA.
+    result = stops_ahead_for_match(
+        catalogue,
+        "U1",
+        [4111, 4118],
+        "Reumannplatz",
+        live_direction="R",
+    )
+    assert result is not None
+    # R pattern goes 4333 → 4222 → 4118 → 4001; from 4118 the tail is [4001].
+    # Reumannplatz (DIVA 62000001) is the only stop in the tail.
+    assert [s["name"] for s in result] == ["Reumannplatz"]
+    assert result[-1].get("is_terminus") is True
+
+
 def test_stops_ahead_no_truncation_when_short() -> None:
     """Lists at or below the cap come back fully."""
     catalogue = _u1_catalogue()
@@ -597,14 +623,17 @@ def test_store_load_pre_trip_pattern_payload_treats_field_as_missing() -> None:
     assert 60201012 in rebuilt.stations_by_diva
 
 
-async def test_async_load_catalogue_pre_1_4_cache_triggers_refetch(
+async def test_async_load_catalogue_pre_1_4_cache_schedules_background_refetch(
     hass: HomeAssistant,
 ) -> None:
-    """A cache without trip_patterns forces an inline refetch.
+    """A cache without trip_patterns spawns a background refetch.
 
-    1.4.0 introduced trip_patterns additively. Without this auto-refresh,
-    existing installs would wait up to a week for the periodic refresh
-    to populate it; users would see no chevrons until then.
+    1.4.0 introduced trip_patterns additively. The refetch runs in the
+    background so coordinator.async_setup never blocks on the multi-MB
+    fahrwegverlaeufe.csv download — without this, the per-entry setup
+    timeout cancels the load on a Pi-class host. The stale cache is
+    returned synchronously; running coordinators read the shared ref
+    live and pick up the refreshed catalogue when the task completes.
     """
     store: Store[dict] = Store(hass, STORE_VERSION, STORE_KEY)
     payload = _catalogue_to_store(_sample())
@@ -618,15 +647,21 @@ async def test_async_load_catalogue_pre_1_4_cache_triggers_refetch(
         return_value=refreshed,
     ) as mock_fetch:
         result = await async_load_catalogue(hass)
+        # Stale cache returned synchronously — refetch hasn't run yet.
+        assert result.trip_patterns is None
+        # Drain the background task queue.
+        await hass.async_block_till_done()
 
     mock_fetch.assert_awaited_once()
-    assert result.trip_patterns is not None
+    saved = await store.async_load()
+    assert saved is not None
+    assert saved.get("trip_patterns") is not None
 
 
-async def test_async_load_catalogue_pre_1_4_cache_falls_back_on_network_failure(
+async def test_async_load_catalogue_pre_1_4_cache_swallows_network_failure(
     hass: HomeAssistant,
 ) -> None:
-    """If the auto-refetch fails, return the stale cache rather than raising."""
+    """A failing background refetch leaves the stale cache intact, no raise."""
     store: Store[dict] = Store(hass, STORE_VERSION, STORE_KEY)
     payload = _catalogue_to_store(_sample())
     payload.pop("trip_patterns", None)
@@ -638,6 +673,11 @@ async def test_async_load_catalogue_pre_1_4_cache_falls_back_on_network_failure(
         side_effect=aiohttp.ClientError("upstream unreachable"),
     ):
         result = await async_load_catalogue(hass)
+        await hass.async_block_till_done()
 
     assert result.trip_patterns is None
     assert 60201012 in result.stations_by_diva
+    # Store unchanged — failed background refresh must not corrupt it.
+    saved = await store.async_load()
+    assert saved is not None
+    assert saved.get("trip_patterns") is None
