@@ -12,6 +12,8 @@ import {
   LINE_TYPE_BUS_NIGHT,
   LINE_TYPE_METRO,
   LINE_TYPE_TRAM,
+  NIGHTLINE_BG,
+  NIGHTLINE_FG,
 } from "./const.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -92,6 +94,23 @@ function platformLabelKey(type: string | undefined): string {
     return "platform_short_rail";
   }
   return "platform_short_bus";
+}
+
+// Returns inline-style values for a line chip. Default white-on-coloured
+// keeps day-line chips readable. Nightlines that fall through to the
+// default NIGHTLINE_BG navy use the WL signage yellow as foreground —
+// white-on-navy is hard to read at chip size. Skipped when the user
+// has overridden the bg via line_colors (we don't know what reads well
+// on their custom colour, so we leave the default white).
+function chipColors(
+  line: string,
+  overrides: Record<string, string>,
+): { background: string; color?: string } {
+  const background = colorForLine(line, overrides);
+  if (background === NIGHTLINE_BG) {
+    return { background, color: NIGHTLINE_FG };
+  }
+  return { background };
 }
 
 @customElement("wiener-linien-austria-card")
@@ -646,7 +665,7 @@ export class WienerLinienAustriaCard extends LitElement {
                   ${lines.map(
                     (l) => html`<span
                       class="alert-line-badge"
-                      style=${styleMap({ background: colorForLine(l, overrides) })}
+                      style=${styleMap(chipColors(l, overrides))}
                     >${l}</span>`,
                   )}
                 </div>`
@@ -725,7 +744,8 @@ export class WienerLinienAustriaCard extends LitElement {
    * hero-meta column; one entry per departure in the hero group.
    */
   private _renderHeroEntry(d: DepartureAttr, entityId: string): TemplateResult {
-    const accent = colorForLine(d.line || "", this._config!.line_colors);
+    const accentLine = d.line || "";
+    const accentStyle = chipColors(accentLine, this._config!.line_colors);
     const platform =
       this._config!.show_platform && d.platform ? String(d.platform) : null;
     const isBarrierFree =
@@ -767,7 +787,7 @@ export class WienerLinienAustriaCard extends LitElement {
         >
           <span
             class="line-badge"
-            style=${styleMap({ background: accent })}
+            style=${styleMap(accentStyle)}
           >${line}</span>
           <span class="hero-direction">${deText(d.towards)}</span>
           ${platform
@@ -836,7 +856,7 @@ export class WienerLinienAustriaCard extends LitElement {
   ): TemplateResult | TemplateResult[] {
     const overrides = this._config!.line_colors;
     const line = d.line || "?";
-    const color = colorForLine(line, overrides);
+    const badgeStyle = chipColors(line, overrides);
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const cdLabel = cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
 
@@ -904,7 +924,7 @@ export class WienerLinienAustriaCard extends LitElement {
         @keydown=${(ev: KeyboardEvent) =>
           this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
       >
-        <div class="line-badge" style=${styleMap({ background: color })}>${line}</div>
+        <div class="line-badge" style=${styleMap(badgeStyle)}>${line}</div>
         <div class="towards">
           ${typeIcon
             ? html`<ha-icon class="type-icon" icon=${typeIcon} aria-hidden="true"></ha-icon>`
@@ -1028,7 +1048,7 @@ export class WienerLinienAustriaCard extends LitElement {
           ${inlineLines.map(
             (line) => html`<span
               class="stops-ahead-line-chip"
-              style=${styleMap({ background: colorForLine(line, overrides) })}
+              style=${styleMap(chipColors(line, overrides))}
               >${line}</span
             >`,
           )}
@@ -1066,7 +1086,7 @@ export class WienerLinienAustriaCard extends LitElement {
             ${otherLines.map(
               (line) => html`<span
                 class="stops-ahead-line-chip stops-ahead-line-chip--other"
-                style=${styleMap({ background: colorForLine(line, overrides) })}
+                style=${styleMap(chipColors(line, overrides))}
                 >${line}</span
               >`,
             )}

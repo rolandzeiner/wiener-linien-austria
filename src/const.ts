@@ -24,13 +24,14 @@ export const METRO_COLORS: Record<string, string> = {
   U6: "#9D6830",
 };
 
-// Default background for nightline (N-prefix) chips. Wiener Linien
-// branding on the actual signage uses dark navy with yellow numerals;
-// we apply the navy here as the chip background and let the existing
-// white-on-coloured chip text styling carry through (the yellow text
-// override would need a per-chip text-colour pipeline that isn't
-// wired today). User-supplied `line_colors` overrides win.
+// Default background and foreground for nightline (N-prefix) chips.
+// Wiener Linien branding on actual signage pairs the navy with bright
+// yellow numerals, which also reads better against the deep navy than
+// the default white text. User-supplied `line_colors` overrides win on
+// the background; the foreground is currently fixed (no per-line
+// text-colour override surface yet).
 export const NIGHTLINE_BG = "#1b1464";
+export const NIGHTLINE_FG = "#fef200";
 
 // MeansOfTransport values from /monitor — used to pick icons + apply
 // typographic conventions (trams/buses use the line-number badge, metro
