@@ -5,7 +5,7 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
-import { LINE_TYPE_BUS_DAY, LINE_TYPE_BUS_NIGHT, LINE_TYPE_METRO, METRO_COLORS, RETRO_CARD_VERSION } from "./const.js";
+import { LINE_TYPE_METRO, METRO_COLORS, RETRO_CARD_VERSION } from "./const.js";
 import { translate } from "./localize/localize.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
@@ -693,9 +693,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
     const platform = cfg.show_platform ? rawPlatform : null;
     const gleisLeft = platform === "2";
-    const type = rows[0]?.type ?? "";
-    const isBus = type === LINE_TYPE_BUS_DAY || type === LINE_TYPE_BUS_NIGHT;
-    const platformLabel = this._t(isBus ? "steig" : "gleis");
+    // Wiener Linien signage uses "Steig" universally for U-Bahn, tram,
+    // and bus — "Gleis" is the ÖBB convention and Wiener Linien doesn't
+    // operate heavy rail. Internal layout class names (retro--gleis-*)
+    // stay as-is; only the user-facing label switches.
+    const platformLabel = this._t("steig");
 
     const stopName = attrs.stop_name || attrs.friendly_name || "";
     const showStationName = cfg.show_station_name && !!stopName;
