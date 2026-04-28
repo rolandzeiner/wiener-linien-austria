@@ -232,11 +232,16 @@ export const cardStyles = css`
   /* hero-block wraps an entry + its (optional) collapsible stops_ahead
      panel. Stays a flex column so the panel slides out below the entry
      without disturbing the line-badge row layout. The hero-meta gap
-     separates blocks; entry-and-panel inside one block sit flush. */
+     separates blocks; entry-and-panel inside one block sit flush.
+     The contain:layout below isolates the panel's expand/collapse
+     animation from the entry above it — without it, the chevron
+     rotation + hero-direction flex shrink can micro-reflow the entry
+     row during the transition. */
   .hero-block {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    contain: layout;
   }
   .hero-entry {
     display: flex;
@@ -255,6 +260,10 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
     margin-left: auto;
     flex-shrink: 0;
+    /* will-change promotes the chevron to its own composite layer so
+       the rotation animates on the GPU instead of triggering a layout
+       pass that nudges flex siblings during the transition. */
+    will-change: transform;
     transition: transform
       var(--ha-transition-duration-fast, 160ms)
       var(--ha-transition-easing-standard, ease);
