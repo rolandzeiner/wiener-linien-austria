@@ -229,12 +229,65 @@ export const cardStyles = css`
     gap: 6px;
     min-width: 0;
   }
+  /* hero-block wraps an entry + its (optional) collapsible stops_ahead
+     panel. Stays a flex column so the panel slides out below the entry
+     without disturbing the line-badge row layout. The hero-meta gap
+     separates blocks; entry-and-panel inside one block sit flush. */
+  .hero-block {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
   .hero-entry {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     min-width: 0;
+  }
+  .hero-entry.expandable {
+    cursor: pointer;
+    user-select: none;
+    border-radius: 6px;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    transition: background-color
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .hero-entry.expandable:hover {
+    background: color-mix(
+      in srgb,
+      var(--primary-text-color) 4%,
+      transparent
+    );
+  }
+  .hero-chevron {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+    margin-left: auto;
+    flex-shrink: 0;
+    transition: transform
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .hero-entry.expanded .hero-chevron {
+    transform: rotate(180deg);
+  }
+  /* Hero-side collapsible panel — same 0fr↔1fr trick as
+     .dep-row-detail so the trail animates to intrinsic height. The
+     entry itself reuses the same .stops-ahead inner styling. */
+  .hero-detail {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+  }
+  .hero-detail-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .hero-detail.expanded {
+    grid-template-rows: 1fr;
   }
   .hero-direction {
     font-weight: 500;
@@ -899,6 +952,7 @@ export const cardStyles = css`
   .tab:focus-visible,
   .alert:focus-visible,
   .dep-row.expandable:focus-visible,
+  .hero-entry.expandable:focus-visible,
   .stops-ahead-other-toggle:focus-visible,
   .icon-action:focus-visible,
   a:focus-visible,

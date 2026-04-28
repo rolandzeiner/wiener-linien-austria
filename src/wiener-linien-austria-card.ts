@@ -483,7 +483,7 @@ export class WienerLinienAustriaCard extends LitElement {
                   : nothing}
               </div>
               <div class="hero-meta">
-                ${heroGroup.map((d) => this._renderHeroEntry(d))}
+                ${heroGroup.map((d) => this._renderHeroEntry(d, stopCfg.entity))}
               </div>
             </div>`
           : nothing}
@@ -724,37 +724,108 @@ export class WienerLinienAustriaCard extends LitElement {
    * platform pill + optional wheelchair pill). Used inside the
    * hero-meta column; one entry per departure in the hero group.
    */
-  private _renderHeroEntry(d: DepartureAttr): TemplateResult {
+  private _renderHeroEntry(d: DepartureAttr, entityId: string): TemplateResult {
     const accent = colorForLine(d.line || "", this._config!.line_colors);
     const platform =
       this._config!.show_platform && d.platform ? String(d.platform) : null;
     const isBarrierFree =
       !!d.barrier_free && this._config!.show_accessibility;
+
+    // Same expand-to-show-stops_ahead affordance as the row list. The
+    // hero entry shares the row's stable identifier so opening the
+    // panel from the hero leaves the same row's panel open in the list
+    // below (when both surface the same departure), and vice versa.
+    const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
+    const rowStableId = d.time_planned ?? `cd${d.countdown}`;
+    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
+    const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
+    const panelId = `wl-hero-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
+    const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
+    const ariaLabel = hasStopsAhead
+      ? this._t(ariaLabelKey, { line: d.line || "?", towards: d.towards || "" })
+      : "";
+
+    const entryClasses = {
+      "hero-entry": true,
+      expandable: hasStopsAhead,
+      expanded,
+    };
+    const line = d.line || "?";
+
     return html`
-      <div class="hero-entry">
-        <span
-          class="line-badge"
-          style=${styleMap({ background: accent })}
-        >${d.line}</span>
-        <span class="hero-direction">${deText(d.towards)}</span>
-        ${platform
-          ? html`<span class="hero-platform"
-              >${this._t(platformLabelKey(d.type))} ${platform}</span
-            >`
-          : nothing}
-        ${isBarrierFree
-          ? html`<span
-              class="hero-a11y"
-              role="img"
-              aria-label=${this._t("barrier_free_title")}
-              title=${this._t("barrier_free_title")}
-            >
-              <ha-icon
-                icon="mdi:wheelchair-accessibility"
+      <div class="hero-block">
+        <div
+          class=${classMap(entryClasses)}
+          role=${hasStopsAhead ? "button" : nothing}
+          tabindex=${hasStopsAhead ? "0" : nothing}
+          aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
+          aria-controls=${hasStopsAhead ? panelId : nothing}
+          aria-label=${hasStopsAhead ? ariaLabel : nothing}
+          @click=${() => hasStopsAhead && this._toggleRow(rowKey)}
+          @keydown=${(ev: KeyboardEvent) =>
+            this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
+        >
+          <span
+            class="line-badge"
+            style=${styleMap({ background: accent })}
+          >${line}</span>
+          <span class="hero-direction">${deText(d.towards)}</span>
+          ${platform
+            ? html`<span class="hero-platform"
+                >${this._t(platformLabelKey(d.type))} ${platform}</span
+              >`
+            : nothing}
+          ${isBarrierFree
+            ? html`<span
+                class="hero-a11y"
+                role="img"
+                aria-label=${this._t("barrier_free_title")}
+                title=${this._t("barrier_free_title")}
+              >
+                <ha-icon
+                  icon="mdi:wheelchair-accessibility"
+                  aria-hidden="true"
+                ></ha-icon>
+              </span>`
+            : nothing}
+          ${hasStopsAhead
+            ? html`<ha-icon
+                class="hero-chevron"
+                icon="mdi:chevron-down"
                 aria-hidden="true"
-              ></ha-icon>
-            </span>`
+              ></ha-icon>`
+            : nothing}
+        </div>
+        ${hasStopsAhead
+          ? this._renderHeroStopsAheadPanel(d.stops_ahead!, panelId, expanded, line, rowKey)
           : nothing}
+      </div>
+    `;
+  }
+
+  private _renderHeroStopsAheadPanel(
+    stops: NonNullable<DepartureAttr["stops_ahead"]>,
+    panelId: string,
+    expanded: boolean,
+    currentLine: string,
+    rowKey: string,
+  ): TemplateResult {
+    const overrides = this._config!.line_colors;
+    return html`
+      <div
+        class=${classMap({ "hero-detail": true, expanded })}
+        id=${panelId}
+        role="region"
+        aria-hidden=${expanded ? "false" : "true"}
+      >
+        <div class="hero-detail-inner">
+          <ol
+            class="stops-ahead"
+            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides) })}
+          >
+            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides))}
+          </ol>
+        </div>
       </div>
     `;
   }
