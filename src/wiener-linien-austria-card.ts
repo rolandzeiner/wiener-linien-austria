@@ -997,17 +997,23 @@ export class WienerLinienAustriaCard extends LitElement {
     rowKey: string,
     overrides: Record<string, string>,
   ): TemplateResult {
-    // Split transfers into U-Bahn (always inline, immediately after the
-    // station name) and "everything else" (tram, bus, night). The
-    // non-metro group is collapsed behind a small chevron-count chip
-    // on the right; clicking expands it inline. Keeps hub stops like
-    // Karlsplatz (~5+ transfer lines) readable.
+    // Inline lines (always shown next to the station name): U-Bahn at
+    // any time, plus night lines (N-prefix + digit) WHEN they're
+    // actually running. Outside the night window the N-chips fold
+    // back into the +N toggle so the daytime trail stays compact.
+    // Wiener Linien NightLine runs daily ~00:30–05:00 with first/last
+    // buses spreading from ~23:55 to ~05:15 across all routes — we
+    // use that envelope as the active window.
     const allLines = s.lines ?? [];
-    const metroLines: string[] = [];
+    const nightActive = this._isNightlineHour();
+    const inlineLines: string[] = [];
     const otherLines: string[] = [];
     for (const l of allLines) {
-      if (/^U\d/.test(l)) metroLines.push(l);
-      else otherLines.push(l);
+      if (/^U\d/.test(l) || (nightActive && /^N\d/.test(l))) {
+        inlineLines.push(l);
+      } else {
+        otherLines.push(l);
+      }
     }
     const transferKey = `${rowKey}|${idx}`;
     const transfersExpanded = this._expandedTransfers.has(transferKey);
@@ -1017,9 +1023,9 @@ export class WienerLinienAustriaCard extends LitElement {
       "transfers-expanded": transfersExpanded,
     };
 
-    const metroChips = metroLines.length
+    const metroChips = inlineLines.length
       ? html`<span class="stops-ahead-metros">
-          ${metroLines.map(
+          ${inlineLines.map(
             (line) => html`<span
               class="stops-ahead-line-chip"
               style=${styleMap({ background: colorForLine(line, overrides) })}
@@ -1084,6 +1090,23 @@ export class WienerLinienAustriaCard extends LitElement {
     if (next.has(key)) next.delete(key);
     else next.add(key);
     this._expandedTransfers = next;
+  }
+
+  // Whether Wiener Linien NightLine is currently running. Used to
+  // promote N-prefix chips to the always-inline tier on the
+  // stops_ahead trail during the night window — outside it, those
+  // chips fold back into the +N toggle. Daily envelope captures
+  // the first/last bus spread across all NightLine routes (Wikipedia +
+  // wien.info: 00:30–05:00 typical, with edges at 23:55 and 05:15).
+  // Re-evaluated on every render; the coordinator's ~30 s poll
+  // re-renders frequently enough that the transition from day-mode
+  // to night-mode reaches the user well within a minute of the actual
+  // service start. No timezone math: the user's HA-served browser
+  // and Vienna are the same timezone in practice.
+  private _isNightlineHour(): boolean {
+    const now = new Date();
+    const minutesIntoDay = now.getHours() * 60 + now.getMinutes();
+    return minutesIntoDay >= 23 * 60 + 55 || minutesIntoDay <= 5 * 60 + 15;
   }
 
   private _toggleRow(key: string): void {
