@@ -16,7 +16,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 - Multi-step config flow (search → pick stop → pick lines) with a live `/monitor` probe so you only see lines actually serving the stop.
 - Reconfigure flow to add/remove lines without losing the entry; options flow to change the polling interval.
 - **Service disruption alerts** (`trafficInfoList`) and **elevator outage alerts** (`Aufzugsinfo`) filtered to your tracked lines and stop RBLs — surfaced as `traffic_info` / `elevator_info` sensor attributes and rendered inline by both bundled cards.
-- **Stops-ahead trail** *(1.4.0)* — each departure on the modern card can be expanded to show the upcoming stops on that exact trip down to the terminus. Sourced from the static `fahrwegverlaeufe.csv` (CC BY 4.0) and joined against the existing stop catalogue.
+- **Stops-ahead trail** *(1.4.0)* — every departure on the modern card (hero block and row list) can be expanded into a metro-style trail that shows every upcoming stop on that exact trip down to the terminus. The trail renders a vertical line in the operating line's brand colour with a dot per stop, marks the terminus with a hollow ring, and surfaces transfer-line chips at every station — U-Bahn always inline, tram/bus folded behind a `+N` toggle. Nightline (N-prefix) chips get promoted to the always-inline tier during night service hours (~23:55–05:15) so you can see them at a glance when they're actually running. Panels persist across polls (keyed by scheduled time) so opening a row stays open as the countdown ticks. Sourced from the static `fahrwegverlaeufe.csv` + `linien.csv` (CC BY 4.0) and joined against the existing stop catalogue.
 - **Two bundled Lovelace cards** — modern full-feature board + retro LED-display style.
 
 ## Screenshots
@@ -85,6 +85,8 @@ Visual editor covers:
 
 Each station section auto-tints to the next-departure's line colour and picks an icon for that vehicle type. Departure rows show a colour-coded line badge, destination + optional inline delay ("3 Minuten verspätet" when `time_real` lags `time_planned` by ≥ 1 min), optional traffic-jam and step-free icons, and a countdown cell (`N min` or `jetzt`). Stop titles link to Google Maps pinned by `latitude` / `longitude` (short names like "Ottakring" otherwise resolve to the district centroid). Empty boards render "Betriebsschluss" / "End of service".
 
+**Stops-ahead trail.** Departures with a known schedule pattern grow a chevron; click the row (or the hero block) to expand a metro-map-style trail beneath: a vertical 2 px line in the operating line's brand colour, a filled dot per stop, a hollow ring at the terminus, and the station name in a row-per-stop list. Each station carries inline chips for U-Bahn lines that pass through it (always visible); tram, bus, and night transfers fold behind a small `+N` toggle on the right (per-stop expanded state, click to reveal). Nightline chips get promoted to the always-inline tier between ~23:55 and ~05:15 so they're visible when actual service is running; outside that window they stay in `+N`. Nightline chips default to WL signage colours (`#1b1464` background, `#fef200` text). Panels survive realtime polls because they're keyed by the departure's scheduled time, not the live countdown.
+
 Disruption and elevator entries render as collapsible rows above the stop list — always-visible summary, click to expand details + timestamps.
 
 ### Retro card — `wiener-linien-austria-retro-card`
@@ -113,12 +115,12 @@ Every `sensor.{stop}_abfahrten` entity carries:
 | `stop_name` | string | Human-readable station name. |
 | `latitude` / `longitude` | float \| None | Station coordinates from the static catalogue. |
 | `server_time` | ISO string \| None | Wiener Linien `serverTime` from the last successful fetch. |
-| `departures` | list[dict] | Capped at 30 entries, sorted by countdown. Each dict: `line`, `towards`, `direction` ("H"/"R"), `type` (`ptMetro`/`ptTram`/`ptBusCity`/`ptBusNight`), `countdown`, `time_planned` (ISO), `time_real` (ISO), `realtime` (bool), `barrier_free` (bool), `traffic_jam` (bool), `platform` (string, e.g. `"1"`). |
+| `departures` | list[dict] | Capped at 20 entries, sorted by countdown. Each dict: `line`, `towards`, `direction` ("H"/"R"), `type` (`ptMetro`/`ptTram`/`ptBusCity`/`ptBusNight`), `countdown`, `time_planned` (ISO), `time_real` (ISO), `realtime` (bool), `barrier_free` (bool), `traffic_jam` (bool), `platform` (string, e.g. `"1"`), and (when the static schedule index has resolved a matching trip) `stops_ahead`: an ordered `[{name, is_terminus?, lines?}]` list of upcoming stops on that exact trip down to the terminus. `lines` carries the OTHER lines that pass through each stop, used by the card to render transfer chips. |
 | `next_by_line` | dict[str, int] | Per-line map to the earliest countdown. E.g. `{"U1": 2, "U4": 6}`. |
 | `traffic_info` | list[dict] | Service disruptions matching the tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
-The 30-departure cap keeps busy multi-line stops under HA's 16 KB recorder attribute limit. The card's `max_departures` slider tops out at 20, so nothing displayed is ever clipped.
+The 20-departure cap keeps busy multi-line stops under HA's 16 KB recorder attribute limit even when each row carries the full `stops_ahead` trail. The card's `max_departures` slider also tops out at 20, so nothing displayed is ever clipped.
 
 ## Data Updates
 
