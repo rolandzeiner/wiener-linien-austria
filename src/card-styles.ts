@@ -193,15 +193,10 @@ export const cardStyles = css`
     grid-template-columns: auto 1fr;
     gap: var(--ha-spacing-3, 12px);
     align-items: center;
-    /* 12px vertical, --nb-pad-x horizontal — matches Linz's hero
-       padding exactly so the line-badge / direction column has the
-       same breathing room from the tinted edge. The hero block itself
-       is already inset by .wrap (which provides --nb-pad-x on the
-       outside); these values are the inner padding inside the tinted
-       surface. */
-    padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
-    background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
-    border-radius: var(--nb-radius-lg);
+    /* Cosmetics (background, padding, radius) live on .hero-host so
+       the tinted surface visually contains both the grid and any
+       expanded stops_ahead panel below. The .hero grid itself just
+       does layout. */
   }
   .hero-time {
     display: flex;
@@ -239,11 +234,27 @@ export const cardStyles = css`
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* 12px vertical, --nb-pad-x horizontal — same padding the hero
+       grid used to carry, lifted up here so the tinted surface
+       wraps around both the grid and any expanded stops_ahead
+       panels below. */
+    padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
+    background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
+    border-radius: var(--nb-radius-lg);
   }
   .hero-panels {
     display: flex;
     flex-direction: column;
     min-width: 0;
+    /* Small gap between the hero grid and any expanded panel; reads
+       as a separator without breaking the tinted-surface continuity. */
+    margin-top: 6px;
+  }
+  /* Drop the gap when the panels container is empty (no entries
+     have stops_ahead) so the hero card height doesn't carry a
+     stray 6px below the grid. */
+  .hero-panels:empty {
+    display: none;
   }
   .hero-entry {
     display: flex;
