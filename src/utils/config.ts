@@ -1,4 +1,4 @@
-import { METRO_COLORS } from "../const.js";
+import { METRO_COLORS, NIGHTLINE_BG } from "../const.js";
 import type {
   ModernStopConfig,
   RetroSize,
@@ -259,5 +259,10 @@ export function colorForLine(
   fallback = "var(--primary-color)",
 ): string {
   const upper = line.toUpperCase();
-  return overrides[upper] ?? METRO_COLORS[upper] ?? fallback;
+  if (overrides[upper] !== undefined) return overrides[upper];
+  if (METRO_COLORS[upper] !== undefined) return METRO_COLORS[upper];
+  // Nightlines (N + digit, e.g. N66, N25, N99) get the WL navy
+  // backgound by default; user overrides above still win.
+  if (/^N\d/.test(upper)) return NIGHTLINE_BG;
+  return fallback;
 }
