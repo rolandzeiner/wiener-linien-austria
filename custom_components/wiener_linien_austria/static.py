@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import re
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -42,6 +43,41 @@ from .const import (
 from .http import CacheValidators, base_request_headers
 
 _LOGGER = logging.getLogger(__name__)
+
+# Natural-numeric sort for line labels, applied to lines_at_diva. The
+# user-visible order should be ascending (so "2" < "10" < "13A" < "71"
+# < "D" < "U1" < "U6") with nightlines (N + digit) pushed to the end —
+# regardless of nightline service hours, the daytime view should not
+# interleave N-lines with regular ones, and the +N reveal at hub stops
+# reads more naturally when N66 sits after the trams.
+_LINE_LEADING_DIGITS_RE = re.compile(r"^(\d+)?(.*)$")
+_LINE_SORT_LETTER_TIE = 10**9  # sentinel: letter-only labels rank after numerics
+
+
+def _line_sort_key(label: str) -> tuple[int, int, str]:
+    """Return a sort key for a Wiener Linien line label.
+
+    Tier 1 (group): nightlines (N + digit) at the end (key=1), all
+    other lines first (key=0). Tier 2 (within group): leading-digit
+    integer (so "2" < "10" < "13A"); letter-only labels fall to the
+    sentinel and sort alphabetically among themselves (D, U1, U2, …).
+    Tier 3 (tiebreaker): the full remaining label so "13A" < "13B".
+    """
+    is_night = (
+        1 if len(label) >= 2 and label[0].upper() == "N" and label[1].isdigit() else 0
+    )
+    body = label[1:] if is_night else label
+    match = _LINE_LEADING_DIGITS_RE.match(body)
+    if match is None:  # never happens — re matches empty string too
+        return (is_night, _LINE_SORT_LETTER_TIE, body)
+    digits, rest = match.group(1), match.group(2)
+    numeric = int(digits) if digits else _LINE_SORT_LETTER_TIE
+    return (is_night, numeric, rest)
+
+
+def _sort_line_labels(labels: Iterable[str]) -> tuple[str, ...]:
+    """Return labels in natural ascending order, nightlines at the end."""
+    return tuple(sorted(labels, key=_line_sort_key))
 
 STORE_VERSION = 1
 STORE_KEY = f"{DOMAIN}_static"
@@ -649,7 +685,7 @@ def _parse_trip_patterns(
         )
 
     lines_at_diva: dict[int, tuple[str, ...]] = {
-        diva: tuple(sorted(labels)) for diva, labels in lines_per_diva.items()
+        diva: _sort_line_labels(labels) for diva, labels in lines_per_diva.items()
     }
     return TripPatternIndex(
         patterns_by_line=patterns_by_line,
@@ -916,7 +952,7 @@ def _trip_patterns_from_store(
             int(k): str(v) for k, v in (raw.get("means_by_line") or {}).items()
         }
         lines_at_diva = {
-            int(k): tuple(str(label) for label in (v or []))
+            int(k): _sort_line_labels([str(label) for label in (v or [])])
             for k, v in (raw.get("lines_at_diva") or {}).items()
         }
         patterns_by_line: dict[int, list[TripPattern]] = {}

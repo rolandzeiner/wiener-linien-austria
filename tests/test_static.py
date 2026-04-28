@@ -632,6 +632,29 @@ def test_stops_ahead_includes_transfer_lines() -> None:
     assert stephansplatz.get("lines") == ["U3", "U4"]
 
 
+def test_lines_at_diva_natural_sort_with_nightlines_last() -> None:
+    """lines_at_diva is ascending natural order with N-lines at the end.
+
+    Verifies the user-facing sort: numeric labels sort numerically (2
+    before 10 before 13A), letter-prefixed labels follow numerics,
+    nightlines (N + digit) come last regardless of letter content.
+    """
+    from custom_components.wiener_linien_austria.static import _sort_line_labels
+
+    labels = ["U6", "13A", "N66", "2", "U1", "62", "N25", "D", "10A"]
+    assert _sort_line_labels(labels) == (
+        "2",
+        "10A",
+        "13A",
+        "62",
+        "D",
+        "U1",
+        "U6",
+        "N25",
+        "N66",
+    )
+
+
 def test_stops_ahead_omits_lines_when_no_transfers() -> None:
     """Stops without transfer data don't add an empty `lines` field."""
     catalogue = _u1_catalogue()  # lines_at_diva empty by default
