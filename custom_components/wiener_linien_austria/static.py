@@ -47,6 +47,13 @@ _LOGGER = logging.getLogger(__name__)
 STORE_VERSION = 1
 STORE_KEY = f"{DOMAIN}_static"
 
+# hass.data key for the shared catalogue (or in-flight load task). Holding it
+# in domain_data means a multi-entry user only pays the static-fetch cost
+# once per HA session — without this, each coordinator.async_setup
+# independently triggered _fetch_and_build, multiplying the bandwidth and
+# Wiener-Linien-Pi-stresses by N entries.
+_CATALOGUE_KEY = "static_catalogue"
+
 
 @dataclass
 class Station:
@@ -135,6 +142,58 @@ class StaticCatalogue:
             key=lambda s: (not s.name.casefold().startswith(needle), s.name)
         )
         return results[:limit]
+
+
+async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
+    """Return a process-wide memoized catalogue, sharing across all callers.
+
+    The first caller triggers the actual `async_load_catalogue` and stores
+    the in-flight Task in `hass.data[DOMAIN]`. Concurrent callers (the
+    config flow, every coordinator's `async_setup`, the periodic refresh)
+    await the same Task and pay zero additional download cost. Once the
+    Task resolves, the StaticCatalogue replaces it in domain_data so
+    subsequent calls are O(1).
+
+    This is the entry point coordinators / config-flow should use; the
+    underlying `async_load_catalogue` stays public for the periodic
+    refresher and tests that exercise the load path directly.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    cached = domain_data.get(_CATALOGUE_KEY)
+    if isinstance(cached, StaticCatalogue):
+        return cached
+    if isinstance(cached, asyncio.Task):
+        # already loading — await the in-flight task
+        result: StaticCatalogue = await cached
+        return result
+
+    task: asyncio.Task[StaticCatalogue] = asyncio.create_task(
+        async_load_catalogue(hass)
+    )
+    domain_data[_CATALOGUE_KEY] = task
+    try:
+        catalogue = await task
+    except BaseException:
+        # Drop the failed task so the next caller retries from scratch.
+        domain_data.pop(_CATALOGUE_KEY, None)
+        raise
+    domain_data[_CATALOGUE_KEY] = catalogue
+    return catalogue
+
+
+def async_set_cached_catalogue(
+    hass: HomeAssistant, catalogue: StaticCatalogue
+) -> None:
+    """Replace the shared catalogue ref (called by the periodic refresher).
+
+    Existing coordinators continue to hold their captured ref from setup
+    — that's an acceptable v1 trade-off because trip patterns / stops /
+    RBLs change on a weeks-to-months cadence. This call ensures only that
+    *new* coordinators (after entry reload) and the next config-flow
+    invocation see the refreshed data.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data[_CATALOGUE_KEY] = catalogue
 
 
 async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:

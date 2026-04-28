@@ -156,9 +156,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         """
         # Local import to avoid pulling static.py into coordinator import
         # cycles; static.py is a leaf that doesn't import this module.
-        from .static import async_load_catalogue  # noqa: PLC0415
+        from .static import async_get_catalogue  # noqa: PLC0415
         try:
-            catalogue = await async_load_catalogue(self.hass)
+            catalogue = await async_get_catalogue(self.hass)
         except (
             aiohttp.ClientError,
             asyncio.TimeoutError,

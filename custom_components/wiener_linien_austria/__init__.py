@@ -34,7 +34,7 @@ from .const import (
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
-from .static import async_refresh_catalogue
+from .static import async_refresh_catalogue, async_set_cached_catalogue
 
 # Registered Lovelace cards shipped with this integration. Each tuple is
 # (lovelace-served URL, version string, on-disk filename in www/).
@@ -90,7 +90,13 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 
     if STATIC_REFRESH_UNSUB_KEY not in domain_data:
         async def _periodic_refresh(_now: Any) -> None:
-            await async_refresh_catalogue(hass)
+            refreshed = await async_refresh_catalogue(hass)
+            if refreshed is not None:
+                # Surface the new catalogue to future config-flow / entry-load
+                # callers. Already-running coordinators keep their captured
+                # ref — that's an accepted v1 staleness window since trip
+                # patterns and stops change on a weeks-to-months cadence.
+                async_set_cached_catalogue(hass, refreshed)
 
         domain_data[STATIC_REFRESH_UNSUB_KEY] = async_track_time_interval(
             hass,

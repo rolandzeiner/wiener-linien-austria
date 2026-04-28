@@ -53,7 +53,7 @@ from .const import (
     USER_AGENT,
 )
 from .http import base_request_headers
-from .static import Station, async_load_catalogue
+from .static import Station, async_get_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors[CONF_SEARCH_QUERY] = "query_too_short"
             else:
                 try:
-                    catalogue = await async_load_catalogue(self.hass)
+                    catalogue = await async_get_catalogue(self.hass)
                 except (aiohttp.ClientError, asyncio.TimeoutError) as err:
                     _LOGGER.warning("Static catalogue load failed: %s", err)
                     errors["base"] = "catalogue_unavailable"
@@ -381,7 +381,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         data = entry.data
 
         try:
-            catalogue = await async_load_catalogue(self.hass)
+            catalogue = await async_get_catalogue(self.hass)
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             _LOGGER.warning("Static catalogue load failed on reconfigure: %s", err)
             return self.async_abort(reason="catalogue_unavailable")

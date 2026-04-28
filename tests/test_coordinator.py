@@ -702,7 +702,7 @@ async def test_async_setup_no_coords_when_catalogue_load_fails(
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
     with patch(
-        "custom_components.wiener_linien_austria.static.async_load_catalogue",
+        "custom_components.wiener_linien_austria.static.async_get_catalogue",
         new_callable=AsyncMock,
         side_effect=RuntimeError("upstream unreachable"),
     ):

@@ -112,7 +112,12 @@ def mock_static_catalogue():
             return_value=catalogue,
         ),
         patch(
-            "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+            "custom_components.wiener_linien_austria.static.async_get_catalogue",
+            new_callable=AsyncMock,
+            return_value=catalogue,
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
             new_callable=AsyncMock,
             return_value=catalogue,
         ),
