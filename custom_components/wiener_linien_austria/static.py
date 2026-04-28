@@ -225,10 +225,18 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 err,
             )
         else:
+            needs_refresh_reason: str | None = None
             if catalogue.trip_patterns is None:
+                needs_refresh_reason = "predates trip_patterns"
+            elif not catalogue.trip_patterns.lines_at_diva:
+                # Cache from an early 1.4 build that wrote trip_patterns
+                # without the lines_at_diva index (added later in 1.4
+                # for transfer-line chips on the card).
+                needs_refresh_reason = "missing lines_at_diva index"
+            if needs_refresh_reason is not None:
                 _LOGGER.warning(
-                    "Static cache predates trip_patterns; "
-                    "scheduling background refresh"
+                    "Static cache %s; scheduling background refresh",
+                    needs_refresh_reason,
                 )
                 hass.async_create_background_task(
                     _async_background_refresh(hass, prior=catalogue, store=store),

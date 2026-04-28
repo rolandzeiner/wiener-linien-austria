@@ -565,7 +565,7 @@ export const cardStyles = css`
   .stops-ahead {
     --stops-ahead-line: var(--primary-color);
     --stops-ahead-dot-size: 10px;
-    --stops-ahead-line-width: 3px;
+    --stops-ahead-line-width: 2px;
     list-style: none;
     margin: 0;
     padding: 8px 10px 10px calc(2.4em + 8px);
@@ -608,7 +608,6 @@ export const cardStyles = css`
     height: var(--stops-ahead-dot-size);
     border-radius: 50%;
     background: var(--stops-ahead-line);
-    box-shadow: 0 0 0 2px var(--card-background-color, var(--ha-card-background, #fff));
     z-index: 1;
     forced-color-adjust: none;
   }
@@ -626,9 +625,7 @@ export const cardStyles = css`
   .stops-ahead-stop.terminus .stops-ahead-dot {
     /* Hollow ring at the terminus, anchoring "this is where you end up". */
     background: var(--card-background-color, var(--ha-card-background, #fff));
-    box-shadow:
-      0 0 0 2px var(--card-background-color, var(--ha-card-background, #fff)),
-      inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
+    box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
   }
   /* Transfer-line chips: small pill badges showing the OTHER lines that
      pass through this stop, coloured per-line so U-Bahn lines retain
