@@ -793,26 +793,33 @@ def stops_ahead_for_match(
 
     # Short-turn truncation. When the live `towards` matches a stop on
     # the pattern *before* its natural terminus, truncate the tail
-    # there. Handles cases like an Alaudagasse-bound U1: there's no
-    # Alaudagasse-terminating pattern in fahrwegverlaeufe.csv, only
-    # the full Oberlaa schedule, but Alaudagasse is on that schedule
-    # between us and Oberlaa. Without this, the panel ends at Oberlaa
-    # while the row says "Alaudagasse" — confusing.
+    # there. Handles cases like an Alaudagasse-bound U1 (Oberlaa pattern
+    # truncated at Alaudagasse) or a Michelbeuern–AKH-bound U6
+    # (Floridsdorf pattern truncated at Michelbeuern).
     #
-    # Match is one-directional (towards substring of stop name) on
-    # purpose: the bidirectional variant used by the terminus
-    # tiebreaker would catch "Stop3" inside "Stop35" and truncate too
-    # eagerly. Live `towards` strings are clean station names, so
-    # forward-only is sufficient and avoids false positives.
+    # Match uses the live `towards`'s primary segment — Wiener Linien
+    # often appends a sub-stop descriptor with " - " or " (" (e.g.
+    # "Michelbeuern - AKH", "Wien Mitte (Landstr.)"). Stripping to the
+    # first segment lets it substring-match the catalogue's canonical
+    # station name. Match is one-directional (primary substring of
+    # stop name): bidirectional would catch "Stop3" inside "Stop35"
+    # and truncate too eagerly.
     if needle:
-        for i, rbl in enumerate(tail):
-            name = _station_name_for_rbl(catalogue, rbl) or ""
-            if not name:
-                continue
-            if needle in name.casefold():
-                if i < len(tail) - 1:
-                    tail = tail[: i + 1]
-                break
+        primary = needle
+        for sep in (" - ", " (", ", "):
+            head, _, _ = primary.partition(sep)
+            if head:
+                primary = head
+        primary = primary.strip()
+        if primary:
+            for i, rbl in enumerate(tail):
+                name = _station_name_for_rbl(catalogue, rbl) or ""
+                if not name:
+                    continue
+                if primary in name.casefold():
+                    if i < len(tail) - 1:
+                        tail = tail[: i + 1]
+                    break
 
     # Build the full ordered list. Each stop carries its name, an optional
     # `is_terminus` flag on the last entry, and an optional `lines` list

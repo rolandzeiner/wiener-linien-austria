@@ -551,6 +551,32 @@ def test_stops_ahead_short_turn_truncates_tail_at_towards() -> None:
     assert all(s["name"] != "Leopoldau" for s in result)
 
 
+def test_stops_ahead_short_turn_strips_descriptor_in_towards() -> None:
+    """`towards` with a " - <descriptor>" suffix still truncates at the right stop.
+
+    Regression: a U6 short-turn to "Michelbeuern - AKH" stopped at the
+    Floridsdorf terminus instead of Michelbeuern because the matcher
+    used the full `towards` as a substring needle and "michelbeuern -
+    akh" is not contained in the catalogue's "Michelbeuern" name. Now
+    we strip to the first segment before " - " (or " (" / ", ") so
+    the canonical station name matches.
+    """
+    catalogue = _u1_catalogue()
+    # The H pattern is Reumannplatz → Stephansplatz → Praterstern →
+    # Leopoldau. Asking for towards="Praterstern - DescriptorX" should
+    # truncate at Praterstern as if towards were just "Praterstern".
+    result = stops_ahead_for_match(
+        catalogue,
+        "U1",
+        [4001],
+        "Praterstern - Tegetthoff",
+        live_direction="H",
+    )
+    assert result is not None
+    assert [s["name"] for s in result] == ["Stephansplatz", "Praterstern"]
+    assert result[-1].get("is_terminus") is True
+
+
 def test_stops_ahead_for_match_returns_empty_at_terminus() -> None:
     """When our RBL IS the terminus, return an empty list (not None)."""
     catalogue = _u1_catalogue()
