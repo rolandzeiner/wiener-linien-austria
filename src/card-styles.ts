@@ -228,6 +228,14 @@ export const cardStyles = css`
     flex-direction: column;
     gap: 6px;
     min-width: 0;
+    /* Anchor to the top of the .hero grid row so the meta column's
+       top edge never moves: when the stops_ahead panel expands and
+       the column grows taller than the hero-time countdown, the row
+       grows downward without the meta's existing entries appearing
+       to "jump up". The hero-time stays vertically centred (default
+       align-items: center on .hero) and instead drifts down as the
+       row grows — a subtler, more expected motion. */
+    align-self: start;
   }
   /* hero-block wraps an entry + its (optional) collapsible stops_ahead
      panel. Stays a flex column so the panel slides out below the entry
