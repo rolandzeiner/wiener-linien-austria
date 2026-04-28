@@ -82,7 +82,7 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   return stop;
 }
 
-export interface NormalisedModernConfig {
+export interface NormalisedModernConfigValidated {
   // HA's Lovelace editor wrapper re-validates every `config-changed` payload
   // against `type` — omit it and HA flags the card with "Kein Typ angegeben"
   // / "No type specified" and refuses to render. Preserve whatever the raw
@@ -104,14 +104,20 @@ export interface NormalisedModernConfig {
   hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
-  // Passthrough fields HA injects on the card config itself — section-view
-  // grid sizing, legacy view layout, conditional visibility. The editor
-  // must round-trip these unchanged on every config-changed payload, else
-  // HA writes back the stripped config and the user's column choice resets.
-  [key: string]: unknown;
 }
 
-const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" | "type"> = {
+// Passthrough fields HA injects on the card config itself — section-view
+// grid sizing, legacy view layout, conditional visibility. The editor
+// must round-trip these unchanged on every config-changed payload, else
+// HA writes back the stripped config and the user's column choice resets.
+// Kept as a separate type so `Omit<NormalisedModernConfigValidated, ...>`
+// for MODERN_DEFAULTS doesn't get collapsed to `unknown` by the index
+// signature (Omit + index signature loses explicit property types).
+export type NormalisedModernConfig = NormalisedModernConfigValidated & {
+  [key: string]: unknown;
+};
+
+const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
   accessibility_only: false,
@@ -194,7 +200,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   };
 }
 
-export interface NormalisedRetroConfig {
+export interface NormalisedRetroConfigValidated {
   // See NormalisedModernConfig.type — HA requires `type` on every config
   // in the `config-changed` payload or it flags "Kein Typ angegeben".
   type: string;
@@ -210,10 +216,13 @@ export interface NormalisedRetroConfig {
   wheelchair_race: boolean;
   accessibility_only: boolean;
   walk_times?: WalkTimes;
-  // See NormalisedModernConfig — same passthrough rule for dashboard
-  // layout fields injected onto the card config.
-  [key: string]: unknown;
 }
+
+// See NormalisedModernConfig — same passthrough rule for dashboard
+// layout fields injected onto the card config.
+export type NormalisedRetroConfig = NormalisedRetroConfigValidated & {
+  [key: string]: unknown;
+};
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   const direction = raw.direction === "R" ? "R" : "H";
