@@ -169,7 +169,13 @@ def test_store_roundtrip() -> None:
 
 
 def _sample(diva: int = 60201012, name: str = "Stephansplatz") -> StaticCatalogue:
-    """Build a minimal StaticCatalogue with one station."""
+    """Build a minimal StaticCatalogue with one station and a trip-pattern index.
+
+    The trip_patterns field is populated so this fixture round-trips through
+    the auto-refresh-on-pre-1.4-cache branch in async_load_catalogue without
+    triggering an unwanted refetch. Tests that specifically need a missing
+    trip_patterns field strip it from the Store payload after serialisation.
+    """
     return StaticCatalogue(
         stations_by_diva={
             diva: Station(
@@ -182,6 +188,7 @@ def _sample(diva: int = 60201012, name: str = "Stephansplatz") -> StaticCatalogu
             )
         },
         last_fetched="2026-04-20T12:00:00+00:00",
+        trip_patterns=_build_sample_index(),
     )
 
 
@@ -588,3 +595,49 @@ def test_store_load_pre_trip_pattern_payload_treats_field_as_missing() -> None:
     assert rebuilt.trip_patterns is None
     # Stations + RBLs preserved as before.
     assert 60201012 in rebuilt.stations_by_diva
+
+
+async def test_async_load_catalogue_pre_1_4_cache_triggers_refetch(
+    hass: HomeAssistant,
+) -> None:
+    """A cache without trip_patterns forces an inline refetch.
+
+    1.4.0 introduced trip_patterns additively. Without this auto-refresh,
+    existing installs would wait up to a week for the periodic refresh
+    to populate it; users would see no chevrons until then.
+    """
+    store: Store[dict] = Store(hass, STORE_VERSION, STORE_KEY)
+    payload = _catalogue_to_store(_sample())
+    payload.pop("trip_patterns", None)  # simulate pre-1.4 cache
+    await store.async_save(payload)
+
+    refreshed = _u1_catalogue()  # has a populated trip_patterns
+    with patch(
+        "custom_components.wiener_linien_austria.static._fetch_and_build",
+        new_callable=AsyncMock,
+        return_value=refreshed,
+    ) as mock_fetch:
+        result = await async_load_catalogue(hass)
+
+    mock_fetch.assert_awaited_once()
+    assert result.trip_patterns is not None
+
+
+async def test_async_load_catalogue_pre_1_4_cache_falls_back_on_network_failure(
+    hass: HomeAssistant,
+) -> None:
+    """If the auto-refetch fails, return the stale cache rather than raising."""
+    store: Store[dict] = Store(hass, STORE_VERSION, STORE_KEY)
+    payload = _catalogue_to_store(_sample())
+    payload.pop("trip_patterns", None)
+    await store.async_save(payload)
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._fetch_and_build",
+        new_callable=AsyncMock,
+        side_effect=aiohttp.ClientError("upstream unreachable"),
+    ):
+        result = await async_load_catalogue(hass)
+
+    assert result.trip_patterns is None
+    assert 60201012 in result.stations_by_diva

@@ -141,17 +141,44 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     """Return the current static catalogue, loading from cache or network.
 
     If both cache and network are unavailable, raises RuntimeError.
+
+    When the cache predates the additive `trip_patterns` field (1.4.0),
+    forces an inline refetch so users get the stops-ahead feature on the
+    first entry-load instead of waiting for the next weekly refresh
+    (which would otherwise be up to 7 days away). Network failure falls
+    back to the stale cache so the integration still works.
     """
     store: Store[dict[str, Any]] = Store(hass, STORE_VERSION, STORE_KEY)
     cached = await store.async_load()
     if cached:
         try:
-            return _catalogue_from_store(cached)
+            catalogue = _catalogue_from_store(cached)
         except (KeyError, ValueError, TypeError) as err:
             _LOGGER.warning(
                 "Ignoring corrupt static cache (%s); refetching from upstream",
                 err,
             )
+        else:
+            if catalogue.trip_patterns is None:
+                _LOGGER.info(
+                    "Static cache predates trip_patterns; refetching to populate it"
+                )
+                try:
+                    refreshed = await _fetch_and_build(hass, prior=catalogue)
+                except (
+                    aiohttp.ClientError,
+                    asyncio.TimeoutError,
+                    ValueError,
+                ) as err:
+                    _LOGGER.warning(
+                        "Could not refresh trip_patterns (%s); using stale cache",
+                        err,
+                    )
+                    return catalogue
+                if refreshed is not catalogue:
+                    await store.async_save(_catalogue_to_store(refreshed))
+                return refreshed
+            return catalogue
 
     catalogue = await _fetch_and_build(hass, prior=None)
     await store.async_save(_catalogue_to_store(catalogue))
