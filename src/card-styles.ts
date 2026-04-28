@@ -501,9 +501,23 @@ export const cardStyles = css`
     gap: 8px;
     padding: 6px 2px;
     border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+    transition: background-color
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
   }
   .dep-row:last-child {
     border-bottom: none;
+  }
+  /* Soft tint on hover so brushing the cursor across the list reads
+     as interactive without flashing. Mirrors the Linz card. The
+     prefers-reduced-motion block at the bottom of this stylesheet
+     neutralises the transition for users who opt out. */
+  .dep-row:hover {
+    background: color-mix(
+      in srgb,
+      var(--primary-text-color) 4%,
+      transparent
+    );
   }
   .line-badge {
     text-align: center;
