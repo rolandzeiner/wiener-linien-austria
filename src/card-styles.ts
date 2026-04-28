@@ -249,18 +249,6 @@ export const cardStyles = css`
     cursor: pointer;
     user-select: none;
     border-radius: 6px;
-    padding: 2px 4px;
-    margin: -2px -4px;
-    transition: background-color
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
-  }
-  .hero-entry.expandable:hover {
-    background: color-mix(
-      in srgb,
-      var(--primary-text-color) 4%,
-      transparent
-    );
   }
   .hero-chevron {
     --mdc-icon-size: 18px;
