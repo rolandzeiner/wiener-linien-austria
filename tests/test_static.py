@@ -82,8 +82,16 @@ FAHR_CSV = (
 
 
 def _build_sample_index() -> TripPatternIndex:
-    """Helper: build a TripPatternIndex matching the LINIEN_CSV + FAHR_CSV."""
-    return _parse_trip_patterns(LINIEN_CSV, FAHR_CSV)
+    """Helper: build a TripPatternIndex matching the LINIEN_CSV + FAHR_CSV.
+
+    Stations are derived from HALTESTELLEN_CSV + HALTEPUNKTE_CSV so the
+    parser populates `lines_at_diva` — without it the auto-refresh check
+    in async_load_catalogue would treat the cache as stale and trigger
+    an unwanted refresh during cache-hit tests.
+    """
+    stations = _parse_haltestellen(HALTESTELLEN_CSV)
+    _merge_haltepunkte(stations, HALTEPUNKTE_CSV)
+    return _parse_trip_patterns(LINIEN_CSV, FAHR_CSV, stations)
 
 
 def test_parse_haltestellen() -> None:
@@ -514,6 +522,33 @@ def test_stops_ahead_for_match_terminus_substring_picks_branch() -> None:
     )
     assert result is not None
     assert result[-1]["name"] == "Leopoldau"
+
+
+def test_stops_ahead_short_turn_truncates_tail_at_towards() -> None:
+    """When `towards` is a stop ON the pattern (not its terminus), truncate.
+
+    Regression: Alaudagasse-bound U1 short-turns hit the Oberlaa pattern
+    (no Alaudagasse-terminating variant in fahrwegverlaeufe.csv) and
+    rendered the full path to Oberlaa with Oberlaa marked terminus —
+    contradicting the row's "Alaudagasse" header. The truncation walks
+    the matched pattern's tail looking for `towards` and ends the list
+    there, keeping the panel's terminus consistent with the live row.
+    """
+    # Build a 4-stop H pattern: Reumannplatz → Stephansplatz → Praterstern → Leopoldau
+    # Then ask for towards="Praterstern" — should truncate at Praterstern.
+    catalogue = _u1_catalogue()
+    result = stops_ahead_for_match(
+        catalogue,
+        "U1",
+        [4001],  # at Reumannplatz, going H
+        "Praterstern",  # short-turn before the real terminus (Leopoldau)
+        live_direction="H",
+    )
+    assert result is not None
+    assert [s["name"] for s in result] == ["Stephansplatz", "Praterstern"]
+    assert result[-1].get("is_terminus") is True
+    # Real terminus (Leopoldau) absent — we truncated.
+    assert all(s["name"] != "Leopoldau" for s in result)
 
 
 def test_stops_ahead_for_match_returns_empty_at_terminus() -> None:

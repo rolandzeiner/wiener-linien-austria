@@ -755,6 +755,29 @@ def stops_ahead_for_match(
     if not tail:
         return []  # We're at the terminus on this pattern.
 
+    # Short-turn truncation. When the live `towards` matches a stop on
+    # the pattern *before* its natural terminus, truncate the tail
+    # there. Handles cases like an Alaudagasse-bound U1: there's no
+    # Alaudagasse-terminating pattern in fahrwegverlaeufe.csv, only
+    # the full Oberlaa schedule, but Alaudagasse is on that schedule
+    # between us and Oberlaa. Without this, the panel ends at Oberlaa
+    # while the row says "Alaudagasse" — confusing.
+    #
+    # Match is one-directional (towards substring of stop name) on
+    # purpose: the bidirectional variant used by the terminus
+    # tiebreaker would catch "Stop3" inside "Stop35" and truncate too
+    # eagerly. Live `towards` strings are clean station names, so
+    # forward-only is sufficient and avoids false positives.
+    if needle:
+        for i, rbl in enumerate(tail):
+            name = _station_name_for_rbl(catalogue, rbl) or ""
+            if not name:
+                continue
+            if needle in name.casefold():
+                if i < len(tail) - 1:
+                    tail = tail[: i + 1]
+                break
+
     # Build the full ordered list. Each stop carries its name, an optional
     # `is_terminus` flag on the last entry, and an optional `lines` list
     # of OTHER lines (excluding the one we're on) that pass through that
