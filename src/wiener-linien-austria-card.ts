@@ -502,17 +502,11 @@ export class WienerLinienAustriaCard extends LitElement {
                     ? html`<span class="hero-unit">${heroUnit}</span>`
                     : nothing}
                 </div>
-                <div class="hero-meta">
-                  ${heroGroup.map((d) => this._renderHeroEntry(d, stopCfg.entity))}
-                </div>
+                ${heroGroup.flatMap((d) => [
+                  this._renderHeroEntry(d, stopCfg.entity),
+                  this._renderHeroPanelForEntry(d, stopCfg.entity),
+                ])}
               </div>
-              ${heroGroup.some(
-                (d) => Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0,
-              )
-                ? html`<div class="hero-panels">
-                    ${heroGroup.map((d) => this._renderHeroPanelForEntry(d, stopCfg.entity))}
-                  </div>`
-                : nothing}
             </div>`
           : nothing}
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}

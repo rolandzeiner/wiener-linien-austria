@@ -191,12 +191,25 @@ export const cardStyles = css`
   .hero {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: var(--ha-spacing-3, 12px);
+    column-gap: var(--ha-spacing-3, 12px);
+    row-gap: 6px;
     align-items: center;
     /* Cosmetics (background, padding, radius) live on .hero-host so
        the tinted surface visually contains both the grid and any
        expanded stops_ahead panel below. The .hero grid itself just
-       does layout. */
+       does layout — entries + their panels live in column 2 in
+       interleaved row order so each panel sits directly below its
+       trigger entry; .hero-time pins to row 1 of column 1 and stays
+       vertically centred against the first entry regardless of
+       which panels expand below. */
+  }
+  .hero > .hero-time {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hero > .hero-entry,
+  .hero > .hero-detail {
+    grid-column: 2;
   }
   .hero-time {
     display: flex;
@@ -216,45 +229,16 @@ export const cardStyles = css`
     font-weight: 600;
     color: var(--secondary-text-color);
   }
-  /* Hero meta column — line badge + direction + platform pill + rt
-     pill. Wraps onto a second visual row at narrow widths. */
-  .hero-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-  }
-  /* hero-host wraps the .hero grid + all expanded stops_ahead panels
-     in a single visual block. Panels render BELOW the grid (not
-     nested inside .hero-meta) so the meta column's height stays
-     bound to the entries only. align-items: center on .hero can
-     then keep the big "1 Min" countdown vertically aligned with
-     the entry row regardless of which panel is open. */
+  /* hero-host carries the cosmetics (background, padding, radius)
+     so the tinted surface wraps both the .hero grid and any
+     expanded stops_ahead panels in one continuous block. */
   .hero-host {
     display: flex;
     flex-direction: column;
     min-width: 0;
-    /* 12px vertical, --nb-pad-x horizontal — same padding the hero
-       grid used to carry, lifted up here so the tinted surface
-       wraps around both the grid and any expanded stops_ahead
-       panels below. */
     padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
     background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
     border-radius: var(--nb-radius-lg);
-  }
-  .hero-panels {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    /* Small gap between the hero grid and any expanded panel; reads
-       as a separator without breaking the tinted-surface continuity. */
-    margin-top: 6px;
-  }
-  /* Drop the gap when the panels container is empty (no entries
-     have stops_ahead) so the hero card height doesn't carry a
-     stray 6px below the grid. */
-  .hero-panels:empty {
-    display: none;
   }
   .hero-entry {
     display: flex;
