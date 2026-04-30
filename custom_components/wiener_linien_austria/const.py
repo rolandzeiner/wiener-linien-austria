@@ -113,10 +113,12 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 # mismatch on one bundle doesn't show a banner on the other.
 CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
+CARD_FILENAME: Final = "wiener-linien-austria-card.js"
 RETRO_CARD_VERSION: Final = INTEGRATION_VERSION
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
+RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
 
 # Cap on how many departures we surface in sensor attributes. The card maxes
 # out at 20 per stop; matching that here keeps the per-departure stops_ahead

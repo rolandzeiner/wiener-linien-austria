@@ -1,27 +1,23 @@
 """Coverage for the corners of __init__.py the lifecycle test doesn't reach.
 
 The main lifecycle test (`test_init.py`) covers entry setup/unload and the
-reference-counted teardown. This file fills in:
+reference-counted teardown. The card-registration internals moved to
+`tests/test_card_registration.py` after the JSModuleRegistration extraction.
+This file fills in:
 
 - Both WebSocket `card_version` handlers
-- Card JS file-not-found path
-- Lovelace resource upsert (storage mode, with/without existing item)
 - The HOMEASSISTANT_STARTED-deferred frontend registration
 - async_migrate_entry placeholder
 - async_unload_entry's "platform unload failed" early return
 """
 from __future__ import annotations
 
-from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from homeassistant.core import CoreState, HomeAssistant
 
 from custom_components.wiener_linien_austria import (
-    _async_register_one_card,
     _websocket_card_version,
     _websocket_retro_card_version,
     async_migrate_entry,
@@ -65,189 +61,10 @@ async def test_websocket_retro_card_version(hass: HomeAssistant) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _async_register_one_card — file missing / lovelace branches
+# Card registration internals: see tests/test_card_registration.py — the
+# logic moved out of __init__.py into a dedicated JSModuleRegistration
+# module after the v1.4.0 platinum-baseline pass.
 # ---------------------------------------------------------------------------
-
-
-async def test_register_one_card_file_missing_warns_and_returns(
-    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Non-existent filename → log a warning, do nothing else."""
-    fake_http = SimpleNamespace(async_register_static_paths=AsyncMock())
-    object.__setattr__(hass, "http", fake_http)
-
-    caplog.clear()
-    await _async_register_one_card(
-        hass, "/x/y.js", "9.9", "definitely-not-a-real-file.js"
-    )
-    fake_http.async_register_static_paths.assert_not_awaited()
-    assert any("Card JS not found" in r.message for r in caplog.records)
-
-
-def _ensure_card_file_exists() -> str:
-    """Pick a card filename that actually ships in www/."""
-    www_dir = (
-        Path(__file__).resolve().parent.parent
-        / "custom_components"
-        / "wiener_linien_austria"
-        / "www"
-    )
-    candidates = list(www_dir.glob("*.js"))
-    if not candidates:
-        pytest.skip("no built card JS to register against")
-    return candidates[0].name
-
-
-def _make_lovelace(
-    *,
-    mode: str = "storage",
-    items: list[dict[str, Any]] | None = None,
-) -> SimpleNamespace:
-    resources = SimpleNamespace(
-        async_load=AsyncMock(),
-        async_items=MagicMock(return_value=items or []),
-        async_create_item=AsyncMock(),
-        async_update_item=AsyncMock(),
-        async_delete_item=AsyncMock(),
-    )
-    return SimpleNamespace(mode=mode, resources=resources)
-
-
-async def test_register_one_card_no_lovelace_returns(
-    hass: HomeAssistant,
-) -> None:
-    """Lovelace not in hass.data → static path registered, resource skipped."""
-    fname = _ensure_card_file_exists()
-    fake_http = SimpleNamespace(async_register_static_paths=AsyncMock())
-    object.__setattr__(hass, "http", fake_http)
-    hass.data.pop("lovelace", None)
-
-    await _async_register_one_card(hass, "/wla/test.js", "1.0", fname)
-    fake_http.async_register_static_paths.assert_awaited_once()
-
-
-async def test_register_one_card_yaml_mode_skips_resource(
-    hass: HomeAssistant,
-) -> None:
-    """YAML mode owns its resources via files; we must not touch them."""
-    fname = _ensure_card_file_exists()
-    lovelace = _make_lovelace(mode="yaml")
-    hass.data["lovelace"] = lovelace
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-    await _async_register_one_card(hass, "/wla/test.js", "1.0", fname)
-    lovelace.resources.async_load.assert_not_awaited()
-    lovelace.resources.async_create_item.assert_not_awaited()
-
-
-async def test_register_one_card_no_resources_attr(
-    hass: HomeAssistant,
-) -> None:
-    """Lovelace without `.resources` (older HA shapes) → graceful skip."""
-    fname = _ensure_card_file_exists()
-    hass.data["lovelace"] = SimpleNamespace(mode="storage")  # no .resources
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-    await _async_register_one_card(hass, "/wla/test.js", "1.0", fname)
-    # Nothing to assert except that it didn't raise — the function returns.
-
-
-async def test_register_one_card_creates_when_no_existing(
-    hass: HomeAssistant,
-) -> None:
-    """Storage mode, no existing resource → create with versioned URL."""
-    fname = _ensure_card_file_exists()
-    lovelace = _make_lovelace(items=[])
-    hass.data["lovelace"] = lovelace
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-
-    await _async_register_one_card(hass, "/wla/test.js", "9.9", fname)
-    lovelace.resources.async_create_item.assert_awaited_once()
-    payload = lovelace.resources.async_create_item.call_args.args[0]
-    assert payload["res_type"] == "module"
-    assert payload["url"] == "/wla/test.js?v=9.9"
-
-
-async def test_register_one_card_updates_when_version_stale(
-    hass: HomeAssistant,
-) -> None:
-    """Existing resource with older version → update_item with new URL."""
-    fname = _ensure_card_file_exists()
-    lovelace = _make_lovelace(
-        items=[{"id": "r-1", "url": "/wla/test.js?v=0.0.1"}]
-    )
-    hass.data["lovelace"] = lovelace
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-
-    await _async_register_one_card(hass, "/wla/test.js", "9.9", fname)
-    lovelace.resources.async_update_item.assert_awaited_once()
-    item_id, payload = lovelace.resources.async_update_item.call_args.args
-    assert item_id == "r-1"
-    assert payload["url"] == "/wla/test.js?v=9.9"
-    lovelace.resources.async_create_item.assert_not_awaited()
-
-
-async def test_register_one_card_noop_when_version_matches(
-    hass: HomeAssistant,
-) -> None:
-    """Existing resource at current version → no create, no update."""
-    fname = _ensure_card_file_exists()
-    lovelace = _make_lovelace(
-        items=[{"id": "r-1", "url": "/wla/test.js?v=9.9"}]
-    )
-    hass.data["lovelace"] = lovelace
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-
-    await _async_register_one_card(hass, "/wla/test.js", "9.9", fname)
-    lovelace.resources.async_create_item.assert_not_awaited()
-    lovelace.resources.async_update_item.assert_not_awaited()
-
-
-async def test_register_one_card_update_falls_back_to_delete_create(
-    hass: HomeAssistant,
-) -> None:
-    """If async_update_item raises, fall back to delete+recreate."""
-    fname = _ensure_card_file_exists()
-    lovelace = _make_lovelace(
-        items=[{"id": "r-1", "url": "/wla/test.js?v=0.0.1"}]
-    )
-    lovelace.resources.async_update_item = AsyncMock(side_effect=RuntimeError("x"))
-    hass.data["lovelace"] = lovelace
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-
-    await _async_register_one_card(hass, "/wla/test.js", "9.9", fname)
-    lovelace.resources.async_delete_item.assert_awaited_once_with("r-1")
-    lovelace.resources.async_create_item.assert_awaited_once()
-
-
-async def test_register_one_card_outer_exception_is_logged_not_raised(
-    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Any unexpected error inside the resource block must be swallowed."""
-    fname = _ensure_card_file_exists()
-    # Make the lovelace lookup itself blow up inside the try.
-    bad_data = MagicMock()
-    bad_data.get.side_effect = RuntimeError("unexpected")
-    hass.data = bad_data  # type: ignore[assignment]
-    object.__setattr__(
-        hass, "http", SimpleNamespace(async_register_static_paths=AsyncMock())
-    )
-
-    caplog.clear()
-    await _async_register_one_card(hass, "/wla/test.js", "9.9", fname)
-    assert any(
-        "Could not register Lovelace resource" in r.message for r in caplog.records
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +80,7 @@ async def test_setup_defers_frontend_until_started_event(
     hass.data.pop(DOMAIN, None)
 
     with patch(
-        "custom_components.wiener_linien_austria._async_register_cards",
+        "custom_components.wiener_linien_austria.JSModuleRegistration.async_register",
         new_callable=AsyncMock,
     ) as register:
         assert await async_setup(hass, {})
