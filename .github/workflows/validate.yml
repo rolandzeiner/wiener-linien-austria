@@ -12,6 +12,22 @@ permissions:
   packages: read
 
 jobs:
+  no-dev-fixture:
+    # `_dev_fixture.py` is a gitignored, dev-only hook some siblings
+    # ship to inject a recorded payload during local development. It
+    # must never enter the repo — gitignore covers accidental staging,
+    # this guards against `git add -f` or the rule being deleted. Loud,
+    # fast, first job.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify _dev_fixture.py is not committed
+        run: |
+          if [ -f custom_components/wiener_linien_austria/_dev_fixture.py ]; then
+            echo "::error::custom_components/wiener_linien_austria/_dev_fixture.py must never be committed (dev-only hook)."
+            exit 1
+          fi
+
   validate-hacs:
     runs-on: ubuntu-latest
     steps:
@@ -38,34 +54,76 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          # Pinned to 3.13 — HA core's current target. Python 3.14 was
+          # tried but the dependency tree (pydantic-core / orjson /
+          # Pillow) ships pyo3 0.24 which doesn't yet support 3.14, so
+          # `pip install` falls through to a source build that fails on
+          # `the configured Python interpreter version (3.14) is newer
+          # than PyO3's maximum supported version (3.13)`. Bump back to
+          # 3.14 once the ecosystem catches up.
+          python-version: "3.13"
       - name: Install dependencies
         run: pip install -r requirements_test.txt
       - name: Run Linter (Ruff)
-        run: |
-          pip install ruff
-          ruff check .
+        run: ruff check .
       - name: Run mypy (strict)
         run: mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
       - name: Run tests
         run: pytest tests/ -v
 
   validate-card:
-    # Rebuilds both Lovelace card bundles from src/ and verifies each
-    # output is valid JS. Catches TS errors and missing deps before they
-    # reach the served www/*.js.
+    # Rebuilds both Lovelace card bundles from src/ and verifies each output
+    # is valid JS. Catches TS errors, missing deps, and high-severity npm
+    # advisories before they reach the served www/*.js files.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
+      - name: Guard against backticks inside Lit css/html templates
+        # The `css\`...\`` and `html\`...\`` tagged templates are
+        # backtick-delimited; a stray backtick inside a comment or a
+        # CSS class reference (`.foo`) terminates the literal early
+        # and the rest of the template parses as JavaScript. Build
+        # still succeeds (the bundle is valid JS) but the card crashes
+        # at module load. Cheapest possible CI guard: scan the body of
+        # every cardStyles / editorStyles / html`` template for an
+        # unescaped backtick. Critical for wiener-linien because both
+        # cards are 1300+ lines of Lit templates each.
+        run: |
+          if perl -0777 -ne '
+            while (m{(css|html)\`(.*?)(?<!\\)\`}gs) {
+              my ($tag, $body) = ($1, $2);
+              if ($body =~ /\`/) {
+                print "Stray backtick inside ${tag}\`...\` template\n";
+                print "Surrounding text:\n";
+                print substr($body, 0, 240), "\n...\n";
+                exit 1;
+              }
+            }
+            exit 0;
+          ' src/*.ts src/**/*.ts; then
+            echo "OK: no stray backticks in tagged templates"
+          else
+            echo "::error::A backtick inside a Lit css/html template will" \
+              "terminate the literal early and silently break the card." \
+              "Use single quotes, double quotes, or word descriptions in" \
+              "comments and class-name references."
+            exit 1
+          fi
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
       - name: Install card deps
         run: npm ci
       - name: Audit production deps
+        # --omit=dev keeps the gate enforceable; without it Rollup-plugin
+        # advisories (which never ship to users) flood the report and the
+        # team learns to ignore failures.
         run: npm audit --omit=dev --audit-level=high
-      - name: Type-check
+      - name: Type-check (strict)
+        # Rollup's @rollup/plugin-typescript is more permissive than tsc
+        # in strict mode. Run tsc separately so TS regressions surface in
+        # CI instead of slipping into the bundle.
         run: npx tsc --noEmit
       - name: Build card bundles
         run: npm run build
