@@ -293,7 +293,8 @@ export class WienerLinienAustriaCard extends LitElement {
     );
     if (picked.length) return picked;
     const available = findWienerLinienEntities(this.hass);
-    return available.length ? [{ entity: available[0] }] : [];
+    const first = available[0];
+    return first ? [{ entity: first }] : [];
   }
 
   private _attrs(entityId: string): WienerLinienAttrs {
@@ -350,7 +351,11 @@ export class WienerLinienAustriaCard extends LitElement {
   private _renderBody(stops: NormalisedModernStop[], useTabs: boolean): TemplateResult {
     if (!stops.length) return this._renderEmpty();
     if (useTabs) {
-      const active = stops[this._activeTab];
+      // willUpdate clamps `_activeTab` to a valid index whenever stops
+      // changes, so this lookup is safe — the `?? stops[0]` is belt-and-
+      // braces against the strict-flag noUncheckedIndexedAccess narrowing
+      // (and against any race where willUpdate hasn't fired yet).
+      const active = stops[this._activeTab] ?? stops[0]!;
       return html`${this._renderStop(active, this._activeTab)}`;
     }
     return html`${stops.map((s) => this._renderStop(s))}`;
@@ -478,7 +483,7 @@ export class WienerLinienAustriaCard extends LitElement {
     return html`
       <section
         class="station"
-        style="--nb-accent: ${accent};"
+        style="--wl-accent: ${accent};"
         id=${isPanel ? `wl-tabpanel-${tabIndex}` : nothing}
         role=${isPanel ? "tabpanel" : nothing}
         aria-labelledby=${isPanel ? `wl-tab-${tabIndex}` : nothing}
@@ -1255,7 +1260,9 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private _randomFrom<T>(arr: T[]): T | null {
-    return arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+    // `arr.length` truthy implies at least one element exists; the `?? null`
+    // satisfies noUncheckedIndexedAccess (which widens arr[i] to T | undefined).
+    return arr.length ? arr[Math.floor(Math.random() * arr.length)] ?? null : null;
   }
 
   private _devTestTraffic = (): void => {

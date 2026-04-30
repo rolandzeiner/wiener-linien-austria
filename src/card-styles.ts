@@ -1,7 +1,7 @@
 import { css } from "lit";
 
 // Tile-card visual language. Token-driven, container-query-paced.
-// Per-station accent is piped in via inline `style="--nb-accent: …;"` on
+// Per-station accent is piped in via inline `style="--wl-accent: …;"` on
 // `.station`, so every accented surface (icon-tile, line badge, alert
 // surface, focus ring) reads from one prop.
 export const cardStyles = css`
@@ -15,32 +15,32 @@ export const cardStyles = css`
     container-name: wlcard;
 
     /* Brand accent inherits HA's primary. Per-station accent override
-       lands inline on .station via style="--nb-accent: …;". */
-    --nb-accent: var(--primary-color);
+       lands inline on .station via style="--wl-accent: …;". */
+    --wl-accent: var(--primary-color);
 
     /* Semantic state tokens layered over HA's official semantic palette
        so theme authors can recolour the whole portfolio in one place;
        hard-coded fallbacks for older HA versions. */
-    --nb-rt:      var(--ha-color-success, #43a047);
-    --nb-warning: var(--ha-color-warning, #ffa000);
-    --nb-error:   var(--ha-color-error,   #db4437);
-    --nb-info:    var(--ha-color-info,    #1565c0);
+    --wl-rt:      var(--ha-color-success, #43a047);
+    --wl-warning: var(--ha-color-warning, #ffa000);
+    --wl-error:   var(--ha-color-error,   #db4437);
+    --wl-info:    var(--ha-color-info,    #1565c0);
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
        linz-linien-austria so a stacked dashboard reads as one
        family. */
-    --nb-radius-sm: var(--ha-radius-sm, 6px);
-    --nb-radius-md: var(--ha-radius-md, 10px);
-    --nb-radius-lg: var(--ha-card-border-radius, var(--ha-radius-lg, 12px));
-    --nb-pad-x:     var(--ha-spacing-4, 16px);
-    --nb-pad-y:     var(--ha-spacing-3, 14px);
-    --nb-row-gap:   var(--ha-spacing-3, 12px);
-    --nb-tile-size: 40px;
-    --nb-slot-radius: var(--ha-radius-md, 10px);
-    --nb-slot-gap: 6px;
-    --nb-slot-min-h: 44px;
-    --nb-metric-size: 2.25rem;
+    --wl-radius-sm: var(--ha-radius-sm, 6px);
+    --wl-radius-md: var(--ha-radius-md, 10px);
+    --wl-radius-lg: var(--ha-card-border-radius, var(--ha-radius-lg, 12px));
+    --wl-pad-x:     var(--ha-spacing-4, 16px);
+    --wl-pad-y:     var(--ha-spacing-3, 14px);
+    --wl-row-gap:   var(--ha-spacing-3, 12px);
+    --wl-tile-size: 40px;
+    --wl-slot-radius: var(--ha-radius-md, 10px);
+    --wl-slot-gap: 6px;
+    --wl-slot-min-h: 44px;
+    --wl-metric-size: 2.25rem;
   }
 
   ha-card {
@@ -50,8 +50,8 @@ export const cardStyles = css`
   .wrap {
     display: flex;
     flex-direction: column;
-    gap: var(--nb-row-gap);
-    padding: var(--nb-pad-y) var(--nb-pad-x);
+    gap: var(--wl-row-gap);
+    padding: var(--wl-pad-y) var(--wl-pad-x);
   }
 
   /* Tabs sit flush with the card edge — direct child of <ha-card>, not
@@ -93,16 +93,16 @@ export const cardStyles = css`
     box-shadow: inset 0 -2px 0 var(--primary-color);
   }
 
-  /* Per-station section. Inline --nb-accent on this element drives the
+  /* Per-station section. Inline --wl-accent on this element drives the
      icon-tile tint, line-badge fallback, alert tints, and CTA fill. */
   .station {
     display: flex;
     flex-direction: column;
-    gap: var(--nb-row-gap);
+    gap: var(--wl-row-gap);
   }
   .station + .station {
-    margin-top: var(--nb-row-gap);
-    padding-top: var(--nb-row-gap);
+    margin-top: var(--wl-row-gap);
+    padding-top: var(--wl-row-gap);
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
   }
 
@@ -114,11 +114,11 @@ export const cardStyles = css`
     gap: 12px;
   }
   .icon-tile {
-    width: var(--nb-tile-size);
-    height: var(--nb-tile-size);
-    border-radius: var(--nb-radius-md);
-    background: color-mix(in srgb, var(--nb-accent) 18%, transparent);
-    color: var(--nb-accent);
+    width: var(--wl-tile-size);
+    height: var(--wl-tile-size);
+    border-radius: var(--wl-radius-md);
+    background: color-mix(in srgb, var(--wl-accent) 18%, transparent);
+    color: var(--wl-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -184,7 +184,7 @@ export const cardStyles = css`
   /* Hero block — Linz-Linien-aligned layout: tinted background, big
      countdown on the left, line-badge + direction column on the right.
      Matches linz-linien-austria so a stacked dashboard reads as one
-     visual family. The per-station --nb-accent (set inline on .station)
+     visual family. The per-station --wl-accent (set inline on .station)
      drives the tint and the big-number colour; the row beside lists
      the next departure's line, direction, platform, and a realtime
      pill if applicable. */
@@ -215,10 +215,10 @@ export const cardStyles = css`
     display: flex;
     align-items: baseline;
     gap: 4px;
-    color: var(--nb-accent);
+    color: var(--wl-accent);
   }
   .hero-min {
-    font-size: var(--nb-metric-size);
+    font-size: var(--wl-metric-size);
     font-weight: var(--ha-font-weight-bold, 600);
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -236,9 +236,9 @@ export const cardStyles = css`
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
-    background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
-    border-radius: var(--nb-radius-lg);
+    padding: var(--ha-spacing-3, 12px) var(--wl-pad-x);
+    background: color-mix(in srgb, var(--wl-accent) 12%, transparent);
+    border-radius: var(--wl-radius-lg);
   }
   .hero-entry {
     display: flex;
@@ -317,7 +317,7 @@ export const cardStyles = css`
     align-items: center;
     justify-content: center;
     color: #fff;
-    background: var(--nb-info);
+    background: var(--wl-info);
     padding: 2px 6px;
     border-radius: 999px;
     flex-shrink: 0;
@@ -363,12 +363,12 @@ export const cardStyles = css`
     forced-color-adjust: none;
   }
   .flag.warning {
-    background: color-mix(in srgb, var(--nb-warning) 16%, transparent);
-    color: var(--nb-warning);
+    background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
+    color: var(--wl-warning);
   }
   .flag.error {
-    background: color-mix(in srgb, var(--nb-error) 16%, transparent);
-    color: var(--nb-error);
+    background: color-mix(in srgb, var(--wl-error) 16%, transparent);
+    color: var(--wl-error);
   }
   .flag ha-icon {
     --mdc-icon-size: 14px;
@@ -383,7 +383,7 @@ export const cardStyles = css`
     padding: 0 14px;
     border: none;
     border-radius: 999px;
-    background: var(--nb-accent);
+    background: var(--wl-accent);
     color: var(--text-primary-color, #fff);
     font-family: inherit;
     font-size: 0.75rem;
@@ -409,8 +409,8 @@ export const cardStyles = css`
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    border-radius: var(--nb-radius-md);
-    background: color-mix(in srgb, var(--nb-warning) 16%, transparent);
+    border-radius: var(--wl-radius-md);
+    background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
     color: var(--primary-text-color);
     font-size: 0.85rem;
   }
@@ -418,7 +418,7 @@ export const cardStyles = css`
     flex: 1;
   }
   .banner .btn-primary {
-    background: var(--nb-warning);
+    background: var(--wl-warning);
   }
 
   /* Alerts: traffic + elevator items use the same expandable surface. */
@@ -432,9 +432,9 @@ export const cardStyles = css`
     gap: 10px;
     align-items: flex-start;
     padding: 10px 12px;
-    border-radius: var(--nb-radius-md);
-    background: color-mix(in srgb, var(--nb-warning) 12%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nb-warning) 22%, transparent);
+    border-radius: var(--wl-radius-md);
+    background: color-mix(in srgb, var(--wl-warning) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wl-warning) 22%, transparent);
     font-size: 0.85rem;
     cursor: pointer;
     user-select: none;
@@ -445,7 +445,7 @@ export const cardStyles = css`
   }
   .alert > ha-icon {
     --mdc-icon-size: 18px;
-    color: var(--nb-warning);
+    color: var(--wl-warning);
     flex-shrink: 0;
     margin-top: 1px;
   }
@@ -773,7 +773,7 @@ export const cardStyles = css`
     vertical-align: 1px;
   }
   .delay {
-    color: var(--nb-warning);
+    color: var(--wl-warning);
     font-size: 0.85rem;
     font-weight: 500;
     margin-left: 4px;
@@ -813,7 +813,7 @@ export const cardStyles = css`
     --mdc-icon-size: 16px;
   }
   .row-flags .disturbance {
-    color: var(--nb-warning);
+    color: var(--wl-warning);
   }
   .countdown {
     font-variant-numeric: tabular-nums;
@@ -829,9 +829,9 @@ export const cardStyles = css`
      not expose a realtime-vs-scheduled distinction, so the live-pulse
      dot Linz uses isn't applicable here — countdowns are coloured
      purely by their delay state. */
-  .countdown.now   { color: var(--nb-accent); }
-  .countdown.late  { color: var(--nb-error); }
-  .countdown.early { color: var(--nb-info); }
+  .countdown.now   { color: var(--wl-accent); }
+  .countdown.late  { color: var(--wl-error); }
+  .countdown.early { color: var(--wl-info); }
 
   /* Empty / fallback states */
   .empty {
@@ -860,12 +860,12 @@ export const cardStyles = css`
        butts up against the last row's bottom edge AND bottoms-out at
        the card edge — matching linz-linien (where .foot is a direct
        ha-card child with no gap above and no padding below). Without
-       margin-top, .wrap's --nb-row-gap pushes the divider 12px below
+       margin-top, .wrap's --wl-row-gap pushes the divider 12px below
        the last row; without margin-bottom, the timestamp sits 8px +
-       --nb-pad-y above the card edge instead of being vertically
+       --wl-pad-y above the card edge instead of being vertically
        centred between divider and edge. */
-    margin-top: calc(-1 * var(--nb-row-gap));
-    margin-bottom: calc(-1 * var(--nb-pad-y));
+    margin-top: calc(-1 * var(--wl-row-gap));
+    margin-bottom: calc(-1 * var(--wl-pad-y));
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     font-size: 0.7rem;
     color: var(--secondary-text-color);
@@ -881,7 +881,7 @@ export const cardStyles = css`
     gap: 6px;
     padding: 6px 10px;
     border: 1px dashed var(--secondary-text-color, rgba(0, 0, 0, 0.3));
-    border-radius: var(--nb-radius-sm);
+    border-radius: var(--wl-radius-sm);
     font-size: 0.7rem;
     color: var(--secondary-text-color);
   }
@@ -892,7 +892,7 @@ export const cardStyles = css`
   }
   .dev-strip button {
     padding: 4px 10px;
-    border-radius: var(--nb-radius-sm);
+    border-radius: var(--wl-radius-sm);
     border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.2));
     background: transparent;
     color: var(--primary-text-color);
@@ -912,11 +912,11 @@ export const cardStyles = css`
      through every component above. */
   @container wlcard (inline-size < 360px) {
     :host {
-      --nb-pad-x: 12px;
-      --nb-pad-y: 12px;
-      --nb-tile-size: 36px;
-      --nb-slot-min-h: 40px;
-      --nb-metric-size: 2rem;
+      --wl-pad-x: 12px;
+      --wl-pad-y: 12px;
+      --wl-tile-size: 36px;
+      --wl-slot-min-h: 40px;
+      --wl-metric-size: 2rem;
     }
     .tabs {
       padding: 0 8px;
@@ -932,10 +932,10 @@ export const cardStyles = css`
 
   @container wlcard (inline-size > 480px) {
     :host {
-      --nb-pad-x: 20px;
-      --nb-pad-y: 16px;
-      --nb-tile-size: 44px;
-      --nb-metric-size: 2.5rem;
+      --wl-pad-x: 20px;
+      --wl-pad-y: 16px;
+      --wl-tile-size: 44px;
+      --wl-metric-size: 2.5rem;
     }
     .icon-tile ha-icon {
       --mdc-icon-size: 24px;
