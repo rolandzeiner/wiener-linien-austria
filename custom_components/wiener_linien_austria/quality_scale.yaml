@@ -34,8 +34,6 @@ rules:
     status: done
   runtime-data:
     status: done
-  source-code-standards:
-    status: done
   test-before-configure:
     status: done
   test-before-setup:
@@ -65,7 +63,7 @@ rules:
     status: done
   reauthentication-flow:
     status: exempt
-    comment: TODO — flip if your API has long-lived credentials that can expire.
+    comment: Wiener Linien OGD has no credentials; the coordinator has no auth branch and no token can expire.
   test-coverage:
     status: done
     comment: Config flow (3 steps + reconfigure + search-again + abort reasons), coordinator (parse, rate-limit, cooldown, async_setup coord population, tram/bus fixture, stops_ahead enrichment + fail-soft + unknown-line + no-catalogue branches), sensor (MAX_DEPARTURES cap, alerts matching, availability), static catalogue loader (cache hit / corrupt / refresh-on-failure, four-CSV gather, all-304 fast path, one-304 mixed branch, trip-pattern parsing, hybrid truncation, terminus substring match, Store v1 backwards compat for the additive trip_patterns field), alerts (_fetch_info_list error branches + line-fallback), and diagnostics are all covered.
