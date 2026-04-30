@@ -141,3 +141,20 @@ export function filterDepartures(
     return true;
   });
 }
+
+/** Whether the given departure should render its stops_ahead expandable
+ *  affordance — gated on the user-configurable `show_stops_ahead`
+ *  toggle (default true) AND on the actual presence of upstream
+ *  trip-pattern data. Centralised so the modern card's three render
+ *  helpers (row list, hero entry, hero-panel companion) share one
+ *  rule rather than each carrying their own copy of the gate. */
+export function shouldShowStopsAhead(
+  showStopsAhead: boolean | undefined,
+  d: DepartureAttr,
+): boolean {
+  return (
+    showStopsAhead !== false &&
+    Array.isArray(d.stops_ahead) &&
+    d.stops_ahead.length > 0
+  );
+}

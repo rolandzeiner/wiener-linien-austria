@@ -116,8 +116,9 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 
     # WS commands registered here survive integration removal — they're
     # process-scoped, not entry-scoped, and HA core doesn't expose a
-    # deregister API. Re-registering on the next async_setup is harmless
-    # (the second registration replaces the first).
+    # deregister API. We never reach a duplicate-registration branch
+    # since `async_setup` only runs once per HA process; behaviour on
+    # duplicates is HA core internal and we don't rely on it.
     async_register_command(hass, _websocket_card_version)
     async_register_command(hass, _websocket_retro_card_version)
 

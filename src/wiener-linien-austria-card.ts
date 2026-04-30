@@ -34,7 +34,7 @@ import {
   type NormalisedModernStop,
 } from "./utils/config.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
-import { filterDepartures } from "./utils/departures.js";
+import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeTrafficHtml } from "./utils/html.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
 
@@ -767,13 +767,10 @@ export class WienerLinienAustriaCard extends LitElement {
     // hero entry shares the row's stable identifier so opening the
     // panel from the hero leaves the same row's panel open in the list
     // below (when both surface the same departure), and vice versa.
-    // `show_stops_ahead` (default true) gates the chevron + panel
-     // — when off, a row that has trip-pattern data still renders, just
-     // without the expandable affordance.
-     const hasStopsAhead =
-      this._config!.show_stops_ahead !== false &&
-      Array.isArray(d.stops_ahead) &&
-      d.stops_ahead.length > 0;
+    const hasStopsAhead = shouldShowStopsAhead(
+      this._config!.show_stops_ahead,
+      d,
+    );
     const rowStableId = d.time_planned ?? `cd${d.countdown}`;
     const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
     const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
@@ -840,13 +837,10 @@ export class WienerLinienAustriaCard extends LitElement {
     d: DepartureAttr,
     entityId: string,
   ): TemplateResult | typeof nothing {
-    // `show_stops_ahead` (default true) gates the chevron + panel
-     // — when off, a row that has trip-pattern data still renders, just
-     // without the expandable affordance.
-     const hasStopsAhead =
-      this._config!.show_stops_ahead !== false &&
-      Array.isArray(d.stops_ahead) &&
-      d.stops_ahead.length > 0;
+    const hasStopsAhead = shouldShowStopsAhead(
+      this._config!.show_stops_ahead,
+      d,
+    );
     if (!hasStopsAhead) return nothing;
     const rowStableId = d.time_planned ?? `cd${d.countdown}`;
     const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
@@ -936,13 +930,10 @@ export class WienerLinienAustriaCard extends LitElement {
     // are at the terminus" — still no panel, no chevron. A truncated list
     // (head + ellipsis + terminus) renders the same affordance as a full
     // short list.
-    // `show_stops_ahead` (default true) gates the chevron + panel
-     // — when off, a row that has trip-pattern data still renders, just
-     // without the expandable affordance.
-     const hasStopsAhead =
-      this._config!.show_stops_ahead !== false &&
-      Array.isArray(d.stops_ahead) &&
-      d.stops_ahead.length > 0;
+    const hasStopsAhead = shouldShowStopsAhead(
+      this._config!.show_stops_ahead,
+      d,
+    );
     // Use `time_planned` (or countdown fallback) as the stable
     // identifier so panels stay open across polls — countdown alone
     // ticks every minute and would re-key + collapse the panel.

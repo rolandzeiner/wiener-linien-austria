@@ -78,16 +78,22 @@ def _heuristic_mot(label: str) -> str | None:
       - digits + letter suffix (`7A`, `13A`) → city bus
       - everything else (digits-only, single letter, two-letter `WLB`) → tram
 
+    Wiener Linien data is always uppercase, but the heuristic normalises
+    via `.upper()` so every branch uses the same case-folding rule —
+    keeps the rule applicable to user input or future schema surprises
+    without one branch silently disagreeing with the others.
+
     Returns None only on empty input.
     """
     if not label:
         return None
-    head = label[0].upper()
-    if len(label) >= 2 and head == "U" and label[1].isdigit():
+    upper = label.upper()
+    head = upper[0]
+    if len(upper) >= 2 and head == "U" and upper[1].isdigit():
         return "ptMetro"
-    if len(label) >= 2 and head == "N" and label[1].isdigit():
+    if len(upper) >= 2 and head == "N" and upper[1].isdigit():
         return "ptBusNight"
-    if _LINE_BUS_DAY_RE.match(label):
+    if _LINE_BUS_DAY_RE.match(upper):
         return "ptBusCity"
     return "ptTram"
 
