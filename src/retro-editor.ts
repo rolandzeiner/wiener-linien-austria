@@ -27,10 +27,11 @@
 //   field explicitly so a future maintainer can't add a nested
 //   expandable by accident.
 
-import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
+import { LitElement, html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
+import { editorBaseStyles } from "./editor-shared-styles.js";
 import { translate } from "./localize/localize.js";
 import type {
   HaFormSchema,
@@ -364,73 +365,7 @@ export class WienerLinienAustriaRetroCardEditor
     `;
   }
 
-  static styles: CSSResultGroup = css`
-    :host {
-      display: block;
-    }
-    .editor {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .editor-section {
-      background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
-      border-radius: 12px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .section-header {
-      font-size: 0.6875rem;
-      font-weight: 600;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-      color: var(--secondary-text-color);
-    }
-    .editor-hint {
-      font-size: 0.75rem;
-      color: var(--secondary-text-color);
-      line-height: 1.4;
-    }
-    .walk-time-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .walk-time-row {
-      display: grid;
-      grid-template-columns: 44px 1fr 72px;
-      align-items: center;
-      gap: 8px;
-    }
-    .walk-time-badge {
-      text-align: center;
-      font-weight: 700;
-      color: #fff;
-      border-radius: 4px;
-      padding: 2px 4px;
-      font-size: 0.9em;
-      background: var(--primary-color);
-    }
-    .walk-time-towards {
-      font-size: 0.8125rem;
-      color: var(--primary-text-color);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .walk-time-input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 4px 8px;
-      border: 1px solid var(--divider-color);
-      border-radius: 4px;
-      background: var(--card-background-color, transparent);
-      color: var(--primary-text-color);
-      font-size: 0.8125rem;
-      text-align: right;
-    }
-  `;
+  // Retro editor needs only the shared base — no bespoke selectors
+  // beyond what editor-shared-styles already provides.
+  static styles: CSSResultGroup = [editorBaseStyles];
 }

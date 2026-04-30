@@ -29,15 +29,6 @@ export const DOMAIN = "wiener_linien_austria";
 export const NIGHTLINE_BG = "#1b1464";
 export const NIGHTLINE_FG = "#fef200";
 
-// MeansOfTransport values + icon mapping moved to ./utils/mot.ts —
-// single source of truth, no longer mirrored on three files.
-// Re-exported here so existing import paths continue to resolve, but
-// new code should import directly from ./utils/mot.js.
-export {
-  LINE_TYPE_BUS_DAY,
-  LINE_TYPE_BUS_NIGHT,
-  LINE_TYPE_METRO,
-  LINE_TYPE_TRAM,
-  headerIconForType,
-  lineTypeIcon,
-} from "./utils/mot.js";
+// MeansOfTransport values + icon mapping live in ./utils/mot.ts —
+// import them from there directly. Re-export shim removed in v1.4.0
+// (no in-tree callers remained).

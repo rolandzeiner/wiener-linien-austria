@@ -23,11 +23,3 @@ export function findWienerLinienEntities(hass: HomeAssistant | undefined): strin
   matches.sort();
   return matches;
 }
-
-// Pretty name for the picker — falls back to the entity id if no friendly
-// name / stop_name is present. Never throws.
-export function stopLabel(hass: HomeAssistant | undefined, entityId: string): string {
-  const state = hass?.states?.[entityId];
-  const attrs = (state?.attributes ?? {}) as WienerLinienAttrs;
-  return attrs.stop_name || attrs.friendly_name || entityId;
-}

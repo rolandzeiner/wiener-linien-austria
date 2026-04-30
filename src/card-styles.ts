@@ -327,83 +327,9 @@ export const cardStyles = css`
     --mdc-icon-size: 16px;
   }
 
-  /* Chips: tablet-style pill, tabular numerals so countdowns don't
-     jiggle. Default tint reads from --primary-color so neutral chips
-     stay calm; severity flags override per class. */
-  .chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
-    color: var(--primary-color);
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    forced-color-adjust: none;
-  }
-  .chip.muted {
-    background: color-mix(in srgb, var(--secondary-text-color) 14%, transparent);
-    color: var(--secondary-text-color);
-  }
-  .chip ha-icon {
-    --mdc-icon-size: 14px;
-  }
-
-  /* Status flag pills. Same shape as .chip but severity-tinted. */
-  .flag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    forced-color-adjust: none;
-  }
-  .flag.warning {
-    background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
-    color: var(--wl-warning);
-  }
-  .flag.error {
-    background: color-mix(in srgb, var(--wl-error) 16%, transparent);
-    color: var(--wl-error);
-  }
-  .flag ha-icon {
-    --mdc-icon-size: 14px;
-  }
-
-  /* Filled CTA — used by the version banner reload button. */
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: 32px;
-    padding: 0 14px;
-    border: none;
-    border-radius: 999px;
-    background: var(--wl-accent);
-    color: var(--text-primary-color, #fff);
-    font-family: inherit;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
-    transition: filter var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), transform 0.06s ease;
-    forced-color-adjust: none;
-  }
-  .btn-primary:hover {
-    filter: brightness(1.08);
-  }
-  .btn-primary:active {
-    transform: translateY(1px);
-  }
-  .btn-primary ha-icon {
-    --mdc-icon-size: 16px;
-  }
-
-  /* Version banner — accent surface that uses warning tokens. */
+  /* Version banner — accent surface that uses warning tokens. The
+     button is rendered bare by renderVersionBanner (shared-render.ts);
+     the .banner > button selector below tints it to match. */
   .banner {
     display: flex;
     align-items: center;
@@ -417,8 +343,26 @@ export const cardStyles = css`
   .banner > span {
     flex: 1;
   }
-  .banner .btn-primary {
+  .banner > button {
+    height: 32px;
+    padding: 0 14px;
+    border: none;
+    border-radius: 999px;
     background: var(--wl-warning);
+    color: var(--text-primary-color, #fff);
+    font-family: inherit;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
+    transition: filter var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), transform 0.06s ease;
+    forced-color-adjust: none;
+  }
+  .banner > button:hover {
+    filter: brightness(1.08);
+  }
+  .banner > button:active {
+    transform: translateY(1px);
   }
 
   /* Alerts: traffic + elevator items use the same expandable surface. */
@@ -955,16 +899,8 @@ export const cardStyles = css`
     outline-offset: 2px;
     border-radius: 6px;
   }
-  .btn-primary:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 3px;
-  }
-
   @media (forced-colors: active) {
     .icon-tile,
-    .chip,
-    .flag,
-    .btn-primary,
     .line-badge,
     .alert,
     .dep-row {

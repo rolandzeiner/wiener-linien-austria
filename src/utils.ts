@@ -24,34 +24,3 @@ export function safeHttpsUri(raw: unknown): string {
   if (typeof raw !== "string") return "";
   return /^https?:\/\//i.test(raw) ? raw : "";
 }
-
-/**
- * Format an ISO-8601 string OR a numeric epoch (seconds) as a relative
- * "n minutes ago" / "n hours ago" string. Returns null when the input
- * is unparseable. The Wiener Linien sensor surfaces ISO-8601 UTC; older
- * fixtures and YAML configs may still ship raw epoch seconds — accept
- * both shapes so a card-side bump doesn't gate on a coordinator update.
- *
- * `t` is the card's flat-key translate callback. Required keys:
- * `now`, `seconds_ago`, `minutes_ago`, `hours_ago`, each with `{n}`.
- */
-export function relativeTime(
-  ts: number | string | undefined | null,
-  t: (key: string) => string,
-): string | null {
-  let tsSeconds: number | null = null;
-  if (typeof ts === "number" && Number.isFinite(ts)) {
-    tsSeconds = ts;
-  } else if (typeof ts === "string" && ts.length > 0) {
-    const ms = Date.parse(ts);
-    if (Number.isFinite(ms)) tsSeconds = ms / 1000;
-  }
-  if (tsSeconds === null) return null;
-  const ageSec = Math.max(0, Math.floor(Date.now() / 1000 - tsSeconds));
-  if (ageSec < 10) return t("now");
-  if (ageSec < 60) return t("seconds_ago").replace("{n}", String(ageSec));
-  if (ageSec < 3600) {
-    return t("minutes_ago").replace("{n}", String(Math.floor(ageSec / 60)));
-  }
-  return t("hours_ago").replace("{n}", String(Math.floor(ageSec / 3600)));
-}
