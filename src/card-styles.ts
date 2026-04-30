@@ -596,6 +596,15 @@ export const cardStyles = css`
     gap: 8px;
     min-height: var(--stops-ahead-dot-size);
   }
+  /* Pointer cursor on intermediate stops the user can actually click —
+     the row gets role=button only when the stop has transfer-to-
+     other-lines (otherLines length above zero) and is therefore an
+     expand/collapse affordance for the +N transfer panel. Stops with
+     U-Bahn-only inline chips (no toggle) stay text-cursor since
+     there is nothing to click. */
+  .stops-ahead-row[role="button"] {
+    cursor: pointer;
+  }
   .stops-ahead-dot {
     position: absolute;
     left: 0;

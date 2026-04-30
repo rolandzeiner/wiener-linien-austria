@@ -238,10 +238,16 @@ export class WienerLinienAustriaRetroCardEditor
         schema: [
           { name: "show_station_name", selector: { boolean: {} } },
           {
+            // `mode: "list"` renders as radio buttons stacked vertically.
+            // Three short options earn the column readout (one tap to
+            // change vs a click-to-open dropdown). ha-selector-select
+            // forces `ha-formfield { display: flex }` internally so the
+            // options can't be made horizontal without piercing the
+            // shadow boundary — left as a column by design.
             name: "station_bg",
             selector: {
               select: {
-                mode: "dropdown",
+                mode: "list",
                 options: [
                   { value: "default", label: this._et("station_bg_default") },
                   { value: "white", label: this._et("station_bg_white") },
@@ -263,30 +269,45 @@ export class WienerLinienAustriaRetroCardEditor
           { name: "flicker", selector: { boolean: {} } },
           { name: "wheelchair_race", selector: { boolean: {} } },
           {
-            name: "size",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "small", label: this._et("size_small") },
-                  { value: "medium", label: this._et("size_medium") },
-                  { value: "regular", label: this._et("size_regular") },
-                ],
+            // `grid` lays its child fields out side-by-side in a
+            // two-column row — size + style are short enum-typed
+            // pickers with three options each, so the radio columns
+            // pack neatly next to each other instead of consuming
+            // double the vertical space stacked.
+            //
+            // `name: ""` is required by ha-form's grid schema shape
+            // (HaFormGridSchema in src/types.ts).
+            type: "grid",
+            name: "",
+            schema: [
+              {
+                // mode "list" → radio column. See station_bg above.
+                name: "size",
+                selector: {
+                  select: {
+                    mode: "list",
+                    options: [
+                      { value: "small", label: this._et("size_small") },
+                      { value: "medium", label: this._et("size_medium") },
+                      { value: "regular", label: this._et("size_regular") },
+                    ],
+                  },
+                },
               },
-            },
-          },
-          {
-            name: "style",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "classic", label: this._et("style_classic") },
-                  { value: "warm", label: this._et("style_warm") },
-                  { value: "pixel", label: this._et("style_pixel") },
-                ],
+              {
+                name: "style",
+                selector: {
+                  select: {
+                    mode: "list",
+                    options: [
+                      { value: "classic", label: this._et("style_classic") },
+                      { value: "warm", label: this._et("style_warm") },
+                      { value: "pixel", label: this._et("style_pixel") },
+                    ],
+                  },
+                },
               },
-            },
+            ],
           },
         ],
       },

@@ -58,6 +58,7 @@ import {
   pairsAtStop,
   tripletsAtStop,
 } from "./utils/departures.js";
+import { lineTypeIcon } from "./utils/mot.js";
 
 /** Local minimal `fireEvent` shim — `bubbles: true` + `composed: true`
  *  are required so the event crosses our shadow boundary and reaches
@@ -415,6 +416,15 @@ export class WienerLinienAustriaCardEditor
     const lines = [...new Set(
       (attrs.departures ?? []).map((d) => d.line).filter((l): l is string => !!l),
     )].sort();
+    // Per-line vehicle type lookup so each chip can render its MoT icon
+    // (mdi:subway-variant / mdi:tram / mdi:bus). First-seen-wins on
+    // collision because Wiener Linien lines have a stable single MoT.
+    const typeByLine = new Map<string, string>();
+    for (const d of attrs.departures ?? []) {
+      if (d.line && d.type && !typeByLine.has(d.line)) {
+        typeByLine.set(d.line, d.type);
+      }
+    }
     const picked = new Set(stop.lines ?? []);
     const dir = stop.direction ?? null;
     const lineDirs = stop.line_directions ?? {};
@@ -460,15 +470,18 @@ export class WienerLinienAustriaCardEditor
               ? lines.map((l) => {
                   const isOn = picked.size === 0 || picked.has(l);
                   const color = colorForLine(l, overrides, lineColors);
-                  const style = isOn
-                    ? { background: color, borderColor: color, color: "#fff" }
-                    : {};
+                  const icon = lineTypeIcon(typeByLine.get(l)) ?? "mdi:bus-stop";
                   return html`<button
                     type="button"
                     class=${classMap({ chip: true, selected: isOn })}
-                    style=${styleMap(style)}
+                    style=${styleMap({ "--chip-color": color })}
+                    aria-pressed=${isOn ? "true" : "false"}
+                    aria-label="${this._et("lines_label")}: ${l}"
                     @click=${() => this._toggleLine(stop.entity, l)}
-                  >${l}</button>`;
+                  >
+                    <ha-icon icon=${icon} aria-hidden="true"></ha-icon>
+                    <span>${l}</span>
+                  </button>`;
                 })
               : html`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
           </div>
@@ -746,23 +759,50 @@ export class WienerLinienAustriaCardEditor
       padding: 2px 6px;
       font-size: 0.8125rem;
     }
+    /* Line chip — outlined-by-default, filled-when-selected, with the
+       MoT icon beside the line label. Mirrors linz-linien's chip
+       pattern: --chip-color is set inline per line (GTFS palette →
+       colorForLine), the CSS does state via .selected + the
+       color-mix hover tint. */
     .chip {
+      --chip-color: var(--primary-color);
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      min-height: 36px;
-      padding: 6px 12px;
-      border-radius: 18px;
+      gap: 4px;
+      min-height: 32px;
+      padding: 4px 12px;
+      border-radius: 999px;
       font-size: 0.8125rem;
       font-weight: 600;
+      font-variant-numeric: tabular-nums;
       cursor: pointer;
-      transition: all 0.15s;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color, #fff);
+      transition:
+        background-color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease),
+        color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+      border: 1.5px solid var(--chip-color);
+      background: transparent;
       color: var(--primary-text-color);
+      forced-color-adjust: none;
+    }
+    .chip ha-icon {
+      --mdc-icon-size: 16px;
+      color: var(--chip-color);
+      flex-shrink: 0;
+      transition: color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
     }
     .chip:hover {
-      opacity: 0.85;
+      background: color-mix(in srgb, var(--chip-color) 16%, transparent);
+    }
+    .chip.selected {
+      background: var(--chip-color);
+      color: #fff;
+    }
+    .chip.selected ha-icon {
+      color: #fff;
+    }
+    .chip:focus-visible {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
     .direction-buttons {
       display: inline-flex;

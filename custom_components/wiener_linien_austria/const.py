@@ -30,9 +30,13 @@ CONF_RBLS: Final = "rbls"
 CONF_LINES: Final = "lines"  # selected {rbl}_{line}_{direction} ids
 CONF_SEARCH_QUERY: Final = "search_query"
 
-# Polling policy
-# Wiener Linien fair-use rule = 15s minimum. We enforce 30s as a hard floor
-# so two concurrent entries still leave headroom. Default is a comfortable 60s.
+# Polling policy.
+# The conventional minimum interval circulated for the Wiener Linien OGD
+# real-time endpoint is 15 s — the WL `open-data` page documents the
+# CC-BY licence and "no API key required" but does not currently publish
+# a numeric request-rate cap, so 15 s is convention rather than written
+# rule. We enforce 30 s as a hard floor (twice the conventional minimum)
+# so two concurrent entries still leave headroom. Default is 60 s.
 MIN_POLL_SECONDS: Final = 30
 DEFAULT_SCAN_INTERVAL: Final = 60  # seconds
 MAX_POLL_SECONDS: Final = 600
@@ -60,7 +64,7 @@ TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
 
 # Alerts (traffic disruptions + elevator outages) refresh cadence. Domain-wide,
 # shared across all entries. 5 min is plenty — these don't change any faster
-# than a few times an hour and fetching more often just eats the fair-use
+# than a few times an hour and fetching more often just eats the request
 # budget that belongs to live departure polling.
 ALERTS_REFRESH_SECONDS: Final = 300
 
@@ -96,7 +100,10 @@ ATTRIBUTION: Final = (
     "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 )
 
-# Error code 316 = rate limit exceeded per Wiener Linien fair-use.
+# Error code 316 = rate limit exceeded — observed empirically from the
+# OGD real-time endpoint when the conventional 15-second minimum
+# interval is breached (the public dataset page does not currently
+# publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
 # MeansOfTransport values → rough categorisation for UI icons

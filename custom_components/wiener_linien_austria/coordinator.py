@@ -127,8 +127,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             # hit 3-4× in quick succession. Even though the integration
             # already does conditional GET (ETag / If-Modified-Since),
             # collapsing redundant requests still saves CDN round-trips
-            # on 304 responses. Cooldown matches the existing fair-use
-            # floor — first call goes through, subsequent calls within
+            # on 304 responses. Cooldown matches the existing 15-second
+            # domain-wide floor — first call goes through, subsequent calls within
             # the window piggy-back on the scheduled refresh. immediate
             # =False so the FIRST call also waits for the debouncer
             # window to settle, important during config-flow setup

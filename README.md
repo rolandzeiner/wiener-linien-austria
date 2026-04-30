@@ -134,7 +134,9 @@ Four Wiener Linien OGD endpoints, on different cadences:
 | Static stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 
-All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — both within Wiener Linien's fair-use policy. Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the previously-parsed payload, halving steady-state bandwidth without changing freshness. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
+All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — both well below the conventional 15-second minimum interval circulated for the OGD real-time endpoint. Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the previously-parsed payload, halving steady-state bandwidth without changing freshness. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
+
+> **First five minutes after a Home Assistant restart**: the alerts feeds (`traffic_info` / `elevator_info`) refresh on a domain-wide 5-minute cadence, so they may be empty for up to 5 min after startup before the first refresh lands. Departures are unaffected — they fetch immediately on the per-entry cadence.
 
 **Failure handling.** A single failed poll keeps the user-configured cadence and serves the last successful board (templates can detect staleness via `server_time`). From the second consecutive failure, the interval doubles each tick, capped at 30 minutes, until the next successful fetch resets it. If the API responds with error code 316 (rate limit), a Repairs issue is raised and cleared automatically when the API recovers. Only a never-successful integration stays unavailable.
 
@@ -185,7 +187,7 @@ template:
 
 **"No stops match this search".** Try shorter/partial names (e.g. `Karls` matches Karlsplatz, Karlskirche, …). Search is case-insensitive but umlauts matter.
 
-**A Repairs issue "Wiener Linien rate limit hit" appeared.** The default 60 s interval is well within the fair-use policy, so this typically only happens when many HA instances behind the same outbound IP saturate the shared allowance. Raise the scan interval, reduce concurrent entries, or ignore — the integration recovers automatically.
+**A Repairs issue "Wiener Linien rate limit hit" appeared.** The default 60 s interval is well above the conventional 15-second minimum interval circulated for the OGD endpoint, so this typically only happens when many HA instances behind the same outbound IP saturate the shared allowance. Raise the scan interval, reduce concurrent entries, or ignore — the integration recovers automatically.
 
 **Bug reports.** Settings → Devices & Services → Wiener Linien Austria → ⋯ → Download diagnostics. The JSON includes attribution, RBL list, last error code, and coordinator timing. No personal data.
 
