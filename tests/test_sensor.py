@@ -296,7 +296,9 @@ async def test_attributes_line_colors_publishes_full_catalogue(hass: HomeAssista
     coordinator = _make_coordinator(hass, entry, data)
 
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN]["static_catalogue"] = StaticCatalogue(
+    from custom_components.wiener_linien_austria.static import CATALOGUE_KEY
+
+    hass.data[DOMAIN][CATALOGUE_KEY] = StaticCatalogue(
         stations_by_diva={},
         last_fetched="2026-04-30T12:00:00+00:00",
         trip_patterns=TripPatternIndex(

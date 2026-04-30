@@ -142,11 +142,13 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             ),
         )
 
-    async def async_setup(self) -> None:
+    async def _async_setup(self) -> None:
         """Load the cached static catalogue and pluck this stop's coords.
 
-        Failure is non-fatal — coords stay None and the sensor falls back to
-        a text-based Google Maps query instead of lat/lon. The catalogue is
+        Auto-called by `async_config_entry_first_refresh()` per HA core
+        contract — do NOT invoke from `async_setup_entry`. Failure is
+        non-fatal: coords stay None and the sensor falls back to a
+        text-based Google Maps query instead of lat/lon. The catalogue is
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
@@ -359,9 +361,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         useful for enrichment; the others fall through to None and
         the parser skips stops_ahead.
         """
-        from .static import StaticCatalogue  # noqa: PLC0415
+        from .static import CATALOGUE_KEY, StaticCatalogue  # noqa: PLC0415
         domain_data = self.hass.data.get(DOMAIN, {})
-        cached = domain_data.get("static_catalogue")
+        cached = domain_data.get(CATALOGUE_KEY)
         if isinstance(cached, StaticCatalogue):
             return cached
         return None

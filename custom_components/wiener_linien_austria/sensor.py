@@ -28,7 +28,7 @@ from .coordinator import (
     WienerLinienAustriaCoordinator,
     WienerLinienConfigEntry,
 )
-from .static import StaticCatalogue
+from .static import CATALOGUE_KEY, StaticCatalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ class WienerLinienStopSensor(
         own fallbacks (nightline rule + neutral default).
         """
         domain_data = self.coordinator.hass.data.get(DOMAIN, {})
-        catalogue = domain_data.get("static_catalogue")
+        catalogue = domain_data.get(CATALOGUE_KEY)
         if not isinstance(catalogue, StaticCatalogue):
             return {}
         index = catalogue.trip_patterns

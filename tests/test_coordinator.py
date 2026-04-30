@@ -687,7 +687,7 @@ async def test_async_setup_populates_coordinates(hass: HomeAssistant) -> None:
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    await coordinator.async_setup()
+    await coordinator._async_setup()
     # Sample catalogue in conftest carries Stephansplatz @ 48.2085, 16.3726.
     assert coordinator.latitude == 48.2085
     assert coordinator.longitude == 16.3726
@@ -706,7 +706,7 @@ async def test_async_setup_no_coords_when_catalogue_load_fails(
         new_callable=AsyncMock,
         side_effect=RuntimeError("upstream unreachable"),
     ):
-        await coordinator.async_setup()
+        await coordinator._async_setup()
 
     assert coordinator.latitude is None
     assert coordinator.longitude is None
@@ -719,7 +719,7 @@ async def test_async_setup_no_coords_when_diva_not_in_catalogue(
     entry = _make_entry({CONF_DIVA: 99999999})
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    await coordinator.async_setup()
+    await coordinator._async_setup()
     assert coordinator.latitude is None
     assert coordinator.longitude is None
 

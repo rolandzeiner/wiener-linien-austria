@@ -84,10 +84,13 @@ STORE_KEY = f"{DOMAIN}_static"
 
 # hass.data key for the shared catalogue (or in-flight load task). Holding it
 # in domain_data means a multi-entry user only pays the static-fetch cost
-# once per HA session — without this, each coordinator.async_setup
-# independently triggered _fetch_and_build, multiplying the bandwidth and
-# Wiener-Linien-Pi-stresses by N entries.
-_CATALOGUE_KEY = "static_catalogue"
+# once per HA session — without this, each coordinator setup independently
+# triggered _fetch_and_build, multiplying the bandwidth and Wiener-Linien
+# Pi stresses by N entries. Exported (no leading underscore) so coordinator,
+# sensor, and diagnostics consumers reference the same constant rather than
+# duplicating the bare string — a typo in any caller would silently break
+# the catalogue lookup on that one path only.
+CATALOGUE_KEY = "static_catalogue"
 
 
 @dataclass
@@ -206,7 +209,7 @@ async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     refresher and tests that exercise the load path directly.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
-    cached = domain_data.get(_CATALOGUE_KEY)
+    cached = domain_data.get(CATALOGUE_KEY)
     if isinstance(cached, StaticCatalogue):
         return cached
     if isinstance(cached, asyncio.Task):
@@ -217,14 +220,14 @@ async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     task: asyncio.Task[StaticCatalogue] = asyncio.create_task(
         async_load_catalogue(hass)
     )
-    domain_data[_CATALOGUE_KEY] = task
+    domain_data[CATALOGUE_KEY] = task
     try:
         catalogue = await task
     except BaseException:
         # Drop the failed task so the next caller retries from scratch.
-        domain_data.pop(_CATALOGUE_KEY, None)
+        domain_data.pop(CATALOGUE_KEY, None)
         raise
-    domain_data[_CATALOGUE_KEY] = catalogue
+    domain_data[CATALOGUE_KEY] = catalogue
     return catalogue
 
 
@@ -240,7 +243,7 @@ def async_set_cached_catalogue(
     invocation see the refreshed data.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
-    domain_data[_CATALOGUE_KEY] = catalogue
+    domain_data[CATALOGUE_KEY] = catalogue
 
 
 async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:

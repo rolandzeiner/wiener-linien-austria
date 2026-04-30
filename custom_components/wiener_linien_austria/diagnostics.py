@@ -65,8 +65,8 @@ async def async_get_config_entry_diagnostics(
     # session" not "is the data correct for stop X". Read the live
     # shared catalogue ref so a background refresh that hasn't been
     # picked up by the coordinator yet still reports as loaded.
-    from .static import StaticCatalogue  # noqa: PLC0415
-    cached = hass.data.get(DOMAIN, {}).get("static_catalogue")
+    from .static import CATALOGUE_KEY, StaticCatalogue  # noqa: PLC0415
+    cached = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
     trip_patterns = (
         cached.trip_patterns if isinstance(cached, StaticCatalogue) else None
     )

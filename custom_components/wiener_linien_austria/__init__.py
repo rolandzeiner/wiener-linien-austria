@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from pathlib import Path
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.components import websocket_api
-from homeassistant.components.http import StaticPathConfig
-from homeassistant.components.websocket_api import ActiveConnection  # type: ignore[attr-defined]
+from homeassistant.components.websocket_api import async_register_command
+from homeassistant.components.websocket_api.connection import ActiveConnection
+from homeassistant.components.websocket_api.decorators import (
+    async_response,
+    websocket_command,
+)
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import CoreState, Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
@@ -17,33 +19,23 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.event import async_track_time_interval
 
 from .alerts import async_refresh_alerts
+from .card_registration import JSModuleRegistration
 from .const import (
     ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_SECONDS,
     ALERTS_REFRESH_UNSUB_KEY,
-    CARD_URL,
     CARD_VERSION,
     CONF_LINES,
     DOMAIN,
     DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
-    RETRO_CARD_URL,
     RETRO_CARD_VERSION,
     STATIC_CACHE_REFRESH_HOURS,
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
 from .static import async_refresh_catalogue, async_set_cached_catalogue
-
-# Registered Lovelace cards shipped with this integration. Each tuple is
-# (lovelace-served URL, version string, on-disk filename in www/).
-# `_async_register_card` iterates over this list; adding a third card is
-# just an append here.
-_CARDS: tuple[tuple[str, str, str], ...] = (
-    (CARD_URL, CARD_VERSION, "wiener-linien-austria-card.js"),
-    (RETRO_CARD_URL, RETRO_CARD_VERSION, "wiener-linien-austria-retro-card.js"),
-)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -53,10 +45,10 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 STATIC_REFRESH_UNSUB_KEY = "static_refresh_unsub"
 
 
-@websocket_api.websocket_command(  # type: ignore[attr-defined]
+@websocket_command(
     {vol.Required("type"): "wiener_linien_austria/card_version"}
 )
-@websocket_api.async_response  # type: ignore[attr-defined]
+@async_response
 async def _websocket_card_version(
     hass: HomeAssistant,
     connection: ActiveConnection,
@@ -66,10 +58,10 @@ async def _websocket_card_version(
     connection.send_result(msg["id"], {"version": CARD_VERSION})
 
 
-@websocket_api.websocket_command(  # type: ignore[attr-defined]
+@websocket_command(
     {vol.Required("type"): "wiener_linien_austria/retro_card_version"}
 )
-@websocket_api.async_response  # type: ignore[attr-defined]
+@async_response
 async def _websocket_retro_card_version(
     hass: HomeAssistant,
     connection: ActiveConnection,
@@ -122,11 +114,17 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             cancel_on_shutdown=True,
         )
 
-    websocket_api.async_register_command(hass, _websocket_card_version)
-    websocket_api.async_register_command(hass, _websocket_retro_card_version)
+    # WS commands registered here survive integration removal — they're
+    # process-scoped, not entry-scoped, and HA core doesn't expose a
+    # deregister API. Re-registering on the next async_setup is harmless
+    # (the second registration replaces the first).
+    async_register_command(hass, _websocket_card_version)
+    async_register_command(hass, _websocket_retro_card_version)
+
+    registration = JSModuleRegistration(hass)
 
     async def _register_frontend(_event: Event | None = None) -> None:
-        await _async_register_cards(hass)
+        await registration.async_register()
 
     if hass.state == CoreState.running:
         await _register_frontend()
@@ -136,97 +134,19 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     return True
 
 
-async def _async_register_cards(hass: HomeAssistant) -> None:
-    """Register every bundled Lovelace card JS + its storage resource."""
-    for url, version, filename in _CARDS:
-        await _async_register_one_card(hass, url, version, filename)
-
-
-async def _async_register_one_card(
-    hass: HomeAssistant, url: str, version: str, filename: str
-) -> None:
-    """Serve one card JS and upsert its Lovelace resource with ?v=version."""
-    card_path = Path(__file__).parent / "www" / filename
-    if not card_path.is_file():
-        _LOGGER.warning("Card JS not found at %s", card_path)
-        return
-
-    try:
-        await hass.http.async_register_static_paths(
-            [StaticPathConfig(url, str(card_path), False)]
-        )
-    except Exception:  # noqa: BLE001
-        _LOGGER.debug("Static path already registered or unavailable: %s", url)
-
-    try:
-        lovelace = hass.data.get("lovelace")
-        if lovelace is None:
-            _LOGGER.debug(
-                "Lovelace not yet available in hass.data — resource URL not updated. "
-                "The WebSocket version check will notify the user if the card JS is stale."
-            )
-            return
-
-        # HA <2024.x exposed .mode directly; newer versions use LovelaceData
-        # where mode lives on .config. Fall back gracefully when neither exists.
-        mode = getattr(lovelace, "mode", None) or getattr(
-            getattr(lovelace, "config", None), "mode", None
-        )
-        if mode is not None and mode != "storage":
-            _LOGGER.debug(
-                "Lovelace is in %s mode — resource URL must be managed manually", mode
-            )
-            return
-
-        resources = getattr(lovelace, "resources", None)
-        if resources is None:
-            _LOGGER.debug("Lovelace resources not accessible on this HA version")
-            return
-        await resources.async_load()
-
-        versioned_url = f"{url}?v={version}"
-
-        for item in resources.async_items():
-            existing_base = item.get("url", "").split("?")[0]
-            if existing_base == url:
-                if item.get("url") == versioned_url:
-                    return  # already up to date
-                try:
-                    await resources.async_update_item(
-                        item["id"],
-                        {"res_type": "module", "url": versioned_url},
-                    )
-                except Exception as update_err:  # noqa: BLE001
-                    _LOGGER.debug(
-                        "async_update_item failed (%s), trying delete+recreate",
-                        update_err,
-                    )
-                    await resources.async_delete_item(item["id"])
-                    await resources.async_create_item(
-                        {"res_type": "module", "url": versioned_url}
-                    )
-                _LOGGER.info("Updated Lovelace resource to %s", versioned_url)
-                return
-
-        await resources.async_create_item(
-            {"res_type": "module", "url": versioned_url}
-        )
-        _LOGGER.info("Registered Lovelace resource %s", versioned_url)
-
-    except Exception:  # noqa: BLE001
-        _LOGGER.warning(
-            "Could not register Lovelace resource – add manually: "
-            "Settings → Dashboards → Resources → %s (JavaScript module)",
-            url,
-            exc_info=True,
-        )
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    await coordinator.async_setup()
+    # `_async_setup` is auto-called by `async_config_entry_first_refresh`
+    # (HA core contract) — do NOT invoke it explicitly here.
     await coordinator.async_config_entry_first_refresh()
+
+    # Register shutdown AFTER first_refresh succeeds so a half-initialised
+    # coordinator that raised ConfigEntryNotReady doesn't leak listeners.
+    # `async_shutdown` is the canonical DataUpdateCoordinator cleanup hook
+    # (HA 2024.4+) — cancels the interval timer + debouncer task so the
+    # next entry reload doesn't accrete listeners.
+    entry.async_on_unload(coordinator.async_shutdown)
 
     entry.runtime_data = coordinator
 
@@ -286,6 +206,26 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
         ):
             domain_data.pop(stale_key, None)
     return True
+
+
+async def async_remove_entry(
+    hass: HomeAssistant, entry: WienerLinienConfigEntry
+) -> None:
+    """Drop the Lovelace resources when the LAST config entry is removed.
+
+    Both card resources are registered once globally per integration, so
+    reloading or removing a single entry must not remove them. Only when
+    no other entries of this domain remain do we unregister.
+    """
+    remaining = [
+        e
+        for e in hass.config_entries.async_entries(DOMAIN)
+        if e.entry_id != entry.entry_id
+    ]
+    if remaining:
+        return
+    registration = JSModuleRegistration(hass)
+    await registration.async_unregister()
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
