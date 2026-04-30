@@ -14,6 +14,11 @@ import {
   LINE_TYPE_TRAM,
 } from "./const.js";
 import { translate } from "./localize/localize.js";
+import {
+  checkCardVersionWS,
+  renderVersionBanner,
+} from "./shared-render.js";
+import { safeHttpsUri } from "./utils.js";
 import type {
   DepartureAttr,
   ElevatorInfoAttr,
@@ -271,16 +276,11 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    try {
-      const result = (await this.hass!.callWS({
-        type: "wiener_linien_austria/card_version",
-      })) as { version?: string } | undefined;
-      if (result?.version && result.version !== CARD_VERSION) {
-        this._versionMismatch = result.version;
-      }
-    } catch {
-      // backend may not yet support the command (older integration version)
-    }
+    this._versionMismatch = await checkCardVersionWS(
+      this.hass,
+      "wiener_linien_austria/card_version",
+      CARD_VERSION,
+    );
   }
 
   // ------------------------------------------------------------------
@@ -326,7 +326,7 @@ export class WienerLinienAustriaCard extends LitElement {
       <ha-card>
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
-          ${this._versionMismatch ? this._renderBanner() : nothing}
+          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
           ${cfg.show_traffic_info ? this._renderTrafficBanner(stops) : nothing}
           ${this._renderBody(stops, useTabs)}
           ${this._renderFooter(attribution)}
@@ -1197,37 +1197,21 @@ export class WienerLinienAustriaCard extends LitElement {
     lat: number | null | undefined,
     lon: number | null | undefined,
   ): string | null {
+    // Always pass the URL through `safeHttpsUri` — the URL is built from
+    // hardcoded `https://` literals today, but the trust-boundary gate
+    // guards against a future contributor swapping in an upstream-supplied
+    // URL field without remembering to validate it.
+    let url: string | null = null;
     if (typeof lat === "number" && typeof lon === "number") {
-      return `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+      url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+    } else if (stopName) {
+      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stopName}, Wien`)}`;
     }
-    if (!stopName) return null;
-    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stopName}, Wien`)}`;
+    return url ? safeHttpsUri(url) || null : null;
   }
 
-  private _renderBanner(): TemplateResult {
-    const msg = this._t("version_update", { v: this._versionMismatch ?? "" });
-    return html`
-      <div class="banner" role="alert">
-        <span>${msg}</span>
-        <button type="button" class="btn-primary" @click=${this._reload}>
-          <ha-icon icon="mdi:refresh" aria-hidden="true"></ha-icon>
-          ${this._t("version_reload")}
-        </button>
-      </div>
-    `;
-  }
-
-  private async _reload(): Promise<void> {
-    try {
-      if (window.caches?.keys) {
-        const keys = await window.caches.keys();
-        await Promise.all(keys.map((k) => window.caches.delete(k)));
-      }
-    } catch {
-      // best-effort cache wipe
-    }
-    window.location.reload();
-  }
+  // Banner is rendered via the shared `renderVersionBanner` helper —
+  // see shared-render.ts. Cache-wipe + reload also lives there.
 
   // ------------------------------------------------------------------
   // Dev-mode panel — only visible on rpi25 or with ?wl_debug=1

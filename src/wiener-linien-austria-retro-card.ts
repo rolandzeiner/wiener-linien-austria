@@ -7,6 +7,10 @@ import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
 import { LINE_TYPE_METRO, RETRO_CARD_VERSION } from "./const.js";
 import { translate } from "./localize/localize.js";
+import {
+  checkCardVersionWS,
+  renderVersionBanner,
+} from "./shared-render.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
@@ -274,16 +278,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    try {
-      const result = (await this.hass!.callWS({
-        type: "wiener_linien_austria/retro_card_version",
-      })) as { version?: string } | undefined;
-      if (result?.version && result.version !== RETRO_CARD_VERSION) {
-        this._versionMismatch = result.version;
-      }
-    } catch {
-      // backend may be older; ignore
-    }
+    this._versionMismatch = await checkCardVersionWS(
+      this.hass,
+      "wiener_linien_austria/retro_card_version",
+      RETRO_CARD_VERSION,
+    );
   }
 
   private _resolveEntity(): string | null {
@@ -738,7 +737,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         <div
           class=${classMap(retroClasses)}
           @click=${this._handleCardClick}>
-          ${this._versionMismatch ? this._renderBanner() : nothing}
+          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
@@ -902,27 +901,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     `;
   }
 
-  private _renderBanner(): TemplateResult {
-    const msg = this._t("version_update", { v: this._versionMismatch ?? "" });
-    return html`
-      <div class="retro-banner">
-        <span>${msg}</span>
-        <button type="button" @click=${this._reload}>${this._t("version_reload")}</button>
-      </div>
-    `;
-  }
-
-  private async _reload(): Promise<void> {
-    try {
-      if (window.caches?.keys) {
-        const keys = await window.caches.keys();
-        await Promise.all(keys.map((k) => window.caches.delete(k)));
-      }
-    } catch {
-      // best-effort
-    }
-    window.location.reload();
-  }
+  // Banner is rendered via the shared `renderVersionBanner` helper —
+  // see shared-render.ts. Cache-wipe + reload also lives there.
 
   // ------------------------------------------------------------------
   // Styles — ported verbatim from the vanilla RETRO_STYLE
