@@ -104,17 +104,19 @@ export function collectLinesInSelection(
 }
 
 export interface ModernStopFilter {
-  lines?: string[];
-  direction?: "H" | "R";
+  // `?: T | undefined` — see NormalisedRetroConfigValidated comment for
+  // the dual-form rationale under exactOptionalPropertyTypes.
+  lines?: string[] | undefined;
+  direction?: "H" | "R" | undefined;
   // Per-line direction override. Takes precedence over `direction`.
   // Absence of an entry for a line falls back to `direction`, then to
   // "no direction filter" if `direction` is also unset.
-  line_directions?: Record<string, "H" | "R">;
-  walk_times?: WalkTimes;
+  line_directions?: Record<string, "H" | "R"> | undefined;
+  walk_times?: WalkTimes | undefined;
   // When true, drop any departure whose `barrier_free` flag isn't set —
   // wheelchair-only view. Card-wide on the modern card, card-wide on
   // retro; both pass it through this filter.
-  accessibility_only?: boolean;
+  accessibility_only?: boolean | undefined;
 }
 
 // Apply line/direction/walk-time filters to a departure list, preserving

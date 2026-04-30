@@ -427,8 +427,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       ".retro-row .retro-wheelchair",
     );
     if (!wheels || wheels.length < 2) return null;
-    const aRect = wheels[0].getBoundingClientRect();
-    const bRect = wheels[1].getBoundingClientRect();
+    const wheelA = wheels[0];
+    const wheelB = wheels[1];
+    if (!wheelA || !wheelB) return null;  // length-guard above; satisfies noUncheckedIndexedAccess
+    const aRect = wheelA.getBoundingClientRect();
+    const bRect = wheelB.getBoundingClientRect();
     const aLeft = aRect.left - cardRect.left;
     const bLeft = bRect.left - cardRect.left;
     const stripWidthPx = this._config?.size === "small" ? 10 : 14;

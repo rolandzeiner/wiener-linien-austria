@@ -205,9 +205,13 @@ export interface NormalisedRetroConfigValidated {
   // See NormalisedModernConfig.type — HA requires `type` on every config
   // in the `config-changed` payload or it flags "Kein Typ angegeben".
   type: string;
-  entity: string | undefined;
+  // `?: T | undefined` is the dual form that lets callers EITHER omit the
+  // key (e.g. `delete next.line`) OR assign `undefined` explicitly. The
+  // bare `?:` form alone would reject explicit `undefined` under
+  // `exactOptionalPropertyTypes`, so we widen with the union.
+  entity?: string | undefined;
   direction: "H" | "R";
-  line?: string;
+  line?: string | undefined;
   show_platform: boolean;
   show_station_name: boolean;
   station_bg: RetroStationBg;
@@ -216,7 +220,7 @@ export interface NormalisedRetroConfigValidated {
   flicker: boolean;
   wheelchair_race: boolean;
   accessibility_only: boolean;
-  walk_times?: WalkTimes;
+  walk_times?: WalkTimes | undefined;
 }
 
 // See NormalisedModernConfig — same passthrough rule for dashboard
