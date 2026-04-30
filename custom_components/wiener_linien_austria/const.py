@@ -78,6 +78,11 @@ STATIC_FILES: Final = {
     "fahrwegverlaeufe": (
         f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-fahrwegverlaeufe.csv"
     ),
+    # GTFS routes.txt — authoritative `route_color` + `route_text_color`
+    # per line label. Roughly 8 KB on the wire (gzipped). Keeps the card's
+    # default palette in sync with whatever Wiener Linien publishes
+    # (e.g. the U5 launch will rev every metro colour at once).
+    "routes": f"{API_BASE_URL}/doku/ogd/gtfs/routes.txt",
 }
 
 # Response attribution (CC-BY mandated)

@@ -12,24 +12,20 @@ export const RETRO_CARD_VERSION = "1.3.0";
 
 export const DOMAIN = "wiener_linien_austria";
 
-// Wiener Linien corporate-identity metro colours. Authoritative — don't
-// substitute "close enough" CSS-named colours. Non-metro lines stay neutral
-// until the user supplies overrides via `line_colors`.
-export const METRO_COLORS: Record<string, string> = {
-  U1: "#E3000F",
-  U2: "#A862A4",
-  U3: "#EF7C00",
-  U4: "#00963F",
-  U5: "#008F95",
-  U6: "#9D6830",
-};
-
-// Default background and foreground for nightline (N-prefix) chips.
-// Wiener Linien branding on actual signage pairs the navy with bright
-// yellow numerals, which also reads better against the deep navy than
-// the default white text. User-supplied `line_colors` overrides win on
-// the background; the foreground is currently fixed (no per-line
-// text-colour override surface yet).
+// Per-line palette is sourced from the integration's GTFS-backed
+// `line_colors` sensor attribute (Wiener Linien `routes.txt`). The
+// hardcoded `METRO_COLORS` map this file used to carry was removed once
+// the static catalogue gained colours — keeping a stale copy in the
+// bundle would silently diverge from upstream after every WL palette
+// change (e.g. the U5 launch).
+//
+// Nightlines (N-prefix bus) are a deliberate exception: GTFS treats them
+// as regular buses (navy on white), but Wiener Linien's signage convention
+// pairs a deeper navy with bright yellow numerals — much higher contrast
+// at chip size on dark dashboards. We keep the rule here as a category
+// override, applied only when the user hasn't set a `line_colors` value
+// for that specific line. NIGHTLINE_FG is fixed (no per-line text-colour
+// override surface yet).
 export const NIGHTLINE_BG = "#1b1464";
 export const NIGHTLINE_FG = "#fef200";
 

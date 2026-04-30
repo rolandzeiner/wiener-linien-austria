@@ -12,18 +12,18 @@ import {
   LINE_TYPE_BUS_NIGHT,
   LINE_TYPE_METRO,
   LINE_TYPE_TRAM,
-  NIGHTLINE_BG,
-  NIGHTLINE_FG,
 } from "./const.js";
 import { translate } from "./localize/localize.js";
 import type {
   DepartureAttr,
   ElevatorInfoAttr,
+  LineColorsMap,
   TrafficInfoAttr,
   WienerLinienAttrs,
   WienerLinienCardConfig,
 } from "./types.js";
 import {
+  chipPalette,
   colorForLine,
   normaliseModernConfig,
   type NormalisedModernConfig,
@@ -96,21 +96,38 @@ function platformLabelKey(type: string | undefined): string {
   return "platform_short_bus";
 }
 
-// Returns inline-style values for a line chip. Default white-on-coloured
-// keeps day-line chips readable. Nightlines that fall through to the
-// default NIGHTLINE_BG navy use the WL signage yellow as foreground —
-// white-on-navy is hard to read at chip size. Skipped when the user
-// has overridden the bg via line_colors (we don't know what reads well
-// on their custom colour, so we leave the default white).
-function chipColors(
-  line: string,
-  overrides: Record<string, string>,
-): { background: string; color?: string } {
-  const background = colorForLine(line, overrides);
-  if (background === NIGHTLINE_BG) {
-    return { background, color: NIGHTLINE_FG };
+// Reads the GTFS-derived per-line palette from a stop sensor. The
+// integration publishes the full Wiener Linien catalogue (~150 lines)
+// on every sensor — same data on each — so any one entity is sufficient
+// to look up colours for transfer chips of OTHER lines too. Returns
+// `{}` when the catalogue hasn't loaded yet; the card helpers
+// (chipPalette, colorForLine) handle empty maps as "fall through to the
+// nightline rule / fallback".
+function lineColorsFor(
+  hass: HomeAssistant | undefined,
+  entityId: string | undefined,
+): LineColorsMap {
+  if (!hass || !entityId) return {};
+  const attrs = hass.states[entityId]?.attributes as
+    | WienerLinienAttrs
+    | undefined;
+  return attrs?.line_colors ?? {};
+}
+
+// First non-empty line_colors map across the configured entities. Used
+// by render paths that aren't scoped to one stop (the traffic banner
+// aggregates alerts from every entity). Picks the first hit because
+// every sensor publishes the same GTFS catalogue.
+function anyLineColors(
+  hass: HomeAssistant | undefined,
+  config: NormalisedModernConfig | undefined,
+): LineColorsMap {
+  if (!hass || !config) return {};
+  for (const stop of config.entities) {
+    const colors = lineColorsFor(hass, stop.entity);
+    if (Object.keys(colors).length) return colors;
   }
-  return { background };
+  return {};
 }
 
 @customElement("wiener-linien-austria-card")
@@ -445,8 +462,9 @@ export class WienerLinienAustriaCard extends LitElement {
     const remaining = filtered.filter((d) => !heroDedupe.has(d));
     const rows = remaining.slice(0, this._config!.max_departures);
 
+    const lineColors = lineColorsFor(this.hass, stopCfg.entity);
     const accent = heroLead
-      ? colorForLine(heroLead.line || "", this._config!.line_colors)
+      ? colorForLine(heroLead.line || "", this._config!.line_colors, lineColors)
       : "var(--primary-color)";
     const headerIcon = headerIconForType(heroLead?.type);
 
@@ -628,6 +646,10 @@ export class WienerLinienAustriaCard extends LitElement {
 
   private _renderTrafficItem(t: TrafficInfoAttr): TemplateResult {
     const overrides = this._config!.line_colors;
+    // Traffic items aren't scoped to a single stop — pick the first
+    // entity's palette (every sensor publishes the same GTFS catalogue,
+    // so any one of them resolves any line that might appear here).
+    const lineColors = anyLineColors(this.hass, this._config);
     const lines = Array.isArray(t.related_lines) ? t.related_lines : [];
     const descHtml = t.description_html
       ? safeTrafficHtml(t.description_html)
@@ -668,7 +690,7 @@ export class WienerLinienAustriaCard extends LitElement {
                   ${lines.map(
                     (l) => html`<span
                       class="alert-line-badge"
-                      style=${styleMap(chipColors(l, overrides))}
+                      style=${styleMap(chipPalette(l, overrides, lineColors))}
                     >${l}</span>`,
                   )}
                 </div>`
@@ -748,7 +770,11 @@ export class WienerLinienAustriaCard extends LitElement {
    */
   private _renderHeroEntry(d: DepartureAttr, entityId: string): TemplateResult {
     const accentLine = d.line || "";
-    const accentStyle = chipColors(accentLine, this._config!.line_colors);
+    const accentStyle = chipPalette(
+      accentLine,
+      this._config!.line_colors,
+      lineColorsFor(this.hass, entityId),
+    );
     const platform =
       this._config!.show_platform && d.platform ? String(d.platform) : null;
     const isBarrierFree =
@@ -838,6 +864,7 @@ export class WienerLinienAustriaCard extends LitElement {
       expanded,
       line,
       rowKey,
+      entityId,
     );
   }
 
@@ -847,8 +874,10 @@ export class WienerLinienAustriaCard extends LitElement {
     expanded: boolean,
     currentLine: string,
     rowKey: string,
+    entityId: string,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
+    const lineColors = lineColorsFor(this.hass, entityId);
     return html`
       <div
         class=${classMap({ "hero-detail": true, expanded })}
@@ -859,9 +888,9 @@ export class WienerLinienAustriaCard extends LitElement {
         <div class="hero-detail-inner">
           <ol
             class="stops-ahead"
-            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides) })}
+            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides, lineColors) })}
           >
-            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides))}
+            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides, lineColors))}
           </ol>
         </div>
       </div>
@@ -873,8 +902,9 @@ export class WienerLinienAustriaCard extends LitElement {
     entityId: string,
   ): TemplateResult | TemplateResult[] {
     const overrides = this._config!.line_colors;
+    const lineColors = lineColorsFor(this.hass, entityId);
     const line = d.line || "?";
-    const badgeStyle = chipColors(line, overrides);
+    const badgeStyle = chipPalette(line, overrides, lineColors);
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const cdLabel = cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
 
@@ -998,7 +1028,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     return [
       rowTpl,
-      this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded, line, rowKey),
+      this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded, line, rowKey, entityId),
     ];
   }
 
@@ -1008,8 +1038,10 @@ export class WienerLinienAustriaCard extends LitElement {
     expanded: boolean,
     currentLine: string,
     rowKey: string,
+    entityId: string,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
+    const lineColors = lineColorsFor(this.hass, entityId);
     return html`
       <li
         class=${classMap({ "dep-row-detail": true, expanded })}
@@ -1020,9 +1052,9 @@ export class WienerLinienAustriaCard extends LitElement {
         <div class="dep-row-detail-inner">
           <ol
             class="stops-ahead"
-            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides) })}
+            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides, lineColors) })}
           >
-            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides))}
+            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides, lineColors))}
           </ol>
         </div>
       </li>
@@ -1034,6 +1066,7 @@ export class WienerLinienAustriaCard extends LitElement {
     idx: number,
     rowKey: string,
     overrides: Record<string, string>,
+    lineColors: LineColorsMap,
   ): TemplateResult {
     // Inline lines (always shown next to the station name): U-Bahn at
     // any time, plus night lines (N-prefix + digit) WHEN they're
@@ -1066,7 +1099,7 @@ export class WienerLinienAustriaCard extends LitElement {
           ${inlineLines.map(
             (line) => html`<span
               class="stops-ahead-line-chip"
-              style=${styleMap(chipColors(line, overrides))}
+              style=${styleMap(chipPalette(line, overrides, lineColors))}
               >${line}</span
             >`,
           )}
@@ -1104,7 +1137,7 @@ export class WienerLinienAustriaCard extends LitElement {
             ${otherLines.map(
               (line) => html`<span
                 class="stops-ahead-line-chip stops-ahead-line-chip--other"
-                style=${styleMap(chipColors(line, overrides))}
+                style=${styleMap(chipPalette(line, overrides, lineColors))}
                 >${line}</span
               >`,
             )}

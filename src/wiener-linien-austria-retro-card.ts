@@ -5,7 +5,7 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
-import { LINE_TYPE_METRO, METRO_COLORS, RETRO_CARD_VERSION } from "./const.js";
+import { LINE_TYPE_METRO, RETRO_CARD_VERSION } from "./const.js";
 import { translate } from "./localize/localize.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
@@ -700,7 +700,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const stopName = attrs.stop_name || attrs.friendly_name || "";
     const showStationName = cfg.show_station_name && !!stopName;
     const stationPanel = showStationName
-      ? this._renderStationName(stopName, matching, departures, cfg.station_bg)
+      ? this._renderStationName(
+          stopName,
+          matching,
+          departures,
+          cfg.station_bg,
+          attrs.line_colors ?? {},
+        )
       : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
@@ -858,6 +864,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     matching: DepartureAttr[],
     allDepartures: DepartureAttr[],
     bgChoice: "default" | "white" | "black",
+    lineColors: NonNullable<WienerLinienAttrs["line_colors"]>,
   ): TemplateResult {
     const pool = matching.length ? matching : allDepartures;
     const metroDep = pool.find((d) => d.type === LINE_TYPE_METRO);
@@ -872,8 +879,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       bg = "#000";
       fg = "#fff";
     } else if (metroLine) {
-      bg = METRO_COLORS[metroLine.toUpperCase()] ?? "var(--primary-color)";
-      fg = "#fff";
+      // Pull the GTFS-published colour for the soonest metro line at this
+      // stop. The retro panel doesn't honour user `line_colors` overrides
+      // here — the station tile follows upstream branding by design,
+      // matching the in-station signage aesthetic the card emulates.
+      const upper = metroLine.toUpperCase();
+      const palette = lineColors[metroLine] ?? lineColors[upper];
+      bg = palette?.bg ? `#${palette.bg}` : "var(--primary-color)";
+      fg = palette?.fg ? `#${palette.fg}` : "#fff";
     } else {
       bg = "#fff";
       fg = "#000";

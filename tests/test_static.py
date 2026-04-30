@@ -19,6 +19,7 @@ from custom_components.wiener_linien_austria.static import (
     _catalogue_to_store,
     _merge_haltepunkte,
     _parse_haltestellen,
+    _parse_route_colors,
     _parse_trip_patterns,
     async_load_catalogue,
     async_refresh_catalogue,
@@ -87,11 +88,20 @@ def _build_sample_index() -> TripPatternIndex:
     Stations are derived from HALTESTELLEN_CSV + HALTEPUNKTE_CSV so the
     parser populates `lines_at_diva` — without it the auto-refresh check
     in async_load_catalogue would treat the cache as stale and trigger
-    an unwanted refresh during cache-hit tests.
+    an unwanted refresh during cache-hit tests. Colours are attached so
+    the same check doesn't trip on `colors_by_line` being empty either.
     """
     stations = _parse_haltestellen(HALTESTELLEN_CSV)
     _merge_haltepunkte(stations, HALTEPUNKTE_CSV)
-    return _parse_trip_patterns(LINIEN_CSV, FAHR_CSV, stations)
+    index = _parse_trip_patterns(LINIEN_CSV, FAHR_CSV, stations)
+    return TripPatternIndex(
+        patterns_by_line=index.patterns_by_line,
+        lines_by_label=index.lines_by_label,
+        means_by_line=index.means_by_line,
+        lines_at_diva=index.lines_at_diva,
+        colors_by_line={"U1": "E3000F", "71": "C00808"},
+        text_colors_by_line={"U1": "FFFFFF", "71": "FFFFFF"},
+    )
 
 
 def test_parse_haltestellen() -> None:
@@ -281,10 +291,17 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     haltepunkte_resp = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v1"')
     linien_resp = _csv_response(LINIEN_CSV, etag='"linien-v1"')
     fahr_resp = _csv_response(FAHR_CSV, etag='"fahr-v1"')
+    routes_resp = _csv_response(ROUTES_CSV, etag='"routes-v1"')
 
     fake_session = MagicMock()
     fake_session.get = AsyncMock(
-        side_effect=[haltestellen_resp, haltepunkte_resp, linien_resp, fahr_resp]
+        side_effect=[
+            haltestellen_resp,
+            haltepunkte_resp,
+            linien_resp,
+            fahr_resp,
+            routes_resp,
+        ]
     )
 
     with patch(
@@ -300,9 +317,12 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     assert catalogue.validators["haltepunkte"].etag == '"punkte-v1"'
     assert catalogue.validators["linien"].etag == '"linien-v1"'
     assert catalogue.validators["fahrwegverlaeufe"].etag == '"fahr-v1"'
-    # Trip-pattern index built from the fresh linien + fahrwegverlaeufe.
+    assert catalogue.validators["routes"].etag == '"routes-v1"'
+    # Trip-pattern index built from the fresh linien + fahrwegverlaeufe,
+    # enriched with the GTFS route colours from the fresh routes payload.
     assert catalogue.trip_patterns is not None
     assert catalogue.trip_patterns.lines_by_label["U1"] == 301
+    assert catalogue.trip_patterns.colors_by_line["U1"] == "E3000F"
 
 
 async def test_fetch_and_build_all_304_returns_prior_unchanged(
@@ -318,6 +338,7 @@ async def test_fetch_and_build_all_304_returns_prior_unchanged(
         "haltepunkte": CacheValidators(etag='"punkte-v1"'),
         "linien": CacheValidators(etag='"linien-v1"'),
         "fahrwegverlaeufe": CacheValidators(etag='"fahr-v1"'),
+        "routes": CacheValidators(etag='"routes-v1"'),
     }
     prior.trip_patterns = _build_sample_index()
 
@@ -333,7 +354,13 @@ async def test_fetch_and_build_all_304_returns_prior_unchanged(
 
     fake_session = MagicMock()
     fake_session.get = AsyncMock(
-        side_effect=[_not_modified(), _not_modified(), _not_modified(), _not_modified()]
+        side_effect=[
+            _not_modified(),
+            _not_modified(),
+            _not_modified(),
+            _not_modified(),
+            _not_modified(),
+        ]
     )
 
     with patch(
@@ -372,6 +399,7 @@ async def test_fetch_and_build_one_304_one_fresh(
             "haltepunkte": CacheValidators(etag='"punkte-v1"'),
             "linien": CacheValidators(etag='"linien-v1"'),
             "fahrwegverlaeufe": CacheValidators(etag='"fahr-v1"'),
+            "routes": CacheValidators(etag='"routes-v1"'),
         },
         trip_patterns=_build_sample_index(),
     )
@@ -387,7 +415,9 @@ async def test_fetch_and_build_one_304_one_fresh(
     punkte_fresh = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v2"')
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=[_304(), punkte_fresh, _304(), _304()])
+    fake_session.get = AsyncMock(
+        side_effect=[_304(), punkte_fresh, _304(), _304(), _304()]
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_clientsession",
@@ -464,6 +494,87 @@ def test_parse_trip_patterns_orders_stops_by_seq_count() -> None:
     # H pattern: Reumannplatz(0) → Stephansplatz(1) → Praterstern(3) → Leopoldau(4)
     assert h_pattern.stops == (4001, 4111, 4222, 4333)
     assert h_pattern.direction == 1
+
+
+# Real-shape sample of GTFS routes.txt: header includes a UTF-8 BOM as the
+# upstream feed actually serves. Covers: U-Bahn (own colour, agency 04),
+# tram (shared red, agency 04), bus (shared navy, agency 04), an SEV row
+# with empty colour (must be skipped, not crash), a WLB row claiming a
+# label that Wiener Linien also claims (agency 04 must win), and a row
+# with a malformed colour (must be skipped silently).
+ROUTES_CSV = (
+    "﻿route_id,agency_id,route_short_name,route_long_name,"
+    "route_type,route_color,route_text_color\n"
+    "21-U1-j26-1,04,U1,Oberlaa - Leopoldau,1,E3000F,FFFFFF\n"
+    "22-71-j26-1,04,71,Kaiserebersdorf - Schwarzenbergplatz,0,C00808,FFFFFF\n"
+    "23-13A-j26-1,04,13A,Skodagasse - Hauptbahnhof,3,0A295D,FFFFFF\n"
+    "11-SEV-1-j26-1,03,SEV BB,Vösendorf - Wiener Neudorf,3,,\n"
+    # WLB also publishes a "13A" — Wiener Linien's claim must win.
+    "11-13A-WLB,03,13A,WLB ghost,3,000000,FFFFFF\n"
+    # Malformed: colour too short. Skipped, doesn't break the rest.
+    "22-99-j26-1,04,99,Bad row,0,ABC,FFFFFF\n"
+)
+
+
+def test_parse_route_colors_keeps_only_valid_rows() -> None:
+    """SEV (empty colour) and malformed rows are skipped; colours uppercased."""
+    bg, fg = _parse_route_colors(ROUTES_CSV)
+    assert bg == {
+        "U1": "E3000F",
+        "71": "C00808",
+        "13A": "0A295D",  # Wiener Linien wins over WLB's "000000"
+    }
+    assert fg == {"U1": "FFFFFF", "71": "FFFFFF", "13A": "FFFFFF"}
+    assert "99" not in bg  # malformed colour skipped
+    assert "SEV BB" not in bg  # empty colour skipped
+
+
+def test_parse_route_colors_wiener_linien_wins_on_label_collision() -> None:
+    """When agency 03 (WLB) and agency 04 (Wiener Linien) both publish a label,
+    the Wiener Linien row wins regardless of file order."""
+    csv_text = (
+        "route_id,agency_id,route_short_name,route_long_name,"
+        "route_type,route_color,route_text_color\n"
+        # WLB row appears FIRST in the file.
+        "11-13A-WLB,03,13A,WLB ghost,3,000000,FFFFFF\n"
+        # Wiener Linien row arrives later — should still win.
+        "23-13A-j26-1,04,13A,Skodagasse - Hauptbahnhof,3,0A295D,FFFFFF\n"
+    )
+    bg, _ = _parse_route_colors(csv_text)
+    assert bg["13A"] == "0A295D"
+
+
+def test_parse_route_colors_empty_text_color_omits_fg() -> None:
+    """A row with bg but blank text_color records bg only — no fg key."""
+    csv_text = (
+        "route_id,agency_id,route_short_name,route_long_name,"
+        "route_type,route_color,route_text_color\n"
+        "21-U1-j26-1,04,U1,Oberlaa - Leopoldau,1,E3000F,\n"
+    )
+    bg, fg = _parse_route_colors(csv_text)
+    assert bg == {"U1": "E3000F"}
+    assert fg == {}
+
+
+def test_trip_pattern_index_round_trips_colors_through_store() -> None:
+    """Colours survive a Store write/read cycle without loss."""
+    bg, fg = _parse_route_colors(ROUTES_CSV)
+    index = TripPatternIndex(
+        lines_by_label={"U1": 301},
+        means_by_line={301: "ptMetro"},
+        colors_by_line=bg,
+        text_colors_by_line=fg,
+    )
+    catalogue = StaticCatalogue(
+        stations_by_diva={},
+        last_fetched="2026-04-30T12:00:00+00:00",
+        trip_patterns=index,
+    )
+    payload = _catalogue_to_store(catalogue)
+    restored = _catalogue_from_store(payload)
+    assert restored.trip_patterns is not None
+    assert restored.trip_patterns.colors_by_line == bg
+    assert restored.trip_patterns.text_colors_by_line == fg
 
 
 def test_stops_ahead_for_match_returns_tail_after_current_rbl() -> None:

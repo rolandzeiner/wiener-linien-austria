@@ -72,6 +72,17 @@ export interface ElevatorInfoAttr {
   related_lines?: string[];
 }
 
+// GTFS-derived line palette: { "U1": { bg: "E3000F", fg: "FFFFFF" }, … }.
+// Hex is 6-digit uppercase WITHOUT a leading `#` (matches the `routes.txt`
+// payload — the card prepends `#` at use-site). `fg` is omitted when the
+// upstream `route_text_color` was blank for that line.
+export interface LineColorPair {
+  bg: string;
+  fg?: string;
+}
+
+export type LineColorsMap = Record<string, LineColorPair>;
+
 export interface WienerLinienAttrs {
   attribution?: string;
   stop_name?: string;
@@ -82,6 +93,9 @@ export interface WienerLinienAttrs {
   server_time?: string | null;
   departures?: DepartureAttr[];
   next_by_line?: Record<string, number>;
+  // GTFS-derived per-line colours, scoped to the lines at this stop.
+  // Empty when the static catalogue hasn't been loaded yet.
+  line_colors?: LineColorsMap;
   traffic_info?: TrafficInfoAttr[];
   elevator_info?: ElevatorInfoAttr[];
 }

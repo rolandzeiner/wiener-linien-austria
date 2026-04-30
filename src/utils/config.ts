@@ -1,5 +1,6 @@
-import { METRO_COLORS, NIGHTLINE_BG } from "../const.js";
+import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
 import type {
+  LineColorsMap,
   ModernStopConfig,
   RetroSize,
   RetroStationBg,
@@ -253,16 +254,56 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   };
 }
 
+// Resolves a line label to its background hex (`#…`). Precedence:
+//   1. user-config `line_colors` (per-line override)
+//   2. GTFS `routes.txt` from the integration's `line_colors` attribute
+//   3. nightline category rule (deeper navy than the GTFS bus navy —
+//      keeps the WL signage convention readable on dark dashboards)
+//   4. neutral fallback (`var(--primary-color)`)
+//
+// `overrides` keys are case-folded to uppercase to match the editor's
+// own normalisation; the GTFS map is keyed verbatim by line label and
+// is also probed both upper and as-given for robustness against any
+// future schema surprise.
 export function colorForLine(
   line: string,
   overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
   fallback = "var(--primary-color)",
 ): string {
   const upper = line.toUpperCase();
   if (overrides[upper] !== undefined) return overrides[upper];
-  if (METRO_COLORS[upper] !== undefined) return METRO_COLORS[upper];
+  const gtfs = gtfsColors[line] ?? gtfsColors[upper];
+  if (gtfs?.bg) return `#${gtfs.bg}`;
   // Nightlines (N + digit, e.g. N66, N25, N99) get the WL navy
-  // backgound by default; user overrides above still win.
+  // background by default; user overrides above still win.
   if (/^N\d/.test(upper)) return NIGHTLINE_BG;
   return fallback;
+}
+
+// Resolves the paired (background, foreground) palette for a line chip.
+// The fg rule is coupled to where the bg came from so the two never
+// drift: nightline-yellow text only pairs with the nightline navy bg,
+// GTFS fg only pairs with the matching GTFS bg, and a user override
+// leaves the fg unset (the card's CSS default — white — applies because
+// we don't know what reads well on the user's custom colour).
+export function chipPalette(
+  line: string,
+  overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
+): { background: string; color?: string } {
+  const upper = line.toUpperCase();
+  if (overrides[upper] !== undefined) {
+    return { background: overrides[upper] };
+  }
+  const gtfs = gtfsColors[line] ?? gtfsColors[upper];
+  if (gtfs?.bg) {
+    return gtfs.fg
+      ? { background: `#${gtfs.bg}`, color: `#${gtfs.fg}` }
+      : { background: `#${gtfs.bg}` };
+  }
+  if (/^N\d/.test(upper)) {
+    return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
+  }
+  return { background: "var(--primary-color)" };
 }

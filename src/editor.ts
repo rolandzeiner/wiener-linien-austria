@@ -233,6 +233,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     if (!attrs) return html``;
     const stopName = attrs.stop_name || stop.entity;
     const overrides = this._config!.line_colors;
+    const lineColors = attrs.line_colors ?? {};
     const lines = linesAtStop(attrs);
     const picked = new Set(stop.lines ?? []);
     const dir = stop.direction ?? null;
@@ -291,7 +292,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
             ${lines.length
               ? lines.map((l) => {
                   const isOn = picked.size === 0 || picked.has(l);
-                  const color = colorForLine(l, overrides);
+                  const color = colorForLine(l, overrides, lineColors);
                   const style = isOn
                     ? { background: color, borderColor: color, color: "#fff" }
                     : {};
@@ -340,7 +341,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
                 <div class="editor-hint">${this._et("per_line_direction_hint")}</div>
                 <div class="per-line-dir-list">
                   ${effectiveLines.map((l) => {
-                    const color = colorForLine(l, overrides);
+                    const color = colorForLine(l, overrides, lineColors);
                     const lineDir = lineDirs[l] ?? null;
                     const lineAvail = dirsForLine(l);
                     const lineHasH = lineAvail.has("H");
@@ -409,7 +410,7 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
               <div class="editor-hint">${this._et("walk_time_hint")}</div>
               <div class="walk-time-list">
                 ${pairs.map((p) => {
-                  const color = colorForLine(p.line, overrides);
+                  const color = colorForLine(p.line, overrides, lineColors);
                   const key = lineDirKey(p.line, p.direction);
                   const val = stop.walk_times?.[key];
                   const terminusLabel = p.termini.join(" / ");
@@ -526,13 +527,24 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     const cfg = this._config!;
     const lines = collectLinesInSelection(this.hass, cfg.entities.map((s) => s.entity));
     const overrides = cfg.line_colors;
+    // Every sensor publishes the same GTFS palette; pick the first non-empty
+    // map across configured entities so the swatches preview the upstream
+    // default rather than the neutral fallback.
+    let lineColors: NonNullable<WienerLinienAttrs["line_colors"]> = {};
+    for (const stop of cfg.entities) {
+      const attrs = this.hass?.states?.[stop.entity]?.attributes as WienerLinienAttrs | undefined;
+      if (attrs?.line_colors && Object.keys(attrs.line_colors).length) {
+        lineColors = attrs.line_colors;
+        break;
+      }
+    }
     return html`
       <div class="editor-section">
         <div class="section-header">${this._et("section_colors")}</div>
         <div class="editor-hint">${this._et("colors_hint")}</div>
         ${lines.length
           ? lines.map((line) => {
-              const current = colorForLine(line, overrides, "#888888");
+              const current = colorForLine(line, overrides, lineColors, "#888888");
               const hex = current.startsWith("#") ? current : "#888888";
               const hasOverride = Boolean(overrides[line.toUpperCase()]);
               const ariaPick = this._et("pick_color_for_line").replace("{line}", line);

@@ -121,7 +121,7 @@ class TripPattern:
 
 @dataclass
 class TripPatternIndex:
-    """Compact index over `fahrwegverlaeufe` + `linien`.
+    """Compact index over `fahrwegverlaeufe` + `linien` + GTFS `routes.txt`.
 
     `patterns_by_line` keys patterns by LineID; the inner list holds every
     PatternID variant (both directions, branching termini, short turns).
@@ -133,12 +133,19 @@ class TripPatternIndex:
     line whose schedule passes through that station. Built at parse time
     by walking every pattern's RBLs, resolving each to its parent DIVA via
     the haltepunkte index, and aggregating the line labels.
+    `colors_by_line` / `text_colors_by_line` map a line label ("U1") to its
+    Wiener-Linien-published `route_color` / `route_text_color` as 6-digit
+    uppercase hex (no `#`). Sourced from GTFS `routes.txt`. Empty when the
+    routes file hasn't been fetched yet (cache predates the feature, or
+    fetch failed) — the card falls through to its built-in fallbacks.
     """
 
     patterns_by_line: dict[int, list[TripPattern]] = field(default_factory=dict)
     lines_by_label: dict[str, int] = field(default_factory=dict)
     means_by_line: dict[int, str] = field(default_factory=dict)
     lines_at_diva: dict[int, tuple[str, ...]] = field(default_factory=dict)
+    colors_by_line: dict[str, str] = field(default_factory=dict)
+    text_colors_by_line: dict[str, str] = field(default_factory=dict)
 
     @property
     def line_count(self) -> int:
@@ -269,6 +276,12 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 # without the lines_at_diva index (added later in 1.4
                 # for transfer-line chips on the card).
                 needs_refresh_reason = "missing lines_at_diva index"
+            elif not catalogue.trip_patterns.colors_by_line:
+                # Cache predates GTFS routes.txt (colours moved out of the
+                # card's hardcoded palette into the static catalogue).
+                # Background-refresh so the card isn't stuck on the generic
+                # fallback palette until the next weekly tick.
+                needs_refresh_reason = "missing route colours"
             if needs_refresh_reason is not None:
                 _LOGGER.warning(
                     "Static cache %s; scheduling background refresh",
@@ -378,33 +391,44 @@ async def _fetch_and_build(
     fahr_validators = (
         prior.validators.get("fahrwegverlaeufe") if prior else None
     ) or CacheValidators()
+    routes_validators = (
+        prior.validators.get("routes") if prior else None
+    ) or CacheValidators()
 
-    haltestellen_result, haltepunkte_result, linien_result, fahr_result = (
-        await asyncio.gather(
-            _download_text(
-                session, STATIC_FILES["haltestellen"], timeout, halte_validators
-            ),
-            _download_text(
-                session, STATIC_FILES["haltepunkte"], timeout, punkte_validators
-            ),
-            _download_or_fail_soft(
-                session, STATIC_FILES["linien"], timeout, linien_validators
-            ),
-            _download_or_fail_soft(
-                session,
-                STATIC_FILES["fahrwegverlaeufe"],
-                timeout,
-                fahr_validators,
-            ),
-        )
+    (
+        haltestellen_result,
+        haltepunkte_result,
+        linien_result,
+        fahr_result,
+        routes_result,
+    ) = await asyncio.gather(
+        _download_text(
+            session, STATIC_FILES["haltestellen"], timeout, halte_validators
+        ),
+        _download_text(
+            session, STATIC_FILES["haltepunkte"], timeout, punkte_validators
+        ),
+        _download_or_fail_soft(
+            session, STATIC_FILES["linien"], timeout, linien_validators
+        ),
+        _download_or_fail_soft(
+            session,
+            STATIC_FILES["fahrwegverlaeufe"],
+            timeout,
+            fahr_validators,
+        ),
+        _download_or_fail_soft(
+            session, STATIC_FILES["routes"], timeout, routes_validators
+        ),
     )
 
     halte_text, halte_validators_new = haltestellen_result
     punkte_text, punkte_validators_new = haltepunkte_result
     linien_text, linien_validators_new, linien_failed = linien_result
     fahr_text, fahr_validators_new, fahr_failed = fahr_result
+    routes_text, routes_validators_new, routes_failed = routes_result
 
-    # All-304 fast path: only valid if the trip-pattern fetches actually
+    # All-304 fast path: only valid if every optional fetch actually
     # happened (not failed) and also returned 304. A failed fetch is NOT
     # the same as 304 — we lose the freshness signal, so we fall through
     # and rebuild from prior.
@@ -413,8 +437,10 @@ async def _fetch_and_build(
         and punkte_text is None
         and linien_text is None
         and fahr_text is None
+        and routes_text is None
         and not linien_failed
         and not fahr_failed
+        and not routes_failed
         and prior is not None
     )
     if all_304:
@@ -480,17 +506,46 @@ async def _fetch_and_build(
     else:
         pattern_status = "fetch-failed"
 
+    # Route colours (GTFS routes.txt). Independent of the trip-pattern
+    # rebuild — the colour map only depends on routes.txt, so a fresh
+    # routes payload can refresh colours even when linien/fahr were 304.
+    # Attached onto whichever TripPatternIndex we end up returning so
+    # the card has a single per-line catalogue to read.
+    color_status = "preserved"
+    if trip_patterns is not None:
+        if routes_text is not None and not routes_failed:
+            try:
+                bg, fg = _parse_route_colors(routes_text)
+                trip_patterns = TripPatternIndex(
+                    patterns_by_line=trip_patterns.patterns_by_line,
+                    lines_by_label=trip_patterns.lines_by_label,
+                    means_by_line=trip_patterns.means_by_line,
+                    lines_at_diva=trip_patterns.lines_at_diva,
+                    colors_by_line=bg,
+                    text_colors_by_line=fg,
+                )
+                color_status = "fresh"
+            except (KeyError, ValueError) as err:
+                _LOGGER.warning(
+                    "Route-colour CSV parse failed, keeping prior colours: %s",
+                    err,
+                )
+        elif routes_failed:
+            color_status = "fetch-failed"
+
     _LOGGER.info(
         "Loaded Wiener Linien static catalogue: %d stations, %d platforms"
         " (haltestellen=%s, haltepunkte=%s, linien=%s, fahrwegverlaeufe=%s,"
-        " trip_patterns=%s)",
+        " routes=%s, trip_patterns=%s, colors=%s)",
         len(stations),
         sum(len(s.rbls) for s in stations.values()),
         "fresh" if halte_text is not None else "304",
         "fresh" if punkte_text is not None else "304",
         "fresh" if linien_text is not None else ("failed" if linien_failed else "304"),
         "fresh" if fahr_text is not None else ("failed" if fahr_failed else "304"),
+        "fresh" if routes_text is not None else ("failed" if routes_failed else "304"),
         pattern_status,
+        color_status,
     )
     return StaticCatalogue(
         stations_by_diva=stations,
@@ -500,6 +555,7 @@ async def _fetch_and_build(
             "haltepunkte": punkte_validators_new,
             "linien": linien_validators_new,
             "fahrwegverlaeufe": fahr_validators_new,
+            "routes": routes_validators_new,
         },
         trip_patterns=trip_patterns,
     )
@@ -693,6 +749,55 @@ def _parse_trip_patterns(
         means_by_line=means_by_line,
         lines_at_diva=lines_at_diva,
     )
+
+
+# Wiener Linien GTFS publishes two agencies in routes.txt: `04` is Wiener
+# Linien proper, `03` is Wiener Lokalbahnen (WLB / Badener Bahn). On a
+# label collision we prefer `04` so the "11" tram colour, not the WLB
+# "BB" navy, wins for the Wiener Linien customers this integration
+# primarily serves.
+_AGENCY_WIENER_LINIEN = "04"
+
+
+def _parse_route_colors(routes_text: str) -> tuple[dict[str, str], dict[str, str]]:
+    """Parse GTFS routes.txt → (colors_by_line, text_colors_by_line).
+
+    Columns (utf-8 BOM may prefix the first header):
+        route_id,agency_id,route_short_name,route_long_name,
+        route_type,route_color,route_text_color
+
+    The relevant fields are `route_short_name` (line label as the user
+    sees it: "U1", "13A", "N66") and the two colour columns. We keep
+    only rows with a non-empty `route_color` — SEV (Schienenersatzverkehr)
+    and other temporary entries leave it blank, and falling through to
+    the card's fallback is the right behaviour for those. Colours are
+    normalised to 6-digit uppercase hex without the `#` prefix so the
+    JSON payload stays compact.
+
+    On label conflict between agency 04 (Wiener Linien) and 03 (WLB),
+    Wiener Linien wins — see `_AGENCY_WIENER_LINIEN` above.
+    """
+    bg: dict[str, str] = {}
+    fg: dict[str, str] = {}
+    bg_agency: dict[str, str] = {}
+    reader = csv.DictReader(io.StringIO(routes_text), delimiter=",")
+    for row in reader:
+        label = (row.get("route_short_name") or "").strip()
+        color = (row.get("route_color") or "").strip().upper()
+        if not label or not color or len(color) != 6:
+            continue
+        agency = (row.get("agency_id") or "").strip()
+        prior_agency = bg_agency.get(label)
+        # Skip if a Wiener Linien row already claimed this label and the
+        # current row is a different agency — we don't want WLB overwriting U1.
+        if prior_agency == _AGENCY_WIENER_LINIEN and agency != _AGENCY_WIENER_LINIEN:
+            continue
+        bg[label] = color
+        bg_agency[label] = agency
+        text_color = (row.get("route_text_color") or "").strip().upper()
+        if len(text_color) == 6:
+            fg[label] = text_color
+    return bg, fg
 
 
 def stops_ahead_for_match(
@@ -932,6 +1037,8 @@ def _trip_patterns_to_store(index: TripPatternIndex) -> dict[str, Any]:
         "lines_at_diva": {
             str(diva): list(labels) for diva, labels in index.lines_at_diva.items()
         },
+        "colors_by_line": dict(index.colors_by_line),
+        "text_colors_by_line": dict(index.text_colors_by_line),
         "patterns": [
             {
                 "line_id": p.line_id,
@@ -962,6 +1069,16 @@ def _trip_patterns_from_store(
             int(k): _sort_line_labels([str(label) for label in (v or [])])
             for k, v in (raw.get("lines_at_diva") or {}).items()
         }
+        colors_by_line = {
+            str(k): str(v).upper()
+            for k, v in (raw.get("colors_by_line") or {}).items()
+            if isinstance(v, str) and len(v) == 6
+        }
+        text_colors_by_line = {
+            str(k): str(v).upper()
+            for k, v in (raw.get("text_colors_by_line") or {}).items()
+            if isinstance(v, str) and len(v) == 6
+        }
         patterns_by_line: dict[int, list[TripPattern]] = {}
         for entry in raw.get("patterns") or []:
             line_id = int(entry["line_id"])
@@ -985,6 +1102,8 @@ def _trip_patterns_from_store(
         lines_by_label=lines_by_label,
         means_by_line=means_by_line,
         lines_at_diva=lines_at_diva,
+        colors_by_line=colors_by_line,
+        text_colors_by_line=text_colors_by_line,
     )
 
 
