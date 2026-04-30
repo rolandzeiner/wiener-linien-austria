@@ -200,30 +200,31 @@ export interface ModernStopConfig {
 
 export interface WienerLinienCardConfig extends LovelaceCardConfig {
   type: string;
-  entities?: Array<ModernStopConfig | string>;
+  entities?: Array<ModernStopConfig | string> | undefined;
   // v0.1.x back-compat: single-entity legacy shape is promoted to entities[0]
   // inside normaliseConfig. Both shapes read here; only `entities` survives.
-  entity?: string;
-  lines?: string[];
-  direction?: "H" | "R" | "";
-  walk_times?: WalkTimes;
+  // `?: T | undefined` dual form for exactOptionalPropertyTypes compatibility.
+  entity?: string | undefined;
+  lines?: string[] | undefined;
+  direction?: "H" | "R" | "" | undefined;
+  walk_times?: WalkTimes | undefined;
 
-  max_departures?: number;
-  line_colors?: Record<string, string>;
+  max_departures?: number | undefined;
+  line_colors?: Record<string, string> | undefined;
 
-  show_accessibility?: boolean;
-  accessibility_only?: boolean;
-  show_traffic_info?: boolean;
-  show_elevator_info?: boolean;
-  show_delay?: boolean;
-  show_type_icon?: boolean;
-  show_platform?: boolean;
-  show_hero_metric?: boolean;
-  show_departures?: boolean;
-  hide_header?: boolean;
-  hide_attribution?: boolean;
+  show_accessibility?: boolean | undefined;
+  accessibility_only?: boolean | undefined;
+  show_traffic_info?: boolean | undefined;
+  show_elevator_info?: boolean | undefined;
+  show_delay?: boolean | undefined;
+  show_type_icon?: boolean | undefined;
+  show_platform?: boolean | undefined;
+  show_hero_metric?: boolean | undefined;
+  show_departures?: boolean | undefined;
+  hide_header?: boolean | undefined;
+  hide_attribution?: boolean | undefined;
 
-  layout?: "stacked" | "tabs";
+  layout?: "stacked" | "tabs" | undefined;
 }
 
 // ---------------------------------------------------------------------------

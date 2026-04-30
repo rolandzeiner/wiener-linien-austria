@@ -1,11 +1,50 @@
-import { LitElement, css, html, nothing, type TemplateResult } from "lit";
+// Schema-driven Lovelace editor for the Wiener Linien Austria modern card.
+//
+// Design notes
+// ------------
+// * Static fields go through `<ha-form>`: the `entities` selector
+//   (multi-select sensor picker, integration-filtered), `layout`, the
+//   `max_departures` slider, and the boolean toggles in the "display"
+//   expandable. ha-form is the canonical HA editor component: theme
+//   integration, label/helper localisation chain, a11y / forced-colors
+//   / focus-visible all match HA core.
+//
+// * **Three bespoke sections** stay below `<ha-form>` because their
+//   row lists are derived from the live data (lines/direction/walk-time
+//   per stop, colour swatches per line in the user's selection):
+//   - Per-stop filters (line chips + direction picker + per-line dir
+//     overrides + walk-times) — one block per configured entity.
+//   - Per-line colour swatches — native `<input type="color">` is the
+//     right primitive for this; ha-form has no equivalent selector.
+//
+// * **Storage-shape translator** at the form-changed boundary —
+//   ha-form's entity selector with `multiple: true` emits a flat
+//   `string[]`; the saved config carries `Array<NormalisedModernStop>`
+//   to preserve per-stop overrides (lines, direction, walk_times) when
+//   the user adds/removes a stop. Without the translator, every
+//   add/remove cycle would wipe every per-stop override silently.
+//
+// * **Editor `_config` lifecycle gotcha** — custom editors do NOT
+//   receive a re-`setConfig()` after dispatching `config-changed`. The
+//   form-handler must therefore set `this._config = next` BEFORE
+//   firing the event; otherwise the next render reads stale state.
+//
+// * **`expandable` + `flatten: true`** — without `flatten`, ha-form
+//   scopes inner-schema values under `data[name]` and the card's
+//   flat-key reads (`this._config.show_platform`) silently default.
+
+import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
 import { translate } from "./localize/localize.js";
-import type { WienerLinienAttrs, WienerLinienCardConfig } from "./types.js";
+import type {
+  HaFormSchema,
+  WienerLinienAttrs,
+  WienerLinienCardConfig,
+} from "./types.js";
 import {
   colorForLine,
   normaliseModernConfig,
@@ -15,37 +54,30 @@ import {
 import {
   collectLinesInSelection,
   lineDirKey,
-  linesAtStop,
   pairsAtStop,
   tripletsAtStop,
 } from "./utils/departures.js";
-import { findWienerLinienEntities, stopLabel } from "./utils/entities.js";
 
-type ToggleField =
-  | "show_accessibility"
-  | "accessibility_only"
-  | "show_traffic_info"
-  | "show_elevator_info"
-  | "show_delay"
-  | "show_type_icon"
-  | "show_platform"
-  | "show_hero_metric"
-  | "show_departures"
-  | "hide_header"
-  | "hide_attribution";
+/** Local minimal `fireEvent` shim — `bubbles: true` + `composed: true`
+ *  are required so the event crosses our shadow boundary and reaches
+ *  the dashboard's card-editor listener. */
+function fireEvent<T>(node: HTMLElement, type: string, detail: T): void {
+  node.dispatchEvent(
+    new CustomEvent(type, { detail, bubbles: true, composed: true }),
+  );
+}
 
 @customElement("wiener-linien-austria-card-editor")
-export class WienerLinienAustriaCardEditor extends LitElement implements LovelaceCardEditor {
+export class WienerLinienAustriaCardEditor
+  extends LitElement
+  implements LovelaceCardEditor
+{
   @property({ attribute: false }) public hass?: HomeAssistant;
 
   @state() private _config?: NormalisedModernConfig;
 
   public setConfig(config: WienerLinienCardConfig): void {
     this._config = normaliseModernConfig(config);
-  }
-
-  private _lang(): string {
-    return this.hass?.language?.startsWith("de") ? "de" : "en";
   }
 
   private _et(key: string): string {
@@ -57,31 +89,164 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
   }
 
   private _fire(next: NormalisedModernConfig): void {
+    // CRITICAL: set _config BEFORE fireEvent. Custom editors don't
+    // receive a re-setConfig after config-changed, so a fireEvent-only
+    // path leaves _config stale and the next render reverts the form
+    // to its pre-change value.
     this._config = next;
-    // bubbles + composed: must cross the shadow boundary, else HA never sees
-    // the change. Both flags are required.
-    this.dispatchEvent(
-      new CustomEvent("config-changed", {
-        detail: { config: next },
-        bubbles: true,
-        composed: true,
-      }),
+    fireEvent(this, "config-changed", { config: next });
+  }
+
+  // ------------------------------------------------------------------
+  // ha-form schema + computed labels/helpers
+  // ------------------------------------------------------------------
+
+  private _schema(): ReadonlyArray<HaFormSchema> {
+    return [
+      {
+        name: "entities",
+        required: true,
+        selector: {
+          entity: {
+            domain: "sensor",
+            integration: "wiener_linien_austria",
+            multiple: true,
+          },
+        },
+      },
+      {
+        name: "layout",
+        selector: {
+          select: {
+            mode: "dropdown",
+            options: [
+              { value: "stacked", label: this._et("layout_stacked") },
+              { value: "tabs", label: this._et("layout_tabs") },
+            ],
+          },
+        },
+      },
+      {
+        // `flatten: true` — every toggle below writes flat to `data`
+        // (e.g. `data.show_hero_metric`), matching the card's flat
+        // config-key reads. See HaFormExpandableSchema docstring.
+        type: "expandable",
+        name: "display",
+        title: this._et("section_display"),
+        flatten: true,
+        schema: [
+          {
+            name: "max_departures",
+            selector: {
+              number: { min: 0, max: 20, step: 1, mode: "slider" },
+            },
+          },
+          { name: "hide_header", selector: { boolean: {} } },
+          { name: "show_hero_metric", selector: { boolean: {} } },
+          { name: "show_departures", selector: { boolean: {} } },
+          { name: "show_platform", selector: { boolean: {} } },
+          { name: "show_accessibility", selector: { boolean: {} } },
+          { name: "accessibility_only", selector: { boolean: {} } },
+          { name: "show_type_icon", selector: { boolean: {} } },
+          { name: "show_traffic_info", selector: { boolean: {} } },
+          { name: "show_elevator_info", selector: { boolean: {} } },
+          { name: "show_delay", selector: { boolean: {} } },
+          { name: "hide_attribution", selector: { boolean: {} } },
+        ],
+      },
+    ];
+  }
+
+  /** Field-label resolver. Three-step chain:
+   *  1. HA core's own translations for common field names.
+   *  2. Card's editor-namespaced bundle (`editor.<field>`).
+   *  3. Last resort: raw field name. */
+  private _computeLabel = (field: { name: string }): string => {
+    const haKey = `ui.panel.lovelace.editor.card.generic.${field.name}`;
+    const ha = this.hass?.localize?.(haKey);
+    if (ha) return ha;
+    const editorTrans = this._et(field.name);
+    if (editorTrans !== `modern.editor.${field.name}` && editorTrans !== field.name) {
+      return editorTrans;
+    }
+    return field.name;
+  };
+
+  /** Helper-text resolver. Returns undefined on miss so empty helper
+   *  lines don't eat vertical space. */
+  private _computeHelper = (field: { name: string }): string | undefined => {
+    const key = `${field.name}_helper`;
+    const editorTrans = this._et(key);
+    if (editorTrans !== `modern.editor.${key}` && editorTrans !== key) {
+      return editorTrans;
+    }
+    return undefined;
+  };
+
+  /** Translate the saved-config shape (Array<NormalisedModernStop>) to
+   *  ha-form's input shape (flat string[]). Per-stop overrides are
+   *  rendered separately below the form. */
+  private _formData(): Record<string, unknown> {
+    if (!this._config) return {};
+    const entities = this._config.entities.map((s) => s.entity);
+    return {
+      ...this._config,
+      entities,
+    };
+  }
+
+  /** Translate ha-form's value back to NormalisedModernConfig. The
+   *  storage-shape translator is the critical piece: when the user
+   *  adds/removes a stop via the entity selector, ha-form emits a
+   *  flat `string[]`, but we must preserve per-stop overrides
+   *  (lines, direction, walk_times, line_directions) for the surviving
+   *  entities. Match by entity id; new entities get a bare
+   *  `{ entity: id }` placeholder. */
+  private _onFormChanged = (
+    ev: CustomEvent<{ value: Record<string, unknown> }>,
+  ): void => {
+    if (!this._config) return;
+    const value = ev.detail.value;
+    const rawEntities = value["entities"];
+    const newEntityIds: string[] = Array.isArray(rawEntities)
+      ? rawEntities.filter((s): s is string => typeof s === "string" && s.length > 0)
+      : [];
+    // Index current per-stop overrides by entity id.
+    const byEntity = new Map<string, NormalisedModernStop>();
+    for (const stop of this._config.entities) {
+      byEntity.set(stop.entity, stop);
+    }
+    // Rebuild in the order ha-form produced (so user-visible order
+    // tracks the selector). New entities get a placeholder; surviving
+    // entities preserve their overrides.
+    const nextEntities: NormalisedModernStop[] = newEntityIds.map(
+      (eid) => byEntity.get(eid) ?? { entity: eid },
     );
-  }
 
-  private _updateStop(eid: string, mutator: (s: NormalisedModernStop) => NormalisedModernStop): void {
-    if (!this._config) return;
-    const entities = this._config.entities.map((s) => (s.entity === eid ? mutator({ ...s }) : s));
-    this._fire({ ...this._config, entities });
-  }
+    // Pipe through normaliseModernConfig so the boolean coercion + slider
+    // clamp + layout narrowing stay consistent with the card's setConfig.
+    // Spread existing _config first to preserve dashboard passthrough
+    // fields AND `type` (which ha-form's value never carries).
+    const next = normaliseModernConfig({
+      ...(this._config as unknown as WienerLinienCardConfig),
+      ...(value as Partial<WienerLinienCardConfig>),
+      entities: nextEntities,
+    });
+    this._fire(next);
+  };
 
-  private _toggleStop(eid: string): void {
+  // ------------------------------------------------------------------
+  // Bespoke per-stop mutators (line chips, direction, walk-times)
+  // ------------------------------------------------------------------
+
+  private _updateStop(
+    eid: string,
+    mutator: (s: NormalisedModernStop) => NormalisedModernStop,
+  ): void {
     if (!this._config) return;
-    const idx = this._config.entities.findIndex((s) => s.entity === eid);
-    const entities =
-      idx >= 0
-        ? this._config.entities.filter((_, i) => i !== idx)
-        : [...this._config.entities, { entity: eid }];
+    const entities = this._config.entities.map((s) =>
+      s.entity === eid ? mutator({ ...s }) : s,
+    );
     this._fire({ ...this._config, entities });
   }
 
@@ -104,7 +269,11 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     });
   }
 
-  private _setLineDirection(eid: string, line: string, dir: "H" | "R" | null): void {
+  private _setLineDirection(
+    eid: string,
+    line: string,
+    dir: "H" | "R" | null,
+  ): void {
     this._updateStop(eid, (s) => {
       const cur = { ...(s.line_directions ?? {}) };
       if (dir === null) delete cur[line];
@@ -130,7 +299,10 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
 
   private _setLineColor(line: string, color: string): void {
     if (!this._config) return;
-    const line_colors = { ...this._config.line_colors, [line.toUpperCase()]: color };
+    const line_colors = {
+      ...this._config.line_colors,
+      [line.toUpperCase()]: color,
+    };
     this._fire({ ...this._config, line_colors });
   }
 
@@ -141,29 +313,14 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     this._fire({ ...this._config, line_colors });
   }
 
-  private _setLayout(layout: "stacked" | "tabs"): void {
-    if (!this._config || this._config.layout === layout) return;
-    this._fire({ ...this._config, layout });
-  }
-
-  private _setMaxDepartures(v: number): void {
-    // Lower bound 0 — hero-only mode (no row list). Mirrors the
-    // normalise clamp in utils/config.ts.
-    if (!this._config) return;
-    const max_departures = Math.max(0, Math.min(20, Math.round(v)));
-    if (max_departures === this._config.max_departures) return;
-    this._fire({ ...this._config, max_departures });
-  }
-
-  private _toggleField(field: ToggleField, checked: boolean): void {
-    if (!this._config) return;
-    this._fire({ ...this._config, [field]: checked });
-  }
-
-  // HA's card-editor steals arrow keys for navigation; stop propagation on
-  // number/range inputs so the user can actually edit values.
+  // HA's card-editor steals arrow keys for navigation; stop propagation
+  // on number inputs so the user can actually edit values.
   private _swallowKeys(ev: KeyboardEvent): void {
     ev.stopPropagation();
+  }
+
+  private _attrs(eid: string): WienerLinienAttrs | undefined {
+    return this.hass?.states?.[eid]?.attributes as WienerLinienAttrs | undefined;
   }
 
   // ------------------------------------------------------------------
@@ -171,81 +328,49 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
   // ------------------------------------------------------------------
 
   protected render(): TemplateResult | typeof nothing {
-    if (!this._config || !this.hass) return nothing;
-    const cfg = this._config;
-
-    const available = findWienerLinienEntities(this.hass);
-    const selectedIds = new Set(cfg.entities.map((s) => s.entity));
-
+    if (!this._config) return nothing;
     return html`
       <div class="editor">
-        ${this._renderStopsSection(available, selectedIds)}
-        ${this._renderFiltersSection()}
-        ${this._renderDisplaySection()}
+        <ha-form
+          .hass=${this.hass}
+          .data=${this._formData()}
+          .schema=${this._schema()}
+          .computeLabel=${this._computeLabel}
+          .computeHelper=${this._computeHelper}
+          @value-changed=${this._onFormChanged}
+        ></ha-form>
+        ${this._renderPerStopSections()}
         ${this._renderColorsSection()}
       </div>
     `;
   }
 
-  private _renderStopsSection(available: string[], selectedIds: Set<string>): TemplateResult {
-    const chips = available.length
-      ? available.map((eid) => {
-          const name = stopLabel(this.hass, eid);
-          const slug = eid.split(".")[1] ?? eid;
-          const isSelected = selectedIds.has(eid);
-          return html`
-            <button
-              type="button"
-              class=${classMap({ chip: true, selected: isSelected })}
-              @click=${() => this._toggleStop(eid)}
-            >
-              <span class="stop-name">${name}</span>
-              <span class="eid">${slug}</span>
-            </button>
-          `;
-        })
-      : html`<div class="editor-hint">${this._et("no_sensors_available")}</div>`;
-    return html`
-      <div class="editor-section">
-        <div class="section-header">${this._et("section_sensors")}</div>
-        <div class="editor-hint">${this._et("sensors_hint")}</div>
-        <div class="entity-chips">${chips}</div>
-      </div>
-    `;
-  }
-
-  private _renderFiltersSection(): TemplateResult {
+  /** One bespoke per-stop section per configured entity. Holds the
+   *  line chips + direction picker + per-line direction overrides +
+   *  walk-time inputs. Derived from the live sensor's departures so
+   *  the row list can't be expressed as a static schema. */
+  private _renderPerStopSections(): TemplateResult | typeof nothing {
     const cfg = this._config!;
-    const body = cfg.entities.length
-      ? cfg.entities.map((stop) => this._renderStopFilter(stop))
-      : html`<div class="editor-hint">${this._et("sensors_hint")}</div>`;
-    return html`
-      <div class="editor-section">
-        <div class="section-header">${this._et("section_filters")}</div>
-        <div class="editor-hint">${this._et("filters_hint")}</div>
-        ${body}
-      </div>
-    `;
+    if (!cfg.entities.length) return nothing;
+    return html`${cfg.entities.map((stop) => this._renderStopFilter(stop))}`;
   }
 
   private _renderStopFilter(stop: NormalisedModernStop): TemplateResult {
-    const attrs = this.hass?.states?.[stop.entity]?.attributes as WienerLinienAttrs | undefined;
+    const attrs = this._attrs(stop.entity);
     if (!attrs) return html``;
     const stopName = attrs.stop_name || stop.entity;
     const overrides = this._config!.line_colors;
     const lineColors = attrs.line_colors ?? {};
-    const lines = linesAtStop(attrs);
+    const lines = [...new Set(
+      (attrs.departures ?? []).map((d) => d.line).filter((l): l is string => !!l),
+    )].sort();
     const picked = new Set(stop.lines ?? []);
     const dir = stop.direction ?? null;
     const lineDirs = stop.line_directions ?? {};
 
-    // "Effectively visible" lines = whitelist if set, else all lines.
     const effectiveLines = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
     const showPerLineDir = effectiveLines.length >= 2;
 
-    // Walk-time triplets: drop any whose line is filtered out by the
-    // whitelist OR whose direction is filtered out by the *effective*
-    // direction for that line (per-line override beats stop-wide).
     const allTriplets = tripletsAtStop(attrs);
     const triplets = allTriplets.filter((t) => {
       if (picked.size > 0 && !picked.has(t.line)) return false;
@@ -254,11 +379,6 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       return true;
     });
 
-    // Available directions per scope. A line that only runs in one
-    // direction at this stop (e.g. terminus) gets the unavailable
-    // direction button disabled, and the available one shows as
-    // "active" by default — even when the user hasn't explicitly
-    // picked it — so the UI never offers a meaningless choice.
     const dirsForLine = (line: string): Set<"H" | "R"> => {
       const out = new Set<"H" | "R">();
       for (const t of allTriplets) {
@@ -274,10 +394,6 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     const stopHasH = stopAvailableDirs.has("H");
     const stopHasR = stopAvailableDirs.has("R");
     const stopOnlyOne = stopAvailableDirs.size === 1;
-    // Stop-wide effective active state: explicit pick wins; otherwise
-    // pre-highlight the only-available direction so the user sees the
-    // truth at a glance. Encoded as 3 booleans (not a tagged union) so
-    // TypeScript can't accidentally narrow them across template uses.
     const stopActiveH = dir === "H" || (dir === null && stopOnlyOne && stopHasH);
     const stopActiveR = dir === "R" || (dir === null && stopOnlyOne && stopHasR);
     const stopActiveBoth = dir === null && !stopOnlyOne;
@@ -389,140 +505,80 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
             `
           : nothing}
 
-        ${(() => {
-          // Walk-time rows: one per (line, direction) pair, not per
-          // (line, direction, towards) triple. The /monitor API flips
-          // line.towards across polls on branching termini, so a triple
-          // key would silently miss the threshold whenever the API
-          // labelled the same line with a different terminus. The pair
-          // key is what filterDepartures actually looks up.
-          const allPairs = pairsAtStop(attrs);
-          const pairs = allPairs.filter((p) => {
-            if (picked.size > 0 && !picked.has(p.line)) return false;
-            const effDir = lineDirs[p.line] ?? dir;
-            if (effDir && p.direction !== effDir) return false;
-            return true;
-          });
-          if (!pairs.length) return nothing;
-          return html`
-            <div class="stop-filter-row">
-              <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
-              <div class="editor-hint">${this._et("walk_time_hint")}</div>
-              <div class="walk-time-list">
-                ${pairs.map((p) => {
-                  const color = colorForLine(p.line, overrides, lineColors);
-                  const key = lineDirKey(p.line, p.direction);
-                  const val = stop.walk_times?.[key];
-                  const terminusLabel = p.termini.join(" / ");
-                  const arrow = terminusLabel ? `→ ${terminusLabel}` : "";
-                  const branchingHint =
-                    p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
-                  return html`
-                    <div class="walk-time-row">
-                      <span class="walk-time-badge" style=${styleMap({ background: color })}>${p.line}</span>
-                      <span class="walk-time-towards" title=${branchingHint || terminusLabel}>${arrow}</span>
-                      <input
-                        type="number"
-                        class="walk-time-input"
-                        min="0"
-                        max="120"
-                        step="1"
-                        inputmode="numeric"
-                        placeholder=${this._et("walk_time_placeholder")}
-                        aria-label=${this._et("walk_time_aria")
-                          .replace("{line}", p.line)
-                          .replace("{towards}", terminusLabel)}
-                        .value=${val !== undefined ? String(val) : ""}
-                        @keydown=${this._swallowKeys}
-                        @keyup=${this._swallowKeys}
-                        @keypress=${this._swallowKeys}
-                        @change=${(ev: Event) =>
-                          this._setWalkTime(
-                            stop.entity,
-                            key,
-                            (ev.target as HTMLInputElement).value,
-                          )}
-                      />
-                    </div>
-                  `;
-                })}
+        ${this._renderWalkTimes(stop, triplets, dir, lineDirs)}
+      </div>
+    `;
+  }
+
+  private _renderWalkTimes(
+    stop: NormalisedModernStop,
+    triplets: ReturnType<typeof tripletsAtStop>,
+    dir: "H" | "R" | null,
+    lineDirs: Record<string, "H" | "R">,
+  ): TemplateResult | typeof nothing {
+    void triplets; // direction visibility handled per pair below
+    const overrides = this._config!.line_colors;
+    const attrs = this._attrs(stop.entity);
+    const lineColors = attrs?.line_colors ?? {};
+    const allPairs = pairsAtStop(attrs);
+    const picked = new Set(stop.lines ?? []);
+    const pairs = allPairs.filter((p) => {
+      if (picked.size > 0 && !picked.has(p.line)) return false;
+      const effDir = lineDirs[p.line] ?? dir;
+      if (effDir && p.direction !== effDir) return false;
+      return true;
+    });
+    if (!pairs.length) return nothing;
+    return html`
+      <div class="stop-filter-row">
+        <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
+        <div class="editor-hint">${this._et("walk_time_hint")}</div>
+        <div class="walk-time-list">
+          ${pairs.map((p) => {
+            const color = colorForLine(p.line, overrides, lineColors);
+            const key = lineDirKey(p.line, p.direction);
+            const val = stop.walk_times?.[key];
+            const terminusLabel = p.termini.join(" / ");
+            const arrow = terminusLabel ? `→ ${terminusLabel}` : "";
+            const branchingHint =
+              p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
+            return html`
+              <div class="walk-time-row">
+                <span class="walk-time-badge" style=${styleMap({ background: color })}>${p.line}</span>
+                <span class="walk-time-towards" title=${branchingHint || terminusLabel}>${arrow}</span>
+                <input
+                  type="number"
+                  class="walk-time-input"
+                  min="0"
+                  max="120"
+                  step="1"
+                  inputmode="numeric"
+                  placeholder=${this._et("walk_time_placeholder")}
+                  aria-label=${this._et("walk_time_aria")
+                    .replace("{line}", p.line)
+                    .replace("{towards}", terminusLabel)}
+                  .value=${val !== undefined ? String(val) : ""}
+                  @keydown=${this._swallowKeys}
+                  @keyup=${this._swallowKeys}
+                  @keypress=${this._swallowKeys}
+                  @change=${(ev: Event) =>
+                    this._setWalkTime(
+                      stop.entity,
+                      key,
+                      (ev.target as HTMLInputElement).value,
+                    )}
+                />
               </div>
-            </div>
-          `;
-        })()}
-      </div>
-    `;
-  }
-
-  private _renderDisplaySection(): TemplateResult {
-    const cfg = this._config!;
-    return html`
-      <div class="editor-section">
-        <div class="section-header">${this._et("section_display")}</div>
-
-        <div class="toggle-row" style="gap:12px;">
-          <span style="font-size:0.8125rem;">${this._et("layout_label")}</span>
-          <div class="direction-buttons">
-            <button
-              type="button"
-              class=${classMap({ active: cfg.layout === "stacked" })}
-              @click=${() => this._setLayout("stacked")}
-            >${this._et("layout_stacked")}</button>
-            <button
-              type="button"
-              class=${classMap({ active: cfg.layout === "tabs" })}
-              @click=${() => this._setLayout("tabs")}
-            >${this._et("layout_tabs")}</button>
-          </div>
+            `;
+          })}
         </div>
-
-        <div class="slider-row">
-          <span class="slider-label">${this._et("max_departures")}</span>
-          <input
-            type="range"
-            min="0"
-            max="20"
-            step="1"
-            .value=${String(cfg.max_departures)}
-            @keydown=${this._swallowKeys}
-            @keyup=${this._swallowKeys}
-            @keypress=${this._swallowKeys}
-            @change=${(ev: Event) =>
-              this._setMaxDepartures(Number((ev.target as HTMLInputElement).value))}
-          />
-          <span class="slider-value">${cfg.max_departures}</span>
-        </div>
-
-        ${this._renderSwitch("hide_header", cfg.hide_header)}
-        ${this._renderSwitch("show_hero_metric", cfg.show_hero_metric)}
-        ${this._renderSwitch("show_departures", cfg.show_departures)}
-        ${this._renderSwitch("show_platform", cfg.show_platform)}
-        ${this._renderSwitch("show_accessibility", cfg.show_accessibility)}
-        ${this._renderSwitch("accessibility_only", cfg.accessibility_only)}
-        ${this._renderSwitch("show_type_icon", cfg.show_type_icon)}
-        ${this._renderSwitch("show_traffic_info", cfg.show_traffic_info)}
-        ${this._renderSwitch("show_elevator_info", cfg.show_elevator_info)}
-        ${this._renderSwitch("show_delay", cfg.show_delay)}
-        ${this._renderSwitch("hide_attribution", cfg.hide_attribution)}
       </div>
     `;
   }
 
-  private _renderSwitch(field: ToggleField, checked: boolean): TemplateResult {
-    const id = `wl-${field.replace(/_/g, "-")}-toggle`;
-    return html`
-      <div class="toggle-row">
-        <label for=${id}>${this._et(field)}</label>
-        <ha-switch
-          id=${id}
-          .checked=${checked}
-          @change=${(ev: Event) =>
-            this._toggleField(field, (ev.target as HTMLInputElement).checked)}
-        ></ha-switch>
-      </div>
-    `;
-  }
-
+  /** Per-line colour swatch grid — bespoke because native
+   *  `<input type="color">` is the right primitive for picking a
+   *  hex value, and ha-form has no equivalent selector. */
   private _renderColorsSection(): TemplateResult {
     const cfg = this._config!;
     const lines = collectLinesInSelection(this.hass, cfg.entities.map((s) => s.entity));
@@ -562,7 +618,6 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
                       type="color"
                       class="color-swatch-input"
                       .value=${hex}
-                      .configValue=${`color_${line}`}
                       aria-label=${ariaPick}
                       @input=${(ev: Event) =>
                         this._setLineColor(line, (ev.target as HTMLInputElement).value)}
@@ -584,215 +639,119 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
     `;
   }
 
-  static styles = css`
-    :host { display: block; }
+  static styles: CSSResultGroup = css`
+    :host {
+      display: block;
+    }
     .editor {
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 12px;
     }
-    .editor-section {
-      background: var(--secondary-background-color, rgba(0,0,0,0.04));
+    .editor-section,
+    .stop-filter {
+      background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
       border-radius: 12px;
       padding: 14px 16px;
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
-    .section-header {
+    .section-header,
+    .stop-filter-header {
       font-size: 0.6875rem;
       font-weight: 600;
       letter-spacing: 0.6px;
       text-transform: uppercase;
       color: var(--secondary-text-color);
     }
+    .stop-filter-header {
+      font-size: 0.875rem;
+      text-transform: none;
+      color: var(--primary-text-color);
+    }
     .editor-hint {
       font-size: 0.75rem;
       color: var(--secondary-text-color);
       line-height: 1.4;
     }
-    .entity-chips, .line-chips {
+    .stop-filter-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stop-filter-row-label {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--primary-text-color);
+    }
+    .line-chips,
+    .per-line-dir-list {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
+    }
+    .per-line-dir-list {
+      flex-direction: column;
+      gap: 4px;
+    }
+    .per-line-dir-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .per-line-dir-badge {
+      min-width: 36px;
+      text-align: center;
+      font-weight: 700;
+      color: #fff;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.8125rem;
     }
     .chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      min-height: 44px;
-      padding: 10px 16px;
-      border-radius: 22px;
+      min-height: 36px;
+      padding: 6px 12px;
+      border-radius: 18px;
       font-size: 0.8125rem;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.15s;
       border: 1px solid var(--divider-color);
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
     }
-    .chip.selected {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
-      border-color: var(--primary-color);
-    }
-    .chip:hover { opacity: 0.85; }
-    .chip .stop-name { font-weight: 500; }
-    .chip .eid {
-      font-size: 0.6875rem;
-      opacity: 0.7;
-    }
-    .stop-filter {
-      padding: 8px 10px;
-      border: 1px solid var(--divider-color);
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .stop-filter-header {
-      font-size: 0.8125rem;
-      font-weight: 500;
-    }
-    .stop-filter-row {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .stop-filter-row-label {
-      font-size: 0.6875rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--secondary-text-color);
+    .chip:hover {
+      opacity: 0.85;
     }
     .direction-buttons {
       display: inline-flex;
-      gap: 4px;
+      gap: 6px;
+      flex-wrap: wrap;
     }
     .direction-buttons button {
-      padding: 10px 16px;
-      border-radius: 22px;
+      padding: 8px 14px;
+      border-radius: 18px;
       border: 1px solid var(--divider-color);
       background: var(--card-background-color, #fff);
       color: var(--primary-text-color);
       font-size: 0.8125rem;
       cursor: pointer;
-      min-height: 44px;
+      min-width: 44px;
+      min-height: 36px;
     }
     .direction-buttons button.active {
       background: var(--primary-color);
       color: var(--text-primary-color, #fff);
       border-color: var(--primary-color);
     }
-    .direction-buttons button[disabled] {
-      opacity: 0.35;
+    .direction-buttons button:disabled {
+      opacity: 0.4;
       cursor: not-allowed;
-      background: var(--card-background-color, #fff);
-      color: var(--secondary-text-color);
-      border-color: var(--divider-color);
-    }
-    .color-row {
-      display: grid;
-      grid-template-columns: 44px 1fr auto;
-      align-items: center;
-      gap: 10px;
-    }
-    .color-row .line-preview {
-      display: inline-block;
-      text-align: center;
-      font-weight: 700;
-      color: #fff;
-      border-radius: 6px;
-      padding: 4px 6px;
-      font-size: 0.85rem;
-      box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
-    }
-    .color-swatch {
-      --swatch-color: var(--primary-color);
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: color-mix(in srgb, var(--swatch-color) 18%, transparent);
-      color: var(--primary-text-color);
-      font-size: 0.8125rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background-color 0.16s ease, transform 0.06s ease;
-    }
-    .color-swatch:hover {
-      background: color-mix(in srgb, var(--swatch-color) 26%, transparent);
-    }
-    .color-swatch:active {
-      transform: translateY(1px);
-    }
-    .color-swatch ha-icon {
-      --mdc-icon-size: 20px;
-      color: var(--swatch-color);
-      flex-shrink: 0;
-    }
-    .color-swatch-hex {
-      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.02em;
-    }
-    .color-swatch-input {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      border: 0;
-      padding: 0;
-      margin: 0;
-      cursor: pointer;
-      overflow: hidden;
-    }
-    .color-row .reset-btn {
-      font-size: 0.6875rem;
-      padding: 6px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--divider-color);
-      background: transparent;
-      color: var(--secondary-text-color);
-      cursor: pointer;
-    }
-    .color-row .reset-btn[disabled] {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-    .slider-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .slider-row input[type="range"] {
-      flex: 1;
-      accent-color: var(--primary-color);
-    }
-    .slider-row .slider-label {
-      font-size: 0.8125rem;
-      color: var(--primary-text-color);
-      min-width: 180px;
-    }
-    .slider-value {
-      min-width: 24px;
-      text-align: center;
-      font-weight: 600;
-      font-size: 0.875rem;
-      color: var(--primary-color);
-    }
-    .toggle-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .toggle-row label {
-      font-size: 0.8125rem;
-      color: var(--primary-text-color);
-      cursor: pointer;
     }
     .walk-time-list {
       display: flex;
@@ -831,29 +790,62 @@ export class WienerLinienAustriaCardEditor extends LitElement implements Lovelac
       font-size: 0.8125rem;
       text-align: right;
     }
-    .walk-time-input::-webkit-outer-spin-button,
-    .walk-time-input::-webkit-inner-spin-button {
-      margin: 0;
-    }
-    .per-line-dir-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .per-line-dir-row {
+    .color-row {
       display: grid;
-      grid-template-columns: 44px 1fr;
+      grid-template-columns: 60px 1fr auto;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
+      margin-top: 6px;
     }
-    .per-line-dir-badge {
+    .line-preview {
       text-align: center;
       font-weight: 700;
       color: #fff;
       border-radius: 6px;
       padding: 4px 6px;
-      font-size: 0.85rem;
-      box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
+      font-size: 0.8125rem;
+    }
+    .color-swatch {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--divider-color);
+      background: var(--card-background-color, #fff);
+      cursor: pointer;
+    }
+    .color-swatch::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background: var(--swatch-color, #888888);
+    }
+    .color-swatch-hex {
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--secondary-text-color);
+    }
+    .color-swatch-input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .reset-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--divider-color);
+      background: transparent;
+      color: var(--primary-text-color);
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .reset-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
   `;
 }
