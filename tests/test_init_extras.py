@@ -125,29 +125,13 @@ async def test_migrate_entry_collapses_v1_triples_to_pairs(
     hass: HomeAssistant,
 ) -> None:
     """v1 triples ("U1|R|Oberlaa") are rewritten to pairs ("U1|R")."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.wiener_linien_austria.const import CONF_LINES
 
-    from homeassistant.const import CONF_SCAN_INTERVAL
+    from .conftest import make_v1_entry
 
-    from custom_components.wiener_linien_austria.const import (
-        CONF_DIVA,
-        CONF_LINES,
-        CONF_RBLS,
-        CONF_STOP_NAME,
-    )
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=1,
-        data={
-            CONF_DIVA: 60201012,
-            CONF_STOP_NAME: "Stephansplatz",
-            CONF_RBLS: [4111, 4118],
-            # Two triples for the same (line, direction) — must dedupe to one.
-            CONF_LINES: ["U1|R|Oberlaa", "U1|R|Alaudagasse", "U1|H|Leopoldau"],
-            CONF_SCAN_INTERVAL: 60,
-        },
-        title="Stephansplatz",
+    # Two triples for the same (line, direction) — must dedupe to one.
+    entry = make_v1_entry(
+        lines=["U1|R|Oberlaa", "U1|R|Alaudagasse", "U1|H|Leopoldau"]
     )
     entry.add_to_hass(hass)
 
@@ -159,29 +143,11 @@ async def test_migrate_entry_collapses_v1_triples_to_pairs(
 
 async def test_migrate_entry_handles_options_bucket(hass: HomeAssistant) -> None:
     """CONF_LINES living in entry.options (reconfigure path) is migrated too."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from custom_components.wiener_linien_austria.const import CONF_LINES
 
-    from homeassistant.const import CONF_SCAN_INTERVAL
+    from .conftest import make_v1_entry
 
-    from custom_components.wiener_linien_austria.const import (
-        CONF_DIVA,
-        CONF_LINES,
-        CONF_RBLS,
-        CONF_STOP_NAME,
-    )
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=1,
-        data={
-            CONF_DIVA: 60201012,
-            CONF_STOP_NAME: "Stephansplatz",
-            CONF_RBLS: [4111],
-            CONF_SCAN_INTERVAL: 60,
-        },
-        options={CONF_LINES: ["U1|H|Leopoldau"]},
-        title="Stephansplatz",
-    )
+    entry = make_v1_entry(rbls=[4111], options_lines=["U1|H|Leopoldau"])
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry) is True
@@ -193,27 +159,9 @@ async def test_migrate_entry_v1_without_lines_just_bumps_version(
     hass: HomeAssistant,
 ) -> None:
     """Old entries without CONF_LINES still get the version bump."""
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from .conftest import make_v1_entry
 
-    from homeassistant.const import CONF_SCAN_INTERVAL
-
-    from custom_components.wiener_linien_austria.const import (
-        CONF_DIVA,
-        CONF_RBLS,
-        CONF_STOP_NAME,
-    )
-
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        version=1,
-        data={
-            CONF_DIVA: 60201012,
-            CONF_STOP_NAME: "Stephansplatz",
-            CONF_RBLS: [4111],
-            CONF_SCAN_INTERVAL: 60,
-        },
-        title="Stephansplatz",
-    )
+    entry = make_v1_entry(rbls=[4111])  # no `lines` → omitted from data
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry) is True
