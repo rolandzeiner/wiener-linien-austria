@@ -1,4 +1,4 @@
-import type { LovelaceCard, LovelaceCardConfig, LovelaceCardEditor } from "custom-card-helpers";
+import type { HomeAssistant, LovelaceCard, LovelaceCardConfig, LovelaceCardEditor } from "custom-card-helpers";
 
 // Register editor element tags with the global customElements registry so
 // TypeScript autocompletes them inside html`…` templates.
@@ -7,7 +7,87 @@ declare global {
     "wiener-linien-austria-card-editor": LovelaceCardEditor;
     "wiener-linien-austria-retro-card-editor": LovelaceCardEditor;
     "hui-error-card": LovelaceCard;
+    "ha-form": HaFormElement;
   }
+}
+
+// ---------------------------------------------------------------------------
+// ha-form schema types — keep narrow on purpose so the schema builder stays
+// strictly typed. `expandable` + `flatten: true` is non-negotiable —
+// without `flatten`, ha-form scopes inner-schema values under `data[name]`
+// and the card's flat-key reads silently default. The interface declares
+// `flatten?: boolean` explicitly so a future maintainer can't add an
+// expandable that quietly nests its values.
+// ---------------------------------------------------------------------------
+
+export type HASelector =
+  | {
+      entity: {
+        domain?: string | string[];
+        integration?: string;
+        multiple?: boolean;
+      };
+    }
+  | { boolean: Record<string, never> }
+  | { text: { type?: "text" | "password" | "url" | "email"; multiline?: boolean } }
+  | {
+      number: {
+        min?: number;
+        max?: number;
+        step?: number;
+        mode?: "box" | "slider";
+        unit_of_measurement?: string;
+      };
+    }
+  | {
+      select: {
+        mode?: "dropdown" | "list";
+        multiple?: boolean;
+        custom_value?: boolean;
+        options: ReadonlyArray<{ value: string; label: string }>;
+      };
+    };
+
+export interface HaFormBaseSchema {
+  name: string;
+  required?: boolean;
+}
+
+export interface HaFormSelectorSchema extends HaFormBaseSchema {
+  selector: HASelector;
+}
+
+export interface HaFormGridSchema {
+  type: "grid";
+  name: "";
+  schema: ReadonlyArray<HaFormSchema>;
+}
+
+export interface HaFormExpandableSchema {
+  type: "expandable";
+  name: string;
+  title?: string;
+  /** When true, ha-form keeps the inner schema's values flat in
+   *  `data` (i.e. `data.show_platform` rather than `data.display.show_platform`).
+   *  Required for cards whose render() reads flat config keys —
+   *  forgetting it silently leaves every flag at its default. */
+  flatten?: boolean;
+  schema: ReadonlyArray<HaFormSchema>;
+}
+
+export type HaFormSchema =
+  | HaFormSelectorSchema
+  | HaFormGridSchema
+  | HaFormExpandableSchema;
+
+// `<ha-form>` element shape — mirror the props the editor sets so
+// `tsc --noEmit` validates the template at compile time.
+interface HaFormElement extends HTMLElement {
+  hass?: HomeAssistant;
+  data?: Record<string, unknown>;
+  schema?: ReadonlyArray<HaFormSchema>;
+  computeLabel?: (field: { name: string }) => string;
+  computeHelper?: (field: { name: string }) => string | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,16 +236,18 @@ export type RetroStyle = "classic" | "warm" | "pixel";
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
-  entity?: string;
-  direction?: "H" | "R";
-  line?: string;
-  show_platform?: boolean;
-  show_station_name?: boolean;
-  station_bg?: RetroStationBg;
-  size?: RetroSize;
-  style?: RetroStyle;
-  flicker?: boolean;
-  wheelchair_race?: boolean;
-  accessibility_only?: boolean;
-  walk_times?: WalkTimes;
+  // `?: T | undefined` — dual form for `exactOptionalPropertyTypes`
+  // compatibility (callers may set or omit each field).
+  entity?: string | undefined;
+  direction?: "H" | "R" | undefined;
+  line?: string | undefined;
+  show_platform?: boolean | undefined;
+  show_station_name?: boolean | undefined;
+  station_bg?: RetroStationBg | undefined;
+  size?: RetroSize | undefined;
+  style?: RetroStyle | undefined;
+  flicker?: boolean | undefined;
+  wheelchair_race?: boolean | undefined;
+  accessibility_only?: boolean | undefined;
+  walk_times?: WalkTimes | undefined;
 }
