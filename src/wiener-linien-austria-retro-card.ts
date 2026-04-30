@@ -5,7 +5,8 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
-import { LINE_TYPE_METRO, RETRO_CARD_VERSION } from "./const.js";
+import { RETRO_CARD_VERSION } from "./const.js";
+import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,

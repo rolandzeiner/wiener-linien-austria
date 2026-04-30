@@ -106,3 +106,36 @@ def test_retro_card_version_matches_ts() -> None:
         f"RETRO_CARD_VERSION drift: src/const.ts={ts_version!r} vs "
         f"manifest.json={expected!r} — bump both in the same commit"
     )
+
+
+# LINE_TYPE_* parity. The four MeansOfTransport strings live in two places
+# (Python const.py + TS src/utils/mot.ts) because they're stable upstream
+# URL constants — duplicating them is cheaper than publishing them as a
+# sensor attribute on every state write. The test here locks that the two
+# copies stay byte-identical.
+_MOT_TS = Path(__file__).parent.parent / "src" / "utils" / "mot.ts"
+_LINE_TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
+    "LINE_TYPE_METRO": re.compile(r'\bLINE_TYPE_METRO\s*=\s*"([^"]+)"'),
+    "LINE_TYPE_TRAM": re.compile(r'\bLINE_TYPE_TRAM\s*=\s*"([^"]+)"'),
+    "LINE_TYPE_BUS_DAY": re.compile(r'\bLINE_TYPE_BUS_DAY\s*=\s*"([^"]+)"'),
+    "LINE_TYPE_BUS_NIGHT": re.compile(r'\bLINE_TYPE_BUS_NIGHT\s*=\s*"([^"]+)"'),
+}
+
+
+def test_line_type_constants_match_python_and_ts() -> None:
+    """Each LINE_TYPE_* constant must match between const.py and src/utils/mot.ts."""
+    from custom_components.wiener_linien_austria import const as py_const
+
+    assert _MOT_TS.is_file(), f"expected TS MoT module at {_MOT_TS}"
+    ts_source = _MOT_TS.read_text(encoding="utf-8")
+    for name, pattern in _LINE_TYPE_PATTERNS.items():
+        py_value = getattr(py_const, name)
+        match = pattern.search(ts_source)
+        assert match is not None, (
+            f"{name} literal not found in {_MOT_TS}; regex may be stale"
+        )
+        ts_value = match.group(1)
+        assert ts_value == py_value, (
+            f"{name} drift: const.py={py_value!r} vs "
+            f"src/utils/mot.ts={ts_value!r} — bump both together"
+        )

@@ -29,10 +29,15 @@ export const DOMAIN = "wiener_linien_austria";
 export const NIGHTLINE_BG = "#1b1464";
 export const NIGHTLINE_FG = "#fef200";
 
-// MeansOfTransport values from /monitor — used to pick icons + apply
-// typographic conventions (trams/buses use the line-number badge, metro
-// uses the line-letter shield).
-export const LINE_TYPE_METRO = "ptMetro";
-export const LINE_TYPE_TRAM = "ptTram";
-export const LINE_TYPE_BUS_DAY = "ptBusCity";
-export const LINE_TYPE_BUS_NIGHT = "ptBusNight";
+// MeansOfTransport values + icon mapping moved to ./utils/mot.ts —
+// single source of truth, no longer mirrored on three files.
+// Re-exported here so existing import paths continue to resolve, but
+// new code should import directly from ./utils/mot.js.
+export {
+  LINE_TYPE_BUS_DAY,
+  LINE_TYPE_BUS_NIGHT,
+  LINE_TYPE_METRO,
+  LINE_TYPE_TRAM,
+  headerIconForType,
+  lineTypeIcon,
+} from "./utils/mot.js";

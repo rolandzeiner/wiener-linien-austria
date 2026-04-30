@@ -6,19 +6,18 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
 import { cardStyles } from "./card-styles.js";
-import {
-  CARD_VERSION,
-  LINE_TYPE_BUS_DAY,
-  LINE_TYPE_BUS_NIGHT,
-  LINE_TYPE_METRO,
-  LINE_TYPE_TRAM,
-} from "./const.js";
+import { CARD_VERSION } from "./const.js";
 import { translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
   renderVersionBanner,
 } from "./shared-render.js";
 import { safeHttpsUri } from "./utils.js";
+import {
+  LINE_TYPE_METRO,
+  headerIconForType,
+  lineTypeIcon,
+} from "./utils/mot.js";
 import type {
   DepartureAttr,
   ElevatorInfoAttr,
@@ -67,27 +66,6 @@ console.info(
 function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
   if (raw) return html`<span lang="de">${raw}</span>`;
   return fallback ?? "";
-}
-
-function iconForType(type: string | undefined): string | null {
-  switch (type) {
-    case LINE_TYPE_METRO:
-      return "mdi:subway-variant";
-    case LINE_TYPE_TRAM:
-      return "mdi:tram";
-    case LINE_TYPE_BUS_DAY:
-    case LINE_TYPE_BUS_NIGHT:
-      return "mdi:bus";
-    default:
-      return null;
-  }
-}
-
-// Header tile icon: derives from the next departure's vehicle type so the
-// card visually announces *what's coming* (bus / tram / metro). Falls back
-// to a generic transit glyph when no rows are available.
-function headerIconForType(type: string | undefined): string {
-  return iconForType(type) ?? "mdi:bus-stop";
 }
 
 // Platform-prefix translation key by vehicle type. U-Bahn stations use
@@ -940,7 +918,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const rowPlatform =
       this._config!.show_platform && d.platform ? String(d.platform) : null;
 
-    const typeIcon = this._config!.show_type_icon ? iconForType(d.type) : null;
+    const typeIcon = this._config!.show_type_icon ? lineTypeIcon(d.type) : null;
 
     // Stops-ahead expandability: an empty list means "we matched but you
     // are at the terminus" — still no panel, no chevron. A truncated list
