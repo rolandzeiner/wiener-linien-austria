@@ -1,15 +1,21 @@
 """Constants for Wiener Linien Austria."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Final
 
 from homeassistant.const import __version__ as _HA_VERSION
 
 DOMAIN: Final = "wiener_linien_austria"
 
-# Integration version — manifest.json carries the clean target ("1.3.0");
-# this constant is allowed to carry a "-beta-N" suffix during development.
-INTEGRATION_VERSION: Final = "1.3.0"
+# Integration version — read from manifest.json at module import so the
+# string can never drift from HACS's authoritative source. Sync read of a
+# ~600-byte file happens once per process; the manifest is required for
+# HACS anyway. Release workflow: bump only manifest.json "version".
+INTEGRATION_VERSION: Final = json.loads(
+    (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+)["version"]
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
@@ -101,11 +107,13 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 
 # Lovelace cards — each JS file carries a `const CARD_VERSION` that must
 # match the corresponding Python constant below byte-for-byte, else the
-# reload banner loops. Retro card iterates independently from the modern
-# one so the two can rev at different paces without spurious reloads.
-CARD_VERSION: Final = "1.3.0"
+# reload banner loops. Both cards version in lockstep with the integration
+# (mirrored in src/const.ts; tests/test_card_version.py asserts both
+# directions). The two cards still ship independent WS probes so a
+# mismatch on one bundle doesn't show a banner on the other.
+CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
-RETRO_CARD_VERSION: Final = "1.3.0"
+RETRO_CARD_VERSION: Final = INTEGRATION_VERSION
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
