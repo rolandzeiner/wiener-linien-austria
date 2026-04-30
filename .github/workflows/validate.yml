@@ -54,14 +54,12 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
-          # Pinned to 3.13 — HA core's current target. Python 3.14 was
-          # tried but the dependency tree (pydantic-core / orjson /
-          # Pillow) ships pyo3 0.24 which doesn't yet support 3.14, so
-          # `pip install` falls through to a source build that fails on
-          # `the configured Python interpreter version (3.14) is newer
-          # than PyO3's maximum supported version (3.13)`. Bump back to
-          # 3.14 once the ecosystem catches up.
-          python-version: "3.13"
+          # Pinned to 3.14 — HA core 2026.4.4 declares
+          # `Requires-Python >=3.14.2`. Earlier in the cycle the pyo3
+          # 0.24 dependency tree (pydantic-core / orjson / Pillow)
+          # didn't yet support 3.14 and CI fell back to 3.13; the
+          # ecosystem has caught up and 3.14 is the current target.
+          python-version: "3.14"
       - name: Install dependencies
         run: pip install -r requirements_test.txt
       - name: Run Linter (Ruff)
