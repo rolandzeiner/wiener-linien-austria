@@ -59,6 +59,11 @@ export class WienerLinienAustriaRetroCardEditor
 
   @state() private _config?: NormalisedRetroConfig;
 
+  // Coalesces direction-autocorrect runs so render storms (typing in
+  // another field) don't queue multiple config-changed dispatches.
+  // Plain field, not @state — this is render bookkeeping, not UI state.
+  private _pendingDirectionFix = false;
+
   public setConfig(config: WienerLinienRetroCardConfig): void {
     this._config = normaliseRetroConfig(config);
   }
@@ -95,14 +100,98 @@ export class WienerLinienAustriaRetroCardEditor
     return [...s].sort();
   }
 
+  /** Distinct termini ("Oberlaa", "Alaudagasse", …) seen in `dir` for the
+   *  picker. When a line is already selected, narrow to that line's
+   *  termini. When no line is selected (the typical case — the form
+   *  asks for direction BEFORE line), fall back to all termini at the
+   *  stop in that direction so the user can decide direction by
+   *  destination, not by the abstract H/R. */
+  private _terminiForDirection(dir: "H" | "R"): string[] {
+    const attrs = this._attrs(this._config?.entity);
+    if (!attrs) return [];
+    const line = this._config?.line;
+    const towards = new Set<string>();
+    for (const d of attrs.departures ?? []) {
+      if (d.direction !== dir || !d.towards) continue;
+      if (line && d.line !== line) continue;
+      towards.add(d.towards);
+    }
+    return [...towards].sort();
+  }
+
+  /** Direction-dropdown label. Two formats:
+   *  - With terminus(es): `H: Oberlaa` (compact letter prefix so the
+   *    pill doesn't blow out at narrow widths).
+   *  - Without terminus (no data flowing right now): full word
+   *    `Hinfahrt` / `Rückfahrt` so the meaning is clear when no
+   *    destination context is available.
+   *  Caps at 3 termini joined by " / " plus a trailing "+N" for hub
+   *  stops with many lines.
+   */
+  private _directionLabel(dir: "H" | "R"): string {
+    const termini = this._terminiForDirection(dir);
+    if (!termini.length) {
+      return this._t(dir === "H" ? "dir_h" : "dir_r");
+    }
+    const prefix = this._t(dir === "H" ? "dir_h_short" : "dir_r_short");
+    const head = termini.slice(0, 3).join(" / ");
+    const more = termini.length > 3 ? ` +${termini.length - 3}` : "";
+    return `${prefix}: ${head}${more}`;
+  }
+
+  /** Distinct directions ("H" / "R") observed at the currently-selected
+   *  entity. Empty when no entity is picked or no data has streamed yet
+   *  — the schema treats empty as "show both" rather than hiding both. */
+  private _availableDirections(): Set<"H" | "R"> {
+    const attrs = this._attrs(this._config?.entity);
+    const out = new Set<"H" | "R">();
+    for (const d of attrs?.departures ?? []) {
+      if (d.direction === "H" || d.direction === "R") out.add(d.direction);
+    }
+    return out;
+  }
+
   /** Build the ha-form schema. Called per render so option labels
    *  pick up the current `hass.language` AND the current selected
-   *  entity (which determines the line dropdown options). */
+   *  entity (which determines the line dropdown options).
+   *
+   *  Two saved-state robustness rules:
+   *    - The line dropdown's `options` always includes the currently-saved
+   *      `line` even if it's not flowing right now (off-hours, cold
+   *      sensor, the line not yet observed in this direction). Without
+   *      this, ha-form renders the trigger empty and the user thinks
+   *      their config got wiped.
+   *    - The direction dropdown hides the option for a direction with
+   *      no live departures so the user can't pick a one-way stop's
+   *      missing direction. When ONLY one direction has data and the
+   *      saved value is the other, _scheduleDirectionAutocorrect (in
+   *      render) flips the saved value to the available one. When the
+   *      stop has no data yet, both options stay visible.
+   */
   private _schema(): ReadonlyArray<HaFormSchema> {
-    const lineOptions = this._linesForCurrent().map((line) => ({
+    const liveLines = this._linesForCurrent();
+    const savedLine = this._config?.line;
+    // Prepend the saved line if it's not in the live list — keeps the
+    // dropdown trigger populated when the line isn't currently flowing.
+    const allLines =
+      savedLine && !liveLines.includes(savedLine)
+        ? [savedLine, ...liveLines]
+        : liveLines;
+    const lineOptions = allLines.map((line) => ({
       value: line,
       label: line,
     }));
+
+    const avail = this._availableDirections();
+    const dirOptions: Array<{ value: string; label: string }> = [];
+    // Empty avail → no entity / no data yet → show both so the user
+    // can pre-pick a direction. Otherwise show only what the stop has.
+    if (avail.size === 0 || avail.has("H")) {
+      dirOptions.push({ value: "H", label: this._directionLabel("H") });
+    }
+    if (avail.size === 0 || avail.has("R")) {
+      dirOptions.push({ value: "R", label: this._directionLabel("R") });
+    }
 
     return [
       {
@@ -122,10 +211,7 @@ export class WienerLinienAustriaRetroCardEditor
         selector: {
           select: {
             mode: "dropdown",
-            options: [
-              { value: "H", label: this._t("dir_h") },
-              { value: "R", label: this._t("dir_r") },
-            ],
+            options: dirOptions,
           },
         },
       },
@@ -251,6 +337,7 @@ export class WienerLinienAustriaRetroCardEditor
     ev: CustomEvent<{ value: Record<string, unknown> }>,
   ): void => {
     if (!this._config) return;
+    const prevEntity = this._config.entity;
     const value = ev.detail.value;
     // Pipe through normaliseRetroConfig so the boolean coercion + enum
     // narrowing stay consistent with the card's setConfig path.
@@ -258,6 +345,21 @@ export class WienerLinienAustriaRetroCardEditor
       ...this._config,
       ...(value as Partial<WienerLinienRetroCardConfig>),
     });
+    // Entity changed → the previous `line` is meaningless on the new
+    // stop. Drop it and auto-pick the first line the new entity reports
+    // in the (possibly auto-corrected) direction. Falls back to undefined
+    // when the new sensor has no live data yet — the line dropdown then
+    // renders empty until the user picks one or the data streams in.
+    if (next.entity !== prevEntity) {
+      const newAttrs = this._attrs(next.entity);
+      const dir = next.direction;
+      const lines = new Set<string>();
+      for (const d of newAttrs?.departures ?? []) {
+        if (d.direction === dir && d.line) lines.add(d.line);
+      }
+      const sorted = [...lines].sort();
+      next.line = sorted[0];
+    }
     // CRITICAL: set _config BEFORE fireEvent. Custom editors don't
     // receive a re-setConfig after config-changed, so a fireEvent-only
     // path leaves _config stale and the next render reverts the form
@@ -286,6 +388,13 @@ export class WienerLinienAustriaRetroCardEditor
 
   protected render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
+    // After this render lands, swap the saved direction to whichever
+    // direction the stop actually has data for IF it's currently
+    // mismatched (e.g. user picked a one-way terminus stop while
+    // direction was set to "R" from a previous bidirectional stop).
+    // Deferred via Promise.resolve() so we never write to _config from
+    // inside render() (Lit warns; queues a redundant re-render).
+    this._scheduleDirectionAutocorrect();
     return html`
       <div class="editor">
         <ha-form
@@ -299,6 +408,36 @@ export class WienerLinienAustriaRetroCardEditor
         ${this._renderWalkTimeSection()}
       </div>
     `;
+  }
+
+  /** When the current entity exposes only one direction AND the saved
+   *  config disagrees, dispatch a one-shot config-changed that swaps to
+   *  the available direction. Coalesced via `_pendingDirectionFix` so
+   *  render storms don't fire multiple corrections. No-op when both
+   *  directions exist or no data has streamed yet (keeps the saved
+   *  value untouched until the sensor reports). */
+  private _scheduleDirectionAutocorrect(): void {
+    if (!this._config || this._pendingDirectionFix) return;
+    const avail = this._availableDirections();
+    if (avail.size !== 1) return;  // both / neither → don't autocorrect
+    const onlyAvail = avail.has("H") ? "H" : "R";
+    if (this._config.direction === onlyAvail) return;
+    this._pendingDirectionFix = true;
+    Promise.resolve().then(() => {
+      this._pendingDirectionFix = false;
+      if (!this._config) return;
+      // Re-check after the async hop — entity might have changed in
+      // the meantime; the new entity might have both directions again.
+      const stillAvail = this._availableDirections();
+      if (stillAvail.size !== 1) return;
+      const target = stillAvail.has("H") ? "H" : "R";
+      if (this._config.direction === target) return;
+      const next: NormalisedRetroConfig = { ...this._config, direction: target };
+      // CRITICAL: assign _config BEFORE fireEvent, same lifecycle rule
+      // as _onFormChanged — otherwise the next render reads stale data.
+      this._config = next;
+      fireEvent(this, "config-changed", { config: next });
+    });
   }
 
   /** Bespoke section: per-(line, direction) walk-time inputs. The row

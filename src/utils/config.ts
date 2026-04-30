@@ -102,6 +102,7 @@ export interface NormalisedModernConfigValidated {
   show_platform: boolean;
   show_hero_metric: boolean;
   show_departures: boolean;
+  show_stops_ahead: boolean;
   hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
@@ -129,6 +130,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   show_platform: true,
   show_hero_metric: true,
   show_departures: true,
+  show_stops_ahead: true,
   hide_header: false,
   hide_attribution: false,
   layout: "stacked",
@@ -195,6 +197,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
     show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
     show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
+    show_stops_ahead: raw.show_stops_ahead ?? MODERN_DEFAULTS.show_stops_ahead,
     hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
@@ -260,9 +263,12 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
 
 // Resolves a line label to its background hex (`#…`). Precedence:
 //   1. user-config `line_colors` (per-line override)
-//   2. GTFS `routes.txt` from the integration's `line_colors` attribute
-//   3. nightline category rule (deeper navy than the GTFS bus navy —
-//      keeps the WL signage convention readable on dark dashboards)
+//   2. nightline category rule (`^N\d`) — wins OVER GTFS for N-prefix
+//      lines. GTFS publishes nightlines as bus navy (`0A295D`), but
+//      Wiener Linien's signage convention pairs a deeper navy with
+//      bright yellow numerals; that pairing only reads correctly when
+//      the nightline rule beats the GTFS lookup.
+//   3. GTFS `routes.txt` from the integration's `line_colors` attribute
 //   4. neutral fallback (`var(--primary-color)`)
 //
 // `overrides` keys are case-folded to uppercase to match the editor's
@@ -277,11 +283,10 @@ export function colorForLine(
 ): string {
   const upper = line.toUpperCase();
   if (overrides[upper] !== undefined) return overrides[upper];
+  // Nightline rule wins over GTFS — see precedence comment above.
+  if (/^N\d/.test(upper)) return NIGHTLINE_BG;
   const gtfs = gtfsColors[line] ?? gtfsColors[upper];
   if (gtfs?.bg) return `#${gtfs.bg}`;
-  // Nightlines (N + digit, e.g. N66, N25, N99) get the WL navy
-  // background by default; user overrides above still win.
-  if (/^N\d/.test(upper)) return NIGHTLINE_BG;
   return fallback;
 }
 
@@ -290,7 +295,8 @@ export function colorForLine(
 // drift: nightline-yellow text only pairs with the nightline navy bg,
 // GTFS fg only pairs with the matching GTFS bg, and a user override
 // leaves the fg unset (the card's CSS default — white — applies because
-// we don't know what reads well on the user's custom colour).
+// we don't know what reads well on the user's custom colour). Nightline
+// rule wins over GTFS — see colorForLine precedence comment.
 export function chipPalette(
   line: string,
   overrides: Record<string, string>,
@@ -300,14 +306,14 @@ export function chipPalette(
   if (overrides[upper] !== undefined) {
     return { background: overrides[upper] };
   }
+  if (/^N\d/.test(upper)) {
+    return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
+  }
   const gtfs = gtfsColors[line] ?? gtfsColors[upper];
   if (gtfs?.bg) {
     return gtfs.fg
       ? { background: `#${gtfs.bg}`, color: `#${gtfs.fg}` }
       : { background: `#${gtfs.bg}` };
-  }
-  if (/^N\d/.test(upper)) {
-    return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
   }
   return { background: "var(--primary-color)" };
 }

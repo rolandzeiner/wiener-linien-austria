@@ -769,27 +769,46 @@ def test_stops_ahead_includes_transfer_lines() -> None:
     assert stephansplatz.get("lines") == ["U3", "U4"]
 
 
-def test_lines_at_diva_natural_sort_with_nightlines_last() -> None:
-    """lines_at_diva is ascending natural order with N-lines at the end.
+def test_lines_at_diva_sort_groups_by_mode_of_transport() -> None:
+    """lines_at_diva groups by MoT first (Metro → Tram → Bus → Night),
+    then by leading-digit number within each mode.
 
-    Verifies the user-facing sort: numeric labels sort numerically (2
-    before 10 before 13A), letter-prefixed labels follow numerics,
-    nightlines (N + digit) come last regardless of letter content.
+    Without an authoritative MoT lookup, the sort uses a label-format
+    heuristic: U-prefix → Metro, N-prefix → Nightline, digit+letter
+    suffix → city bus, everything else → tram. Both paths produce the
+    same ordering for the four standard Wiener Linien label formats.
     """
     from custom_components.wiener_linien_austria.static import _sort_line_labels
 
     labels = ["U6", "13A", "N66", "2", "U1", "62", "N25", "D", "10A"]
+    # Metro (U1, U6) → Tram (2, 62, D — D sorts last among trams as
+    # letter-only) → city bus (10A, 13A) → Nightline (N25, N66).
     assert _sort_line_labels(labels) == (
-        "2",
-        "10A",
-        "13A",
-        "62",
-        "D",
         "U1",
         "U6",
+        "2",
+        "62",
+        "D",
+        "10A",
+        "13A",
         "N25",
         "N66",
     )
+
+
+def test_sort_line_labels_uses_mot_lookup_when_provided() -> None:
+    """Authoritative MoT lookup overrides the label-format heuristic.
+
+    "WLB" is two-letter (heuristic would call it tram) but the live
+    catalogue may say it's something else; the lookup path wins.
+    """
+    from custom_components.wiener_linien_austria.static import _sort_line_labels
+
+    labels = ["U6", "WLB", "71"]
+    mot = {"U6": "ptMetro", "WLB": "ptTram", "71": "ptTram"}
+    # Metro first, then trams sorted numerically (71 before letter-only
+    # WLB which falls to the letter-tie sentinel).
+    assert _sort_line_labels(labels, mot) == ("U6", "71", "WLB")
 
 
 def test_stops_ahead_omits_lines_when_no_transfers() -> None:

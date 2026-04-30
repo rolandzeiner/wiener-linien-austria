@@ -18,8 +18,10 @@
     "stops_ahead_transfer_aria": "Change to {lines}",
     "stops_ahead_other_show": "Show {count} more lines at {stop}",
     "stops_ahead_other_hide": "Hide other lines at {stop}",
-    "dir_h": "H",
-    "dir_r": "R",
+    "dir_h": "Outbound",
+    "dir_r": "Return",
+    "dir_h_short": "H",
+    "dir_r_short": "R",
     "dir_both": "Both",
     "traffic_label": "Disruption",
     "traffic_until": "Until",
@@ -60,8 +62,10 @@
       "show_delay": "Show delays",
       "show_hero_metric": "Show hero block",
       "show_departures": "Show departure list",
+      "show_stops_ahead": "Show intermediate stops",
       "hide_header": "Hide header",
       "hide_attribution": "Hide data source",
+      "layout": "Multi-stop layout",
       "layout_stacked": "Stacked",
       "layout_tabs": "Tabs",
       "no_lines_available": "Lines appear here once stops are selected."
@@ -73,8 +77,10 @@
     "no_data_wrong_direction": "No departures in this direction",
     "no_data_wrong_line": "No departures for this line",
     "betriebsschluss": "End of service",
-    "dir_h": "H",
-    "dir_r": "R",
+    "dir_h": "Outbound",
+    "dir_r": "Return",
+    "dir_h_short": "H",
+    "dir_r_short": "R",
     "gleis": "PLATF.",
     "steig": "STAND",
     "version_update": "Retro card updated to v{v} — please reload",
@@ -87,6 +93,11 @@
     "race_winner_announce": "Wheelchair {n} wins the accessibility race",
     "barrier_free_title": "Step-free access",
     "editor": {
+      "direction": "Direction",
+      "line": "Line",
+      "size": "Size",
+      "style": "Style",
+      "station_bg": "Station-name background",
       "section_display": "Display",
       "section_walk_time": "Walking time to stop",
       "walk_time_hint": "Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",
@@ -106,7 +117,9 @@
       "style_classic": "Classic",
       "style_warm": "Warm",
       "style_pixel": "Dot matrix",
-      "accessibility_only": "Only show step-free departures"
+      "accessibility_only": "Only show step-free departures",
+      "flicker": "Line badge flicker",
+      "wheelchair_race": "Wheelchair race"
     }
   }
 }

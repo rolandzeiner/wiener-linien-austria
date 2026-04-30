@@ -13,7 +13,7 @@ import {
   renderVersionBanner,
 } from "./shared-render.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
-import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
+import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 
@@ -869,10 +869,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     bgChoice: "default" | "white" | "black",
     lineColors: NonNullable<WienerLinienAttrs["line_colors"]>,
   ): TemplateResult {
-    const pool = matching.length ? matching : allDepartures;
-    const metroDep = pool.find((d) => d.type === LINE_TYPE_METRO);
-    const metroLine = metroDep?.line;
-
     let bg: string;
     let fg: string;
     if (bgChoice === "white") {
@@ -881,18 +877,35 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     } else if (bgChoice === "black") {
       bg = "#000";
       fg = "#fff";
-    } else if (metroLine) {
-      // Pull the GTFS-published colour for the soonest metro line at this
-      // stop. The retro panel doesn't honour user `line_colors` overrides
-      // here — the station tile follows upstream branding by design,
-      // matching the in-station signage aesthetic the card emulates.
-      const upper = metroLine.toUpperCase();
-      const palette = lineColors[metroLine] ?? lineColors[upper];
-      bg = palette?.bg ? `#${palette.bg}` : "var(--primary-color)";
-      fg = palette?.fg ? `#${palette.fg}` : "#fff";
     } else {
-      bg = "#fff";
-      fg = "#000";
+      // Default: tint the station tile with the selected line's
+      // Wiener-Linien-published palette. Goes through chipPalette so
+      // the precedence rules elsewhere on the card carry over —
+      // notably the nightline rule (`^N\d`), which overrides the
+      // GTFS bus-navy with the deeper signage navy + bright yellow
+      // numerals so N-prefix tiles match the in-station NightLine
+      // signage. Falls back to white when no line is selected and
+      // no departure context is available, since chipPalette's own
+      // var(--primary-color) fallback can read poorly on light themes.
+      const pool = matching.length ? matching : allDepartures;
+      const sourceLine = pool[0]?.line;
+      if (sourceLine) {
+        // No user line_colors overrides on the retro tile — the panel
+        // follows upstream branding only. Pass {} for overrides.
+        const palette = chipPalette(sourceLine, {}, lineColors);
+        bg = palette.background;
+        fg = palette.color ?? "#fff";
+        // chipPalette's bottom-tier fallback is a CSS var that doesn't
+        // print well on the LED aesthetic — promote to white if the
+        // line is unknown to GTFS / not a nightline / no override.
+        if (bg === "var(--primary-color)") {
+          bg = "#fff";
+          fg = "#000";
+        }
+      } else {
+        bg = "#fff";
+        fg = "#000";
+      }
     }
 
     return html`
@@ -1362,12 +1375,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       top: 50%;
       left: 50%;
       z-index: 22;
-      width: 41cqmin;
-      height: 41cqmin;
-      min-width: 82px;
-      min-height: 82px;
-      max-width: 172px;
-      max-height: 172px;
+      /* +10% over the previous 41cqmin / 82px / 172px sizing so the
+         trophy + lane number have more breathing room inside the LED
+         ring without crowding the embossed numerals. */
+      width: 45cqmin;
+      height: 45cqmin;
+      min-width: 90px;
+      min-height: 90px;
+      max-width: 190px;
+      max-height: 190px;
       border-radius: 50%;
       background-color: var(--led-bg);
       background-image: radial-gradient(
@@ -1380,10 +1396,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       align-items: center;
       justify-content: center;
       color: var(--led-amber);
-      box-shadow:
-        0 0 12px rgb(var(--led-glow-rgb) / 0.85),
-        0 0 28px rgb(var(--led-glow-rgb) / 0.55),
-        inset 0 0 10px rgb(var(--led-glow-rgb) / 0.25);
       transform: translate(-50%, -50%) scale(0.2);
       opacity: 0;
       animation: retroWinnerBadgeAppear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s forwards;
@@ -1398,56 +1410,42 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.85))
               drop-shadow(0 0 10px rgb(var(--led-glow-rgb) / 0.45));
     }
-    /* Lane number on the trophy cup. Amber so it reads as part of the
-       trophy material. Embossed via a subtle highlight on top-left
-       (light from above) + soft shadow on bottom-right (depth), plus
-       a faint LED glow to tie it to the rest of the panel. No heavy
-       drop-shadow extrusion or thick stroke — those read as a
-       separate label sitting on top of the trophy, not as letters
-       pressed into the metal. */
+    /* Lane number on the trophy cup. Coloured with --led-substrate (the
+       same dot colour the rest of the panel uses for unlit pixels) so
+       the digit reads as a hole punched out of the trophy's lit amber
+       — matching the dotted-board / Punktmatrix aesthetic across all
+       three style variants. No text-shadow / embossing: with the
+       substrate-tone digit, any lit-edge highlight reads as a halo
+       around a "missing pixel" hole, which is the wrong material. */
     .retro-winner-num {
       position: absolute;
-      top: 40%;
+      top: 44%;
       left: 0;
       right: 0;
       transform: translateY(-50%);
       text-align: center;
       font-family: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-weight: 900;
-      font-size: 22cqmin;
+      /* -10% from the previous 22cqmin so the digit sits inside the
+         cup bowl rather than overflowing onto the trophy stem. */
+      font-size: 20cqmin;
       line-height: 1;
-      color: var(--led-amber);
+      color: var(--led-substrate);
       letter-spacing: -0.04em;
       pointer-events: none;
-      text-shadow:
-        -1px -1px 0 rgba(255, 240, 180, 0.55),
-        1px 1px 1px rgba(0, 0, 0, 0.4),
-        0 0 6px rgb(var(--led-glow-rgb) / 0.35);
     }
     /* Tighter on the small variant so trophy + number still fit. */
     .retro--size-small .retro-winner-trophy {
       --mdc-icon-size: 51cqmin;
     }
     .retro--size-small .retro-winner-num {
-      font-size: 19cqmin;
+      /* -10% from the previous 19cqmin, same rationale as base. */
+      font-size: 17cqmin;
       /* On small the badge hits its 82px min-width while the trophy
          icon scales down independently — so the cup ends up a touch
          higher in the badge than on regular/medium. Nudge the number
          up the same amount so it lands on the cup body, not below it. */
-      top: 33%;
-    }
-    /* Pixel style: both the trophy icon and the number are screened
-       by the LED dot overlay above. Color the number with
-       --led-substrate (the same tone the rest of the panel uses for
-       its substrate dots) so the letter's dots match the substrate
-       dots of the surrounding panel — the number reads as "unlit
-       pixels" within the trophy's lit amber, not as a darker hole
-       below the panel background. The embossed shadow stack stops
-       making sense once everything is dotty, so drop it. */
-    .retro--style-pixel .retro-winner-num {
-      color: var(--led-substrate);
-      text-shadow: none;
-      -webkit-text-stroke: 0;
+      top: 37%;
     }
     /* Pixel mode alignment fix: drop the trophy badge's own substrate
        gradient. The badge's gradient origin doesn't coregister with

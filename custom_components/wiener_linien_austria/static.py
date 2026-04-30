@@ -51,33 +51,99 @@ _LOGGER = logging.getLogger(__name__)
 # interleave N-lines with regular ones, and the +N reveal at hub stops
 # reads more naturally when N66 sits after the trams.
 _LINE_LEADING_DIGITS_RE = re.compile(r"^(\d+)?(.*)$")
+_LINE_BUS_DAY_RE = re.compile(r"^\d+[A-Z]+$")
 _LINE_SORT_LETTER_TIE = 10**9  # sentinel: letter-only labels rank after numerics
 
+# Mode-of-transport sort tiers — applied first so the lines_at_diva
+# changeover chips group by colour-coded mode (Metro → Tram → Bus →
+# Nightline) rather than interleaving every mode by number alone.
+# Matches the GTFS palette tiers the card now renders.
+_MOT_SORT_RANK: dict[str, int] = {
+    "ptMetro": 0,
+    "ptTram": 1,
+    "ptBusCity": 2,
+    "ptBusNight": 3,
+}
+_MOT_SORT_UNKNOWN = 99
 
-def _line_sort_key(label: str) -> tuple[int, int, str]:
+
+def _heuristic_mot(label: str) -> str | None:
+    """Best-effort MoT inference from label format alone.
+
+    Used when no MoT lookup table is available (e.g. legacy cache entries
+    that round-tripped through `_trip_patterns_from_store` before the
+    table was built). Wiener Linien label conventions:
+      - `U` + digit → Metro
+      - `N` + digit → Nightline bus
+      - digits + letter suffix (`7A`, `13A`) → city bus
+      - everything else (digits-only, single letter, two-letter `WLB`) → tram
+
+    Returns None only on empty input.
+    """
+    if not label:
+        return None
+    head = label[0].upper()
+    if len(label) >= 2 and head == "U" and label[1].isdigit():
+        return "ptMetro"
+    if len(label) >= 2 and head == "N" and label[1].isdigit():
+        return "ptBusNight"
+    if _LINE_BUS_DAY_RE.match(label):
+        return "ptBusCity"
+    return "ptTram"
+
+
+def _line_sort_key(label: str, mot: str | None = None) -> tuple[int, int, int, str]:
     """Return a sort key for a Wiener Linien line label.
 
-    Tier 1 (group): nightlines (N + digit) at the end (key=1), all
-    other lines first (key=0). Tier 2 (within group): leading-digit
-    integer (so "2" < "10" < "13A"); letter-only labels fall to the
-    sentinel and sort alphabetically among themselves (D, U1, U2, …).
-    Tier 3 (tiebreaker): the full remaining label so "13A" < "13B".
+    Tier 1 — mode of transport (Metro → Tram → BusCity → BusNight →
+    unknown). Groups colour-coded modes together on the per-stop
+    changeover chips. When `mot` is None, falls back to a label-format
+    heuristic (`_heuristic_mot`) so callers without an authoritative
+    lookup still produce sensible ordering.
+    Tier 2 — leading-digit integer (so "2" < "10" < "13A"); letter-only
+    labels fall to the sentinel and sort alphabetically among themselves.
+    Tier 3 — full remaining label so "13A" < "13B".
     """
-    is_night = (
-        1 if len(label) >= 2 and label[0].upper() == "N" and label[1].isdigit() else 0
+    resolved_mot = mot or _heuristic_mot(label)
+    mot_rank = (
+        _MOT_SORT_RANK.get(resolved_mot, _MOT_SORT_UNKNOWN)
+        if resolved_mot
+        else _MOT_SORT_UNKNOWN
     )
-    body = label[1:] if is_night else label
+    # Strip the mode-letter prefix from the body so within-mode sort is
+    # purely numeric: "U1" / "U6" sort by 1 / 6, not as letter-only.
+    if resolved_mot in ("ptMetro", "ptBusNight"):
+        body = label[1:]
+    else:
+        body = label
     match = _LINE_LEADING_DIGITS_RE.match(body)
     if match is None:  # never happens — re matches empty string too
-        return (is_night, _LINE_SORT_LETTER_TIE, body)
+        return (mot_rank, 0, _LINE_SORT_LETTER_TIE, body)
     digits, rest = match.group(1), match.group(2)
     numeric = int(digits) if digits else _LINE_SORT_LETTER_TIE
-    return (is_night, numeric, rest)
+    return (mot_rank, 0, numeric, rest)
 
 
-def _sort_line_labels(labels: Iterable[str]) -> tuple[str, ...]:
-    """Return labels in natural ascending order, nightlines at the end."""
-    return tuple(sorted(labels, key=_line_sort_key))
+def _sort_line_labels(
+    labels: Iterable[str],
+    mot_by_label: dict[str, str] | None = None,
+) -> tuple[str, ...]:
+    """Return labels grouped by mode of transport, then numerically.
+
+    When `mot_by_label` is supplied, uses the authoritative MoT for each
+    label; otherwise falls back to a label-format heuristic that handles
+    the four standard Wiener Linien conventions (U-Bahn, tram, city bus,
+    nightline). Both paths produce the same final ordering for the
+    standard label formats.
+    """
+    if mot_by_label:
+        return tuple(
+            sorted(
+                labels,
+                key=lambda label: _line_sort_key(label, mot_by_label.get(label)),
+            )
+        )
+    return tuple(sorted(labels, key=lambda label: _line_sort_key(label)))
 
 STORE_VERSION = 1
 STORE_KEY = f"{DOMAIN}_static"
@@ -743,8 +809,18 @@ def _parse_trip_patterns(
             )
         )
 
+    # Build label → MoT for the per-stop chip sort: groups Metro / Tram /
+    # Bus / Nightline together so the colour-coded chips on the card line
+    # up by mode rather than interleaving every mode by number.
+    mot_by_label: dict[str, str] = {}
+    for label, line_id in lines_by_label.items():
+        mot = means_by_line.get(line_id)
+        if mot:
+            mot_by_label[label] = mot
+
     lines_at_diva: dict[int, tuple[str, ...]] = {
-        diva: _sort_line_labels(labels) for diva, labels in lines_per_diva.items()
+        diva: _sort_line_labels(labels, mot_by_label)
+        for diva, labels in lines_per_diva.items()
     }
     return TripPatternIndex(
         patterns_by_line=patterns_by_line,
@@ -1068,8 +1144,19 @@ def _trip_patterns_from_store(
         means_by_line = {
             int(k): str(v) for k, v in (raw.get("means_by_line") or {}).items()
         }
+        # Build label → MoT for the per-stop sort tier — same as the
+        # parse path. Re-sort on read so a cache written under the old
+        # numeric-only sort gets reordered to the new MoT-grouped order
+        # without a network refresh.
+        mot_by_label_load: dict[str, str] = {}
+        for label, line_id in lines_by_label.items():
+            mot = means_by_line.get(line_id)
+            if mot:
+                mot_by_label_load[label] = mot
         lines_at_diva = {
-            int(k): _sort_line_labels([str(label) for label in (v or [])])
+            int(k): _sort_line_labels(
+                [str(label) for label in (v or [])], mot_by_label_load
+            )
             for k, v in (raw.get("lines_at_diva") or {}).items()
         }
         colors_by_line = {

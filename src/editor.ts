@@ -145,6 +145,7 @@ export class WienerLinienAustriaCardEditor
           { name: "hide_header", selector: { boolean: {} } },
           { name: "show_hero_metric", selector: { boolean: {} } },
           { name: "show_departures", selector: { boolean: {} } },
+          { name: "show_stops_ahead", selector: { boolean: {} } },
           { name: "show_platform", selector: { boolean: {} } },
           { name: "show_accessibility", selector: { boolean: {} } },
           { name: "accessibility_only", selector: { boolean: {} } },
@@ -356,6 +357,55 @@ export class WienerLinienAustriaCardEditor
     return html`${cfg.entities.map((stop) => this._renderStopFilter(stop))}`;
   }
 
+  /** Build a direction-button label that prefers the live terminus(es)
+   *  with a compact "H:" / "R:" prefix; falls back to the full word
+   *  ("Hinfahrt" / "Rückfahrt") when no terminus data is available.
+   *  Caps at 3 termini joined by " / " plus a trailing "+N" so hub
+   *  stops with many lines stay readable in narrow pills. */
+  private _directionLabelFromTermini(
+    dir: "H" | "R",
+    termini: string[],
+  ): string {
+    if (!termini.length) {
+      return this._t(dir === "H" ? "dir_h" : "dir_r");
+    }
+    const prefix = this._t(dir === "H" ? "dir_h_short" : "dir_r_short");
+    const head = termini.slice(0, 3).join(" / ");
+    const more = termini.length > 3 ? ` +${termini.length - 3}` : "";
+    return `${prefix}: ${head}${more}`;
+  }
+
+  /** Stop-wide direction-button label: pools every terminus visible in
+   *  `dir` across every line at the stop. Useful at hub stops where the
+   *  user wants to know "Hinfahrt = which destinations?" before
+   *  committing to the filter. */
+  private _stopWideDirectionLabel(
+    triplets: ReadonlyArray<{ line: string; direction: string; towards: string }>,
+    dir: "H" | "R",
+  ): string {
+    const termini = new Set<string>();
+    for (const t of triplets) {
+      if (t.direction === dir && t.towards) termini.add(t.towards);
+    }
+    return this._directionLabelFromTermini(dir, [...termini].sort());
+  }
+
+  /** Per-line direction-button label: terminus(es) for one specific line
+   *  in `dir`. Same compact / fallback behaviour as the stop-wide label. */
+  private _perLineDirectionLabel(
+    triplets: ReadonlyArray<{ line: string; direction: string; towards: string }>,
+    line: string,
+    dir: "H" | "R",
+  ): string {
+    const termini = new Set<string>();
+    for (const t of triplets) {
+      if (t.line === line && t.direction === dir && t.towards) {
+        termini.add(t.towards);
+      }
+    }
+    return this._directionLabelFromTermini(dir, [...termini].sort());
+  }
+
   private _renderStopFilter(stop: NormalisedModernStop): TemplateResult {
     const attrs = this._attrs(stop.entity);
     if (!attrs) return html``;
@@ -433,14 +483,14 @@ export class WienerLinienAustriaCardEditor
               ?disabled=${!stopHasH}
               title=${!stopHasH ? this._et("direction_unavailable") : ""}
               @click=${() => stopHasH && this._setDirection(stop.entity, "H")}
-            >${this._t("dir_h")}</button>
+            >${this._stopWideDirectionLabel(allTriplets, "H")}</button>
             <button
               type="button"
               class=${classMap({ active: stopActiveR })}
               ?disabled=${!stopHasR}
               title=${!stopHasR ? this._et("direction_unavailable") : ""}
               @click=${() => stopHasR && this._setDirection(stop.entity, "R")}
-            >${this._t("dir_r")}</button>
+            >${this._stopWideDirectionLabel(allTriplets, "R")}</button>
             <button
               type="button"
               class=${classMap({ active: stopActiveBoth })}
@@ -469,6 +519,12 @@ export class WienerLinienAustriaCardEditor
                     const lineActiveBoth = lineDir === null && !lineOnlyOne;
                     const ariaLabel = this._et("per_line_direction_aria").replace("{line}", l);
                     const dirUnavailable = this._et("direction_unavailable");
+                    // Show this line's actual termini per direction
+                    // (e.g. "H: Oberlaa") so the user picks by destination,
+                    // not abstract H/R. Falls back to the full word
+                    // ("Hinfahrt"/"Rückfahrt") when no data flows.
+                    const labelFor = (d: "H" | "R"): string =>
+                      this._perLineDirectionLabel(allTriplets, l, d);
                     return html`
                       <div class="per-line-dir-row" role="group" aria-label=${ariaLabel}>
                         <span class="per-line-dir-badge" style=${styleMap({ background: color })}>${l}</span>
@@ -480,7 +536,7 @@ export class WienerLinienAustriaCardEditor
                             ?disabled=${!lineHasH}
                             title=${!lineHasH ? dirUnavailable : ""}
                             @click=${() => lineHasH && this._setLineDirection(stop.entity, l, "H")}
-                          >${this._t("dir_h")}</button>
+                          >${labelFor("H")}</button>
                           <button
                             type="button"
                             class=${classMap({ active: lineActiveR })}
@@ -488,7 +544,7 @@ export class WienerLinienAustriaCardEditor
                             ?disabled=${!lineHasR}
                             title=${!lineHasR ? dirUnavailable : ""}
                             @click=${() => lineHasR && this._setLineDirection(stop.entity, l, "R")}
-                          >${this._t("dir_r")}</button>
+                          >${labelFor("R")}</button>
                           <button
                             type="button"
                             class=${classMap({ active: lineActiveBoth })}

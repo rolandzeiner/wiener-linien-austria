@@ -18,8 +18,10 @@
     "stops_ahead_transfer_aria": "Umsteigen auf {lines}",
     "stops_ahead_other_show": "{count} weitere Linien bei {stop} anzeigen",
     "stops_ahead_other_hide": "Weitere Linien bei {stop} ausblenden",
-    "dir_h": "H",
-    "dir_r": "R",
+    "dir_h": "Hinfahrt",
+    "dir_r": "Rückfahrt",
+    "dir_h_short": "H",
+    "dir_r_short": "R",
     "dir_both": "Beide",
     "traffic_label": "Störung",
     "traffic_until": "Bis",
@@ -60,8 +62,10 @@
       "show_delay": "Verspätungen anzeigen",
       "show_hero_metric": "Hauptbereich anzeigen",
       "show_departures": "Abfahrtsliste anzeigen",
+      "show_stops_ahead": "Zwischenstopps anzeigen",
       "hide_header": "Kopfzeile ausblenden",
       "hide_attribution": "Datenquelle ausblenden",
+      "layout": "Layout mehrerer Haltestellen",
       "layout_stacked": "Gestapelt",
       "layout_tabs": "Reiter",
       "no_lines_available": "Linien erscheinen hier, sobald Haltestellen ausgewählt wurden."
@@ -73,8 +77,10 @@
     "no_data_wrong_direction": "Keine Abfahrten in dieser Richtung",
     "no_data_wrong_line": "Keine Abfahrten für diese Linie",
     "betriebsschluss": "Betriebsschluss",
-    "dir_h": "H",
-    "dir_r": "R",
+    "dir_h": "Hinfahrt",
+    "dir_r": "Rückfahrt",
+    "dir_h_short": "H",
+    "dir_r_short": "R",
     "gleis": "GLEIS",
     "steig": "STEIG",
     "version_update": "Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",
@@ -87,6 +93,11 @@
     "race_winner_announce": "Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",
     "barrier_free_title": "Barrierefrei zugänglich",
     "editor": {
+      "direction": "Richtung",
+      "line": "Linie",
+      "size": "Größe",
+      "style": "Stil",
+      "station_bg": "Hintergrund",
       "section_display": "Darstellung",
       "section_walk_time": "Fußweg zur Haltestelle",
       "walk_time_hint": "Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",
@@ -106,7 +117,9 @@
       "style_classic": "Klassisch",
       "style_warm": "Warm",
       "style_pixel": "Punktmatrix",
-      "accessibility_only": "Nur barrierefreie Abfahrten anzeigen"
+      "accessibility_only": "Nur barrierefreie Abfahrten anzeigen",
+      "flicker": "Linien-Flimmern",
+      "wheelchair_race": "Rollstuhl-Rennen"
     }
   }
 }

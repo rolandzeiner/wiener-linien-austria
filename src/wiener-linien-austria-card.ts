@@ -767,7 +767,13 @@ export class WienerLinienAustriaCard extends LitElement {
     // hero entry shares the row's stable identifier so opening the
     // panel from the hero leaves the same row's panel open in the list
     // below (when both surface the same departure), and vice versa.
-    const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
+    // `show_stops_ahead` (default true) gates the chevron + panel
+     // — when off, a row that has trip-pattern data still renders, just
+     // without the expandable affordance.
+     const hasStopsAhead =
+      this._config!.show_stops_ahead !== false &&
+      Array.isArray(d.stops_ahead) &&
+      d.stops_ahead.length > 0;
     const rowStableId = d.time_planned ?? `cd${d.countdown}`;
     const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
     const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
@@ -834,7 +840,13 @@ export class WienerLinienAustriaCard extends LitElement {
     d: DepartureAttr,
     entityId: string,
   ): TemplateResult | typeof nothing {
-    const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
+    // `show_stops_ahead` (default true) gates the chevron + panel
+     // — when off, a row that has trip-pattern data still renders, just
+     // without the expandable affordance.
+     const hasStopsAhead =
+      this._config!.show_stops_ahead !== false &&
+      Array.isArray(d.stops_ahead) &&
+      d.stops_ahead.length > 0;
     if (!hasStopsAhead) return nothing;
     const rowStableId = d.time_planned ?? `cd${d.countdown}`;
     const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
@@ -924,7 +936,13 @@ export class WienerLinienAustriaCard extends LitElement {
     // are at the terminus" — still no panel, no chevron. A truncated list
     // (head + ellipsis + terminus) renders the same affordance as a full
     // short list.
-    const hasStopsAhead = Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
+    // `show_stops_ahead` (default true) gates the chevron + panel
+     // — when off, a row that has trip-pattern data still renders, just
+     // without the expandable affordance.
+     const hasStopsAhead =
+      this._config!.show_stops_ahead !== false &&
+      Array.isArray(d.stops_ahead) &&
+      d.stops_ahead.length > 0;
     // Use `time_planned` (or countdown fallback) as the stable
     // identifier so panels stay open across polls — countdown alone
     // ticks every minute and would re-key + collapse the panel.
@@ -1127,9 +1145,46 @@ export class WienerLinienAustriaCard extends LitElement {
           </div>`
         : nothing;
 
+    // When the stop has transfer-to-other-lines (`otherLines`), the WHOLE
+    // row becomes clickable + keyboard-activatable so tapping the stop
+    // name has the same effect as tapping the +N toggle button. Cleaner
+    // hit target on touch and matches user expectation that the entire
+    // row is the affordance, not just the small button on the right.
+    // The toggle button still has its own click handler (with
+    // stopPropagation) so its dedicated label + ARIA stay intact for
+    // screen readers.
+    const rowInteractive = otherLines.length > 0;
+    const rowAriaLabel = rowInteractive
+      ? this._t(
+          transfersExpanded ? "stops_ahead_other_hide" : "stops_ahead_other_show",
+          { count: otherLines.length, stop: s.name },
+        )
+      : "";
+
     return html`
       <li class=${classMap(stopClasses)}>
-        <div class="stops-ahead-row">
+        <div
+          class="stops-ahead-row"
+          role=${rowInteractive ? "button" : nothing}
+          tabindex=${rowInteractive ? "0" : nothing}
+          aria-expanded=${rowInteractive ? (transfersExpanded ? "true" : "false") : nothing}
+          aria-label=${rowInteractive ? rowAriaLabel : nothing}
+          @click=${rowInteractive
+            ? (ev: MouseEvent) => {
+                ev.stopPropagation();
+                this._toggleTransfers(transferKey);
+              }
+            : nothing}
+          @keydown=${rowInteractive
+            ? (ev: KeyboardEvent) => {
+                if (ev.key === "Enter" || ev.key === " ") {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  this._toggleTransfers(transferKey);
+                }
+              }
+            : nothing}
+        >
           <span class="stops-ahead-dot" aria-hidden="true"></span>
           <span class="stops-ahead-name">${deText(s.name)}</span>
           ${metroChips} ${otherToggle}
