@@ -45,8 +45,17 @@ BASE_ENTRY_DATA: dict = {
 }
 
 
-def make_entry(data: dict | None = None) -> MockConfigEntry:
-    """Build a MockConfigEntry with realistic Stephansplatz data."""
+def make_entry(
+    data: dict | None = None,
+    *,
+    unique_id: str = "diva_60201012",
+) -> MockConfigEntry:
+    """Build a MockConfigEntry with realistic Stephansplatz data.
+
+    `unique_id` defaults to the production formula (`diva_{diva}`) so the
+    diagnostics snapshot is reproducible across runs — without it MockConfigEntry
+    generates a fresh random id each run and the snapshot diff is unstable.
+    """
     entry_data = {**BASE_ENTRY_DATA, **(data or {})}
     return MockConfigEntry(
         domain=DOMAIN,
@@ -54,6 +63,7 @@ def make_entry(data: dict | None = None) -> MockConfigEntry:
         options={},
         title="Stephansplatz",
         version=2,
+        unique_id=unique_id,
     )
 
 

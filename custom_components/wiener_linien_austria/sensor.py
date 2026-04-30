@@ -56,6 +56,7 @@ class WienerLinienStopSensor(
 
     _attr_has_entity_name = True
     _attr_translation_key = "stop"
+    _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
 
@@ -139,8 +140,10 @@ class WienerLinienStopSensor(
         # the recorder dedupes it via the state-diff path.
         line_colors = self._line_colors()
 
+        # `attribution` lives on the entity class via `_attr_attribution`
+        # (HA core renders it in the same dict) — don't duplicate here, that
+        # would just add bytes to every recorder write at busy stops.
         return {
-            "attribution": ATTRIBUTION,
             "diva": diva,
             "stop_name": stop_name,
             "latitude": self.coordinator.latitude,

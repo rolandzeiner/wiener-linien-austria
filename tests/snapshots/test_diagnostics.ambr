@@ -11,6 +11,7 @@
     'coordinator': dict({
       'departure_count': 45,
       'last_error_code': None,
+      'last_exception': 'None',
       'last_update_success': True,
       'rbls': list([
         4111,

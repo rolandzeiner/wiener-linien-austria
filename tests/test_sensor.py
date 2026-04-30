@@ -180,8 +180,13 @@ async def test_attributes_carry_attribution_and_identity(hass: HomeAssistant) ->
     coordinator._latitude = 48.2085
     coordinator._longitude = 16.3726
     sensor = WienerLinienStopSensor(coordinator, entry)
+    # `attribution` is now declared on the entity class via `_attr_attribution`
+    # — HA core merges it into `state.attributes` (covered by the end-to-end
+    # test below where state.attributes["attribution"] is asserted). It is NOT
+    # present in `extra_state_attributes` directly.
+    assert sensor.attribution == ATTRIBUTION
     attrs = sensor.extra_state_attributes
-    assert attrs["attribution"] == ATTRIBUTION
+    assert "attribution" not in attrs
     assert attrs["diva"] == 60201012
     assert attrs["stop_name"] == "Stephansplatz"
     assert attrs["server_time"] == "2026-04-20T14:40:00+0200"

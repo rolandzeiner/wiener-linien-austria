@@ -15,12 +15,11 @@ from .coordinator import WienerLinienConfigEntry
 # are not currently surfaced in the diagnostics output, but redact them
 # defensively: the user's *chosen* stop coords reveal location, so a
 # future field addition that exposes lat/lon would otherwise leak it
-# silently. `api_key` / `password` / `token` are defensive
-# future-proofing — diagnostics dumps end up in public GitHub issues,
-# so over-redacting is essentially free and protects against a future
-# contributor adding a generically-named credential field without
-# remembering to update this set. Treat the set as monotonically
-# growing — never shrink.
+# silently. The credential / header keys are defensive future-proofing —
+# diagnostics dumps end up in public GitHub issues, so over-redacting is
+# essentially free and protects against a future contributor adding a
+# generically-named credential or header-bag field without remembering to
+# update this set. Treat the set as monotonically growing — never shrink.
 TO_REDACT: set[str] = {
     "lat",
     "lon",
@@ -29,6 +28,17 @@ TO_REDACT: set[str] = {
     "api_key",
     "password",
     "token",
+    "secret",
+    "bearer",
+    "client_id",
+    "client_secret",
+    "access_token",
+    "refresh_token",
+    "Authorization",
+    "Cookie",
+    "Set-Cookie",
+    "Referer",
+    "host",
 }
 
 
@@ -77,6 +87,11 @@ async def async_get_config_entry_diagnostics(
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
+            # `repr()` preserves both the exception class name and its args
+            # (e.g. `aiohttp.ClientResponseError(0, ())`) without leaking
+            # response-body fragments — most useful triage signal when
+            # last_update_success is False.
+            "last_exception": repr(coordinator.last_exception),
             "last_error_code": coordinator.last_error_code,
             "update_interval": str(coordinator.update_interval),
             "server_time": coordinator.server_time,
