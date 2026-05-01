@@ -21,7 +21,13 @@ INTEGRATION_VERSION: Final = json.loads(
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
 # reach out to *this* integration specifically rather than blanket-blocking
 # the HA UA for everyone. HA convention: "HomeAssistant/{ver} {slug}/{ver}".
-USER_AGENT: Final = f"HomeAssistant/{_HA_VERSION} {DOMAIN}/{INTEGRATION_VERSION}"
+# The trailing "(+<repo-url>)" comment follows RFC-9110 product-token-comment
+# convention so the upstream operator has a direct contact point for abuse
+# / coordination without having to find the repo by guessing.
+USER_AGENT: Final = (
+    f"HomeAssistant/{_HA_VERSION} {DOMAIN}/{INTEGRATION_VERSION} "
+    f"(+https://github.com/rolandzeiner/wiener-linien-austria)"
+)
 
 # Config entry keys
 CONF_DIVA: Final = "diva"
