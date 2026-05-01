@@ -67,3 +67,13 @@ node_modules/
 # Local dev tooling — dev-push scripts are personal, not shared repo code
 scripts/
 dev-push.sh
+
+# ---------------------------------------------------------------------------
+# Fallow code-quality tool — config + caches. Personal tooling; ship the
+# repo without forcing fallow on contributors. Drop the rule if you decide
+# fallow should be a project-wide standard.
+# ---------------------------------------------------------------------------
+.fallowrc.json
+.fallowrc.jsonc
+fallow.toml
+.fallow/

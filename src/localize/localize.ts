@@ -41,7 +41,7 @@ export interface TranslateContext {
 // German first, English fallback — the integration originates in Vienna and
 // every untranslated key defaults to the live-language string rather than
 // an empty blob.
-export function resolveLang(ctx: TranslateContext): string {
+function resolveLang(ctx: TranslateContext): string {
   const raw = ctx.configLanguage || ctx.hassLanguage || "de";
   const code = raw.replace("-", "_").split("_")[0] ?? "de";
   return code === "en" ? "en" : "de";

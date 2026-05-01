@@ -6,7 +6,7 @@ import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 // per-triple `seen` deduplication in tripletsAtStop and as a stable React-
 // like key for the line picker. NOT used for walk-times any more — see
 // lineDirKey below for why.
-export function lineKey(line: string, direction: string, towards: string): string {
+function lineKey(line: string, direction: string, towards: string): string {
   return `${line}|${direction}|${towards}`;
 }
 
@@ -83,7 +83,7 @@ export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   return out;
 }
 
-export function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
+function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
   const s = new Set<string>();
   for (const d of attrs?.departures ?? []) {
     if (d.line) s.add(d.line);

@@ -12,9 +12,9 @@
 // without paying the per-state-write cost.
 
 export const LINE_TYPE_METRO = "ptMetro";
-export const LINE_TYPE_TRAM = "ptTram";
-export const LINE_TYPE_BUS_DAY = "ptBusCity";
-export const LINE_TYPE_BUS_NIGHT = "ptBusNight";
+const LINE_TYPE_TRAM = "ptTram";
+const LINE_TYPE_BUS_DAY = "ptBusCity";
+const LINE_TYPE_BUS_NIGHT = "ptBusNight";
 
 /**
  * Resolve the MDI icon name for a `/monitor`-published vehicle type.
