@@ -60,6 +60,21 @@ class WienerLinienStopSensor(
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
 
+    # Excluded from the recorder: combined size at busy stops (~26 KB) trips
+    # the 16 KB attribute cap, so the recorder was already refusing to store
+    # them. Frontend (card, templates, /api/states) still receives them in
+    # real time — only history is skipped. Mirrors the pattern used by
+    # weather.forecast and other high-frequency-attribute entities.
+    _unrecorded_attributes = frozenset(
+        {
+            "departures",
+            "line_colors",
+            "traffic_info",
+            "elevator_info",
+            "next_by_line",
+        }
+    )
+
     def __init__(
         self,
         coordinator: WienerLinienAustriaCoordinator,
