@@ -25,6 +25,11 @@ export const cardStyles = css`
     --wl-warning: var(--ha-color-warning, #ffa000);
     --wl-error:   var(--ha-color-error,   #db4437);
     --wl-info:    var(--ha-color-info,    #1565c0);
+    /* ISA / ISO 7001 accessibility blue (Pantone 285 C). Kept on its
+       own token — separate from --wl-info — so the wheelchair pill
+       always renders in the standards-correct colour, while themes can
+       still override if they need to. */
+    --wl-a11y:    #0072CE;
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
@@ -207,9 +212,14 @@ export const cardStyles = css`
     grid-column: 1;
     grid-row: 1;
   }
-  .hero > .hero-entry,
-  .hero > .hero-detail {
+  .hero > .hero-entry {
     grid-column: 2;
+  }
+  /* Detail panel spans both columns so its dot column starts at the
+     hero-host's left padding — long station names get the full inner
+     width to render before they need to truncate. */
+  .hero > .hero-detail {
+    grid-column: 1 / -1;
   }
   .hero-time {
     display: flex;
@@ -317,7 +327,7 @@ export const cardStyles = css`
     align-items: center;
     justify-content: center;
     color: #fff;
-    background: var(--wl-info);
+    background: var(--wl-a11y);
     padding: 2px 6px;
     border-radius: 999px;
     flex-shrink: 0;
@@ -559,7 +569,7 @@ export const cardStyles = css`
     --stops-ahead-line-width: 2px;
     list-style: none;
     margin: 0;
-    padding: 8px 10px 10px calc(2.4em + 8px);
+    padding: 8px 10px 10px 0;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -571,11 +581,12 @@ export const cardStyles = css`
   /* The vertical line. Sits behind the dots (they have higher z-index)
      and stops at the centre of the first/last dot via a clip on the
      containing list — easiest done by pinning top/bottom to half the
-     dot size. */
+     dot size. The dot column hugs the panel's left edge so long
+     station names get the maximum readable width on narrow cards. */
   .stops-ahead::before {
     content: "";
     position: absolute;
-    left: calc(2.4em + 8px + var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
+    left: calc(var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
     top: calc(8px + var(--stops-ahead-dot-size) / 2);
     bottom: calc(10px + var(--stops-ahead-dot-size) / 2);
     width: var(--stops-ahead-line-width);
@@ -712,12 +723,30 @@ export const cardStyles = css`
     box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     forced-color-adjust: none;
   }
+  /* Towards cell: type-icon sits as a sibling of .towards-rows so when
+     the delay wraps under the direction name, both rows share the same
+     left edge — aligned with the direction's text, not the icon. */
   .towards {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    color: var(--primary-text-color);
+  }
+  .towards-rows {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    row-gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .towards-name {
+    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--primary-text-color);
   }
   .type-icon {
     --mdc-icon-size: 16px;
@@ -729,7 +758,8 @@ export const cardStyles = css`
     color: var(--wl-warning);
     font-size: 0.85rem;
     font-weight: 500;
-    margin-left: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   /* Trailing column container — holds the optional platform pill and
      the optional flags icons in one grid cell. Inline-flex so platform
@@ -784,7 +814,7 @@ export const cardStyles = css`
      purely by their delay state. */
   .countdown.now   { color: var(--wl-accent); }
   .countdown.late  { color: var(--wl-error); }
-  .countdown.early { color: var(--wl-info); }
+  .countdown.early { color: var(--wl-rt); }
 
   /* Empty / fallback states */
   .empty {
@@ -878,8 +908,18 @@ export const cardStyles = css`
       padding: 0 8px;
       font-size: 0.8125rem;
     }
-    .towards {
-      white-space: normal;
+  }
+
+  /* Narrow cards (sidebar dashboards, mobile portrait) — the hero
+     stacks "Jetzt"/countdown above the line + towards row so the
+     direction name gets the full container width instead of being
+     truncated next to a wide "Jetzt". */
+  @container wlcard (inline-size < 420px) {
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
     }
   }
 
@@ -892,6 +932,19 @@ export const cardStyles = css`
     }
     .icon-tile ha-icon {
       --mdc-icon-size: 24px;
+    }
+    /* Wide enough to afford the metro-map alignment: dots + connecting
+       line indent under the line-badge column so the trail descends
+       visually from under the badge. Narrow cards keep the flush-left
+       layout above for readability of long station names. */
+    .stops-ahead {
+      padding-left: calc(2.4em + 8px);
+    }
+    .stops-ahead::before {
+      left: calc(2.4em + 8px + var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
+    }
+    .hero > .hero-detail {
+      grid-column: 2;
     }
   }
 

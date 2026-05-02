@@ -734,7 +734,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     };
 
     return html`
-      <ha-card style="background:#000;padding:0;overflow:hidden;">
+      <ha-card style="padding:0;overflow:hidden;">
         <div
           class=${classMap(retroClasses)}
           @click=${this._handleCardClick}>
@@ -958,7 +958,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-weight: 700;
       letter-spacing: 0.08em;
       overflow: hidden;
-      border-radius: var(--ha-card-border-radius, 12px);
       min-height: 110px;
     }
     .retro-led {
@@ -1578,8 +1577,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       letter-spacing: 0.01em;
       line-height: 1.05;
       font-size: 1.95em;
-      border-radius: var(--ha-card-border-radius, 12px)
-                     var(--ha-card-border-radius, 12px) 0 0;
     }
     .retro-station-name {
       text-shadow: none;

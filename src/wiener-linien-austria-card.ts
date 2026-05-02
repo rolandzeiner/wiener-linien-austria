@@ -968,9 +968,12 @@ export class WienerLinienAustriaCard extends LitElement {
         <div class="towards">
           ${typeIcon
             ? html`<ha-icon class="type-icon" icon=${typeIcon} aria-hidden="true"></ha-icon>`
-            : nothing}${deText(d.towards)}${delayText
-            ? html` <span class="delay">${delayText}</span>`
             : nothing}
+          <div class="towards-rows">
+            <span class="towards-name">${deText(d.towards)}</span>${delayText
+              ? html`<span class="delay">${delayText}</span>`
+              : nothing}
+          </div>
         </div>
         ${rowPlatform || hasFlags
           ? html`<span class="row-end">
