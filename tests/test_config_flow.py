@@ -206,7 +206,7 @@ async def test_catalogue_unavailable_during_search(hass: HomeAssistant) -> None:
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     with patch(
-        "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+        "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
         side_effect=aiohttp.ClientError("upstream down"),
     ):
@@ -242,7 +242,7 @@ async def test_reconfigure_aborts_when_catalogue_unavailable(
     entry = hass.config_entries.async_entries(DOMAIN)[0]
 
     with patch(
-        "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+        "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
         side_effect=aiohttp.ClientError("upstream down"),
     ):
@@ -318,7 +318,7 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
 
     empty = StaticCatalogue(stations_by_diva={}, last_fetched="t")
     with patch(
-        "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+        "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
         return_value=empty,
     ):

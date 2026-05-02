@@ -6,7 +6,7 @@ import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 // per-triple `seen` deduplication in tripletsAtStop and as a stable React-
 // like key for the line picker. NOT used for walk-times any more — see
 // lineDirKey below for why.
-export function lineKey(line: string, direction: string, towards: string): string {
+function lineKey(line: string, direction: string, towards: string): string {
   return `${line}|${direction}|${towards}`;
 }
 
@@ -83,7 +83,7 @@ export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   return out;
 }
 
-export function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
+function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
   const s = new Set<string>();
   for (const d of attrs?.departures ?? []) {
     if (d.line) s.add(d.line);
@@ -104,17 +104,19 @@ export function collectLinesInSelection(
 }
 
 export interface ModernStopFilter {
-  lines?: string[];
-  direction?: "H" | "R";
+  // `?: T | undefined` — see NormalisedRetroConfigValidated comment for
+  // the dual-form rationale under exactOptionalPropertyTypes.
+  lines?: string[] | undefined;
+  direction?: "H" | "R" | undefined;
   // Per-line direction override. Takes precedence over `direction`.
   // Absence of an entry for a line falls back to `direction`, then to
   // "no direction filter" if `direction` is also unset.
-  line_directions?: Record<string, "H" | "R">;
-  walk_times?: WalkTimes;
+  line_directions?: Record<string, "H" | "R"> | undefined;
+  walk_times?: WalkTimes | undefined;
   // When true, drop any departure whose `barrier_free` flag isn't set —
   // wheelchair-only view. Card-wide on the modern card, card-wide on
   // retro; both pass it through this filter.
-  accessibility_only?: boolean;
+  accessibility_only?: boolean | undefined;
 }
 
 // Apply line/direction/walk-time filters to a departure list, preserving
@@ -138,4 +140,21 @@ export function filterDepartures(
     if (accessibility_only && !d.barrier_free) return false;
     return true;
   });
+}
+
+/** Whether the given departure should render its stops_ahead expandable
+ *  affordance — gated on the user-configurable `show_stops_ahead`
+ *  toggle (default true) AND on the actual presence of upstream
+ *  trip-pattern data. Centralised so the modern card's three render
+ *  helpers (row list, hero entry, hero-panel companion) share one
+ *  rule rather than each carrying their own copy of the gate. */
+export function shouldShowStopsAhead(
+  showStopsAhead: boolean | undefined,
+  d: DepartureAttr,
+): boolean {
+  return (
+    showStopsAhead !== false &&
+    Array.isArray(d.stops_ahead) &&
+    d.stops_ahead.length > 0
+  );
 }

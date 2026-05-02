@@ -1,21 +1,33 @@
 """Constants for Wiener Linien Austria."""
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Final
 
 from homeassistant.const import __version__ as _HA_VERSION
 
 DOMAIN: Final = "wiener_linien_austria"
 
-# Integration version — manifest.json carries the clean target ("1.3.0");
-# this constant is allowed to carry a "-beta-N" suffix during development.
-INTEGRATION_VERSION: Final = "1.3.0"
+# Integration version — read from manifest.json at module import so the
+# string can never drift from HACS's authoritative source. Sync read of a
+# ~600-byte file happens once per process; the manifest is required for
+# HACS anyway. Release workflow: bump only manifest.json "version".
+INTEGRATION_VERSION: Final = json.loads(
+    (Path(__file__).parent / "manifest.json").read_text(encoding="utf-8")
+)["version"]
 
 # User-Agent header sent on every outbound request. Identifying ourselves
 # beyond HA's default clientsession UA lets Wiener Linien traffic-shape or
 # reach out to *this* integration specifically rather than blanket-blocking
 # the HA UA for everyone. HA convention: "HomeAssistant/{ver} {slug}/{ver}".
-USER_AGENT: Final = f"HomeAssistant/{_HA_VERSION} {DOMAIN}/{INTEGRATION_VERSION}"
+# The trailing "(+<repo-url>)" comment follows RFC-9110 product-token-comment
+# convention so the upstream operator has a direct contact point for abuse
+# / coordination without having to find the repo by guessing.
+USER_AGENT: Final = (
+    f"HomeAssistant/{_HA_VERSION} {DOMAIN}/{INTEGRATION_VERSION} "
+    f"(+https://github.com/rolandzeiner/wiener-linien-austria)"
+)
 
 # Config entry keys
 CONF_DIVA: Final = "diva"
@@ -24,9 +36,13 @@ CONF_RBLS: Final = "rbls"
 CONF_LINES: Final = "lines"  # selected {rbl}_{line}_{direction} ids
 CONF_SEARCH_QUERY: Final = "search_query"
 
-# Polling policy
-# Wiener Linien fair-use rule = 15s minimum. We enforce 30s as a hard floor
-# so two concurrent entries still leave headroom. Default is a comfortable 60s.
+# Polling policy.
+# The conventional minimum interval circulated for the Wiener Linien OGD
+# real-time endpoint is 15 s — the WL `open-data` page documents the
+# CC-BY licence and "no API key required" but does not currently publish
+# a numeric request-rate cap, so 15 s is convention rather than written
+# rule. We enforce 30 s as a hard floor (twice the conventional minimum)
+# so two concurrent entries still leave headroom. Default is 60 s.
 MIN_POLL_SECONDS: Final = 30
 DEFAULT_SCAN_INTERVAL: Final = 60  # seconds
 MAX_POLL_SECONDS: Final = 600
@@ -54,7 +70,7 @@ TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
 
 # Alerts (traffic disruptions + elevator outages) refresh cadence. Domain-wide,
 # shared across all entries. 5 min is plenty — these don't change any faster
-# than a few times an hour and fetching more often just eats the fair-use
+# than a few times an hour and fetching more often just eats the request
 # budget that belongs to live departure polling.
 ALERTS_REFRESH_SECONDS: Final = 300
 
@@ -74,6 +90,15 @@ ENTRY_COUNT_KEY: Final = "entry_count"
 STATIC_FILES: Final = {
     "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",
     "haltepunkte": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltepunkte.csv",
+    "linien": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-linien.csv",
+    "fahrwegverlaeufe": (
+        f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-fahrwegverlaeufe.csv"
+    ),
+    # GTFS routes.txt — authoritative `route_color` + `route_text_color`
+    # per line label. Roughly 8 KB on the wire (gzipped). Keeps the card's
+    # default palette in sync with whatever Wiener Linien publishes
+    # (e.g. the U5 launch will rev every metro colour at once).
+    "routes": f"{API_BASE_URL}/doku/ogd/gtfs/routes.txt",
 }
 
 # Response attribution (CC-BY mandated)
@@ -81,7 +106,10 @@ ATTRIBUTION: Final = (
     "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 )
 
-# Error code 316 = rate limit exceeded per Wiener Linien fair-use.
+# Error code 316 = rate limit exceeded — observed empirically from the
+# OGD real-time endpoint when the conventional 15-second minimum
+# interval is breached (the public dataset page does not currently
+# publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
 # MeansOfTransport values → rough categorisation for UI icons
@@ -92,17 +120,26 @@ LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 
 # Lovelace cards — each JS file carries a `const CARD_VERSION` that must
 # match the corresponding Python constant below byte-for-byte, else the
-# reload banner loops. Retro card iterates independently from the modern
-# one so the two can rev at different paces without spurious reloads.
-CARD_VERSION: Final = "1.3.0"
+# reload banner loops. Both cards version in lockstep with the integration
+# (mirrored in src/const.ts; tests/test_card_version.py asserts both
+# directions). The two cards still ship independent WS probes so a
+# mismatch on one bundle doesn't show a banner on the other.
+CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
-RETRO_CARD_VERSION: Final = "1.3.0"
+CARD_FILENAME: Final = "wiener-linien-austria-card.js"
+RETRO_CARD_VERSION: Final = INTEGRATION_VERSION
 RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
+RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
 
 # Cap on how many departures we surface in sensor attributes. The card maxes
-# out at 20 per stop; 30 gives buffer for diagnostics and templates while
-# keeping the full payload comfortably under HA's 16 KB recorder attribute
+# out at 20 per stop; matching that here keeps the per-departure stops_ahead
+# trail (now full route, not truncated) within HA's 16 KB recorder attribute
 # cap at busy multi-line stops (Stephansplatz tracks U1/U3/U4).
-MAX_DEPARTURES_IN_ATTRS: Final = 30
+MAX_DEPARTURES_IN_ATTRS: Final = 20
+
+# Hard safety cap on `stops_ahead` length per departure. The longest Wiener
+# Linien lines are ~25 stops end-to-end; 30 gives generous headroom while
+# still protecting against runaway data on a future schema surprise.
+MAX_STOPS_AHEAD: Final = 30

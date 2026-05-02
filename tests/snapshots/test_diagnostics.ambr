@@ -11,6 +11,7 @@
     'coordinator': dict({
       'departure_count': 45,
       'last_error_code': None,
+      'last_exception': 'None',
       'last_update_success': True,
       'rbls': list([
         4111,
@@ -37,6 +38,9 @@
       }),
       'title': 'Stephansplatz',
       'version': 2,
+    }),
+    'trip_patterns': dict({
+      'loaded': False,
     }),
   })
 # ---

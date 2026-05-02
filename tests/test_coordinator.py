@@ -152,6 +152,130 @@ def test_parse_monitor_body_falls_back_to_line_towards_when_vehicle_missing() ->
 
 
 # ---------------------------------------------------------------------------
+# stops_ahead enrichment (per-departure trip-pattern lookup)
+# ---------------------------------------------------------------------------
+
+
+def _u1_catalogue_for_coord():
+    """Catalogue + trip-pattern index covering U1 H + R for enrichment tests."""
+    from custom_components.wiener_linien_austria.static import (
+        Station,
+        StaticCatalogue,
+        TripPattern,
+        TripPatternIndex,
+    )
+
+    stations = {
+        62000001: Station(62000001, "Reumannplatz", "Wien", 16.37, 48.18, [4001]),
+        60201012: Station(60201012, "Stephansplatz", "Wien", 16.37, 48.21, [4111, 4118]),
+        62000002: Station(62000002, "Praterstern", "Wien", 16.39, 48.22, [4222]),
+        62000003: Station(62000003, "Leopoldau", "Wien", 16.47, 48.27, [4333]),
+    }
+    h_pattern = TripPattern(
+        line_id=301, pattern_id=1, direction=1, stops=(4001, 4111, 4222, 4333)
+    )
+    r_pattern = TripPattern(
+        line_id=301, pattern_id=2, direction=2, stops=(4333, 4222, 4118, 4001)
+    )
+    index = TripPatternIndex(
+        patterns_by_line={301: [h_pattern, r_pattern]},
+        lines_by_label={"U1": 301},
+        means_by_line={301: "ptMetro"},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="t",
+        trip_patterns=index,
+    )
+
+
+def _u1_h_body() -> dict:
+    """A /monitor body with one U1/H departure towards Leopoldau."""
+    return {
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U1",
+                            "towards": "Leopoldau",
+                            "direction": "H",
+                            "type": "ptMetro",
+                            "barrierFree": True,
+                            "realtimeSupported": True,
+                            "trafficjam": False,
+                            "departures": {
+                                "departure": [
+                                    {
+                                        "departureTime": {"countdown": 2},
+                                        "vehicle": {"towards": "Leopoldau"},
+                                    },
+                                ]
+                            },
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+
+def test_parse_monitor_body_enriches_with_stops_ahead() -> None:
+    """When catalogue + entry_rbls are passed, departures get stops_ahead."""
+    catalogue = _u1_catalogue_for_coord()
+    result = _parse_monitor_body(
+        _u1_h_body(),
+        None,
+        None,
+        catalogue=catalogue,
+        entry_rbls=[4111, 4118],
+    )
+    assert len(result.departures) == 1
+    sa = result.departures[0].stops_ahead
+    assert sa is not None
+    assert [s["name"] for s in sa] == ["Praterstern", "Leopoldau"]
+    assert sa[-1].get("is_terminus") is True
+
+
+def test_parse_monitor_body_omits_stops_ahead_for_unknown_line() -> None:
+    """Unknown line label → stops_ahead absent on the dict, None on the dataclass."""
+    catalogue = _u1_catalogue_for_coord()
+    body = _u1_h_body()
+    body["data"]["monitors"][0]["lines"][0]["name"] = "U99"
+    result = _parse_monitor_body(
+        body, None, None, catalogue=catalogue, entry_rbls=[4111]
+    )
+    assert result.departures[0].stops_ahead is None
+    assert "stops_ahead" not in result.departures[0].to_dict()
+
+
+def test_parse_monitor_body_skips_enrichment_when_no_catalogue() -> None:
+    """Without catalogue/entry_rbls, the parser leaves stops_ahead None."""
+    result = _parse_monitor_body(_u1_h_body(), None, None)
+    assert result.departures[0].stops_ahead is None
+
+
+def test_parse_monitor_body_failsoft_on_match_exception() -> None:
+    """A throwing matcher must not poison the rest of the parse."""
+    catalogue = _u1_catalogue_for_coord()
+    body = _u1_h_body()
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("synthetic matcher failure")
+
+    with patch(
+        "custom_components.wiener_linien_austria.static.stops_ahead_for_match",
+        side_effect=_boom,
+    ):
+        result = _parse_monitor_body(
+            body, None, None, catalogue=catalogue, entry_rbls=[4111]
+        )
+    # Departure parsed; stops_ahead silently None.
+    assert len(result.departures) == 1
+    assert result.departures[0].stops_ahead is None
+
+
+# ---------------------------------------------------------------------------
 # Fetch behaviour
 # ---------------------------------------------------------------------------
 
@@ -563,7 +687,7 @@ async def test_async_setup_populates_coordinates(hass: HomeAssistant) -> None:
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    await coordinator.async_setup()
+    await coordinator._async_setup()
     # Sample catalogue in conftest carries Stephansplatz @ 48.2085, 16.3726.
     assert coordinator.latitude == 48.2085
     assert coordinator.longitude == 16.3726
@@ -578,11 +702,11 @@ async def test_async_setup_no_coords_when_catalogue_load_fails(
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
     with patch(
-        "custom_components.wiener_linien_austria.static.async_load_catalogue",
+        "custom_components.wiener_linien_austria.static.async_get_catalogue",
         new_callable=AsyncMock,
         side_effect=RuntimeError("upstream unreachable"),
     ):
-        await coordinator.async_setup()
+        await coordinator._async_setup()
 
     assert coordinator.latitude is None
     assert coordinator.longitude is None
@@ -595,7 +719,7 @@ async def test_async_setup_no_coords_when_diva_not_in_catalogue(
     entry = _make_entry({CONF_DIVA: 99999999})
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    await coordinator.async_setup()
+    await coordinator._async_setup()
     assert coordinator.latitude is None
     assert coordinator.longitude is None
 

@@ -28,6 +28,7 @@ from .coordinator import (
     WienerLinienAustriaCoordinator,
     WienerLinienConfigEntry,
 )
+from .static import CATALOGUE_KEY, StaticCatalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -55,8 +56,24 @@ class WienerLinienStopSensor(
 
     _attr_has_entity_name = True
     _attr_translation_key = "stop"
+    _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.MINUTES
+
+    # Excluded from the recorder: combined size at busy stops (~26 KB) trips
+    # the 16 KB attribute cap, so the recorder was already refusing to store
+    # them. Frontend (card, templates, /api/states) still receives them in
+    # real time — only history is skipped. Mirrors the pattern used by
+    # weather.forecast and other high-frequency-attribute entities.
+    _unrecorded_attributes = frozenset(
+        {
+            "departures",
+            "line_colors",
+            "traffic_info",
+            "elevator_info",
+            "next_by_line",
+        }
+    )
 
     def __init__(
         self,
@@ -129,8 +146,19 @@ class WienerLinienStopSensor(
         # max_departures setting (≤ 20) so nothing the UI shows is lost.
         capped = [d.to_dict() for d in departures[:MAX_DEPARTURES_IN_ATTRS]]
 
+        # GTFS-derived per-line palette. Published unscoped (every line in
+        # the Wiener Linien catalogue, not just lines at this stop) because
+        # the card's stops_ahead trail can render chips for transfer lines
+        # at OTHER stops — scoping here would leave those chips colourless.
+        # Total size is ~3 KB regardless of stop, well under the recorder's
+        # 16 KB attribute cap, and the data is identical across sensors so
+        # the recorder dedupes it via the state-diff path.
+        line_colors = self._line_colors()
+
+        # `attribution` lives on the entity class via `_attr_attribution`
+        # (HA core renders it in the same dict) — don't duplicate here, that
+        # would just add bytes to every recorder write at busy stops.
         return {
-            "attribution": ATTRIBUTION,
             "diva": diva,
             "stop_name": stop_name,
             "latitude": self.coordinator.latitude,
@@ -138,9 +166,35 @@ class WienerLinienStopSensor(
             "server_time": data.server_time if data is not None else None,
             "departures": capped,
             "next_by_line": next_by_line,
+            "line_colors": line_colors,
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
         }
+
+    def _line_colors(self) -> dict[str, dict[str, str]]:
+        """Return the full GTFS palette as `{label: {bg, fg}}`.
+
+        Reads the shared catalogue ref live so a background trip-pattern
+        refresh (which also refreshes route colours) is picked up on the
+        very next sensor read. Returns `{}` when the catalogue isn't
+        loaded yet or the routes payload hasn't landed — the card has its
+        own fallbacks (nightline rule + neutral default).
+        """
+        domain_data = self.coordinator.hass.data.get(DOMAIN, {})
+        catalogue = domain_data.get(CATALOGUE_KEY)
+        if not isinstance(catalogue, StaticCatalogue):
+            return {}
+        index = catalogue.trip_patterns
+        if index is None or not index.colors_by_line:
+            return {}
+        out: dict[str, dict[str, str]] = {}
+        for label, bg in index.colors_by_line.items():
+            entry = {"bg": bg}
+            fg = index.text_colors_by_line.get(label)
+            if fg:
+                entry["fg"] = fg
+            out[label] = entry
+        return out
 
     @property
     def available(self) -> bool:

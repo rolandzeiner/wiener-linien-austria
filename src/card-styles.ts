@@ -1,7 +1,7 @@
 import { css } from "lit";
 
 // Tile-card visual language. Token-driven, container-query-paced.
-// Per-station accent is piped in via inline `style="--nb-accent: …;"` on
+// Per-station accent is piped in via inline `style="--wl-accent: …;"` on
 // `.station`, so every accented surface (icon-tile, line badge, alert
 // surface, focus ring) reads from one prop.
 export const cardStyles = css`
@@ -15,32 +15,37 @@ export const cardStyles = css`
     container-name: wlcard;
 
     /* Brand accent inherits HA's primary. Per-station accent override
-       lands inline on .station via style="--nb-accent: …;". */
-    --nb-accent: var(--primary-color);
+       lands inline on .station via style="--wl-accent: …;". */
+    --wl-accent: var(--primary-color);
 
     /* Semantic state tokens layered over HA's official semantic palette
        so theme authors can recolour the whole portfolio in one place;
        hard-coded fallbacks for older HA versions. */
-    --nb-rt:      var(--ha-color-success, #43a047);
-    --nb-warning: var(--ha-color-warning, #ffa000);
-    --nb-error:   var(--ha-color-error,   #db4437);
-    --nb-info:    var(--ha-color-info,    #1565c0);
+    --wl-rt:      var(--ha-color-success, #43a047);
+    --wl-warning: var(--ha-color-warning, #ffa000);
+    --wl-error:   var(--ha-color-error,   #db4437);
+    --wl-info:    var(--ha-color-info,    #1565c0);
+    /* ISA / ISO 7001 accessibility blue (Pantone 285 C). Kept on its
+       own token — separate from --wl-info — so the wheelchair pill
+       always renders in the standards-correct colour, while themes can
+       still override if they need to. */
+    --wl-a11y:    #0072CE;
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
        linz-linien-austria so a stacked dashboard reads as one
        family. */
-    --nb-radius-sm: var(--ha-radius-sm, 6px);
-    --nb-radius-md: var(--ha-radius-md, 10px);
-    --nb-radius-lg: var(--ha-card-border-radius, var(--ha-radius-lg, 12px));
-    --nb-pad-x:     var(--ha-spacing-4, 16px);
-    --nb-pad-y:     var(--ha-spacing-3, 14px);
-    --nb-row-gap:   var(--ha-spacing-3, 12px);
-    --nb-tile-size: 40px;
-    --nb-slot-radius: var(--ha-radius-md, 10px);
-    --nb-slot-gap: 6px;
-    --nb-slot-min-h: 44px;
-    --nb-metric-size: 2.25rem;
+    --wl-radius-sm: var(--ha-radius-sm, 6px);
+    --wl-radius-md: var(--ha-radius-md, 10px);
+    --wl-radius-lg: var(--ha-card-border-radius, var(--ha-radius-lg, 12px));
+    --wl-pad-x:     var(--ha-spacing-4, 16px);
+    --wl-pad-y:     var(--ha-spacing-3, 14px);
+    --wl-row-gap:   var(--ha-spacing-3, 12px);
+    --wl-tile-size: 40px;
+    --wl-slot-radius: var(--ha-radius-md, 10px);
+    --wl-slot-gap: 6px;
+    --wl-slot-min-h: 44px;
+    --wl-metric-size: 2.25rem;
   }
 
   ha-card {
@@ -50,8 +55,8 @@ export const cardStyles = css`
   .wrap {
     display: flex;
     flex-direction: column;
-    gap: var(--nb-row-gap);
-    padding: var(--nb-pad-y) var(--nb-pad-x);
+    gap: var(--wl-row-gap);
+    padding: var(--wl-pad-y) var(--wl-pad-x);
   }
 
   /* Tabs sit flush with the card edge — direct child of <ha-card>, not
@@ -93,16 +98,16 @@ export const cardStyles = css`
     box-shadow: inset 0 -2px 0 var(--primary-color);
   }
 
-  /* Per-station section. Inline --nb-accent on this element drives the
+  /* Per-station section. Inline --wl-accent on this element drives the
      icon-tile tint, line-badge fallback, alert tints, and CTA fill. */
   .station {
     display: flex;
     flex-direction: column;
-    gap: var(--nb-row-gap);
+    gap: var(--wl-row-gap);
   }
   .station + .station {
-    margin-top: var(--nb-row-gap);
-    padding-top: var(--nb-row-gap);
+    margin-top: var(--wl-row-gap);
+    padding-top: var(--wl-row-gap);
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
   }
 
@@ -114,11 +119,11 @@ export const cardStyles = css`
     gap: 12px;
   }
   .icon-tile {
-    width: var(--nb-tile-size);
-    height: var(--nb-tile-size);
-    border-radius: var(--nb-radius-md);
-    background: color-mix(in srgb, var(--nb-accent) 18%, transparent);
-    color: var(--nb-accent);
+    width: var(--wl-tile-size);
+    height: var(--wl-tile-size);
+    border-radius: var(--wl-radius-md);
+    background: color-mix(in srgb, var(--wl-accent) 18%, transparent);
+    color: var(--wl-accent);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -184,33 +189,46 @@ export const cardStyles = css`
   /* Hero block — Linz-Linien-aligned layout: tinted background, big
      countdown on the left, line-badge + direction column on the right.
      Matches linz-linien-austria so a stacked dashboard reads as one
-     visual family. The per-station --nb-accent (set inline on .station)
+     visual family. The per-station --wl-accent (set inline on .station)
      drives the tint and the big-number colour; the row beside lists
      the next departure's line, direction, platform, and a realtime
      pill if applicable. */
   .hero {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: var(--ha-spacing-3, 12px);
+    column-gap: var(--ha-spacing-3, 12px);
+    row-gap: 6px;
     align-items: center;
-    /* 12px vertical, --nb-pad-x horizontal — matches Linz's hero
-       padding exactly so the line-badge / direction column has the
-       same breathing room from the tinted edge. The hero block itself
-       is already inset by .wrap (which provides --nb-pad-x on the
-       outside); these values are the inner padding inside the tinted
-       surface. */
-    padding: var(--ha-spacing-3, 12px) var(--nb-pad-x);
-    background: color-mix(in srgb, var(--nb-accent) 12%, transparent);
-    border-radius: var(--nb-radius-lg);
+    /* Cosmetics (background, padding, radius) live on .hero-host so
+       the tinted surface visually contains both the grid and any
+       expanded stops_ahead panel below. The .hero grid itself just
+       does layout — entries + their panels live in column 2 in
+       interleaved row order so each panel sits directly below its
+       trigger entry; .hero-time pins to row 1 of column 1 and stays
+       vertically centred against the first entry regardless of
+       which panels expand below. */
+  }
+  .hero > .hero-time {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .hero > .hero-entry {
+    grid-column: 2;
+  }
+  /* Detail panel spans both columns so its dot column starts at the
+     hero-host's left padding — long station names get the full inner
+     width to render before they need to truncate. */
+  .hero > .hero-detail {
+    grid-column: 1 / -1;
   }
   .hero-time {
     display: flex;
     align-items: baseline;
     gap: 4px;
-    color: var(--nb-accent);
+    color: var(--wl-accent);
   }
   .hero-min {
-    font-size: var(--nb-metric-size);
+    font-size: var(--wl-metric-size);
     font-weight: var(--ha-font-weight-bold, 600);
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -221,13 +239,16 @@ export const cardStyles = css`
     font-weight: 600;
     color: var(--secondary-text-color);
   }
-  /* Hero meta column — line badge + direction + platform pill + rt
-     pill. Wraps onto a second visual row at narrow widths. */
-  .hero-meta {
+  /* hero-host carries the cosmetics (background, padding, radius)
+     so the tinted surface wraps both the .hero grid and any
+     expanded stops_ahead panels in one continuous block. */
+  .hero-host {
     display: flex;
     flex-direction: column;
-    gap: 6px;
     min-width: 0;
+    padding: var(--ha-spacing-3, 12px) var(--wl-pad-x);
+    background: color-mix(in srgb, var(--wl-accent) 12%, transparent);
+    border-radius: var(--wl-radius-lg);
   }
   .hero-entry {
     display: flex;
@@ -235,6 +256,42 @@ export const cardStyles = css`
     align-items: center;
     gap: 8px;
     min-width: 0;
+  }
+  .hero-entry.expandable {
+    cursor: pointer;
+    user-select: none;
+    border-radius: 6px;
+  }
+  .hero-chevron {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+    margin-left: auto;
+    flex-shrink: 0;
+    /* will-change promotes the chevron to its own composite layer so
+       the rotation animates on the GPU instead of triggering a layout
+       pass that nudges flex siblings during the transition. */
+    will-change: transform;
+    transition: transform
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .hero-entry.expanded .hero-chevron {
+    transform: rotate(180deg);
+  }
+  /* Hero-side collapsible panel — same 0fr↔1fr trick as
+     .dep-row-detail so the trail animates to intrinsic height. The
+     entry itself reuses the same .stops-ahead inner styling. */
+  .hero-detail {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+  }
+  .hero-detail-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .hero-detail.expanded {
+    grid-template-rows: 1fr;
   }
   .hero-direction {
     font-weight: 500;
@@ -270,7 +327,7 @@ export const cardStyles = css`
     align-items: center;
     justify-content: center;
     color: #fff;
-    background: var(--nb-info);
+    background: var(--wl-a11y);
     padding: 2px 6px;
     border-radius: 999px;
     flex-shrink: 0;
@@ -280,63 +337,28 @@ export const cardStyles = css`
     --mdc-icon-size: 16px;
   }
 
-  /* Chips: tablet-style pill, tabular numerals so countdowns don't
-     jiggle. Default tint reads from --primary-color so neutral chips
-     stay calm; severity flags override per class. */
-  .chip {
-    display: inline-flex;
+  /* Version banner — accent surface that uses warning tokens. The
+     button is rendered bare by renderVersionBanner (shared-render.ts);
+     the .banner > button selector below tints it to match. */
+  .banner {
+    display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
-    color: var(--primary-color);
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    forced-color-adjust: none;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--wl-radius-md);
+    background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
+    color: var(--primary-text-color);
+    font-size: 0.85rem;
   }
-  .chip.muted {
-    background: color-mix(in srgb, var(--secondary-text-color) 14%, transparent);
-    color: var(--secondary-text-color);
+  .banner > span {
+    flex: 1;
   }
-  .chip ha-icon {
-    --mdc-icon-size: 14px;
-  }
-
-  /* Status flag pills. Same shape as .chip but severity-tinted. */
-  .flag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    forced-color-adjust: none;
-  }
-  .flag.warning {
-    background: color-mix(in srgb, var(--nb-warning) 16%, transparent);
-    color: var(--nb-warning);
-  }
-  .flag.error {
-    background: color-mix(in srgb, var(--nb-error) 16%, transparent);
-    color: var(--nb-error);
-  }
-  .flag ha-icon {
-    --mdc-icon-size: 14px;
-  }
-
-  /* Filled CTA — used by the version banner reload button. */
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+  .banner > button {
     height: 32px;
     padding: 0 14px;
     border: none;
     border-radius: 999px;
-    background: var(--nb-accent);
+    background: var(--wl-warning);
     color: var(--text-primary-color, #fff);
     font-family: inherit;
     font-size: 0.75rem;
@@ -346,32 +368,11 @@ export const cardStyles = css`
     transition: filter var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), transform 0.06s ease;
     forced-color-adjust: none;
   }
-  .btn-primary:hover {
+  .banner > button:hover {
     filter: brightness(1.08);
   }
-  .btn-primary:active {
+  .banner > button:active {
     transform: translateY(1px);
-  }
-  .btn-primary ha-icon {
-    --mdc-icon-size: 16px;
-  }
-
-  /* Version banner — accent surface that uses warning tokens. */
-  .banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: var(--nb-radius-md);
-    background: color-mix(in srgb, var(--nb-warning) 16%, transparent);
-    color: var(--primary-text-color);
-    font-size: 0.85rem;
-  }
-  .banner > span {
-    flex: 1;
-  }
-  .banner .btn-primary {
-    background: var(--nb-warning);
   }
 
   /* Alerts: traffic + elevator items use the same expandable surface. */
@@ -385,9 +386,9 @@ export const cardStyles = css`
     gap: 10px;
     align-items: flex-start;
     padding: 10px 12px;
-    border-radius: var(--nb-radius-md);
-    background: color-mix(in srgb, var(--nb-warning) 12%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nb-warning) 22%, transparent);
+    border-radius: var(--wl-radius-md);
+    background: color-mix(in srgb, var(--wl-warning) 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--wl-warning) 22%, transparent);
     font-size: 0.85rem;
     cursor: pointer;
     user-select: none;
@@ -398,7 +399,7 @@ export const cardStyles = css`
   }
   .alert > ha-icon {
     --mdc-icon-size: 18px;
-    color: var(--nb-warning);
+    color: var(--wl-warning);
     flex-shrink: 0;
     margin-top: 1px;
   }
@@ -496,14 +497,219 @@ export const cardStyles = css`
   }
   .dep-row {
     display: grid;
-    grid-template-columns: max-content 1fr auto auto;
+    grid-template-columns: max-content 1fr auto auto auto;
     align-items: center;
     gap: 8px;
     padding: 6px 2px;
     border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+    transition: background-color
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
   }
   .dep-row:last-child {
     border-bottom: none;
+  }
+  /* Soft tint on hover so brushing the cursor across the list reads
+     as interactive without flashing. Mirrors the Linz card. The
+     prefers-reduced-motion block at the bottom of this stylesheet
+     neutralises the transition for users who opt out. */
+  .dep-row:hover {
+    background: color-mix(
+      in srgb,
+      var(--primary-text-color) 4%,
+      transparent
+    );
+  }
+  /* When the row carries a stops_ahead panel, the entire row becomes a
+     button-like surface. Cursor and user-select cues mirror the alert
+     pattern (.alert) so the affordance is consistent across the card. */
+  .dep-row.expandable {
+    cursor: pointer;
+    user-select: none;
+  }
+  .row-chevron {
+    --mdc-icon-size: 18px;
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+    transition: transform
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .dep-row.expanded .row-chevron {
+    transform: rotate(180deg);
+  }
+  /* Detail panel: sibling <li> rendered immediately below an expandable
+     .dep-row. The 0fr ↔ 1fr trick mirrors .alert-detail and animates to
+     intrinsic height so the stop list never clips. The panel is always
+     in the DOM (inside aria-hidden) so screen readers can step into it
+     when expanded; collapse just zeroes the row track. */
+  .dep-row-detail {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+    list-style: none;
+  }
+  .dep-row-detail-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .dep-row-detail.expanded {
+    grid-template-rows: 1fr;
+  }
+  /* Metro-map style trail: a vertical line in the line's brand colour
+     with one filled dot per stop. Indent matches the row's line-badge
+     (min-width 2.4em) + gap (8px) so the line visually descends from
+     under the badge. The connecting line is drawn as a 3px-wide pseudo-
+     element under the dot column; dots overlap it so they appear "on"
+     the line. The terminus stop highlights with a hollow ring + bold
+     name to anchor the destination. */
+  .stops-ahead {
+    --stops-ahead-line: var(--primary-color);
+    --stops-ahead-dot-size: 10px;
+    --stops-ahead-line-width: 2px;
+    list-style: none;
+    margin: 0;
+    padding: 8px 10px 10px 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--secondary-text-color);
+    font-size: 0.85rem;
+    line-height: 1.3;
+  }
+  /* The vertical line. Sits behind the dots (they have higher z-index)
+     and stops at the centre of the first/last dot via a clip on the
+     containing list — easiest done by pinning top/bottom to half the
+     dot size. The dot column hugs the panel's left edge so long
+     station names get the maximum readable width on narrow cards. */
+  .stops-ahead::before {
+    content: "";
+    position: absolute;
+    left: calc(var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
+    top: calc(8px + var(--stops-ahead-dot-size) / 2);
+    bottom: calc(10px + var(--stops-ahead-dot-size) / 2);
+    width: var(--stops-ahead-line-width);
+    background: var(--stops-ahead-line);
+    border-radius: 2px;
+  }
+  .stops-ahead-stop {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: calc(var(--stops-ahead-dot-size) + 10px);
+    min-height: var(--stops-ahead-dot-size);
+  }
+  .stops-ahead-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--stops-ahead-dot-size);
+  }
+  /* Pointer cursor on intermediate stops the user can actually click —
+     the row gets role=button only when the stop has transfer-to-
+     other-lines (otherLines length above zero) and is therefore an
+     expand/collapse affordance for the +N transfer panel. Stops with
+     U-Bahn-only inline chips (no toggle) stay text-cursor since
+     there is nothing to click. */
+  .stops-ahead-row[role="button"] {
+    cursor: pointer;
+  }
+  .stops-ahead-dot {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--stops-ahead-dot-size);
+    height: var(--stops-ahead-dot-size);
+    border-radius: 50%;
+    background: var(--stops-ahead-line);
+    z-index: 1;
+    forced-color-adjust: none;
+  }
+  .stops-ahead-name {
+    color: var(--primary-text-color);
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stops-ahead-stop.terminus .stops-ahead-name {
+    font-weight: 600;
+  }
+  .stops-ahead-stop.terminus .stops-ahead-dot {
+    /* Hollow ring at the terminus, anchoring "this is where you end up". */
+    background: var(--card-background-color, var(--ha-card-background, #fff));
+    box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
+  }
+  /* Transfer-line chips: small pill badges. U-Bahn chips sit inline
+     immediately after the station name (always visible, brand-coloured).
+     Tram/bus/night transfers sit behind the right-aligned toggle button
+     ("+N" with a chevron) and wrap to a second row inside the same
+     stop entry when expanded. */
+  .stops-ahead-metros {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .stops-ahead-line-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: var(--ha-font-weight-bold, 600);
+    color: #fff;
+    background: var(--primary-color);
+    line-height: 1.4;
+    forced-color-adjust: none;
+  }
+  /* "+N ▾" toggle button: pill-shaped, neutral background, chevron
+     rotates when the non-metro chip group below is expanded. Pinned
+     to the right via margin-left:auto. */
+  .stops-ahead-other-toggle {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 1px 4px 1px 6px;
+    border: 0;
+    border-radius: 999px;
+    background: color-mix(
+      in srgb,
+      var(--secondary-text-color) 14%,
+      transparent
+    );
+    color: var(--secondary-text-color);
+    font-size: 0.7rem;
+    font-weight: var(--ha-font-weight-bold, 600);
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1.4;
+  }
+  .stops-ahead-other-toggle ha-icon {
+    --mdc-icon-size: 14px;
+    transition: transform
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .stops-ahead-stop.transfers-expanded .stops-ahead-other-toggle ha-icon {
+    transform: rotate(180deg);
+  }
+  /* Second-row container for non-metro chips. Wraps freely; sits below
+     the station-name row so its width never pushes the layout. */
+  .stops-ahead-others {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  /* Non-metro chips render slightly lighter so the inline U-Bahn chips
+     stay the dominant signal. */
+  .stops-ahead-line-chip--other {
+    opacity: 0.92;
   }
   .line-badge {
     text-align: center;
@@ -517,12 +723,30 @@ export const cardStyles = css`
     box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     forced-color-adjust: none;
   }
+  /* Towards cell: type-icon sits as a sibling of .towards-rows so when
+     the delay wraps under the direction name, both rows share the same
+     left edge — aligned with the direction's text, not the icon. */
   .towards {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    color: var(--primary-text-color);
+  }
+  .towards-rows {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 6px;
+    row-gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .towards-name {
+    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    color: var(--primary-text-color);
   }
   .type-icon {
     --mdc-icon-size: 16px;
@@ -531,10 +755,11 @@ export const cardStyles = css`
     vertical-align: 1px;
   }
   .delay {
-    color: var(--nb-warning);
+    color: var(--wl-warning);
     font-size: 0.85rem;
     font-weight: 500;
-    margin-left: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   /* Trailing column container — holds the optional platform pill and
      the optional flags icons in one grid cell. Inline-flex so platform
@@ -571,7 +796,7 @@ export const cardStyles = css`
     --mdc-icon-size: 16px;
   }
   .row-flags .disturbance {
-    color: var(--nb-warning);
+    color: var(--wl-warning);
   }
   .countdown {
     font-variant-numeric: tabular-nums;
@@ -587,9 +812,9 @@ export const cardStyles = css`
      not expose a realtime-vs-scheduled distinction, so the live-pulse
      dot Linz uses isn't applicable here — countdowns are coloured
      purely by their delay state. */
-  .countdown.now   { color: var(--nb-accent); }
-  .countdown.late  { color: var(--nb-error); }
-  .countdown.early { color: var(--nb-info); }
+  .countdown.now   { color: var(--wl-accent); }
+  .countdown.late  { color: var(--wl-error); }
+  .countdown.early { color: var(--wl-rt); }
 
   /* Empty / fallback states */
   .empty {
@@ -618,12 +843,12 @@ export const cardStyles = css`
        butts up against the last row's bottom edge AND bottoms-out at
        the card edge — matching linz-linien (where .foot is a direct
        ha-card child with no gap above and no padding below). Without
-       margin-top, .wrap's --nb-row-gap pushes the divider 12px below
+       margin-top, .wrap's --wl-row-gap pushes the divider 12px below
        the last row; without margin-bottom, the timestamp sits 8px +
-       --nb-pad-y above the card edge instead of being vertically
+       --wl-pad-y above the card edge instead of being vertically
        centred between divider and edge. */
-    margin-top: calc(-1 * var(--nb-row-gap));
-    margin-bottom: calc(-1 * var(--nb-pad-y));
+    margin-top: calc(-1 * var(--wl-row-gap));
+    margin-bottom: calc(-1 * var(--wl-pad-y));
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     font-size: 0.7rem;
     color: var(--secondary-text-color);
@@ -639,7 +864,7 @@ export const cardStyles = css`
     gap: 6px;
     padding: 6px 10px;
     border: 1px dashed var(--secondary-text-color, rgba(0, 0, 0, 0.3));
-    border-radius: var(--nb-radius-sm);
+    border-radius: var(--wl-radius-sm);
     font-size: 0.7rem;
     color: var(--secondary-text-color);
   }
@@ -650,7 +875,7 @@ export const cardStyles = css`
   }
   .dev-strip button {
     padding: 4px 10px;
-    border-radius: var(--nb-radius-sm);
+    border-radius: var(--wl-radius-sm);
     border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.2));
     background: transparent;
     color: var(--primary-text-color);
@@ -670,11 +895,11 @@ export const cardStyles = css`
      through every component above. */
   @container wlcard (inline-size < 360px) {
     :host {
-      --nb-pad-x: 12px;
-      --nb-pad-y: 12px;
-      --nb-tile-size: 36px;
-      --nb-slot-min-h: 40px;
-      --nb-metric-size: 2rem;
+      --wl-pad-x: 12px;
+      --wl-pad-y: 12px;
+      --wl-tile-size: 36px;
+      --wl-slot-min-h: 40px;
+      --wl-metric-size: 2rem;
     }
     .tabs {
       padding: 0 8px;
@@ -683,26 +908,52 @@ export const cardStyles = css`
       padding: 0 8px;
       font-size: 0.8125rem;
     }
-    .towards {
-      white-space: normal;
+  }
+
+  /* Narrow cards (sidebar dashboards, mobile portrait) — the hero
+     stacks "Jetzt"/countdown above the line + towards row so the
+     direction name gets the full container width instead of being
+     truncated next to a wide "Jetzt". */
+  @container wlcard (inline-size < 420px) {
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
     }
   }
 
   @container wlcard (inline-size > 480px) {
     :host {
-      --nb-pad-x: 20px;
-      --nb-pad-y: 16px;
-      --nb-tile-size: 44px;
-      --nb-metric-size: 2.5rem;
+      --wl-pad-x: 20px;
+      --wl-pad-y: 16px;
+      --wl-tile-size: 44px;
+      --wl-metric-size: 2.5rem;
     }
     .icon-tile ha-icon {
       --mdc-icon-size: 24px;
+    }
+    /* Wide enough to afford the metro-map alignment: dots + connecting
+       line indent under the line-badge column so the trail descends
+       visually from under the badge. Narrow cards keep the flush-left
+       layout above for readability of long station names. */
+    .stops-ahead {
+      padding-left: calc(2.4em + 8px);
+    }
+    .stops-ahead::before {
+      left: calc(2.4em + 8px + var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
+    }
+    .hero > .hero-detail {
+      grid-column: 2;
     }
   }
 
   /* Accessibility primitives — verbatim from the project spec. */
   .tab:focus-visible,
   .alert:focus-visible,
+  .dep-row.expandable:focus-visible,
+  .hero-entry.expandable:focus-visible,
+  .stops-ahead-other-toggle:focus-visible,
   .icon-action:focus-visible,
   a:focus-visible,
   button:focus-visible {
@@ -710,16 +961,8 @@ export const cardStyles = css`
     outline-offset: 2px;
     border-radius: 6px;
   }
-  .btn-primary:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 3px;
-  }
-
   @media (forced-colors: active) {
     .icon-tile,
-    .chip,
-    .flag,
-    .btn-primary,
     .line-badge,
     .alert,
     .dep-row {

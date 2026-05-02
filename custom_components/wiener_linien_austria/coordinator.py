@@ -50,10 +50,15 @@ class Departure:
     barrier_free: bool
     traffic_jam: bool
     platform: str | None = None  # "1" / "2" / "A" / "B" — Gleis as published
+    # Ordered list of upcoming stops on the trip the vehicle is running.
+    # None when the static trip-pattern index hasn't loaded or no pattern
+    # matches the row (replacement service, short-turn variant, etc.). The
+    # card treats None and missing-key as identical: render no chevron.
+    stops_ahead: list[dict[str, Any]] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Render as a plain dict for HA attributes / diagnostics."""
-        return {
+        out: dict[str, Any] = {
             "line": self.line,
             "towards": self.towards,
             "direction": self.direction,
@@ -66,6 +71,9 @@ class Departure:
             "traffic_jam": self.traffic_jam,
             "platform": self.platform,
         }
+        if self.stops_ahead is not None:
+            out["stops_ahead"] = self.stops_ahead
+        return out
 
 
 @dataclass(slots=True)
@@ -119,8 +127,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             # hit 3-4× in quick succession. Even though the integration
             # already does conditional GET (ETag / If-Modified-Since),
             # collapsing redundant requests still saves CDN round-trips
-            # on 304 responses. Cooldown matches the existing fair-use
-            # floor — first call goes through, subsequent calls within
+            # on 304 responses. Cooldown matches the existing 15-second
+            # domain-wide floor — first call goes through, subsequent calls within
             # the window piggy-back on the scheduled refresh. immediate
             # =False so the FIRST call also waits for the debouncer
             # window to settle, important during config-flow setup
@@ -134,19 +142,21 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             ),
         )
 
-    async def async_setup(self) -> None:
+    async def _async_setup(self) -> None:
         """Load the cached static catalogue and pluck this stop's coords.
 
-        Failure is non-fatal — coords stay None and the sensor falls back to
-        a text-based Google Maps query instead of lat/lon. The catalogue is
+        Auto-called by `async_config_entry_first_refresh()` per HA core
+        contract — do NOT invoke from `async_setup_entry`. Failure is
+        non-fatal: coords stay None and the sensor falls back to a
+        text-based Google Maps query instead of lat/lon. The catalogue is
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
         # Local import to avoid pulling static.py into coordinator import
         # cycles; static.py is a leaf that doesn't import this module.
-        from .static import async_load_catalogue  # noqa: PLC0415
+        from .static import async_get_catalogue  # noqa: PLC0415
         try:
-            catalogue = await async_load_catalogue(self.hass)
+            catalogue = await async_get_catalogue(self.hass)
         except (
             aiohttp.ClientError,
             asyncio.TimeoutError,
@@ -330,7 +340,33 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # never store them for an error reply, else next tick would
         # send If-None-Match against a payload we never accepted.
         self._monitor_cache.update_from_response(resp)
-        return _parse_monitor_body(body, self._selected_lines, self._server_time)
+        # Read the shared catalogue ref live so a background trip-pattern
+        # refresh that lands after this coordinator's setup is picked up
+        # on the very next parse — no restart needed.
+        catalogue = self._current_catalogue()
+        return _parse_monitor_body(
+            body,
+            self._selected_lines,
+            self._server_time,
+            catalogue=catalogue,
+            entry_rbls=self._rbls,
+        )
+
+    def _current_catalogue(self) -> Any:
+        """Fetch the live catalogue ref from hass.data, or None.
+
+        The catalogue may be a `StaticCatalogue` (resolved), an
+        `asyncio.Task` (still loading on a fresh start), or absent
+        (load hasn't been triggered yet). Only the resolved form is
+        useful for enrichment; the others fall through to None and
+        the parser skips stops_ahead.
+        """
+        from .static import CATALOGUE_KEY, StaticCatalogue  # noqa: PLC0415
+        domain_data = self.hass.data.get(DOMAIN, {})
+        cached = domain_data.get(CATALOGUE_KEY)
+        if isinstance(cached, StaticCatalogue):
+            return cached
+        return None
 
     def _note_success(self) -> None:
         """Reset the consecutive-failure counter and restore normal cadence."""
@@ -383,10 +419,23 @@ def _parse_monitor_body(
     body: dict[str, Any],
     selected: set[str] | None,
     server_time: str | None,
+    *,
+    catalogue: Any = None,
+    entry_rbls: list[int] | None = None,
 ) -> MonitorData:
-    """Parse a successful /monitor response into a MonitorData."""
+    """Parse a successful /monitor response into a MonitorData.
+
+    `catalogue` and `entry_rbls`, when provided, drive the per-row
+    `stops_ahead` enrichment via `static.stops_ahead_for_match`. Both are
+    optional: tests construct MonitorData directly and this parser is
+    re-used in fixtures that don't carry the static layer.
+    """
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
+    # Resolve once per parse — cheap, but no point doing it per row.
+    _trip_patterns_loaded = (
+        catalogue is not None and getattr(catalogue, "trip_patterns", None) is not None
+    )
 
     # Match the user's selection on (line, direction) only — `line.towards`
     # is unstable for branching termini (e.g. U1/R reports "Oberlaa" or
@@ -427,10 +476,37 @@ def _parse_monitor_body(
                     continue
                 vehicle = entry.get("vehicle") or {}
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
+                resolved_towards = vehicle_towards or line_towards
+                stops_ahead: list[dict[str, Any]] | None = None
+                if _trip_patterns_loaded and entry_rbls:
+                    # Lazy-import to avoid a circular reference (static.py is
+                    # a leaf module that doesn't import coordinator).
+                    try:
+                        from .static import (  # noqa: PLC0415
+                            stops_ahead_for_match,
+                        )
+                        stops_ahead = stops_ahead_for_match(
+                            catalogue,
+                            line_name,
+                            entry_rbls,
+                            resolved_towards,
+                            live_direction=direction,
+                        )
+                    except Exception:  # noqa: BLE001
+                        # Fail-soft: a single matcher hiccup must not poison
+                        # the rest of the parse. Logged at debug because
+                        # stops_ahead is non-essential.
+                        _LOGGER.debug(
+                            "stops_ahead lookup failed for %s towards %s",
+                            line_name,
+                            resolved_towards,
+                            exc_info=True,
+                        )
+                        stops_ahead = None
                 departures.append(
                     Departure(
                         line=line_name,
-                        towards=vehicle_towards or line_towards,
+                        towards=resolved_towards,
                         direction=direction,
                         type=line_type,
                         countdown=countdown,
@@ -440,6 +516,7 @@ def _parse_monitor_body(
                         barrier_free=barrier_free,
                         traffic_jam=traffic_jam,
                         platform=platform,
+                        stops_ahead=stops_ahead,
                     )
                 )
 

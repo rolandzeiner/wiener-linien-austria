@@ -45,8 +45,17 @@ BASE_ENTRY_DATA: dict = {
 }
 
 
-def make_entry(data: dict | None = None) -> MockConfigEntry:
-    """Build a MockConfigEntry with realistic Stephansplatz data."""
+def make_entry(
+    data: dict | None = None,
+    *,
+    unique_id: str = "diva_60201012",
+) -> MockConfigEntry:
+    """Build a MockConfigEntry with realistic Stephansplatz data.
+
+    `unique_id` defaults to the production formula (`diva_{diva}`) so the
+    diagnostics snapshot is reproducible across runs — without it MockConfigEntry
+    generates a fresh random id each run and the snapshot diff is unstable.
+    """
     entry_data = {**BASE_ENTRY_DATA, **(data or {})}
     return MockConfigEntry(
         domain=DOMAIN,
@@ -54,6 +63,49 @@ def make_entry(data: dict | None = None) -> MockConfigEntry:
         options={},
         title="Stephansplatz",
         version=2,
+        unique_id=unique_id,
+    )
+
+
+def make_v1_entry(
+    *,
+    lines: list[str] | None = None,
+    options_lines: list[str] | None = None,
+    rbls: list[int] | None = None,
+    diva: int = 60201012,
+    stop_name: str = "Stephansplatz",
+    title: str = "Stephansplatz",
+) -> MockConfigEntry:
+    """Build a v1-shaped MockConfigEntry for `async_migrate_entry` tests.
+
+    The v1 schema carries `CONF_LINES` triples (`line|direction|towards`)
+    rather than the v2 pairs (`line|direction`). Tests for the migration
+    path must explicitly construct v1 data — the default `make_entry`
+    helper hardcodes `version=2` because every other test should run
+    against the current schema.
+
+    Pass `options_lines` to put CONF_LINES in `entry.options` (the
+    reconfigure path) instead of `entry.data`.
+    """
+    from homeassistant.const import CONF_SCAN_INTERVAL
+
+    data: dict = {
+        CONF_DIVA: diva,
+        CONF_STOP_NAME: stop_name,
+        CONF_RBLS: rbls if rbls is not None else [4111, 4118],
+        CONF_SCAN_INTERVAL: 60,
+    }
+    if lines is not None:
+        data[CONF_LINES] = lines
+    options: dict = {}
+    if options_lines is not None:
+        options[CONF_LINES] = options_lines
+    return MockConfigEntry(
+        domain=DOMAIN,
+        version=1,
+        data=data,
+        options=options,
+        title=title,
     )
 
 
@@ -112,7 +164,12 @@ def mock_static_catalogue():
             return_value=catalogue,
         ),
         patch(
-            "custom_components.wiener_linien_austria.config_flow.async_load_catalogue",
+            "custom_components.wiener_linien_austria.static.async_get_catalogue",
+            new_callable=AsyncMock,
+            return_value=catalogue,
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
             new_callable=AsyncMock,
             return_value=catalogue,
         ),

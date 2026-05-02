@@ -84,6 +84,40 @@ async def test_diagnostics_redacts_coordinates_in_entry_data(
     assert data[CONF_DIVA] == 60201012
 
 
+# Sentinel value: any leak of this exact string into the diagnostics
+# dump fails the canary test below. Length + uniqueness chosen so a
+# bare grep finds it even if buried inside a deeply nested structure
+# that `async_redact_data` doesn't recursively walk.
+SECRET_API_KEY = "ZZZ-LEAK-CANARY-DO-NOT-SHIP-ZZZ"
+
+
+async def test_diagnostics_does_not_leak_secret_sentinel(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Belt-and-braces redaction check: the raw secret string MUST NOT appear
+    anywhere in the JSON dump.
+
+    The snapshot test catches structural changes; this canary catches the
+    sneakier failure mode where a future field bypasses async_redact_data
+    entirely (e.g. nested under a key not in TO_REDACT). If this test fails,
+    add the leaking key to TO_REDACT and update the snapshot.
+    """
+    import json
+
+    entry = _make_entry({"api_key": SECRET_API_KEY, "token": SECRET_API_KEY})
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    serialised = json.dumps(diag, default=str)
+    assert SECRET_API_KEY not in serialised, (
+        f"sentinel {SECRET_API_KEY!r} leaked into diagnostics dump — "
+        "a field is bypassing async_redact_data. Add the leaking key to "
+        "TO_REDACT in diagnostics.py."
+    )
+
+
 async def test_diagnostics_includes_matched_alerts(
     hass: HomeAssistant, mock_fetch
 ) -> None:

@@ -1,9 +1,10 @@
 """Domain-wide rate limiting for Wiener Linien API calls.
 
 Both the per-entry monitor polls (coordinator.py) and the shared alerts refresh
-(alerts.py) must stay above the 15s fair-use floor *in aggregate*. An
-asyncio.Lock serialises the check-then-update, so concurrent callers can't
-both observe the same `last_call_ts` and skip the sleep.
+(alerts.py) must stay above the conventional 15-second minimum interval
+circulated for the OGD real-time endpoint, *in aggregate*. An asyncio.Lock
+serialises the check-then-update, so concurrent callers can't both observe
+the same `last_call_ts` and skip the sleep.
 """
 from __future__ import annotations
 
@@ -23,8 +24,8 @@ async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
 
     The `asyncio.sleep` runs *inside* the lock — that's by design. Concurrent
     callers queue up and each waits its full 15s slice, so N simultaneous
-    callers take ~N × 15s to drain. This is exactly the fair-use floor we
-    promised Wiener Linien; it's not a bug.
+    callers take ~N × 15s to drain. This is exactly the conventional
+    15-second minimum interval the OGD endpoint asks for; it's not a bug.
 
     Practical implication: at the default 60s `update_interval` the queue
     drains comfortably for ~3 entries (3 × 15s = 45s < 60s). With more

@@ -26,7 +26,7 @@
           "scan_interval": "Aktualisierungsintervall (Sekunden)"
         },
         "data_description": {
-          "scan_interval": "Mindestens 30 Sekunden (Wiener-Linien-Fair-Use ist 15 s; wir verdoppeln aus Sicherheitsgründen)."
+          "scan_interval": "Mindestens 30 Sekunden — doppelter Sicherheitsabstand zum konventionellen 15-Sekunden-Mindestintervall, das für die OGD-Schnittstelle zirkuliert. Bietet Reserve, wenn mehrere HA-Instanzen dieselbe Ausgangs-IP nutzen."
         }
       },
       "reconfigure": {
@@ -92,7 +92,7 @@
   "issues": {
     "rate_limited": {
       "title": "Wiener-Linien-Rate-Limit erreicht",
-      "description": "Die Wiener Linien antworteten mit Fehler 316 (Rate-Limit überschritten) auf Abfragen für **{entry_title}**. Das Fair-Use-Limit beträgt 15 s; diese Integration nutzt 60 s Standard und mindestens 30 s, daher tritt das üblicherweise nur auf, wenn mehrere HA-Instanzen dieselbe Ausgangs-IP nutzen. Intervall erhöhen oder parallele Einträge reduzieren."
+      "description": "Die Wiener Linien antworteten mit Fehler 316 (Rate-Limit überschritten) auf Abfragen für **{entry_title}**. Das konventionell für die OGD-Schnittstelle zirkulierte Mindestintervall beträgt 15 s; diese Integration nutzt 60 s Standard und mindestens 30 s, daher tritt das üblicherweise nur auf, wenn mehrere HA-Instanzen dieselbe Ausgangs-IP nutzen. Intervall erhöhen oder parallele Einträge reduzieren."
     }
   }
 }

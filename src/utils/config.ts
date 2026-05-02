@@ -1,5 +1,6 @@
-import { METRO_COLORS } from "../const.js";
+import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
 import type {
+  LineColorsMap,
   ModernStopConfig,
   RetroSize,
   RetroStationBg,
@@ -82,7 +83,7 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   return stop;
 }
 
-export interface NormalisedModernConfig {
+export interface NormalisedModernConfigValidated {
   // HA's Lovelace editor wrapper re-validates every `config-changed` payload
   // against `type` — omit it and HA flags the card with "Kein Typ angegeben"
   // / "No type specified" and refuses to render. Preserve whatever the raw
@@ -101,12 +102,24 @@ export interface NormalisedModernConfig {
   show_platform: boolean;
   show_hero_metric: boolean;
   show_departures: boolean;
+  show_stops_ahead: boolean;
   hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
 }
 
-const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" | "type"> = {
+// Passthrough fields HA injects on the card config itself — section-view
+// grid sizing, legacy view layout, conditional visibility. The editor
+// must round-trip these unchanged on every config-changed payload, else
+// HA writes back the stripped config and the user's column choice resets.
+// Kept as a separate type so `Omit<NormalisedModernConfigValidated, ...>`
+// for MODERN_DEFAULTS doesn't get collapsed to `unknown` by the index
+// signature (Omit + index signature loses explicit property types).
+export type NormalisedModernConfig = NormalisedModernConfigValidated & {
+  [key: string]: unknown;
+};
+
+const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
   accessibility_only: false,
@@ -117,6 +130,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfig, "entities" | "line_colors" |
   show_platform: true,
   show_hero_metric: true,
   show_departures: true,
+  show_stops_ahead: true,
   hide_header: false,
   hide_attribution: false,
   layout: "stacked",
@@ -166,6 +180,10 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   }
 
   return {
+    // Spread raw first so dashboard passthrough fields (grid_options,
+    // view_layout, visibility, layout_options) survive the round-trip.
+    // Validated keys below override anything raw carried for them.
+    ...(raw as Record<string, unknown>),
     type: raw.type || "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
@@ -179,19 +197,24 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
     show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
     show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
+    show_stops_ahead: raw.show_stops_ahead ?? MODERN_DEFAULTS.show_stops_ahead,
     hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
   };
 }
 
-export interface NormalisedRetroConfig {
+export interface NormalisedRetroConfigValidated {
   // See NormalisedModernConfig.type — HA requires `type` on every config
   // in the `config-changed` payload or it flags "Kein Typ angegeben".
   type: string;
-  entity: string | undefined;
+  // `?: T | undefined` is the dual form that lets callers EITHER omit the
+  // key (e.g. `delete next.line`) OR assign `undefined` explicitly. The
+  // bare `?:` form alone would reject explicit `undefined` under
+  // `exactOptionalPropertyTypes`, so we widen with the union.
+  entity?: string | undefined;
   direction: "H" | "R";
-  line?: string;
+  line?: string | undefined;
   show_platform: boolean;
   show_station_name: boolean;
   station_bg: RetroStationBg;
@@ -200,8 +223,14 @@ export interface NormalisedRetroConfig {
   flicker: boolean;
   wheelchair_race: boolean;
   accessibility_only: boolean;
-  walk_times?: WalkTimes;
+  walk_times?: WalkTimes | undefined;
 }
+
+// See NormalisedModernConfig — same passthrough rule for dashboard
+// layout fields injected onto the card config.
+export type NormalisedRetroConfig = NormalisedRetroConfigValidated & {
+  [key: string]: unknown;
+};
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   const direction = raw.direction === "R" ? "R" : "H";
@@ -213,6 +242,9 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     ? (raw.style as RetroStyle)
     : "classic";
   return {
+    // Spread raw first so dashboard passthrough fields (grid_options,
+    // view_layout, visibility, layout_options) survive the round-trip.
+    ...(raw as Record<string, unknown>),
     type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
@@ -229,11 +261,59 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   };
 }
 
+// Resolves a line label to its background hex (`#…`). Precedence:
+//   1. user-config `line_colors` (per-line override)
+//   2. nightline category rule (`^N\d`) — wins OVER GTFS for N-prefix
+//      lines. GTFS publishes nightlines as bus navy (`0A295D`), but
+//      Wiener Linien's signage convention pairs a deeper navy with
+//      bright yellow numerals; that pairing only reads correctly when
+//      the nightline rule beats the GTFS lookup.
+//   3. GTFS `routes.txt` from the integration's `line_colors` attribute
+//   4. neutral fallback (`var(--primary-color)`)
+//
+// `overrides` keys are case-folded to uppercase to match the editor's
+// own normalisation; the GTFS map is keyed verbatim by line label and
+// is also probed both upper and as-given for robustness against any
+// future schema surprise.
 export function colorForLine(
   line: string,
   overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
   fallback = "var(--primary-color)",
 ): string {
   const upper = line.toUpperCase();
-  return overrides[upper] ?? METRO_COLORS[upper] ?? fallback;
+  if (overrides[upper] !== undefined) return overrides[upper];
+  // Nightline rule wins over GTFS — see precedence comment above.
+  if (/^N\d/.test(upper)) return NIGHTLINE_BG;
+  const gtfs = gtfsColors[line] ?? gtfsColors[upper];
+  if (gtfs?.bg) return `#${gtfs.bg}`;
+  return fallback;
+}
+
+// Resolves the paired (background, foreground) palette for a line chip.
+// The fg rule is coupled to where the bg came from so the two never
+// drift: nightline-yellow text only pairs with the nightline navy bg,
+// GTFS fg only pairs with the matching GTFS bg, and a user override
+// leaves the fg unset (the card's CSS default — white — applies because
+// we don't know what reads well on the user's custom colour). Nightline
+// rule wins over GTFS — see colorForLine precedence comment.
+export function chipPalette(
+  line: string,
+  overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
+): { background: string; color?: string } {
+  const upper = line.toUpperCase();
+  if (overrides[upper] !== undefined) {
+    return { background: overrides[upper] };
+  }
+  if (/^N\d/.test(upper)) {
+    return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
+  }
+  const gtfs = gtfsColors[line] ?? gtfsColors[upper];
+  if (gtfs?.bg) {
+    return gtfs.fg
+      ? { background: `#${gtfs.bg}`, color: `#${gtfs.fg}` }
+      : { background: `#${gtfs.bg}` };
+  }
+  return { background: "var(--primary-color)" };
 }

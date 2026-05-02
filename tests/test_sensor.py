@@ -180,8 +180,13 @@ async def test_attributes_carry_attribution_and_identity(hass: HomeAssistant) ->
     coordinator._latitude = 48.2085
     coordinator._longitude = 16.3726
     sensor = WienerLinienStopSensor(coordinator, entry)
+    # `attribution` is now declared on the entity class via `_attr_attribution`
+    # — HA core merges it into `state.attributes` (covered by the end-to-end
+    # test below where state.attributes["attribution"] is asserted). It is NOT
+    # present in `extra_state_attributes` directly.
+    assert sensor.attribution == ATTRIBUTION
     attrs = sensor.extra_state_attributes
-    assert attrs["attribution"] == ATTRIBUTION
+    assert "attribution" not in attrs
     assert attrs["diva"] == 60201012
     assert attrs["stop_name"] == "Stephansplatz"
     assert attrs["server_time"] == "2026-04-20T14:40:00+0200"
@@ -259,6 +264,73 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     sensor = WienerLinienStopSensor(coordinator, entry)
     next_by_line = sensor.extra_state_attributes["next_by_line"]
     assert next_by_line == {"U1": 2, "71": 4}
+
+
+async def test_attributes_line_colors_publishes_full_catalogue(hass: HomeAssistant) -> None:
+    """`line_colors` carries every line in the GTFS catalogue.
+
+    Published unscoped (not "only lines at this stop") because the card's
+    stops_ahead trail renders transfer chips for OTHER stops — a U1 row
+    at Stephansplatz can show a U2 transfer at Karlsplatz, and that U2
+    chip needs its colour. Scoping here would leave those chips
+    colourless. Trade-off: ~3 KB extra per sensor, well under recorder
+    limits.
+    """
+    from custom_components.wiener_linien_austria.static import (
+        StaticCatalogue,
+        TripPatternIndex,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=[
+            Departure(
+                line="U1", towards="Leopoldau", direction="H", type="ptMetro",
+                countdown=2, time_planned=None, time_real=None,
+                realtime=True, barrier_free=True, traffic_jam=False,
+            ),
+        ],
+        server_time=None,
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+
+    hass.data.setdefault(DOMAIN, {})
+    from custom_components.wiener_linien_austria.static import CATALOGUE_KEY
+
+    hass.data[DOMAIN][CATALOGUE_KEY] = StaticCatalogue(
+        stations_by_diva={},
+        last_fetched="2026-04-30T12:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            colors_by_line={
+                "U1": "E3000F",
+                "U2": "A862A4",
+                "71": "C00808",
+                "13A": "0A295D",
+            },
+            text_colors_by_line={"U1": "FFFFFF", "U2": "FFFFFF"},
+        ),
+    )
+
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    line_colors = sensor.extra_state_attributes["line_colors"]
+    # Every line in the catalogue is published — even ones not at this stop.
+    assert set(line_colors.keys()) == {"U1", "U2", "71", "13A"}
+    assert line_colors["U1"] == {"bg": "E3000F", "fg": "FFFFFF"}
+    # Lines without an fg recorded omit the key (card falls through to
+    # default white).
+    assert line_colors["71"] == {"bg": "C00808"}
+
+
+async def test_attributes_line_colors_empty_when_catalogue_missing(hass: HomeAssistant) -> None:
+    """Without a loaded catalogue, the attribute is `{}` — card uses fallbacks."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(departures=_make_departures(), server_time=None)
+    coordinator = _make_coordinator(hass, entry, data)
+    # Deliberately don't put a catalogue in hass.data — simulates fresh boot.
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    assert sensor.extra_state_attributes["line_colors"] == {}
 
 
 # ---------------------------------------------------------------------------

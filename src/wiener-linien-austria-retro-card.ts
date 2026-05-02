@@ -5,10 +5,15 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
-import { LINE_TYPE_BUS_DAY, LINE_TYPE_BUS_NIGHT, LINE_TYPE_METRO, METRO_COLORS, RETRO_CARD_VERSION } from "./const.js";
+import { RETRO_CARD_VERSION } from "./const.js";
+import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { translate } from "./localize/localize.js";
+import {
+  checkCardVersionWS,
+  renderVersionBanner,
+} from "./shared-render.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
-import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
+import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 
@@ -274,16 +279,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    try {
-      const result = (await this.hass!.callWS({
-        type: "wiener_linien_austria/retro_card_version",
-      })) as { version?: string } | undefined;
-      if (result?.version && result.version !== RETRO_CARD_VERSION) {
-        this._versionMismatch = result.version;
-      }
-    } catch {
-      // backend may be older; ignore
-    }
+    this._versionMismatch = await checkCardVersionWS(
+      this.hass,
+      "wiener_linien_austria/retro_card_version",
+      RETRO_CARD_VERSION,
+    );
   }
 
   private _resolveEntity(): string | null {
@@ -427,8 +427,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       ".retro-row .retro-wheelchair",
     );
     if (!wheels || wheels.length < 2) return null;
-    const aRect = wheels[0].getBoundingClientRect();
-    const bRect = wheels[1].getBoundingClientRect();
+    const wheelA = wheels[0];
+    const wheelB = wheels[1];
+    if (!wheelA || !wheelB) return null;  // length-guard above; satisfies noUncheckedIndexedAccess
+    const aRect = wheelA.getBoundingClientRect();
+    const bRect = wheelB.getBoundingClientRect();
     const aLeft = aRect.left - cardRect.left;
     const bLeft = bRect.left - cardRect.left;
     const stripWidthPx = this._config?.size === "small" ? 10 : 14;
@@ -694,13 +697,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const platform = cfg.show_platform ? rawPlatform : null;
     const gleisLeft = platform === "2";
     const type = rows[0]?.type ?? "";
-    const isBus = type === LINE_TYPE_BUS_DAY || type === LINE_TYPE_BUS_NIGHT;
-    const platformLabel = this._t(isBus ? "steig" : "gleis");
+    const isMetro = type === LINE_TYPE_METRO;
+    const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
     const stopName = attrs.stop_name || attrs.friendly_name || "";
     const showStationName = cfg.show_station_name && !!stopName;
     const stationPanel = showStationName
-      ? this._renderStationName(stopName, matching, departures, cfg.station_bg)
+      ? this._renderStationName(
+          stopName,
+          matching,
+          departures,
+          cfg.station_bg,
+          attrs.line_colors ?? {},
+        )
       : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
@@ -725,11 +734,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     };
 
     return html`
-      <ha-card style="background:#000;padding:0;overflow:hidden;">
+      <ha-card style="padding:0;overflow:hidden;">
         <div
           class=${classMap(retroClasses)}
           @click=${this._handleCardClick}>
-          ${this._versionMismatch ? this._renderBanner() : nothing}
+          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
@@ -858,11 +867,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     matching: DepartureAttr[],
     allDepartures: DepartureAttr[],
     bgChoice: "default" | "white" | "black",
+    lineColors: NonNullable<WienerLinienAttrs["line_colors"]>,
   ): TemplateResult {
-    const pool = matching.length ? matching : allDepartures;
-    const metroDep = pool.find((d) => d.type === LINE_TYPE_METRO);
-    const metroLine = metroDep?.line;
-
     let bg: string;
     let fg: string;
     if (bgChoice === "white") {
@@ -871,12 +877,35 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     } else if (bgChoice === "black") {
       bg = "#000";
       fg = "#fff";
-    } else if (metroLine) {
-      bg = METRO_COLORS[metroLine.toUpperCase()] ?? "var(--primary-color)";
-      fg = "#fff";
     } else {
-      bg = "#fff";
-      fg = "#000";
+      // Default: tint the station tile with the selected line's
+      // Wiener-Linien-published palette. Goes through chipPalette so
+      // the precedence rules elsewhere on the card carry over —
+      // notably the nightline rule (`^N\d`), which overrides the
+      // GTFS bus-navy with the deeper signage navy + bright yellow
+      // numerals so N-prefix tiles match the in-station NightLine
+      // signage. Falls back to white when no line is selected and
+      // no departure context is available, since chipPalette's own
+      // var(--primary-color) fallback can read poorly on light themes.
+      const pool = matching.length ? matching : allDepartures;
+      const sourceLine = pool[0]?.line;
+      if (sourceLine) {
+        // No user line_colors overrides on the retro tile — the panel
+        // follows upstream branding only. Pass {} for overrides.
+        const palette = chipPalette(sourceLine, {}, lineColors);
+        bg = palette.background;
+        fg = palette.color ?? "#fff";
+        // chipPalette's bottom-tier fallback is a CSS var that doesn't
+        // print well on the LED aesthetic — promote to white if the
+        // line is unknown to GTFS / not a nightline / no override.
+        if (bg === "var(--primary-color)") {
+          bg = "#fff";
+          fg = "#000";
+        }
+      } else {
+        bg = "#fff";
+        fg = "#000";
+      }
     }
 
     return html`
@@ -886,27 +915,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     `;
   }
 
-  private _renderBanner(): TemplateResult {
-    const msg = this._t("version_update", { v: this._versionMismatch ?? "" });
-    return html`
-      <div class="retro-banner">
-        <span>${msg}</span>
-        <button type="button" @click=${this._reload}>${this._t("version_reload")}</button>
-      </div>
-    `;
-  }
-
-  private async _reload(): Promise<void> {
-    try {
-      if (window.caches?.keys) {
-        const keys = await window.caches.keys();
-        await Promise.all(keys.map((k) => window.caches.delete(k)));
-      }
-    } catch {
-      // best-effort
-    }
-    window.location.reload();
-  }
+  // Banner is rendered via the shared `renderVersionBanner` helper —
+  // see shared-render.ts. Cache-wipe + reload also lives there.
 
   // ------------------------------------------------------------------
   // Styles — ported verbatim from the vanilla RETRO_STYLE
@@ -948,7 +958,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-weight: 700;
       letter-spacing: 0.08em;
       overflow: hidden;
-      border-radius: var(--ha-card-border-radius, 12px);
       min-height: 110px;
     }
     .retro-led {
@@ -1365,12 +1374,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       top: 50%;
       left: 50%;
       z-index: 22;
-      width: 41cqmin;
-      height: 41cqmin;
-      min-width: 82px;
-      min-height: 82px;
-      max-width: 172px;
-      max-height: 172px;
+      /* +10% over the previous 41cqmin / 82px / 172px sizing so the
+         trophy + lane number have more breathing room inside the LED
+         ring without crowding the embossed numerals. */
+      width: 45cqmin;
+      height: 45cqmin;
+      min-width: 90px;
+      min-height: 90px;
+      max-width: 190px;
+      max-height: 190px;
       border-radius: 50%;
       background-color: var(--led-bg);
       background-image: radial-gradient(
@@ -1383,10 +1395,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       align-items: center;
       justify-content: center;
       color: var(--led-amber);
-      box-shadow:
-        0 0 12px rgb(var(--led-glow-rgb) / 0.85),
-        0 0 28px rgb(var(--led-glow-rgb) / 0.55),
-        inset 0 0 10px rgb(var(--led-glow-rgb) / 0.25);
       transform: translate(-50%, -50%) scale(0.2);
       opacity: 0;
       animation: retroWinnerBadgeAppear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s forwards;
@@ -1401,56 +1409,42 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.85))
               drop-shadow(0 0 10px rgb(var(--led-glow-rgb) / 0.45));
     }
-    /* Lane number on the trophy cup. Amber so it reads as part of the
-       trophy material. Embossed via a subtle highlight on top-left
-       (light from above) + soft shadow on bottom-right (depth), plus
-       a faint LED glow to tie it to the rest of the panel. No heavy
-       drop-shadow extrusion or thick stroke — those read as a
-       separate label sitting on top of the trophy, not as letters
-       pressed into the metal. */
+    /* Lane number on the trophy cup. Coloured with --led-substrate (the
+       same dot colour the rest of the panel uses for unlit pixels) so
+       the digit reads as a hole punched out of the trophy's lit amber
+       — matching the dotted-board / Punktmatrix aesthetic across all
+       three style variants. No text-shadow / embossing: with the
+       substrate-tone digit, any lit-edge highlight reads as a halo
+       around a "missing pixel" hole, which is the wrong material. */
     .retro-winner-num {
       position: absolute;
-      top: 40%;
+      top: 44%;
       left: 0;
       right: 0;
       transform: translateY(-50%);
       text-align: center;
       font-family: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
       font-weight: 900;
-      font-size: 22cqmin;
+      /* -10% from the previous 22cqmin so the digit sits inside the
+         cup bowl rather than overflowing onto the trophy stem. */
+      font-size: 20cqmin;
       line-height: 1;
-      color: var(--led-amber);
+      color: var(--led-substrate);
       letter-spacing: -0.04em;
       pointer-events: none;
-      text-shadow:
-        -1px -1px 0 rgba(255, 240, 180, 0.55),
-        1px 1px 1px rgba(0, 0, 0, 0.4),
-        0 0 6px rgb(var(--led-glow-rgb) / 0.35);
     }
     /* Tighter on the small variant so trophy + number still fit. */
     .retro--size-small .retro-winner-trophy {
       --mdc-icon-size: 51cqmin;
     }
     .retro--size-small .retro-winner-num {
-      font-size: 19cqmin;
+      /* -10% from the previous 19cqmin, same rationale as base. */
+      font-size: 17cqmin;
       /* On small the badge hits its 82px min-width while the trophy
          icon scales down independently — so the cup ends up a touch
          higher in the badge than on regular/medium. Nudge the number
          up the same amount so it lands on the cup body, not below it. */
-      top: 33%;
-    }
-    /* Pixel style: both the trophy icon and the number are screened
-       by the LED dot overlay above. Color the number with
-       --led-substrate (the same tone the rest of the panel uses for
-       its substrate dots) so the letter's dots match the substrate
-       dots of the surrounding panel — the number reads as "unlit
-       pixels" within the trophy's lit amber, not as a darker hole
-       below the panel background. The embossed shadow stack stops
-       making sense once everything is dotty, so drop it. */
-    .retro--style-pixel .retro-winner-num {
-      color: var(--led-substrate);
-      text-shadow: none;
-      -webkit-text-stroke: 0;
+      top: 37%;
     }
     /* Pixel mode alignment fix: drop the trophy badge's own substrate
        gradient. The badge's gradient origin doesn't coregister with
@@ -1583,8 +1577,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       letter-spacing: 0.01em;
       line-height: 1.05;
       font-size: 1.95em;
-      border-radius: var(--ha-card-border-radius, 12px)
-                     var(--ha-card-border-radius, 12px) 0 0;
     }
     .retro-station-name {
       text-shadow: none;
