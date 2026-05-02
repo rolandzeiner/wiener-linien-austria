@@ -15,4 +15,4 @@ ruff>=0.15.12,<1
 # pycares 5.x and pytest crashes at collection with `AttributeError:
 # module 'pycares' has no attribute 'ares_query_a_result'`. Cap below
 # the rename until HA bumps aiodns to a version that targets pycares 5.
-pycares>=4.4,<5
+pycares>=5.0.1,<6
