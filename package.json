@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "custom-card-helpers": "^2.0.0",
-    "lit": "^3.3.0"
+    "lit": "^3.3.0",
+    "qr-creator": "1.0.0"
   }
 }

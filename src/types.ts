@@ -222,6 +222,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_hero_metric?: boolean | undefined;
   show_departures?: boolean | undefined;
   show_stops_ahead?: boolean | undefined;
+  show_qr_button?: boolean | undefined;
   hide_header?: boolean | undefined;
   hide_attribution?: boolean | undefined;
 

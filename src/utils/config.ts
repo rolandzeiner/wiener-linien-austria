@@ -103,6 +103,7 @@ export interface NormalisedModernConfigValidated {
   show_hero_metric: boolean;
   show_departures: boolean;
   show_stops_ahead: boolean;
+  show_qr_button: boolean;
   hide_header: boolean;
   hide_attribution: boolean;
   layout: "stacked" | "tabs";
@@ -131,6 +132,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   show_hero_metric: true,
   show_departures: true,
   show_stops_ahead: true,
+  show_qr_button: true,
   hide_header: false,
   hide_attribution: false,
   layout: "stacked",
@@ -198,6 +200,7 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
     show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
     show_stops_ahead: raw.show_stops_ahead ?? MODERN_DEFAULTS.show_stops_ahead,
+    show_qr_button: raw.show_qr_button ?? MODERN_DEFAULTS.show_qr_button,
     hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
     hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
     layout: raw.layout === "tabs" ? "tabs" : "stacked",

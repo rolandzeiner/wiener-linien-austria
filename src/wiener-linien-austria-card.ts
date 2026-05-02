@@ -3,6 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
+import QrCreator from "qr-creator";
 import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
 
 import { cardStyles } from "./card-styles.js";
@@ -137,6 +138,9 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _expandedTransfers = new Set<string>();
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
+  // QR dialog open state, keyed by stop entity_id. null = closed.
+  // Per-stop so that in `tabs` layout each tab keeps its own dialog.
+  @state() private _qrOpenFor: string | null = null;
 
   private _versionCheckDone = false;
 
@@ -221,6 +225,38 @@ export class WienerLinienAustriaCard extends LitElement {
     }
   }
 
+  protected updated(changed: PropertyValues): void {
+    if (changed.has("_qrOpenFor")) {
+      if (this._qrOpenFor) {
+        // Modal opened: render the QR into the (now-mounted) canvas
+        // wrapper and wire the document-level Escape handler.
+        const host = this.renderRoot.querySelector<HTMLElement>(".qr-canvas");
+        if (host) {
+          while (host.firstChild) host.removeChild(host.firstChild);
+          QrCreator.render(
+            {
+              text: host.getAttribute("data-qr-text") ?? "",
+              radius: 0,
+              ecLevel: "M",
+              fill: "#000",
+              background: "#fff",
+              size: 256,
+            },
+            host,
+          );
+        }
+        document.addEventListener("keydown", this._qrEscHandler);
+      } else {
+        document.removeEventListener("keydown", this._qrEscHandler);
+      }
+    }
+  }
+
+  public disconnectedCallback(): void {
+    document.removeEventListener("keydown", this._qrEscHandler);
+    super.disconnectedCallback();
+  }
+
   protected shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (
@@ -231,6 +267,7 @@ export class WienerLinienAustriaCard extends LitElement {
       changed.has("_expandedElevator") ||
       changed.has("_expandedRows") ||
       changed.has("_expandedTransfers") ||
+      changed.has("_qrOpenFor") ||
       changed.has("_debugTraffic") ||
       changed.has("_debugElevator")
     ) {
@@ -420,7 +457,25 @@ export class WienerLinienAustriaCard extends LitElement {
     const showElevator = this._config!.show_elevator_info && elevatorInfos.length > 0;
 
     const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
+    // Phone-first QR target: geo: URI hands off to the user's default
+    // maps app (Apple Maps, Organic Maps, OsmAnd, …), no Google preference.
+    // Falls back to the HTTPS OSM URL when we don't have coordinates so
+    // the QR still resolves to something useful.
+    const geoUri =
+      this._stopGeoUri(title, attrs.latitude, attrs.longitude) ?? mapUrl;
+    // Click target stays on the HTTPS stadtplan URL across all devices.
+    // The HA Companion app embeds the dashboard in a WebView whose
+    // navigation interceptor only forwards http(s):// schemes to the
+    // OS — geo: URIs are silently dropped, so a tap on the map button
+    // would do nothing for most phone users (HA's primary mobile
+    // surface). Desktop browsers and the QR-scan path still get the
+    // full open-in-maps-app handoff: the QR encodes the geo: URI
+    // separately, and OS camera apps decode + open it at the OS level
+    // regardless of which app rendered the QR.
+    const showQrButton =
+      this._config!.show_qr_button !== false && geoUri !== null;
     const openInMaps = this._t("open_in_maps");
+    const qrOpenLabel = this._t("qr_open");
 
     // Hero group — the set of departures shown in the big hero block.
     // Mirrors linz-linien-austria's _computeHeroGroup verbatim: the
@@ -480,19 +535,33 @@ export class WienerLinienAustriaCard extends LitElement {
                   ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
                   : nothing}
               </div>
-              ${mapUrl
+              ${mapUrl || showQrButton
                 ? html`<div class="head-actions">
-                    <a
-                      class="icon-action"
-                      href=${mapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title=${openInMaps}
-                      aria-label="${openInMaps}: ${title}"
-                    ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>
+                    ${showQrButton
+                      ? html`<button
+                          type="button"
+                          class="icon-action"
+                          title=${qrOpenLabel}
+                          aria-label="${qrOpenLabel}: ${title}"
+                          @click=${() => this._openQrFor(stopCfg.entity)}
+                        ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
+                      : nothing}
+                    ${mapUrl
+                      ? html`<a
+                          class="icon-action"
+                          href=${mapUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title=${openInMaps}
+                          aria-label="${openInMaps}: ${title}"
+                        ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`
+                      : nothing}
                   </div>`
                 : nothing}
             </header>`}
+        ${showQrButton && this._qrOpenFor === stopCfg.entity && geoUri
+          ? this._renderQrDialog(stopCfg.entity, title, geoUri, mapUrl)
+          : nothing}
 
         ${this._config!.show_hero_metric && heroLead
           ? html`<div class="hero-host">
@@ -1219,22 +1288,139 @@ export class WienerLinienAustriaCard extends LitElement {
     this._expandedRows = next;
   }
 
+  /**
+   * Official Vienna city map (beta viewer) — stadtplan.wien.gv.at,
+   * maintained by Magistrat der Stadt Wien. Built on basemap.at
+   * tiles, renders the Wiener-Linien stop network natively, and
+   * exposes a hash-based permalink with a stable WGS84 contract:
+   *
+   *   #/@<lon>,<lat>,<zoom>,<rotation>,<tilt>,<basemap>/<theme>
+   *
+   * Used by the header map button and the dialog "open in maps" link.
+   * Falls back to OpenStreetMap search when the sensor doesn't expose
+   * coordinates (rare — the integration normally seeds them from the
+   * Wiener Linien static catalogue at config-flow time).
+   */
   private _stopMapUrl(
     stopName: string | undefined,
     lat: number | null | undefined,
     lon: number | null | undefined,
   ): string | null {
-    // Always pass the URL through `safeHttpsUri` — the URL is built from
-    // hardcoded `https://` literals today, but the trust-boundary gate
-    // guards against a future contributor swapping in an upstream-supplied
-    // URL field without remembering to validate it.
     let url: string | null = null;
     if (typeof lat === "number" && typeof lon === "number") {
-      url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+      // 17.5 is street-level zoom — close enough that the stop and its
+      // platforms read clearly without losing the surrounding block.
+      url = `https://stadtplan.wien.gv.at/#/@${lon},${lat},17.5,0,0,standard/themes`;
     } else if (stopName) {
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stopName}, Wien`)}`;
+      url = `https://www.openstreetmap.org/search?query=${encodeURIComponent(`${stopName}, Wien`)}`;
     }
     return url ? safeHttpsUri(url) || null : null;
+  }
+
+  /**
+   * Platform-native map intent. RFC 5870 + Android Intent extensions.
+   * Encoded into the QR so phone scanners hand off to whichever maps
+   * app the user has set as their default — Apple Maps on iOS,
+   * Google Maps / OsmAnd / Organic Maps on Android, Magic Earth, etc.
+   * No vendor preference baked in. Falls back to the HTTPS OSM URL
+   * when we don't have lat/lon (the QR scanner will open the browser).
+   */
+  private _stopGeoUri(
+    stopName: string | undefined,
+    lat: number | null | undefined,
+    lon: number | null | undefined,
+  ): string | null {
+    if (typeof lat !== "number" || typeof lon !== "number") return null;
+    const label = stopName ? `(${encodeURIComponent(stopName)})` : "";
+    return `geo:${lat},${lon}?q=${lat},${lon}${label}`;
+  }
+
+  private _openQrFor(entityId: string): void {
+    this._qrOpenFor = entityId;
+  }
+
+  private _closeQr(): void {
+    this._qrOpenFor = null;
+  }
+
+  /** Escape-to-close keyboard handler, attached while the modal is open. */
+  private _qrEscHandler = (ev: KeyboardEvent): void => {
+    if (ev.key === "Escape") {
+      ev.preventDefault();
+      this._closeQr();
+    }
+  };
+
+  /**
+   * QR modal. Plain positioned overlay (`position: fixed; inset: 0`)
+   * instead of `<dialog>` — `<dialog>.showModal()` inside a Lit shadow
+   * root that's nested in HA's own dialog stack misbehaves on some
+   * browsers (the top-layer registration races against Lit's render
+   * commit). A plain backdrop + dialog div is bulletproof.
+   */
+  private _renderQrDialog(
+    entityId: string,
+    title: string,
+    qrTarget: string,
+    fallbackHref: string | null,
+  ): TemplateResult {
+    const dialogId = `wl-qr-${entityId.replace(/[^a-z0-9_]/gi, "_")}`;
+    const closeLabel = this._t("qr_close");
+    const dialogTitle = this._t("qr_dialog_title");
+    const hint = this._t("qr_dialog_hint");
+    const openMapsLabel = this._t("qr_open_maps");
+    // The QR carries a geo: URI for native maps-app handoff on phones.
+    // Desktop browsers can't follow geo: in a click — surface an HTTPS
+    // fallback (OSM) for the visible link so the dialog stays useful
+    // when opened on a laptop/desktop dashboard.
+    const linkHref = fallbackHref ?? qrTarget;
+    return html`
+      <div
+        class="qr-backdrop"
+        role="presentation"
+        @click=${() => this._closeQr()}
+      ></div>
+      <div
+        class="qr-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="${dialogId}-title"
+      >
+        <div class="qr-dialog-inner">
+          <header class="qr-dialog-head">
+            <h3 class="qr-dialog-title" id="${dialogId}-title">
+              ${dialogTitle}
+            </h3>
+            <button
+              type="button"
+              class="icon-action"
+              aria-label=${closeLabel}
+              title=${closeLabel}
+              @click=${() => this._closeQr()}
+            ><ha-icon icon="mdi:close" aria-hidden="true"></ha-icon></button>
+          </header>
+          <p class="qr-dialog-stop">${title}</p>
+          <div
+            class="qr-canvas"
+            role="img"
+            aria-label="${dialogTitle}: ${title}"
+            data-qr-text=${qrTarget}
+          ></div>
+          <p class="qr-dialog-hint">${hint}</p>
+          <div class="qr-dialog-links">
+            <a
+              class="qr-link"
+              href=${linkHref}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>
+              <span>${openMapsLabel}</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // Banner is rendered via the shared `renderVersionBanner` helper —

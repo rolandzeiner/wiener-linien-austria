@@ -891,6 +891,106 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
   }
 
+  /* QR-code dialog — plain positioned overlay (not the native dialog
+     element). The dialog.showModal top-layer registration races against
+     Lit's render commit when the card is nested inside HA's own dialog
+     stack (edit mode), so a fixed-position div pair is bulletproof.
+     The escape-to-close handler is wired in updated() instead. */
+  .qr-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 999;
+    cursor: pointer;
+  }
+  .qr-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    max-width: min(360px, 92vw);
+    width: max-content;
+    border-radius: var(--wl-radius-lg);
+    box-shadow: 0 12px 40px color-mix(in srgb, #000 32%, transparent);
+    z-index: 1000;
+  }
+  .qr-dialog-inner {
+    background: var(--ha-card-background, var(--card-background-color, #fff));
+    color: var(--primary-text-color);
+    padding: 16px;
+    border-radius: var(--wl-radius-lg);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .qr-dialog-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .qr-dialog-title {
+    margin: 0;
+    flex: 1;
+    font-size: var(--ha-font-size-m, 0.9375rem);
+    font-weight: 600;
+  }
+  .qr-dialog-stop {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--secondary-text-color);
+  }
+  /* Canvas wrapper — qr-creator appends a 256×256 <canvas>; centre it
+     and let mobile shrink it to viewport width minus padding. */
+  .qr-canvas {
+    align-self: center;
+    padding: 12px;
+    background: #fff;
+    border-radius: var(--wl-radius-md);
+    line-height: 0;
+    forced-color-adjust: none;
+  }
+  .qr-canvas canvas {
+    display: block;
+    width: 100%;
+    max-width: 256px;
+    height: auto;
+  }
+  .qr-dialog-hint {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--secondary-text-color);
+    line-height: 1.4;
+  }
+  .qr-dialog-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 2px;
+  }
+  .qr-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+    color: var(--primary-text-color);
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: background-color
+      var(--ha-transition-duration-fast, 160ms)
+      var(--ha-transition-easing-standard, ease);
+  }
+  .qr-link:hover {
+    background: color-mix(in srgb, var(--primary-color) 22%, transparent);
+  }
+  .qr-link ha-icon {
+    --mdc-icon-size: 16px;
+    color: var(--secondary-text-color);
+  }
+
   /* Container density ladder. One token tweak per breakpoint cascades
      through every component above. */
   @container wlcard (inline-size < 360px) {
