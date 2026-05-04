@@ -20,7 +20,8 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "custom-card-helpers": "^2.0.0",
-    "lit": "^3.3.0"
+    "@mdi/js": "7.4.47",
+    "lit": "^3.3.0",
+    "qr-creator": "1.0.0"
   }
 }

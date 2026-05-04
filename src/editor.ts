@@ -9,7 +9,7 @@
 //   integration, label/helper localisation chain, a11y / forced-colors
 //   / focus-visible all match HA core.
 //
-// * **Three bespoke sections** stay below `<ha-form>` because their
+// * **Two bespoke sections** stay below `<ha-form>` because their
 //   row lists are derived from the live data (lines/direction/walk-time
 //   per stop, colour swatches per line in the user's selection):
 //   - Per-stop filters (line chips + direction picker + per-line dir
@@ -37,7 +37,7 @@ import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResul
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
+import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
 import { translate } from "./localize/localize.js";
@@ -147,6 +147,7 @@ export class WienerLinienAustriaCardEditor
           { name: "show_hero_metric", selector: { boolean: {} } },
           { name: "show_departures", selector: { boolean: {} } },
           { name: "show_stops_ahead", selector: { boolean: {} } },
+          { name: "show_qr_button", selector: { boolean: {} } },
           { name: "show_platform", selector: { boolean: {} } },
           { name: "show_accessibility", selector: { boolean: {} } },
           { name: "accessibility_only", selector: { boolean: {} } },
@@ -413,9 +414,25 @@ export class WienerLinienAustriaCardEditor
     const stopName = attrs.stop_name || stop.entity;
     const overrides = this._config!.line_colors;
     const lineColors = attrs.line_colors ?? {};
-    const lines = [...new Set(
-      (attrs.departures ?? []).map((d) => d.line).filter((l): l is string => !!l),
-    )].sort();
+    // Tracked subset wins — only surface lines the user opted into via
+    // the integration's config flow. Includes off-service lines
+    // (nightlines during the day) because the tracking is independent
+    // of the live `/monitor` window. Falls back to the static-catalogue
+    // list, then live departures, when no tracked list is published
+    // (older sensor cache before this attribute landed).
+    let lines: string[];
+    if (attrs.tracked_lines?.length) {
+      lines = [...attrs.tracked_lines].sort();
+    } else {
+      const fallbackLive = (attrs.departures ?? [])
+        .map((d) => d.line)
+        .filter((l): l is string => !!l);
+      const lineSet = new Set<string>(
+        attrs.lines_at_stop?.length ? attrs.lines_at_stop : fallbackLive,
+      );
+      for (const l of fallbackLive) lineSet.add(l);
+      lines = [...lineSet].sort();
+    }
     // Per-line vehicle type lookup so each chip can render its MoT icon
     // (mdi:subway-variant / mdi:tram / mdi:bus). First-seen-wins on
     // collision because Wiener Linien lines have a stable single MoT.

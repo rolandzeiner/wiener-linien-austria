@@ -23,7 +23,6 @@ from .const import (
     MAX_DEPARTURES_IN_ATTRS,
 )
 from .coordinator import (
-    Departure,
     MonitorData,
     WienerLinienAustriaCoordinator,
     WienerLinienConfigEntry,
@@ -155,6 +154,28 @@ class WienerLinienStopSensor(
         # the recorder dedupes it via the state-diff path.
         line_colors = self._line_colors()
 
+        # Static-catalogue line list for THIS stop — every line that
+        # serves the DIVA per the Wiener Linien schedule, regardless of
+        # whether it has a departure inside the live `/monitor` window
+        # right now. Falls back to the live-derived list when the
+        # catalogue/trip-pattern index isn't loaded yet.
+        lines_at_stop = self._lines_at_stop(diva)
+
+        # User-tracked subset of `lines_at_stop` — the lines selected in
+        # the integration's config flow (`CONF_LINES` is a list of
+        # `{line}|{direction}` keys). Both card editors prefer this
+        # filtered list so the per-stop pickers don't surface lines the
+        # user has explicitly opted out of, while still including ones
+        # that aren't currently driving (nightlines during the day,
+        # day-only lines after midnight). Empty when nothing's tracked,
+        # in which case the editors fall through to `lines_at_stop`.
+        tracked_keys = [
+            str(k)
+            for k in (selected_line_keys or [])
+            if isinstance(k, str) and k
+        ]
+        tracked_lines = sorted({k.split("|", 1)[0] for k in tracked_keys})
+
         # `attribution` lives on the entity class via `_attr_attribution`
         # (HA core renders it in the same dict) — don't duplicate here, that
         # would just add bytes to every recorder write at busy stops.
@@ -166,10 +187,30 @@ class WienerLinienStopSensor(
             "server_time": data.server_time if data is not None else None,
             "departures": capped,
             "next_by_line": next_by_line,
+            "lines_at_stop": lines_at_stop,
+            "tracked_lines": tracked_lines,
+            "tracked_line_keys": tracked_keys,
             "line_colors": line_colors,
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
         }
+
+    def _lines_at_stop(self, diva: int) -> list[str]:
+        """Static-catalogue line list for this DIVA.
+
+        Returns `[]` when the catalogue or trip-pattern index isn't
+        loaded yet — callers (the card editor) fall through to the
+        live-derived list in that case so behaviour degrades gracefully.
+        """
+        domain_data = self.coordinator.hass.data.get(DOMAIN, {})
+        catalogue = domain_data.get(CATALOGUE_KEY)
+        if not isinstance(catalogue, StaticCatalogue):
+            return []
+        index = catalogue.trip_patterns
+        if index is None:
+            return []
+        labels = index.lines_at_diva.get(diva)
+        return list(labels) if labels else []
 
     def _line_colors(self) -> dict[str, dict[str, str]]:
         """Return the full GTFS palette as `{label: {bg, fg}}`.
@@ -211,7 +252,3 @@ class WienerLinienStopSensor(
         `data` is None and we stay unavailable — nothing to show.
         """
         return self.coordinator.data is not None
-
-
-# Explicit re-export so mypy sees the full type contract.
-_Departure = Departure

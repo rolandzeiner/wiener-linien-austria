@@ -1,11 +1,10 @@
-import type { HomeAssistant } from "custom-card-helpers";
+import type { HomeAssistant } from "../types.js";
 
 import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 
-// Stable (line, direction, towards) identifier. Retained for the editor's
-// per-triple `seen` deduplication in tripletsAtStop and as a stable React-
-// like key for the line picker. NOT used for walk-times any more — see
-// lineDirKey below for why.
+// Stable (line, direction, towards) identifier — used by tripletsAtStop's
+// seen-dedupe and as a stable picker key. Walk-times key by pair instead;
+// see lineDirKey below.
 function lineKey(line: string, direction: string, towards: string): string {
   return `${line}|${direction}|${towards}`;
 }
@@ -32,8 +31,7 @@ export interface Triplet {
 
 // Every distinct (line, direction, towards) triple visible at a stop.
 // Used by the line multi-picker and direction picker — display surfaces
-// where every visible terminus matters. NOT used for walk-times any more
-// (see pairsAtStop).
+// where every visible terminus matters. Walk-times use pairsAtStop.
 export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] {
   const out: Triplet[] = [];
   const seen = new Set<string>();
@@ -84,7 +82,22 @@ export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
 }
 
 function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
+  // Tracked list wins — once the user has configured which lines to
+  // track in the integration's config flow, the card editors only
+  // surface those, regardless of whether each is currently running.
+  // Off-service lines (nightlines during the day, day-only lines
+  // after midnight) stay visible because they were tracked, not
+  // because they have a live departure.
+  if (attrs?.tracked_lines?.length) {
+    return [...attrs.tracked_lines].sort();
+  }
   const s = new Set<string>();
+  // Fallback when no tracked list is published yet (cache predates the
+  // attribute, or coordinator hasn't completed first refresh): static
+  // catalogue first, then live departures.
+  if (attrs?.lines_at_stop?.length) {
+    for (const l of attrs.lines_at_stop) s.add(l);
+  }
   for (const d of attrs?.departures ?? []) {
     if (d.line) s.add(d.line);
   }

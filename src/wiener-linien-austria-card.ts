@@ -3,7 +3,14 @@ import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
+import QrCreator from "qr-creator";
+import {
+  mdiBus,
+  mdiBusStop,
+  mdiSubwayVariant,
+  mdiTram,
+} from "@mdi/js";
+import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { cardStyles } from "./card-styles.js";
 import { CARD_VERSION } from "./const.js";
@@ -38,26 +45,31 @@ import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeTrafficHtml } from "./utils/html.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
 
-// Eager editor import — the skill's gotcha about `await import("./editor")`
-// racing against HA's `document.createElement(…-editor)` applies here.
+// Eager import — a dynamic `await import("./editor.js")` would race
+// HA's synchronous `document.createElement('…-editor')` call when the
+// editor opens for the first time.
 import "./editor.js";
-
-console.info(
-  `%c WIENER-LINIEN-AUSTRIA-CARD %c ${CARD_VERSION} `,
-  "color: white; background: #E3000F; font-weight: 700;",
-  "color: #E3000F; background: white; font-weight: 700;",
-);
 
 // Register the card with HA's picker so it shows up in the visual editor's
 // "+ Add card" dialog.
-(window as unknown as { customCards?: unknown[] }).customCards =
-  (window as unknown as { customCards?: unknown[] }).customCards ?? [];
-(window as unknown as { customCards: Array<Record<string, unknown>> }).customCards.push({
-  type: "wiener-linien-austria-card",
-  name: "Wiener Linien Austria",
-  description: "Abfahrtsmonitor mit Störungen und Aufzugsinfo",
-  preview: true,
-});
+// Dedupe by `type` so a double-load (cache-bust race during a version
+// banner reload, HMR during dev, URL-deduplication failure on the
+// resource registration path) doesn't surface the same card twice in
+// the picker.
+{
+  const win = window as unknown as {
+    customCards?: Array<Record<string, unknown>>;
+  };
+  win.customCards = win.customCards ?? [];
+  if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-card")) {
+    win.customCards.push({
+      type: "wiener-linien-austria-card",
+      name: "Wiener Linien Austria",
+      description: "Abfahrtsmonitor mit Störungen und Aufzugsinfo",
+      preview: true,
+    });
+  }
+}
 
 // Wrap API-sourced German strings (station names, destinations, disturbance
 // text) so assistive tech pronounces them correctly even when HA's dashboard
@@ -137,6 +149,9 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _expandedTransfers = new Set<string>();
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
+  // QR dialog open state, keyed by stop entity_id. null = closed.
+  // Per-stop so that in `tabs` layout each tab keeps its own dialog.
+  @state() private _qrOpenFor: string | null = null;
 
   private _versionCheckDone = false;
 
@@ -218,6 +233,140 @@ export class WienerLinienAustriaCard extends LitElement {
       if (stops.length && this._activeTab >= stops.length) {
         this._activeTab = 0;
       }
+      // Clear `_qrOpenFor` if the entity it references has been removed
+      // from the card config (user reconfigured and dropped that stop).
+      // Without this, the saved entity-id lingers and `aria-controls`
+      // points at a panel that no longer exists in the DOM.
+      if (this._qrOpenFor) {
+        const liveEntities = new Set(stops.map((s) => s.entity));
+        if (!liveEntities.has(this._qrOpenFor)) {
+          this._qrOpenFor = null;
+        }
+      }
+    }
+  }
+
+  protected updated(changed: PropertyValues): void {
+    if (changed.has("_qrOpenFor") && this._qrOpenFor) {
+      // Panel just expanded — render the QR into its canvas wrapper.
+      // Re-render whenever the target URL changes (tab switch reuses
+      // the same Lit DOM element and just updates `data-qr-text`),
+      // so we compare want vs. last-rendered-for and only redraw on
+      // mismatch. Without this guard, the second tab would inherit
+      // the first tab's accent because the canvas would still hold
+      // the prior render.
+      const host = this.renderRoot.querySelector<HTMLElement>(
+        ".qr-panel.expanded .qr-canvas",
+      );
+      if (!host) return;
+      const wantText = host.getAttribute("data-qr-text") ?? "";
+      const haveText = host.getAttribute("data-qr-rendered-for") ?? "";
+      if (wantText && wantText !== haveText) {
+        // Don't clear `host` here — `_renderTintedQr` reads
+        // `getComputedStyle` before mutating the DOM so the layout
+        // engine doesn't have to flush twice (clear + re-append).
+        this._renderTintedQr(host);
+        host.setAttribute("data-qr-rendered-for", wantText);
+      }
+    }
+  }
+
+  /**
+   * Render the QR tinted with the per-station accent colour, then
+   * overlay the MOT (mode-of-transport) MDI icon at the centre in
+   * the same accent on a small white plate. Uses ecLevel "H"
+   * (≈30% damage tolerance) so the obscured centre stays scannable.
+   *
+   * Accent comes from the closest `.station` ancestor's computed
+   * `--wl-accent` — same token the icon-tile, line-badge, and hero
+   * tints already track, so the QR shares the colour identity of
+   * the station it belongs to.
+   */
+  private _renderTintedQr(host: HTMLElement): void {
+    // Read accent FIRST — `getComputedStyle` triggers a layout flush,
+    // and any DOM mutation done before it would force the engine to
+    // recompute layout twice (once after our mutation, once for the
+    // style read). Reading before any clear/append keeps it to one
+    // pass per render.
+    const station = host.closest<HTMLElement>(".station");
+    const accent = station
+      ? getComputedStyle(station).getPropertyValue("--wl-accent").trim() ||
+        "#000"
+      : "#000";
+    // Clear any prior canvas now that we have the accent — the next
+    // QrCreator.render appends a fresh canvas, and we don't want a
+    // stack of canvases across re-renders.
+    while (host.firstChild) host.removeChild(host.firstChild);
+    const size = 220;
+    QrCreator.render(
+      {
+        text: host.getAttribute("data-qr-text") ?? "",
+        radius: 0,
+        // ecLevel "H" tolerates ≈30% damage — required because the
+        // MOT-icon overlay obscures ≈18% of the centre modules.
+        ecLevel: "H",
+        fill: accent,
+        background: "#fff",
+        size,
+      },
+      host,
+    );
+    const canvas = host.querySelector("canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const iconName = host.getAttribute("data-qr-icon") ?? "mdi:bus-stop";
+    const iconPath = this._mdiPathFor(iconName);
+    if (!iconPath) return;
+    // Centred icon footprint: ≈22% of the QR width — stays well inside
+    // the H-level error-correction headroom while reading clearly at
+    // small sizes.
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const iconRatio = 0.22;
+    const iconSize = Math.round(cw * iconRatio);
+    const iconX = Math.round((cw - iconSize) / 2);
+    const iconY = Math.round((ch - iconSize) / 2);
+    // White plate around the icon — gives the QR detector clean
+    // module boundaries to recover from rather than mixed accent /
+    // icon pixels at the icon edge. Rounded corners (≈20% of icon
+    // size) match the rest of the card's visual language; falls
+    // through to a sharp rect on browsers without Path2D.roundRect
+    // (pre-Chrome 99 / Safari 16) so the QR still scans correctly.
+    const padding = Math.round(iconSize * 0.18);
+    const plateX = iconX - padding;
+    const plateY = iconY - padding;
+    const plateSize = iconSize + padding * 2;
+    const plateRadius = Math.round(iconSize * 0.2);
+    ctx.fillStyle = "#fff";
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(plateX, plateY, plateSize, plateSize, plateRadius);
+      ctx.fill();
+    } else {
+      ctx.fillRect(plateX, plateY, plateSize, plateSize);
+    }
+    // MDI icons use a 24×24 viewBox. Scale to fit the icon area and
+    // tint with the same accent the QR modules use.
+    ctx.save();
+    ctx.translate(iconX, iconY);
+    ctx.scale(iconSize / 24, iconSize / 24);
+    ctx.fillStyle = accent;
+    ctx.fill(new Path2D(iconPath));
+    ctx.restore();
+  }
+
+  private _mdiPathFor(iconName: string): string | null {
+    switch (iconName) {
+      case "mdi:subway-variant":
+        return mdiSubwayVariant;
+      case "mdi:tram":
+        return mdiTram;
+      case "mdi:bus":
+        return mdiBus;
+      case "mdi:bus-stop":
+      default:
+        return mdiBusStop;
     }
   }
 
@@ -231,6 +380,7 @@ export class WienerLinienAustriaCard extends LitElement {
       changed.has("_expandedElevator") ||
       changed.has("_expandedRows") ||
       changed.has("_expandedTransfers") ||
+      changed.has("_qrOpenFor") ||
       changed.has("_debugTraffic") ||
       changed.has("_debugElevator")
     ) {
@@ -371,9 +521,23 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private _setActiveTab(i: number): void {
-    if (Number.isFinite(i) && i !== this._activeTab) {
-      this._activeTab = i;
+    if (!Number.isFinite(i) || i === this._activeTab) return;
+    // If the QR panel was open on the previous tab, carry that
+    // expanded state to the new tab so the user doesn't have to
+    // re-tap the QR button after switching. Stops a config away
+    // from `layout: tabs` would have at most one station to begin
+    // with, so this only applies in tabs mode by definition.
+    const stops = this._resolveStops();
+    const prevEntity = stops[this._activeTab]?.entity;
+    const nextEntity = stops[i]?.entity;
+    if (
+      prevEntity &&
+      nextEntity &&
+      this._qrOpenFor === prevEntity
+    ) {
+      this._qrOpenFor = nextEntity;
     }
+    this._activeTab = i;
   }
 
   private _onTabKeydown(ev: KeyboardEvent, index: number, count: number): void {
@@ -420,14 +584,31 @@ export class WienerLinienAustriaCard extends LitElement {
     const showElevator = this._config!.show_elevator_info && elevatorInfos.length > 0;
 
     const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
+    // Phone-first QR target: geo: URI hands off to the user's default
+    // maps app (Apple Maps, Organic Maps, OsmAnd, …), no Google preference.
+    // Falls back to the HTTPS OSM URL when we don't have coordinates so
+    // the QR still resolves to something useful.
+    const geoUri =
+      this._stopGeoUri(title, attrs.latitude, attrs.longitude) ?? mapUrl;
+    // Click target stays on the HTTPS stadtplan URL across all devices.
+    // The HA Companion app embeds the dashboard in a WebView whose
+    // navigation interceptor only forwards http(s):// schemes to the
+    // OS — geo: URIs are silently dropped, so a tap on the map button
+    // would do nothing for most phone users (HA's primary mobile
+    // surface). Desktop browsers and the QR-scan path still get the
+    // full open-in-maps-app handoff: the QR encodes the geo: URI
+    // separately, and OS camera apps decode + open it at the OS level
+    // regardless of which app rendered the QR.
+    const showQrButton =
+      this._config!.show_qr_button !== false && geoUri !== null;
     const openInMaps = this._t("open_in_maps");
+    const qrOpenLabel = this._t("qr_open");
 
     // Hero group — the set of departures shown in the big hero block.
-    // Mirrors linz-linien-austria's _computeHeroGroup verbatim: the
-    // soonest departure leads, and any others tied on the exact same
-    // countdown ride along. When the lead is at "Jetzt" (cd <= 0), we
-    // group every other Jetzt departure too — a tram and a bus both
-    // showing as Jetzt simultaneously is the case where surfacing
+    // The soonest departure leads, and any others tied on the exact
+    // same countdown ride along. When the lead is at "Jetzt" (cd <= 0),
+    // we group every other Jetzt departure too — a tram and a bus
+    // both showing as Jetzt simultaneously is the case where surfacing
     // both is most useful, even though either has technically already
     // arrived.
     const heroGroup = this._computeHeroGroup(filtered);
@@ -480,19 +661,45 @@ export class WienerLinienAustriaCard extends LitElement {
                   ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
                   : nothing}
               </div>
-              ${mapUrl
+              ${mapUrl || showQrButton
                 ? html`<div class="head-actions">
-                    <a
-                      class="icon-action"
-                      href=${mapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title=${openInMaps}
-                      aria-label="${openInMaps}: ${title}"
-                    ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>
+                    ${showQrButton
+                      ? html`<button
+                          type="button"
+                          class=${classMap({
+                            "icon-action": true,
+                            "qr-toggle": true,
+                            expanded: this._qrOpenFor === stopCfg.entity,
+                          })}
+                          title=${qrOpenLabel}
+                          aria-label="${qrOpenLabel}: ${title}"
+                          aria-expanded=${this._qrOpenFor === stopCfg.entity ? "true" : "false"}
+                          aria-controls="wl-qr-${stopCfg.entity.replace(/[^a-z0-9_]/gi, "_")}"
+                          @click=${() => this._toggleQrFor(stopCfg.entity)}
+                        ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
+                      : nothing}
+                    ${mapUrl
+                      ? html`<a
+                          class="icon-action"
+                          href=${mapUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title=${openInMaps}
+                          aria-label="${openInMaps}: ${title}"
+                        ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`
+                      : nothing}
                   </div>`
                 : nothing}
             </header>`}
+        ${showQrButton && geoUri
+          ? this._renderQrPanel(
+              stopCfg.entity,
+              title,
+              geoUri,
+              headerIcon,
+              this._qrOpenFor === stopCfg.entity,
+            )
+          : nothing}
 
         ${this._config!.show_hero_metric && heroLead
           ? html`<div class="hero-host">
@@ -717,8 +924,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
   /**
    * Compute the hero group: the lead departure plus any others tied
-   * on the exact same countdown. Mirrors linz-linien-austria's
-   * _computeHeroGroup verbatim. When the lead is at Jetzt (cd <= 0),
+   * on the exact same countdown. When the lead is at Jetzt (cd <= 0),
    * group every entry that's also at Jetzt — multiple lines all
    * arriving simultaneously is precisely the case where surfacing all
    * of them in the hero is most useful. Outside the Jetzt case, fall
@@ -909,7 +1115,7 @@ export class WienerLinienAustriaCard extends LitElement {
           : this._t("delay_plural", { n: signedDelay })
         : "";
 
-    // Row state — Linz parity. `now` overrides late/early when cd<=0.
+    // Row state — `now` overrides late/early when cd<=0.
     const cdState =
       cd !== null && cd <= 0
         ? "now"
@@ -1195,20 +1401,25 @@ export class WienerLinienAustriaCard extends LitElement {
     this._expandedTransfers = next;
   }
 
-  // Whether Wiener Linien NightLine is currently running. Used to
-  // promote N-prefix chips to the always-inline tier on the
-  // stops_ahead trail during the night window — outside it, those
-  // chips fold back into the +N toggle. Daily envelope captures
-  // the first/last bus spread across all NightLine routes (Wikipedia +
-  // wien.info: 00:30–05:00 typical, with edges at 23:55 and 05:15).
-  // Re-evaluated on every render; the coordinator's ~30 s poll
-  // re-renders frequently enough that the transition from day-mode
-  // to night-mode reaches the user well within a minute of the actual
-  // service start. No timezone math: the user's HA-served browser
-  // and Vienna are the same timezone in practice.
+  // Daily envelope ~23:55–05:15 captures the first/last NightLine bus
+  // spread across all routes. Computed in HA's configured timezone
+  // (`hass.config.time_zone`) — `Date.getHours()` would use the
+  // browser's local TZ, which diverges when a user remote-accesses
+  // a Vienna instance from another country, when the HA Companion
+  // app's WebView reports the device TZ, or for travellers checking
+  // their stops on the road at 02:00. Falls back to Europe/Vienna
+  // if hass isn't yet wired up (very early renders).
   private _isNightlineHour(): boolean {
-    const now = new Date();
-    const minutesIntoDay = now.getHours() * 60 + now.getMinutes();
+    const tz = this.hass?.config?.time_zone || "Europe/Vienna";
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date());
+    const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+    const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+    const minutesIntoDay = hour * 60 + minute;
     return minutesIntoDay >= 23 * 60 + 55 || minutesIntoDay <= 5 * 60 + 15;
   }
 
@@ -1219,22 +1430,102 @@ export class WienerLinienAustriaCard extends LitElement {
     this._expandedRows = next;
   }
 
+  /**
+   * Official Vienna city map (beta viewer) — stadtplan.wien.gv.at,
+   * maintained by Magistrat der Stadt Wien. Built on basemap.at
+   * tiles, renders the Wiener-Linien stop network natively, and
+   * exposes a hash-based permalink with a stable WGS84 contract:
+   *
+   *   #/@<lon>,<lat>,<zoom>,<rotation>,<tilt>,<basemap>/<theme>
+   *
+   * Used by the header map button and the dialog "open in maps" link.
+   * Falls back to OpenStreetMap search when the sensor doesn't expose
+   * coordinates (rare — the integration normally seeds them from the
+   * Wiener Linien static catalogue at config-flow time).
+   */
   private _stopMapUrl(
     stopName: string | undefined,
     lat: number | null | undefined,
     lon: number | null | undefined,
   ): string | null {
-    // Always pass the URL through `safeHttpsUri` — the URL is built from
-    // hardcoded `https://` literals today, but the trust-boundary gate
-    // guards against a future contributor swapping in an upstream-supplied
-    // URL field without remembering to validate it.
     let url: string | null = null;
     if (typeof lat === "number" && typeof lon === "number") {
-      url = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+      // 17.5 is street-level zoom — close enough that the stop and its
+      // platforms read clearly without losing the surrounding block.
+      url = `https://stadtplan.wien.gv.at/#/@${lon},${lat},17.5,0,0,standard/themes`;
     } else if (stopName) {
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${stopName}, Wien`)}`;
+      url = `https://www.openstreetmap.org/search?query=${encodeURIComponent(`${stopName}, Wien`)}`;
     }
     return url ? safeHttpsUri(url) || null : null;
+  }
+
+  /**
+   * Platform-native map intent. RFC 5870 + Android Intent extensions.
+   * Encoded into the QR so phone scanners hand off to whichever maps
+   * app the user has set as their default — Apple Maps on iOS,
+   * Google Maps / OsmAnd / Organic Maps on Android, Magic Earth, etc.
+   * No vendor preference baked in. Falls back to the HTTPS OSM URL
+   * when we don't have lat/lon (the QR scanner will open the browser).
+   */
+  private _stopGeoUri(
+    stopName: string | undefined,
+    lat: number | null | undefined,
+    lon: number | null | undefined,
+  ): string | null {
+    if (typeof lat !== "number" || typeof lon !== "number") return null;
+    const label = stopName ? `(${encodeURIComponent(stopName)})` : "";
+    return `geo:${lat},${lon}?q=${lat},${lon}${label}`;
+  }
+
+  private _toggleQrFor(entityId: string): void {
+    this._qrOpenFor = this._qrOpenFor === entityId ? null : entityId;
+  }
+
+  /**
+   * Inline QR panel. Same 0fr↔1fr grid-template-rows trick as
+   * `.dep-row-detail` and `.stops-ahead-detail` so the panel
+   * animates to its intrinsic height. Renders below the header,
+   * above the hero, so the QR feels like an extension of the
+   * stop card rather than a modal interruption. The "open in
+   * maps" link lives only in the header (the mdi:map-marker icon
+   * sits right next to the QR toggle), so the panel doesn't
+   * duplicate it.
+   */
+  private _renderQrPanel(
+    entityId: string,
+    title: string,
+    qrTarget: string,
+    motIcon: string,
+    expanded: boolean,
+  ): TemplateResult {
+    const panelId = `wl-qr-${entityId.replace(/[^a-z0-9_]/gi, "_")}`;
+    const dialogTitle = this._t("qr_dialog_title");
+    const hint = this._t("qr_dialog_hint");
+    return html`
+      <div
+        class=${classMap({ "qr-panel": true, expanded })}
+        id=${panelId}
+        role="region"
+        aria-hidden=${expanded ? "false" : "true"}
+        aria-label="${dialogTitle}: ${title}"
+      >
+        <div class="qr-panel-inner">
+          <div
+            class="qr-panel-body"
+            @click=${() => this._toggleQrFor(entityId)}
+          >
+            <div
+              class="qr-canvas"
+              role="img"
+              aria-label="${dialogTitle}: ${title}"
+              data-qr-text=${qrTarget}
+              data-qr-icon=${motIcon}
+            ></div>
+            <p class="qr-panel-hint">${hint}</p>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   // Banner is rendered via the shared `renderVersionBanner` helper —

@@ -64,7 +64,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
 2. Type part of a stop name (e.g. `Stephans`) and submit.
 3. Pick the matching stop from the dropdown.
-4. The integration calls `/monitor` live and lists every line currently serving that stop. Pick the one or two you want to track — busy stops list 20+ lines.
+4. The integration lists every line that serves that stop — live `/monitor` rows are merged with the static schedule catalogue, so off-service lines (nightlines during the day, day-only lines after midnight) stay selectable. Pick the one or two you want to track — busy stops list 20+ lines.
 5. Set a polling interval (default 60 s, min 30 s, max 600 s) and save.
 
 Change tracked lines later via **Reconfigure**; change polling interval via **Configure** (options).
@@ -80,11 +80,11 @@ Each card is served under a versioned URL (`/wiener-linien-austria/*-card.js?v=X
 The everyday departure board. Dashboard → Add card → "Wiener Linien Austria" (under *Custom*).
 
 Visual editor covers:
-- **Stops** — multi-select chip picker. For each stop, a second row picks lines, direction (H / R / both, also per-line for mixed routing like "U1 toward city, U3 toward home"), and per-line **walking time** in minutes (departures leaving before you can reach the platform are hidden; inclusive, so you can run for the last minute).
-- **Line colours** — pill swatch picker. Wiener Linien metro CI defaults are built in; tram/bus fall back to the theme primary until overridden.
-- **Display** — multi-stop layout (*stacked* or *tabs*), departures-per-stop slider (1–20), and toggles for hero countdown, departure list, step-free icon, disruption banner, elevator badge, delay text, vehicle-type icon, and "hide attribution" (the sensor attribute keeps the CC-BY string regardless).
+- **Stops** — multi-select chip picker. For each stop, a second row lists only the **lines you tracked in the integration's config flow** (independent of whether they're driving right now — a nightline tracked at 12:30 still appears), direction (H / R / both, also per-line for mixed routing like "U1 toward city, U3 toward home"), and per-line **walking time** in minutes (departures leaving before you can reach the platform are hidden; inclusive, so you can run for the last minute).
+- **Line colours** — pill swatch picker. Defaults come live from the GTFS `routes.txt` palette the integration ships as a sensor attribute; per-line overrides are stored on the card config.
+- **Display** — multi-stop layout (*stacked* or *tabs*), departures-per-stop slider (0–20), and toggles for hero countdown, departure list, stops-ahead trail, QR map button, platform pill, step-free icon, accessibility-only filter, vehicle-type icon, disruption banner, elevator badge, delay text, header, and "hide attribution" (the sensor attribute keeps the CC-BY string regardless).
 
-Each station section auto-tints to the next-departure's line colour and picks an icon for that vehicle type. Departure rows show a colour-coded line badge, destination + optional inline delay ("3 Minuten verspätet" when `time_real` lags `time_planned` by ≥ 1 min), optional traffic-jam and step-free icons, and a countdown cell (`N min` or `jetzt`). Stop titles link to Google Maps pinned by `latitude` / `longitude` (short names like "Ottakring" otherwise resolve to the district centroid). Empty boards render "Betriebsschluss" / "End of service".
+Each station section auto-tints to the next-departure's line colour and picks an icon for that vehicle type. Departure rows show a colour-coded line badge, destination + optional inline delay ("3 Minuten verspätet" when `time_real` lags `time_planned` by ≥ 1 min), optional traffic-jam and step-free icons, and a countdown cell (`N min` or `jetzt`). Stop titles link to the official Vienna city map (`stadtplan.wien.gv.at`) pinned by `latitude` / `longitude`, with an OpenStreetMap fallback when no coordinates are available; an optional QR button next to the map link encodes a `geo:` URI so phone scanners hand off to the user's default maps app (Apple Maps / Organic Maps / OsmAnd / …). Empty boards render "Betriebsschluss" / "End of service".
 
 **Stops-ahead trail.** Departures with a known schedule pattern grow a chevron; click the row (or the hero block) to expand a metro-map-style trail beneath: a vertical 2 px line in the operating line's brand colour, a filled dot per stop, a hollow ring at the terminus, and the station name in a row-per-stop list. Each station carries inline chips for U-Bahn lines that pass through it (always visible); tram, bus, and night transfers fold behind a small `+N` toggle on the right (per-stop expanded state, click to reveal). Nightline chips get promoted to the always-inline tier between ~23:55 and ~05:15 so they're visible when actual service is running; outside that window they stay in `+N`. Nightline chips default to WL signage colours (`#1b1464` background, `#fef200` text). Panels survive realtime polls because they're keyed by the departure's scheduled time, not the live countdown.
 
@@ -94,13 +94,14 @@ Disruption and elevator entries render as collapsible rows above the stop list �
 
 A focused single-stop, single-direction LED-display card mimicking real Wiener Linien platform signs. Dashboard → Add card → "Wiener Linien Austria Retro".
 
-- Next 2 departures for one direction; amber `#FFC700` glyphs in a system monospace stack on a violet (classic) or warm-brown LED substrate. No Google-Fonts fetch (GDPR-clean).
+- Next 2 departures for one direction; amber glyphs in a system monospace stack. Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on warm-brown substrate), and *pixel* (screen-door overlay turning every glyph into discrete LED dots). No Google-Fonts fetch (GDPR-clean).
 - Amber **GLEIS** / **STEIG** panel when the API reports a platform — left-aligned for Gleis "2", right-aligned otherwise, mirroring the real signs.
 - Wheelchair glyph after destinations on step-free departures; alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`).
 - "Betriebsschluss" / "End of service" rendering when the board is empty; differentiated empty-state hints for wrong direction or filtered-out lines.
 - Three size variants (small / medium / regular). Defaults to a full 12-column row in HA section view.
-- Editor: stop chip picker, H/R direction toggle, optional single-line filter, size picker, style picker (classic / warm), show-platform toggle, and per-line walking-time inputs.
-- Optional **wheelchair race** (toggle in editor) — when ≥ 2 upcoming departures are barrier-free, runs a "3, 2, 1" pre-race countdown and a finish overlay with a trophy badge for the winning lane. Gated by `prefers-reduced-motion`.
+- Editor: stop picker, H/R direction toggle (auto-corrects to the only-tracked direction when the stop is one-way OR when only one direction is tracked), single-line picker drawn from the **lines you tracked in the integration's config flow** (off-service nightlines appear regardless of time-of-day), station-name panel + background picker, size picker (small / medium / regular), style picker (classic / warm / pixel), flicker toggle, accessibility-only filter, show-platform toggle, and per-line walking-time inputs.
+- Station-name tile colour: when `Background = default`, the tile picks up the **configured line's** Wiener-Linien-published palette (nightline-blue + bright yellow for N-prefix lines via the signage rule, GTFS palette otherwise). The configured line wins over live departures, so a nightline-configured retro card renders in nightline-blue at noon instead of falling back to white.
+- Optional **wheelchair race** (toggle in editor) — when ≥ 2 upcoming departures are barrier-free, runs a "3, 2, 1" pre-race countdown and a finish overlay with a trophy badge for the winning lane. Tap the card while idle to trigger one immediately. Gated by `prefers-reduced-motion`.
 
 Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
 
@@ -118,6 +119,9 @@ Every `sensor.{stop}_abfahrten` entity carries:
 | `server_time` | ISO string \| None | Wiener Linien `serverTime` from the last successful fetch. |
 | `departures` | list[dict] | Capped at 20 entries, sorted by countdown. Each dict: `line`, `towards`, `direction` ("H"/"R"), `type` (`ptMetro`/`ptTram`/`ptBusCity`/`ptBusNight`), `countdown`, `time_planned` (ISO), `time_real` (ISO), `realtime` (bool), `barrier_free` (bool), `traffic_jam` (bool), `platform` (string, e.g. `"1"`), and (when the static schedule index has resolved a matching trip) `stops_ahead`: an ordered `[{name, is_terminus?, lines?}]` list of upcoming stops on that exact trip down to the terminus. `lines` carries the OTHER lines that pass through each stop, used by the card to render transfer chips. |
 | `next_by_line` | dict[str, int] | Per-line map to the earliest countdown. E.g. `{"U1": 2, "U4": 6}`. |
+| `lines_at_stop` | list[str] | Every line serving this DIVA per the static Wiener-Linien schedule, regardless of whether it has a live departure right now. Empty until the trip-pattern catalogue has loaded. Used by the card editors to populate line pickers without depending on the live `/monitor` window. |
+| `tracked_lines` | list[str] | Sorted unique line labels tracked in this entry (derived from `CONF_LINES`). Card editors filter their pickers to this set so users only see lines they opted into. |
+| `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys from `CONF_LINES`. Used by the retro card editor to filter the line dropdown by the selected direction without losing off-service lines. |
 | `traffic_info` | list[dict] | Service disruptions matching the tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 

@@ -263,8 +263,11 @@ def test_parse_monitor_body_failsoft_on_match_exception() -> None:
     def _boom(*_args, **_kwargs):
         raise RuntimeError("synthetic matcher failure")
 
+    # Patch the symbol bound in coordinator (where it's actually called)
+    # — the import is now at module level, so the historical
+    # `static.stops_ahead_for_match` patch path no longer intercepts.
     with patch(
-        "custom_components.wiener_linien_austria.static.stops_ahead_for_match",
+        "custom_components.wiener_linien_austria.coordinator.stops_ahead_for_match",
         side_effect=_boom,
     ):
         result = _parse_monitor_body(

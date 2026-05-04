@@ -1,5 +1,5 @@
 // Wiener Linien Austria — bundled by Rollup. Edit sources in src/, then `npm run build`.
-function e(e,t,i,r){var n,s=arguments.length,a=s<3?t:null===r?r=Object.getOwnPropertyDescriptor(t,i):r;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)a=Reflect.decorate(e,t,i,r);else for(var o=e.length-1;o>=0;o--)(n=e[o])&&(a=(s<3?n(a):s>3?n(t,i,a):n(t,i))||a);return s>3&&a&&Object.defineProperty(t,i,a),a}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,i=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,r=Symbol(),n=new WeakMap;let s=class{constructor(e,t,i){if(this._$cssResult$=!0,i!==r)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(i&&void 0===e){const i=void 0!==t&&1===t.length;i&&(e=n.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),i&&n.set(t,e))}return e}toString(){return this.cssText}};const a=(e,...t)=>{const i=1===e.length?e[0]:t.reduce((t,i,r)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+e[r+1],e[0]);return new s(i,e,r)},o=i?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const i of e.cssRules)t+=i.cssText;return(e=>new s("string"==typeof e?e:e+"",void 0,r))(t)})(e):e,{is:l,defineProperty:d,getOwnPropertyDescriptor:c,getOwnPropertyNames:h,getOwnPropertySymbols:p,getPrototypeOf:u}=Object,f=globalThis,_=f.trustedTypes,g=_?_.emptyScript:"",m=f.reactiveElementPolyfillSupport,b=(e,t)=>e,w={toAttribute(e,t){switch(t){case Boolean:e=e?g:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let i=e;switch(t){case Boolean:i=null!==e;break;case Number:i=null===e?null:Number(e);break;case Object:case Array:try{i=JSON.parse(e)}catch(e){i=null}}return i}},v=(e,t)=>!l(e,t),y={attribute:!0,type:String,converter:w,reflect:!1,useDefault:!1,hasChanged:v};Symbol.metadata??=Symbol("metadata"),f.litPropertyMetadata??=new WeakMap;let $=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=y){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const i=Symbol(),r=this.getPropertyDescriptor(e,i,t);void 0!==r&&d(this.prototype,e,r)}}static getPropertyDescriptor(e,t,i){const{get:r,set:n}=c(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:r,set(t){const s=r?.call(this);n?.call(this,t),this.requestUpdate(e,s,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??y}static _$Ei(){if(this.hasOwnProperty(b("elementProperties")))return;const e=u(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(b("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(b("properties"))){const e=this.properties,t=[...h(e),...p(e)];for(const i of t)this.createProperty(i,e[i])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,i]of t)this.elementProperties.set(e,i)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const i=this._$Eu(e,t);void 0!==i&&this._$Eh.set(i,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const i=new Set(e.flat(1/0).reverse());for(const e of i)t.unshift(o(e))}else void 0!==e&&t.push(o(e));return t}static _$Eu(e,t){const i=t.attribute;return!1===i?void 0:"string"==typeof i?i:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const i of t.keys())this.hasOwnProperty(i)&&(e.set(i,this[i]),delete this[i]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,r)=>{if(i)e.adoptedStyleSheets=r.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const i of r){const r=document.createElement("style"),n=t.litNonce;void 0!==n&&r.setAttribute("nonce",n),r.textContent=i.cssText,e.appendChild(r)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,i){this._$AK(e,i)}_$ET(e,t){const i=this.constructor.elementProperties.get(e),r=this.constructor._$Eu(e,i);if(void 0!==r&&!0===i.reflect){const n=(void 0!==i.converter?.toAttribute?i.converter:w).toAttribute(t,i.type);this._$Em=e,null==n?this.removeAttribute(r):this.setAttribute(r,n),this._$Em=null}}_$AK(e,t){const i=this.constructor,r=i._$Eh.get(e);if(void 0!==r&&this._$Em!==r){const e=i.getPropertyOptions(r),n="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:w;this._$Em=r;const s=n.fromAttribute(t,e.type);this[r]=s??this._$Ej?.get(r)??s,this._$Em=null}}requestUpdate(e,t,i,r=!1,n){if(void 0!==e){const s=this.constructor;if(!1===r&&(n=this[e]),i??=s.getPropertyOptions(e),!((i.hasChanged??v)(n,t)||i.useDefault&&i.reflect&&n===this._$Ej?.get(e)&&!this.hasAttribute(s._$Eu(e,i))))return;this.C(e,t,i)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:i,reflect:r,wrapped:n},s){i&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,s??t??this[e]),!0!==n||void 0!==s)||(this._$AL.has(e)||(this.hasUpdated||i||(t=void 0),this._$AL.set(e,t)),!0===r&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,i]of e){const{wrapped:e}=i,r=this[t];!0!==e||this._$AL.has(t)||void 0===r||this.C(t,void 0,i,r)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};$.elementStyles=[],$.shadowRootOptions={mode:"open"},$[b("elementProperties")]=new Map,$[b("finalized")]=new Map,m?.({ReactiveElement:$}),(f.reactiveElementVersions??=[]).push("2.1.2");const x=globalThis,k=e=>e,S=x.trustedTypes,A=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,z="$lit$",E=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+E,C=`<${T}>`,R=document,L=()=>R.createComment(""),H=e=>null===e||"object"!=typeof e&&"function"!=typeof e,D=Array.isArray,N="[ \t\n\f\r]",M=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,P=/-->/g,O=/>/g,U=RegExp(`>|${N}(?:([^\\s"'>=/]+)(${N}*=${N}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),j=/'/g,B=/"/g,W=/^(?:script|style|textarea|title)$/i,F=(e=>(t,...i)=>({_$litType$:e,strings:t,values:i}))(1),I=Symbol.for("lit-noChange"),K=Symbol.for("lit-nothing"),G=new WeakMap,V=R.createTreeWalker(R,129);function q(e,t){if(!D(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==A?A.createHTML(t):t}const Z=(e,t)=>{const i=e.length-1,r=[];let n,s=2===t?"<svg>":3===t?"<math>":"",a=M;for(let t=0;t<i;t++){const i=e[t];let o,l,d=-1,c=0;for(;c<i.length&&(a.lastIndex=c,l=a.exec(i),null!==l);)c=a.lastIndex,a===M?"!--"===l[1]?a=P:void 0!==l[1]?a=O:void 0!==l[2]?(W.test(l[2])&&(n=RegExp("</"+l[2],"g")),a=U):void 0!==l[3]&&(a=U):a===U?">"===l[0]?(a=n??M,d=-1):void 0===l[1]?d=-2:(d=a.lastIndex-l[2].length,o=l[1],a=void 0===l[3]?U:'"'===l[3]?B:j):a===B||a===j?a=U:a===P||a===O?a=M:(a=U,n=void 0);const h=a===U&&e[t+1].startsWith("/>")?" ":"";s+=a===M?i+C:d>=0?(r.push(o),i.slice(0,d)+z+i.slice(d)+E+h):i+E+(-2===d?t:h)}return[q(e,s+(e[i]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),r]};class J{constructor({strings:e,_$litType$:t},i){let r;this.parts=[];let n=0,s=0;const a=e.length-1,o=this.parts,[l,d]=Z(e,t);if(this.el=J.createElement(l,i),V.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(r=V.nextNode())&&o.length<a;){if(1===r.nodeType){if(r.hasAttributes())for(const e of r.getAttributeNames())if(e.endsWith(z)){const t=d[s++],i=r.getAttribute(e).split(E),a=/([.?@])?(.*)/.exec(t);o.push({type:1,index:n,name:a[2],strings:i,ctor:"."===a[1]?te:"?"===a[1]?ie:"@"===a[1]?re:ee}),r.removeAttribute(e)}else e.startsWith(E)&&(o.push({type:6,index:n}),r.removeAttribute(e));if(W.test(r.tagName)){const e=r.textContent.split(E),t=e.length-1;if(t>0){r.textContent=S?S.emptyScript:"";for(let i=0;i<t;i++)r.append(e[i],L()),V.nextNode(),o.push({type:2,index:++n});r.append(e[t],L())}}}else if(8===r.nodeType)if(r.data===T)o.push({type:2,index:n});else{let e=-1;for(;-1!==(e=r.data.indexOf(E,e+1));)o.push({type:7,index:n}),e+=E.length-1}n++}}static createElement(e,t){const i=R.createElement("template");return i.innerHTML=e,i}}function Y(e,t,i=e,r){if(t===I)return t;let n=void 0!==r?i._$Co?.[r]:i._$Cl;const s=H(t)?void 0:t._$litDirective$;return n?.constructor!==s&&(n?._$AO?.(!1),void 0===s?n=void 0:(n=new s(e),n._$AT(e,i,r)),void 0!==r?(i._$Co??=[])[r]=n:i._$Cl=n),void 0!==n&&(t=Y(e,n._$AS(e,t.values),n,r)),t}class Q{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:i}=this._$AD,r=(e?.creationScope??R).importNode(t,!0);V.currentNode=r;let n=V.nextNode(),s=0,a=0,o=i[0];for(;void 0!==o;){if(s===o.index){let t;2===o.type?t=new X(n,n.nextSibling,this,e):1===o.type?t=new o.ctor(n,o.name,o.strings,this,e):6===o.type&&(t=new ne(n,this,e)),this._$AV.push(t),o=i[++a]}s!==o?.index&&(n=V.nextNode(),s++)}return V.currentNode=R,r}p(e){let t=0;for(const i of this._$AV)void 0!==i&&(void 0!==i.strings?(i._$AI(e,i,t),t+=i.strings.length-2):i._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,i,r){this.type=2,this._$AH=K,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=i,this.options=r,this._$Cv=r?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=Y(this,e,t),H(e)?e===K||null==e||""===e?(this._$AH!==K&&this._$AR(),this._$AH=K):e!==this._$AH&&e!==I&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>D(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==K&&H(this._$AH)?this._$AA.nextSibling.data=e:this.T(R.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:i}=e,r="number"==typeof i?this._$AC(e):(void 0===i.el&&(i.el=J.createElement(q(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===r)this._$AH.p(t);else{const e=new Q(r,this),i=e.u(this.options);e.p(t),this.T(i),this._$AH=e}}_$AC(e){let t=G.get(e.strings);return void 0===t&&G.set(e.strings,t=new J(e)),t}k(e){D(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let i,r=0;for(const n of e)r===t.length?t.push(i=new X(this.O(L()),this.O(L()),this,this.options)):i=t[r],i._$AI(n),r++;r<t.length&&(this._$AR(i&&i._$AB.nextSibling,r),t.length=r)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=k(e).nextSibling;k(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}class ee{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,i,r,n){this.type=1,this._$AH=K,this._$AN=void 0,this.element=e,this.name=t,this._$AM=r,this.options=n,i.length>2||""!==i[0]||""!==i[1]?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=K}_$AI(e,t=this,i,r){const n=this.strings;let s=!1;if(void 0===n)e=Y(this,e,t,0),s=!H(e)||e!==this._$AH&&e!==I,s&&(this._$AH=e);else{const r=e;let a,o;for(e=n[0],a=0;a<n.length-1;a++)o=Y(this,r[i+a],t,a),o===I&&(o=this._$AH[a]),s||=!H(o)||o!==this._$AH[a],o===K?e=K:e!==K&&(e+=(o??"")+n[a+1]),this._$AH[a]=o}s&&!r&&this.j(e)}j(e){e===K?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}}class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===K?void 0:e}}class ie extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==K)}}class re extends ee{constructor(e,t,i,r,n){super(e,t,i,r,n),this.type=5}_$AI(e,t=this){if((e=Y(this,e,t,0)??K)===I)return;const i=this._$AH,r=e===K&&i!==K||e.capture!==i.capture||e.once!==i.once||e.passive!==i.passive,n=e!==K&&(i===K||r);r&&this.element.removeEventListener(this.name,this,i),n&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class ne{constructor(e,t,i){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(e){Y(this,e)}}const se=x.litHtmlPolyfillSupport;se?.(J,X),(x.litHtmlVersions??=[]).push("3.3.2");const ae=globalThis;let oe=class extends ${constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,i)=>{const r=i?.renderBefore??t;let n=r._$litPart$;if(void 0===n){const e=i?.renderBefore??null;r._$litPart$=n=new X(t.insertBefore(L(),e),e,void 0,i??{})}return n._$AI(e),n})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return I}};oe._$litElement$=!0,oe.finalized=!0,ae.litElementHydrateSupport?.({LitElement:oe});const le=ae.litElementPolyfillSupport;le?.({LitElement:oe}),(ae.litElementVersions??=[]).push("4.2.2");const de=e=>(t,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(e,t)}):customElements.define(e,t)},ce={attribute:!0,type:String,converter:w,reflect:!1,hasChanged:v},he=(e=ce,t,i)=>{const{kind:r,metadata:n}=i;let s=globalThis.litPropertyMetadata.get(n);if(void 0===s&&globalThis.litPropertyMetadata.set(n,s=new Map),"setter"===r&&((e=Object.create(e)).wrapped=!0),s.set(i.name,e),"accessor"===r){const{name:r}=i;return{set(i){const n=t.get.call(this);t.set.call(this,i),this.requestUpdate(r,n,e,!0,i)},init(t){return void 0!==t&&this.C(r,void 0,e,t),t}}}if("setter"===r){const{name:r}=i;return function(i){const n=this[r];t.call(this,i),this.requestUpdate(r,n,e,!0,i)}}throw Error("Unsupported decorator location: "+r)};function pe(e){return(t,i)=>"object"==typeof i?he(e,t,i):((e,t,i)=>{const r=t.hasOwnProperty(i);return t.constructor.createProperty(i,e),r?Object.getOwnPropertyDescriptor(t,i):void 0})(e,t,i)}function ue(e){return pe({...e,state:!0,attribute:!1})}const fe=1,_e=2,ge=e=>(...t)=>({_$litDirective$:e,values:t});let me=class{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,t,i){this._$Ct=e,this._$AM=t,this._$Ci=i}_$AS(e,t){return this.update(e,t)}update(e,t){return this.render(...t)}},be=class extends me{constructor(e){if(super(e),this.it=K,e.type!==_e)throw Error(this.constructor.directiveName+"() can only be used in child bindings")}render(e){if(e===K||null==e)return this._t=void 0,this.it=e;if(e===I)return e;if("string"!=typeof e)throw Error(this.constructor.directiveName+"() called with a non-string value");if(e===this.it)return this._t;this.it=e;const t=[e];return t.raw=t,this._t={_$litType$:this.constructor.resultType,strings:t,values:[]}}};be.directiveName="unsafeHTML",be.resultType=1;const we=ge(be),ve=ge(class extends me{constructor(e){if(super(e),e.type!==fe||"class"!==e.name||e.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(e){return" "+Object.keys(e).filter(t=>e[t]).join(" ")+" "}update(e,[t]){if(void 0===this.st){this.st=new Set,void 0!==e.strings&&(this.nt=new Set(e.strings.join(" ").split(/\s/).filter(e=>""!==e)));for(const e in t)t[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(t)}const i=e.element.classList;for(const e of this.st)e in t||(i.remove(e),this.st.delete(e));for(const e in t){const r=!!t[e];r===this.st.has(e)||this.nt?.has(e)||(r?(i.add(e),this.st.add(e)):(i.remove(e),this.st.delete(e)))}return I}}),ye="important",$e=" !"+ye,xe=ge(class extends me{constructor(e){if(super(e),e.type!==fe||"style"!==e.name||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((t,i)=>{const r=e[i];return null==r?t:t+`${i=i.includes("-")?i:i.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${r};`},"")}update(e,[t]){const{style:i}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(t)),this.render(t);for(const e of this.ft)null==t[e]&&(this.ft.delete(e),e.includes("-")?i.removeProperty(e):i[e]=null);for(const e in t){const r=t[e];if(null!=r){this.ft.add(e);const t="string"==typeof r&&r.endsWith($e);e.includes("-")||t?i.setProperty(e,t?r.slice(0,-11):r,t?ye:""):i[e]=r}}return I}}),ke=a`
+function e(e,t,i,r){var n,o=arguments.length,a=o<3?t:null===r?r=Object.getOwnPropertyDescriptor(t,i):r;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)a=Reflect.decorate(e,t,i,r);else for(var s=e.length-1;s>=0;s--)(n=e[s])&&(a=(o<3?n(a):o>3?n(t,i,a):n(t,i))||a);return o>3&&a&&Object.defineProperty(t,i,a),a}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,i=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,r=Symbol(),n=new WeakMap;let o=class{constructor(e,t,i){if(this._$cssResult$=!0,i!==r)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(i&&void 0===e){const i=void 0!==t&&1===t.length;i&&(e=n.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),i&&n.set(t,e))}return e}toString(){return this.cssText}};const a=(e,...t)=>{const i=1===e.length?e[0]:t.reduce((t,i,r)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+e[r+1],e[0]);return new o(i,e,r)},s=i?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const i of e.cssRules)t+=i.cssText;return(e=>new o("string"==typeof e?e:e+"",void 0,r))(t)})(e):e,{is:l,defineProperty:d,getOwnPropertyDescriptor:c,getOwnPropertyNames:h,getOwnPropertySymbols:p,getPrototypeOf:u}=Object,f=globalThis,_=f.trustedTypes,g=_?_.emptyScript:"",m=f.reactiveElementPolyfillSupport,b=(e,t)=>e,v={toAttribute(e,t){switch(t){case Boolean:e=e?g:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let i=e;switch(t){case Boolean:i=null!==e;break;case Number:i=null===e?null:Number(e);break;case Object:case Array:try{i=JSON.parse(e)}catch(e){i=null}}return i}},w=(e,t)=>!l(e,t),y={attribute:!0,type:String,converter:v,reflect:!1,useDefault:!1,hasChanged:w};Symbol.metadata??=Symbol("metadata"),f.litPropertyMetadata??=new WeakMap;let x=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=y){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const i=Symbol(),r=this.getPropertyDescriptor(e,i,t);void 0!==r&&d(this.prototype,e,r)}}static getPropertyDescriptor(e,t,i){const{get:r,set:n}=c(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:r,set(t){const o=r?.call(this);n?.call(this,t),this.requestUpdate(e,o,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??y}static _$Ei(){if(this.hasOwnProperty(b("elementProperties")))return;const e=u(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(b("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(b("properties"))){const e=this.properties,t=[...h(e),...p(e)];for(const i of t)this.createProperty(i,e[i])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,i]of t)this.elementProperties.set(e,i)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const i=this._$Eu(e,t);void 0!==i&&this._$Eh.set(i,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const i=new Set(e.flat(1/0).reverse());for(const e of i)t.unshift(s(e))}else void 0!==e&&t.push(s(e));return t}static _$Eu(e,t){const i=t.attribute;return!1===i?void 0:"string"==typeof i?i:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const i of t.keys())this.hasOwnProperty(i)&&(e.set(i,this[i]),delete this[i]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,r)=>{if(i)e.adoptedStyleSheets=r.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const i of r){const r=document.createElement("style"),n=t.litNonce;void 0!==n&&r.setAttribute("nonce",n),r.textContent=i.cssText,e.appendChild(r)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,i){this._$AK(e,i)}_$ET(e,t){const i=this.constructor.elementProperties.get(e),r=this.constructor._$Eu(e,i);if(void 0!==r&&!0===i.reflect){const n=(void 0!==i.converter?.toAttribute?i.converter:v).toAttribute(t,i.type);this._$Em=e,null==n?this.removeAttribute(r):this.setAttribute(r,n),this._$Em=null}}_$AK(e,t){const i=this.constructor,r=i._$Eh.get(e);if(void 0!==r&&this._$Em!==r){const e=i.getPropertyOptions(r),n="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:v;this._$Em=r;const o=n.fromAttribute(t,e.type);this[r]=o??this._$Ej?.get(r)??o,this._$Em=null}}requestUpdate(e,t,i,r=!1,n){if(void 0!==e){const o=this.constructor;if(!1===r&&(n=this[e]),i??=o.getPropertyOptions(e),!((i.hasChanged??w)(n,t)||i.useDefault&&i.reflect&&n===this._$Ej?.get(e)&&!this.hasAttribute(o._$Eu(e,i))))return;this.C(e,t,i)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:i,reflect:r,wrapped:n},o){i&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,o??t??this[e]),!0!==n||void 0!==o)||(this._$AL.has(e)||(this.hasUpdated||i||(t=void 0),this._$AL.set(e,t)),!0===r&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,i]of e){const{wrapped:e}=i,r=this[t];!0!==e||this._$AL.has(t)||void 0===r||this.C(t,void 0,i,r)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};x.elementStyles=[],x.shadowRootOptions={mode:"open"},x[b("elementProperties")]=new Map,x[b("finalized")]=new Map,m?.({ReactiveElement:x}),(f.reactiveElementVersions??=[]).push("2.1.2");const $=globalThis,k=e=>e,A=$.trustedTypes,S=A?A.createPolicy("lit-html",{createHTML:e=>e}):void 0,z="$lit$",E=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+E,C=`<${T}>`,M=document,H=()=>M.createComment(""),R=e=>null===e||"object"!=typeof e&&"function"!=typeof e,L=Array.isArray,O="[ \t\n\f\r]",P=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,D=/-->/g,N=/>/g,U=RegExp(`>|${O}(?:([^\\s"'>=/]+)(${O}*=${O}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),q=/'/g,j=/"/g,F=/^(?:script|style|textarea|title)$/i,B=(e=>(t,...i)=>({_$litType$:e,strings:t,values:i}))(1),V=Symbol.for("lit-noChange"),W=Symbol.for("lit-nothing"),I=new WeakMap,K=M.createTreeWalker(M,129);function G(e,t){if(!L(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==S?S.createHTML(t):t}const Q=(e,t)=>{const i=e.length-1,r=[];let n,o=2===t?"<svg>":3===t?"<math>":"",a=P;for(let t=0;t<i;t++){const i=e[t];let s,l,d=-1,c=0;for(;c<i.length&&(a.lastIndex=c,l=a.exec(i),null!==l);)c=a.lastIndex,a===P?"!--"===l[1]?a=D:void 0!==l[1]?a=N:void 0!==l[2]?(F.test(l[2])&&(n=RegExp("</"+l[2],"g")),a=U):void 0!==l[3]&&(a=U):a===U?">"===l[0]?(a=n??P,d=-1):void 0===l[1]?d=-2:(d=a.lastIndex-l[2].length,s=l[1],a=void 0===l[3]?U:'"'===l[3]?j:q):a===j||a===q?a=U:a===D||a===N?a=P:(a=U,n=void 0);const h=a===U&&e[t+1].startsWith("/>")?" ":"";o+=a===P?i+C:d>=0?(r.push(s),i.slice(0,d)+z+i.slice(d)+E+h):i+E+(-2===d?t:h)}return[G(e,o+(e[i]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),r]};class Z{constructor({strings:e,_$litType$:t},i){let r;this.parts=[];let n=0,o=0;const a=e.length-1,s=this.parts,[l,d]=Q(e,t);if(this.el=Z.createElement(l,i),K.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(r=K.nextNode())&&s.length<a;){if(1===r.nodeType){if(r.hasAttributes())for(const e of r.getAttributeNames())if(e.endsWith(z)){const t=d[o++],i=r.getAttribute(e).split(E),a=/([.?@])?(.*)/.exec(t);s.push({type:1,index:n,name:a[2],strings:i,ctor:"."===a[1]?te:"?"===a[1]?ie:"@"===a[1]?re:ee}),r.removeAttribute(e)}else e.startsWith(E)&&(s.push({type:6,index:n}),r.removeAttribute(e));if(F.test(r.tagName)){const e=r.textContent.split(E),t=e.length-1;if(t>0){r.textContent=A?A.emptyScript:"";for(let i=0;i<t;i++)r.append(e[i],H()),K.nextNode(),s.push({type:2,index:++n});r.append(e[t],H())}}}else if(8===r.nodeType)if(r.data===T)s.push({type:2,index:n});else{let e=-1;for(;-1!==(e=r.data.indexOf(E,e+1));)s.push({type:7,index:n}),e+=E.length-1}n++}}static createElement(e,t){const i=M.createElement("template");return i.innerHTML=e,i}}function J(e,t,i=e,r){if(t===V)return t;let n=void 0!==r?i._$Co?.[r]:i._$Cl;const o=R(t)?void 0:t._$litDirective$;return n?.constructor!==o&&(n?._$AO?.(!1),void 0===o?n=void 0:(n=new o(e),n._$AT(e,i,r)),void 0!==r?(i._$Co??=[])[r]=n:i._$Cl=n),void 0!==n&&(t=J(e,n._$AS(e,t.values),n,r)),t}class Y{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:i}=this._$AD,r=(e?.creationScope??M).importNode(t,!0);K.currentNode=r;let n=K.nextNode(),o=0,a=0,s=i[0];for(;void 0!==s;){if(o===s.index){let t;2===s.type?t=new X(n,n.nextSibling,this,e):1===s.type?t=new s.ctor(n,s.name,s.strings,this,e):6===s.type&&(t=new ne(n,this,e)),this._$AV.push(t),s=i[++a]}o!==s?.index&&(n=K.nextNode(),o++)}return K.currentNode=M,r}p(e){let t=0;for(const i of this._$AV)void 0!==i&&(void 0!==i.strings?(i._$AI(e,i,t),t+=i.strings.length-2):i._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,i,r){this.type=2,this._$AH=W,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=i,this.options=r,this._$Cv=r?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=J(this,e,t),R(e)?e===W||null==e||""===e?(this._$AH!==W&&this._$AR(),this._$AH=W):e!==this._$AH&&e!==V&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>L(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==W&&R(this._$AH)?this._$AA.nextSibling.data=e:this.T(M.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:i}=e,r="number"==typeof i?this._$AC(e):(void 0===i.el&&(i.el=Z.createElement(G(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===r)this._$AH.p(t);else{const e=new Y(r,this),i=e.u(this.options);e.p(t),this.T(i),this._$AH=e}}_$AC(e){let t=I.get(e.strings);return void 0===t&&I.set(e.strings,t=new Z(e)),t}k(e){L(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let i,r=0;for(const n of e)r===t.length?t.push(i=new X(this.O(H()),this.O(H()),this,this.options)):i=t[r],i._$AI(n),r++;r<t.length&&(this._$AR(i&&i._$AB.nextSibling,r),t.length=r)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=k(e).nextSibling;k(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}let ee=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,i,r,n){this.type=1,this._$AH=W,this._$AN=void 0,this.element=e,this.name=t,this._$AM=r,this.options=n,i.length>2||""!==i[0]||""!==i[1]?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=W}_$AI(e,t=this,i,r){const n=this.strings;let o=!1;if(void 0===n)e=J(this,e,t,0),o=!R(e)||e!==this._$AH&&e!==V,o&&(this._$AH=e);else{const r=e;let a,s;for(e=n[0],a=0;a<n.length-1;a++)s=J(this,r[i+a],t,a),s===V&&(s=this._$AH[a]),o||=!R(s)||s!==this._$AH[a],s===W?e=W:e!==W&&(e+=(s??"")+n[a+1]),this._$AH[a]=s}o&&!r&&this.j(e)}j(e){e===W?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}};class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===W?void 0:e}}class ie extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==W)}}class re extends ee{constructor(e,t,i,r,n){super(e,t,i,r,n),this.type=5}_$AI(e,t=this){if((e=J(this,e,t,0)??W)===V)return;const i=this._$AH,r=e===W&&i!==W||e.capture!==i.capture||e.once!==i.once||e.passive!==i.passive,n=e!==W&&(i===W||r);r&&this.element.removeEventListener(this.name,this,i),n&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class ne{constructor(e,t,i){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(e){J(this,e)}}const oe=$.litHtmlPolyfillSupport;oe?.(Z,X),($.litHtmlVersions??=[]).push("3.3.2");const ae=globalThis;let se=class extends x{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,i)=>{const r=i?.renderBefore??t;let n=r._$litPart$;if(void 0===n){const e=i?.renderBefore??null;r._$litPart$=n=new X(t.insertBefore(H(),e),e,void 0,i??{})}return n._$AI(e),n})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return V}};se._$litElement$=!0,se.finalized=!0,ae.litElementHydrateSupport?.({LitElement:se});const le=ae.litElementPolyfillSupport;le?.({LitElement:se}),(ae.litElementVersions??=[]).push("4.2.2");const de=e=>(t,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(e,t)}):customElements.define(e,t)},ce={attribute:!0,type:String,converter:v,reflect:!1,hasChanged:w},he=(e=ce,t,i)=>{const{kind:r,metadata:n}=i;let o=globalThis.litPropertyMetadata.get(n);if(void 0===o&&globalThis.litPropertyMetadata.set(n,o=new Map),"setter"===r&&((e=Object.create(e)).wrapped=!0),o.set(i.name,e),"accessor"===r){const{name:r}=i;return{set(i){const n=t.get.call(this);t.set.call(this,i),this.requestUpdate(r,n,e,!0,i)},init(t){return void 0!==t&&this.C(r,void 0,e,t),t}}}if("setter"===r){const{name:r}=i;return function(i){const n=this[r];t.call(this,i),this.requestUpdate(r,n,e,!0,i)}}throw Error("Unsupported decorator location: "+r)};function pe(e){return(t,i)=>"object"==typeof i?he(e,t,i):((e,t,i)=>{const r=t.hasOwnProperty(i);return t.constructor.createProperty(i,e),r?Object.getOwnPropertyDescriptor(t,i):void 0})(e,t,i)}function ue(e){return pe({...e,state:!0,attribute:!1})}const fe=1,_e=2,ge=e=>(...t)=>({_$litDirective$:e,values:t});let me=class{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,t,i){this._$Ct=e,this._$AM=t,this._$Ci=i}_$AS(e,t){return this.update(e,t)}update(e,t){return this.render(...t)}},be=class extends me{constructor(e){if(super(e),this.it=W,e.type!==_e)throw Error(this.constructor.directiveName+"() can only be used in child bindings")}render(e){if(e===W||null==e)return this._t=void 0,this.it=e;if(e===V)return e;if("string"!=typeof e)throw Error(this.constructor.directiveName+"() called with a non-string value");if(e===this.it)return this._t;this.it=e;const t=[e];return t.raw=t,this._t={_$litType$:this.constructor.resultType,strings:t,values:[]}}};be.directiveName="unsafeHTML",be.resultType=1;const ve=ge(be),we=ge(class extends me{constructor(e){if(super(e),e.type!==fe||"class"!==e.name||e.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(e){return" "+Object.keys(e).filter(t=>e[t]).join(" ")+" "}update(e,[t]){if(void 0===this.st){this.st=new Set,void 0!==e.strings&&(this.nt=new Set(e.strings.join(" ").split(/\s/).filter(e=>""!==e)));for(const e in t)t[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(t)}const i=e.element.classList;for(const e of this.st)e in t||(i.remove(e),this.st.delete(e));for(const e in t){const r=!!t[e];r===this.st.has(e)||this.nt?.has(e)||(r?(i.add(e),this.st.add(e)):(i.remove(e),this.st.delete(e)))}return V}}),ye="important",xe=" !"+ye,$e=ge(class extends me{constructor(e){if(super(e),e.type!==fe||"style"!==e.name||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((t,i)=>{const r=e[i];return null==r?t:t+`${i=i.includes("-")?i:i.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${r};`},"")}update(e,[t]){const{style:i}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(t)),this.render(t);for(const e of this.ft)null==t[e]&&(this.ft.delete(e),e.includes("-")?i.removeProperty(e):i[e]=null);for(const e in t){const r=t[e];if(null!=r){this.ft.add(e);const t="string"==typeof r&&r.endsWith(xe);e.includes("-")||t?i.setProperty(e,t?r.slice(0,-11):r,t?ye:""):i[e]=r}}return V}});let ke=null;class Ae{}Ae.render=function(e,t){ke(e,t)},self.QrCreator=Ae,function(e){function t(t,i,r,n){var o={},a=e(r,i);a.u(t),a.J(),n=n||0;var s=a.h(),l=a.h()+2*n;return o.text=t,o.level=i,o.version=r,o.O=l,o.a=function(e,t){return t-=n,!(0>(e-=n)||e>=s||0>t||t>=s)&&a.a(e,t)},o}function i(e,t,i,r,n,o,a,s,l,d){function c(t,i,r,n,a,s,l){t?(e.lineTo(i+s,r+l),e.arcTo(i,r,n,a,o)):e.lineTo(i,r)}a?e.moveTo(t+o,i):e.moveTo(t,i),c(s,r,i,r,n,-o,0),c(l,r,n,t,n,0,-o),c(d,t,n,t,i,o,0),c(a,t,i,r,i,0,o)}function r(e,t,i,r,n,o,a,s,l,d){function c(t,i,r,n){e.moveTo(t+r,i),e.lineTo(t,i),e.lineTo(t,i+n),e.arcTo(t,i,t+r,i,o)}a&&c(t,i,o,o),s&&c(r,i,-o,o),l&&c(r,n,-o,-o),d&&c(t,n,o,-o)}function n(e,n){e:{var o=n.text,a=n.v,s=n.N,l=n.K,d=n.P;for(s=Math.max(1,s||1),l=Math.min(40,l||40);s<=l;s+=1)try{var c=t(o,a,s,d);break e}catch(e){}c=void 0}if(!c)return null;for(o=e.getContext("2d"),n.background&&(o.fillStyle=n.background,o.fillRect(n.left,n.top,n.size,n.size)),a=c.O,l=n.size/a,o.beginPath(),d=0;d<a;d+=1)for(s=0;s<a;s+=1){var h=o,p=n.left+s*l,u=n.top+d*l,f=d,_=s,g=c.a,m=p+l,b=u+l,v=f-1,w=f+1,y=_-1,x=_+1,$=Math.floor(Math.min(.5,Math.max(0,n.R))*l),k=g(f,_),A=g(v,y),S=g(v,_);v=g(v,x);var z=g(f,x);x=g(w,x),_=g(w,_),w=g(w,y),f=g(f,y),p=Math.round(p),u=Math.round(u),m=Math.round(m),b=Math.round(b),k?i(h,p,u,m,b,$,!S&&!f,!S&&!z,!_&&!z,!_&&!f):r(h,p,u,m,b,$,S&&f&&A,S&&z&&v,_&&z&&x,_&&f&&w)}return function(e,t){var i=t.fill;if("string"==typeof i)e.fillStyle=i;else{var r=i.type,n=i.colorStops;if(i=i.position.map(e=>Math.round(e*t.size)),"linear-gradient"===r)var o=e.createLinearGradient.apply(e,i);else{if("radial-gradient"!==r)throw Error("Unsupported fill");o=e.createRadialGradient.apply(e,i)}n.forEach(([e,t])=>{o.addColorStop(e,t)}),e.fillStyle=o}}(o,n),o.fill(),e}var o={minVersion:1,maxVersion:40,ecLevel:"L",left:0,top:0,size:200,fill:"#000",background:null,text:"no text",radius:.5,quiet:0};ke=function(e,t){var i={};Object.assign(i,o,e),i.N=i.minVersion,i.K=i.maxVersion,i.v=i.ecLevel,i.left=i.left,i.top=i.top,i.size=i.size,i.fill=i.fill,i.background=i.background,i.text=i.text,i.R=i.radius,i.P=i.quiet,t instanceof HTMLCanvasElement?(t.width===i.size&&t.height===i.size||(t.width=i.size,t.height=i.size),t.getContext("2d").clearRect(0,0,t.width,t.height),n(t,i)):((e=document.createElement("canvas")).width=i.size,e.height=i.size,i=n(e,i),t.appendChild(i))}}(function(){function e(n,a){function s(e,t){for(var i=-1;7>=i;i+=1)if(!(-1>=e+i||h<=e+i))for(var r=-1;7>=r;r+=1)-1>=t+r||h<=t+r||(c[e+i][t+r]=0<=i&&6>=i&&(0==r||6==r)||0<=r&&6>=r&&(0==i||6==i)||2<=i&&4>=i&&2<=r&&4>=r)}function l(e,i){for(var a=h=4*n+17,l=Array(a),f=0;f<a;f+=1){l[f]=Array(a);for(var _=0;_<a;_+=1)l[f][_]=null}for(c=l,s(0,0),s(h-7,0),s(0,h-7),a=r.G(n),l=0;l<a.length;l+=1)for(f=0;f<a.length;f+=1){_=a[l];var g=a[f];if(null==c[_][g])for(var m=-2;2>=m;m+=1)for(var b=-2;2>=b;b+=1)c[_+m][g+b]=-2==m||2==m||-2==b||2==b||0==m&&0==b}for(a=8;a<h-8;a+=1)null==c[a][6]&&(c[a][6]=0==a%2);for(a=8;a<h-8;a+=1)null==c[6][a]&&(c[6][a]=0==a%2);for(a=r.w(d<<3|i),l=0;15>l;l+=1)f=!e&&1==(a>>l&1),c[6>l?l:8>l?l+1:h-15+l][8]=f,c[8][8>l?h-l-1:9>l?15-l:14-l]=f;if(c[h-8][8]=!e,7<=n){for(a=r.A(n),l=0;18>l;l+=1)f=!e&&1==(a>>l&1),c[Math.floor(l/3)][l%3+h-8-3]=f;for(l=0;18>l;l+=1)f=!e&&1==(a>>l&1),c[l%3+h-8-3][Math.floor(l/3)]=f}if(null==p){for(e=o.I(n,d),a=function(){var e=[],t=0,i={B:function(){return e},c:function(t){return 1==(e[Math.floor(t/8)]>>>7-t%8&1)},put:function(e,t){for(var r=0;r<t;r+=1)i.m(1==(e>>>t-r-1&1))},f:function(){return t},m:function(i){var r=Math.floor(t/8);e.length<=r&&e.push(0),i&&(e[r]|=128>>>t%8),t+=1}};return i}(),l=0;l<u.length;l+=1)f=u[l],a.put(4,4),a.put(f.b(),r.f(4,n)),f.write(a);for(l=f=0;l<e.length;l+=1)f+=e[l].j;if(a.f()>8*f)throw Error("code length overflow. ("+a.f()+">"+8*f+")");for(a.f()+4<=8*f&&a.put(0,4);0!=a.f()%8;)a.m(!1);for(;!(a.f()>=8*f)&&(a.put(236,8),!(a.f()>=8*f));)a.put(17,8);var v=0;for(f=l=0,_=Array(e.length),g=Array(e.length),m=0;m<e.length;m+=1){var w=e[m].j,y=e[m].o-w;for(l=Math.max(l,w),f=Math.max(f,y),_[m]=Array(w),b=0;b<_[m].length;b+=1)_[m][b]=255&a.B()[b+v];for(v+=w,b=r.C(y),w=t(_[m],b.b()-1).l(b),g[m]=Array(b.b()-1),b=0;b<g[m].length;b+=1)y=b+w.b()-g[m].length,g[m][b]=0<=y?w.c(y):0}for(b=a=0;b<e.length;b+=1)a+=e[b].o;for(a=Array(a),b=v=0;b<l;b+=1)for(m=0;m<e.length;m+=1)b<_[m].length&&(a[v]=_[m][b],v+=1);for(b=0;b<f;b+=1)for(m=0;m<e.length;m+=1)b<g[m].length&&(a[v]=g[m][b],v+=1);p=a}for(e=p,a=-1,l=h-1,f=7,_=0,i=r.F(i),g=h-1;0<g;g-=2)for(6==g&&--g;;){for(m=0;2>m;m+=1)null==c[l][g-m]&&(b=!1,_<e.length&&(b=1==(e[_]>>>f&1)),i(l,g-m)&&(b=!b),c[l][g-m]=b,-1==--f&&(_+=1,f=7));if(0>(l+=a)||h<=l){l-=a,a=-a;break}}}var d=i[a],c=null,h=0,p=null,u=[],f={u:function(t){t=function(t){var i=e.s(t);return{S:function(){return 4},b:function(){return i.length},write:function(e){for(var t=0;t<i.length;t+=1)e.put(i[t],8)}}}(t),u.push(t),p=null},a:function(e,t){if(0>e||h<=e||0>t||h<=t)throw Error(e+","+t);return c[e][t]},h:function(){return h},J:function(){for(var e=0,t=0,i=0;8>i;i+=1){l(!0,i);var n=r.D(f);(0==i||e>n)&&(e=n,t=i)}l(!1,t)}};return f}function t(e,i){if(void 0===e.length)throw Error(e.length+"/"+i);var r=function(){for(var t=0;t<e.length&&0==e[t];)t+=1;for(var r=Array(e.length-t+i),n=0;n<e.length-t;n+=1)r[n]=e[n+t];return r}(),o={c:function(e){return r[e]},b:function(){return r.length},multiply:function(e){for(var i=Array(o.b()+e.b()-1),r=0;r<o.b();r+=1)for(var a=0;a<e.b();a+=1)i[r+a]^=n.i(n.g(o.c(r))+n.g(e.c(a)));return t(i,0)},l:function(e){if(0>o.b()-e.b())return o;for(var i=n.g(o.c(0))-n.g(e.c(0)),r=Array(o.b()),a=0;a<o.b();a+=1)r[a]=o.c(a);for(a=0;a<e.b();a+=1)r[a]^=n.i(n.g(e.c(a))+i);return t(r,0).l(e)}};return o}e.s=function(e){for(var t=[],i=0;i<e.length;i++){var r=e.charCodeAt(i);128>r?t.push(r):2048>r?t.push(192|r>>6,128|63&r):55296>r||57344<=r?t.push(224|r>>12,128|r>>6&63,128|63&r):(i++,r=65536+((1023&r)<<10|1023&e.charCodeAt(i)),t.push(240|r>>18,128|r>>12&63,128|r>>6&63,128|63&r))}return t};var i={L:1,M:0,Q:3,H:2},r=function(){function e(e){for(var t=0;0!=e;)t+=1,e>>>=1;return t}var i=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],r={w:function(t){for(var i=t<<10;0<=e(i)-e(1335);)i^=1335<<e(i)-e(1335);return 21522^(t<<10|i)},A:function(t){for(var i=t<<12;0<=e(i)-e(7973);)i^=7973<<e(i)-e(7973);return t<<12|i},G:function(e){return i[e-1]},F:function(e){switch(e){case 0:return function(e,t){return 0==(e+t)%2};case 1:return function(e){return 0==e%2};case 2:return function(e,t){return 0==t%3};case 3:return function(e,t){return 0==(e+t)%3};case 4:return function(e,t){return 0==(Math.floor(e/2)+Math.floor(t/3))%2};case 5:return function(e,t){return 0==e*t%2+e*t%3};case 6:return function(e,t){return 0==(e*t%2+e*t%3)%2};case 7:return function(e,t){return 0==(e*t%3+(e+t)%2)%2};default:throw Error("bad maskPattern:"+e)}},C:function(e){for(var i=t([1],0),r=0;r<e;r+=1)i=i.multiply(t([1,n.i(r)],0));return i},f:function(e,t){if(4!=e||1>t||40<t)throw Error("mode: "+e+"; type: "+t);return 10>t?8:16},D:function(e){for(var t=e.h(),i=0,r=0;r<t;r+=1)for(var n=0;n<t;n+=1){for(var o=0,a=e.a(r,n),s=-1;1>=s;s+=1)if(!(0>r+s||t<=r+s))for(var l=-1;1>=l;l+=1)0>n+l||t<=n+l||(0!=s||0!=l)&&a==e.a(r+s,n+l)&&(o+=1);5<o&&(i+=3+o-5)}for(r=0;r<t-1;r+=1)for(n=0;n<t-1;n+=1)o=0,e.a(r,n)&&(o+=1),e.a(r+1,n)&&(o+=1),e.a(r,n+1)&&(o+=1),e.a(r+1,n+1)&&(o+=1),(0==o||4==o)&&(i+=3);for(r=0;r<t;r+=1)for(n=0;n<t-6;n+=1)e.a(r,n)&&!e.a(r,n+1)&&e.a(r,n+2)&&e.a(r,n+3)&&e.a(r,n+4)&&!e.a(r,n+5)&&e.a(r,n+6)&&(i+=40);for(n=0;n<t;n+=1)for(r=0;r<t-6;r+=1)e.a(r,n)&&!e.a(r+1,n)&&e.a(r+2,n)&&e.a(r+3,n)&&e.a(r+4,n)&&!e.a(r+5,n)&&e.a(r+6,n)&&(i+=40);for(n=o=0;n<t;n+=1)for(r=0;r<t;r+=1)e.a(r,n)&&(o+=1);return i+Math.abs(100*o/t/t-50)/5*10}};return r}(),n=function(){for(var e=Array(256),t=Array(256),i=0;8>i;i+=1)e[i]=1<<i;for(i=8;256>i;i+=1)e[i]=e[i-4]^e[i-5]^e[i-6]^e[i-8];for(i=0;255>i;i+=1)t[e[i]]=i;return{g:function(e){if(1>e)throw Error("glog("+e+")");return t[e]},i:function(t){for(;0>t;)t+=255;for(;256<=t;)t-=255;return e[t]}}}(),o=function(){function e(e,r){switch(r){case i.L:return t[4*(e-1)];case i.M:return t[4*(e-1)+1];case i.Q:return t[4*(e-1)+2];case i.H:return t[4*(e-1)+3]}}var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r={I:function(t,i){var r=e(t,i);if(void 0===r)throw Error("bad rs block @ typeNumber:"+t+"/errorCorrectLevel:"+i);t=r.length/3,i=[];for(var n=0;n<t;n+=1)for(var o=r[3*n],a=r[3*n+1],s=r[3*n+2],l=0;l<o;l+=1){var d=s,c={};c.o=a,c.j=d,i.push(c)}return i}};return r}();return e}());var Se=QrCreator;const ze=a`
   :host {
     /* color-scheme enables light-dark() and steers forced-colors
        palette selection (WCAG 1.4.11). HA's active theme drives the
@@ -314,9 +314,9 @@ function e(e,t,i,r){var n,s=arguments.length,a=s<3?t:null===r?r=Object.getOwnPro
       transparent
     );
   }
-  /* Hero accessibility flag — small icon-only pill in the same slot
-     the rt-pill used to occupy. Only rendered when the next departure
-     is barrier-free AND the user has show_accessibility enabled. */
+  /* Hero accessibility flag — small icon-only pill, only rendered
+     when the next departure is barrier-free AND the user has
+     show_accessibility enabled. */
   .hero-a11y {
     display: inline-flex;
     align-items: center;
@@ -820,15 +820,8 @@ function e(e,t,i,r){var n,s=arguments.length,a=s<3?t:null===r?r=Object.getOwnPro
   }
 
   /* Footer: attribution timestamp / etc. Right-pin via margin-left:auto.
-     Padding + margin mirror linz-linien-austria so a stacked dashboard
-     reads as one visual family. Linz uses margin: 0 var(--linz-pad-x)
-     plus padding: 8px 0 because its .foot is a direct <ha-card> child
-     with no wrapper to provide outer inset. Wiener's .foot lives
-     inside .wrap (which already pads horizontally), so the equivalent
-     here is padding: 8px 0 with no extra horizontal margin — divider
-     line ends up at the same horizontal inset as the row content
-     above. (No backticks in this comment — the whole stylesheet is a
-     css tagged template, an inner backtick terminates the literal.) */
+     Lives inside .wrap (which already pads horizontally), so padding
+     stays vertical-only. */
   .foot {
     display: flex;
     align-items: center;
@@ -884,6 +877,63 @@ function e(e,t,i,r){var n,s=arguments.length,a=s<3?t:null===r?r=Object.getOwnPro
   .dev-strip .dev-strip-clear {
     margin-left: auto;
     color: var(--secondary-text-color);
+  }
+
+  /* QR icon button — gentle accent tint while the panel is expanded
+     so the toggle state reads at a glance, mirroring how dep-row's
+     row-chevron flips on expand. */
+  .qr-toggle.expanded {
+    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    color: var(--primary-text-color);
+  }
+  /* Inline QR panel — same 0fr↔1fr grid-template-rows trick as
+     .dep-row-detail and .stops-ahead-detail so the panel animates to
+     its intrinsic height and never clips the canvas mid-transition.
+     Sits between the header and the hero so the QR feels like an
+     extension of the stop card rather than a modal interruption. */
+  .qr-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+  }
+  .qr-panel.expanded {
+    grid-template-rows: 1fr;
+  }
+  .qr-panel-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .qr-panel-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0 4px;
+    cursor: pointer;
+  }
+  /* Canvas wrapper — qr-creator appends a 220×220 canvas; the white
+     plate gives the QR a quiet zone independent of theme background
+     so contrast stays clean in dark mode too. */
+  .qr-canvas {
+    padding: 10px;
+    background: #fff;
+    border-radius: var(--wl-radius-md);
+    line-height: 0;
+    forced-color-adjust: none;
+  }
+  .qr-canvas canvas {
+    display: block;
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+  }
+  .qr-panel-hint {
+    margin: 0;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--secondary-text-color);
+    line-height: 1.4;
+    max-width: 280px;
   }
 
   /* Container density ladder. One token tweak per breakpoint cascades
@@ -976,18 +1026,18 @@ function e(e,t,i,r){var n,s=arguments.length,a=s<3?t:null===r?r=Object.getOwnPro
       scroll-behavior: auto !important;
     }
   }
-`,Se="1.4.0",Ae="#1b1464";var ze={no_data:"Keine Abfahrten verfügbar",betriebsschluss:"Betriebsschluss",min:"Min",now:"Jetzt",platform_short_rail:"Gleis",platform_short_bus:"Steig",version_update:"Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",no_entities_picked:"Keine Haltestelle ausgewählt",no_entities_available:"Keine Wiener-Linien-Sensoren gefunden",departures_list:"Kommende Abfahrten",barrier_free_title:"Barrierefrei zugänglich",disturbance_title:"Verkehrsbehinderung gemeldet",stops_ahead_aria_show:"Streckenverlauf für {line} Richtung {towards} anzeigen",stops_ahead_aria_hide:"Streckenverlauf für {line} Richtung {towards} ausblenden",stops_ahead_transfer_aria:"Umsteigen auf {lines}",stops_ahead_other_show:"{count} weitere Linien bei {stop} anzeigen",stops_ahead_other_hide:"Weitere Linien bei {stop} ausblenden",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",dir_both:"Beide",traffic_label:"Störung",traffic_until:"Bis",traffic_updated:"aktualisiert",elevator_label:"Aufzug außer Betrieb",elevator_until:"Bis",open_in_maps:"In Karte öffnen",delay_singular:"1 Min. verspätet",delay_plural:"{n} Min. verspätet",devmode_title:"DEV",devmode_traffic_btn:"Test Störung",devmode_elevator_btn:"Test Aufzug",devmode_clear_btn:"Löschen",editor:{lines_label:"Linien",direction_label:"Richtung",per_line_direction_label:"Richtung pro Linie",per_line_direction_hint:"Optional: Richtung pro Linie einzeln festlegen. Beide = haltestellenweite Richtung oben verwenden.",per_line_direction_aria:"Richtung für Linie {line}",direction_unavailable:"Keine Abfahrten in dieser Richtung",walk_time_label:"Fußweg (min)",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",section_colors:"Linienfarben",colors_hint:"Optional: Farben überschreiben. U-Bahn-Standardwerte sind gesetzt.",reset_color:"Zurücksetzen",pick_color_for_line:"Farbe für Linie {line} wählen",section_display:"Anzeige",max_departures:"Anzahl Abfahrten pro Haltestelle",show_accessibility:"Barrierefrei-Symbol anzeigen",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",show_type_icon:"Verkehrsmittel-Symbol anzeigen",show_platform:"Steig/Gleis anzeigen",show_traffic_info:"Störungen anzeigen",show_elevator_info:"Aufzugsinfo anzeigen",show_delay:"Verspätungen anzeigen",show_hero_metric:"Hauptbereich anzeigen",show_departures:"Abfahrtsliste anzeigen",show_stops_ahead:"Zwischenstopps anzeigen",hide_header:"Kopfzeile ausblenden",hide_attribution:"Datenquelle ausblenden",layout:"Layout mehrerer Haltestellen",layout_stacked:"Gestapelt",layout_tabs:"Reiter",no_lines_available:"Linien erscheinen hier, sobald Haltestellen ausgewählt wurden."}},Ee={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",version_update:"Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",race_finished:"Barrierefreiheits-Rennen beendet",race_starting_in:"Rennen startet in {n}",race_winner_announce:"Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",barrier_free_title:"Barrierefrei zugänglich",editor:{direction:"Richtung",line:"Linie",size:"Größe",style:"Stil",station_bg:"Hintergrund",section_display:"Darstellung",section_walk_time:"Fußweg zur Haltestelle",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_no_data:"Keine Abfahrten in dieser Richtung. Richtung wechseln oder warten, bis der Sensor Linien meldet.",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",show_platform:"Gleis/Steig anzeigen",show_station_name:"Stationsnamen anzeigen",section_station:"Stationsnamen-Schild",station_bg_default:"Standard",station_bg_white:"Weiß",station_bg_black:"Schwarz",size_small:"Klein",size_medium:"Mittel",size_regular:"Normal",style_classic:"Klassisch",style_warm:"Warm",style_pixel:"Punktmatrix",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",flicker:"Linien-Flimmern",wheelchair_race:"Rollstuhl-Rennen"}},Te={modern:ze,retro:Ee},Ce={no_data:"No departures available",betriebsschluss:"End of service",min:"min",now:"Now",platform_short_rail:"Track",platform_short_bus:"Bay",version_update:"Wiener Linien Austria updated to v{v} — please reload",version_reload:"Reload",no_entities_picked:"No stop selected",no_entities_available:"No Wiener Linien sensors found",departures_list:"Upcoming departures",barrier_free_title:"Step-free access",disturbance_title:"Traffic disruption reported",stops_ahead_aria_show:"Show stops ahead for {line} towards {towards}",stops_ahead_aria_hide:"Hide stops ahead for {line} towards {towards}",stops_ahead_transfer_aria:"Change to {lines}",stops_ahead_other_show:"Show {count} more lines at {stop}",stops_ahead_other_hide:"Hide other lines at {stop}",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",dir_both:"Both",traffic_label:"Disruption",traffic_until:"Until",traffic_updated:"updated",elevator_label:"Elevator out of service",elevator_until:"Until",open_in_maps:"Open in maps",delay_singular:"1 min. late",delay_plural:"{n} min. late",devmode_title:"DEV",devmode_traffic_btn:"Test disruption",devmode_elevator_btn:"Test elevator",devmode_clear_btn:"Clear",editor:{lines_label:"Lines",direction_label:"Direction",per_line_direction_label:"Per-line direction",per_line_direction_hint:"Optional: pick the direction for each line individually. Both = use the stop-wide direction above.",per_line_direction_aria:"Direction for line {line}",direction_unavailable:"No departures in this direction",walk_time_label:"Walking time (min)",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",section_colors:"Line colours",colors_hint:"Optional overrides. Metro defaults are already set.",reset_color:"Reset",pick_color_for_line:"Pick colour for line {line}",section_display:"Display",max_departures:"Departures per stop",show_accessibility:"Show step-free icon",accessibility_only:"Only show step-free departures",show_type_icon:"Show vehicle-type icon",show_platform:"Show platform / track",show_traffic_info:"Show disruption alerts",show_elevator_info:"Show elevator outages",show_delay:"Show delays",show_hero_metric:"Show hero block",show_departures:"Show departure list",show_stops_ahead:"Show intermediate stops",hide_header:"Hide header",hide_attribution:"Hide data source",layout:"Multi-stop layout",layout_stacked:"Stacked",layout_tabs:"Tabs",no_lines_available:"Lines appear here once stops are selected."}},Re={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"PLATF.",steig:"STAND",version_update:"Retro card updated to v{v} — please reload",version_reload:"Reload",departures_list:"Upcoming departures",at_platform:"At platform",countdown_minutes:"{n} minutes",race_finished:"Accessibility race finished",race_starting_in:"Race starting in {n}",race_winner_announce:"Wheelchair {n} wins the accessibility race",barrier_free_title:"Step-free access",editor:{direction:"Direction",line:"Line",size:"Size",style:"Style",station_bg:"Station-name background",section_display:"Display",section_walk_time:"Walking time to stop",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_no_data:"No departures in this direction. Switch direction or wait until the sensor reports lines.",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",show_platform:"Show platform",show_station_name:"Show station name",section_station:"Station name sign",station_bg_default:"Default",station_bg_white:"White",station_bg_black:"Black",size_small:"Small",size_medium:"Medium",size_regular:"Regular",style_classic:"Classic",style_warm:"Warm",style_pixel:"Dot matrix",accessibility_only:"Only show step-free departures",flicker:"Line badge flicker",wheelchair_race:"Wheelchair race"}},Le={modern:Ce,retro:Re};const He={de:Object.freeze({__proto__:null,default:Te,modern:ze,retro:Ee}),en:Object.freeze({__proto__:null,default:Le,modern:Ce,retro:Re})},De=He.de??{};function Ne(e,t){const i=function(e,t){return e.split(".").reduce((e,t)=>{if(e&&"object"==typeof e&&t in e)return e[t]},t)}(e,t);return"string"==typeof i?i:void 0}function Me(e,t,i){const r=function(e){return"en"===((e.configLanguage||e.hassLanguage||"de").replace("-","_").split("_")[0]??"de")?"en":"de"}(t);let n=Ne(e,He[r]??De);if(void 0===n&&(n=Ne(e,De)),void 0===n)return e;if(i)for(const[e,t]of Object.entries(i))n=n.replace(`{${e}}`,String(t));return n}function Pe(){try{window.caches?.keys?.().then(e=>{e.forEach(e=>window.caches?.delete?.(e))})}catch{}window.location.reload()}function Oe(e,t,i="banner"){if(!e)return K;const r=t("version_update").replace("{v}",e),n=t("version_reload");return F`
+`,Ee="#1b1464";var Te={no_data:"Keine Abfahrten verfügbar",betriebsschluss:"Betriebsschluss",min:"Min",now:"Jetzt",platform_short_rail:"Gleis",platform_short_bus:"Steig",version_update:"Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",no_entities_picked:"Keine Haltestelle ausgewählt",no_entities_available:"Keine Wiener-Linien-Sensoren gefunden",departures_list:"Kommende Abfahrten",barrier_free_title:"Barrierefrei zugänglich",disturbance_title:"Verkehrsbehinderung gemeldet",stops_ahead_aria_show:"Streckenverlauf für {line} Richtung {towards} anzeigen",stops_ahead_aria_hide:"Streckenverlauf für {line} Richtung {towards} ausblenden",stops_ahead_transfer_aria:"Umsteigen auf {lines}",stops_ahead_other_show:"{count} weitere Linien bei {stop} anzeigen",stops_ahead_other_hide:"Weitere Linien bei {stop} ausblenden",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",dir_both:"Beide",traffic_label:"Störung",traffic_until:"Bis",traffic_updated:"aktualisiert",elevator_label:"Aufzug außer Betrieb",elevator_until:"Bis",open_in_maps:"In Karte öffnen",qr_open:"QR-Code anzeigen",qr_dialog_title:"QR-Code für Haltestelle",qr_dialog_hint:"Mit dem Smartphone scannen — öffnet die Haltestelle in der Karten-App.",delay_singular:"1 Min. verspätet",delay_plural:"{n} Min. verspätet",devmode_title:"DEV",devmode_traffic_btn:"Test Störung",devmode_elevator_btn:"Test Aufzug",devmode_clear_btn:"Löschen",editor:{lines_label:"Linien",direction_label:"Richtung",per_line_direction_label:"Richtung pro Linie",per_line_direction_hint:"Optional: Richtung pro Linie einzeln festlegen. Beide = haltestellenweite Richtung oben verwenden.",per_line_direction_aria:"Richtung für Linie {line}",direction_unavailable:"Keine Abfahrten in dieser Richtung",walk_time_label:"Fußweg (min)",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",section_colors:"Linienfarben",colors_hint:"Optional: Farben überschreiben. U-Bahn-Standardwerte sind gesetzt.",reset_color:"Zurücksetzen",pick_color_for_line:"Farbe für Linie {line} wählen",section_display:"Anzeige",max_departures:"Anzahl Abfahrten pro Haltestelle",show_accessibility:"Barrierefrei-Symbol anzeigen",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",show_type_icon:"Verkehrsmittel-Symbol anzeigen",show_platform:"Steig/Gleis anzeigen",show_traffic_info:"Störungen anzeigen",show_elevator_info:"Aufzugsinfo anzeigen",show_delay:"Verspätungen anzeigen",show_hero_metric:"Hauptbereich anzeigen",show_departures:"Abfahrtsliste anzeigen",show_stops_ahead:"Zwischenstopps anzeigen",show_qr_button:"QR-Code-Button anzeigen",hide_header:"Kopfzeile ausblenden",hide_attribution:"Datenquelle ausblenden",layout:"Layout mehrerer Haltestellen",layout_stacked:"Gestapelt",layout_tabs:"Reiter",no_lines_available:"Linien erscheinen hier, sobald Haltestellen ausgewählt wurden."}},Ce={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",version_update:"Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",race_finished:"Barrierefreiheits-Rennen beendet",race_starting_in:"Rennen startet in {n}",race_winner_announce:"Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",barrier_free_title:"Barrierefrei zugänglich",editor:{direction:"Richtung",line:"Linie",size:"Größe",style:"Stil",station_bg:"Hintergrund",section_display:"Darstellung",section_walk_time:"Fußweg zur Haltestelle",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis du dort bist. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_no_data:"Keine Abfahrten in dieser Richtung. Richtung wechseln oder warten, bis der Sensor Linien meldet.",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",show_platform:"Gleis/Steig anzeigen",show_station_name:"Stationsnamen anzeigen",section_station:"Stationsnamen-Schild",station_bg_default:"Standard",station_bg_white:"Weiß",station_bg_black:"Schwarz",size_small:"Klein",size_medium:"Mittel",size_regular:"Normal",style_classic:"Klassisch",style_warm:"Warm",style_pixel:"Punktmatrix",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",flicker:"Linien-Flimmern",wheelchair_race:"Rollstuhl-Rennen"}},Me={modern:Te,retro:Ce},He={no_data:"No departures available",betriebsschluss:"End of service",min:"min",now:"Now",platform_short_rail:"Track",platform_short_bus:"Bay",version_update:"Wiener Linien Austria updated to v{v} — please reload",version_reload:"Reload",no_entities_picked:"No stop selected",no_entities_available:"No Wiener Linien sensors found",departures_list:"Upcoming departures",barrier_free_title:"Step-free access",disturbance_title:"Traffic disruption reported",stops_ahead_aria_show:"Show stops ahead for {line} towards {towards}",stops_ahead_aria_hide:"Hide stops ahead for {line} towards {towards}",stops_ahead_transfer_aria:"Change to {lines}",stops_ahead_other_show:"Show {count} more lines at {stop}",stops_ahead_other_hide:"Hide other lines at {stop}",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",dir_both:"Both",traffic_label:"Disruption",traffic_until:"Until",traffic_updated:"updated",elevator_label:"Elevator out of service",elevator_until:"Until",open_in_maps:"Open in maps",qr_open:"Show QR code",qr_dialog_title:"QR code for stop",qr_dialog_hint:"Scan with your phone — opens the stop in your maps app.",delay_singular:"1 min. late",delay_plural:"{n} min. late",devmode_title:"DEV",devmode_traffic_btn:"Test disruption",devmode_elevator_btn:"Test elevator",devmode_clear_btn:"Clear",editor:{lines_label:"Lines",direction_label:"Direction",per_line_direction_label:"Per-line direction",per_line_direction_hint:"Optional: pick the direction for each line individually. Both = use the stop-wide direction above.",per_line_direction_aria:"Direction for line {line}",direction_unavailable:"No departures in this direction",walk_time_label:"Walking time (min)",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",section_colors:"Line colours",colors_hint:"Optional overrides. Metro defaults are already set.",reset_color:"Reset",pick_color_for_line:"Pick colour for line {line}",section_display:"Display",max_departures:"Departures per stop",show_accessibility:"Show step-free icon",accessibility_only:"Only show step-free departures",show_type_icon:"Show vehicle-type icon",show_platform:"Show platform / track",show_traffic_info:"Show disruption alerts",show_elevator_info:"Show elevator outages",show_delay:"Show delays",show_hero_metric:"Show hero block",show_departures:"Show departure list",show_stops_ahead:"Show intermediate stops",show_qr_button:"Show QR-code button",hide_header:"Hide header",hide_attribution:"Hide data source",layout:"Multi-stop layout",layout_stacked:"Stacked",layout_tabs:"Tabs",no_lines_available:"Lines appear here once stops are selected."}},Re={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"PLATF.",steig:"STAND",version_update:"Retro card updated to v{v} — please reload",version_reload:"Reload",departures_list:"Upcoming departures",at_platform:"At platform",countdown_minutes:"{n} minutes",race_finished:"Accessibility race finished",race_starting_in:"Race starting in {n}",race_winner_announce:"Wheelchair {n} wins the accessibility race",barrier_free_title:"Step-free access",editor:{direction:"Direction",line:"Line",size:"Size",style:"Style",station_bg:"Station-name background",section_display:"Display",section_walk_time:"Walking time to stop",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_no_data:"No departures in this direction. Switch direction or wait until the sensor reports lines.",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",show_platform:"Show platform",show_station_name:"Show station name",section_station:"Station name sign",station_bg_default:"Default",station_bg_white:"White",station_bg_black:"Black",size_small:"Small",size_medium:"Medium",size_regular:"Regular",style_classic:"Classic",style_warm:"Warm",style_pixel:"Dot matrix",accessibility_only:"Only show step-free departures",flicker:"Line badge flicker",wheelchair_race:"Wheelchair race"}},Le={modern:He,retro:Re};const Oe={de:Object.freeze({__proto__:null,default:Me,modern:Te,retro:Ce}),en:Object.freeze({__proto__:null,default:Le,modern:He,retro:Re})},Pe=Oe.de??{};function De(e,t){const i=function(e,t){return e.split(".").reduce((e,t)=>{if(e&&"object"==typeof e&&t in e)return e[t]},t)}(e,t);return"string"==typeof i?i:void 0}function Ne(e,t,i){const r=function(e){return"en"===((e.configLanguage||e.hassLanguage||"de").replace("-","_").split("_")[0]??"de")?"en":"de"}(t);let n=De(e,Oe[r]??Pe);if(void 0===n&&(n=De(e,Pe)),void 0===n)return e;if(i)for(const[e,t]of Object.entries(i))n=n.replace(`{${e}}`,String(t));return n}function Ue(){try{window.caches?.keys?.().then(e=>{e.forEach(e=>window.caches?.delete?.(e))})}catch{}window.location.reload()}function qe(e,t,i="banner"){if(!e)return W;const r=t("version_update").replace("{v}",e),n=t("version_reload");return B`
     <div class=${i} role="alert" aria-live="assertive">
       <span>${r}</span>
       <button
         type="button"
         aria-label=${n}
-        @click=${Pe}
+        @click=${Ue}
       >
         ${n}
       </button>
     </div>
-  `}const Ue="ptMetro";function je(e){switch(e){case Ue:return"mdi:subway-variant";case"ptTram":return"mdi:tram";case"ptBusCity":case"ptBusNight":return"mdi:bus";default:return null}}function Be(e){if("string"==typeof e)return e.startsWith("sensor.")?{entity:e}:null;if(!e||"object"!=typeof e)return null;const t=e,i="string"==typeof t.entity?t.entity:null;if(!i?.startsWith("sensor."))return null;const r={entity:i};if(Array.isArray(t.lines)){const e=t.lines.filter(e=>"string"==typeof e&&e.length>0);e.length&&(r.lines=e)}"H"!==t.direction&&"R"!==t.direction||(r.direction=t.direction);const n=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,r]of Object.entries(e))"string"==typeof i&&i.length&&("H"!==r&&"R"!==r||(t[i]=r));return Object.keys(t).length?t:void 0}(t.line_directions);n&&(r.line_directions=n);const s=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,r]of Object.entries(e)){const e="number"==typeof r?r:"string"==typeof r?Number(r):NaN;if(!Number.isFinite(e))continue;if(e<0||e>120)continue;const n=i.split("|"),s=n.length>=3?`${n[0]}|${n[1]}`:i,a=Math.round(e),o=t[s];t[s]=void 0===o?a:Math.max(o,a)}return Object.keys(t).length?t:void 0}(t.walk_times);return s&&(r.walk_times=s),r}const We=6,Fe=!1,Ie=!1,Ke=!0,Ge=!0,Ve=!0,qe=!1,Ze=!0,Je=!0,Ye=!0,Qe=!0,Xe=!1,et=!1;function tt(e){let t=[];Array.isArray(e.entities)?t=e.entities:"string"==typeof e.entity&&(t=[{entity:e.entity,lines:e.lines,direction:e.direction,walk_times:e.walk_times}]);const i=[],r=new Set;for(const e of t){const t=Be(e);t&&(r.has(t.entity)||(r.add(t.entity),i.push(t)))}const n=Number(e.max_departures),s=Number.isFinite(n)?Math.max(0,Math.min(20,Math.round(n))):We,a={};if(e.line_colors&&"object"==typeof e.line_colors)for(const[t,i]of Object.entries(e.line_colors))"string"==typeof i&&/^#[0-9A-Fa-f]{3,8}$/.test(i.trim())&&(a[t.toUpperCase()]=i.trim());return{...e,type:e.type||"custom:wiener-linien-austria-card",entities:i,max_departures:s,line_colors:a,show_accessibility:e.show_accessibility??Fe,accessibility_only:e.accessibility_only??Ie,show_traffic_info:e.show_traffic_info??Ke,show_elevator_info:e.show_elevator_info??Ge,show_delay:e.show_delay??Ve,show_type_icon:e.show_type_icon??qe,show_platform:e.show_platform??Ze,show_hero_metric:e.show_hero_metric??Je,show_departures:e.show_departures??Ye,show_stops_ahead:e.show_stops_ahead??Qe,hide_header:e.hide_header??Xe,hide_attribution:e.hide_attribution??et,layout:"tabs"===e.layout?"tabs":"stacked"}}function it(e,t,i={},r="var(--primary-color)"){const n=e.toUpperCase();if(void 0!==t[n])return t[n];if(/^N\d/.test(n))return Ae;const s=i[e]??i[n];return s?.bg?`#${s.bg}`:r}function rt(e,t,i={}){const r=e.toUpperCase();if(void 0!==t[r])return{background:t[r]};if(/^N\d/.test(r))return{background:Ae,color:"#fef200"};const n=i[e]??i[r];return n?.bg?n.fg?{background:`#${n.bg}`,color:`#${n.fg}`}:{background:`#${n.bg}`}:{background:"var(--primary-color)"}}function nt(e){if(!e)return[];const t=[];for(const[i,r]of Object.entries(e.states??{})){if(!i.startsWith("sensor."))continue;const e=r?.attributes??{};if("number"!=typeof e.diva)continue;if(!Array.isArray(e.departures))continue;(e.attribution??"").toLowerCase().includes("wiener linien")&&t.push(i)}return t.sort(),t}function st(e,t,i){return`${e}|${t}|${i}`}function at(e,t){return`${e}|${t}`}function ot(e){const t=new Set;for(const i of e?.departures??[])i.line&&t.add(i.line);return Array.from(t).sort()}function lt(e,t){return!1!==e&&Array.isArray(t.stops_ahead)&&t.stops_ahead.length>0}function dt(e){return function(e){return String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}(e).replace(/&lt;br\s*\/?&gt;/gi,"<br>")}function ct(e,t="de"){if(!e)return"";const i=Date.parse(e);if(!Number.isFinite(i))return e;try{return new Date(i).toLocaleString("en"===t?"en-GB":"de-AT",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch{return e}}const ht=a`
+  `}const je="ptMetro";function Fe(e){switch(e){case je:return"mdi:subway-variant";case"ptTram":return"mdi:tram";case"ptBusCity":case"ptBusNight":return"mdi:bus";default:return null}}function Be(e){if("string"==typeof e)return e.startsWith("sensor.")?{entity:e}:null;if(!e||"object"!=typeof e)return null;const t=e,i="string"==typeof t.entity?t.entity:null;if(!i?.startsWith("sensor."))return null;const r={entity:i};if(Array.isArray(t.lines)){const e=t.lines.filter(e=>"string"==typeof e&&e.length>0);e.length&&(r.lines=e)}"H"!==t.direction&&"R"!==t.direction||(r.direction=t.direction);const n=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,r]of Object.entries(e))"string"==typeof i&&i.length&&("H"!==r&&"R"!==r||(t[i]=r));return Object.keys(t).length?t:void 0}(t.line_directions);n&&(r.line_directions=n);const o=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,r]of Object.entries(e)){const e="number"==typeof r?r:"string"==typeof r?Number(r):NaN;if(!Number.isFinite(e))continue;if(e<0||e>120)continue;const n=i.split("|"),o=n.length>=3?`${n[0]}|${n[1]}`:i,a=Math.round(e),s=t[o];t[o]=void 0===s?a:Math.max(s,a)}return Object.keys(t).length?t:void 0}(t.walk_times);return o&&(r.walk_times=o),r}const Ve=6,We=!1,Ie=!1,Ke=!0,Ge=!0,Qe=!0,Ze=!1,Je=!0,Ye=!0,Xe=!0,et=!0,tt=!0,it=!1,rt=!1;function nt(e){let t=[];Array.isArray(e.entities)?t=e.entities:"string"==typeof e.entity&&(t=[{entity:e.entity,lines:e.lines,direction:e.direction,walk_times:e.walk_times}]);const i=[],r=new Set;for(const e of t){const t=Be(e);t&&(r.has(t.entity)||(r.add(t.entity),i.push(t)))}const n=Number(e.max_departures),o=Number.isFinite(n)?Math.max(0,Math.min(20,Math.round(n))):Ve,a={};if(e.line_colors&&"object"==typeof e.line_colors)for(const[t,i]of Object.entries(e.line_colors))"string"==typeof i&&/^#[0-9A-Fa-f]{3,8}$/.test(i.trim())&&(a[t.toUpperCase()]=i.trim());return{...e,type:e.type||"custom:wiener-linien-austria-card",entities:i,max_departures:o,line_colors:a,show_accessibility:e.show_accessibility??We,accessibility_only:e.accessibility_only??Ie,show_traffic_info:e.show_traffic_info??Ke,show_elevator_info:e.show_elevator_info??Ge,show_delay:e.show_delay??Qe,show_type_icon:e.show_type_icon??Ze,show_platform:e.show_platform??Je,show_hero_metric:e.show_hero_metric??Ye,show_departures:e.show_departures??Xe,show_stops_ahead:e.show_stops_ahead??et,show_qr_button:e.show_qr_button??tt,hide_header:e.hide_header??it,hide_attribution:e.hide_attribution??rt,layout:"tabs"===e.layout?"tabs":"stacked"}}function ot(e,t,i={},r="var(--primary-color)"){const n=e.toUpperCase();if(void 0!==t[n])return t[n];if(/^N\d/.test(n))return Ee;const o=i[e]??i[n];return o?.bg?`#${o.bg}`:r}function at(e,t,i={}){const r=e.toUpperCase();if(void 0!==t[r])return{background:t[r]};if(/^N\d/.test(r))return{background:Ee,color:"#fef200"};const n=i[e]??i[r];return n?.bg?n.fg?{background:`#${n.bg}`,color:`#${n.fg}`}:{background:`#${n.bg}`}:{background:"var(--primary-color)"}}function st(e){if(!e)return[];const t=[];for(const[i,r]of Object.entries(e.states??{})){if(!i.startsWith("sensor."))continue;const e=r?.attributes??{};"number"==typeof e.diva&&(Array.isArray(e.departures)&&e.next_by_line&&"object"==typeof e.next_by_line&&t.push(i))}return t.sort(),t}function lt(e,t,i){return`${e}|${t}|${i}`}function dt(e,t){return`${e}|${t}`}function ct(e){if(e?.tracked_lines?.length)return[...e.tracked_lines].sort();const t=new Set;if(e?.lines_at_stop?.length)for(const i of e.lines_at_stop)t.add(i);for(const i of e?.departures??[])i.line&&t.add(i.line);return Array.from(t).sort()}function ht(e,t){return!1!==e&&Array.isArray(t.stops_ahead)&&t.stops_ahead.length>0}function pt(e){return function(e){return String(e).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}(e).replace(/&lt;br\s*\/?&gt;/gi,"<br>")}function ut(e,t="de"){if(!e)return"";const i=Date.parse(e);if(!Number.isFinite(i))return e;try{return new Date(i).toLocaleString("en"===t?"en-GB":"de-AT",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch{return e}}const ft=a`
   :host {
     display: block;
   }
@@ -1057,7 +1107,7 @@ function e(e,t,i,r){var n,s=arguments.length,a=s<3?t:null===r?r=Object.getOwnPro
   }
 `;
 // Schema-driven Lovelace editor for the Wiener Linien Austria modern card.
-let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>{const t=`ui.panel.lovelace.editor.card.generic.${e.name}`,i=this.hass?.localize?.(t);if(i)return i;const r=this._et(e.name);return r!==`modern.editor.${e.name}`&&r!==e.name?r:e.name},this._computeHelper=e=>{const t=`${e.name}_helper`,i=this._et(t);if(i!==`modern.editor.${t}`&&i!==t)return i},this._onFormChanged=e=>{if(!this._config)return;const t=e.detail.value,i=t.entities,r=Array.isArray(i)?i.filter(e=>"string"==typeof e&&e.length>0):[],n=new Map;for(const e of this._config.entities)n.set(e.entity,e);const s=r.map(e=>n.get(e)??{entity:e}),a=tt({...this._config,...t,entities:s});this._fire(a)}}setConfig(e){this._config=tt(e)}_et(e){return Me(`modern.editor.${e}`,{hassLanguage:this.hass?.language})}_t(e){return Me(`modern.${e}`,{hassLanguage:this.hass?.language})}_fire(e){var t,i;this._config=e,t="config-changed",i={config:e},this.dispatchEvent(new CustomEvent(t,{detail:i,bubbles:!0,composed:!0}))}_schema(){return[{name:"entities",required:!0,selector:{entity:{domain:"sensor",integration:"wiener_linien_austria",multiple:!0}}},{name:"layout",selector:{select:{mode:"dropdown",options:[{value:"stacked",label:this._et("layout_stacked")},{value:"tabs",label:this._et("layout_tabs")}]}}},{type:"expandable",name:"display",title:this._et("section_display"),flatten:!0,schema:[{name:"max_departures",selector:{number:{min:0,max:20,step:1,mode:"slider"}}},{name:"hide_header",selector:{boolean:{}}},{name:"show_hero_metric",selector:{boolean:{}}},{name:"show_departures",selector:{boolean:{}}},{name:"show_stops_ahead",selector:{boolean:{}}},{name:"show_platform",selector:{boolean:{}}},{name:"show_accessibility",selector:{boolean:{}}},{name:"accessibility_only",selector:{boolean:{}}},{name:"show_type_icon",selector:{boolean:{}}},{name:"show_traffic_info",selector:{boolean:{}}},{name:"show_elevator_info",selector:{boolean:{}}},{name:"show_delay",selector:{boolean:{}}},{name:"hide_attribution",selector:{boolean:{}}}]}]}_formData(){if(!this._config)return{};const e=this._config.entities.map(e=>e.entity);return{...this._config,entities:e}}_updateStop(e,t){if(!this._config)return;const i=this._config.entities.map(i=>i.entity===e?t({...i}):i);this._fire({...this._config,entities:i})}_toggleLine(e,t){this._updateStop(e,e=>{const i=new Set(e.lines??[]);return i.has(t)?i.delete(t):i.add(t),i.size>0?e.lines=[...i]:delete e.lines,e})}_setDirection(e,t){this._updateStop(e,e=>(null===t?delete e.direction:e.direction=t,e))}_setLineDirection(e,t,i){this._updateStop(e,e=>{const r={...e.line_directions??{}};return null===i?delete r[t]:r[t]=i,Object.keys(r).length?e.line_directions=r:delete e.line_directions,e})}_setWalkTime(e,t,i){const r=parseInt(i,10),n=Number.isFinite(r)&&r>0?Math.min(120,r):null;this._updateStop(e,e=>{const i={...e.walk_times??{}};return null===n?delete i[t]:i[t]=n,Object.keys(i).length?e.walk_times=i:delete e.walk_times,e})}_setLineColor(e,t){if(!this._config)return;const i={...this._config.line_colors,[e.toUpperCase()]:t};this._fire({...this._config,line_colors:i})}_resetLineColor(e){if(!this._config)return;const t={...this._config.line_colors};delete t[e.toUpperCase()],this._fire({...this._config,line_colors:t})}_swallowKeys(e){e.stopPropagation()}_attrs(e){return this.hass?.states?.[e]?.attributes}render(){return this._config?F`
+let _t=class extends se{constructor(){super(...arguments),this._computeLabel=e=>{const t=`ui.panel.lovelace.editor.card.generic.${e.name}`,i=this.hass?.localize?.(t);if(i)return i;const r=this._et(e.name);return r!==`modern.editor.${e.name}`&&r!==e.name?r:e.name},this._computeHelper=e=>{const t=`${e.name}_helper`,i=this._et(t);if(i!==`modern.editor.${t}`&&i!==t)return i},this._onFormChanged=e=>{if(!this._config)return;const t=e.detail.value,i=t.entities,r=Array.isArray(i)?i.filter(e=>"string"==typeof e&&e.length>0):[],n=new Map;for(const e of this._config.entities)n.set(e.entity,e);const o=r.map(e=>n.get(e)??{entity:e}),a=nt({...this._config,...t,entities:o});this._fire(a)}}setConfig(e){this._config=nt(e)}_et(e){return Ne(`modern.editor.${e}`,{hassLanguage:this.hass?.language})}_t(e){return Ne(`modern.${e}`,{hassLanguage:this.hass?.language})}_fire(e){var t,i;this._config=e,t="config-changed",i={config:e},this.dispatchEvent(new CustomEvent(t,{detail:i,bubbles:!0,composed:!0}))}_schema(){return[{name:"entities",required:!0,selector:{entity:{domain:"sensor",integration:"wiener_linien_austria",multiple:!0}}},{name:"layout",selector:{select:{mode:"dropdown",options:[{value:"stacked",label:this._et("layout_stacked")},{value:"tabs",label:this._et("layout_tabs")}]}}},{type:"expandable",name:"display",title:this._et("section_display"),flatten:!0,schema:[{name:"max_departures",selector:{number:{min:0,max:20,step:1,mode:"slider"}}},{name:"hide_header",selector:{boolean:{}}},{name:"show_hero_metric",selector:{boolean:{}}},{name:"show_departures",selector:{boolean:{}}},{name:"show_stops_ahead",selector:{boolean:{}}},{name:"show_qr_button",selector:{boolean:{}}},{name:"show_platform",selector:{boolean:{}}},{name:"show_accessibility",selector:{boolean:{}}},{name:"accessibility_only",selector:{boolean:{}}},{name:"show_type_icon",selector:{boolean:{}}},{name:"show_traffic_info",selector:{boolean:{}}},{name:"show_elevator_info",selector:{boolean:{}}},{name:"show_delay",selector:{boolean:{}}},{name:"hide_attribution",selector:{boolean:{}}}]}]}_formData(){if(!this._config)return{};const e=this._config.entities.map(e=>e.entity);return{...this._config,entities:e}}_updateStop(e,t){if(!this._config)return;const i=this._config.entities.map(i=>i.entity===e?t({...i}):i);this._fire({...this._config,entities:i})}_toggleLine(e,t){this._updateStop(e,e=>{const i=new Set(e.lines??[]);return i.has(t)?i.delete(t):i.add(t),i.size>0?e.lines=[...i]:delete e.lines,e})}_setDirection(e,t){this._updateStop(e,e=>(null===t?delete e.direction:e.direction=t,e))}_setLineDirection(e,t,i){this._updateStop(e,e=>{const r={...e.line_directions??{}};return null===i?delete r[t]:r[t]=i,Object.keys(r).length?e.line_directions=r:delete e.line_directions,e})}_setWalkTime(e,t,i){const r=parseInt(i,10),n=Number.isFinite(r)&&r>0?Math.min(120,r):null;this._updateStop(e,e=>{const i={...e.walk_times??{}};return null===n?delete i[t]:i[t]=n,Object.keys(i).length?e.walk_times=i:delete e.walk_times,e})}_setLineColor(e,t){if(!this._config)return;const i={...this._config.line_colors,[e.toUpperCase()]:t};this._fire({...this._config,line_colors:i})}_resetLineColor(e){if(!this._config)return;const t={...this._config.line_colors};delete t[e.toUpperCase()],this._fire({...this._config,line_colors:t})}_swallowKeys(e){e.stopPropagation()}_attrs(e){return this.hass?.states?.[e]?.attributes}render(){return this._config?B`
       <div class="editor">
         <ha-form
           .hass=${this.hass}
@@ -1070,24 +1120,24 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
         ${this._renderPerStopSections()}
         ${this._renderColorsSection()}
       </div>
-    `:K}_renderPerStopSections(){const e=this._config;return e.entities.length?F`${e.entities.map(e=>this._renderStopFilter(e))}`:K}_directionLabelFromTermini(e,t){if(!t.length)return this._t("H"===e?"dir_h":"dir_r");return`${this._t("H"===e?"dir_h_short":"dir_r_short")}: ${t.slice(0,3).join(" / ")}${t.length>3?" +"+(t.length-3):""}`}_stopWideDirectionLabel(e,t){const i=new Set;for(const r of e)r.direction===t&&r.towards&&i.add(r.towards);return this._directionLabelFromTermini(t,[...i].sort())}_perLineDirectionLabel(e,t,i){const r=new Set;for(const n of e)n.line===t&&n.direction===i&&n.towards&&r.add(n.towards);return this._directionLabelFromTermini(i,[...r].sort())}_renderStopFilter(e){const t=this._attrs(e.entity);if(!t)return F``;const i=t.stop_name||e.entity,r=this._config.line_colors,n=t.line_colors??{},s=[...new Set((t.departures??[]).map(e=>e.line).filter(e=>!!e))].sort(),a=new Map;for(const e of t.departures??[])e.line&&e.type&&!a.has(e.line)&&a.set(e.line,e.type);const o=new Set(e.lines??[]),l=e.direction??null,d=e.line_directions??{},c=o.size>0?s.filter(e=>o.has(e)):s,h=c.length>=2,p=function(e){const t=[],i=new Set;for(const r of e?.departures??[]){const e=st(r.line,String(r.direction??""),r.towards);i.has(e)||(i.add(e),t.push({line:r.line,direction:String(r.direction??""),towards:r.towards,type:r.type}))}return t.sort((e,t)=>e.line===t.line?e.towards.localeCompare(t.towards):e.line.localeCompare(t.line)),t}(t),u=p.filter(e=>{if(o.size>0&&!o.has(e.line))return!1;const t=d[e.line]??l;return!t||e.direction===t}),f=new Set;for(const e of p)"H"!==e.direction&&"R"!==e.direction||f.add(e.direction);const _=f.has("H"),g=f.has("R"),m=1===f.size,b="H"===l||null===l&&m&&_,w="R"===l||null===l&&m&&g,v=null===l&&!m;return F`
+    `:W}_renderPerStopSections(){const e=this._config;return e.entities.length?B`${e.entities.map(e=>this._renderStopFilter(e))}`:W}_directionLabelFromTermini(e,t){if(!t.length)return this._t("H"===e?"dir_h":"dir_r");return`${this._t("H"===e?"dir_h_short":"dir_r_short")}: ${t.slice(0,3).join(" / ")}${t.length>3?" +"+(t.length-3):""}`}_stopWideDirectionLabel(e,t){const i=new Set;for(const r of e)r.direction===t&&r.towards&&i.add(r.towards);return this._directionLabelFromTermini(t,[...i].sort())}_perLineDirectionLabel(e,t,i){const r=new Set;for(const n of e)n.line===t&&n.direction===i&&n.towards&&r.add(n.towards);return this._directionLabelFromTermini(i,[...r].sort())}_renderStopFilter(e){const t=this._attrs(e.entity);if(!t)return B``;const i=t.stop_name||e.entity,r=this._config.line_colors,n=t.line_colors??{};let o;if(t.tracked_lines?.length)o=[...t.tracked_lines].sort();else{const e=(t.departures??[]).map(e=>e.line).filter(e=>!!e),i=new Set(t.lines_at_stop?.length?t.lines_at_stop:e);for(const t of e)i.add(t);o=[...i].sort()}const a=new Map;for(const e of t.departures??[])e.line&&e.type&&!a.has(e.line)&&a.set(e.line,e.type);const s=new Set(e.lines??[]),l=e.direction??null,d=e.line_directions??{},c=s.size>0?o.filter(e=>s.has(e)):o,h=c.length>=2,p=function(e){const t=[],i=new Set;for(const r of e?.departures??[]){const e=lt(r.line,String(r.direction??""),r.towards);i.has(e)||(i.add(e),t.push({line:r.line,direction:String(r.direction??""),towards:r.towards,type:r.type}))}return t.sort((e,t)=>e.line===t.line?e.towards.localeCompare(t.towards):e.line.localeCompare(t.line)),t}(t),u=p.filter(e=>{if(s.size>0&&!s.has(e.line))return!1;const t=d[e.line]??l;return!t||e.direction===t}),f=new Set;for(const e of p)"H"!==e.direction&&"R"!==e.direction||f.add(e.direction);const _=f.has("H"),g=f.has("R"),m=1===f.size,b="H"===l||null===l&&m&&_,v="R"===l||null===l&&m&&g,w=null===l&&!m;return B`
       <div class="stop-filter">
         <div class="stop-filter-header">${i}</div>
 
         <div class="stop-filter-row">
           <div class="stop-filter-row-label">${this._et("lines_label")}</div>
           <div class="line-chips">
-            ${s.length?s.map(t=>{const i=0===o.size||o.has(t),s=it(t,r,n),l=je(a.get(t))??"mdi:bus-stop";return F`<button
+            ${o.length?o.map(t=>{const i=0===s.size||s.has(t),o=ot(t,r,n),l=Fe(a.get(t))??"mdi:bus-stop";return B`<button
                     type="button"
-                    class=${ve({chip:!0,selected:i})}
-                    style=${xe({"--chip-color":s})}
+                    class=${we({chip:!0,selected:i})}
+                    style=${$e({"--chip-color":o})}
                     aria-pressed=${i?"true":"false"}
                     aria-label="${this._et("lines_label")}: ${t}"
                     @click=${()=>this._toggleLine(e.entity,t)}
                   >
                     <ha-icon icon=${l} aria-hidden="true"></ha-icon>
                     <span>${t}</span>
-                  </button>`}):F`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
+                  </button>`}):B`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
           </div>
         </div>
 
@@ -1096,21 +1146,21 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
           <div class="direction-buttons">
             <button
               type="button"
-              class=${ve({active:b})}
+              class=${we({active:b})}
               ?disabled=${!_}
               title=${_?"":this._et("direction_unavailable")}
               @click=${()=>_&&this._setDirection(e.entity,"H")}
             >${this._stopWideDirectionLabel(p,"H")}</button>
             <button
               type="button"
-              class=${ve({active:w})}
+              class=${we({active:v})}
               ?disabled=${!g}
               title=${g?"":this._et("direction_unavailable")}
               @click=${()=>g&&this._setDirection(e.entity,"R")}
             >${this._stopWideDirectionLabel(p,"R")}</button>
             <button
               type="button"
-              class=${ve({active:v})}
+              class=${we({active:w})}
               ?disabled=${m}
               title=${m?this._et("direction_unavailable"):""}
               @click=${()=>!m&&this._setDirection(e.entity,null)}
@@ -1118,26 +1168,26 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
           </div>
         </div>
 
-        ${h?F`
+        ${h?B`
               <div class="stop-filter-row">
                 <div class="stop-filter-row-label">${this._et("per_line_direction_label")}</div>
                 <div class="editor-hint">${this._et("per_line_direction_hint")}</div>
                 <div class="per-line-dir-list">
-                  ${c.map(t=>{const i=it(t,r,n),s=d[t]??null,a=(e=>{const t=new Set;for(const i of p)i.line===e&&("H"!==i.direction&&"R"!==i.direction||t.add(i.direction));return t})(t),o=a.has("H"),l=a.has("R"),c=1===a.size,h="H"===s||null===s&&c&&o,u="R"===s||null===s&&c&&l,f=null===s&&!c,_=this._et("per_line_direction_aria").replace("{line}",t),g=this._et("direction_unavailable"),m=e=>this._perLineDirectionLabel(p,t,e);return F`
+                  ${c.map(t=>{const i=ot(t,r,n),o=d[t]??null,a=(e=>{const t=new Set;for(const i of p)i.line===e&&("H"!==i.direction&&"R"!==i.direction||t.add(i.direction));return t})(t),s=a.has("H"),l=a.has("R"),c=1===a.size,h="H"===o||null===o&&c&&s,u="R"===o||null===o&&c&&l,f=null===o&&!c,_=this._et("per_line_direction_aria").replace("{line}",t),g=this._et("direction_unavailable"),m=e=>this._perLineDirectionLabel(p,t,e);return B`
                       <div class="per-line-dir-row" role="group" aria-label=${_}>
-                        <span class="per-line-dir-badge" style=${xe({background:i})}>${t}</span>
+                        <span class="per-line-dir-badge" style=${$e({background:i})}>${t}</span>
                         <div class="direction-buttons">
                           <button
                             type="button"
-                            class=${ve({active:h})}
+                            class=${we({active:h})}
                             aria-pressed=${h?"true":"false"}
-                            ?disabled=${!o}
-                            title=${o?"":g}
-                            @click=${()=>o&&this._setLineDirection(e.entity,t,"H")}
+                            ?disabled=${!s}
+                            title=${s?"":g}
+                            @click=${()=>s&&this._setLineDirection(e.entity,t,"H")}
                           >${m("H")}</button>
                           <button
                             type="button"
-                            class=${ve({active:u})}
+                            class=${we({active:u})}
                             aria-pressed=${u?"true":"false"}
                             ?disabled=${!l}
                             title=${l?"":g}
@@ -1145,7 +1195,7 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
                           >${m("R")}</button>
                           <button
                             type="button"
-                            class=${ve({active:f})}
+                            class=${we({active:f})}
                             aria-pressed=${f?"true":"false"}
                             ?disabled=${c}
                             title=${c?g:""}
@@ -1156,19 +1206,19 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
                     `})}
                 </div>
               </div>
-            `:K}
+            `:W}
 
         ${this._renderWalkTimes(e,u,l,d)}
       </div>
-    `}_renderWalkTimes(e,t,i,r){const n=this._config.line_colors,s=this._attrs(e.entity),a=s?.line_colors??{},o=function(e){const t=new Map;for(const i of e?.departures??[]){const e=String(i.direction??""),r=at(i.line,e);let n=t.get(r);n||(n={line:i.line,direction:e,type:i.type,termini:[]},t.set(r,n)),i.towards&&!n.termini.includes(i.towards)&&n.termini.push(i.towards)}const i=Array.from(t.values());return i.sort((e,t)=>e.line===t.line?e.direction.localeCompare(t.direction):e.line.localeCompare(t.line)),i}(s),l=new Set(e.lines??[]),d=o.filter(e=>{if(l.size>0&&!l.has(e.line))return!1;const t=r[e.line]??i;return!t||e.direction===t});return d.length?F`
+    `}_renderWalkTimes(e,t,i,r){const n=this._config.line_colors,o=this._attrs(e.entity),a=o?.line_colors??{},s=function(e){const t=new Map;for(const i of e?.departures??[]){const e=String(i.direction??""),r=dt(i.line,e);let n=t.get(r);n||(n={line:i.line,direction:e,type:i.type,termini:[]},t.set(r,n)),i.towards&&!n.termini.includes(i.towards)&&n.termini.push(i.towards)}const i=Array.from(t.values());return i.sort((e,t)=>e.line===t.line?e.direction.localeCompare(t.direction):e.line.localeCompare(t.line)),i}(o),l=new Set(e.lines??[]),d=s.filter(e=>{if(l.size>0&&!l.has(e.line))return!1;const t=r[e.line]??i;return!t||e.direction===t});return d.length?B`
       <div class="stop-filter-row">
         <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
         <div class="editor-hint">${this._et("walk_time_hint")}</div>
         <div class="walk-time-list">
-          ${d.map(t=>{const i=it(t.line,n,a),r=at(t.line,t.direction),s=e.walk_times?.[r],o=t.termini.join(" / "),l=o?`→ ${o}`:"",d=t.termini.length>1?this._et("walk_time_branching_hint"):"";return F`
+          ${d.map(t=>{const i=ot(t.line,n,a),r=dt(t.line,t.direction),o=e.walk_times?.[r],s=t.termini.join(" / "),l=s?`→ ${s}`:"",d=t.termini.length>1?this._et("walk_time_branching_hint"):"";return B`
               <div class="walk-time-row">
-                <span class="walk-time-badge" style=${xe({background:i})}>${t.line}</span>
-                <span class="walk-time-towards" title=${d||o}>${l}</span>
+                <span class="walk-time-badge" style=${$e({background:i})}>${t.line}</span>
+                <span class="walk-time-towards" title=${d||s}>${l}</span>
                 <input
                   type="number"
                   class="walk-time-input"
@@ -1177,8 +1227,8 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
                   step="1"
                   inputmode="numeric"
                   placeholder=${this._et("walk_time_placeholder")}
-                  aria-label=${this._et("walk_time_aria").replace("{line}",t.line).replace("{towards}",o)}
-                  .value=${void 0!==s?String(s):""}
+                  aria-label=${this._et("walk_time_aria").replace("{line}",t.line).replace("{towards}",s)}
+                  .value=${void 0!==o?String(o):""}
                   @keydown=${this._swallowKeys}
                   @keyup=${this._swallowKeys}
                   @keypress=${this._swallowKeys}
@@ -1188,13 +1238,13 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
             `})}
         </div>
       </div>
-    `:K}_renderColorsSection(){const e=this._config,t=function(e,t){const i=new Set;for(const r of t){const t=e?.states?.[r]?.attributes;for(const e of ot(t))i.add(e)}return Array.from(i).sort()}(this.hass,e.entities.map(e=>e.entity)),i=e.line_colors;let r={};for(const t of e.entities){const e=this.hass?.states?.[t.entity]?.attributes;if(e?.line_colors&&Object.keys(e.line_colors).length){r=e.line_colors;break}}return F`
+    `:W}_renderColorsSection(){const e=this._config,t=function(e,t){const i=new Set;for(const r of t){const t=e?.states?.[r]?.attributes;for(const e of ct(t))i.add(e)}return Array.from(i).sort()}(this.hass,e.entities.map(e=>e.entity)),i=e.line_colors;let r={};for(const t of e.entities){const e=this.hass?.states?.[t.entity]?.attributes;if(e?.line_colors&&Object.keys(e.line_colors).length){r=e.line_colors;break}}return B`
       <div class="editor-section">
         <div class="section-header">${this._et("section_colors")}</div>
         <div class="editor-hint">${this._et("colors_hint")}</div>
-        ${t.length?t.map(e=>{const t=it(e,i,r,"#888888"),n=t.startsWith("#")?t:"#888888",s=Boolean(i[e.toUpperCase()]),a=this._et("pick_color_for_line").replace("{line}",e);return F`
+        ${t.length?t.map(e=>{const t=ot(e,i,r,"#888888"),n=t.startsWith("#")?t:"#888888",o=Boolean(i[e.toUpperCase()]),a=this._et("pick_color_for_line").replace("{line}",e);return B`
                 <div class="color-row">
-                  <span class="line-preview" aria-hidden="true" style=${xe({background:t})}>${e}</span>
+                  <span class="line-preview" aria-hidden="true" style=${$e({background:t})}>${e}</span>
                   <label
                     class="color-swatch"
                     style=${`--swatch-color: ${n};`}
@@ -1214,13 +1264,13 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
                   <button
                     type="button"
                     class="reset-btn"
-                    ?disabled=${!s}
-                    @click=${()=>s&&this._resetLineColor(e)}
+                    ?disabled=${!o}
+                    @click=${()=>o&&this._resetLineColor(e)}
                   >${this._et("reset_color")}</button>
                 </div>
-              `}):F`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
+              `}):B`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
       </div>
-    `}static{this.styles=[ht,a`
+    `}static{this.styles=[ft,a`
     .stop-filter {
       background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
       border-radius: 12px;
@@ -1398,91 +1448,101 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
       opacity: 0.4;
       cursor: not-allowed;
     }
-  `]}};function ut(e,t){return e?F`<span lang="de">${e}</span>`:t??""}function ft(e){return e===Ue?"platform_short_rail":"platform_short_bus"}function _t(e,t){if(!e||!t)return{};const i=e.states[t]?.attributes;return i?.line_colors??{}}e([pe({attribute:!1})],pt.prototype,"hass",void 0),e([ue()],pt.prototype,"_config",void 0),pt=e([de("wiener-linien-austria-card-editor")],pt),console.info(`%c WIENER-LINIEN-AUSTRIA-CARD %c ${Se} `,"color: white; background: #E3000F; font-weight: 700;","color: #E3000F; background: white; font-weight: 700;"),window.customCards=window.customCards??[],window.customCards.push({type:"wiener-linien-austria-card",name:"Wiener Linien Austria",description:"Abfahrtsmonitor mit Störungen und Aufzugsinfo",preview:!0});let gt=class extends oe{constructor(){super(...arguments),this._activeTab=0,this._versionMismatch=null,this._expandedTraffic=new Set,this._expandedElevator=new Set,this._expandedRows=new Set,this._expandedTransfers=new Set,this._debugTraffic=[],this._debugElevator=[],this._versionCheckDone=!1,this._devTestTraffic=()=>{const e=this._resolveStops(),t=[];for(const i of e)for(const e of this._attrs(i.entity).departures??[])e.line&&e.towards&&t.push(e);const i=this._randomFrom(t),r=i?.line||"U?",n=i?.towards||"Unbekannt",s=new Date;this._debugTraffic=[...this._debugTraffic,{name:`DEBUG-T-${Date.now()}`,title:`${r}: Testmeldung`,description:`Debug-Eintrag für Linie ${r} Richtung ${n}.`,description_html:`Debug-Eintrag für Linie ${r} Richtung ${n}.<br><br>Grund: Dev-Mode-Test.`,location:"Debug-Stelle",related_lines:[r],time_start:new Date(s.getTime()-18e5).toISOString(),time_end:new Date(s.getTime()+108e5).toISOString(),time_created:new Date(s.getTime()-18e5).toISOString(),time_last_update:s.toISOString(),status:"active"}]},this._devTestElevator=()=>{const e=this._resolveStops(),t=this._randomFrom(e);if(!t)return;const i=this._attrs(t.entity),r=i.stop_name||t.entity,n=i.departures??[],s=this._randomFrom(n)?.line||"",a=this._randomFrom(n)?.towards||"Unbekannt",o=new Date;this._debugElevator=[...this._debugElevator,{__debug_entity:t.entity,name:`DEBUG-E-${Date.now()}`,station:r,description:`${s||"Station"} Bahnsteig Richtung ${a} — Ausgang ${r}`,reason:"AUFZUGSERNEUERUNG Voraussichtlich bis Ende Mai außer Betrieb! (Dev-Mode-Test)",status:"außer Betrieb",related_lines:s?[s]:[],time_start:new Date(o.getTime()-27e5).toISOString(),time_end:new Date(o.getTime()+144e5).toISOString()}]},this._devClear=()=>{this._debugTraffic=[],this._debugElevator=[]}}setConfig(e){if(!e||"object"!=typeof e)throw new Error("wiener-linien-austria-card: config must be an object");const t=Array.isArray(e.entities),i="string"==typeof e.entity;if(!t&&!i)throw new Error("wiener-linien-austria-card: 'entities' (array) or legacy 'entity' (string) is required");this._config=tt(e)}getCardSize(){const e=this._config?.entities.length??1;return Math.min(12,3+3*e)}getGridOptions(){return{columns:12,rows:"auto",min_columns:6,min_rows:3}}static getConfigElement(){return document.createElement("wiener-linien-austria-card-editor")}static getStubConfig(e){const t=nt(e);return{entities:t.length?[t[0]]:[],max_departures:6}}connectedCallback(){super.connectedCallback(),!this._versionCheckDone&&this.hass?.callWS&&(this._versionCheckDone=!0,this._checkCardVersion())}willUpdate(e){if(this._config&&(e.has("_config")||e.has("hass"))){const e=this._resolveStops();e.length&&this._activeTab>=e.length&&(this._activeTab=0)}}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config")||e.has("_activeTab")||e.has("_versionMismatch")||e.has("_expandedTraffic")||e.has("_expandedElevator")||e.has("_expandedRows")||e.has("_expandedTransfers")||e.has("_debugTraffic")||e.has("_debugElevator"))return!0;const t=e.get("hass");if(!t||!this.hass)return!0;const i=this._resolveStops().map(e=>e.entity);return i.some(e=>t.states[e]!==this.hass.states[e])}_lang(){return this.hass?.language?.startsWith("de")?"de":"en"}_t(e,t){return Me(`modern.${e}`,{hassLanguage:this.hass?.language},t)}async _checkCardVersion(){this._versionMismatch=await async function(e,t,i){if(!e?.callWS)return null;try{const r=await e.callWS({type:t});if(r?.version&&r.version!==i)return r.version}catch{}return null}(this.hass,"wiener_linien_austria/card_version",Se)}_resolveStops(){const e=(this._config?.entities??[]).filter(e=>this.hass?.states?.[e.entity]);if(e.length)return e;const t=nt(this.hass)[0];return t?[{entity:t}]:[]}_attrs(e){return this.hass?.states?.[e]?.attributes??{}}render(){if(!this._config)return K;if(!this.hass)return F`<ha-card><div class="wrap"></div></ha-card>`;const e=this._config,t=this._resolveStops(),i="tabs"===e.layout&&t.length>=2,r=e.hide_attribution?"":t.map(e=>this._attrs(e.entity).attribution).find(e=>"string"==typeof e&&e.length>0)||"Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";return F`
+  `]}};e([pe({attribute:!1})],_t.prototype,"hass",void 0),e([ue()],_t.prototype,"_config",void 0),_t=e([de("wiener-linien-austria-card-editor")],_t);{const e=window;e.customCards=e.customCards??[],e.customCards.some(e=>"wiener-linien-austria-card"===e.type)||e.customCards.push({type:"wiener-linien-austria-card",name:"Wiener Linien Austria",description:"Abfahrtsmonitor mit Störungen und Aufzugsinfo",preview:!0})}function gt(e,t){return e?B`<span lang="de">${e}</span>`:t??""}function mt(e){return e===je?"platform_short_rail":"platform_short_bus"}function bt(e,t){if(!e||!t)return{};const i=e.states[t]?.attributes;return i?.line_colors??{}}let vt=class extends se{constructor(){super(...arguments),this._activeTab=0,this._versionMismatch=null,this._expandedTraffic=new Set,this._expandedElevator=new Set,this._expandedRows=new Set,this._expandedTransfers=new Set,this._debugTraffic=[],this._debugElevator=[],this._qrOpenFor=null,this._versionCheckDone=!1,this._devTestTraffic=()=>{const e=this._resolveStops(),t=[];for(const i of e)for(const e of this._attrs(i.entity).departures??[])e.line&&e.towards&&t.push(e);const i=this._randomFrom(t),r=i?.line||"U?",n=i?.towards||"Unbekannt",o=new Date;this._debugTraffic=[...this._debugTraffic,{name:`DEBUG-T-${Date.now()}`,title:`${r}: Testmeldung`,description:`Debug-Eintrag für Linie ${r} Richtung ${n}.`,description_html:`Debug-Eintrag für Linie ${r} Richtung ${n}.<br><br>Grund: Dev-Mode-Test.`,location:"Debug-Stelle",related_lines:[r],time_start:new Date(o.getTime()-18e5).toISOString(),time_end:new Date(o.getTime()+108e5).toISOString(),time_created:new Date(o.getTime()-18e5).toISOString(),time_last_update:o.toISOString(),status:"active"}]},this._devTestElevator=()=>{const e=this._resolveStops(),t=this._randomFrom(e);if(!t)return;const i=this._attrs(t.entity),r=i.stop_name||t.entity,n=i.departures??[],o=this._randomFrom(n)?.line||"",a=this._randomFrom(n)?.towards||"Unbekannt",s=new Date;this._debugElevator=[...this._debugElevator,{__debug_entity:t.entity,name:`DEBUG-E-${Date.now()}`,station:r,description:`${o||"Station"} Bahnsteig Richtung ${a} — Ausgang ${r}`,reason:"AUFZUGSERNEUERUNG Voraussichtlich bis Ende Mai außer Betrieb! (Dev-Mode-Test)",status:"außer Betrieb",related_lines:o?[o]:[],time_start:new Date(s.getTime()-27e5).toISOString(),time_end:new Date(s.getTime()+144e5).toISOString()}]},this._devClear=()=>{this._debugTraffic=[],this._debugElevator=[]}}setConfig(e){if(!e||"object"!=typeof e)throw new Error("wiener-linien-austria-card: config must be an object");const t=Array.isArray(e.entities),i="string"==typeof e.entity;if(!t&&!i)throw new Error("wiener-linien-austria-card: 'entities' (array) or legacy 'entity' (string) is required");this._config=nt(e)}getCardSize(){const e=this._config?.entities.length??1;return Math.min(12,3+3*e)}getGridOptions(){return{columns:12,rows:"auto",min_columns:6,min_rows:3}}static getConfigElement(){return document.createElement("wiener-linien-austria-card-editor")}static getStubConfig(e){const t=st(e);return{entities:t.length?[t[0]]:[],max_departures:6}}connectedCallback(){super.connectedCallback(),!this._versionCheckDone&&this.hass?.callWS&&(this._versionCheckDone=!0,this._checkCardVersion())}willUpdate(e){if(this._config&&(e.has("_config")||e.has("hass"))){const e=this._resolveStops();if(e.length&&this._activeTab>=e.length&&(this._activeTab=0),this._qrOpenFor){const t=new Set(e.map(e=>e.entity));t.has(this._qrOpenFor)||(this._qrOpenFor=null)}}}updated(e){if(e.has("_qrOpenFor")&&this._qrOpenFor){const e=this.renderRoot.querySelector(".qr-panel.expanded .qr-canvas");if(!e)return;const t=e.getAttribute("data-qr-text")??"",i=e.getAttribute("data-qr-rendered-for")??"";t&&t!==i&&(this._renderTintedQr(e),e.setAttribute("data-qr-rendered-for",t))}}_renderTintedQr(e){const t=e.closest(".station"),i=t&&getComputedStyle(t).getPropertyValue("--wl-accent").trim()||"#000";for(;e.firstChild;)e.removeChild(e.firstChild);Se.render({text:e.getAttribute("data-qr-text")??"",radius:0,ecLevel:"H",fill:i,background:"#fff",size:220},e);const r=e.querySelector("canvas");if(!(r instanceof HTMLCanvasElement))return;const n=r.getContext("2d");if(!n)return;const o=e.getAttribute("data-qr-icon")??"mdi:bus-stop",a=this._mdiPathFor(o);if(!a)return;const s=r.width,l=r.height,d=Math.round(.22*s),c=Math.round((s-d)/2),h=Math.round((l-d)/2),p=Math.round(.18*d),u=c-p,f=h-p,_=d+2*p,g=Math.round(.2*d);n.fillStyle="#fff","function"==typeof n.roundRect?(n.beginPath(),n.roundRect(u,f,_,_,g),n.fill()):n.fillRect(u,f,_,_),n.save(),n.translate(c,h),n.scale(d/24,d/24),n.fillStyle=i,n.fill(new Path2D(a)),n.restore()}_mdiPathFor(e){switch(e){case"mdi:subway-variant":return"M18,11H13V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M11,11H6V6H11M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M12,2C7.58,2 4,2.5 4,6V15.5A3.5,3.5 0 0,0 7.5,19L6,20.5V21H18V20.5L16.5,19A3.5,3.5 0 0,0 20,15.5V6C20,2.5 16.42,2 12,2Z";case"mdi:tram":return"M19,16.94V8.5C19,5.71 16.39,5.1 13,5L13.75,3.5H17V2H7V3.5H11.75L11,5C7.86,5.11 5,5.73 5,8.5V16.94C5,18.39 6.19,19.6 7.59,19.91L6,21.5V22H8.23L10.23,20H14L16,22H18V21.5L16.5,20H16.42C18.11,20 19,18.63 19,16.94M12,18.5A1.5,1.5 0 0,1 10.5,17A1.5,1.5 0 0,1 12,15.5A1.5,1.5 0 0,1 13.5,17A1.5,1.5 0 0,1 12,18.5M17,14H7V9H17V14Z";case"mdi:bus":return"M18,11H6V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16Z";default:return"M22 7V16C22 16.71 21.62 17.36 21 17.72V19.25C21 19.66 20.66 20 20.25 20H19.75C19.34 20 19 19.66 19 19.25V18H12V19.25C12 19.66 11.66 20 11.25 20H10.75C10.34 20 10 19.66 10 19.25V17.72C9.39 17.36 9 16.71 9 16V7C9 4 12 4 15.5 4S22 4 22 7M13 15C13 14.45 12.55 14 12 14S11 14.45 11 15 11.45 16 12 16 13 15.55 13 15M20 15C20 14.45 19.55 14 19 14S18 14.45 18 15 18.45 16 19 16 20 15.55 20 15M20 7H11V11H20V7M7 9.5C6.97 8.12 5.83 7 4.45 7.05C3.07 7.08 1.97 8.22 2 9.6C2.03 10.77 2.86 11.77 4 12V20H5V12C6.18 11.76 7 10.71 7 9.5Z"}}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config")||e.has("_activeTab")||e.has("_versionMismatch")||e.has("_expandedTraffic")||e.has("_expandedElevator")||e.has("_expandedRows")||e.has("_expandedTransfers")||e.has("_qrOpenFor")||e.has("_debugTraffic")||e.has("_debugElevator"))return!0;const t=e.get("hass");if(!t||!this.hass)return!0;const i=this._resolveStops().map(e=>e.entity);return i.some(e=>t.states[e]!==this.hass.states[e])}_lang(){return this.hass?.language?.startsWith("de")?"de":"en"}_t(e,t){return Ne(`modern.${e}`,{hassLanguage:this.hass?.language},t)}async _checkCardVersion(){this._versionMismatch=await async function(e,t,i){if(!e?.callWS)return null;try{const r=await e.callWS({type:t});if(r?.version&&r.version!==i)return r.version}catch{}return null}(this.hass,"wiener_linien_austria/card_version","1.4.1")}_resolveStops(){const e=(this._config?.entities??[]).filter(e=>this.hass?.states?.[e.entity]);if(e.length)return e;const t=st(this.hass)[0];return t?[{entity:t}]:[]}_attrs(e){return this.hass?.states?.[e]?.attributes??{}}render(){if(!this._config)return W;if(!this.hass)return B`<ha-card><div class="wrap"></div></ha-card>`;const e=this._config,t=this._resolveStops(),i="tabs"===e.layout&&t.length>=2,r=e.hide_attribution?"":t.map(e=>this._attrs(e.entity).attribution).find(e=>"string"==typeof e&&e.length>0)||"Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";return B`
       <ha-card>
-        ${i?this._renderTabs(t,this._activeTab):K}
+        ${i?this._renderTabs(t,this._activeTab):W}
         <div class="wrap">
-          ${Oe(this._versionMismatch,e=>this._t(e))}
-          ${e.show_traffic_info?this._renderTrafficBanner(t):K}
+          ${qe(this._versionMismatch,e=>this._t(e))}
+          ${e.show_traffic_info?this._renderTrafficBanner(t):W}
           ${this._renderBody(t,i)}
           ${this._renderFooter(r)}
         </div>
       </ha-card>
-    `}_renderFooter(e){const t=this._isDevMode();return e||t?F`
-      ${e?F`<div class="foot">
+    `}_renderFooter(e){const t=this._isDevMode();return e||t?B`
+      ${e?B`<div class="foot">
             <span class="timestamp">${e}</span>
-          </div>`:K}
-      ${t?this._renderDevModePanel():K}
-    `:K}_renderBody(e,t){if(!e.length)return this._renderEmpty();if(t){const t=e[this._activeTab]??e[0];return F`${this._renderStop(t,this._activeTab)}`}return F`${e.map(e=>this._renderStop(e))}`}_renderEmpty(){const e=nt(this.hass).length?"no_entities_picked":"no_entities_available";return F`<div class="empty" role="status" aria-live="polite">${this._t(e)}</div>`}_renderTabs(e,t){return F`
+          </div>`:W}
+      ${t?this._renderDevModePanel():W}
+    `:W}_renderBody(e,t){if(!e.length)return this._renderEmpty();if(t){const t=e[this._activeTab]??e[0];return B`${this._renderStop(t,this._activeTab)}`}return B`${e.map(e=>this._renderStop(e))}`}_renderEmpty(){const e=st(this.hass).length?"no_entities_picked":"no_entities_available";return B`<div class="empty" role="status" aria-live="polite">${this._t(e)}</div>`}_renderTabs(e,t){return B`
       <div class="tabs" role="tablist">
-        ${e.map((i,r)=>{const n=this._attrs(i.entity),s=n.stop_name||n.friendly_name||i.entity,a=r===t;return F`<button
+        ${e.map((i,r)=>{const n=this._attrs(i.entity),o=n.stop_name||n.friendly_name||i.entity,a=r===t;return B`<button
             type="button"
             role="tab"
             id=${`wl-tab-${r}`}
             aria-controls=${`wl-tabpanel-${r}`}
-            class=${ve({tab:!0,active:r===t})}
+            class=${we({tab:!0,active:r===t})}
             aria-selected=${a?"true":"false"}
             tabindex=${a?"0":"-1"}
             @click=${()=>this._setActiveTab(r)}
             @keydown=${t=>this._onTabKeydown(t,r,e.length)}
-          >${s}</button>`})}
+          >${o}</button>`})}
       </div>
-    `}_setActiveTab(e){Number.isFinite(e)&&e!==this._activeTab&&(this._activeTab=e)}_onTabKeydown(e,t,i){let r=t;switch(e.key){case"ArrowRight":r=(t+1)%i;break;case"ArrowLeft":r=(t-1+i)%i;break;case"Home":r=0;break;case"End":r=i-1;break;default:return}e.preventDefault(),this._setActiveTab(r),this.updateComplete.then(()=>{const e=this.shadowRoot?.querySelectorAll('.tabs [role="tab"]');e?.[r]?.focus()})}_renderStop(e,t){const i=this._attrs(e.entity),r=i.stop_name||i.friendly_name,n=r||e.entity,s=function(e,t){const{lines:i,direction:r,line_directions:n,walk_times:s,accessibility_only:a}=t,o=i&&i.length?new Set(i):null;return e.filter(e=>{if(o&&!o.has(e.line))return!1;const t=n?.[e.line]??r;if(t&&e.direction!==t)return!1;if(s){const t=s[at(e.line,String(e.direction??""))];if("number"==typeof t&&e.countdown<t)return!1}return!(a&&!e.barrier_free)})}(Array.isArray(i.departures)?i.departures:[],{...e,accessibility_only:this._config.accessibility_only}),a=Array.isArray(i.elevator_info)?i.elevator_info:[],o=this._debugElevator.filter(t=>t.__debug_entity===e.entity),l=[...a,...o],d=this._config.show_elevator_info&&l.length>0,c=this._stopMapUrl(n,i.latitude,i.longitude),h=this._t("open_in_maps"),p=this._computeHeroGroup(s),u=p[0],f=this._config.show_hero_metric?new Set(p):new Set,_=s.filter(e=>!f.has(e)),g=_.slice(0,this._config.max_departures),m=_t(this.hass,e.entity),b=u?it(u.line||"",this._config.line_colors,m):"var(--primary-color)",w=(v=u?.type,je(v)??"mdi:bus-stop");var v;const y=u&&Number.isFinite(u.countdown)?u.countdown:null,$=null===y?"—":y<=0?this._t("now"):String(y),x=null!==y&&y>0?this._t("min"):"",k=void 0!==t;return F`
+    `}_setActiveTab(e){if(!Number.isFinite(e)||e===this._activeTab)return;const t=this._resolveStops(),i=t[this._activeTab]?.entity,r=t[e]?.entity;i&&r&&this._qrOpenFor===i&&(this._qrOpenFor=r),this._activeTab=e}_onTabKeydown(e,t,i){let r=t;switch(e.key){case"ArrowRight":r=(t+1)%i;break;case"ArrowLeft":r=(t-1+i)%i;break;case"Home":r=0;break;case"End":r=i-1;break;default:return}e.preventDefault(),this._setActiveTab(r),this.updateComplete.then(()=>{const e=this.shadowRoot?.querySelectorAll('.tabs [role="tab"]');e?.[r]?.focus()})}_renderStop(e,t){const i=this._attrs(e.entity),r=i.stop_name||i.friendly_name,n=r||e.entity,o=function(e,t){const{lines:i,direction:r,line_directions:n,walk_times:o,accessibility_only:a}=t,s=i&&i.length?new Set(i):null;return e.filter(e=>{if(s&&!s.has(e.line))return!1;const t=n?.[e.line]??r;if(t&&e.direction!==t)return!1;if(o){const t=o[dt(e.line,String(e.direction??""))];if("number"==typeof t&&e.countdown<t)return!1}return!(a&&!e.barrier_free)})}(Array.isArray(i.departures)?i.departures:[],{...e,accessibility_only:this._config.accessibility_only}),a=Array.isArray(i.elevator_info)?i.elevator_info:[],s=this._debugElevator.filter(t=>t.__debug_entity===e.entity),l=[...a,...s],d=this._config.show_elevator_info&&l.length>0,c=this._stopMapUrl(n,i.latitude,i.longitude),h=this._stopGeoUri(n,i.latitude,i.longitude)??c,p=!1!==this._config.show_qr_button&&null!==h,u=this._t("open_in_maps"),f=this._t("qr_open"),_=this._computeHeroGroup(o),g=_[0],m=this._config.show_hero_metric?new Set(_):new Set,b=o.filter(e=>!m.has(e)),v=b.slice(0,this._config.max_departures),w=bt(this.hass,e.entity),y=g?ot(g.line||"",this._config.line_colors,w):"var(--primary-color)",x=($=g?.type,Fe($)??"mdi:bus-stop");var $;const k=g&&Number.isFinite(g.countdown)?g.countdown:null,A=null===k?"—":k<=0?this._t("now"):String(k),S=null!==k&&k>0?this._t("min"):"",z=void 0!==t;return B`
       <section
         class="station"
-        style="--wl-accent: ${b};"
-        id=${k?`wl-tabpanel-${t}`:K}
-        role=${k?"tabpanel":K}
-        aria-labelledby=${k?`wl-tab-${t}`:K}
-        tabindex=${k?"0":K}
+        style="--wl-accent: ${y};"
+        id=${z?`wl-tabpanel-${t}`:W}
+        role=${z?"tabpanel":W}
+        aria-labelledby=${z?`wl-tab-${t}`:W}
+        tabindex=${z?"0":W}
         aria-label=${n}
       >
-        ${this._config.hide_header?K:F`<header class="head">
+        ${this._config.hide_header?W:B`<header class="head">
               <span class="icon-tile" aria-hidden="true">
-                <ha-icon icon=${w}></ha-icon>
+                <ha-icon icon=${x}></ha-icon>
               </span>
               <div class="title-block">
-                <h3 class="title">${ut(r,e.entity)}</h3>
-                ${u?.line?F`<p class="subtitle">${ut(u.towards)}</p>`:K}
+                <h3 class="title">${gt(r,e.entity)}</h3>
+                ${g?.line?B`<p class="subtitle">${gt(g.towards)}</p>`:W}
               </div>
-              ${c?F`<div class="head-actions">
-                    <a
-                      class="icon-action"
-                      href=${c}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title=${h}
-                      aria-label="${h}: ${n}"
-                    ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>
-                  </div>`:K}
+              ${c||p?B`<div class="head-actions">
+                    ${p?B`<button
+                          type="button"
+                          class=${we({"icon-action":!0,"qr-toggle":!0,expanded:this._qrOpenFor===e.entity})}
+                          title=${f}
+                          aria-label="${f}: ${n}"
+                          aria-expanded=${this._qrOpenFor===e.entity?"true":"false"}
+                          aria-controls="wl-qr-${e.entity.replace(/[^a-z0-9_]/gi,"_")}"
+                          @click=${()=>this._toggleQrFor(e.entity)}
+                        ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`:W}
+                    ${c?B`<a
+                          class="icon-action"
+                          href=${c}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title=${u}
+                          aria-label="${u}: ${n}"
+                        ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`:W}
+                  </div>`:W}
             </header>`}
+        ${p&&h?this._renderQrPanel(e.entity,n,h,x,this._qrOpenFor===e.entity):W}
 
-        ${this._config.show_hero_metric&&u?F`<div class="hero-host">
+        ${this._config.show_hero_metric&&g?B`<div class="hero-host">
               <div class="hero">
                 <div class="hero-time" aria-live="polite" aria-atomic="true">
-                  <span class="hero-min">${$}</span>
-                  ${x?F`<span class="hero-unit">${x}</span>`:K}
+                  <span class="hero-min">${A}</span>
+                  ${S?B`<span class="hero-unit">${S}</span>`:W}
                 </div>
-                ${p.flatMap(t=>[this._renderHeroEntry(t,e.entity),this._renderHeroPanelForEntry(t,e.entity)])}
+                ${_.flatMap(t=>[this._renderHeroEntry(t,e.entity),this._renderHeroPanelForEntry(t,e.entity)])}
               </div>
-            </div>`:K}
-        ${d?this._renderElevatorDetails(l):K}
-        ${this._config.show_departures&&this._config.max_departures>0?g.length?F`<ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
-                ${g.map(t=>this._renderRow(t,e.entity))}
-              </ul>`:F`<div class="empty" role="status" aria-live="polite">
+            </div>`:W}
+        ${d?this._renderElevatorDetails(l):W}
+        ${this._config.show_departures&&this._config.max_departures>0?v.length?B`<ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
+                ${v.map(t=>this._renderRow(t,e.entity))}
+              </ul>`:B`<div class="empty" role="status" aria-live="polite">
                 ${this._t(i.server_time?"betriebsschluss":"no_data")}
-              </div>`:K}
+              </div>`:W}
       </section>
-    `}_renderElevatorDetails(e){return F`
+    `}_renderElevatorDetails(e){return B`
       <div class="alert-list">
         ${e.map(e=>this._renderElevatorDetail(e))}
       </div>
-    `}_renderElevatorDetail(e){const t=e.description||e.station||"",i=e.reason||"",r=ct(e.time_end,this._lang()),n=Boolean(i||r),s=this._expandedElevator.has(e.name);return F`
+    `}_renderElevatorDetail(e){const t=e.description||e.station||"",i=e.reason||"",r=ut(e.time_end,this._lang()),n=Boolean(i||r),o=this._expandedElevator.has(e.name);return B`
       <div
-        class=${ve({alert:!0,expanded:s,"no-detail":!n})}
+        class=${we({alert:!0,expanded:o,"no-detail":!n})}
         role=${n?"button":"group"}
         tabindex=${n?"0":"-1"}
-        aria-expanded=${n?s?"true":"false":K}
+        aria-expanded=${n?o?"true":"false":W}
         aria-label=${t}
         @click=${()=>n&&this._toggleElevator(e.name)}
         @keydown=${t=>this._onExpanderKeydown(t,n,()=>this._toggleElevator(e.name))}
@@ -1490,29 +1550,29 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
         <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
-            <div class="alert-title">${ut(t)}</div>
+            <div class="alert-title">${gt(t)}</div>
           </div>
-          ${n?F`<div class="alert-detail">
+          ${n?B`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${i?F`<div class="alert-desc">${ut(i)}</div>`:K}
-                  ${r?F`<div class="alert-meta">
+                  ${i?B`<div class="alert-desc">${gt(i)}</div>`:W}
+                  ${r?B`<div class="alert-meta">
                         <span>${this._t("elevator_until")} ${r}</span>
-                      </div>`:K}
+                      </div>`:W}
                 </div>
-              </div>`:K}
+              </div>`:W}
         </div>
-        ${n?F`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:K}
+        ${n?B`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:W}
       </div>
-    `}_toggleElevator(e){const t=new Set(this._expandedElevator);t.has(e)?t.delete(e):t.add(e),this._expandedElevator=t}_onExpanderKeydown(e,t,i){t&&("Enter"!==e.key&&" "!==e.key||(e.preventDefault(),i()))}_renderTrafficBanner(e){const t=new Set,i=[];for(const r of e)for(const e of this._attrs(r.entity).traffic_info??[])t.has(e.name)||(t.add(e.name),i.push(e));for(const e of this._debugTraffic)t.has(e.name)||(t.add(e.name),i.push(e));return i.length?F`
+    `}_toggleElevator(e){const t=new Set(this._expandedElevator);t.has(e)?t.delete(e):t.add(e),this._expandedElevator=t}_onExpanderKeydown(e,t,i){t&&("Enter"!==e.key&&" "!==e.key||(e.preventDefault(),i()))}_renderTrafficBanner(e){const t=new Set,i=[];for(const r of e)for(const e of this._attrs(r.entity).traffic_info??[])t.has(e.name)||(t.add(e.name),i.push(e));for(const e of this._debugTraffic)t.has(e.name)||(t.add(e.name),i.push(e));return i.length?B`
       <div class="alert-list">
         ${i.map(e=>this._renderTrafficItem(e))}
       </div>
-    `:K}_renderTrafficItem(e){const t=this._config.line_colors,i=function(e,t){if(!e||!t)return{};for(const i of t.entities){const t=_t(e,i.entity);if(Object.keys(t).length)return t}return{}}(this.hass,this._config),r=Array.isArray(e.related_lines)?e.related_lines:[],n=e.description_html?dt(e.description_html):e.description?dt(e.description):"",s=ct(e.time_end,this._lang()),a=ct(e.time_last_update,this._lang()),o=ct(e.time_created,this._lang()),l=a&&a!==o?a:"",d=Boolean(e.location||s||l),c=Boolean(n||d),h=this._expandedTraffic.has(e.name),p={alert:!0,expanded:h,"no-detail":!c},u=e.title||this._t("traffic_label");return F`
+    `:W}_renderTrafficItem(e){const t=this._config.line_colors,i=function(e,t){if(!e||!t)return{};for(const i of t.entities){const t=bt(e,i.entity);if(Object.keys(t).length)return t}return{}}(this.hass,this._config),r=Array.isArray(e.related_lines)?e.related_lines:[],n=e.description_html?pt(e.description_html):e.description?pt(e.description):"",o=ut(e.time_end,this._lang()),a=ut(e.time_last_update,this._lang()),s=ut(e.time_created,this._lang()),l=a&&a!==s?a:"",d=Boolean(e.location||o||l),c=Boolean(n||d),h=this._expandedTraffic.has(e.name),p={alert:!0,expanded:h,"no-detail":!c},u=e.title||this._t("traffic_label");return B`
       <div
-        class=${ve(p)}
+        class=${we(p)}
         role=${c?"button":"group"}
         tabindex=${c?"0":"-1"}
-        aria-expanded=${c?h?"true":"false":K}
+        aria-expanded=${c?h?"true":"false":W}
         aria-label=${u}
         @click=${()=>c&&this._toggleTraffic(e.name)}
         @keydown=${t=>this._onExpanderKeydown(t,c,()=>this._toggleTraffic(e.name))}
@@ -1520,49 +1580,49 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
         <ha-icon icon="mdi:alert-octagon" aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
-            ${r.length?F`<div class="alert-lines">
-                  ${r.map(e=>F`<span
+            ${r.length?B`<div class="alert-lines">
+                  ${r.map(e=>B`<span
                       class="alert-line-badge"
-                      style=${xe(rt(e,t,i))}
+                      style=${$e(at(e,t,i))}
                     >${e}</span>`)}
-                </div>`:K}
-            <div class="alert-title">${e.title?ut(e.title):this._t("traffic_label")}</div>
+                </div>`:W}
+            <div class="alert-title">${e.title?gt(e.title):this._t("traffic_label")}</div>
           </div>
-          ${c?F`<div class="alert-detail">
+          ${c?B`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${n?F`<div class="alert-desc">${we(n)}</div>`:K}
-                  ${d?F`<div class="alert-meta">
-                        ${e.location?F`<span class="alert-location-chip">
-                              <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>${ut(e.location)}
-                            </span>`:K}
-                        ${s?F`<span>${this._t("traffic_until")} ${s}</span>`:K}
-                        ${l?F`<span>${this._t("traffic_updated")} ${l}</span>`:K}
-                      </div>`:K}
+                  ${n?B`<div class="alert-desc">${ve(n)}</div>`:W}
+                  ${d?B`<div class="alert-meta">
+                        ${e.location?B`<span class="alert-location-chip">
+                              <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>${gt(e.location)}
+                            </span>`:W}
+                        ${o?B`<span>${this._t("traffic_until")} ${o}</span>`:W}
+                        ${l?B`<span>${this._t("traffic_updated")} ${l}</span>`:W}
+                      </div>`:W}
                 </div>
-              </div>`:K}
+              </div>`:W}
         </div>
-        ${c?F`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:K}
+        ${c?B`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:W}
       </div>
-    `}_toggleTraffic(e){const t=new Set(this._expandedTraffic);t.has(e)?t.delete(e):t.add(e),this._expandedTraffic=t}_computeHeroGroup(e){if(0===e.length)return[];const t=e=>Number.isFinite(e.countdown)?e.countdown:Number.POSITIVE_INFINITY;let i=Number.POSITIVE_INFINITY;for(const r of e){const e=t(r);e<i&&(i=e)}if(!Number.isFinite(i)){const t=e[0];return t?[t]:[]}return i<=0?e.filter(e=>t(e)<=0):e.filter(e=>t(e)===i)}_renderHeroEntry(e,t){const i=rt(e.line||"",this._config.line_colors,_t(this.hass,t)),r=this._config.show_platform&&e.platform?String(e.platform):null,n=!!e.barrier_free&&this._config.show_accessibility,s=lt(this._config.show_stops_ahead,e),a=e.time_planned??`cd${e.countdown}`,o=`${t}|${e.line}|${e.direction}|${e.towards??""}|${a}`,l=s&&this._expandedRows.has(o),d=`wl-hero-stopsahead-${t.replace(/[^a-z0-9_]/gi,"_")}-${e.line}-${e.direction}-${e.countdown}`,c=l?"stops_ahead_aria_hide":"stops_ahead_aria_show",h=s?this._t(c,{line:e.line||"?",towards:e.towards||""}):"",p={"hero-entry":!0,expandable:s,expanded:l},u=e.line||"?";return F`
+    `}_toggleTraffic(e){const t=new Set(this._expandedTraffic);t.has(e)?t.delete(e):t.add(e),this._expandedTraffic=t}_computeHeroGroup(e){if(0===e.length)return[];const t=e=>Number.isFinite(e.countdown)?e.countdown:Number.POSITIVE_INFINITY;let i=Number.POSITIVE_INFINITY;for(const r of e){const e=t(r);e<i&&(i=e)}if(!Number.isFinite(i)){const t=e[0];return t?[t]:[]}return i<=0?e.filter(e=>t(e)<=0):e.filter(e=>t(e)===i)}_renderHeroEntry(e,t){const i=at(e.line||"",this._config.line_colors,bt(this.hass,t)),r=this._config.show_platform&&e.platform?String(e.platform):null,n=!!e.barrier_free&&this._config.show_accessibility,o=ht(this._config.show_stops_ahead,e),a=e.time_planned??`cd${e.countdown}`,s=`${t}|${e.line}|${e.direction}|${e.towards??""}|${a}`,l=o&&this._expandedRows.has(s),d=`wl-hero-stopsahead-${t.replace(/[^a-z0-9_]/gi,"_")}-${e.line}-${e.direction}-${e.countdown}`,c=l?"stops_ahead_aria_hide":"stops_ahead_aria_show",h=o?this._t(c,{line:e.line||"?",towards:e.towards||""}):"",p={"hero-entry":!0,expandable:o,expanded:l},u=e.line||"?";return B`
       <div
-        class=${ve(p)}
-        role=${s?"button":K}
-        tabindex=${s?"0":K}
-        aria-expanded=${s?l?"true":"false":K}
-        aria-controls=${s?d:K}
-        aria-label=${s?h:K}
-        @click=${()=>s&&this._toggleRow(o)}
-        @keydown=${e=>this._onExpanderKeydown(e,s,()=>this._toggleRow(o))}
+        class=${we(p)}
+        role=${o?"button":W}
+        tabindex=${o?"0":W}
+        aria-expanded=${o?l?"true":"false":W}
+        aria-controls=${o?d:W}
+        aria-label=${o?h:W}
+        @click=${()=>o&&this._toggleRow(s)}
+        @keydown=${e=>this._onExpanderKeydown(e,o,()=>this._toggleRow(s))}
       >
         <span
           class="line-badge"
-          style=${xe(i)}
+          style=${$e(i)}
         >${u}</span>
-        <span class="hero-direction">${ut(e.towards)}</span>
-        ${r?F`<span class="hero-platform"
-              >${this._t(ft(e.type))} ${r}</span
-            >`:K}
-        ${n?F`<span
+        <span class="hero-direction">${gt(e.towards)}</span>
+        ${r?B`<span class="hero-platform"
+              >${this._t(mt(e.type))} ${r}</span
+            >`:W}
+        ${n?B`<span
               class="hero-a11y"
               role="img"
               aria-label=${this._t("barrier_free_title")}
@@ -1572,16 +1632,16 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
                 icon="mdi:wheelchair-accessibility"
                 aria-hidden="true"
               ></ha-icon>
-            </span>`:K}
-        ${s?F`<ha-icon
+            </span>`:W}
+        ${o?B`<ha-icon
               class="hero-chevron"
               icon="mdi:chevron-down"
               aria-hidden="true"
-            ></ha-icon>`:K}
+            ></ha-icon>`:W}
       </div>
-    `}_renderHeroPanelForEntry(e,t){if(!lt(this._config.show_stops_ahead,e))return K;const i=e.time_planned??`cd${e.countdown}`,r=`${t}|${e.line}|${e.direction}|${e.towards??""}|${i}`,n=this._expandedRows.has(r),s=`wl-hero-stopsahead-${t.replace(/[^a-z0-9_]/gi,"_")}-${e.line}-${e.direction}-${e.countdown}`,a=e.line||"?";return this._renderHeroStopsAheadPanel(e.stops_ahead,s,n,a,r,t)}_renderHeroStopsAheadPanel(e,t,i,r,n,s){const a=this._config.line_colors,o=_t(this.hass,s);return F`
+    `}_renderHeroPanelForEntry(e,t){if(!ht(this._config.show_stops_ahead,e))return W;const i=e.time_planned??`cd${e.countdown}`,r=`${t}|${e.line}|${e.direction}|${e.towards??""}|${i}`,n=this._expandedRows.has(r),o=`wl-hero-stopsahead-${t.replace(/[^a-z0-9_]/gi,"_")}-${e.line}-${e.direction}-${e.countdown}`,a=e.line||"?";return this._renderHeroStopsAheadPanel(e.stops_ahead,o,n,a,r,t)}_renderHeroStopsAheadPanel(e,t,i,r,n,o){const a=this._config.line_colors,s=bt(this.hass,o);return B`
       <div
-        class=${ve({"hero-detail":!0,expanded:i})}
+        class=${we({"hero-detail":!0,expanded:i})}
         id=${t}
         role="region"
         aria-hidden=${i?"false":"true"}
@@ -1589,61 +1649,61 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
         <div class="hero-detail-inner">
           <ol
             class="stops-ahead"
-            style=${xe({"--stops-ahead-line":it(r,a,o)})}
+            style=${$e({"--stops-ahead-line":ot(r,a,s)})}
           >
-            ${e.map((e,t)=>this._renderStopAhead(e,t,n,a,o))}
+            ${e.map((e,t)=>this._renderStopAhead(e,t,n,a,s))}
           </ol>
         </div>
       </div>
-    `}_renderRow(e,t){const i=this._config.line_colors,r=_t(this.hass,t),n=e.line||"?",s=rt(n,i,r),a=Number.isFinite(e.countdown)?e.countdown:null,o=null===a?"—":a<=0?this._t("now"):`${a} ${this._t("min")}`,l=function(e,t){if(!e||!t)return null;const i=Date.parse(e),r=Date.parse(t);return Number.isFinite(i)&&Number.isFinite(r)?Math.round((r-i)/6e4):null}(e.time_planned,e.time_real),d=this._config.show_delay&&null!==l&&l>=1?1===l?this._t("delay_singular"):this._t("delay_plural",{n:l}):"",c=null!==a&&a<=0?"now":null!==l&&l>=1?"late":null!==l&&l<=-1?"early":"",h=this._config.show_accessibility,p=Boolean(e.traffic_jam||h&&e.barrier_free),u=this._config.show_platform&&e.platform?String(e.platform):null,f=this._config.show_type_icon?je(e.type):null,_=lt(this._config.show_stops_ahead,e),g=e.time_planned??`cd${e.countdown}`,m=`${t}|${e.line}|${e.direction}|${e.towards??""}|${g}`,b=_&&this._expandedRows.has(m),w=`wl-stopsahead-${t.replace(/[^a-z0-9_]/gi,"_")}-${e.line}-${e.direction}-${e.countdown}`,v=b?"stops_ahead_aria_hide":"stops_ahead_aria_show",y=_?this._t(v,{line:n,towards:e.towards||""}):"",$=F`
+    `}_renderRow(e,t){const i=this._config.line_colors,r=bt(this.hass,t),n=e.line||"?",o=at(n,i,r),a=Number.isFinite(e.countdown)?e.countdown:null,s=null===a?"—":a<=0?this._t("now"):`${a} ${this._t("min")}`,l=function(e,t){if(!e||!t)return null;const i=Date.parse(e),r=Date.parse(t);return Number.isFinite(i)&&Number.isFinite(r)?Math.round((r-i)/6e4):null}(e.time_planned,e.time_real),d=this._config.show_delay&&null!==l&&l>=1?1===l?this._t("delay_singular"):this._t("delay_plural",{n:l}):"",c=null!==a&&a<=0?"now":null!==l&&l>=1?"late":null!==l&&l<=-1?"early":"",h=this._config.show_accessibility,p=Boolean(e.traffic_jam||h&&e.barrier_free),u=this._config.show_platform&&e.platform?String(e.platform):null,f=this._config.show_type_icon?Fe(e.type):null,_=ht(this._config.show_stops_ahead,e),g=e.time_planned??`cd${e.countdown}`,m=`${t}|${e.line}|${e.direction}|${e.towards??""}|${g}`,b=_&&this._expandedRows.has(m),v=`wl-stopsahead-${t.replace(/[^a-z0-9_]/gi,"_")}-${e.line}-${e.direction}-${e.countdown}`,w=b?"stops_ahead_aria_hide":"stops_ahead_aria_show",y=_?this._t(w,{line:n,towards:e.towards||""}):"",x=B`
       <li
-        class=${ve({"dep-row":!0,expandable:_,expanded:b})}
-        role=${_?"button":K}
-        tabindex=${_?"0":K}
-        aria-expanded=${_?b?"true":"false":K}
-        aria-controls=${_?w:K}
-        aria-label=${_?y:K}
+        class=${we({"dep-row":!0,expandable:_,expanded:b})}
+        role=${_?"button":W}
+        tabindex=${_?"0":W}
+        aria-expanded=${_?b?"true":"false":W}
+        aria-controls=${_?v:W}
+        aria-label=${_?y:W}
         @click=${()=>_&&this._toggleRow(m)}
         @keydown=${e=>this._onExpanderKeydown(e,_,()=>this._toggleRow(m))}
       >
-        <div class="line-badge" style=${xe(s)}>${n}</div>
+        <div class="line-badge" style=${$e(o)}>${n}</div>
         <div class="towards">
-          ${f?F`<ha-icon class="type-icon" icon=${f} aria-hidden="true"></ha-icon>`:K}
+          ${f?B`<ha-icon class="type-icon" icon=${f} aria-hidden="true"></ha-icon>`:W}
           <div class="towards-rows">
-            <span class="towards-name">${ut(e.towards)}</span>${d?F`<span class="delay">${d}</span>`:K}
+            <span class="towards-name">${gt(e.towards)}</span>${d?B`<span class="delay">${d}</span>`:W}
           </div>
         </div>
-        ${u||p?F`<span class="row-end">
-              ${u?F`<span class="row-platform"
-                    >${this._t(ft(e.type))} ${u}</span
-                  >`:K}
-              ${p?F`<span class="row-flags">
-                    ${e.traffic_jam?F`<ha-icon
+        ${u||p?B`<span class="row-end">
+              ${u?B`<span class="row-platform"
+                    >${this._t(mt(e.type))} ${u}</span
+                  >`:W}
+              ${p?B`<span class="row-flags">
+                    ${e.traffic_jam?B`<ha-icon
                           class="disturbance"
                           icon="mdi:alert-circle"
                           role="img"
                           aria-label=${this._t("disturbance_title")}
                           title=${this._t("disturbance_title")}
-                        ></ha-icon>`:K}
-                    ${h&&e.barrier_free?F`<ha-icon
+                        ></ha-icon>`:W}
+                    ${h&&e.barrier_free?B`<ha-icon
                           class="a11y"
                           icon="mdi:wheelchair-accessibility"
                           role="img"
                           aria-label=${this._t("barrier_free_title")}
                           title=${this._t("barrier_free_title")}
-                        ></ha-icon>`:K}
-                  </span>`:K}
-            </span>`:F`<span></span>`}
-        <div class=${ve({countdown:!0,[c]:!!c})}>${o}</div>
-        ${_?F`<ha-icon
+                        ></ha-icon>`:W}
+                  </span>`:W}
+            </span>`:B`<span></span>`}
+        <div class=${we({countdown:!0,[c]:!!c})}>${s}</div>
+        ${_?B`<ha-icon
               class="row-chevron"
               icon="mdi:chevron-down"
               aria-hidden="true"
-            ></ha-icon>`:K}
+            ></ha-icon>`:W}
       </li>
-    `;return _?[$,this._renderStopsAheadPanel(e.stops_ahead,w,b,n,m,t)]:$}_renderStopsAheadPanel(e,t,i,r,n,s){const a=this._config.line_colors,o=_t(this.hass,s);return F`
+    `;return _?[x,this._renderStopsAheadPanel(e.stops_ahead,v,b,n,m,t)]:x}_renderStopsAheadPanel(e,t,i,r,n,o){const a=this._config.line_colors,s=bt(this.hass,o);return B`
       <li
-        class=${ve({"dep-row-detail":!0,expanded:i})}
+        class=${we({"dep-row-detail":!0,expanded:i})}
         id=${t}
         role="region"
         aria-hidden=${i?"false":"true"}
@@ -1651,19 +1711,19 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
         <div class="dep-row-detail-inner">
           <ol
             class="stops-ahead"
-            style=${xe({"--stops-ahead-line":it(r,a,o)})}
+            style=${$e({"--stops-ahead-line":ot(r,a,s)})}
           >
-            ${e.map((e,t)=>this._renderStopAhead(e,t,n,a,o))}
+            ${e.map((e,t)=>this._renderStopAhead(e,t,n,a,s))}
           </ol>
         </div>
       </li>
-    `}_renderStopAhead(e,t,i,r,n){const s=e.lines??[],a=this._isNightlineHour(),o=[],l=[];for(const e of s)/^U\d/.test(e)||a&&/^N\d/.test(e)?o.push(e):l.push(e);const d=`${i}|${t}`,c=this._expandedTransfers.has(d),h={"stops-ahead-stop":!0,terminus:!!e.is_terminus,"transfers-expanded":c},p=o.length?F`<span class="stops-ahead-metros">
-          ${o.map(e=>F`<span
+    `}_renderStopAhead(e,t,i,r,n){const o=e.lines??[],a=this._isNightlineHour(),s=[],l=[];for(const e of o)/^U\d/.test(e)||a&&/^N\d/.test(e)?s.push(e):l.push(e);const d=`${i}|${t}`,c=this._expandedTransfers.has(d),h={"stops-ahead-stop":!0,terminus:!!e.is_terminus,"transfers-expanded":c},p=s.length?B`<span class="stops-ahead-metros">
+          ${s.map(e=>B`<span
               class="stops-ahead-line-chip"
-              style=${xe(rt(e,r,n))}
+              style=${$e(at(e,r,n))}
               >${e}</span
             >`)}
-        </span>`:K,u=l.length?F`<button
+        </span>`:W,u=l.length?B`<button
           type="button"
           class="stops-ahead-other-toggle"
           aria-expanded=${c?"true":"false"}
@@ -1673,30 +1733,54 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
         >
           <span class="stops-ahead-other-count">+${l.length}</span>
           <ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
-        </button>`:K,f=l.length&&c?F`<div class="stops-ahead-others">
-            ${l.map(e=>F`<span
+        </button>`:W,f=l.length&&c?B`<div class="stops-ahead-others">
+            ${l.map(e=>B`<span
                 class="stops-ahead-line-chip stops-ahead-line-chip--other"
-                style=${xe(rt(e,r,n))}
+                style=${$e(at(e,r,n))}
                 >${e}</span
               >`)}
-          </div>`:K,_=l.length>0,g=_?this._t(c?"stops_ahead_other_hide":"stops_ahead_other_show",{count:l.length,stop:e.name}):"";return F`
-      <li class=${ve(h)}>
+          </div>`:W,_=l.length>0,g=_?this._t(c?"stops_ahead_other_hide":"stops_ahead_other_show",{count:l.length,stop:e.name}):"";return B`
+      <li class=${we(h)}>
         <div
           class="stops-ahead-row"
-          role=${_?"button":K}
-          tabindex=${_?"0":K}
-          aria-expanded=${_?c?"true":"false":K}
-          aria-label=${_?g:K}
-          @click=${_?e=>{e.stopPropagation(),this._toggleTransfers(d)}:K}
-          @keydown=${_?e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),e.stopPropagation(),this._toggleTransfers(d))}:K}
+          role=${_?"button":W}
+          tabindex=${_?"0":W}
+          aria-expanded=${_?c?"true":"false":W}
+          aria-label=${_?g:W}
+          @click=${_?e=>{e.stopPropagation(),this._toggleTransfers(d)}:W}
+          @keydown=${_?e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),e.stopPropagation(),this._toggleTransfers(d))}:W}
         >
           <span class="stops-ahead-dot" aria-hidden="true"></span>
-          <span class="stops-ahead-name">${ut(e.name)}</span>
+          <span class="stops-ahead-name">${gt(e.name)}</span>
           ${p} ${u}
         </div>
         ${f}
       </li>
-    `}_toggleTransfers(e){const t=new Set(this._expandedTransfers);t.has(e)?t.delete(e):t.add(e),this._expandedTransfers=t}_isNightlineHour(){const e=new Date,t=60*e.getHours()+e.getMinutes();return t>=1435||t<=315}_toggleRow(e){const t=new Set(this._expandedRows);t.has(e)?t.delete(e):t.add(e),this._expandedRows=t}_stopMapUrl(e,t,i){let r=null;return"number"==typeof t&&"number"==typeof i?r=`https://www.google.com/maps/search/?api=1&query=${t},${i}`:e&&(r=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${e}, Wien`)}`),r?("string"!=typeof(n=r)?"":/^https?:\/\//i.test(n)?n:"")||null:null;var n}_isDevMode(){try{const e=window.location.hostname||"";if("rpi25"===e||e.startsWith("rpi25."))return!0;if((window.location.search||"").includes("wl_debug=1"))return!0}catch{}return!1}_renderDevModePanel(){return this._isDevMode()?F`
+    `}_toggleTransfers(e){const t=new Set(this._expandedTransfers);t.has(e)?t.delete(e):t.add(e),this._expandedTransfers=t}_isNightlineHour(){const e=this.hass?.config?.time_zone||"Europe/Vienna",t=new Intl.DateTimeFormat("en-GB",{timeZone:e,hour:"2-digit",minute:"2-digit",hour12:!1}).formatToParts(new Date),i=Number(t.find(e=>"hour"===e.type)?.value??"0"),r=Number(t.find(e=>"minute"===e.type)?.value??"0"),n=60*i+r;return n>=1435||n<=315}_toggleRow(e){const t=new Set(this._expandedRows);t.has(e)?t.delete(e):t.add(e),this._expandedRows=t}_stopMapUrl(e,t,i){let r=null;return"number"==typeof t&&"number"==typeof i?r=`https://stadtplan.wien.gv.at/#/@${i},${t},17.5,0,0,standard/themes`:e&&(r=`https://www.openstreetmap.org/search?query=${encodeURIComponent(`${e}, Wien`)}`),r?("string"!=typeof(n=r)?"":/^https?:\/\//i.test(n)?n:"")||null:null;var n}_stopGeoUri(e,t,i){if("number"!=typeof t||"number"!=typeof i)return null;return`geo:${t},${i}?q=${t},${i}${e?`(${encodeURIComponent(e)})`:""}`}_toggleQrFor(e){this._qrOpenFor=this._qrOpenFor===e?null:e}_renderQrPanel(e,t,i,r,n){const o=`wl-qr-${e.replace(/[^a-z0-9_]/gi,"_")}`,a=this._t("qr_dialog_title"),s=this._t("qr_dialog_hint");return B`
+      <div
+        class=${we({"qr-panel":!0,expanded:n})}
+        id=${o}
+        role="region"
+        aria-hidden=${n?"false":"true"}
+        aria-label="${a}: ${t}"
+      >
+        <div class="qr-panel-inner">
+          <div
+            class="qr-panel-body"
+            @click=${()=>this._toggleQrFor(e)}
+          >
+            <div
+              class="qr-canvas"
+              role="img"
+              aria-label="${a}: ${t}"
+              data-qr-text=${i}
+              data-qr-icon=${r}
+            ></div>
+            <p class="qr-panel-hint">${s}</p>
+          </div>
+        </div>
+      </div>
+    `}_isDevMode(){try{const e=window.location.hostname||"";if("rpi25"===e||e.startsWith("rpi25."))return!0;if((window.location.search||"").includes("wl_debug=1"))return!0}catch{}return!1}_renderDevModePanel(){return this._isDevMode()?B`
       <div class="dev-strip">
         <span class="dev-strip-label">${this._t("devmode_title")}</span>
         <button type="button" @click=${this._devTestTraffic}>${this._t("devmode_traffic_btn")}</button>
@@ -1705,4 +1789,4 @@ let pt=class extends oe{constructor(){super(...arguments),this._computeLabel=e=>
           ${this._t("devmode_clear_btn")}
         </button>
       </div>
-    `:K}_randomFrom(e){return e.length?e[Math.floor(Math.random()*e.length)]??null:null}static{this.styles=ke}};e([pe({attribute:!1})],gt.prototype,"hass",void 0),e([ue()],gt.prototype,"_config",void 0),e([ue()],gt.prototype,"_activeTab",void 0),e([ue()],gt.prototype,"_versionMismatch",void 0),e([ue()],gt.prototype,"_expandedTraffic",void 0),e([ue()],gt.prototype,"_expandedElevator",void 0),e([ue()],gt.prototype,"_expandedRows",void 0),e([ue()],gt.prototype,"_expandedTransfers",void 0),e([ue()],gt.prototype,"_debugTraffic",void 0),e([ue()],gt.prototype,"_debugElevator",void 0),gt=e([de("wiener-linien-austria-card")],gt);export{gt as WienerLinienAustriaCard};
+    `:W}_randomFrom(e){return e.length?e[Math.floor(Math.random()*e.length)]??null:null}static{this.styles=ze}};e([pe({attribute:!1})],vt.prototype,"hass",void 0),e([ue()],vt.prototype,"_config",void 0),e([ue()],vt.prototype,"_activeTab",void 0),e([ue()],vt.prototype,"_versionMismatch",void 0),e([ue()],vt.prototype,"_expandedTraffic",void 0),e([ue()],vt.prototype,"_expandedElevator",void 0),e([ue()],vt.prototype,"_expandedRows",void 0),e([ue()],vt.prototype,"_expandedTransfers",void 0),e([ue()],vt.prototype,"_debugTraffic",void 0),e([ue()],vt.prototype,"_debugElevator",void 0),e([ue()],vt.prototype,"_qrOpenFor",void 0),vt=e([de("wiener-linien-austria-card")],vt);export{vt as WienerLinienAustriaCard};

@@ -18,7 +18,12 @@ from custom_components.wiener_linien_austria.const import (
     CONF_STOP_NAME,
     DOMAIN,
 )
-from custom_components.wiener_linien_austria.static import Station, StaticCatalogue
+from custom_components.wiener_linien_austria.static import (
+    Station,
+    StaticCatalogue,
+    TripPattern,
+    TripPatternIndex,
+)
 
 pytest_plugins = "pytest_homeassistant_custom_component"
 
@@ -114,7 +119,19 @@ def _load_fixture(name: str) -> dict:
 
 
 def _sample_catalogue() -> StaticCatalogue:
-    """A tiny in-memory catalogue covering Stephansplatz + Schwarzenbergplatz."""
+    """A tiny in-memory catalogue covering a few central Vienna stops.
+
+    Includes Taubstummengasse with U1 in both directions because that
+    line has two terminus variants per direction (Oberlaa and
+    Alaudagasse on R; Leopoldau on H) — the same kind of branching
+    that historically tripped up the trip-pattern matcher and the
+    config-flow line picker. Keeping it in the shared fixture means
+    every test that loads the catalogue exercises that edge case.
+    """
+    # Synthetic RBLs for U1 patterns. RBLs 90011/90012 are at
+    # Taubstummengasse (one per direction), 90013/90014 at the H/R
+    # mid-stops, and 90015/90016/90017 at the three terminus stops:
+    # Leopoldau (H), Oberlaa (R) and Alaudagasse (R short-turn).
     stations = {
         60201012: Station(
             diva=60201012,
@@ -132,9 +149,81 @@ def _sample_catalogue() -> StaticCatalogue:
             latitude=48.2005,
             rbls=[1491],
         ),
+        60201468: Station(
+            diva=60201468,
+            name="Taubstummengasse",
+            municipality="Wien",
+            longitude=16.3711,
+            latitude=48.1953,
+            rbls=[90011, 90012],
+        ),
+        60201470: Station(
+            diva=60201470,
+            name="Leopoldau",
+            municipality="Wien",
+            longitude=16.4660,
+            latitude=48.2613,
+            rbls=[90015],
+        ),
+        60201471: Station(
+            diva=60201471,
+            name="Oberlaa",
+            municipality="Wien",
+            longitude=16.4019,
+            latitude=48.1646,
+            rbls=[90016],
+        ),
+        60201472: Station(
+            diva=60201472,
+            name="Alaudagasse",
+            municipality="Wien",
+            longitude=16.4006,
+            latitude=48.1660,
+            rbls=[90017],
+        ),
     }
+    # U1 trip-pattern set: 1 H-direction pattern (Leopoldau terminus)
+    # plus 2 R-direction patterns (Oberlaa full line + Alaudagasse
+    # short-turn). The matcher uses the towards string to disambiguate
+    # the two R variants — same pattern Wiener Linien runs in real
+    # service when capacity is reduced overnight.
+    u1_line_id = 1
+    trip_patterns = TripPatternIndex(
+        patterns_by_line={
+            u1_line_id: [
+                TripPattern(
+                    line_id=u1_line_id,
+                    pattern_id=101,
+                    direction=1,  # H — Leopoldau
+                    stops=(90013, 90011, 90015),
+                ),
+                TripPattern(
+                    line_id=u1_line_id,
+                    pattern_id=102,
+                    direction=2,  # R — Oberlaa (full)
+                    stops=(90014, 90012, 90016),
+                ),
+                TripPattern(
+                    line_id=u1_line_id,
+                    pattern_id=103,
+                    direction=2,  # R — Alaudagasse (short turn)
+                    stops=(90014, 90012, 90017),
+                ),
+            ],
+        },
+        lines_by_label={"U1": u1_line_id},
+        means_by_line={u1_line_id: "ptMetro"},
+        lines_at_diva={
+            60201468: ("U1",),  # Taubstummengasse
+            60201470: ("U1",),  # Leopoldau
+            60201471: ("U1",),  # Oberlaa
+            60201472: ("U1",),  # Alaudagasse
+        },
+    )
     return StaticCatalogue(
-        stations_by_diva=stations, last_fetched="2026-04-20T12:00:00+00:00"
+        stations_by_diva=stations,
+        last_fetched="2026-04-20T12:00:00+00:00",
+        trip_patterns=trip_patterns,
     )
 
 

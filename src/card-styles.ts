@@ -319,9 +319,9 @@ export const cardStyles = css`
       transparent
     );
   }
-  /* Hero accessibility flag — small icon-only pill in the same slot
-     the rt-pill used to occupy. Only rendered when the next departure
-     is barrier-free AND the user has show_accessibility enabled. */
+  /* Hero accessibility flag — small icon-only pill, only rendered
+     when the next departure is barrier-free AND the user has
+     show_accessibility enabled. */
   .hero-a11y {
     display: inline-flex;
     align-items: center;
@@ -825,15 +825,8 @@ export const cardStyles = css`
   }
 
   /* Footer: attribution timestamp / etc. Right-pin via margin-left:auto.
-     Padding + margin mirror linz-linien-austria so a stacked dashboard
-     reads as one visual family. Linz uses margin: 0 var(--linz-pad-x)
-     plus padding: 8px 0 because its .foot is a direct <ha-card> child
-     with no wrapper to provide outer inset. Wiener's .foot lives
-     inside .wrap (which already pads horizontally), so the equivalent
-     here is padding: 8px 0 with no extra horizontal margin — divider
-     line ends up at the same horizontal inset as the row content
-     above. (No backticks in this comment — the whole stylesheet is a
-     css tagged template, an inner backtick terminates the literal.) */
+     Lives inside .wrap (which already pads horizontally), so padding
+     stays vertical-only. */
   .foot {
     display: flex;
     align-items: center;
@@ -889,6 +882,63 @@ export const cardStyles = css`
   .dev-strip .dev-strip-clear {
     margin-left: auto;
     color: var(--secondary-text-color);
+  }
+
+  /* QR icon button — gentle accent tint while the panel is expanded
+     so the toggle state reads at a glance, mirroring how dep-row's
+     row-chevron flips on expand. */
+  .qr-toggle.expanded {
+    background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    color: var(--primary-text-color);
+  }
+  /* Inline QR panel — same 0fr↔1fr grid-template-rows trick as
+     .dep-row-detail and .stops-ahead-detail so the panel animates to
+     its intrinsic height and never clips the canvas mid-transition.
+     Sits between the header and the hero so the QR feels like an
+     extension of the stop card rather than a modal interruption. */
+  .qr-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.24s ease;
+  }
+  .qr-panel.expanded {
+    grid-template-rows: 1fr;
+  }
+  .qr-panel-inner {
+    overflow: hidden;
+    min-height: 0;
+  }
+  .qr-panel-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0 4px;
+    cursor: pointer;
+  }
+  /* Canvas wrapper — qr-creator appends a 220×220 canvas; the white
+     plate gives the QR a quiet zone independent of theme background
+     so contrast stays clean in dark mode too. */
+  .qr-canvas {
+    padding: 10px;
+    background: #fff;
+    border-radius: var(--wl-radius-md);
+    line-height: 0;
+    forced-color-adjust: none;
+  }
+  .qr-canvas canvas {
+    display: block;
+    width: 100%;
+    max-width: 220px;
+    height: auto;
+  }
+  .qr-panel-hint {
+    margin: 0;
+    text-align: center;
+    font-size: 0.78rem;
+    color: var(--secondary-text-color);
+    line-height: 1.4;
+    max-width: 280px;
   }
 
   /* Container density ladder. One token tweak per breakpoint cascades

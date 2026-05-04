@@ -12,18 +12,15 @@ Storage-vs-yaml detection — the LovelaceData field name varies across
 HA versions:
 
   * HA ≤ 2026.1: ``LovelaceData.mode: str``
-    https://github.com/home-assistant/core/blob/2026.1.0/homeassistant/components/lovelace/__init__.py
   * HA ≥ 2026.2: ``LovelaceData.resource_mode: str``
-    https://github.com/home-assistant/core/blob/2026.2.0/homeassistant/components/lovelace/__init__.py
 
 ``_is_storage_mode`` reads whichever attribute is present, preferring
-``resource_mode`` when both happen to be defined — duck-typed by design
-so we don't have to track every micro-rename across HA versions.
-``resources`` itself is a
+``resource_mode``. Duck-typed by design so we don't have to track every
+micro-rename across HA versions. ``resources`` itself is a
 ``ResourceYAMLCollection | ResourceStorageCollection`` union; the
-type-only import + ``cast`` below narrow it for the storage-only
-mutation calls without a runtime dependency on the typed class
-existing on every HA version.
+type-only import + ``cast`` below narrow it for storage-only mutation
+calls without a runtime dependency on the typed class existing on
+every HA version.
 """
 from __future__ import annotations
 
@@ -44,28 +41,19 @@ from .const import (
     RETRO_CARD_VERSION,
 )
 
-# Typed access to LovelaceData via the public HassKey HA exposes since
-# 2024.x. The string fallback covers HA versions that pre-date the key
-# (very old installs that would also be missing other modern API surfaces
-# we depend on, but the lookup itself shouldn't crash on import).
+# Older HA installs lacked LOVELACE_DATA — fall back to the bare-string
+# lookup. Compound ignore covers `attr-defined` (older HA) and
+# `unused-ignore` (newer HA where the symbol IS exported).
 try:
-    # Compound ignore covers both:
-    #   - attr-defined: HA versions before LOVELACE_DATA shipped
-    #   - unused-ignore: HA versions where the symbol IS exported and
-    #     local mypy would otherwise grumble that the ignore is unused.
     from homeassistant.components.lovelace.const import (  # type: ignore[attr-defined,unused-ignore]
         LOVELACE_DATA,
     )
 except ImportError:  # pragma: no cover — fallback for HA before LOVELACE_DATA shipped
     LOVELACE_DATA = None  # type: ignore[assignment,unused-ignore]
 
-# `lovelace.resources` is a union of ResourceYAMLCollection (read-only)
-# and ResourceStorageCollection (exposes async_create_item /
-# async_update_item / async_delete_item). _is_storage_mode gates the
-# branches that need the storage shape; the cast() at each call site
-# narrows the union for mypy. Type-only import — the symbol is only
-# referenced in the cast string literal, never at runtime, so older HA
-# installs without this submodule layout still work.
+# Type-only import — `ResourceStorageCollection` is referenced in the
+# `cast()` string literal, never at runtime, so older HA installs
+# without this submodule layout still load this file.
 if TYPE_CHECKING:
     from homeassistant.components.lovelace.resources import (
         ResourceStorageCollection,
@@ -100,10 +88,8 @@ class JSModuleRegistration:
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the registrar."""
         self.hass = hass
-        # Prefer the typed HassKey introduced in HA 2024.x — the bare
-        # string lookup is what HA core can rename without notice (see
-        # the LovelaceData `mode` → `resource_mode` rename across
-        # HA 2026.1 → 2026.2 documented in the module docstring).
+        # Prefer the typed HassKey — the bare string lookup is what HA
+        # core can rename without notice.
         if LOVELACE_DATA is not None:
             self.lovelace = self.hass.data.get(LOVELACE_DATA)
         else:
@@ -151,6 +137,17 @@ class JSModuleRegistration:
                 continue
             configs.append(StaticPathConfig(url, str(card_path), False))
         if not configs:
+            # No card JS at all on disk — the integration's user-visible
+            # surface (both modern and retro Lovelace cards) is broken.
+            # Promote from the per-file warning to a single error so the
+            # condition is loud in the integration log instead of silent.
+            if JSMODULES:
+                _LOGGER.error(
+                    "No Lovelace card bundles found in www/ — expected: %s. "
+                    "The integration will load but cards won't render. "
+                    "Reinstall via HACS or rebuild from source.",
+                    [filename for _, _, filename in JSMODULES],
+                )
             return
         try:
             await self.hass.http.async_register_static_paths(configs)
@@ -230,18 +227,11 @@ class JSModuleRegistration:
                     {"res_type": "module", "url": versioned_url},
                 )
             except Exception as update_err:  # noqa: BLE001
-                # Broad catch is deliberate. ResourceStorageCollection's
-                # async_update_item can fail with HomeAssistantError,
-                # KeyError (item evicted between async_items() and the
-                # update call), or other exceptions whose precise class
-                # has shifted across HA core versions. The recovery path
-                # is the same regardless of cause: drop the existing row
-                # and recreate, which costs a fresh resource id but
-                # produces the same observable state for the dashboard
-                # (resource at url with the current ?v=). Narrowing the
-                # catch risks regressions on a future HA version that
-                # raises a different concrete class for the same failure
-                # mode.
+                # Broad except: HA core has shifted the concrete
+                # exception class for this failure across versions
+                # (HomeAssistantError, KeyError on a mid-flight evict,
+                # other). Recovery — drop and recreate — produces the
+                # same observable dashboard state regardless of cause.
                 _LOGGER.debug(
                     "async_update_item failed for %s (%s), trying delete+recreate",
                     url,

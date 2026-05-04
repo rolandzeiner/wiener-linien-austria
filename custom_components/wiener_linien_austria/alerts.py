@@ -57,6 +57,19 @@ class TrafficInfo:
     location: str | None = None  # free-text locality, e.g. "Stadionallee"
     time_created: str | None = None  # when the alert was first posted
     time_last_update: str | None = None  # when the alert was last edited
+    # Pre-computed frozenset over `related_lines` — used by
+    # `get_alerts_for` for the per-sensor set-intersection that runs on
+    # every state attribute read AND every template fetch. Without this
+    # cache, each read built a fresh `set(t.related_lines)` per traffic
+    # info per call, churning ~hundreds of allocations across busy
+    # dashboards. Built in __post_init__ from the immutable parsed
+    # `related_lines` list so it's correct from construction onward.
+    related_lines_set: frozenset[str] = field(
+        init=False, default=frozenset(), repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        self.related_lines_set = frozenset(self.related_lines)
 
     def to_dict(self) -> dict[str, Any]:
         """Render as plain dict for sensor attributes / diagnostics."""
@@ -89,6 +102,19 @@ class ElevatorInfo:
     related_stops: list[int]  # RBLs where this elevator applies
     time_start: str | None
     time_end: str | None
+    # Pre-computed frozensets — see `TrafficInfo.related_lines_set` for
+    # the rationale. Both the line and stop list participate in the
+    # `get_alerts_for` matcher's intersection per attribute read.
+    related_lines_set: frozenset[str] = field(
+        init=False, default=frozenset(), repr=False, compare=False
+    )
+    related_stops_set: frozenset[int] = field(
+        init=False, default=frozenset(), repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        self.related_lines_set = frozenset(self.related_lines)
+        self.related_stops_set = frozenset(self.related_stops)
 
     def to_dict(self) -> dict[str, Any]:
         """Render as plain dict for sensor attributes / diagnostics."""
@@ -110,10 +136,9 @@ class ElevatorInfo:
 # ---------------------------------------------------------------------------
 
 
-# Sentinel returned by _fetch_info_list when the server replies 304 — tells
-# the caller "no new data, leave the previous parsed cache as-is". A dedicated
-# class (rather than `object()`) keeps the return-type union narrowable under
-# `mypy --strict` so callers can iterate the `list[dict]` branch safely.
+# Sentinel for 304 responses — dedicated class so the return-type
+# union narrows under `mypy --strict` and callers can iterate the
+# `list[dict]` branch safely.
 class _NotModified:
     """Sentinel type for 304 Not Modified responses."""
 
@@ -153,6 +178,15 @@ async def _fetch_info_list(
             return _NOT_MODIFIED
         resp.raise_for_status()
         body = await resp.json()
+    except asyncio.CancelledError:
+        # Cooperative cancellation — usually fired when HA is shutting
+        # down and our `_periodic_alerts` task is being torn down with
+        # an in-flight fetch still pending. The aiohttp session may
+        # already be closed too, surfacing as one of the broader errors
+        # below. Re-raise without logging so the shutdown signal
+        # propagates cleanly and we don't pollute the log with a noisy
+        # warning that the user can do nothing about.
+        raise
     except (
         aiohttp.ClientError,
         aiohttp.ContentTypeError,
@@ -349,7 +383,7 @@ def get_alerts_for(
     matched_traffic: list[TrafficInfo] = []
     if lines:
         for t in all_traffic:
-            if set(t.related_lines) & lines:
+            if t.related_lines_set & lines:
                 matched_traffic.append(t)
     else:
         matched_traffic = list(all_traffic)
@@ -357,12 +391,12 @@ def get_alerts_for(
     matched_elevator: list[ElevatorInfo] = []
     if rbls:
         for e in all_elevator:
-            stop_hit = bool(set(e.related_stops) & rbls)
+            stop_hit = bool(e.related_stops_set & rbls)
             if stop_hit:
                 matched_elevator.append(e)
                 continue
             # No explicit RBL match — fall back to line match if present.
-            if not e.related_stops and lines and set(e.related_lines) & lines:
+            if not e.related_stops and lines and e.related_lines_set & lines:
                 matched_elevator.append(e)
 
     return matched_traffic, matched_elevator

@@ -86,8 +86,8 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             if refreshed is not None:
                 # Surface the new catalogue to future config-flow / entry-load
                 # callers. Already-running coordinators keep their captured
-                # ref — that's an accepted v1 staleness window since trip
-                # patterns and stops change on a weeks-to-months cadence.
+                # ref — accepted because trip patterns and stops change on a
+                # weeks-to-months cadence.
                 async_set_cached_catalogue(hass, refreshed)
 
         domain_data[STATIC_REFRESH_UNSUB_KEY] = async_track_time_interval(
@@ -114,11 +114,9 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             cancel_on_shutdown=True,
         )
 
-    # WS commands registered here survive integration removal — they're
-    # process-scoped, not entry-scoped, and HA core doesn't expose a
-    # deregister API. We never reach a duplicate-registration branch
-    # since `async_setup` only runs once per HA process; behaviour on
-    # duplicates is HA core internal and we don't rely on it.
+    # WS commands are process-scoped — HA core has no deregister API.
+    # `async_setup` only runs once per HA process, so duplicate
+    # registration can't happen.
     async_register_command(hass, _websocket_card_version)
     async_register_command(hass, _websocket_retro_card_version)
 
