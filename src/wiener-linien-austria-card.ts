@@ -4,7 +4,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import QrCreator from "qr-creator";
-import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
+import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { cardStyles } from "./card-styles.js";
 import { CARD_VERSION } from "./const.js";
@@ -42,12 +42,6 @@ import { delayMinutes, formatTime } from "./utils/time.js";
 // Eager editor import — the skill's gotcha about `await import("./editor")`
 // racing against HA's `document.createElement(…-editor)` applies here.
 import "./editor.js";
-
-console.info(
-  `%c WIENER-LINIEN-AUSTRIA-CARD %c ${CARD_VERSION} `,
-  "color: white; background: #E3000F; font-weight: 700;",
-  "color: #E3000F; background: white; font-weight: 700;",
-);
 
 // Register the card with HA's picker so it shows up in the visual editor's
 // "+ Add card" dialog.

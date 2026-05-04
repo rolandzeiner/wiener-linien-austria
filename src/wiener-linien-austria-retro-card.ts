@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
+import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
@@ -18,12 +18,6 @@ import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 
 import "./retro-editor.js";
-
-console.info(
-  `%c WIENER-LINIEN-AUSTRIA-RETRO-CARD %c ${RETRO_CARD_VERSION} `,
-  "color: #FFC700; background: #000; font-weight: 700;",
-  "color: #000; background: #FFC700; font-weight: 700;",
-);
 
 type RaceState = "idle" | "countdown" | "racing" | "freeze" | "victory";
 const VICTORY_DURATION_MS = 4000;

@@ -1,4 +1,4 @@
-import type { HomeAssistant } from "custom-card-helpers";
+import type { HomeAssistant } from "../types.js";
 
 import type { WienerLinienAttrs } from "../types.js";
 

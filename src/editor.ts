@@ -37,7 +37,7 @@ import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResul
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
+import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
 import { translate } from "./localize/localize.js";

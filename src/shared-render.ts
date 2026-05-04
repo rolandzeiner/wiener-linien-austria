@@ -14,7 +14,7 @@
 //   so the helper does not own a hidden module-level language state.
 
 import { html, nothing, type TemplateResult } from "lit";
-import type { HomeAssistant } from "custom-card-helpers";
+import type { HomeAssistant } from "./types.js";
 
 /**
  * Probe the backend's card-version WebSocket command. Returns the

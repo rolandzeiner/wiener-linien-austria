@@ -1,4 +1,52 @@
-import type { HomeAssistant, LovelaceCard, LovelaceCardConfig, LovelaceCardEditor } from "custom-card-helpers";
+// Local mirror of the HA / Lovelace types this card actually uses.
+// Replaces the `custom-card-helpers` dependency — the package is
+// effectively unmaintained and bundled HA-internal types drift faster
+// than its release cadence. `fireEvent` is duplicated as a 6-line shim
+// inside the editor modules (see `editor.ts` and `retro-editor.ts`),
+// keeping the types layer free of any value-side helper.
+
+/** Single entity in `hass.states`. The attributes bag is open-ended —
+ *  the integration's coordinator emits the keys these cards read
+ *  (`departures`, `traffic_info`, `attribution`, `lift_info`, …). */
+export interface HassEntity {
+  state: string;
+  attributes: Record<string, unknown>;
+  last_changed?: string;
+  last_updated?: string;
+  entity_id?: string;
+}
+
+/** Minimal HA shape — only the fields these cards touch. `language` is
+ *  the user-profile locale; `localize` is HA's own UI translation
+ *  lookup the editors reuse for built-in field names; `callWS` powers
+ *  the card-version probe; `themes.darkMode` is reserved for future
+ *  adaptive-logo work. Anything beyond these lives untyped and is read
+ *  with a cast at the call site. */
+export interface HomeAssistant {
+  states: Record<string, HassEntity>;
+  language?: string;
+  themes?: { darkMode?: boolean } & Record<string, unknown>;
+  config?: { time_zone?: string } & Record<string, unknown>;
+  localize?: (key: string, ...args: unknown[]) => string;
+  callWS?<T = unknown>(msg: { type: string; [key: string]: unknown }): Promise<T>;
+}
+
+/** Marker every card config extends. */
+export interface LovelaceCardConfig {
+  type: string;
+  [key: string]: unknown;
+}
+
+/** Custom-card editor contract — Lovelace expects an HTMLElement that
+ *  accepts `setConfig(config)` and reads `hass`. */
+export interface LovelaceCardEditor extends HTMLElement {
+  hass?: HomeAssistant;
+  setConfig(config: LovelaceCardConfig): void;
+}
+
+/** `LovelaceCard` is only referenced as the `hui-error-card` tag-map
+ *  entry below, so an HTMLElement alias suffices. */
+export type LovelaceCard = HTMLElement;
 
 // Register editor element tags with the global customElements registry so
 // TypeScript autocompletes them inside html`…` templates.

@@ -29,7 +29,7 @@
 
 import { LitElement, html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { HomeAssistant, LovelaceCardEditor } from "custom-card-helpers";
+import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
 import { translate } from "./localize/localize.js";
