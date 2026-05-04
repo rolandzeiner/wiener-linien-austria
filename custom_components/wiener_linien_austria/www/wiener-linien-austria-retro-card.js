@@ -405,9 +405,8 @@ function Fe(e,t,i){e.dispatchEvent(new CustomEvent(t,{detail:i,bubbles:!0,compos
       100% { transform: translate(var(--race-end, 110cqw), 0.18em); }
     }
     @media (prefers-reduced-motion: no-preference) {
-      /* LED prep: countdown, racing, and the DEBUG freeze (paused mid-
-         race for visual verification) all share the same row-clearing
-         + overflow-visible setup. */
+      /* LED prep: countdown, racing, and the photo-finish freeze all
+         share the same row-clearing + overflow-visible setup. */
       .retro--race-countdown .retro-dest,
       .retro--race-active .retro-dest,
       .retro--race-freeze .retro-dest {

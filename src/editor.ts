@@ -9,7 +9,7 @@
 //   integration, label/helper localisation chain, a11y / forced-colors
 //   / focus-visible all match HA core.
 //
-// * **Three bespoke sections** stay below `<ha-form>` because their
+// * **Two bespoke sections** stay below `<ha-form>` because their
 //   row lists are derived from the live data (lines/direction/walk-time
 //   per stop, colour swatches per line in the user's selection):
 //   - Per-stop filters (line chips + direction picker + per-line dir

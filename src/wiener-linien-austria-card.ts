@@ -472,11 +472,10 @@ export class WienerLinienAustriaCard extends LitElement {
     const qrOpenLabel = this._t("qr_open");
 
     // Hero group — the set of departures shown in the big hero block.
-    // Mirrors linz-linien-austria's _computeHeroGroup verbatim: the
-    // soonest departure leads, and any others tied on the exact same
-    // countdown ride along. When the lead is at "Jetzt" (cd <= 0), we
-    // group every other Jetzt departure too — a tram and a bus both
-    // showing as Jetzt simultaneously is the case where surfacing
+    // The soonest departure leads, and any others tied on the exact
+    // same countdown ride along. When the lead is at "Jetzt" (cd <= 0),
+    // we group every other Jetzt departure too — a tram and a bus
+    // both showing as Jetzt simultaneously is the case where surfacing
     // both is most useful, even though either has technically already
     // arrived.
     const heroGroup = this._computeHeroGroup(filtered);
@@ -780,8 +779,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
   /**
    * Compute the hero group: the lead departure plus any others tied
-   * on the exact same countdown. Mirrors linz-linien-austria's
-   * _computeHeroGroup verbatim. When the lead is at Jetzt (cd <= 0),
+   * on the exact same countdown. When the lead is at Jetzt (cd <= 0),
    * group every entry that's also at Jetzt — multiple lines all
    * arriving simultaneously is precisely the case where surfacing all
    * of them in the hero is most useful. Outside the Jetzt case, fall
@@ -972,7 +970,7 @@ export class WienerLinienAustriaCard extends LitElement {
           : this._t("delay_plural", { n: signedDelay })
         : "";
 
-    // Row state — Linz parity. `now` overrides late/early when cd<=0.
+    // Row state — `now` overrides late/early when cd<=0.
     const cdState =
       cd !== null && cd <= 0
         ? "now"
@@ -1258,17 +1256,9 @@ export class WienerLinienAustriaCard extends LitElement {
     this._expandedTransfers = next;
   }
 
-  // Whether Wiener Linien NightLine is currently running. Used to
-  // promote N-prefix chips to the always-inline tier on the
-  // stops_ahead trail during the night window — outside it, those
-  // chips fold back into the +N toggle. Daily envelope captures
-  // the first/last bus spread across all NightLine routes (Wikipedia +
-  // wien.info: 00:30–05:00 typical, with edges at 23:55 and 05:15).
-  // Re-evaluated on every render; the coordinator's ~30 s poll
-  // re-renders frequently enough that the transition from day-mode
-  // to night-mode reaches the user well within a minute of the actual
-  // service start. No timezone math: the user's HA-served browser
-  // and Vienna are the same timezone in practice.
+  // Daily envelope ~23:55–05:15 captures the first/last NightLine bus
+  // spread across all routes. No timezone math: the user's HA-served
+  // browser and Vienna are the same timezone in practice.
   private _isNightlineHour(): boolean {
     const now = new Date();
     const minutesIntoDay = now.getHours() * 60 + now.getMinutes();

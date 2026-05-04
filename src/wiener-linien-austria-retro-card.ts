@@ -463,7 +463,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   //
   // Returns the time (ms from race start) at which the WINNER crosses
   // the finish line. The state machine uses that to schedule the
-  // freeze (DEBUG) and then victory.
+  // photo-finish freeze and then victory.
   private _randomizeRaceParams(): { winnerCrossT: number } {
     const rand = (min: number, max: number): number =>
       min + Math.random() * (max - min);
@@ -1140,9 +1140,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       100% { transform: translate(var(--race-end, 110cqw), 0.18em); }
     }
     @media (prefers-reduced-motion: no-preference) {
-      /* LED prep: countdown, racing, and the DEBUG freeze (paused mid-
-         race for visual verification) all share the same row-clearing
-         + overflow-visible setup. */
+      /* LED prep: countdown, racing, and the photo-finish freeze all
+         share the same row-clearing + overflow-visible setup. */
       .retro--race-countdown .retro-dest,
       .retro--race-active .retro-dest,
       .retro--race-freeze .retro-dest {
