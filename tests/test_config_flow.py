@@ -9,7 +9,17 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
-from custom_components.wiener_linien_austria.config_flow import _probe_monitor_lines
+from custom_components.wiener_linien_austria.config_flow import (
+    _probe_monitor_lines,
+    _resolve_lines_for_picker,
+    _static_lines_for_station,
+)
+from custom_components.wiener_linien_austria.static import (
+    Station,
+    StaticCatalogue,
+    TripPattern,
+    TripPatternIndex,
+)
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
@@ -332,4 +342,194 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "stop_gone"
 
+
+# ---------------------------------------------------------------------------
+# Static-catalogue / merged line picker (off-service line visibility)
+# ---------------------------------------------------------------------------
+
+
+def _u1_catalogue() -> tuple[StaticCatalogue, Station]:
+    """Tiny catalogue with U1 in both directions for static-line tests.
+
+    Mirrors the conftest fixture's branching-terminus shape but local
+    so this test file doesn't depend on the autouse mock_static_catalogue
+    swap-in path.
+    """
+    taubstummengasse = Station(
+        diva=60201468,
+        name="Taubstummengasse",
+        municipality="Wien",
+        longitude=16.3711,
+        latitude=48.1953,
+        rbls=[90011, 90012],
+    )
+    leopoldau = Station(
+        diva=60201470,
+        name="Leopoldau",
+        municipality="Wien",
+        longitude=16.4660,
+        latitude=48.2613,
+        rbls=[90015],
+    )
+    oberlaa = Station(
+        diva=60201471,
+        name="Oberlaa",
+        municipality="Wien",
+        longitude=16.4019,
+        latitude=48.1646,
+        rbls=[90016],
+    )
+    trip_patterns = TripPatternIndex(
+        patterns_by_line={
+            1: [
+                TripPattern(line_id=1, pattern_id=101, direction=1, stops=(90011, 90015)),
+                TripPattern(line_id=1, pattern_id=102, direction=2, stops=(90012, 90016)),
+            ],
+        },
+        lines_by_label={"U1": 1},
+        means_by_line={1: "ptMetro"},
+        lines_at_diva={60201468: ("U1",), 60201470: ("U1",), 60201471: ("U1",)},
+    )
+    catalogue = StaticCatalogue(
+        stations_by_diva={
+            60201468: taubstummengasse,
+            60201470: leopoldau,
+            60201471: oberlaa,
+        },
+        last_fetched="t",
+        trip_patterns=trip_patterns,
+    )
+    return catalogue, taubstummengasse
+
+
+def test_static_lines_for_station_returns_both_directions() -> None:
+    """Off-service U1 visible from the static catalogue alone."""
+    catalogue, station = _u1_catalogue()
+    rows = _static_lines_for_station(catalogue, station)
+    assert {r["key"] for r in rows} == {"U1|H", "U1|R"}
+    h = next(r for r in rows if r["key"] == "U1|H")
+    r = next(r for r in rows if r["key"] == "U1|R")
+    assert h["towards"] == "Leopoldau"
+    assert r["towards"] == "Oberlaa"
+    assert h["type"] == "ptMetro"
+
+
+def test_static_lines_for_station_empty_when_no_trip_patterns() -> None:
+    """Catalogue without a trip-pattern index yields an empty list."""
+    catalogue, station = _u1_catalogue()
+    catalogue_no_idx = StaticCatalogue(
+        stations_by_diva=catalogue.stations_by_diva,
+        last_fetched="t",
+        trip_patterns=None,
+    )
+    assert _static_lines_for_station(catalogue_no_idx, station) == []
+
+
+def test_static_lines_for_station_empty_when_diva_not_in_index() -> None:
+    """Stations missing from `lines_at_diva` produce no rows."""
+    catalogue, _ = _u1_catalogue()
+    orphan = Station(
+        diva=99999,
+        name="Nowhere",
+        municipality="Wien",
+        longitude=0.0,
+        latitude=0.0,
+        rbls=[],
+    )
+    assert _static_lines_for_station(catalogue, orphan) == []
+
+
+async def test_resolve_lines_for_picker_merges_live_and_static(
+    hass: HomeAssistant,
+) -> None:
+    """Merge keeps live entries (accurate towards) and adds static-only ones."""
+    catalogue, station = _u1_catalogue()
+
+    # Live response covers only U1|H — U1|R is "off service" right now.
+    body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U1",
+                            "direction": "H",
+                            "towards": "Leopoldau",
+                            "type": "ptMetro",
+                        },
+                    ]
+                },
+            ]
+        },
+    }
+    resp = MagicMock()
+    resp.status = 200
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    session = MagicMock()
+    session.get = AsyncMock(return_value=resp)
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        rows = await _resolve_lines_for_picker(hass, catalogue, station)
+
+    keys = {r["key"] for r in rows}
+    assert keys == {"U1|H", "U1|R"}
+    # U1|H came from the live row, U1|R from static — both present.
+
+
+async def test_resolve_lines_for_picker_falls_back_to_live_only(
+    hass: HomeAssistant,
+) -> None:
+    """When the catalogue has no trip-pattern index, return the live list verbatim."""
+    catalogue, station = _u1_catalogue()
+    catalogue_no_idx = StaticCatalogue(
+        stations_by_diva=catalogue.stations_by_diva,
+        last_fetched="t",
+        trip_patterns=None,
+    )
+    body = {
+        "message": {"messageCode": 1},
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U1",
+                            "direction": "H",
+                            "towards": "Leopoldau",
+                            "type": "ptMetro",
+                        },
+                    ]
+                },
+            ]
+        },
+    }
+    resp = MagicMock()
+    resp.status = 200
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    session = MagicMock()
+    session.get = AsyncMock(return_value=resp)
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
+        return_value=session,
+    ):
+        rows = await _resolve_lines_for_picker(hass, catalogue_no_idx, station)
+
+    assert {r["key"] for r in rows} == {"U1|H"}
+
+
+def test_static_catalogue_index_by_rbl_caches() -> None:
+    """index_by_rbl builds once and re-uses the cached dict."""
+    catalogue, station = _u1_catalogue()
+    first = catalogue.index_by_rbl()
+    second = catalogue.index_by_rbl()
+    assert first is second
+    # 90011 belongs to Taubstummengasse, 90015 to Leopoldau.
+    assert first[90011] == (station.diva, "Taubstummengasse")
+    assert first[90015] == (60201470, "Leopoldau")
+    assert 99999 not in first
 
