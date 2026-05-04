@@ -210,15 +210,53 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
     return True
 
 
+def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
+    """Tear down every domain-wide resource that should die with the LAST entry.
+
+    Single source of truth used by both `async_unload_entry` (normal
+    last-unload path) and `_rollback_setup_failure` (setup-failure
+    path). Drift between the two used to be a recurring audit finding
+    — when a new key joins the cleanup tuple it has to land here, in
+    one place.
+
+    Cancels timer subscriptions, in-flight bg tasks, and pops every
+    cache + validator key.
+    """
+    for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
+        unsub = domain_data.pop(unsub_key, None)
+        if callable(unsub):
+            unsub()
+    # Cancel any in-flight static-refresh background task so it can't
+    # complete after teardown and re-poison the catalogue ref. The
+    # task's done-callback also self-clears the slot; popping here is
+    # belt-and-braces.
+    bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
+    if isinstance(bg_task, asyncio.Task) and not bg_task.done():
+        bg_task.cancel()
+    # Drop the rest of the domain-wide state — caches and validators
+    # are stale by definition once no entry is around to consume them.
+    for stale_key in (
+        TRAFFIC_INFO_KEY,
+        ELEVATOR_INFO_KEY,
+        ALERT_CACHE_VALIDATORS_KEY,
+        DOMAIN_LAST_CALL_KEY,
+        LOCK_KEY,
+        LOCK_LOOP_KEY,
+        CATALOGUE_KEY,
+    ):
+        domain_data.pop(stale_key, None)
+
+
 async def _rollback_setup_failure(
     hass: HomeAssistant, coordinator: WienerLinienAustriaCoordinator
 ) -> None:
     """Decrement counter + tear down domain state on a partial-setup failure.
 
     Called when `async_forward_entry_setups` raises after the bookkeeping
-    above already counted the entry. Mirrors the "remaining == 0" branch
-    of `async_unload_entry` because HA core won't call that path for a
-    setup that never reached the loaded state.
+    above already counted the entry. Shares the cleanup body with
+    `async_unload_entry` via `_teardown_domain_state` because HA core
+    won't call that path for a setup that never reached the loaded
+    state.
     """
     await coordinator.async_shutdown()
     domain_data = hass.data.get(DOMAIN)
@@ -227,23 +265,7 @@ async def _rollback_setup_failure(
     remaining = max(0, domain_data.get(ENTRY_COUNT_KEY, 1) - 1)
     domain_data[ENTRY_COUNT_KEY] = remaining
     if remaining == 0:
-        for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
-            unsub = domain_data.pop(unsub_key, None)
-            if callable(unsub):
-                unsub()
-        bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
-        if isinstance(bg_task, asyncio.Task) and not bg_task.done():
-            bg_task.cancel()
-        for stale_key in (
-            TRAFFIC_INFO_KEY,
-            ELEVATOR_INFO_KEY,
-            ALERT_CACHE_VALIDATORS_KEY,
-            DOMAIN_LAST_CALL_KEY,
-            LOCK_KEY,
-            LOCK_LOOP_KEY,
-            CATALOGUE_KEY,
-        ):
-            domain_data.pop(stale_key, None)
+        _teardown_domain_state(domain_data)
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> None:
@@ -272,29 +294,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
     remaining = max(0, domain_data.get(ENTRY_COUNT_KEY, 1) - 1)
     domain_data[ENTRY_COUNT_KEY] = remaining
     if remaining == 0:
-        for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
-            unsub = domain_data.pop(unsub_key, None)
-            if callable(unsub):
-                unsub()
-        # Cancel any in-flight static-refresh background task so it
-        # can't complete after teardown and re-poison the catalogue
-        # ref. The task's done-callback also self-clears the slot;
-        # popping here is belt-and-braces.
-        bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
-        if isinstance(bg_task, asyncio.Task) and not bg_task.done():
-            bg_task.cancel()
-        # Drop the rest of the domain-wide state — caches and validators
-        # are stale by definition once no entry is around to consume them.
-        for stale_key in (
-            TRAFFIC_INFO_KEY,
-            ELEVATOR_INFO_KEY,
-            ALERT_CACHE_VALIDATORS_KEY,
-            DOMAIN_LAST_CALL_KEY,
-            LOCK_KEY,
-            LOCK_LOOP_KEY,
-            CATALOGUE_KEY,
-        ):
-            domain_data.pop(stale_key, None)
+        _teardown_domain_state(domain_data)
     return True
 
 

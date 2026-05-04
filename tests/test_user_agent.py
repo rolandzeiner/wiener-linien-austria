@@ -60,6 +60,14 @@ async def test_coordinator_monitor_fetch_sends_user_agent(
 
 async def test_alerts_fetch_sends_user_agent(hass: HomeAssistant) -> None:
     """alerts._fetch_info_list carries the canonical User-Agent + gzip."""
+    from custom_components.wiener_linien_austria.const import (
+        DOMAIN,
+        ENTRY_COUNT_KEY,
+    )
+
+    # _fetch_info_list now bails when the domain dict is gone. Seed it
+    # so this test exercises the network path, not the bail.
+    hass.data.setdefault(DOMAIN, {})[ENTRY_COUNT_KEY] = 1
     session = MagicMock()
     session.get = MagicMock(
         return_value=make_response_cm(_ok_response({"data": {"trafficInfos": []}}))

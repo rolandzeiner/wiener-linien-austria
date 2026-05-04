@@ -176,7 +176,7 @@ CATALOGUE_KEY = "static_catalogue"
 BACKGROUND_REFRESH_TASK_KEY = "static_bg_refresh_task"
 
 
-@dataclass
+@dataclass(slots=True)
 class Station:
     """One Wiener Linien station (DIVA) with its RBL platforms."""
 
@@ -205,7 +205,7 @@ class TripPattern:
     stops: tuple[int, ...]
 
 
-@dataclass
+@dataclass(slots=True)
 class TripPatternIndex:
     """Compact index over `fahrwegverlaeufe` + `linien` + GTFS `routes.txt`.
 
@@ -259,7 +259,7 @@ class TripPatternIndex:
         return sum(len(v) for v in self.patterns_by_line.values())
 
 
-@dataclass
+@dataclass(slots=True)
 class StaticCatalogue:
     """In-memory catalogue of Wiener Linien stops and (optionally) trip patterns.
 
@@ -366,10 +366,13 @@ def async_set_cached_catalogue(
     No-op when the integration has been torn down (no entries left). A
     background refresh task spawned earlier may otherwise complete
     after `async_unload_entry` ran and re-poison `hass.data[DOMAIN]`
-    with a catalogue we just deliberately dropped.
+    with a catalogue we just deliberately dropped. Checks the *value*
+    of `ENTRY_COUNT_KEY`, not just its presence — last-unload sets it
+    to 0 (rather than popping it) so a presence-only check would
+    silently let the race through.
     """
     domain_data = hass.data.get(DOMAIN)
-    if not domain_data or ENTRY_COUNT_KEY not in domain_data:
+    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
         return
     domain_data[CATALOGUE_KEY] = catalogue
 
@@ -399,18 +402,25 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 err,
             )
         else:
-            needs_refresh_reason: str | None = None
-            if catalogue.trip_patterns is None:
-                needs_refresh_reason = "predates trip_patterns"
-            elif not catalogue.trip_patterns.lines_at_diva:
+            # First-match tells. Each tuple is (predicate, reason); the
+            # first predicate that returns True wins. Adding a new
+            # migration trigger means appending one tuple — no risk of
+            # forgetting to update the elif chain.
+            tp = catalogue.trip_patterns
+            migration_tells: tuple[tuple[bool, str], ...] = (
+                (tp is None, "predates trip_patterns"),
                 # Older cache wrote trip_patterns without the
-                # lines_at_diva index — refresh to populate it.
-                needs_refresh_reason = "missing lines_at_diva index"
-            elif not catalogue.trip_patterns.colors_by_line:
-                # Cache predates GTFS routes.txt — background-refresh
-                # so the card isn't stuck on the fallback palette until
-                # the next weekly tick.
-                needs_refresh_reason = "missing route colours"
+                # lines_at_diva index.
+                (tp is not None and not tp.lines_at_diva, "missing lines_at_diva index"),
+                # Cache predates GTFS routes.txt — refresh so the card
+                # isn't stuck on the fallback palette until the next
+                # weekly tick.
+                (tp is not None and not tp.colors_by_line, "missing route colours"),
+            )
+            needs_refresh_reason = next(
+                (reason for cond, reason in migration_tells if cond),
+                None,
+            )
             if needs_refresh_reason is not None:
                 domain_data = hass.data.setdefault(DOMAIN, {})
                 existing = domain_data.get(BACKGROUND_REFRESH_TASK_KEY)

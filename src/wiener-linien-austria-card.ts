@@ -208,6 +208,11 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   protected willUpdate(changed: PropertyValues): void {
+    // Drop the per-render memo BEFORE Lit calls render() so every cycle
+    // recomputes `_resolveStops()` / `_isNightlineHour()` exactly once
+    // and threads the cached result through the rest of the pass.
+    this._resolvedStopsMemo = null;
+    this._nightlineHourMemo = null;
     // Bounds-check `_activeTab` *before* render so we don't mutate
     // reactive state from inside render() (which would queue a redundant
     // update + log a Lit warning in dev mode). Only re-evaluate when
@@ -231,6 +236,15 @@ export class WienerLinienAustriaCard extends LitElement {
       }
     }
   }
+
+  // Render-scoped memos. Cleared at the top of every `willUpdate` so
+  // each Lit cycle gets a fresh value. `_resolveStops` and
+  // `_isNightlineHour` are constant within a single render but were
+  // previously recomputed dozens of times per pass — busy dashboards
+  // were paying for redundant `findWienerLinienEntities` walks and
+  // `Intl.DateTimeFormat.formatToParts(new Date())` calls.
+  private _resolvedStopsMemo: NormalisedModernStop[] | null = null;
+  private _nightlineHourMemo: boolean | null = null;
 
   protected updated(changed: PropertyValues): void {
     // Re-render the QR canvas only on changes that could flip the
@@ -407,6 +421,13 @@ export class WienerLinienAustriaCard extends LitElement {
   // ------------------------------------------------------------------
 
   private _resolveStops(): NormalisedModernStop[] {
+    if (this._resolvedStopsMemo !== null) return this._resolvedStopsMemo;
+    const result = this._computeResolvedStops();
+    this._resolvedStopsMemo = result;
+    return result;
+  }
+
+  private _computeResolvedStops(): NormalisedModernStop[] {
     const picked = (this._config?.entities ?? []).filter(
       (s) => this.hass?.states?.[s.entity],
     );
@@ -834,22 +855,25 @@ export class WienerLinienAustriaCard extends LitElement {
       items.push(t);
     }
     if (!items.length) return nothing;
-    return html`
-      <div class="alert-list">
-        ${items.map((t) => this._renderTrafficItem(t))}
-      </div>
-    `;
-  }
-
-  private _renderTrafficItem(t: TrafficInfoAttr): TemplateResult {
-    const overrides = this._config!.line_colors;
-    // Traffic items aren't scoped to a single stop — pick the first
-    // entity's palette (every sensor publishes the same GTFS catalogue,
-    // so any one of them resolves any line that might appear here).
+    // Resolve the GTFS palette once per banner render — every sensor
+    // publishes the same catalogue, so the result is identical across
+    // every traffic item. Previously rebuilt per item.
     const lineColors = firstLineColorsMap(
       this.hass,
       this._config!.entities.map((s) => s.entity),
     );
+    return html`
+      <div class="alert-list">
+        ${items.map((t) => this._renderTrafficItem(t, lineColors))}
+      </div>
+    `;
+  }
+
+  private _renderTrafficItem(
+    t: TrafficInfoAttr,
+    lineColors: LineColorsMap,
+  ): TemplateResult {
+    const overrides = this._config!.line_colors;
     const lines = Array.isArray(t.related_lines) ? t.related_lines : [];
     const descHtml = t.description_html
       ? safeTrafficHtml(t.description_html)
@@ -1414,12 +1438,16 @@ export class WienerLinienAustriaCard extends LitElement {
   // their stops on the road at 02:00. Falls back to Europe/Vienna
   // if hass isn't yet wired up (very early renders).
   private _isNightlineHour(): boolean {
+    if (this._nightlineHourMemo !== null) return this._nightlineHourMemo;
     const tz = this.hass?.config?.time_zone || "Europe/Vienna";
     const parts = _nightlineHourFormatter(tz).formatToParts(new Date());
     const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
     const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
     const minutesIntoDay = hour * 60 + minute;
-    return minutesIntoDay >= 23 * 60 + 55 || minutesIntoDay <= 5 * 60 + 15;
+    const result =
+      minutesIntoDay >= 23 * 60 + 55 || minutesIntoDay <= 5 * 60 + 15;
+    this._nightlineHourMemo = result;
+    return result;
   }
 
   // Single source of truth for the cross-render row identity. `rowStableId`
@@ -1567,9 +1595,11 @@ export class WienerLinienAustriaCard extends LitElement {
   private _isDevMode(): boolean {
     // Cached on first access — `localStorage.getItem` and
     // `window.location.search` would otherwise run on every render
-    // (footer + dev panel both call this), and the answer can't change
-    // mid-session (URL flip or storage write doesn't propagate to a
-    // running card without a reload anyway).
+    // (footer + dev panel both call this). Cache is per-card-instance,
+    // not per-document: re-rendering the card doesn't reset, but a
+    // fresh card added later will read again. The answer can't change
+    // for a given instance without a page reload (URL flip / storage
+    // write don't propagate to a live card).
     if (this._devModeCached !== null) return this._devModeCached;
     let result = false;
     try {

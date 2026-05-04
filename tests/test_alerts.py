@@ -14,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
     TrafficInfo,
+    _FetchFailed,
     _fetch_info_list,
     _parse_elevator,
     _parse_traffic,
@@ -23,8 +24,21 @@ from custom_components.wiener_linien_austria.alerts import (
 from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     ELEVATOR_INFO_KEY,
+    ENTRY_COUNT_KEY,
     TRAFFIC_INFO_KEY,
 )
+
+
+@pytest.fixture(autouse=True)
+def _seed_active_domain(hass: HomeAssistant) -> None:
+    """Seed `ENTRY_COUNT_KEY=1` so `async_refresh_alerts` doesn't bail.
+
+    Production code now bails when no entries are loaded (so a refresh
+    racing with last-unload can't re-poison `hass.data[DOMAIN]`). Tests
+    don't go through `async_setup_entry`, so we pretend an entry is
+    active here.
+    """
+    hass.data.setdefault(DOMAIN, {})[ENTRY_COUNT_KEY] = 1
 
 
 # ---------------------------------------------------------------------------
@@ -359,10 +373,11 @@ def _mock_session(resp: MagicMock) -> MagicMock:
     return fake
 
 
-async def test_fetch_info_list_http_error_returns_empty(
+async def test_fetch_info_list_http_error_returns_failed(
     hass: HomeAssistant,
 ) -> None:
-    """A 5xx from upstream yields []; advisory alerts never raise up."""
+    """A 5xx from upstream yields _FETCH_FAILED so the caller leaves the
+    cache untouched (vs an empty `[]`, which would now overwrite it)."""
     req_info = MagicMock()
     req_info.real_url = "https://example/trafficInfoList"
     err = aiohttp.ClientResponseError(
@@ -378,13 +393,14 @@ async def test_fetch_info_list_http_error_returns_empty(
         return_value=fake_session,
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == []
+    assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_non_ok_message_code_returns_empty(
+async def test_fetch_info_list_non_ok_message_code_returns_failed(
     hass: HomeAssistant,
 ) -> None:
-    """messageCode ≠ 1 drops the payload even if trafficInfos is populated."""
+    """messageCode ≠ 1 drops the payload as _FETCH_FAILED — the cache
+    survives instead of being overwritten with an empty list."""
     body = {
         "message": {"messageCode": 316, "value": "Rate limit"},
         "data": {"trafficInfos": [{"name": "T1", "title": "x"}]},
@@ -399,13 +415,14 @@ async def test_fetch_info_list_non_ok_message_code_returns_empty(
         return_value=fake_session,
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == []
+    assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_non_dict_body_returns_empty(
+async def test_fetch_info_list_non_dict_body_returns_failed(
     hass: HomeAssistant,
 ) -> None:
-    """JSON that decodes to a non-object falls through to []."""
+    """JSON that decodes to a non-object returns _FETCH_FAILED so the
+    cache isn't overwritten."""
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
     resp.json = AsyncMock(return_value=["not", "a", "dict"])
@@ -416,7 +433,7 @@ async def test_fetch_info_list_non_dict_body_returns_empty(
         return_value=fake_session,
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == []
+    assert isinstance(result, _FetchFailed)
 
 
 async def test_fetch_info_list_filters_non_dict_entries(

@@ -27,6 +27,7 @@ from .const import (
     API_BASE_URL,
     DOMAIN,
     ELEVATOR_INFO_KEY,
+    ENTRY_COUNT_KEY,
     TRAFFIC_INFO_ENDPOINT,
     TRAFFIC_INFO_KEY,
     USER_AGENT,
@@ -136,29 +137,43 @@ class ElevatorInfo:
 # ---------------------------------------------------------------------------
 
 
-# Sentinel for 304 responses — dedicated class so the return-type
-# union narrows under `mypy --strict` and callers can iterate the
-# `list[dict]` branch safely.
+# Sentinels for 304 responses + soft failures. Dedicated classes so the
+# return-type union narrows under `mypy --strict` and callers can
+# distinguish "kept cache (304)" / "kept cache (fetch failed)" from
+# "200 returned an empty list" — the third case must overwrite the
+# cache (resolved disruption was the only entry), the first two must
+# leave it alone.
 class _NotModified:
     """Sentinel type for 304 Not Modified responses."""
 
 
+class _FetchFailed:
+    """Sentinel type for fetch / parse failures."""
+
+
 _NOT_MODIFIED: Final[_NotModified] = _NotModified()
+_FETCH_FAILED: Final[_FetchFailed] = _FetchFailed()
 
 
 async def _fetch_info_list(
     hass: HomeAssistant, name: str
-) -> list[dict[str, Any]] | _NotModified:
+) -> list[dict[str, Any]] | _NotModified | _FetchFailed:
     """GET /trafficInfoList?name=<name> with conditional-GET caching.
 
     Returns:
-    - `list[dict]`  on a successful 200 response (raw trafficInfos rows)
-    - `_NOT_MODIFIED` when the server replies 304 (cache still fresh)
-    - `[]` on any fetch/parse failure — alerts are advisory, never fatal.
+    - `list[dict]`        on a successful 200 (possibly empty)
+    - `_NOT_MODIFIED`     on a 304 (cache still fresh)
+    - `_FETCH_FAILED`     on any fetch/parse failure (advisory, never fatal)
     """
     session = async_get_clientsession(hass)
     url = f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}"
-    domain_data = hass.data.setdefault(DOMAIN, {})
+    # Use `get` not `setdefault` — if the domain dict was torn down
+    # during a prior await, don't recreate it just to stash validators.
+    # Caller (`async_refresh_alerts`) already guarded on entry; this is
+    # belt-and-braces for an unload that races mid-fetch.
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data:
+        return _FETCH_FAILED
     validators_by_name: dict[str, CacheValidators] = domain_data.setdefault(
         ALERT_CACHE_VALIDATORS_KEY, {}
     )
@@ -179,7 +194,7 @@ async def _fetch_info_list(
             resp.raise_for_status()
             body = await resp.json()
             if not isinstance(body, dict):
-                return []
+                return _FETCH_FAILED
             message = body.get("message") or {}
             if message.get("messageCode") not in (1, None):
                 _LOGGER.debug(
@@ -187,7 +202,7 @@ async def _fetch_info_list(
                     name,
                     message.get("messageCode"),
                 )
-                return []
+                return _FETCH_FAILED
             # Only capture validators after the body has fully validated —
             # never for an error reply we wouldn't accept anyway.
             validators.update_from_response(resp)
@@ -209,7 +224,7 @@ async def _fetch_info_list(
         ValueError,
     ):
         _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
-        return []
+        return _FETCH_FAILED
 
 
 async def async_refresh_alerts(hass: HomeAssistant) -> None:
@@ -217,21 +232,37 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
 
     Safe to call whenever; failures keep the previous cache, and a 304
     response from the conditional-GET path also keeps it untouched.
+
+    Bails immediately when the domain has been torn down (no entries
+    left). The periodic timer is unsubscribed in `async_unload_entry`,
+    but a task already in flight at unload time would otherwise
+    re-poison `hass.data[DOMAIN]` with the alerts we just deliberately
+    dropped.
     """
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
+        return
+
     traffic_result, elevator_result = await asyncio.gather(
         _fetch_info_list(hass, "stoerunglang"),
         _fetch_info_list(hass, "aufzugsinfo"),
     )
 
-    domain_data = hass.data.setdefault(DOMAIN, {})
+    # Re-check after the gather — `await` boundaries are cancellation
+    # points, and unload may have run while we were waiting on the
+    # network. Same risk as the entry guard above.
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
+        return
 
     # 304 Not Modified → leave the existing cache exactly as it was.
+    # Fetch/parse failure → also leave it. Only an actual successful
+    # 200 (possibly empty) overwrites — a legitimately empty list must
+    # clear stale resolved entries.
     traffic_not_modified = isinstance(traffic_result, _NotModified)
     elevator_not_modified = isinstance(elevator_result, _NotModified)
 
-    if traffic_not_modified:
-        domain_data.setdefault(TRAFFIC_INFO_KEY, [])
-    elif isinstance(traffic_result, list) and traffic_result:
+    if isinstance(traffic_result, list):
         parsed = [_parse_traffic(x) for x in traffic_result]
         # Drop resolved entries — upstream keeps them in the feed for a
         # while after the disruption ends, but users don't want them on
@@ -240,9 +271,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     elif TRAFFIC_INFO_KEY not in domain_data:
         domain_data[TRAFFIC_INFO_KEY] = []
 
-    if elevator_not_modified:
-        domain_data.setdefault(ELEVATOR_INFO_KEY, [])
-    elif isinstance(elevator_result, list) and elevator_result:
+    if isinstance(elevator_result, list):
         domain_data[ELEVATOR_INFO_KEY] = [_parse_elevator(x) for x in elevator_result]
     elif ELEVATOR_INFO_KEY not in domain_data:
         domain_data[ELEVATOR_INFO_KEY] = []

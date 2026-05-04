@@ -77,6 +77,13 @@ async def async_get_config_entry_diagnostics(
     if trip_patterns is not None:
         trip_pattern_summary["line_count"] = trip_patterns.line_count
         trip_pattern_summary["pattern_count"] = trip_patterns.pattern_count
+        # Surface migration health — empty dicts on either of these are
+        # the symptom of an older cache that hasn't completed its
+        # background refresh. Lets a user-supplied diagnostics dump
+        # answer "why don't I see transfer chips / line colours"
+        # without having to crack open the logs.
+        trip_pattern_summary["lines_at_diva_count"] = len(trip_patterns.lines_at_diva)
+        trip_pattern_summary["colors_by_line_count"] = len(trip_patterns.colors_by_line)
 
     return {
         "attribution": ATTRIBUTION,
