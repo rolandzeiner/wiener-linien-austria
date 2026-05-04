@@ -10,9 +10,13 @@ pip install -r requirements_test.txt pre-commit
 pre-commit install      # runs ruff + mypy + checks on every commit
 
 npm ci                  # Lovelace card deps
-npm run build           # produces custom_components/wiener_linien_austria/www/wiener-linien-austria-card.js
-                        # and             custom_components/wiener_linien_austria/www/wiener-linien-austria-retro-card.js
+npm run build           # Rollup builds two bundles into
+                        # custom_components/wiener_linien_austria/www/:
+                        #   wiener-linien-austria-card.js
+                        #   wiener-linien-austria-retro-card.js
 ```
+
+`npm run dev` watches `src/` and rebuilds both bundles on save.
 
 ## Branching & releases
 
@@ -22,9 +26,9 @@ npm run build           # produces custom_components/wiener_linien_austria/www/w
 
 ## Card-version sync
 
-`src/const.ts` `CARD_VERSION` (and `RETRO_CARD_VERSION`) and `custom_components/wiener_linien_austria/const.py` `CARD_VERSION` (and `RETRO_CARD_VERSION`) **must stay byte-identical** — `tests/test_card_version.py` enforces both. Bump in the same commit. If they drift, users get an infinite reload-banner loop.
+Two cards, two version constants. Both `CARD_VERSION` and `RETRO_CARD_VERSION` in `src/const.ts` must stay byte-identical to the same names in `custom_components/wiener_linien_austria/const.py` — `tests/test_card_version.py` enforces both pairs. Bump all four in the same commit (TS constants drive the served `?v=…` query string, the Python constants drive the WebSocket version check). If they drift, users get an infinite reload-banner loop.
 
-`README.md` badge + `manifest.json` stay at the clean (non-beta) version; `const.py` + the TS constants can carry a `-beta-N` suffix during development.
+`manifest.json` stays at the clean (non-beta) version; the TS + Python constants can carry a `-beta-N` suffix during development. The README badge auto-fetches the latest release tag, so it needs no manual edit.
 
 ## Tooling & config
 
