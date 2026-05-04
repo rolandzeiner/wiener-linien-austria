@@ -1,70 +1,124 @@
-# Backup files (e.g. *.vanilla.js.bak from pre-Lit migration)
-*.bak
+# IMPORTANT: review before committing — this default assumes a HACS integration
+# repo. Loosen only with intention. Order = most likely to leak first.
 
+# ---------------------------------------------------------------------------
+# Secrets — API keys and credentials are the #1 leak vector for HA integrations
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+secrets.yaml
+.secrets
+*.secret
+credentials.json
+token.json
+auth.json
+*.pem
+*.key
+*.p12
+*.pfx
+local_*.py
+private_*.py
+
+# ---------------------------------------------------------------------------
+# Claude / AI tooling — transcripts, plans, local state
+# ---------------------------------------------------------------------------
+.claude/
+.claude-cache/
+.claude-*
+CLAUDE.local.md
+*.local.md
+.aider*
+.cursor/
+.cursorrules.local
+.continue/
+.windsurf/
+
+# ---------------------------------------------------------------------------
+# Virtual environments
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+.python-version
+
+# ---------------------------------------------------------------------------
+# HA-local test state (from running a local HA against the integration)
+# ---------------------------------------------------------------------------
+config/
+home-assistant.log*
+home-assistant_*.log*
+.storage/
+
+# ---------------------------------------------------------------------------
+# IDE / editor state
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
 # macOS
+# ---------------------------------------------------------------------------
 **/.DS_Store
 
-# Windows
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Python — compiled + packaging
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
 __pycache__/
 **/__pycache__/
 *.pyc
 *.py[cod]
 .Python
-*.egg-info/
-dist/
-build/
 
-# Python — virtual envs
-.venv/
-venv/
-env/
-ENV/
-
-# Python — coverage
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-
-# Secrets / env files (never commit these, even by mistake)
-.env
-.env.local
-.env.*.local
-secrets.yaml
-
+# ---------------------------------------------------------------------------
 # Tool caches
+# ---------------------------------------------------------------------------
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
 
-# IDEs / editors
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# ---------------------------------------------------------------------------
+# Coverage & build artifacts
+# ---------------------------------------------------------------------------
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+build/
+dist/
+*.egg-info/
 
-# Claude Code
-.claude/
+# ---------------------------------------------------------------------------
+# Node (only relevant if the Lovelace-card subtree is in use)
+# package-lock.json should stay COMMITTED — do not add it here.
+# ---------------------------------------------------------------------------
+node_modules/
+.rollup.cache/
+.parcel-cache/
+.vite-cache/
 
+# ---------------------------------------------------------------------------
 # Logs / pip
+# ---------------------------------------------------------------------------
 *.log
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Card build — source-of-truth is src/; bundle in www/ is tracked.
-node_modules/
-*.js.map
-
-# Local reference copies during in-flight refactors
+# ---------------------------------------------------------------------------
+# Backup files (e.g. *.vanilla.js.bak from pre-Lit migration)
+# ---------------------------------------------------------------------------
 *.bak
 
-# Local dev tooling — dev-push scripts are personal, not shared repo code
+# ---------------------------------------------------------------------------
+# Personal dev tooling — push/sync scripts that target a specific dev box.
+# Each contributor sets these up from the skill template; not shared.
+# ---------------------------------------------------------------------------
 scripts/
 dev-push.sh
 
