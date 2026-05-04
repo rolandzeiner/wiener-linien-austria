@@ -3,8 +3,8 @@
 // byte-for-byte. If they drift, the WebSocket version check sees a
 // mismatch, shows a reload banner, the reload re-serves the same JS,
 // and the banner loops forever.
-export const CARD_VERSION = "1.4.1";
-export const RETRO_CARD_VERSION = "1.4.1";
+export const CARD_VERSION = "1.4.2";
+export const RETRO_CARD_VERSION = "1.4.2";
 
 export const DOMAIN = "wiener_linien_austria";
 
