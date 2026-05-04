@@ -64,7 +64,7 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
 2. Type part of a stop name (e.g. `Stephans`) and submit.
 3. Pick the matching stop from the dropdown.
-4. The integration calls `/monitor` live and lists every line currently serving that stop. Pick the one or two you want to track — busy stops list 20+ lines.
+4. The integration lists every line that serves that stop — live `/monitor` rows are merged with the static schedule catalogue, so off-service lines (nightlines during the day, day-only lines after midnight) stay selectable. Pick the one or two you want to track — busy stops list 20+ lines.
 5. Set a polling interval (default 60 s, min 30 s, max 600 s) and save.
 
 Change tracked lines later via **Reconfigure**; change polling interval via **Configure** (options).
@@ -80,7 +80,7 @@ Each card is served under a versioned URL (`/wiener-linien-austria/*-card.js?v=X
 The everyday departure board. Dashboard → Add card → "Wiener Linien Austria" (under *Custom*).
 
 Visual editor covers:
-- **Stops** — multi-select chip picker. For each stop, a second row picks lines, direction (H / R / both, also per-line for mixed routing like "U1 toward city, U3 toward home"), and per-line **walking time** in minutes (departures leaving before you can reach the platform are hidden; inclusive, so you can run for the last minute).
+- **Stops** — multi-select chip picker. For each stop, a second row lists only the **lines you tracked in the integration's config flow** (independent of whether they're driving right now — a nightline tracked at 12:30 still appears), direction (H / R / both, also per-line for mixed routing like "U1 toward city, U3 toward home"), and per-line **walking time** in minutes (departures leaving before you can reach the platform are hidden; inclusive, so you can run for the last minute).
 - **Line colours** — pill swatch picker. Defaults come live from the GTFS `routes.txt` palette the integration ships as a sensor attribute; per-line overrides are stored on the card config.
 - **Display** — multi-stop layout (*stacked* or *tabs*), departures-per-stop slider (0–20), and toggles for hero countdown, departure list, stops-ahead trail, QR map button, platform pill, step-free icon, accessibility-only filter, vehicle-type icon, disruption banner, elevator badge, delay text, header, and "hide attribution" (the sensor attribute keeps the CC-BY string regardless).
 
@@ -99,7 +99,8 @@ A focused single-stop, single-direction LED-display card mimicking real Wiener L
 - Wheelchair glyph after destinations on step-free departures; alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`).
 - "Betriebsschluss" / "End of service" rendering when the board is empty; differentiated empty-state hints for wrong direction or filtered-out lines.
 - Three size variants (small / medium / regular). Defaults to a full 12-column row in HA section view.
-- Editor: stop picker, H/R direction toggle (auto-corrects when the stop is one-way), optional single-line filter, station-name panel + background picker, size picker (small / medium / regular), style picker (classic / warm / pixel), flicker toggle, accessibility-only filter, show-platform toggle, and per-line walking-time inputs.
+- Editor: stop picker, H/R direction toggle (auto-corrects to the only-tracked direction when the stop is one-way OR when only one direction is tracked), single-line picker drawn from the **lines you tracked in the integration's config flow** (off-service nightlines appear regardless of time-of-day), station-name panel + background picker, size picker (small / medium / regular), style picker (classic / warm / pixel), flicker toggle, accessibility-only filter, show-platform toggle, and per-line walking-time inputs.
+- Station-name tile colour: when `Background = default`, the tile picks up the **configured line's** Wiener-Linien-published palette (nightline-blue + bright yellow for N-prefix lines via the signage rule, GTFS palette otherwise). The configured line wins over live departures, so a nightline-configured retro card renders in nightline-blue at noon instead of falling back to white.
 - Optional **wheelchair race** (toggle in editor) — when ≥ 2 upcoming departures are barrier-free, runs a "3, 2, 1" pre-race countdown and a finish overlay with a trophy badge for the winning lane. Tap the card while idle to trigger one immediately. Gated by `prefers-reduced-motion`.
 
 Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
@@ -118,6 +119,9 @@ Every `sensor.{stop}_abfahrten` entity carries:
 | `server_time` | ISO string \| None | Wiener Linien `serverTime` from the last successful fetch. |
 | `departures` | list[dict] | Capped at 20 entries, sorted by countdown. Each dict: `line`, `towards`, `direction` ("H"/"R"), `type` (`ptMetro`/`ptTram`/`ptBusCity`/`ptBusNight`), `countdown`, `time_planned` (ISO), `time_real` (ISO), `realtime` (bool), `barrier_free` (bool), `traffic_jam` (bool), `platform` (string, e.g. `"1"`), and (when the static schedule index has resolved a matching trip) `stops_ahead`: an ordered `[{name, is_terminus?, lines?}]` list of upcoming stops on that exact trip down to the terminus. `lines` carries the OTHER lines that pass through each stop, used by the card to render transfer chips. |
 | `next_by_line` | dict[str, int] | Per-line map to the earliest countdown. E.g. `{"U1": 2, "U4": 6}`. |
+| `lines_at_stop` | list[str] | Every line serving this DIVA per the static Wiener-Linien schedule, regardless of whether it has a live departure right now. Empty until the trip-pattern catalogue has loaded. Used by the card editors to populate line pickers without depending on the live `/monitor` window. |
+| `tracked_lines` | list[str] | Sorted unique line labels tracked in this entry (derived from `CONF_LINES`). Card editors filter their pickers to this set so users only see lines they opted into. |
+| `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys from `CONF_LINES`. Used by the retro card editor to filter the line dropdown by the selected direction without losing off-service lines. |
 | `traffic_info` | list[dict] | Service disruptions matching the tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 

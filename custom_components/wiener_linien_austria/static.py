@@ -339,9 +339,9 @@ def async_set_cached_catalogue(
     """Replace the shared catalogue ref (called by the periodic refresher).
 
     Existing coordinators continue to hold their captured ref from setup
-    — that's an acceptable v1 trade-off because trip patterns / stops /
-    RBLs change on a weeks-to-months cadence. This call ensures only that
-    *new* coordinators (after entry reload) and the next config-flow
+    — acceptable because trip patterns / stops / RBLs change on a
+    weeks-to-months cadence. This call ensures only that *new*
+    coordinators (after entry reload) and the next config-flow
     invocation see the refreshed data.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
@@ -353,7 +353,7 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
 
     If both cache and network are unavailable, raises RuntimeError.
 
-    When the cache predates the additive `trip_patterns` field (1.4.0),
+    When the cache predates the additive `trip_patterns` field,
     schedules a *background* refetch and returns the stale cache
     immediately so coordinator setup never blocks on the multi-MB
     fahrwegverlaeufe.csv download. The background task updates the
@@ -377,15 +377,13 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
             if catalogue.trip_patterns is None:
                 needs_refresh_reason = "predates trip_patterns"
             elif not catalogue.trip_patterns.lines_at_diva:
-                # Cache from an early 1.4 build that wrote trip_patterns
-                # without the lines_at_diva index (added later in 1.4
-                # for transfer-line chips on the card).
+                # Older cache wrote trip_patterns without the
+                # lines_at_diva index — refresh to populate it.
                 needs_refresh_reason = "missing lines_at_diva index"
             elif not catalogue.trip_patterns.colors_by_line:
-                # Cache predates GTFS routes.txt (colours moved out of the
-                # card's hardcoded palette into the static catalogue).
-                # Background-refresh so the card isn't stuck on the generic
-                # fallback palette until the next weekly tick.
+                # Cache predates GTFS routes.txt — background-refresh
+                # so the card isn't stuck on the fallback palette until
+                # the next weekly tick.
                 needs_refresh_reason = "missing route colours"
             if needs_refresh_reason is not None:
                 _LOGGER.warning(
@@ -1141,12 +1139,7 @@ def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:
 
 
 def _catalogue_to_store(catalogue: StaticCatalogue) -> dict[str, Any]:
-    """Serialise a StaticCatalogue for Store-backed persistence.
-
-    `trip_patterns` is omitted when None so older clients (and the very
-    first cache write before the trip-pattern CSVs land) round-trip
-    unchanged.
-    """
+    """Serialise a StaticCatalogue for Store-backed persistence."""
     payload: dict[str, Any] = {
         "version": 1,
         "last_fetched": catalogue.last_fetched,
@@ -1263,8 +1256,8 @@ def _trip_patterns_from_store(
 def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
     """Rebuild a StaticCatalogue from a Store payload.
 
-    Tolerates payloads written before v1.4 (no `trip_patterns` key) by
-    defaulting that field to None — the next refresh fills it in.
+    Older payloads may lack the `trip_patterns` key — default to None
+    and let the next refresh fill it in.
     """
     stations: dict[int, Station] = {}
     for row in data["stations"]:

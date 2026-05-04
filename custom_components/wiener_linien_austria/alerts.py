@@ -136,10 +136,9 @@ class ElevatorInfo:
 # ---------------------------------------------------------------------------
 
 
-# Sentinel returned by _fetch_info_list when the server replies 304 — tells
-# the caller "no new data, leave the previous parsed cache as-is". A dedicated
-# class (rather than `object()`) keeps the return-type union narrowable under
-# `mypy --strict` so callers can iterate the `list[dict]` branch safely.
+# Sentinel for 304 responses — dedicated class so the return-type
+# union narrows under `mypy --strict` and callers can iterate the
+# `list[dict]` branch safely.
 class _NotModified:
     """Sentinel type for 304 Not Modified responses."""
 

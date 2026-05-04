@@ -236,11 +236,9 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a multi-step config flow for Wiener Linien Austria."""
 
     # Bump + add async_migrate_entry when entry.data shape changes.
-    # Tracks the config-entry schema, NOT the integration release version.
-    # v2 (1.3.0-beta-3): CONF_LINES stores `{line}|{direction}` pairs
-    #     instead of `{line}|{direction}|{towards}` triples. The
-    #     line.towards value is unstable across polls on branching
-    #     termini, so it's no longer part of the saved selection key.
+    # Tracks the config-entry schema, not the integration release version.
+    # v2: CONF_LINES stores `{line}|{direction}` pairs (was triples) —
+    # line.towards is unstable across polls on branching termini.
     VERSION = 2
 
     def __init__(self) -> None:

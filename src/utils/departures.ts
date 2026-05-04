@@ -2,10 +2,9 @@ import type { HomeAssistant } from "../types.js";
 
 import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 
-// Stable (line, direction, towards) identifier. Retained for the editor's
-// per-triple `seen` deduplication in tripletsAtStop and as a stable React-
-// like key for the line picker. NOT used for walk-times any more — see
-// lineDirKey below for why.
+// Stable (line, direction, towards) identifier — used by tripletsAtStop's
+// seen-dedupe and as a stable picker key. Walk-times key by pair instead;
+// see lineDirKey below.
 function lineKey(line: string, direction: string, towards: string): string {
   return `${line}|${direction}|${towards}`;
 }
@@ -32,8 +31,7 @@ export interface Triplet {
 
 // Every distinct (line, direction, towards) triple visible at a stop.
 // Used by the line multi-picker and direction picker — display surfaces
-// where every visible terminus matters. NOT used for walk-times any more
-// (see pairsAtStop).
+// where every visible terminus matters. Walk-times use pairsAtStop.
 export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] {
   const out: Triplet[] = [];
   const seen = new Set<string>();

@@ -47,9 +47,9 @@ const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
   ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
 ];
 // Wheelchair race — the WINNER is whoever crosses the finish line
-// (RACE_FINISH_X_CQW) first, computed from each racer's trajectory
-// post-clamp. The swap-pattern only choreographs mid-race overtakes
-// for visual fun; it doesn't decide the outcome anymore. See
+// (RACE_FINISH_X_CQW) first, computed from each racer's post-clamp
+// trajectory. The swap-pattern choreographs mid-race overtakes for
+// visual fun only; it doesn't decide the outcome. See
 // _randomizeRaceParams() for the full algorithm.
 //
 // When the winner crosses the finish line (ms from race start). The

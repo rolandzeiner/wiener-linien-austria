@@ -45,8 +45,9 @@ import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeTrafficHtml } from "./utils/html.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
 
-// Eager editor import — the skill's gotcha about `await import("./editor")`
-// racing against HA's `document.createElement(…-editor)` applies here.
+// Eager import — a dynamic `await import("./editor.js")` would race
+// HA's synchronous `document.createElement('…-editor')` call when the
+// editor opens for the first time.
 import "./editor.js";
 
 // Register the card with HA's picker so it shows up in the visual editor's

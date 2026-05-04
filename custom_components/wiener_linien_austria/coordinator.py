@@ -31,11 +31,9 @@ from .const import (
 )
 from .http import CacheValidators, base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-# `stops_ahead_for_match` lives in the per-departure inner loop of the
-# monitor parser. Hoisted to module-load time because static.py is a
-# leaf module and the historical "circular reference" comment was stale
-# (static.py never imported coordinator). Avoids per-departure dict
-# lookups against `sys.modules` in the hot path.
+# Hoisted to module level — called per-departure inside the monitor
+# parser's hot loop, so a per-call `from .static import …` would burn
+# `sys.modules` lookups on every row.
 from .static import stops_ahead_for_match
 
 _LOGGER = logging.getLogger(__name__)
@@ -129,17 +127,11 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             name=DOMAIN,
             update_interval=self._normal_interval,
             # Absorb request storms (options-flow save, manual reload,
-            # dashboard edit-mode flip) so the /monitor endpoint isn't
-            # hit 3-4× in quick succession. Even though the integration
-            # already does conditional GET (ETag / If-Modified-Since),
-            # collapsing redundant requests still saves CDN round-trips
-            # on 304 responses. Cooldown matches the existing 15-second
-            # domain-wide floor — first call goes through, subsequent calls within
-            # the window piggy-back on the scheduled refresh. immediate
-            # =False so the FIRST call also waits for the debouncer
-            # window to settle, important during config-flow setup
-            # where test-before-configure + first-refresh land
-            # back-to-back.
+            # dashboard edit-mode flip) so /monitor isn't hit 3-4× back
+            # to back. Cooldown matches the 15s domain-wide floor.
+            # `immediate=False` makes the FIRST call wait too — matters
+            # during config-flow setup where test-before-configure and
+            # first-refresh land back-to-back.
             request_refresh_debouncer=Debouncer(
                 hass,
                 _LOGGER,
@@ -158,8 +150,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
-        # Local import to avoid pulling static.py into coordinator import
-        # cycles; static.py is a leaf that doesn't import this module.
+        # Local import — keeps coordinator.py import-time light.
+        # static.py loads the trip-pattern catalogue lazily on first call.
         from .static import async_get_catalogue  # noqa: PLC0415
         try:
             catalogue = await async_get_catalogue(self.hass)
@@ -194,7 +186,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
 
     @property
     def rbls(self) -> list[int]:
-        """Return the RBL list this coordinator queries."""
         return list(self._rbls)
 
     @property
