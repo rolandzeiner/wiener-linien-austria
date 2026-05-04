@@ -64,7 +64,11 @@ _MOT_SORT_RANK: dict[str, int] = {
     "ptBusCity": 2,
     "ptBusNight": 3,
 }
-_MOT_SORT_UNKNOWN = 99
+# Sentinel for unknown MoT values — derived from the table size so it
+# always ranks AFTER every defined tier, even if Wiener Linien adds a
+# fifth (tourist trains have been mentioned in past releases) and the
+# table grows. Hard-coded `99` would collide if we expanded past it.
+_MOT_SORT_UNKNOWN = len(_MOT_SORT_RANK)
 
 
 def _heuristic_mot(label: str) -> str | None:
@@ -249,6 +253,14 @@ class StaticCatalogue:
     last_fetched: str  # ISO 8601 UTC
     validators: dict[str, CacheValidators] = field(default_factory=dict)
     trip_patterns: TripPatternIndex | None = None
+    # Reverse index: RBL → (DIVA, station name). Built lazily on first
+    # call to `index_by_rbl()` and cached on the dataclass instance so
+    # subsequent lookups are O(1). Without it, the trip-pattern matcher
+    # ran a linear `for station in stations_by_diva.values()` per RBL
+    # per departure per coordinator tick — ~9 k scans/min at busy hubs.
+    _rbl_index: dict[int, tuple[int, str]] | None = field(
+        default=None, repr=False, compare=False
+    )
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
         """Return stations whose name contains the query (case-insensitive)."""
@@ -264,6 +276,24 @@ class StaticCatalogue:
             key=lambda s: (not s.name.casefold().startswith(needle), s.name)
         )
         return results[:limit]
+
+    def index_by_rbl(self) -> dict[int, tuple[int, str]]:
+        """Return (cached) RBL → (DIVA, station name) reverse index.
+
+        Built once on first access by walking every Station's `rbls`. The
+        index lives on the catalogue instance, so it survives every poll
+        and only rebuilds when a new catalogue is fetched (which replaces
+        the whole instance). Tens of thousands of `_diva_for_rbl` /
+        `_station_name_for_rbl` calls per coordinator tick collapse to
+        dict lookups.
+        """
+        if self._rbl_index is None:
+            index: dict[int, tuple[int, str]] = {}
+            for diva, station in self.stations_by_diva.items():
+                for rbl in station.rbls:
+                    index[rbl] = (diva, station.name)
+            self._rbl_index = index
+        return self._rbl_index
 
 
 async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
@@ -842,6 +872,10 @@ def _parse_trip_patterns(
 # "BB" navy, wins for the Wiener Linien customers this integration
 # primarily serves.
 _AGENCY_WIENER_LINIEN = "04"
+# 6-char uppercase hex matcher. Used to validate `route_color` /
+# `route_text_color` from GTFS routes.txt before passing the value
+# through to the card as `#HHHHHH`.
+_HEX6_RE = re.compile(r"^[0-9A-F]{6}$")
 
 
 def _parse_route_colors(routes_text: str) -> tuple[dict[str, str], dict[str, str]]:
@@ -869,7 +903,11 @@ def _parse_route_colors(routes_text: str) -> tuple[dict[str, str], dict[str, str
     for row in reader:
         label = (row.get("route_short_name") or "").strip()
         color = (row.get("route_color") or "").strip().upper()
-        if not label or not color or len(color) != 6:
+        # Validate as 6-char hex — `len() == 6` alone accepts garbage like
+        # "ZZZZZZ" which the card would render as `#ZZZZZZ` (CSS-invalid,
+        # browser ignores). Falling through to the card's fallback palette
+        # is the right behaviour for a malformed upstream row.
+        if not label or not _HEX6_RE.match(color):
             continue
         agency = (row.get("agency_id") or "").strip()
         prior_agency = bg_agency.get(label)
@@ -880,7 +918,7 @@ def _parse_route_colors(routes_text: str) -> tuple[dict[str, str], dict[str, str
         bg[label] = color
         bg_agency[label] = agency
         text_color = (row.get("route_text_color") or "").strip().upper()
-        if len(text_color) == 6:
+        if _HEX6_RE.match(text_color):
             fg[label] = text_color
     return bg, fg
 
@@ -963,8 +1001,23 @@ def stops_ahead_for_match(
                     best = pattern
                     best_tail_len = tail_len
     if best is None:
-        # No terminus match — pick the matching pattern with the longest
-        # tail from our position (best-effort).
+        # No terminus match. Two cases to handle:
+        #
+        # 1) The caller had a terminus name but we couldn't disambiguate
+        #    by it (typo, casing variant, branching name not in any
+        #    pattern's terminus). Falling through to "longest tail" is
+        #    fine because a name was at least supplied — best-effort.
+        #
+        # 2) `towards` was empty (replacement-service row, malformed
+        #    monitor payload) AND multiple patterns / both directions
+        #    matched the RBL set. Picking the longest tail produces a
+        #    deterministic-but-arbitrary direction; surfacing arbitrary
+        #    "next 8 stops" as truth is worse than no panel. Return None
+        #    so the row renders without a chevron.
+        if not needle and len(matching) > 1:
+            distinct_dirs = {p.direction for p in matching}
+            if len(distinct_dirs) > 1:
+                return None
         for pattern in matching:
             idx = _first_index_in_pattern(pattern, rbl_set)
             tail_len = len(pattern.stops) - idx - 1 if idx >= 0 else -1
@@ -1068,19 +1121,23 @@ def _first_index_in_pattern(
 def _station_name_for_rbl(
     catalogue: StaticCatalogue, rbl: int
 ) -> str | None:
-    """Look up the station name for a given RBL (None if unknown)."""
-    for station in catalogue.stations_by_diva.values():
-        if rbl in station.rbls:
-            return station.name
-    return None
+    """Look up the station name for a given RBL (None if unknown).
+
+    Backed by the catalogue's cached RBL index — O(1) per call after
+    the first hit on any catalogue instance.
+    """
+    entry = catalogue.index_by_rbl().get(rbl)
+    return entry[1] if entry is not None else None
 
 
 def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:
-    """Look up the parent DIVA for a given RBL (None if unknown)."""
-    for diva, station in catalogue.stations_by_diva.items():
-        if rbl in station.rbls:
-            return diva
-    return None
+    """Look up the parent DIVA for a given RBL (None if unknown).
+
+    Backed by the catalogue's cached RBL index — O(1) per call after
+    the first hit on any catalogue instance.
+    """
+    entry = catalogue.index_by_rbl().get(rbl)
+    return entry[0] if entry is not None else None
 
 
 def _catalogue_to_store(catalogue: StaticCatalogue) -> dict[str, Any]:

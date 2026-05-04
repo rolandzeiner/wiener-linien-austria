@@ -103,14 +103,22 @@ function deText(raw: string | undefined | null, fallback?: string): TemplateResu
   return fallback ?? "";
 }
 
-(window as unknown as { customCards?: unknown[] }).customCards =
-  (window as unknown as { customCards?: unknown[] }).customCards ?? [];
-(window as unknown as { customCards: Array<Record<string, unknown>> }).customCards.push({
-  type: "wiener-linien-austria-retro-card",
-  name: "Wiener Linien Austria — Retro",
-  description: "LED-Anzeige im Stil der Wiener-Linien-Stationen",
-  preview: true,
-});
+// Dedupe by `type` so a double-load (cache-bust race, HMR, etc.)
+// doesn't surface the retro card twice in the picker.
+{
+  const win = window as unknown as {
+    customCards?: Array<Record<string, unknown>>;
+  };
+  win.customCards = win.customCards ?? [];
+  if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-retro-card")) {
+    win.customCards.push({
+      type: "wiener-linien-austria-retro-card",
+      name: "Wiener Linien Austria — Retro",
+      description: "LED-Anzeige im Stil der Wiener-Linien-Stationen",
+      preview: true,
+    });
+  }
+}
 
 @customElement("wiener-linien-austria-retro-card")
 export class WienerLinienAustriaRetroCard extends LitElement {
@@ -703,6 +711,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           departures,
           cfg.station_bg,
           attrs.line_colors ?? {},
+          cfg.line,
         )
       : nothing;
 
@@ -862,6 +871,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     allDepartures: DepartureAttr[],
     bgChoice: "default" | "white" | "black",
     lineColors: NonNullable<WienerLinienAttrs["line_colors"]>,
+    configuredLine: string | undefined,
   ): TemplateResult {
     let bg: string;
     let fg: string;
@@ -878,11 +888,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       // notably the nightline rule (`^N\d`), which overrides the
       // GTFS bus-navy with the deeper signage navy + bright yellow
       // numerals so N-prefix tiles match the in-station NightLine
-      // signage. Falls back to white when no line is selected and
-      // no departure context is available, since chipPalette's own
-      // var(--primary-color) fallback can read poorly on light themes.
+      // signage.
+      //
+      // Source-line precedence: configured cfg.line wins over live
+      // departures so a nightline configured during the day still
+      // tints the panel in nightline-blue (no live U-Bahn rows would
+      // otherwise overwrite it with U-Bahn-red). Falls back to the
+      // first live departure when no line is configured. Final fall-
+      // through is white — chipPalette's `var(--primary-color)` floor
+      // reads poorly on the LED aesthetic.
       const pool = matching.length ? matching : allDepartures;
-      const sourceLine = pool[0]?.line;
+      const sourceLine = configuredLine || pool[0]?.line;
       if (sourceLine) {
         // No user line_colors overrides on the retro tile — the panel
         // follows upstream branding only. Pass {} for overrides.

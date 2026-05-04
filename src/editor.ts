@@ -414,9 +414,25 @@ export class WienerLinienAustriaCardEditor
     const stopName = attrs.stop_name || stop.entity;
     const overrides = this._config!.line_colors;
     const lineColors = attrs.line_colors ?? {};
-    const lines = [...new Set(
-      (attrs.departures ?? []).map((d) => d.line).filter((l): l is string => !!l),
-    )].sort();
+    // Tracked subset wins — only surface lines the user opted into via
+    // the integration's config flow. Includes off-service lines
+    // (nightlines during the day) because the tracking is independent
+    // of the live `/monitor` window. Falls back to the static-catalogue
+    // list, then live departures, when no tracked list is published
+    // (older sensor cache before this attribute landed).
+    let lines: string[];
+    if (attrs.tracked_lines?.length) {
+      lines = [...attrs.tracked_lines].sort();
+    } else {
+      const fallbackLive = (attrs.departures ?? [])
+        .map((d) => d.line)
+        .filter((l): l is string => !!l);
+      const lineSet = new Set<string>(
+        attrs.lines_at_stop?.length ? attrs.lines_at_stop : fallbackLive,
+      );
+      for (const l of fallbackLive) lineSet.add(l);
+      lines = [...lineSet].sort();
+    }
     // Per-line vehicle type lookup so each chip can render its MoT icon
     // (mdi:subway-variant / mdi:tram / mdi:bus). First-seen-wins on
     // collision because Wiener Linien lines have a stable single MoT.

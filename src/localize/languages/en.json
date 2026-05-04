@@ -32,8 +32,6 @@
     "qr_open": "Show QR code",
     "qr_dialog_title": "QR code for stop",
     "qr_dialog_hint": "Scan with your phone — opens the stop in your maps app.",
-    "qr_open_maps": "Open in maps",
-    "qr_close": "Close",
     "delay_singular": "1 min. late",
     "delay_plural": "{n} min. late",
     "devmode_title": "DEV",

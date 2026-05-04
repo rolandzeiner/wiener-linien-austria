@@ -31,6 +31,12 @@ from .const import (
 )
 from .http import CacheValidators, base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
+# `stops_ahead_for_match` lives in the per-departure inner loop of the
+# monitor parser. Hoisted to module-load time because static.py is a
+# leaf module and the historical "circular reference" comment was stale
+# (static.py never imported coordinator). Avoids per-departure dict
+# lookups against `sys.modules` in the hot path.
+from .static import stops_ahead_for_match
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -385,7 +391,14 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         a sustained outage settles into a slow poll instead of hammering
         the API every minute. The next successful tick resets it.
         """
-        self._consecutive_failures += 1
+        # Cap the counter at 20 — `2 ** 19` is already 524 288 ×
+        # interval, far past `BACKOFF_CAP_SECONDS`, and incrementing
+        # past that just makes the `2 ** N` exponentiation pointlessly
+        # large during a sustained outage. The min() below still clamps
+        # the backoff seconds, but limiting the exponent saves the CPU
+        # the bigint multiplication uses on every failed tick.
+        if self._consecutive_failures < 20:
+            self._consecutive_failures += 1
         if self._consecutive_failures < 2:
             return
         normal_secs = self._normal_interval.total_seconds()
@@ -479,12 +492,7 @@ def _parse_monitor_body(
                 resolved_towards = vehicle_towards or line_towards
                 stops_ahead: list[dict[str, Any]] | None = None
                 if _trip_patterns_loaded and entry_rbls:
-                    # Lazy-import to avoid a circular reference (static.py is
-                    # a leaf module that doesn't import coordinator).
                     try:
-                        from .static import (  # noqa: PLC0415
-                            stops_ahead_for_match,
-                        )
                         stops_ahead = stops_ahead_for_match(
                             catalogue,
                             line_name,

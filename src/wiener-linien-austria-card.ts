@@ -4,6 +4,12 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import QrCreator from "qr-creator";
+import {
+  mdiBus,
+  mdiBusStop,
+  mdiSubwayVariant,
+  mdiTram,
+} from "@mdi/js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { cardStyles } from "./card-styles.js";
@@ -45,14 +51,24 @@ import "./editor.js";
 
 // Register the card with HA's picker so it shows up in the visual editor's
 // "+ Add card" dialog.
-(window as unknown as { customCards?: unknown[] }).customCards =
-  (window as unknown as { customCards?: unknown[] }).customCards ?? [];
-(window as unknown as { customCards: Array<Record<string, unknown>> }).customCards.push({
-  type: "wiener-linien-austria-card",
-  name: "Wiener Linien Austria",
-  description: "Abfahrtsmonitor mit Störungen und Aufzugsinfo",
-  preview: true,
-});
+// Dedupe by `type` so a double-load (cache-bust race during a version
+// banner reload, HMR during dev, URL-deduplication failure on the
+// resource registration path) doesn't surface the same card twice in
+// the picker.
+{
+  const win = window as unknown as {
+    customCards?: Array<Record<string, unknown>>;
+  };
+  win.customCards = win.customCards ?? [];
+  if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-card")) {
+    win.customCards.push({
+      type: "wiener-linien-austria-card",
+      name: "Wiener Linien Austria",
+      description: "Abfahrtsmonitor mit Störungen und Aufzugsinfo",
+      preview: true,
+    });
+  }
+}
 
 // Wrap API-sourced German strings (station names, destinations, disturbance
 // text) so assistive tech pronounces them correctly even when HA's dashboard
@@ -216,39 +232,141 @@ export class WienerLinienAustriaCard extends LitElement {
       if (stops.length && this._activeTab >= stops.length) {
         this._activeTab = 0;
       }
-    }
-  }
-
-  protected updated(changed: PropertyValues): void {
-    if (changed.has("_qrOpenFor")) {
+      // Clear `_qrOpenFor` if the entity it references has been removed
+      // from the card config (user reconfigured and dropped that stop).
+      // Without this, the saved entity-id lingers and `aria-controls`
+      // points at a panel that no longer exists in the DOM.
       if (this._qrOpenFor) {
-        // Modal opened: render the QR into the (now-mounted) canvas
-        // wrapper and wire the document-level Escape handler.
-        const host = this.renderRoot.querySelector<HTMLElement>(".qr-canvas");
-        if (host) {
-          while (host.firstChild) host.removeChild(host.firstChild);
-          QrCreator.render(
-            {
-              text: host.getAttribute("data-qr-text") ?? "",
-              radius: 0,
-              ecLevel: "M",
-              fill: "#000",
-              background: "#fff",
-              size: 256,
-            },
-            host,
-          );
+        const liveEntities = new Set(stops.map((s) => s.entity));
+        if (!liveEntities.has(this._qrOpenFor)) {
+          this._qrOpenFor = null;
         }
-        document.addEventListener("keydown", this._qrEscHandler);
-      } else {
-        document.removeEventListener("keydown", this._qrEscHandler);
       }
     }
   }
 
-  public disconnectedCallback(): void {
-    document.removeEventListener("keydown", this._qrEscHandler);
-    super.disconnectedCallback();
+  protected updated(changed: PropertyValues): void {
+    if (changed.has("_qrOpenFor") && this._qrOpenFor) {
+      // Panel just expanded — render the QR into its canvas wrapper.
+      // Re-render whenever the target URL changes (tab switch reuses
+      // the same Lit DOM element and just updates `data-qr-text`),
+      // so we compare want vs. last-rendered-for and only redraw on
+      // mismatch. Without this guard, the second tab would inherit
+      // the first tab's accent because the canvas would still hold
+      // the prior render.
+      const host = this.renderRoot.querySelector<HTMLElement>(
+        ".qr-panel.expanded .qr-canvas",
+      );
+      if (!host) return;
+      const wantText = host.getAttribute("data-qr-text") ?? "";
+      const haveText = host.getAttribute("data-qr-rendered-for") ?? "";
+      if (wantText && wantText !== haveText) {
+        // Don't clear `host` here — `_renderTintedQr` reads
+        // `getComputedStyle` before mutating the DOM so the layout
+        // engine doesn't have to flush twice (clear + re-append).
+        this._renderTintedQr(host);
+        host.setAttribute("data-qr-rendered-for", wantText);
+      }
+    }
+  }
+
+  /**
+   * Render the QR tinted with the per-station accent colour, then
+   * overlay the MOT (mode-of-transport) MDI icon at the centre in
+   * the same accent on a small white plate. Uses ecLevel "H"
+   * (≈30% damage tolerance) so the obscured centre stays scannable.
+   *
+   * Accent comes from the closest `.station` ancestor's computed
+   * `--wl-accent` — same token the icon-tile, line-badge, and hero
+   * tints already track, so the QR shares the colour identity of
+   * the station it belongs to.
+   */
+  private _renderTintedQr(host: HTMLElement): void {
+    // Read accent FIRST — `getComputedStyle` triggers a layout flush,
+    // and any DOM mutation done before it would force the engine to
+    // recompute layout twice (once after our mutation, once for the
+    // style read). Reading before any clear/append keeps it to one
+    // pass per render.
+    const station = host.closest<HTMLElement>(".station");
+    const accent = station
+      ? getComputedStyle(station).getPropertyValue("--wl-accent").trim() ||
+        "#000"
+      : "#000";
+    // Clear any prior canvas now that we have the accent — the next
+    // QrCreator.render appends a fresh canvas, and we don't want a
+    // stack of canvases across re-renders.
+    while (host.firstChild) host.removeChild(host.firstChild);
+    const size = 220;
+    QrCreator.render(
+      {
+        text: host.getAttribute("data-qr-text") ?? "",
+        radius: 0,
+        // ecLevel "H" tolerates ≈30% damage — required because the
+        // MOT-icon overlay obscures ≈18% of the centre modules.
+        ecLevel: "H",
+        fill: accent,
+        background: "#fff",
+        size,
+      },
+      host,
+    );
+    const canvas = host.querySelector("canvas");
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const iconName = host.getAttribute("data-qr-icon") ?? "mdi:bus-stop";
+    const iconPath = this._mdiPathFor(iconName);
+    if (!iconPath) return;
+    // Centred icon footprint: ≈22% of the QR width — stays well inside
+    // the H-level error-correction headroom while reading clearly at
+    // small sizes.
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const iconRatio = 0.22;
+    const iconSize = Math.round(cw * iconRatio);
+    const iconX = Math.round((cw - iconSize) / 2);
+    const iconY = Math.round((ch - iconSize) / 2);
+    // White plate around the icon — gives the QR detector clean
+    // module boundaries to recover from rather than mixed accent /
+    // icon pixels at the icon edge. Rounded corners (≈20% of icon
+    // size) match the rest of the card's visual language; falls
+    // through to a sharp rect on browsers without Path2D.roundRect
+    // (pre-Chrome 99 / Safari 16) so the QR still scans correctly.
+    const padding = Math.round(iconSize * 0.18);
+    const plateX = iconX - padding;
+    const plateY = iconY - padding;
+    const plateSize = iconSize + padding * 2;
+    const plateRadius = Math.round(iconSize * 0.2);
+    ctx.fillStyle = "#fff";
+    if (typeof ctx.roundRect === "function") {
+      ctx.beginPath();
+      ctx.roundRect(plateX, plateY, plateSize, plateSize, plateRadius);
+      ctx.fill();
+    } else {
+      ctx.fillRect(plateX, plateY, plateSize, plateSize);
+    }
+    // MDI icons use a 24×24 viewBox. Scale to fit the icon area and
+    // tint with the same accent the QR modules use.
+    ctx.save();
+    ctx.translate(iconX, iconY);
+    ctx.scale(iconSize / 24, iconSize / 24);
+    ctx.fillStyle = accent;
+    ctx.fill(new Path2D(iconPath));
+    ctx.restore();
+  }
+
+  private _mdiPathFor(iconName: string): string | null {
+    switch (iconName) {
+      case "mdi:subway-variant":
+        return mdiSubwayVariant;
+      case "mdi:tram":
+        return mdiTram;
+      case "mdi:bus":
+        return mdiBus;
+      case "mdi:bus-stop":
+      default:
+        return mdiBusStop;
+    }
   }
 
   protected shouldUpdate(changed: PropertyValues): boolean {
@@ -402,9 +520,23 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private _setActiveTab(i: number): void {
-    if (Number.isFinite(i) && i !== this._activeTab) {
-      this._activeTab = i;
+    if (!Number.isFinite(i) || i === this._activeTab) return;
+    // If the QR panel was open on the previous tab, carry that
+    // expanded state to the new tab so the user doesn't have to
+    // re-tap the QR button after switching. Stops a config away
+    // from `layout: tabs` would have at most one station to begin
+    // with, so this only applies in tabs mode by definition.
+    const stops = this._resolveStops();
+    const prevEntity = stops[this._activeTab]?.entity;
+    const nextEntity = stops[i]?.entity;
+    if (
+      prevEntity &&
+      nextEntity &&
+      this._qrOpenFor === prevEntity
+    ) {
+      this._qrOpenFor = nextEntity;
     }
+    this._activeTab = i;
   }
 
   private _onTabKeydown(ev: KeyboardEvent, index: number, count: number): void {
@@ -533,10 +665,16 @@ export class WienerLinienAustriaCard extends LitElement {
                     ${showQrButton
                       ? html`<button
                           type="button"
-                          class="icon-action"
+                          class=${classMap({
+                            "icon-action": true,
+                            "qr-toggle": true,
+                            expanded: this._qrOpenFor === stopCfg.entity,
+                          })}
                           title=${qrOpenLabel}
                           aria-label="${qrOpenLabel}: ${title}"
-                          @click=${() => this._openQrFor(stopCfg.entity)}
+                          aria-expanded=${this._qrOpenFor === stopCfg.entity ? "true" : "false"}
+                          aria-controls="wl-qr-${stopCfg.entity.replace(/[^a-z0-9_]/gi, "_")}"
+                          @click=${() => this._toggleQrFor(stopCfg.entity)}
                         ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
                       : nothing}
                     ${mapUrl
@@ -552,8 +690,14 @@ export class WienerLinienAustriaCard extends LitElement {
                   </div>`
                 : nothing}
             </header>`}
-        ${showQrButton && this._qrOpenFor === stopCfg.entity && geoUri
-          ? this._renderQrDialog(stopCfg.entity, title, geoUri, mapUrl)
+        ${showQrButton && geoUri
+          ? this._renderQrPanel(
+              stopCfg.entity,
+              title,
+              geoUri,
+              headerIcon,
+              this._qrOpenFor === stopCfg.entity,
+            )
           : nothing}
 
         ${this._config!.show_hero_metric && heroLead
@@ -1257,11 +1401,24 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   // Daily envelope ~23:55–05:15 captures the first/last NightLine bus
-  // spread across all routes. No timezone math: the user's HA-served
-  // browser and Vienna are the same timezone in practice.
+  // spread across all routes. Computed in HA's configured timezone
+  // (`hass.config.time_zone`) — `Date.getHours()` would use the
+  // browser's local TZ, which diverges when a user remote-accesses
+  // a Vienna instance from another country, when the HA Companion
+  // app's WebView reports the device TZ, or for travellers checking
+  // their stops on the road at 02:00. Falls back to Europe/Vienna
+  // if hass isn't yet wired up (very early renders).
   private _isNightlineHour(): boolean {
-    const now = new Date();
-    const minutesIntoDay = now.getHours() * 60 + now.getMinutes();
+    const tz = this.hass?.config?.time_zone || "Europe/Vienna";
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(new Date());
+    const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+    const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+    const minutesIntoDay = hour * 60 + minute;
     return minutesIntoDay >= 23 * 60 + 55 || minutesIntoDay <= 5 * 60 + 15;
   }
 
@@ -1319,88 +1476,51 @@ export class WienerLinienAustriaCard extends LitElement {
     return `geo:${lat},${lon}?q=${lat},${lon}${label}`;
   }
 
-  private _openQrFor(entityId: string): void {
-    this._qrOpenFor = entityId;
+  private _toggleQrFor(entityId: string): void {
+    this._qrOpenFor = this._qrOpenFor === entityId ? null : entityId;
   }
-
-  private _closeQr(): void {
-    this._qrOpenFor = null;
-  }
-
-  /** Escape-to-close keyboard handler, attached while the modal is open. */
-  private _qrEscHandler = (ev: KeyboardEvent): void => {
-    if (ev.key === "Escape") {
-      ev.preventDefault();
-      this._closeQr();
-    }
-  };
 
   /**
-   * QR modal. Plain positioned overlay (`position: fixed; inset: 0`)
-   * instead of `<dialog>` — `<dialog>.showModal()` inside a Lit shadow
-   * root that's nested in HA's own dialog stack misbehaves on some
-   * browsers (the top-layer registration races against Lit's render
-   * commit). A plain backdrop + dialog div is bulletproof.
+   * Inline QR panel. Same 0fr↔1fr grid-template-rows trick as
+   * `.dep-row-detail` and `.stops-ahead-detail` so the panel
+   * animates to its intrinsic height. Renders below the header,
+   * above the hero, so the QR feels like an extension of the
+   * stop card rather than a modal interruption. The "open in
+   * maps" link lives only in the header (the mdi:map-marker icon
+   * sits right next to the QR toggle), so the panel doesn't
+   * duplicate it.
    */
-  private _renderQrDialog(
+  private _renderQrPanel(
     entityId: string,
     title: string,
     qrTarget: string,
-    fallbackHref: string | null,
+    motIcon: string,
+    expanded: boolean,
   ): TemplateResult {
-    const dialogId = `wl-qr-${entityId.replace(/[^a-z0-9_]/gi, "_")}`;
-    const closeLabel = this._t("qr_close");
+    const panelId = `wl-qr-${entityId.replace(/[^a-z0-9_]/gi, "_")}`;
     const dialogTitle = this._t("qr_dialog_title");
     const hint = this._t("qr_dialog_hint");
-    const openMapsLabel = this._t("qr_open_maps");
-    // The QR carries a geo: URI for native maps-app handoff on phones.
-    // Desktop browsers can't follow geo: in a click — surface an HTTPS
-    // fallback (OSM) for the visible link so the dialog stays useful
-    // when opened on a laptop/desktop dashboard.
-    const linkHref = fallbackHref ?? qrTarget;
     return html`
       <div
-        class="qr-backdrop"
-        role="presentation"
-        @click=${() => this._closeQr()}
-      ></div>
-      <div
-        class="qr-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="${dialogId}-title"
+        class=${classMap({ "qr-panel": true, expanded })}
+        id=${panelId}
+        role="region"
+        aria-hidden=${expanded ? "false" : "true"}
+        aria-label="${dialogTitle}: ${title}"
       >
-        <div class="qr-dialog-inner">
-          <header class="qr-dialog-head">
-            <h3 class="qr-dialog-title" id="${dialogId}-title">
-              ${dialogTitle}
-            </h3>
-            <button
-              type="button"
-              class="icon-action"
-              aria-label=${closeLabel}
-              title=${closeLabel}
-              @click=${() => this._closeQr()}
-            ><ha-icon icon="mdi:close" aria-hidden="true"></ha-icon></button>
-          </header>
-          <p class="qr-dialog-stop">${title}</p>
+        <div class="qr-panel-inner">
           <div
-            class="qr-canvas"
-            role="img"
-            aria-label="${dialogTitle}: ${title}"
-            data-qr-text=${qrTarget}
-          ></div>
-          <p class="qr-dialog-hint">${hint}</p>
-          <div class="qr-dialog-links">
-            <a
-              class="qr-link"
-              href=${linkHref}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>
-              <span>${openMapsLabel}</span>
-            </a>
+            class="qr-panel-body"
+            @click=${() => this._toggleQrFor(entityId)}
+          >
+            <div
+              class="qr-canvas"
+              role="img"
+              aria-label="${dialogTitle}: ${title}"
+              data-qr-text=${qrTarget}
+              data-qr-icon=${motIcon}
+            ></div>
+            <p class="qr-panel-hint">${hint}</p>
           </div>
         </div>
       </div>

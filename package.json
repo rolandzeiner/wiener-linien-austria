@@ -20,6 +20,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
+    "@mdi/js": "7.4.47",
     "lit": "^3.3.0",
     "qr-creator": "1.0.0"
   }

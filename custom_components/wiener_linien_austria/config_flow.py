@@ -53,7 +53,7 @@ from .const import (
     USER_AGENT,
 )
 from .http import base_request_headers
-from .static import Station, async_get_catalogue
+from .static import StaticCatalogue, Station, async_get_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -137,6 +137,101 @@ async def _probe_monitor_lines(
     return out
 
 
+def _static_lines_for_station(
+    catalogue: StaticCatalogue, station: Station
+) -> list[dict[str, str]]:
+    """Enumerate every line × direction that serves this station, regardless
+    of time-of-day, from the static trip-pattern index.
+
+    Solves the "nightlines vanish from the picker between 06:00–23:00 / day
+    lines vanish at 03:00" bug: the live `/monitor` endpoint only returns
+    departures inside the next ~75 minutes, so any line currently out of
+    service is invisible to `_probe_monitor_lines`. The static catalogue
+    knows the full schedule graph (`fahrwegverlaeufe.csv` × `linien.csv`)
+    and exposes every (line, direction) pair plus its terminus name from
+    the published timetable, which is the right source for a "what's
+    trackable here" picker.
+
+    Returns the same shape as `_probe_monitor_lines` so the two sources
+    can be merged. Returns an empty list when the cache predates the
+    trip-pattern index (older v1.4 caches) — caller falls through to the
+    live-only path in that case.
+    """
+    tpi = catalogue.trip_patterns
+    if tpi is None:
+        return []
+    diva_labels = tpi.lines_at_diva.get(station.diva, ())
+    if not diva_labels:
+        return []
+    # Reuse the catalogue's cached RBL → (DIVA, name) reverse index —
+    # it's the same lookup the coordinator's stops_ahead matcher uses,
+    # built once per catalogue instance and dict-resolved per call.
+    rbl_index = catalogue.index_by_rbl()
+    station_rbl_set = set(station.rbls)
+    out: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for label in diva_labels:
+        line_id = tpi.lines_by_label.get(label)
+        if line_id is None:
+            continue
+        mot = tpi.means_by_line.get(line_id, "")
+        for pattern in tpi.patterns_by_line.get(line_id, ()):
+            # Pattern must actually pass through this station — a line
+            # can have multiple patterns (short turns, branches) and
+            # only some visit a given DIVA's RBLs.
+            if not station_rbl_set.intersection(pattern.stops):
+                continue
+            # Direction codes: H="hin" (CSV 1), R="retour" (CSV 2).
+            # Mirrors the live /monitor convention so saved keys round-
+            # trip cleanly when the user reconfigures.
+            direction_str = "H" if pattern.direction == 1 else "R"
+            key = _line_key(label, direction_str)
+            if key in seen:
+                continue
+            terminus_rbl = pattern.stops[-1] if pattern.stops else None
+            terminus_entry = (
+                rbl_index.get(terminus_rbl) if terminus_rbl else None
+            )
+            towards = terminus_entry[1] if terminus_entry is not None else ""
+            if not towards:
+                continue
+            seen.add(key)
+            out.append(
+                {
+                    "key": key,
+                    "line": label,
+                    "towards": towards,
+                    "direction": direction_str,
+                    "type": mot,
+                }
+            )
+    out.sort(key=lambda r: (r["line"], r["towards"]))
+    return out
+
+
+async def _resolve_lines_for_picker(
+    hass: HomeAssistant, catalogue: StaticCatalogue, station: Station
+) -> list[dict[str, str]]:
+    """Merge live + static line lists. Live wins where both have a key —
+    the live `/monitor` row carries the most accurate towards label for
+    branching termini (U1/R reports the active pattern's terminus,
+    "Oberlaa" or "Alaudagasse"); static fills in everything not currently
+    running so off-service lines (nightlines during the day, day-only
+    lines after midnight) still appear in the picker.
+    """
+    live = await _probe_monitor_lines(hass, station.rbls)
+    static = _static_lines_for_station(catalogue, station)
+    if not static:
+        return live
+    live_keys = {row["key"] for row in live}
+    merged = list(live)
+    for row in static:
+        if row["key"] not in live_keys:
+            merged.append(row)
+    merged.sort(key=lambda r: (r["line"], r["towards"]))
+    return merged
+
+
 class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a multi-step config flow for Wiener Linien Austria."""
 
@@ -175,7 +270,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             self._query = str(user_input.get(CONF_SEARCH_QUERY, "")).strip()
-            if len(self._query) < 2:
+            # Clamp pathologically long queries — `catalogue.search` does
+            # an O(stations × len(query)) `casefold` substring scan per
+            # call, so a misclick paste of, say, a 10 MB clipboard would
+            # otherwise spin the event loop. 100 chars is comfortably
+            # past any real Vienna stop name.
+            if len(self._query) < 2 or len(self._query) > 100:
                 errors[CONF_SEARCH_QUERY] = "query_too_short"
             else:
                 try:
@@ -270,7 +370,24 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if not self._lines:
-            self._lines = await _probe_monitor_lines(self.hass, station.rbls)
+            try:
+                catalogue = await async_get_catalogue(self.hass)
+            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                _LOGGER.warning("Static catalogue load failed: %s", err)
+                catalogue = None
+            if catalogue is not None:
+                self._lines = await _resolve_lines_for_picker(
+                    self.hass, catalogue, station
+                )
+            else:
+                # Catalogue unavailable — fall back to the live-only
+                # path so the user can still proceed if the OGD data
+                # store is temporarily down. Picker will be missing
+                # any currently-out-of-service lines, but that's the
+                # pre-fix behaviour and better than blocking entirely.
+                self._lines = await _probe_monitor_lines(
+                    self.hass, station.rbls
+                )
             if not self._lines:
                 return self.async_show_form(
                     step_id="select_lines",

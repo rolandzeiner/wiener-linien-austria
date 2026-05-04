@@ -84,7 +84,22 @@ export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
 }
 
 function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
+  // Tracked list wins — once the user has configured which lines to
+  // track in the integration's config flow, the card editors only
+  // surface those, regardless of whether each is currently running.
+  // Off-service lines (nightlines during the day, day-only lines
+  // after midnight) stay visible because they were tracked, not
+  // because they have a live departure.
+  if (attrs?.tracked_lines?.length) {
+    return [...attrs.tracked_lines].sort();
+  }
   const s = new Set<string>();
+  // Fallback when no tracked list is published yet (cache predates the
+  // attribute, or coordinator hasn't completed first refresh): static
+  // catalogue first, then live departures.
+  if (attrs?.lines_at_stop?.length) {
+    for (const l of attrs.lines_at_stop) s.add(l);
+  }
   for (const d of attrs?.departures ?? []) {
     if (d.line) s.add(d.line);
   }

@@ -151,6 +151,17 @@ class JSModuleRegistration:
                 continue
             configs.append(StaticPathConfig(url, str(card_path), False))
         if not configs:
+            # No card JS at all on disk — the integration's user-visible
+            # surface (both modern and retro Lovelace cards) is broken.
+            # Promote from the per-file warning to a single error so the
+            # condition is loud in the integration log instead of silent.
+            if JSMODULES:
+                _LOGGER.error(
+                    "No Lovelace card bundles found in www/ — expected: %s. "
+                    "The integration will load but cards won't render. "
+                    "Reinstall via HACS or rebuild from source.",
+                    [filename for _, _, filename in JSMODULES],
+                )
             return
         try:
             await self.hass.http.async_register_static_paths(configs)

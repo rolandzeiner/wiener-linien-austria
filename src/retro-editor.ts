@@ -94,6 +94,22 @@ export class WienerLinienAustriaRetroCardEditor
     const attrs = this._attrs(this._config.entity);
     const dir = this._config.direction;
     const s = new Set<string>();
+    // Tracked-line keys win — only surface lines the user opted into
+    // via the integration's config flow, filtered by the configured
+    // direction. Survives off-service hours (nightlines during the day)
+    // because the tracking list is decoupled from the live
+    // `/monitor` window. Keys are `{line}|{direction}` strings.
+    if (attrs?.tracked_line_keys?.length) {
+      for (const key of attrs.tracked_line_keys) {
+        const [line, keyDir] = key.split("|", 2);
+        if (!line) continue;
+        if (dir && keyDir !== dir) continue;
+        s.add(line);
+      }
+      if (s.size > 0) return [...s].sort();
+    }
+    // Fallback for older sensor caches that pre-date `tracked_line_keys`:
+    // derive from live departures so the picker is still populated.
     for (const d of attrs?.departures ?? []) {
       if (d.direction === dir && d.line) s.add(d.line);
     }
@@ -139,12 +155,25 @@ export class WienerLinienAustriaRetroCardEditor
     return `${prefix}: ${head}${more}`;
   }
 
-  /** Distinct directions ("H" / "R") observed at the currently-selected
-   *  entity. Empty when no entity is picked or no data has streamed yet
-   *  — the schema treats empty as "show both" rather than hiding both. */
+  /** Distinct directions ("H" / "R") tracked at the currently-selected
+   *  entity. Tracked-line keys win — once the user has configured which
+   *  lines to track in the integration's config flow, only directions
+   *  that have at least one tracked line are offered. Lines tracked in
+   *  one direction (a nightline tracked R-only) reduce the dropdown to
+   *  that direction so the line picker isn't empty when the user
+   *  finishes configuring the retro card. Falls back to live departures
+   *  for older sensor caches; empty result lets the schema show both
+   *  options as a last resort. */
   private _availableDirections(): Set<"H" | "R"> {
     const attrs = this._attrs(this._config?.entity);
     const out = new Set<"H" | "R">();
+    if (attrs?.tracked_line_keys?.length) {
+      for (const key of attrs.tracked_line_keys) {
+        const [, dir] = key.split("|", 2);
+        if (dir === "H" || dir === "R") out.add(dir);
+      }
+      if (out.size > 0) return out;
+    }
     for (const d of attrs?.departures ?? []) {
       if (d.direction === "H" || d.direction === "R") out.add(d.direction);
     }
@@ -367,16 +396,27 @@ export class WienerLinienAustriaRetroCardEditor
       ...(value as Partial<WienerLinienRetroCardConfig>),
     });
     // Entity changed → the previous `line` is meaningless on the new
-    // stop. Drop it and auto-pick the first line the new entity reports
-    // in the (possibly auto-corrected) direction. Falls back to undefined
-    // when the new sensor has no live data yet — the line dropdown then
-    // renders empty until the user picks one or the data streams in.
+    // stop. Drop it and auto-pick the first tracked line in the
+    // (possibly auto-corrected) direction. Tracked list survives off
+    // hours (a nightline configured for an N-prefix entity still picks
+    // the nightline at noon); falls back to the live-departure
+    // derivation when the cache predates `tracked_line_keys`.
     if (next.entity !== prevEntity) {
       const newAttrs = this._attrs(next.entity);
       const dir = next.direction;
       const lines = new Set<string>();
-      for (const d of newAttrs?.departures ?? []) {
-        if (d.direction === dir && d.line) lines.add(d.line);
+      if (newAttrs?.tracked_line_keys?.length) {
+        for (const key of newAttrs.tracked_line_keys) {
+          const [line, keyDir] = key.split("|", 2);
+          if (!line) continue;
+          if (dir && keyDir !== dir) continue;
+          lines.add(line);
+        }
+      }
+      if (lines.size === 0) {
+        for (const d of newAttrs?.departures ?? []) {
+          if (d.direction === dir && d.line) lines.add(d.line);
+        }
       }
       const sorted = [...lines].sort();
       next.line = sorted[0];

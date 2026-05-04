@@ -221,6 +221,19 @@ export interface WienerLinienAttrs {
   server_time?: string | null;
   departures?: DepartureAttr[];
   next_by_line?: Record<string, number>;
+  // Static-catalogue line list for this stop — every line serving the
+  // DIVA per the Wiener Linien schedule, regardless of whether it has
+  // a live departure right now. Empty array (or absent) until the
+  // catalogue's trip-pattern index has loaded.
+  lines_at_stop?: string[];
+  // User-tracked subset of `lines_at_stop` — line names selected in
+  // the integration's config flow. Card editors prefer this so the
+  // per-stop pickers only surface lines the user opted into.
+  tracked_lines?: string[];
+  // Raw `{line}|{direction}` keys for tracked lines. Used by the retro
+  // card editor to filter the line list by direction without losing
+  // off-service lines.
+  tracked_line_keys?: string[];
   // GTFS-derived per-line colours, scoped to the lines at this stop.
   // Empty when the static catalogue hasn't been loaded yet.
   line_colors?: LineColorsMap;
