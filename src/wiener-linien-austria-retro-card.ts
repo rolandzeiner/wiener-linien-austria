@@ -271,9 +271,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._raceTimers = [];
   }
 
+  /** Schedule a timeout AND track it on `_raceTimers` so a teardown can
+   *  cancel it. The handle self-removes from the array on fire so the
+   *  array doesn't accumulate dead handles between `_clearRaceTimers`
+   *  calls. Use this in place of bare `setTimeout` + manual push. */
+  private _scheduleRaceTimer(cb: () => void, delayMs: number): void {
+    const handle = setTimeout(() => {
+      const idx = this._raceTimers.indexOf(handle);
+      if (idx >= 0) this._raceTimers.splice(idx, 1);
+      cb();
+    }, delayMs);
+    this._raceTimers.push(handle);
+  }
+
   private _scheduleRace(delayMs: number): void {
-    const t = setTimeout(() => this._startRace(), delayMs);
-    this._raceTimers.push(t);
+    this._scheduleRaceTimer(() => this._startRace(), delayMs);
   }
 
   // Click-to-race: tapping the card while idle kicks off a race
@@ -355,7 +367,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._countdownStartAt +
       (Math.floor(elapsed / COUNTDOWN_DIGIT_MS) + 1) * COUNTDOWN_DIGIT_MS;
     const wait = Math.max(50, nextDigitAt - now);
-    this._raceTimers.push(setTimeout(() => this._scheduleCountdownTick(), wait));
+    this._scheduleRaceTimer(() => this._scheduleCountdownTick(), wait);
   }
 
   // Flips countdown → racing. Called from the countdown ticker once the
@@ -464,34 +476,25 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       // right next-tick delay from elapsed wall-clock time.
       this._scheduleCountdownTick();
     } else if (this._raceState === "racing" && this._raceEndAt !== null) {
-      const delay = Math.max(0, this._raceEndAt - now);
-      this._raceTimers.push(
-        setTimeout(() => {
-          this._raceState = "freeze";
-          this._raceEndAt = null;
-          this._armStateTransitions();
-        }, delay),
-      );
+      this._scheduleRaceTimer(() => {
+        this._raceState = "freeze";
+        this._raceEndAt = null;
+        this._armStateTransitions();
+      }, Math.max(0, this._raceEndAt - now));
     } else if (this._raceState === "freeze" && this._freezeEndAt !== null) {
-      const delay = Math.max(0, this._freezeEndAt - now);
-      this._raceTimers.push(
-        setTimeout(() => {
-          this._raceState = "victory";
-          this._freezeEndAt = null;
-          this._armStateTransitions();
-        }, delay),
-      );
+      this._scheduleRaceTimer(() => {
+        this._raceState = "victory";
+        this._freezeEndAt = null;
+        this._armStateTransitions();
+      }, Math.max(0, this._freezeEndAt - now));
     } else if (this._raceState === "victory" && this._victoryEndAt !== null) {
-      const delay = Math.max(0, this._victoryEndAt - now);
-      this._raceTimers.push(
-        setTimeout(() => {
-          this._raceState = "idle";
-          this._victoryEndAt = null;
-          if (this._config?.wheelchair_race) {
-            this._scheduleRace(this._nextRaceDelay());
-          }
-        }, delay),
-      );
+      this._scheduleRaceTimer(() => {
+        this._raceState = "idle";
+        this._victoryEndAt = null;
+        if (this._config?.wheelchair_race) {
+          this._scheduleRace(this._nextRaceDelay());
+        }
+      }, Math.max(0, this._victoryEndAt - now));
     }
   }
 

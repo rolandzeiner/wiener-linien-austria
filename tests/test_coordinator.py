@@ -19,6 +19,7 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN_LAST_CALL_KEY,
     ERR_RATE_LIMIT,
 )
+from tests.conftest import make_response_cm
 from custom_components.wiener_linien_austria.coordinator import (
     MonitorData,
     WienerLinienAustriaCoordinator,
@@ -307,7 +308,7 @@ async def test_fetch_success_real_chain(
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
     mock_resp = _ok_response(monitor_fixture)
-    mock_get = AsyncMock(return_value=mock_resp)
+    mock_get = MagicMock(return_value=make_response_cm(mock_resp))
     with patch.object(coordinator._session, "get", new=mock_get):
         data = await coordinator._async_update_data()
 
@@ -349,7 +350,7 @@ async def test_http_error_raises_update_failed(
 
     with (
         patch.object(
-            coordinator._session, "get", new=AsyncMock(return_value=mock_resp)
+            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
         ),
         pytest.raises(UpdateFailed) as exc,
     ):
@@ -368,7 +369,7 @@ async def test_connection_error_raises_update_failed(hass: HomeAssistant) -> Non
         patch.object(
             coordinator._session,
             "get",
-            new=AsyncMock(side_effect=aiohttp.ClientConnectionError("unreachable")),
+            new=MagicMock(side_effect=aiohttp.ClientConnectionError("unreachable")),
         ),
         pytest.raises(UpdateFailed) as exc,
     ):
@@ -390,7 +391,7 @@ async def test_invalid_json_raises_update_failed(hass: HomeAssistant) -> None:
 
     with (
         patch.object(
-            coordinator._session, "get", new=AsyncMock(return_value=mock_resp)
+            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
         ),
         pytest.raises(UpdateFailed) as exc,
     ):
@@ -409,7 +410,7 @@ async def test_non_dict_body_raises_update_failed(hass: HomeAssistant) -> None:
 
     with (
         patch.object(
-            coordinator._session, "get", new=AsyncMock(return_value=mock_resp)
+            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
         ),
         pytest.raises(UpdateFailed) as exc,
     ):
@@ -432,7 +433,7 @@ async def test_upstream_error_code_raises_update_failed(
 
     with (
         patch.object(
-            coordinator._session, "get", new=AsyncMock(return_value=mock_resp)
+            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
         ),
         pytest.raises(UpdateFailed) as exc,
     ):
@@ -524,7 +525,7 @@ async def test_rate_limit_raises_update_failed_and_issue(
         patch.object(
             coordinator._session,
             "get",
-            new=AsyncMock(return_value=mock_resp),
+            new=MagicMock(return_value=make_response_cm(mock_resp)),
         ),
         pytest.raises(UpdateFailed),
     ):
@@ -561,7 +562,7 @@ async def test_recovery_clears_rate_limit_issue(
     with patch.object(
         coordinator._session,
         "get",
-        new=AsyncMock(return_value=mock_resp),
+        new=MagicMock(return_value=make_response_cm(mock_resp)),
     ):
         await coordinator._async_update_data()
 
@@ -581,7 +582,7 @@ async def test_timeout_raises_update_failed(hass: HomeAssistant) -> None:
         patch.object(
             coordinator._session,
             "get",
-            new=AsyncMock(side_effect=asyncio.TimeoutError()),
+            new=MagicMock(side_effect=asyncio.TimeoutError()),
         ),
         pytest.raises(UpdateFailed) as exc,
     ):
@@ -617,7 +618,7 @@ async def test_domain_cooldown_serialises_calls(
         patch.object(
             coordinator._session,
             "get",
-            new=AsyncMock(return_value=mock_resp),
+            new=MagicMock(return_value=make_response_cm(mock_resp)),
         ),
         patch(
             "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
@@ -661,7 +662,7 @@ async def test_domain_cooldown_no_sleep_when_elapsed(
         patch.object(
             coordinator._session,
             "get",
-            new=AsyncMock(return_value=mock_resp),
+            new=MagicMock(return_value=make_response_cm(mock_resp)),
         ),
         patch(
             "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
@@ -779,7 +780,9 @@ async def test_304_returns_prior_data_unchanged(
     resp_304.raise_for_status = MagicMock()
     resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
 
-    mock_get = AsyncMock(side_effect=[resp_200, resp_304])
+    mock_get = MagicMock(
+        side_effect=[make_response_cm(resp_200), make_response_cm(resp_304)]
+    )
     with patch.object(coordinator._session, "get", new=mock_get):
         first = await coordinator._async_update_data()
         coordinator.data = first  # mimic DataUpdateCoordinator caching
@@ -881,7 +884,7 @@ async def test_304_with_no_prior_data_falls_through(
     resp_304.json = AsyncMock(side_effect=ValueError("304 has no body"))
 
     with (
-        patch.object(coordinator._session, "get", new=AsyncMock(return_value=resp_304)),
+        patch.object(coordinator._session, "get", new=MagicMock(return_value=make_response_cm(resp_304))),
         pytest.raises(UpdateFailed),
     ):
         await coordinator._async_update_data()

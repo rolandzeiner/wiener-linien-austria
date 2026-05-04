@@ -40,7 +40,11 @@ import {
   type NormalisedModernConfig,
   type NormalisedModernStop,
 } from "./utils/config.js";
-import { findWienerLinienEntities, firstLineColorsMap } from "./utils/entities.js";
+import {
+  findWienerLinienEntities,
+  firstLineColorsMap,
+  lineColorsFor,
+} from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeTrafficHtml } from "./utils/html.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
@@ -102,24 +106,6 @@ function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
     _nightlineHourFormatters.set(tz, fmt);
   }
   return fmt;
-}
-
-// Reads the GTFS-derived per-line palette from a stop sensor. The
-// integration publishes the full Wiener Linien catalogue (~150 lines)
-// on every sensor — same data on each — so any one entity is sufficient
-// to look up colours for transfer chips of OTHER lines too. Returns
-// `{}` when the catalogue hasn't loaded yet; the card helpers
-// (chipPalette, colorForLine) handle empty maps as "fall through to the
-// nightline rule / fallback".
-function lineColorsFor(
-  hass: HomeAssistant | undefined,
-  entityId: string | undefined,
-): LineColorsMap {
-  if (!hass || !entityId) return {};
-  const attrs = hass.states[entityId]?.attributes as
-    | WienerLinienAttrs
-    | undefined;
-  return attrs?.line_colors ?? {};
 }
 
 @customElement("wiener-linien-austria-card")
@@ -1444,13 +1430,20 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   // Per-surface DOM id for the stops-ahead panel. Distinct prefix between
-  // hero and row-list panels so an in-page anchor can target either, and
-  // the countdown is included to refresh the id every poll (DOM nodes
-  // ride the new id; aria-controls re-points naturally).
+  // hero and row-list panels so an in-page anchor can target either.
+  // The id stays stable across polls by keying on `time_planned` (or a
+  // countdown fallback when not available) — same recipe as `_rowKey`.
+  // Previously included `d.countdown` directly, which mutates every
+  // minute and left `aria-controls` pointing at a stale id mid-tick;
+  // screen readers polled at the wrong moment chased a dead anchor.
   private _panelId(d: DepartureAttr, entityId: string, prefix: "hero" | "row"): string {
     const safeEid = entityId.replace(/[^a-z0-9_]/gi, "_");
     const suffix = prefix === "hero" ? "wl-hero-stopsahead" : "wl-stopsahead";
-    return `${suffix}-${safeEid}-${d.line}-${d.direction}-${d.countdown}`;
+    const stableId = (d.time_planned ?? `cd${d.countdown}`).replace(
+      /[^a-z0-9_-]/gi,
+      "_",
+    );
+    return `${suffix}-${safeEid}-${d.line}-${d.direction}-${stableId}`;
   }
 
   private _toggleRow(key: string): void {
@@ -1569,15 +1562,24 @@ export class WienerLinienAustriaCard extends LitElement {
   // ------------------------------------------------------------------
 
   private _isDevMode(): boolean {
+    // Cached on first access — `localStorage.getItem` and
+    // `window.location.search` would otherwise run on every render
+    // (footer + dev panel both call this), and the answer can't change
+    // mid-session (URL flip or storage write doesn't propagate to a
+    // running card without a reload anyway).
+    if (this._devModeCached !== null) return this._devModeCached;
+    let result = false;
     try {
       const search = window.location.search || "";
-      if (search.includes("wl_debug=1")) return true;
-      if (window.localStorage?.getItem("wl_debug") === "1") return true;
+      if (search.includes("wl_debug=1")) result = true;
+      else if (window.localStorage?.getItem("wl_debug") === "1") result = true;
     } catch {
       // SSR / restricted ctx (e.g. localStorage blocked) — default off
     }
-    return false;
+    this._devModeCached = result;
+    return result;
   }
+  private _devModeCached: boolean | null = null;
 
   private _renderDevModePanel(): TemplateResult | typeof nothing {
     if (!this._isDevMode()) return nothing;

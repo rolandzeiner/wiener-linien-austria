@@ -139,11 +139,12 @@ class WienerLinienStopSensor(
             line_names = {d.line for d in departures if d.line}
         rbls = {int(r) for r in config.get(CONF_RBLS) or []}
 
-        # Use the coordinator's hass reference — `self.hass` is only set after
-        # async_added_to_hass, but tests instantiate the sensor directly.
-        traffic, elevator = get_alerts_for(
-            self.coordinator.hass, line_names, rbls
-        )
+        # Prefer `self.hass` (the standard Entity reference, set by HA
+        # during `async_added_to_hass`); fall back to the coordinator's
+        # ref so tests that read `extra_state_attributes` without
+        # routing through HA core still resolve.
+        hass = self.hass if self.hass is not None else self.coordinator.hass
+        traffic, elevator = get_alerts_for(hass, line_names, rbls)
 
         # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
         # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) stay under HA's

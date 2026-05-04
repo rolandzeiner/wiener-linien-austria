@@ -4,6 +4,8 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+
+from tests.conftest import make_response_cm
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -294,13 +296,13 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     routes_resp = _csv_response(ROUTES_CSV, etag='"routes-v1"')
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(
+    fake_session.get = MagicMock(
         side_effect=[
-            haltestellen_resp,
-            haltepunkte_resp,
-            linien_resp,
-            fahr_resp,
-            routes_resp,
+            make_response_cm(haltestellen_resp),
+            make_response_cm(haltepunkte_resp),
+            make_response_cm(linien_resp),
+            make_response_cm(fahr_resp),
+            make_response_cm(routes_resp),
         ]
     )
 
@@ -353,13 +355,13 @@ async def test_fetch_and_build_all_304_returns_prior_unchanged(
         return nm
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(
+    fake_session.get = MagicMock(
         side_effect=[
-            _not_modified(),
-            _not_modified(),
-            _not_modified(),
-            _not_modified(),
-            _not_modified(),
+            make_response_cm(_not_modified()),
+            make_response_cm(_not_modified()),
+            make_response_cm(_not_modified()),
+            make_response_cm(_not_modified()),
+            make_response_cm(_not_modified()),
         ]
     )
 
@@ -415,8 +417,14 @@ async def test_fetch_and_build_one_304_one_fresh(
     punkte_fresh = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v2"')
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(
-        side_effect=[_304(), punkte_fresh, _304(), _304(), _304()]
+    fake_session.get = MagicMock(
+        side_effect=[
+            make_response_cm(_304()),
+            make_response_cm(punkte_fresh),
+            make_response_cm(_304()),
+            make_response_cm(_304()),
+            make_response_cm(_304()),
+        ]
     )
 
     with patch(

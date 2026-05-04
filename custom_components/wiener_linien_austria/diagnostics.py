@@ -6,7 +6,6 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .alerts import get_alerts_for
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
 from .coordinator import WienerLinienConfigEntry
 
@@ -56,6 +55,9 @@ async def async_get_config_entry_diagnostics(
         if isinstance(k, str) and k
     }
     rbls = {int(r) for r in config.get(CONF_RBLS) or []}
+    # Lazy-import: diagnostics is a rare path, so we don't pay the
+    # `alerts` module import cost on the hot integration-load path.
+    from .alerts import get_alerts_for  # noqa: PLC0415
     traffic, elevator = get_alerts_for(hass, line_names, rbls)
 
     # Surface trip-pattern index health so user-reported "stops_ahead is

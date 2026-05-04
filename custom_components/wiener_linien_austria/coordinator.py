@@ -256,32 +256,88 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         headers.update(self._monitor_cache.to_request_headers())
         timeout = aiohttp.ClientTimeout(total=30)
 
+        # Single `async with` block keeps the response scoped tightly so
+        # aiohttp returns the connection to the pool the moment we're
+        # done — even on early `raise UpdateFailed(...)` paths. The
+        # body read AND the validator capture both need `resp`, so the
+        # whole parse/validate flow lives inside the context manager.
         try:
-            resp = await self._session.get(
+            async with self._session.get(
                 url, params=params, headers=headers, timeout=timeout
-            )
-            # 304 = our cached data is still fresh. Return the previous
-            # MonitorData unchanged; HA's coordinator handles "same value"
-            # by not re-emitting state changes to entities.
-            if resp.status == 304:
-                if self.data is not None:
-                    self._monitor_cache.update_from_response(resp)
-                    return self.data
-                # First tick after restart with no `self.data` yet — a 304
-                # has an empty body, so falling through to `resp.json()`
-                # would surface as a misleading "invalid response". Treat
-                # it as a transient and retry. Practically unreachable
-                # today (validators reset on init), but defends against a
-                # future change that persists them across restarts.
-                raise UpdateFailed(
-                    translation_domain=DOMAIN,
-                    translation_key="api_invalid_response",
-                    translation_placeholders={
-                        "status": "304",
-                        "error": "no cached data to revalidate",
-                    },
-                )
-            resp.raise_for_status()
+            ) as resp:
+                status = resp.status
+                # 304 = our cached data is still fresh. Return the previous
+                # MonitorData unchanged; HA's coordinator handles "same value"
+                # by not re-emitting state changes to entities.
+                if status == 304:
+                    if self.data is not None:
+                        self._monitor_cache.update_from_response(resp)
+                        return self.data
+                    # First tick after restart with no `self.data` yet — a 304
+                    # has an empty body, so falling through to `resp.json()`
+                    # would surface as a misleading "invalid response". Treat
+                    # it as a transient and retry. Practically unreachable
+                    # today (validators reset on init), but defends against a
+                    # future change that persists them across restarts.
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_invalid_response",
+                        translation_placeholders={
+                            "status": "304",
+                            "error": "no cached data to revalidate",
+                        },
+                    )
+                resp.raise_for_status()
+
+                try:
+                    body = await resp.json()
+                except (aiohttp.ContentTypeError, ValueError) as err:
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_invalid_response",
+                        translation_placeholders={
+                            "status": str(status),
+                            "error": str(err),
+                        },
+                    ) from err
+
+                if not isinstance(body, dict):
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_invalid_response",
+                        translation_placeholders={
+                            "status": str(status),
+                            "error": f"expected object, got {type(body).__name__}",
+                        },
+                    )
+
+                message = body.get("message") or {}
+                code = _safe_int(message.get("messageCode"))
+                self._last_error_code = code
+                self._server_time = message.get("serverTime")
+
+                if code == ERR_RATE_LIMIT:
+                    self._raise_rate_limit_issue()
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_rate_limited",
+                    )
+
+                if code is not None and code != 1:
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_upstream_error",
+                        translation_placeholders={
+                            "code": str(code),
+                            "value": str(message.get("value") or ""),
+                        },
+                    )
+
+                self._clear_rate_limit_issue()
+                # Capture validators only on a fully-validated 200 response —
+                # never store them for an error reply, else next tick would
+                # send If-None-Match against a payload we never accepted.
+                self._monitor_cache.update_from_response(resp)
         except asyncio.TimeoutError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
@@ -306,56 +362,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
                     "error": str(err),
                 },
             ) from err
-
-        try:
-            body = await resp.json()
-        except (aiohttp.ContentTypeError, ValueError) as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_invalid_response",
-                translation_placeholders={
-                    "status": str(resp.status),
-                    "error": str(err),
-                },
-            ) from err
-
-        if not isinstance(body, dict):
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_invalid_response",
-                translation_placeholders={
-                    "status": str(resp.status),
-                    "error": f"expected object, got {type(body).__name__}",
-                },
-            )
-
-        message = body.get("message") or {}
-        code = _safe_int(message.get("messageCode"))
-        self._last_error_code = code
-        self._server_time = message.get("serverTime")
-
-        if code == ERR_RATE_LIMIT:
-            self._raise_rate_limit_issue()
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_rate_limited",
-            )
-
-        if code is not None and code != 1:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_upstream_error",
-                translation_placeholders={
-                    "code": str(code),
-                    "value": str(message.get("value") or ""),
-                },
-            )
-
-        self._clear_rate_limit_issue()
-        # Capture validators only on a fully-validated 200 response —
-        # never store them for an error reply, else next tick would
-        # send If-None-Match against a payload we never accepted.
-        self._monitor_cache.update_from_response(resp)
         # Read the shared catalogue ref live so a background trip-pattern
         # refresh that lands after this coordinator's setup is picked up
         # on the very next parse — no restart needed.

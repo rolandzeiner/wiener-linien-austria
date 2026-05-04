@@ -167,17 +167,32 @@ async def _fetch_info_list(
     headers.update(validators.to_request_headers())
     try:
         await async_enforce_domain_cooldown(hass)
-        resp = await session.get(
+        async with session.get(
             url,
             params=[("name", name)],
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=15),
-        )
-        if resp.status == 304:
+        ) as resp:
+            if resp.status == 304:
+                validators.update_from_response(resp)
+                return _NOT_MODIFIED
+            resp.raise_for_status()
+            body = await resp.json()
+            if not isinstance(body, dict):
+                return []
+            message = body.get("message") or {}
+            if message.get("messageCode") not in (1, None):
+                _LOGGER.debug(
+                    "trafficInfoList?name=%s returned non-OK messageCode %s",
+                    name,
+                    message.get("messageCode"),
+                )
+                return []
+            # Only capture validators after the body has fully validated —
+            # never for an error reply we wouldn't accept anyway.
             validators.update_from_response(resp)
-            return _NOT_MODIFIED
-        resp.raise_for_status()
-        body = await resp.json()
+            infos = (body.get("data") or {}).get("trafficInfos") or []
+            return [x for x in infos if isinstance(x, dict)]
     except asyncio.CancelledError:
         # Cooperative cancellation — usually fired when HA is shutting
         # down and our `_periodic_alerts` task is being torn down with
@@ -195,22 +210,6 @@ async def _fetch_info_list(
     ):
         _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
         return []
-
-    if not isinstance(body, dict):
-        return []
-    message = body.get("message") or {}
-    if message.get("messageCode") not in (1, None):
-        _LOGGER.debug(
-            "trafficInfoList?name=%s returned non-OK messageCode %s",
-            name,
-            message.get("messageCode"),
-        )
-        return []
-    # Only capture validators after the body has fully validated — never
-    # for an error reply we wouldn't accept anyway.
-    validators.update_from_response(resp)
-    infos = (body.get("data") or {}).get("trafficInfos") or []
-    return [x for x in infos if isinstance(x, dict)]
 
 
 async def async_refresh_alerts(hass: HomeAssistant) -> None:

@@ -5,6 +5,8 @@ import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from tests.conftest import make_response_cm
+
 import aiohttp
 import pytest
 from homeassistant.core import HomeAssistant
@@ -227,12 +229,14 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     resp_elevator.raise_for_status = MagicMock()
     resp_elevator.json = AsyncMock(return_value=elevator_body)
 
-    async def fake_get(url: str, **kwargs: object) -> MagicMock:
+    def fake_get(url: str, **kwargs: object) -> MagicMock:
         name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return resp_elevator if name == "aufzugsinfo" else resp_traffic
+        return make_response_cm(
+            resp_elevator if name == "aufzugsinfo" else resp_traffic
+        )
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=fake_get)
+    fake_session.get = MagicMock(side_effect=fake_get)
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -280,12 +284,14 @@ async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None
         r.json = AsyncMock(return_value=body)
         return r
 
-    async def fake_get(url: str, **kwargs: object) -> MagicMock:
+    def fake_get(url: str, **kwargs: object) -> MagicMock:
         name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
+        return make_response_cm(
+            _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
+        )
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=fake_get)
+    fake_session.get = MagicMock(side_effect=fake_get)
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -300,7 +306,7 @@ async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None
 async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None:
     """Fetch failures must not raise — alerts are advisory."""
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=asyncio.TimeoutError())
+    fake_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -326,7 +332,7 @@ async def test_fetch_info_list_propagates_unexpected_errors(
     async_track_time_interval logs the traceback for us.
     """
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=RuntimeError("unexpected"))
+    fake_session.get = MagicMock(side_effect=RuntimeError("unexpected"))
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -342,9 +348,14 @@ async def test_fetch_info_list_propagates_unexpected_errors(
 
 
 def _mock_session(resp: MagicMock) -> MagicMock:
-    """Build a fake aiohttp session whose .get() returns `resp`."""
+    """Build a fake aiohttp session whose .get() returns `resp`.
+
+    Production code uses `async with session.get(...) as resp:`, so the
+    return value of .get must be an async context manager. We use the
+    shared `make_response_cm` helper from conftest to wrap the response.
+    """
     fake = MagicMock()
-    fake.get = AsyncMock(return_value=resp)
+    fake.get = MagicMock(return_value=make_response_cm(resp))
     return fake
 
 
@@ -474,7 +485,7 @@ async def test_async_refresh_alerts_304_keeps_existing_cache(
     resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(return_value=resp_304)
+    fake_session.get = MagicMock(return_value=make_response_cm(resp_304))
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -507,7 +518,14 @@ async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
     resp_second.json = AsyncMock(return_value=body)
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=[resp_first, resp_first, resp_second, resp_second])
+    fake_session.get = MagicMock(
+        side_effect=[
+            make_response_cm(resp_first),
+            make_response_cm(resp_first),
+            make_response_cm(resp_second),
+            make_response_cm(resp_second),
+        ]
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",

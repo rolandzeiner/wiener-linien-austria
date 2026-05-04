@@ -4,6 +4,8 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+
+from tests.conftest import make_response_cm
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -304,7 +306,7 @@ async def test_probe_monitor_lines_dedupes_and_sorts(hass: HomeAssistant) -> Non
     resp.raise_for_status = MagicMock()
     resp.json = AsyncMock(return_value=body)
     session = MagicMock()
-    session.get = AsyncMock(return_value=resp)
+    session.get = MagicMock(return_value=make_response_cm(resp))
 
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
@@ -468,7 +470,7 @@ async def test_resolve_lines_for_picker_merges_live_and_static(
     resp.raise_for_status = MagicMock()
     resp.json = AsyncMock(return_value=body)
     session = MagicMock()
-    session.get = AsyncMock(return_value=resp)
+    session.get = MagicMock(return_value=make_response_cm(resp))
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
         return_value=session,
@@ -512,7 +514,7 @@ async def test_resolve_lines_for_picker_falls_back_to_live_only(
     resp.raise_for_status = MagicMock()
     resp.json = AsyncMock(return_value=body)
     session = MagicMock()
-    session.get = AsyncMock(return_value=resp)
+    session.get = MagicMock(return_value=make_response_cm(resp))
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
         return_value=session,

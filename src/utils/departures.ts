@@ -2,13 +2,6 @@ import type { HomeAssistant } from "../types.js";
 
 import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 
-// Stable (line, direction, towards) identifier — used by tripletsAtStop's
-// seen-dedupe and as a stable picker key. Walk-times key by pair instead;
-// see lineDirKey below.
-function lineKey(line: string, direction: string, towards: string): string {
-  return `${line}|${direction}|${towards}`;
-}
-
 // (line, direction) identifier used for walk-times lookup. The towards
 // component is intentionally omitted: the /monitor API reports both
 // `line.towards` and per-departure `vehicle.towards` based on whichever
@@ -36,10 +29,14 @@ export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] 
   const out: Triplet[] = [];
   const seen = new Set<string>();
   for (const d of attrs?.departures ?? []) {
-    const key = lineKey(d.line, String(d.direction ?? ""), d.towards);
+    const dir = String(d.direction ?? "");
+    // Triple-keyed dedupe — a (line, direction, towards) triple is the
+    // smallest unit the picker shows. Walk-times use lineDirKey (pair)
+    // because the threshold doesn't depend on the active terminus.
+    const key = `${d.line}|${dir}|${d.towards}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ line: d.line, direction: String(d.direction ?? ""), towards: d.towards, type: d.type });
+    out.push({ line: d.line, direction: dir, towards: d.towards, type: d.type });
   }
   out.sort((a, b) => (a.line === b.line ? a.towards.localeCompare(b.towards) : a.line.localeCompare(b.line)));
   return out;

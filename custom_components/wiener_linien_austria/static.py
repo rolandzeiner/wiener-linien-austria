@@ -36,6 +36,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
+    ENTRY_COUNT_KEY,
     MAX_STOPS_AHEAD,
     STATIC_FILES,
     USER_AGENT,
@@ -167,6 +168,12 @@ STORE_KEY = f"{DOMAIN}_static"
 # duplicating the bare string — a typo in any caller would silently break
 # the catalogue lookup on that one path only.
 CATALOGUE_KEY = "static_catalogue"
+# hass.data key for the background catalogue-refresh task spawned when an
+# older cache predates trip-patterns / colours / etc. Stored so the last-
+# entry unload cleanup can cancel an in-flight task — without that, the
+# task could complete after teardown and re-poison hass.data[DOMAIN] via
+# `async_set_cached_catalogue`.
+BACKGROUND_REFRESH_TASK_KEY = "static_bg_refresh_task"
 
 
 @dataclass
@@ -232,9 +239,14 @@ class TripPatternIndex:
     label_for_line: dict[int, str] = field(default_factory=dict, repr=False)
 
     def __post_init__(self) -> None:
-        """Build the LineID→label reverse index once at construction."""
-        if not self.label_for_line:
-            self.label_for_line = {v: k for k, v in self.lines_by_label.items()}
+        """Build the LineID→label reverse index at construction.
+
+        Rebuilt unconditionally — the cost is microseconds even on the
+        full Wiener Linien catalogue, and rebuilding always means the
+        index can't drift away from `lines_by_label` if a future caller
+        constructs an instance with a stale or empty reverse map.
+        """
+        self.label_for_line = {v: k for k, v in self.lines_by_label.items()}
 
     @property
     def line_count(self) -> int:
@@ -350,8 +362,15 @@ def async_set_cached_catalogue(
     weeks-to-months cadence. This call ensures only that *new*
     coordinators (after entry reload) and the next config-flow
     invocation see the refreshed data.
+
+    No-op when the integration has been torn down (no entries left). A
+    background refresh task spawned earlier may otherwise complete
+    after `async_unload_entry` ran and re-poison `hass.data[DOMAIN]`
+    with a catalogue we just deliberately dropped.
     """
-    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data or ENTRY_COUNT_KEY not in domain_data:
+        return
     domain_data[CATALOGUE_KEY] = catalogue
 
 
@@ -393,13 +412,30 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 # the next weekly tick.
                 needs_refresh_reason = "missing route colours"
             if needs_refresh_reason is not None:
+                domain_data = hass.data.setdefault(DOMAIN, {})
+                existing = domain_data.get(BACKGROUND_REFRESH_TASK_KEY)
+                if isinstance(existing, asyncio.Task) and not existing.done():
+                    # A migration is already in flight — don't queue a
+                    # second one. The first will finish and update the
+                    # shared catalogue ref.
+                    return catalogue
                 _LOGGER.warning(
                     "Static cache %s; scheduling background refresh",
                     needs_refresh_reason,
                 )
-                hass.async_create_background_task(
+                task = hass.async_create_background_task(
                     _async_background_refresh(hass, prior=catalogue, store=store),
                     name=f"{DOMAIN}_trip_patterns_migration",
+                )
+                domain_data[BACKGROUND_REFRESH_TASK_KEY] = task
+                # Self-clear the slot when the task finishes so a future
+                # refresh can be scheduled. Cancellation also fires this
+                # callback (asyncio guarantees done-callbacks on cancel),
+                # which keeps the slot tidy after unload.
+                task.add_done_callback(
+                    lambda _t, dd=domain_data: dd.pop(
+                        BACKGROUND_REFRESH_TASK_KEY, None
+                    )
                 )
             return catalogue
 
@@ -495,15 +531,32 @@ async def _fetch_and_build(
     punkte_validators = (
         prior.validators.get("haltepunkte") if prior else None
     ) or CacheValidators()
+    # Force a full body for linien + fahrwegverlaeufe whenever we don't
+    # yet have a parsed trip-pattern index. Otherwise stale validators
+    # could trigger a 304 with an empty body, leaving us unable to
+    # build the index this cycle and stuck on weekly cadence until
+    # both happen to flip fresh in the same tick.
+    needs_pattern_bodies = prior is None or prior.trip_patterns is None
     linien_validators = (
-        prior.validators.get("linien") if prior else None
-    ) or CacheValidators()
+        CacheValidators()
+        if needs_pattern_bodies
+        else (prior.validators.get("linien") if prior else None) or CacheValidators()
+    )
     fahr_validators = (
-        prior.validators.get("fahrwegverlaeufe") if prior else None
-    ) or CacheValidators()
+        CacheValidators()
+        if needs_pattern_bodies
+        else (prior.validators.get("fahrwegverlaeufe") if prior else None)
+        or CacheValidators()
+    )
+    # Same logic for the colour map: if we don't have it yet, force-fetch.
+    needs_routes_body = prior is None or not (
+        prior.trip_patterns and prior.trip_patterns.colors_by_line
+    )
     routes_validators = (
-        prior.validators.get("routes") if prior else None
-    ) or CacheValidators()
+        CacheValidators()
+        if needs_routes_body
+        else (prior.validators.get("routes") if prior else None) or CacheValidators()
+    )
 
     (
         haltestellen_result,
@@ -684,18 +737,18 @@ async def _download_text(
     The validators object is updated in-place from response headers and
     returned so callers can persist it.
     """
-    resp = await session.get(
+    async with session.get(
         url,
         headers={**base_request_headers(USER_AGENT), **validators.to_request_headers()},
         timeout=timeout,
-    )
-    if resp.status == 304:
+    ) as resp:
+        if resp.status == 304:
+            validators.update_from_response(resp)
+            return (None, validators)
+        resp.raise_for_status()
+        body = await resp.text()
         validators.update_from_response(resp)
-        return (None, validators)
-    resp.raise_for_status()
-    body = await resp.text()
-    validators.update_from_response(resp)
-    return (body, validators)
+        return (body, validators)
 
 
 async def _download_or_fail_soft(

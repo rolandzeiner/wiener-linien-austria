@@ -1,6 +1,7 @@
 """Wiener Linien Austria integration."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
@@ -37,7 +38,12 @@ from .const import (
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
 from .rate_limit import LOCK_KEY, LOCK_LOOP_KEY
-from .static import CATALOGUE_KEY, async_refresh_catalogue, async_set_cached_catalogue
+from .static import (
+    BACKGROUND_REFRESH_TASK_KEY,
+    CATALOGUE_KEY,
+    async_refresh_catalogue,
+    async_set_cached_catalogue,
+)
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -149,17 +155,24 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
 
 async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    # `_async_setup` is auto-called by `async_config_entry_first_refresh`
+    # (HA core contract) — do NOT invoke it explicitly here.
+    await coordinator.async_config_entry_first_refresh()
+
+    # Reach this line ONLY when first_refresh succeeded. Bumping the
+    # counter and booting the timers AFTER first_refresh keeps the
+    # accounting in sync with reality: a `ConfigEntryNotReady` retry
+    # storm doesn't accumulate phantom entries, and we don't strand
+    # timers without a running entry to consume them.
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data[ENTRY_COUNT_KEY] = domain_data.get(ENTRY_COUNT_KEY, 0) + 1
     # Boot the domain-wide refresh timers if they're not already running.
     # Idempotent — only the FIRST entry actually creates them; subsequent
     # entries no-op. After a last-entry teardown + add cycle this also
     # recreates them, which `async_setup` (process-scoped, runs once)
     # cannot do.
     _ensure_domain_timers(hass)
-
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    # `_async_setup` is auto-called by `async_config_entry_first_refresh`
-    # (HA core contract) — do NOT invoke it explicitly here.
-    await coordinator.async_config_entry_first_refresh()
 
     # Register shutdown AFTER first_refresh succeeds so a half-initialised
     # coordinator that raised ConfigEntryNotReady doesn't leak listeners.
@@ -183,12 +196,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
-
-    # Reference-count active entries so the *last* unload tears down the
-    # domain-wide refresh timers and in-memory caches. Without this, the
-    # alerts/static timers keep firing after the user removes every entry.
-    domain_data = hass.data.setdefault(DOMAIN, {})
-    domain_data[ENTRY_COUNT_KEY] = domain_data.get(ENTRY_COUNT_KEY, 0) + 1
     return True
 
 
@@ -216,6 +223,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
             unsub = domain_data.pop(unsub_key, None)
             if callable(unsub):
                 unsub()
+        # Cancel any in-flight static-refresh background task so it
+        # can't complete after teardown and re-poison the catalogue
+        # ref. The task's done-callback also self-clears the slot;
+        # popping here is belt-and-braces.
+        bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
+        if isinstance(bg_task, asyncio.Task) and not bg_task.done():
+            bg_task.cancel()
         # Drop the rest of the domain-wide state — caches and validators
         # are stale by definition once no entry is around to consume them.
         for stale_key in (

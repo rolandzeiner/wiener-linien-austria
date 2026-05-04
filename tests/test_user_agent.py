@@ -25,7 +25,7 @@ from custom_components.wiener_linien_austria.coordinator import (
     WienerLinienAustriaCoordinator,
 )
 
-from .conftest import make_entry as _make_entry
+from .conftest import make_entry as _make_entry, make_response_cm
 
 
 def _ok_response(body: object, status: int = 200) -> MagicMock:
@@ -45,8 +45,10 @@ async def test_coordinator_monitor_fetch_sends_user_agent(
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
-    mock_get = AsyncMock(
-        return_value=_ok_response({"data": {"monitors": []}, "message": {"messageCode": 1}})
+    mock_get = MagicMock(
+        return_value=make_response_cm(
+            _ok_response({"data": {"monitors": []}, "message": {"messageCode": 1}})
+        )
     )
     with patch.object(coordinator._session, "get", new=mock_get):
         await coordinator._async_update_data()
@@ -59,7 +61,9 @@ async def test_coordinator_monitor_fetch_sends_user_agent(
 async def test_alerts_fetch_sends_user_agent(hass: HomeAssistant) -> None:
     """alerts._fetch_info_list carries the canonical User-Agent + gzip."""
     session = MagicMock()
-    session.get = AsyncMock(return_value=_ok_response({"data": {"trafficInfos": []}}))
+    session.get = MagicMock(
+        return_value=make_response_cm(_ok_response({"data": {"trafficInfos": []}}))
+    )
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=session,
@@ -74,8 +78,10 @@ async def test_alerts_fetch_sends_user_agent(hass: HomeAssistant) -> None:
 async def test_config_flow_probe_sends_user_agent(hass: HomeAssistant) -> None:
     """config_flow._probe_monitor_lines carries the canonical User-Agent + gzip."""
     session = MagicMock()
-    session.get = AsyncMock(
-        return_value=_ok_response({"data": {"monitors": []}, "message": {"messageCode": 1}})
+    session.get = MagicMock(
+        return_value=make_response_cm(
+            _ok_response({"data": {"monitors": []}, "message": {"messageCode": 1}})
+        )
     )
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",

@@ -29,6 +29,19 @@ export function findWienerLinienEntities(hass: HomeAssistant | undefined): strin
   return matches;
 }
 
+// `line_colors` map for a single entity; empty `{}` when missing or
+// the catalogue hasn't loaded yet. Card helpers (`chipPalette`,
+// `colorForLine`) treat empty as "fall through to the nightline rule
+// or the neutral fallback".
+export function lineColorsFor(
+  hass: HomeAssistant | undefined,
+  entityId: string | undefined,
+): NonNullable<WienerLinienAttrs["line_colors"]> {
+  if (!hass || !entityId) return {};
+  const attrs = hass.states?.[entityId]?.attributes as WienerLinienAttrs | undefined;
+  return attrs?.line_colors ?? {};
+}
+
 // First non-empty `line_colors` map across the supplied entities. Every
 // WL sensor publishes the same GTFS palette, so the first hit is enough
 // to seed render paths that aren't scoped to a single stop. Returns
@@ -40,9 +53,8 @@ export function firstLineColorsMap(
 ): NonNullable<WienerLinienAttrs["line_colors"]> {
   if (!hass) return {};
   for (const eid of entityIds) {
-    const attrs = hass.states?.[eid]?.attributes as WienerLinienAttrs | undefined;
-    const colors = attrs?.line_colors;
-    if (colors && Object.keys(colors).length) return colors;
+    const colors = lineColorsFor(hass, eid);
+    if (Object.keys(colors).length) return colors;
   }
   return {};
 }

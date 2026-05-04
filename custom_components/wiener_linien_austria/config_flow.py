@@ -89,14 +89,14 @@ async def _probe_monitor_lines(
     url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
     params = [("stopId", str(r)) for r in rbls]
     try:
-        resp = await session.get(
+        async with session.get(
             url,
             params=params,
             headers=base_request_headers(USER_AGENT),
             timeout=aiohttp.ClientTimeout(total=10),
-        )
-        resp.raise_for_status()
-        body = await resp.json()
+        ) as resp:
+            resp.raise_for_status()
+            body = await resp.json()
     except (asyncio.TimeoutError, aiohttp.ClientError, ValueError) as err:
         _LOGGER.warning("Line-probe failed for RBLs %s: %s", rbls, err)
         return []
