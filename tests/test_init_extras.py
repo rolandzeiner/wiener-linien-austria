@@ -136,8 +136,10 @@ async def test_setup_entry_rolls_back_on_forward_setup_failure(
     """A `forward_entry_setups` failure must decrement ENTRY_COUNT_KEY and
     tear down domain timers — HA core may not call `async_unload_entry`
     on a setup that never reached the loaded state, so the rollback has
-    to happen inline."""
-    from custom_components.wiener_linien_austria import async_setup_entry
+    to happen inline. Drive the setup through `hass.config_entries.async_setup`
+    so HA puts the entry into SETUP_IN_PROGRESS before our coordinator's
+    `async_config_entry_first_refresh` runs (HA 2026.x rejects calls
+    from any other state)."""
     from custom_components.wiener_linien_austria.const import ENTRY_COUNT_KEY
 
     entry = _make_entry()
@@ -148,10 +150,11 @@ async def test_setup_entry_rolls_back_on_forward_setup_failure(
         "async_forward_entry_setups",
         new=AsyncMock(side_effect=RuntimeError("platform boom")),
     ):
-        try:
-            await async_setup_entry(hass, entry)
-        except RuntimeError:
-            pass
+        # HA core swallows the RuntimeError into a setup-error state;
+        # async_setup itself returns without re-raising so we don't
+        # need a try/except here.
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
     # Counter rolled back to 0; domain timers torn down.
     domain_data = hass.data.get(DOMAIN, {})
     assert domain_data.get(ENTRY_COUNT_KEY, 0) == 0
