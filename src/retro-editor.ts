@@ -27,7 +27,7 @@
 //   field explicitly so a future maintainer can't add a nested
 //   expandable by accident.
 
-import { LitElement, html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
+import { LitElement, html, nothing, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
@@ -39,7 +39,7 @@ import type {
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
-import { lineDirKey, pairsAtStop } from "./utils/departures.js";
+import { lineDirKey, linesForDirection, pairsAtStop } from "./utils/departures.js";
 
 /** Local minimal `fireEvent` shim — `bubbles: true` + `composed: true`
  *  are required so the event crosses our shadow boundary and reaches
@@ -68,6 +68,20 @@ export class WienerLinienAustriaRetroCardEditor
     this._config = normaliseRetroConfig(config);
   }
 
+  protected shouldUpdate(changed: PropertyValues): boolean {
+    if (!this._config) return false;
+    if (changed.has("_config")) return true;
+    // hass fires for every state tick across HA — only re-render when the
+    // single configured entity changed. Without this guard, the form
+    // schema, line dropdown, walk-time list and direction-autocorrect all
+    // recompute on unrelated state changes while the dialog is open.
+    const prev = changed.get("hass") as HomeAssistant | undefined;
+    if (!prev || !this.hass) return true;
+    const eid = this._config.entity;
+    if (!eid) return true;
+    return prev.states[eid] !== this.hass.states[eid];
+  }
+
   /** Translate `key` against the active HA language for retro-card UI strings. */
   private _t(key: string): string {
     return translate(`retro.${key}`, { hassLanguage: this.hass?.language });
@@ -91,29 +105,7 @@ export class WienerLinienAustriaRetroCardEditor
    *  saved line that's temporarily not flowing. */
   private _linesForCurrent(): string[] {
     if (!this._config) return [];
-    const attrs = this._attrs(this._config.entity);
-    const dir = this._config.direction;
-    const s = new Set<string>();
-    // Tracked-line keys win — only surface lines the user opted into
-    // via the integration's config flow, filtered by the configured
-    // direction. Survives off-service hours (nightlines during the day)
-    // because the tracking list is decoupled from the live
-    // `/monitor` window. Keys are `{line}|{direction}` strings.
-    if (attrs?.tracked_line_keys?.length) {
-      for (const key of attrs.tracked_line_keys) {
-        const [line, keyDir] = key.split("|", 2);
-        if (!line) continue;
-        if (dir && keyDir !== dir) continue;
-        s.add(line);
-      }
-      if (s.size > 0) return [...s].sort();
-    }
-    // Fallback for older sensor caches that pre-date `tracked_line_keys`:
-    // derive from live departures so the picker is still populated.
-    for (const d of attrs?.departures ?? []) {
-      if (d.direction === dir && d.line) s.add(d.line);
-    }
-    return [...s].sort();
+    return linesForDirection(this._attrs(this._config.entity), this._config.direction);
   }
 
   /** Distinct termini ("Oberlaa", "Alaudagasse", …) seen in `dir` for the
@@ -402,23 +394,7 @@ export class WienerLinienAustriaRetroCardEditor
     // the nightline at noon); falls back to the live-departure
     // derivation when the cache predates `tracked_line_keys`.
     if (next.entity !== prevEntity) {
-      const newAttrs = this._attrs(next.entity);
-      const dir = next.direction;
-      const lines = new Set<string>();
-      if (newAttrs?.tracked_line_keys?.length) {
-        for (const key of newAttrs.tracked_line_keys) {
-          const [line, keyDir] = key.split("|", 2);
-          if (!line) continue;
-          if (dir && keyDir !== dir) continue;
-          lines.add(line);
-        }
-      }
-      if (lines.size === 0) {
-        for (const d of newAttrs?.departures ?? []) {
-          if (d.direction === dir && d.line) lines.add(d.line);
-        }
-      }
-      const sorted = [...lines].sort();
+      const sorted = linesForDirection(this._attrs(next.entity), next.direction);
       next.line = sorted[0];
     }
     // CRITICAL: set _config BEFORE fireEvent. Custom editors don't

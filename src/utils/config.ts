@@ -264,8 +264,11 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   };
 }
 
-// Resolves a line label to its background hex (`#…`). Precedence:
-//   1. user-config `line_colors` (per-line override)
+// Resolves the paired (background, foreground) palette for a line chip.
+// Precedence:
+//   1. user-config `line_colors` (per-line override) — `color` is left
+//      unset so the card's CSS default (white) applies, since we can't
+//      know what reads well on an arbitrary user colour.
 //   2. nightline category rule (`^N\d`) — wins OVER GTFS for N-prefix
 //      lines. GTFS publishes nightlines as bus navy (`0A295D`), but
 //      Wiener Linien's signage convention pairs a deeper navy with
@@ -275,48 +278,35 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
 //   4. neutral fallback (`var(--primary-color)`)
 //
 // `overrides` keys are case-folded to uppercase to match the editor's
-// own normalisation; the GTFS map is keyed verbatim by line label and
-// is also probed both upper and as-given for robustness against any
-// future schema surprise.
-export function colorForLine(
-  line: string,
-  overrides: Record<string, string>,
-  gtfsColors: LineColorsMap = {},
-  fallback = "var(--primary-color)",
-): string {
-  const upper = line.toUpperCase();
-  if (overrides[upper] !== undefined) return overrides[upper];
-  // Nightline rule wins over GTFS — see precedence comment above.
-  if (/^N\d/.test(upper)) return NIGHTLINE_BG;
-  const gtfs = gtfsColors[line] ?? gtfsColors[upper];
-  if (gtfs?.bg) return `#${gtfs.bg}`;
-  return fallback;
-}
-
-// Resolves the paired (background, foreground) palette for a line chip.
-// The fg rule is coupled to where the bg came from so the two never
-// drift: nightline-yellow text only pairs with the nightline navy bg,
-// GTFS fg only pairs with the matching GTFS bg, and a user override
-// leaves the fg unset (the card's CSS default — white — applies because
-// we don't know what reads well on the user's custom colour). Nightline
-// rule wins over GTFS — see colorForLine precedence comment.
+// own normalisation; the GTFS map is probed by both upper and as-given
+// label for robustness against future schema surprises.
 export function chipPalette(
   line: string,
   overrides: Record<string, string>,
   gtfsColors: LineColorsMap = {},
+  fallback = "var(--primary-color)",
 ): { background: string; color?: string } {
   const upper = line.toUpperCase();
-  if (overrides[upper] !== undefined) {
-    return { background: overrides[upper] };
-  }
-  if (/^N\d/.test(upper)) {
-    return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
-  }
+  if (overrides[upper] !== undefined) return { background: overrides[upper] };
+  if (/^N\d/.test(upper)) return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
   const gtfs = gtfsColors[line] ?? gtfsColors[upper];
   if (gtfs?.bg) {
     return gtfs.fg
       ? { background: `#${gtfs.bg}`, color: `#${gtfs.fg}` }
       : { background: `#${gtfs.bg}` };
   }
-  return { background: "var(--primary-color)" };
+  return { background: fallback };
+}
+
+// Background-only convenience over `chipPalette` for callers that only
+// need the bg colour (badge swatches, filter pills). One ladder, two
+// surfaces — keeping these as separate ladders previously let the
+// nightline / GTFS precedence drift between bg-only and bg+fg sites.
+export function colorForLine(
+  line: string,
+  overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
+  fallback = "var(--primary-color)",
+): string {
+  return chipPalette(line, overrides, gtfsColors, fallback).background;
 }

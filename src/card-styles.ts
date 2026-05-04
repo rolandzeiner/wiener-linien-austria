@@ -850,7 +850,7 @@ export const cardStyles = css`
     margin-left: auto;
   }
 
-  /* Dev-mode strip — visible only on rpi25 / ?wl_debug=1 */
+  /* Dev-mode strip — visible only with ?wl_debug=1 or localStorage.wl_debug=1 */
   .dev-strip {
     display: flex;
     align-items: center;

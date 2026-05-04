@@ -81,20 +81,44 @@ export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   return out;
 }
 
-function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
-  // Tracked list wins — once the user has configured which lines to
-  // track in the integration's config flow, the card editors only
-  // surface those, regardless of whether each is currently running.
-  // Off-service lines (nightlines during the day, day-only lines
-  // after midnight) stay visible because they were tracked, not
-  // because they have a live departure.
+// Lines tracked at a stop in one direction. Tracked-line keys (config-flow
+// selection) win — only surface lines the user opted into. Falls back to
+// live departures for older sensor caches that pre-date `tracked_line_keys`.
+// Used by the retro editor's line dropdown and its entity-changed line
+// auto-pick path; one resolver keeps both surfaces in sync.
+export function linesForDirection(
+  attrs: WienerLinienAttrs | undefined,
+  dir: "H" | "R" | undefined,
+): string[] {
+  if (!attrs) return [];
+  const out = new Set<string>();
+  if (attrs.tracked_line_keys?.length) {
+    for (const key of attrs.tracked_line_keys) {
+      const [line, keyDir] = key.split("|", 2);
+      if (!line) continue;
+      if (dir && keyDir !== dir) continue;
+      out.add(line);
+    }
+    if (out.size > 0) return [...out].sort();
+  }
+  for (const d of attrs.departures ?? []) {
+    if (dir && d.direction !== dir) continue;
+    if (d.line) out.add(d.line);
+  }
+  return [...out].sort();
+}
+
+// Tracked list wins; without it, union the static catalogue with live
+// departures so a brand-new line that hasn't made it into the static
+// catalogue yet is still listed once it appears in the realtime feed.
+// Exported so the modern editor and the per-stop colour previews share
+// the same resolver — divergence between two copies caused subtle drift
+// in the past on stops with both `lines_at_stop` AND new live lines.
+export function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
   if (attrs?.tracked_lines?.length) {
     return [...attrs.tracked_lines].sort();
   }
   const s = new Set<string>();
-  // Fallback when no tracked list is published yet (cache predates the
-  // attribute, or coordinator hasn't completed first refresh): static
-  // catalogue first, then live departures.
   if (attrs?.lines_at_stop?.length) {
     for (const l of attrs.lines_at_stop) s.add(l);
   }

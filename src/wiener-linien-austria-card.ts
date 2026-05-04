@@ -40,7 +40,7 @@ import {
   type NormalisedModernConfig,
   type NormalisedModernStop,
 } from "./utils/config.js";
-import { findWienerLinienEntities } from "./utils/entities.js";
+import { findWienerLinienEntities, firstLineColorsMap } from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeTrafficHtml } from "./utils/html.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
@@ -91,6 +91,28 @@ function platformLabelKey(type: string | undefined): string {
   return "platform_short_bus";
 }
 
+// Cache `Intl.DateTimeFormat` instances by IANA timezone — building one
+// per call is surprisingly expensive (~hundreds of µs on Safari WebKit),
+// and `_isNightlineHour` is invoked from inside `_renderStopAhead` for
+// every departure on every panel on every render. With a busy 4-stop
+// dashboard that's >150 instantiations per render; caching collapses
+// to a single lookup once the active timezone has been seen.
+const _nightlineHourFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
+  let fmt = _nightlineHourFormatters.get(tz);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+    _nightlineHourFormatters.set(tz, fmt);
+  }
+  return fmt;
+}
+
 // Reads the GTFS-derived per-line palette from a stop sensor. The
 // integration publishes the full Wiener Linien catalogue (~150 lines)
 // on every sensor — same data on each — so any one entity is sufficient
@@ -107,22 +129,6 @@ function lineColorsFor(
     | WienerLinienAttrs
     | undefined;
   return attrs?.line_colors ?? {};
-}
-
-// First non-empty line_colors map across the configured entities. Used
-// by render paths that aren't scoped to one stop (the traffic banner
-// aggregates alerts from every entity). Picks the first hit because
-// every sensor publishes the same GTFS catalogue.
-function anyLineColors(
-  hass: HomeAssistant | undefined,
-  config: NormalisedModernConfig | undefined,
-): LineColorsMap {
-  if (!hass || !config) return {};
-  for (const stop of config.entities) {
-    const colors = lineColorsFor(hass, stop.entity);
-    if (Object.keys(colors).length) return colors;
-  }
-  return {};
 }
 
 @customElement("wiener-linien-austria-card")
@@ -154,6 +160,9 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _qrOpenFor: string | null = null;
 
   private _versionCheckDone = false;
+  // One-shot flag so the "configured entity missing → fell back to first WL
+  // sensor" warning doesn't spam the console on every re-render.
+  private _fallbackWarned = false;
 
   public setConfig(config: WienerLinienCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -422,7 +431,23 @@ export class WienerLinienAustriaCard extends LitElement {
     if (picked.length) return picked;
     const available = findWienerLinienEntities(this.hass);
     const first = available[0];
-    return first ? [{ entity: first }] : [];
+    if (first) {
+      // Configured entity exists in the saved config but not in HA's
+      // current state map (renamed sensor, removed integration entry).
+      // Falling back to the first WL sensor keeps the card functional,
+      // but the user could be silently looking at the wrong stop —
+      // surface a one-shot console warning so the cause is debuggable.
+      if (!this._fallbackWarned && (this._config?.entities?.length ?? 0) > 0) {
+        this._fallbackWarned = true;
+        const requested = this._config?.entities.map((s) => s.entity).join(", ");
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[wiener-linien-austria-card] configured entity "${requested}" not in hass.states; falling back to "${first}"`,
+        );
+      }
+      return [{ entity: first }];
+    }
+    return [];
   }
 
   private _attrs(entityId: string): WienerLinienAttrs {
@@ -839,7 +864,10 @@ export class WienerLinienAustriaCard extends LitElement {
     // Traffic items aren't scoped to a single stop — pick the first
     // entity's palette (every sensor publishes the same GTFS catalogue,
     // so any one of them resolves any line that might appear here).
-    const lineColors = anyLineColors(this.hass, this._config);
+    const lineColors = firstLineColorsMap(
+      this.hass,
+      this._config!.entities.map((s) => s.entity),
+    );
     const lines = Array.isArray(t.related_lines) ? t.related_lines : [];
     const descHtml = t.description_html
       ? safeTrafficHtml(t.description_html)
@@ -977,10 +1005,9 @@ export class WienerLinienAustriaCard extends LitElement {
       this._config!.show_stops_ahead,
       d,
     );
-    const rowStableId = d.time_planned ?? `cd${d.countdown}`;
-    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
+    const rowKey = this._rowKey(d, entityId);
     const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
-    const panelId = `wl-hero-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
+    const panelId = this._panelId(d, entityId, "hero");
     const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
     const ariaLabel = hasStopsAhead
       ? this._t(ariaLabelKey, { line: d.line || "?", towards: d.towards || "" })
@@ -1048,10 +1075,9 @@ export class WienerLinienAustriaCard extends LitElement {
       d,
     );
     if (!hasStopsAhead) return nothing;
-    const rowStableId = d.time_planned ?? `cd${d.countdown}`;
-    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
+    const rowKey = this._rowKey(d, entityId);
     const expanded = this._expandedRows.has(rowKey);
-    const panelId = `wl-hero-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
+    const panelId = this._panelId(d, entityId, "hero");
     const line = d.line || "?";
     return this._renderHeroStopsAheadPanel(
       d.stops_ahead!,
@@ -1140,13 +1166,9 @@ export class WienerLinienAustriaCard extends LitElement {
       this._config!.show_stops_ahead,
       d,
     );
-    // Use `time_planned` (or countdown fallback) as the stable
-    // identifier so panels stay open across polls — countdown alone
-    // ticks every minute and would re-key + collapse the panel.
-    const rowStableId = d.time_planned ?? `cd${d.countdown}`;
-    const rowKey = `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${rowStableId}`;
+    const rowKey = this._rowKey(d, entityId);
     const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
-    const panelId = `wl-stopsahead-${entityId.replace(/[^a-z0-9_]/gi, "_")}-${d.line}-${d.direction}-${d.countdown}`;
+    const panelId = this._panelId(d, entityId, "row");
     const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
     const ariaLabel = hasStopsAhead
       ? this._t(ariaLabelKey, { line, towards: d.towards || "" })
@@ -1411,16 +1433,31 @@ export class WienerLinienAustriaCard extends LitElement {
   // if hass isn't yet wired up (very early renders).
   private _isNightlineHour(): boolean {
     const tz = this.hass?.config?.time_zone || "Europe/Vienna";
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: tz,
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).formatToParts(new Date());
+    const parts = _nightlineHourFormatter(tz).formatToParts(new Date());
     const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
     const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
     const minutesIntoDay = hour * 60 + minute;
     return minutesIntoDay >= 23 * 60 + 55 || minutesIntoDay <= 5 * 60 + 15;
+  }
+
+  // Single source of truth for the cross-render row identity. `rowStableId`
+  // uses `time_planned` so panels stay open across polls (countdown ticks
+  // every minute and would re-key the row, snapping the panel closed).
+  // The hero, hero-companion and row-list paths all key by exactly this
+  // tuple — drift here used to desync expand-state across surfaces.
+  private _rowKey(d: DepartureAttr, entityId: string): string {
+    const stableId = d.time_planned ?? `cd${d.countdown}`;
+    return `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${stableId}`;
+  }
+
+  // Per-surface DOM id for the stops-ahead panel. Distinct prefix between
+  // hero and row-list panels so an in-page anchor can target either, and
+  // the countdown is included to refresh the id every poll (DOM nodes
+  // ride the new id; aria-controls re-points naturally).
+  private _panelId(d: DepartureAttr, entityId: string, prefix: "hero" | "row"): string {
+    const safeEid = entityId.replace(/[^a-z0-9_]/gi, "_");
+    const suffix = prefix === "hero" ? "wl-hero-stopsahead" : "wl-stopsahead";
+    return `${suffix}-${safeEid}-${d.line}-${d.direction}-${d.countdown}`;
   }
 
   private _toggleRow(key: string): void {
@@ -1532,17 +1569,19 @@ export class WienerLinienAustriaCard extends LitElement {
   // see shared-render.ts. Cache-wipe + reload also lives there.
 
   // ------------------------------------------------------------------
-  // Dev-mode panel — only visible on rpi25 or with ?wl_debug=1
+  // Dev-mode panel — opt-in via `?wl_debug=1` query string or a sticky
+  // `localStorage.wl_debug = "1"` so the panel is intentional, not
+  // accidentally exposed to anyone whose HA host happens to share a
+  // hostname with the developer's box.
   // ------------------------------------------------------------------
 
   private _isDevMode(): boolean {
     try {
-      const host = window.location.hostname || "";
-      if (host === "rpi25" || host.startsWith("rpi25.")) return true;
       const search = window.location.search || "";
       if (search.includes("wl_debug=1")) return true;
+      if (window.localStorage?.getItem("wl_debug") === "1") return true;
     } catch {
-      // SSR / restricted ctx — default off
+      // SSR / restricted ctx (e.g. localStorage blocked) — default off
     }
     return false;
   }

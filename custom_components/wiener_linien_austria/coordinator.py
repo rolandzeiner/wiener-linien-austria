@@ -106,6 +106,10 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._diva: int = int(config[CONF_DIVA])
         self._latitude: float | None = None
         self._longitude: float | None = None
+        # De-dupe stops_ahead matcher exceptions per line label so a
+        # genuine schema change surfaces once at WARNING (loud enough to
+        # be noticed) without spamming the logbook every poll.
+        self._stops_ahead_warned_lines: set[str] = set()
         # Conditional-GET validators captured from the previous /monitor
         # response. The CDN sets ETag + Last-Modified on every reply; we
         # echo them back as If-None-Match / If-Modified-Since so unchanged
@@ -259,9 +263,24 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             # 304 = our cached data is still fresh. Return the previous
             # MonitorData unchanged; HA's coordinator handles "same value"
             # by not re-emitting state changes to entities.
-            if resp.status == 304 and self.data is not None:
-                self._monitor_cache.update_from_response(resp)
-                return self.data
+            if resp.status == 304:
+                if self.data is not None:
+                    self._monitor_cache.update_from_response(resp)
+                    return self.data
+                # First tick after restart with no `self.data` yet — a 304
+                # has an empty body, so falling through to `resp.json()`
+                # would surface as a misleading "invalid response". Treat
+                # it as a transient and retry. Practically unreachable
+                # today (validators reset on init), but defends against a
+                # future change that persists them across restarts.
+                raise UpdateFailed(
+                    translation_domain=DOMAIN,
+                    translation_key="api_invalid_response",
+                    translation_placeholders={
+                        "status": "304",
+                        "error": "no cached data to revalidate",
+                    },
+                )
             resp.raise_for_status()
         except asyncio.TimeoutError as err:
             raise UpdateFailed(
@@ -347,6 +366,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             self._server_time,
             catalogue=catalogue,
             entry_rbls=self._rbls,
+            warned_lines=self._stops_ahead_warned_lines,
         )
 
     def _current_catalogue(self) -> Any:
@@ -382,14 +402,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         a sustained outage settles into a slow poll instead of hammering
         the API every minute. The next successful tick resets it.
         """
-        # Cap the counter at 20 — `2 ** 19` is already 524 288 ×
-        # interval, far past `BACKOFF_CAP_SECONDS`, and incrementing
-        # past that just makes the `2 ** N` exponentiation pointlessly
-        # large during a sustained outage. The min() below still clamps
-        # the backoff seconds, but limiting the exponent saves the CPU
-        # the bigint multiplication uses on every failed tick.
-        if self._consecutive_failures < 20:
-            self._consecutive_failures += 1
+        self._consecutive_failures += 1
         if self._consecutive_failures < 2:
             return
         normal_secs = self._normal_interval.total_seconds()
@@ -414,11 +427,6 @@ def _normalise_lines(raw: Any) -> set[str] | None:
     return {str(x) for x in raw} or None
 
 
-def _line_key(line: str, direction: str, towards: str) -> str:
-    """Stable identifier for a given (line, direction, towards) triple."""
-    return f"{line}|{direction}|{towards}"
-
-
 def _parse_monitor_body(
     body: dict[str, Any],
     selected: set[str] | None,
@@ -426,6 +434,7 @@ def _parse_monitor_body(
     *,
     catalogue: Any = None,
     entry_rbls: list[int] | None = None,
+    warned_lines: set[str] | None = None,
 ) -> MonitorData:
     """Parse a successful /monitor response into a MonitorData.
 
@@ -433,6 +442,10 @@ def _parse_monitor_body(
     `stops_ahead` enrichment via `static.stops_ahead_for_match`. Both are
     optional: tests construct MonitorData directly and this parser is
     re-used in fixtures that don't carry the static layer.
+
+    `warned_lines`, when supplied, is a per-coordinator de-dupe set so
+    a stops_ahead matcher exception logs once at WARNING per line label
+    rather than spamming on every poll.
     """
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
@@ -493,14 +506,27 @@ def _parse_monitor_body(
                         )
                     except Exception:  # noqa: BLE001
                         # Fail-soft: a single matcher hiccup must not poison
-                        # the rest of the parse. Logged at debug because
-                        # stops_ahead is non-essential.
-                        _LOGGER.debug(
-                            "stops_ahead lookup failed for %s towards %s",
-                            line_name,
-                            resolved_towards,
-                            exc_info=True,
-                        )
+                        # the rest of the parse. First time we see a line
+                        # blow up, log at WARNING so a real upstream schema
+                        # change is visible without enabling debug logging;
+                        # subsequent ticks for the same line stay quiet via
+                        # the per-coordinator warned set.
+                        if warned_lines is not None and line_name not in warned_lines:
+                            warned_lines.add(line_name)
+                            _LOGGER.warning(
+                                "stops_ahead lookup failed for %s towards %s "
+                                "(further failures for this line will be silent)",
+                                line_name,
+                                resolved_towards,
+                                exc_info=True,
+                            )
+                        else:
+                            _LOGGER.debug(
+                                "stops_ahead lookup failed for %s towards %s",
+                                line_name,
+                                resolved_towards,
+                                exc_info=True,
+                            )
                         stops_ahead = None
                 departures.append(
                     Departure(

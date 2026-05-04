@@ -16,6 +16,7 @@ from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import CoreState, Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_interval
 
 from .alerts import async_refresh_alerts
@@ -35,7 +36,8 @@ from .const import (
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
-from .static import async_refresh_catalogue, async_set_cached_catalogue
+from .rate_limit import LOCK_KEY, LOCK_LOOP_KEY
+from .static import CATALOGUE_KEY, async_refresh_catalogue, async_set_cached_catalogue
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -202,6 +204,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
             ELEVATOR_INFO_KEY,
             ALERT_CACHE_VALIDATORS_KEY,
             DOMAIN_LAST_CALL_KEY,
+            LOCK_KEY,
+            LOCK_LOOP_KEY,
+            CATALOGUE_KEY,
         ):
             domain_data.pop(stale_key, None)
     return True
@@ -216,6 +221,10 @@ async def async_remove_entry(
     reloading or removing a single entry must not remove them. Only when
     no other entries of this domain remain do we unregister.
     """
+    # Always clear this entry's per-entry Repairs issue. If the user is
+    # removing a rate-limited entry, leaving the issue behind would keep
+    # warning the user about a config entry that no longer exists.
+    ir.async_delete_issue(hass, DOMAIN, f"rate_limited_{entry.entry_id}")
     remaining = [
         e
         for e in hass.config_entries.async_entries(DOMAIN)

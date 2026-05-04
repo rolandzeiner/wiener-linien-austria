@@ -16,6 +16,11 @@ import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } fr
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import {
+  RACE_FINISH_X_FALLBACK_CQW,
+  computeRaceParams,
+  type Racer,
+} from "./utils/race.js";
 
 import "./retro-editor.js";
 
@@ -37,64 +42,9 @@ const NEXT_RACE_MAX_MS = 180_000;
 // "starting" than just appearing mid-screen.
 const COUNTDOWN_DIGIT_MS = 800;
 const COUNTDOWN_TOTAL_MS = COUNTDOWN_DIGIT_MS * 3;
-// Nailbiter racing — each race picks a lead-change pattern (who's ahead
-// at 25%, 50%, 75%) so there's at least one overtake per race. Winner of
-// the last checkpoint gets the shorter duration.
-type Racer = "A" | "B";
-const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
-  ["A", "A", "B"], ["B", "B", "A"],   // single late swap
-  ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
-  ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
-];
-// Wheelchair race — the WINNER is whoever crosses the finish line
-// (RACE_FINISH_X_CQW) first, computed from each racer's post-clamp
-// trajectory. The swap-pattern choreographs mid-race overtakes for
-// visual fun only; it doesn't decide the outcome. See
-// _randomizeRaceParams() for the full algorithm.
-//
-// When the winner crosses the finish line (ms from race start). The
-// winner duration runs slightly longer so the wheelchair smoothly
-// exits past the right edge after the cross.
-const RACE_CROSS_BASE_MIN_MS = 2400;
-const RACE_CROSS_BASE_MAX_MS = 2700;
-// Animation duration / cross time — the after-finish-line tail.
-const RACE_DUR_TAIL_MIN = 1.08;
-const RACE_DUR_TAIL_MAX = 1.15;
-// Finish-margin distribution (ms between winner's and loser's crossing
-// of the finish line). Mix of close (photo finish), medium and decisive
-// finishes so consecutive races feel different. Close minimum is set
-// high enough that even the photo finish has a clear visual gap (~6cqw
-// at 580px card width) — sub-100ms gaps were too tight to call by eye.
-const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [100, 250];
-const RACE_MARGIN_MEDIUM_MS: readonly [number, number] = [200, 500];
-const RACE_MARGIN_DECISIVE_MS: readonly [number, number] = [500, 900];
-const RACE_PROB_CLOSE = 0.4;
-const RACE_PROB_MEDIUM = 0.35;
-// (rest = decisive)
-// Probability the swap pattern's 75% leader is actually the LOSER —
-// i.e. the winner pulls ahead in the home stretch. Drives the
-// "comeback" feel; the rest are led-from-front finishes.
-const RACE_PROB_COMEBACK = 0.3;
-// Race "track" geometry, in cqw (relative to card width). Each
-// wheelchair starts at its natural position after its destination text
-// (preserving the gag that the wheelchair sits *on* the departure),
-// and we back out per-racer translate values from absolute checkpoint
-// targets. Targets are anchored to whichever racer starts furthest
-// right (`maxStart`) so both racers always move forward.
-const RACE_TRACK_END_CQW = 92;
-const RACE_TRACK_MIN_LENGTH_CQW = 20;
-const RACE_CHECKPOINT_FRACS = [0.25, 0.5, 0.75] as const;
-const RACE_CHECKPOINT_HALF_GAPS_CQW = [3, 2.5, 2.5] as const;
-// Fallback finish-line x (cqw) if the live strip position can't be
-// measured. The real value is the .retro-finish-line's left edge,
-// computed per race from card width — keeps the math glued to the
-// thing the user actually watches.
-const RACE_FINISH_X_FALLBACK_CQW = 96;
-// Absolute exit position bounds (cqw). Outside this band the
-// finish-margin math is approximate; the announced winner is still
-// reconciled from the actual post-clamp trajectories.
-const RACE_EXIT_MIN_CQW = 102;
-const RACE_EXIT_MAX_CQW = 135;
+// Race constants and physics live in `utils/race.ts`. The card keeps
+// only the DOM-touching `_measureRaceStartPositions` and the timer
+// state machine; the math is a pure function fed those measurements.
 
 // Wrap API-sourced German strings so assistive tech pronounces them correctly
 // under non-German HA locales. ASCII fallbacks stay unwrapped.
@@ -136,6 +86,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   @state() private _raceWinner: Racer | null = null;
 
   private _versionCheckDone = false;
+  // One-shot flag so the "configured entity missing → fell back" console
+  // warning doesn't spam on every re-render.
+  private _fallbackWarned = false;
   private _raceTimers: Array<ReturnType<typeof setTimeout>> = [];
   // Wall-clock target times so state transitions survive the disconnect/
   // reconnect cycles HA triggers during dashboard rebuilds.
@@ -293,7 +246,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       return this._config.entity;
     }
     const available = findWienerLinienEntities(this.hass);
-    return available[0] ?? null;
+    const first = available[0] ?? null;
+    if (first && this._config?.entity && !this._fallbackWarned) {
+      // Configured entity is gone (rename, integration removal). The
+      // fallback keeps the card useful, but make the swap auditable so
+      // the user notices their dashboard is now showing a different stop.
+      this._fallbackWarned = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria-retro-card] configured entity "${this._config.entity}" not in hass.states; falling back to "${first}"`,
+      );
+    }
+    return first;
   }
 
   // ------------------------------------------------------------------
@@ -473,145 +437,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // the finish line. The state machine uses that to schedule the
   // photo-finish freeze and then victory.
   private _randomizeRaceParams(): { winnerCrossT: number } {
-    const rand = (min: number, max: number): number =>
-      min + Math.random() * (max - min);
-    const jitter = (base: number, amount: number): number =>
-      base + (Math.random() * 2 - 1) * amount;
-
-    // (1)(3)(4) Pick intended winner + comeback flag + swap pattern.
-    const intendedWinner: Racer = Math.random() < 0.5 ? "A" : "B";
-    const isComeback = Math.random() < RACE_PROB_COMEBACK;
-    const patternLeader: Racer = isComeback
-      ? intendedWinner === "A"
-        ? "B"
-        : "A"
-      : intendedWinner;
-    const patternPool = RACE_PATTERNS.filter((p) => p[2] === patternLeader);
-    const pattern =
-      patternPool[Math.floor(Math.random() * patternPool.length)]!;
-
-    // (2) Pick finish margin (ms between winner and loser crossings).
-    const marginRoll = Math.random();
-    const margin =
-      marginRoll < RACE_PROB_CLOSE
-        ? rand(RACE_MARGIN_CLOSE_MS[0], RACE_MARGIN_CLOSE_MS[1])
-        : marginRoll < RACE_PROB_CLOSE + RACE_PROB_MEDIUM
-          ? rand(RACE_MARGIN_MEDIUM_MS[0], RACE_MARGIN_MEDIUM_MS[1])
-          : rand(RACE_MARGIN_DECISIVE_MS[0], RACE_MARGIN_DECISIVE_MS[1]);
-
-    // Cross times + total animation durations. Each racer's animation
-    // runs slightly past their cross time (the "tail") so the
-    // wheelchair smoothly exits past the right edge after winning.
-    const winnerCrossT = rand(RACE_CROSS_BASE_MIN_MS, RACE_CROSS_BASE_MAX_MS);
-    const loserCrossT = winnerCrossT + margin;
-    const winnerDur = winnerCrossT * rand(RACE_DUR_TAIL_MIN, RACE_DUR_TAIL_MAX);
-    const loserDur = loserCrossT * rand(RACE_DUR_TAIL_MIN, RACE_DUR_TAIL_MAX);
-    const durA = intendedWinner === "A" ? winnerDur : loserDur;
-    const durB = intendedWinner === "B" ? winnerDur : loserDur;
-    const crossTargetA = intendedWinner === "A" ? winnerCrossT : loserCrossT;
-    const crossTargetB = intendedWinner === "B" ? winnerCrossT : loserCrossT;
-
-    // (5)(6) Measure starts + live finish line, then compute per-
-    // checkpoint absolute targets. finishX matches the actual left
-    // edge of the visible checkered strip — math winner == strip-
-    // crossing winner the user observes.
     const measured = this._measureRaceStartPositions();
-    const startA = measured?.a ?? 0;
-    const startB = measured?.b ?? 0;
-    const finishX = measured?.finishCqw ?? RACE_FINISH_X_FALLBACK_CQW;
-    const maxStart = Math.max(startA, startB);
-    const trackLength = Math.max(
-      RACE_TRACK_MIN_LENGTH_CQW,
-      RACE_TRACK_END_CQW - maxStart,
-    );
-    const targetXAbs = (racer: Racer, idx: 0 | 1 | 2): number => {
-      const center = maxStart + RACE_CHECKPOINT_FRACS[idx] * trackLength;
-      const isLead = pattern[idx] === racer;
-      const halfGap = RACE_CHECKPOINT_HALF_GAPS_CQW[idx];
-      return jitter(center + (isLead ? halfGap : -halfGap), 0.6);
-    };
-    const t25A = targetXAbs("A", 0);
-    const t50A = targetXAbs("A", 1);
-    const t75A = targetXAbs("A", 2);
-    const t25B = targetXAbs("B", 0);
-    const t50B = targetXAbs("B", 1);
-    const t75B = targetXAbs("B", 2);
-
-    // (7) Solve the linear interp 75%→100% segment for `exit` so this
-    // racer crosses finishX at their target time:
-    //   crossT = 0.75*dur + 0.25*dur * (finishX - t75) / (exit - t75)
-    //   => exit = t75 + (finishX - t75) * 0.25*dur / (crossT - 0.75*dur)
-    const computeExit = (
-      crossT: number,
-      dur: number,
-      t75: number,
-    ): number => {
-      const distance = finishX - t75;
-      const segmentTime = crossT - 0.75 * dur;
-      if (distance <= 0 || segmentTime <= 1) {
-        // Edge case: finish line was already passed by the 75%
-        // checkpoint. Let the racer exit naturally with a small offset.
-        return Math.max(t75 + 5, RACE_EXIT_MIN_CQW);
-      }
-      const exit = t75 + (distance * 0.25 * dur) / segmentTime;
-      return Math.max(RACE_EXIT_MIN_CQW, Math.min(RACE_EXIT_MAX_CQW, exit));
-    };
-    const exitA = computeExit(crossTargetA, durA, t75A);
-    const exitB = computeExit(crossTargetB, durB, t75B);
-
-    // (8) Recompute actual cross times by walking every animation
-    // segment in time order. Necessary because on the smaller card
-    // variants — where row font size is 1.25em vs 1.9em — long
-    // destination text pushes maxStart high enough that the wheelchair
-    // can already be past finishX by the 75% checkpoint. In that case
-    // the cross happens in the 50→75% segment (or earlier), and a
-    // hardcoded 75→100% formula collapses both racers to the same
-    // 0.75*dur, breaking winner reconciliation. Visible-on-screen
-    // winner is whoever crosses first; assign _raceWinner from that so
-    // the trophy badge always matches what the user just watched.
-    //
-    // Segment 0→25% actually uses ease-out (not linear), so the cross
-    // time in that segment is approximate — but a cross that early
-    // requires extreme maxStart values that don't occur in practice.
-    const actualCrossT = (
-      startX: number,
-      t25: number,
-      t50: number,
-      t75: number,
-      exit: number,
-      dur: number,
-    ): number => {
-      const segments: ReadonlyArray<readonly [number, number, number, number]> = [
-        [0, 0.25, startX, t25],
-        [0.25, 0.5, t25, t50],
-        [0.5, 0.75, t50, t75],
-        [0.75, 1.0, t75, exit],
-      ];
-      for (const [tStart, tEnd, xStart, xEnd] of segments) {
-        if (xStart >= finishX) return tStart * dur;
-        if (xEnd >= finishX) {
-          const frac = (finishX - xStart) / (xEnd - xStart);
-          return (tStart + frac * (tEnd - tStart)) * dur;
-        }
-      }
-      return Number.POSITIVE_INFINITY;
-    };
-    const crossA = actualCrossT(startA, t25A, t50A, t75A, exitA, durA);
-    const crossB = actualCrossT(startB, t25B, t50B, t75B, exitB, durB);
-    this._raceWinner = crossA <= crossB ? "A" : "B";
-
-    // Per-racer translate (cqw) = absolute target - measured start.
-    this.style.setProperty("--race-a-duration", `${durA}ms`);
-    this.style.setProperty("--race-b-duration", `${durB}ms`);
-    this.style.setProperty("--race-a-end", `${exitA - startA}cqw`);
-    this.style.setProperty("--race-b-end", `${exitB - startB}cqw`);
-    this.style.setProperty("--race-a-x-25", `${t25A - startA}cqw`);
-    this.style.setProperty("--race-a-x-50", `${t50A - startA}cqw`);
-    this.style.setProperty("--race-a-x-75", `${t75A - startA}cqw`);
-    this.style.setProperty("--race-b-x-25", `${t25B - startB}cqw`);
-    this.style.setProperty("--race-b-x-50", `${t50B - startB}cqw`);
-    this.style.setProperty("--race-b-x-75", `${t75B - startB}cqw`);
-    return { winnerCrossT: Math.min(crossA, crossB) };
+    const params = computeRaceParams({
+      a: measured?.a ?? 0,
+      b: measured?.b ?? 0,
+      finishCqw: measured?.finishCqw ?? RACE_FINISH_X_FALLBACK_CQW,
+    });
+    this._raceWinner = params.winner;
+    for (const [name, value] of Object.entries(params.cssVars)) {
+      this.style.setProperty(name, value);
+    }
+    return { winnerCrossT: params.winnerCrossT };
   }
 
   // Arms timers for whichever transition is pending next, based on the

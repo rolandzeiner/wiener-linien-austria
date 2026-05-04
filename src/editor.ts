@@ -33,7 +33,7 @@
 //   scopes inner-schema values under `data[name]` and the card's
 //   flat-key reads (`this._config.show_platform`) silently default.
 
-import { LitElement, css, html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
+import { LitElement, css, html, nothing, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
@@ -55,9 +55,11 @@ import {
 import {
   collectLinesInSelection,
   lineDirKey,
+  linesAtStop,
   pairsAtStop,
   tripletsAtStop,
 } from "./utils/departures.js";
+import { firstLineColorsMap } from "./utils/entities.js";
 import { lineTypeIcon } from "./utils/mot.js";
 
 /** Local minimal `fireEvent` shim — `bubbles: true` + `composed: true`
@@ -80,6 +82,21 @@ export class WienerLinienAustriaCardEditor
 
   public setConfig(config: WienerLinienCardConfig): void {
     this._config = normaliseModernConfig(config);
+  }
+
+  protected shouldUpdate(changed: PropertyValues): boolean {
+    if (!this._config) return false;
+    if (changed.has("_config")) return true;
+    // hass fires on every state change anywhere in HA — only re-render when
+    // a state we actually read changed. The form schema, line chips, walk
+    // times and colour swatches all derive from the configured stops, so
+    // restrict comparison to those entities. Without this guard, every
+    // unrelated state tick repeats pairsAtStop / tripletsAtStop /
+    // collectLinesInSelection while the dialog is open.
+    const prev = changed.get("hass") as HomeAssistant | undefined;
+    if (!prev || !this.hass) return true;
+    const eids = this._config.entities.map((s) => s.entity);
+    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
   }
 
   private _et(key: string): string {
@@ -415,24 +432,11 @@ export class WienerLinienAustriaCardEditor
     const overrides = this._config!.line_colors;
     const lineColors = attrs.line_colors ?? {};
     // Tracked subset wins — only surface lines the user opted into via
-    // the integration's config flow. Includes off-service lines
-    // (nightlines during the day) because the tracking is independent
-    // of the live `/monitor` window. Falls back to the static-catalogue
-    // list, then live departures, when no tracked list is published
-    // (older sensor cache before this attribute landed).
-    let lines: string[];
-    if (attrs.tracked_lines?.length) {
-      lines = [...attrs.tracked_lines].sort();
-    } else {
-      const fallbackLive = (attrs.departures ?? [])
-        .map((d) => d.line)
-        .filter((l): l is string => !!l);
-      const lineSet = new Set<string>(
-        attrs.lines_at_stop?.length ? attrs.lines_at_stop : fallbackLive,
-      );
-      for (const l of fallbackLive) lineSet.add(l);
-      lines = [...lineSet].sort();
-    }
+    // the integration's config flow. Falls back to the static catalogue
+    // unioned with live departures via `linesAtStop` so a line that
+    // appears in the realtime feed but not yet in the static catalogue
+    // is still listed.
+    const lines = linesAtStop(attrs);
     // Per-line vehicle type lookup so each chip can render its MoT icon
     // (mdi:subway-variant / mdi:tram / mdi:bus). First-seen-wins on
     // collision because Wiener Linien lines have a stable single MoT.
@@ -670,17 +674,10 @@ export class WienerLinienAustriaCardEditor
     const cfg = this._config!;
     const lines = collectLinesInSelection(this.hass, cfg.entities.map((s) => s.entity));
     const overrides = cfg.line_colors;
-    // Every sensor publishes the same GTFS palette; pick the first non-empty
-    // map across configured entities so the swatches preview the upstream
-    // default rather than the neutral fallback.
-    let lineColors: NonNullable<WienerLinienAttrs["line_colors"]> = {};
-    for (const stop of cfg.entities) {
-      const attrs = this.hass?.states?.[stop.entity]?.attributes as WienerLinienAttrs | undefined;
-      if (attrs?.line_colors && Object.keys(attrs.line_colors).length) {
-        lineColors = attrs.line_colors;
-        break;
-      }
-    }
+    const lineColors = firstLineColorsMap(
+      this.hass,
+      cfg.entities.map((s) => s.entity),
+    );
     return html`
       <div class="editor-section">
         <div class="section-header">${this._et("section_colors")}</div>

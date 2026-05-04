@@ -253,14 +253,25 @@ class StaticCatalogue:
     last_fetched: str  # ISO 8601 UTC
     validators: dict[str, CacheValidators] = field(default_factory=dict)
     trip_patterns: TripPatternIndex | None = None
-    # Reverse index: RBL → (DIVA, station name). Built lazily on first
-    # call to `index_by_rbl()` and cached on the dataclass instance so
-    # subsequent lookups are O(1). Without it, the trip-pattern matcher
-    # ran a linear `for station in stations_by_diva.values()` per RBL
-    # per departure per coordinator tick — ~9 k scans/min at busy hubs.
-    _rbl_index: dict[int, tuple[int, str]] | None = field(
-        default=None, repr=False, compare=False
+    # Reverse index: RBL → (DIVA, station name). Built eagerly in
+    # `__post_init__` so concurrent first-access from two coroutines
+    # can't both trigger a rebuild (lazy initialisation was a benign
+    # but wasteful race). Survives every poll and only rebuilds when a
+    # new catalogue is fetched (which replaces the whole instance).
+    # Tens of thousands of `_diva_for_rbl` / `_station_name_for_rbl`
+    # calls per coordinator tick collapse to dict lookups.
+    _rbl_index: dict[int, tuple[int, str]] = field(
+        default_factory=dict, repr=False, compare=False
     )
+
+    def __post_init__(self) -> None:
+        """Build the RBL→(DIVA, name) index once at construction."""
+        if not self._rbl_index:
+            index: dict[int, tuple[int, str]] = {}
+            for diva, station in self.stations_by_diva.items():
+                for rbl in station.rbls:
+                    index[rbl] = (diva, station.name)
+            self._rbl_index = index
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
         """Return stations whose name contains the query (case-insensitive)."""
@@ -278,21 +289,7 @@ class StaticCatalogue:
         return results[:limit]
 
     def index_by_rbl(self) -> dict[int, tuple[int, str]]:
-        """Return (cached) RBL → (DIVA, station name) reverse index.
-
-        Built once on first access by walking every Station's `rbls`. The
-        index lives on the catalogue instance, so it survives every poll
-        and only rebuilds when a new catalogue is fetched (which replaces
-        the whole instance). Tens of thousands of `_diva_for_rbl` /
-        `_station_name_for_rbl` calls per coordinator tick collapse to
-        dict lookups.
-        """
-        if self._rbl_index is None:
-            index: dict[int, tuple[int, str]] = {}
-            for diva, station in self.stations_by_diva.items():
-                for rbl in station.rbls:
-                    index[rbl] = (diva, station.name)
-            self._rbl_index = index
+        """Return the eager RBL → (DIVA, station name) reverse index."""
         return self._rbl_index
 
 

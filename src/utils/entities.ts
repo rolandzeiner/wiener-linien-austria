@@ -28,3 +28,21 @@ export function findWienerLinienEntities(hass: HomeAssistant | undefined): strin
   matches.sort();
   return matches;
 }
+
+// First non-empty `line_colors` map across the supplied entities. Every
+// WL sensor publishes the same GTFS palette, so the first hit is enough
+// to seed render paths that aren't scoped to a single stop. Returns
+// `{}` when nothing matches so callers can `Object.keys(...).length`
+// without a null guard.
+export function firstLineColorsMap(
+  hass: HomeAssistant | undefined,
+  entityIds: ReadonlyArray<string>,
+): NonNullable<WienerLinienAttrs["line_colors"]> {
+  if (!hass) return {};
+  for (const eid of entityIds) {
+    const attrs = hass.states?.[eid]?.attributes as WienerLinienAttrs | undefined;
+    const colors = attrs?.line_colors;
+    if (colors && Object.keys(colors).length) return colors;
+  }
+  return {};
+}
