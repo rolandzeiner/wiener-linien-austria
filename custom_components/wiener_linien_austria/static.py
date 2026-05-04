@@ -442,11 +442,15 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 # refresh can be scheduled. Cancellation also fires this
                 # callback (asyncio guarantees done-callbacks on cancel),
                 # which keeps the slot tidy after unload.
-                task.add_done_callback(
-                    lambda _t, dd=domain_data: dd.pop(
-                        BACKGROUND_REFRESH_TASK_KEY, None
-                    )
-                )
+                bound_domain_data = domain_data
+
+                def _clear_bg_task_slot(
+                    _t: asyncio.Future[None],
+                    dd: dict[str, Any] = bound_domain_data,
+                ) -> None:
+                    dd.pop(BACKGROUND_REFRESH_TASK_KEY, None)
+
+                task.add_done_callback(_clear_bg_task_slot)
             return catalogue
 
     catalogue = await _fetch_and_build(hass, prior=None)
