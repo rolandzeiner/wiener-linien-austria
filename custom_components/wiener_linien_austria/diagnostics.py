@@ -38,7 +38,6 @@ TO_REDACT: set[str] = {
     "Cookie",
     "Set-Cookie",
     "Referer",
-    "host",
 }
 
 

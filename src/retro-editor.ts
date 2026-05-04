@@ -32,6 +32,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
+import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
   HaFormSchema,
@@ -39,16 +40,12 @@ import type {
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
-import { lineDirKey, linesForDirection, pairsAtStop } from "./utils/departures.js";
-
-/** Local minimal `fireEvent` shim — `bubbles: true` + `composed: true`
- *  are required so the event crosses our shadow boundary and reaches
- *  the dashboard's card-editor listener. */
-function fireEvent<T>(node: HTMLElement, type: string, detail: T): void {
-  node.dispatchEvent(
-    new CustomEvent(type, { detail, bubbles: true, composed: true }),
-  );
-}
+import {
+  formatDirectionPillLabel,
+  lineDirKey,
+  linesForDirection,
+  pairsAtStop,
+} from "./utils/departures.js";
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor
@@ -137,14 +134,10 @@ export class WienerLinienAustriaRetroCardEditor
    *  stops with many lines.
    */
   private _directionLabel(dir: "H" | "R"): string {
-    const termini = this._terminiForDirection(dir);
-    if (!termini.length) {
-      return this._t(dir === "H" ? "dir_h" : "dir_r");
-    }
-    const prefix = this._t(dir === "H" ? "dir_h_short" : "dir_r_short");
-    const head = termini.slice(0, 3).join(" / ");
-    const more = termini.length > 3 ? ` +${termini.length - 3}` : "";
-    return `${prefix}: ${head}${more}`;
+    return formatDirectionPillLabel(this._terminiForDirection(dir), {
+      full: this._t(dir === "H" ? "dir_h" : "dir_r"),
+      short: this._t(dir === "H" ? "dir_h_short" : "dir_r_short"),
+    });
   }
 
   /** Distinct directions ("H" / "R") tracked at the currently-selected

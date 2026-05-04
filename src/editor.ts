@@ -40,6 +40,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
+import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
   HaFormSchema,
@@ -54,6 +55,7 @@ import {
 } from "./utils/config.js";
 import {
   collectLinesInSelection,
+  formatDirectionPillLabel,
   lineDirKey,
   linesAtStop,
   pairsAtStop,
@@ -61,15 +63,6 @@ import {
 } from "./utils/departures.js";
 import { firstLineColorsMap } from "./utils/entities.js";
 import { lineTypeIcon } from "./utils/mot.js";
-
-/** Local minimal `fireEvent` shim — `bubbles: true` + `composed: true`
- *  are required so the event crosses our shadow boundary and reaches
- *  the dashboard's card-editor listener. */
-function fireEvent<T>(node: HTMLElement, type: string, detail: T): void {
-  node.dispatchEvent(
-    new CustomEvent(type, { detail, bubbles: true, composed: true }),
-  );
-}
 
 @customElement("wiener-linien-austria-card-editor")
 export class WienerLinienAustriaCardEditor
@@ -381,17 +374,14 @@ export class WienerLinienAustriaCardEditor
    *  ("Hinfahrt" / "Rückfahrt") when no terminus data is available.
    *  Caps at 3 termini joined by " / " plus a trailing "+N" so hub
    *  stops with many lines stay readable in narrow pills. */
-  private _directionLabelFromTermini(
-    dir: "H" | "R",
-    termini: string[],
-  ): string {
-    if (!termini.length) {
-      return this._t(dir === "H" ? "dir_h" : "dir_r");
-    }
-    const prefix = this._t(dir === "H" ? "dir_h_short" : "dir_r_short");
-    const head = termini.slice(0, 3).join(" / ");
-    const more = termini.length > 3 ? ` +${termini.length - 3}` : "";
-    return `${prefix}: ${head}${more}`;
+  /** Localised strings the shared `formatDirectionPillLabel` helper
+   *  needs. Resolved per call so a language change at runtime is
+   *  picked up on the next render. */
+  private _dirPillStrings(dir: "H" | "R"): { full: string; short: string } {
+    return {
+      full: this._t(dir === "H" ? "dir_h" : "dir_r"),
+      short: this._t(dir === "H" ? "dir_h_short" : "dir_r_short"),
+    };
   }
 
   /** Stop-wide direction-button label: pools every terminus visible in
@@ -406,7 +396,7 @@ export class WienerLinienAustriaCardEditor
     for (const t of triplets) {
       if (t.direction === dir && t.towards) termini.add(t.towards);
     }
-    return this._directionLabelFromTermini(dir, [...termini].sort());
+    return formatDirectionPillLabel([...termini].sort(), this._dirPillStrings(dir));
   }
 
   /** Per-line direction-button label: terminus(es) for one specific line
@@ -422,7 +412,7 @@ export class WienerLinienAustriaCardEditor
         termini.add(t.towards);
       }
     }
-    return this._directionLabelFromTermini(dir, [...termini].sort());
+    return formatDirectionPillLabel([...termini].sort(), this._dirPillStrings(dir));
   }
 
   private _renderStopFilter(stop: NormalisedModernStop): TemplateResult {

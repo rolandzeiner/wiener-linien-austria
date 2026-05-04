@@ -71,6 +71,12 @@ class WienerLinienStopSensor(
             "traffic_info",
             "elevator_info",
             "next_by_line",
+            # Static structural metadata — useful to the card live, but
+            # never useful in history. On hub stops these are 30+ items
+            # each and would write to the recorder on every state tick.
+            "lines_at_stop",
+            "tracked_lines",
+            "tracked_line_keys",
         }
     )
 

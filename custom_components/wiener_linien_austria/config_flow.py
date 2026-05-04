@@ -179,7 +179,17 @@ def _static_lines_for_station(
             # Pattern must actually pass through this station — a line
             # can have multiple patterns (short turns, branches) and
             # only some visit a given DIVA's RBLs.
-            if not station_rbl_set.intersection(pattern.stops):
+            intersection = station_rbl_set.intersection(pattern.stops)
+            if not intersection:
+                continue
+            # Skip self-terminating short-turn patterns: when this
+            # station is itself the terminus, the picker would surface
+            # "U1 → Westbahnhof" while the user is configuring at
+            # Westbahnhof. The live /monitor never emits these (the
+            # vehicle has already arrived), so they only show up via
+            # the static merge.
+            terminus_rbl = pattern.stops[-1] if pattern.stops else None
+            if terminus_rbl is not None and terminus_rbl in station_rbl_set:
                 continue
             # Direction codes: H="hin" (CSV 1), R="retour" (CSV 2).
             # Mirrors the live /monitor convention so saved keys round-
@@ -188,7 +198,6 @@ def _static_lines_for_station(
             key = _line_key(label, direction_str)
             if key in seen:
                 continue
-            terminus_rbl = pattern.stops[-1] if pattern.stops else None
             terminus_entry = (
                 rbl_index.get(terminus_rbl) if terminus_rbl else None
             )

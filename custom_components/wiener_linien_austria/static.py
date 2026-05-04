@@ -225,6 +225,16 @@ class TripPatternIndex:
     lines_at_diva: dict[int, tuple[str, ...]] = field(default_factory=dict)
     colors_by_line: dict[str, str] = field(default_factory=dict)
     text_colors_by_line: dict[str, str] = field(default_factory=dict)
+    # Reverse of `lines_by_label`. Built lazily in `__post_init__` —
+    # callers that need to resolve a LineID back to a label (the
+    # stops_ahead matcher does this once per departure row) get O(1)
+    # instead of an O(N) iteration over `lines_by_label.items()`.
+    label_for_line: dict[int, str] = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        """Build the LineID→label reverse index once at construction."""
+        if not self.label_for_line:
+            self.label_for_line = {v: k for k, v in self.lines_by_label.items()}
 
     @property
     def line_count(self) -> int:
@@ -1066,14 +1076,7 @@ def stops_ahead_for_match(
     # `diva` key is dropped from the attribute on purpose: keeping the
     # per-stop dict small lets MAX_STOPS_AHEAD-bounded full routes fit
     # under the 16 KB recorder cap on busy multi-line stops.
-    current_label = next(
-        (
-            label
-            for label, lid in catalogue.trip_patterns.lines_by_label.items()
-            if lid == best.line_id
-        ),
-        None,
-    )
+    current_label = catalogue.trip_patterns.label_for_line.get(best.line_id)
     lines_at_diva = catalogue.trip_patterns.lines_at_diva
 
     full: list[dict[str, Any]] = []

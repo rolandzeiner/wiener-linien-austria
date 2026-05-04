@@ -76,9 +76,39 @@ async def _websocket_retro_card_version(
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the Wiener Linien Austria component.
 
-    Schedules a weekly refresh of the stop catalogue. First fetch happens
-    lazily on first config-flow use — no need to eagerly download at startup.
-    Also registers the Lovelace card once when the domain is loaded.
+    Process-scoped concerns only: register the WebSocket card-version
+    commands and the Lovelace JS resource. Domain-wide *timers* are
+    booted from the FIRST `async_setup_entry` and torn down by the LAST
+    `async_unload_entry` — see `_ensure_domain_timers` and the unload
+    cleanup tuple. Putting the timers here would leak across the
+    "remove last entry, add a new one" flow because `async_setup` only
+    runs once per HA process.
+    """
+    # WS commands are process-scoped — HA core has no deregister API.
+    # `async_setup` only runs once per HA process, so duplicate
+    # registration can't happen.
+    async_register_command(hass, _websocket_card_version)
+    async_register_command(hass, _websocket_retro_card_version)
+
+    registration = JSModuleRegistration(hass)
+
+    async def _register_frontend(_event: Event | None = None) -> None:
+        await registration.async_register()
+
+    if hass.state == CoreState.running:
+        await _register_frontend()
+    else:
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _register_frontend)
+
+    return True
+
+
+def _ensure_domain_timers(hass: HomeAssistant) -> None:
+    """(Re)create domain-wide refresh timers if they're not running.
+
+    Idempotent: safe to call from every `async_setup_entry`, only does
+    work when the previous unsub is missing. Booted from the first
+    entry, torn down by the last entry, recreated on a re-add.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
 
@@ -116,27 +146,16 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
             cancel_on_shutdown=True,
         )
 
-    # WS commands are process-scoped — HA core has no deregister API.
-    # `async_setup` only runs once per HA process, so duplicate
-    # registration can't happen.
-    async_register_command(hass, _websocket_card_version)
-    async_register_command(hass, _websocket_retro_card_version)
-
-    registration = JSModuleRegistration(hass)
-
-    async def _register_frontend(_event: Event | None = None) -> None:
-        await registration.async_register()
-
-    if hass.state == CoreState.running:
-        await _register_frontend()
-    else:
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _register_frontend)
-
-    return True
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
+    # Boot the domain-wide refresh timers if they're not already running.
+    # Idempotent — only the FIRST entry actually creates them; subsequent
+    # entries no-op. After a last-entry teardown + add cycle this also
+    # recreates them, which `async_setup` (process-scoped, runs once)
+    # cannot do.
+    _ensure_domain_timers(hass)
+
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     # `_async_setup` is auto-called by `async_config_entry_first_refresh`
     # (HA core contract) — do NOT invoke it explicitly here.
@@ -189,7 +208,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
     if not unloaded:
         return False
 
-    domain_data = hass.data.get(DOMAIN, {})
+    domain_data = hass.data.setdefault(DOMAIN, {})
     remaining = max(0, domain_data.get(ENTRY_COUNT_KEY, 1) - 1)
     domain_data[ENTRY_COUNT_KEY] = remaining
     if remaining == 0:

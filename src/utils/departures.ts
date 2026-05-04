@@ -81,6 +81,31 @@ export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   return out;
 }
 
+/** Strings used to render a direction pill. The caller resolves the
+ *  active locale; the helper is purely format-level. `full` is shown
+ *  when no termini flow yet ("Hinfahrt"); `short` is the compact prefix
+ *  used when at least one terminus is known ("H" → "H: Oberlaa"). */
+export interface DirectionPillStrings {
+  full: string;
+  short: string;
+}
+
+/** Render a "H: Oberlaa / Alaudagasse" / "R: Floridsdorf" / fallback
+ *  "Hinfahrt" label. Caps at 3 termini, joined by " / ", with a
+ *  trailing "+N" overflow for hub stops with many lines. Sorting is
+ *  the caller's responsibility — the editors pass an already-sorted
+ *  list. Shared between the modern and retro editors so the rule
+ *  doesn't drift when one side adjusts the cap or the separator. */
+export function formatDirectionPillLabel(
+  termini: ReadonlyArray<string>,
+  strings: DirectionPillStrings,
+): string {
+  if (!termini.length) return strings.full;
+  const head = termini.slice(0, 3).join(" / ");
+  const more = termini.length > 3 ? ` +${termini.length - 3}` : "";
+  return `${strings.short}: ${head}${more}`;
+}
+
 // Lines tracked at a stop in one direction. Tracked-line keys (config-flow
 // selection) win — only surface lines the user opted into. Falls back to
 // live departures for older sensor caches that pre-date `tracked_line_keys`.

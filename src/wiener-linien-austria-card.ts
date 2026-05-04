@@ -19,7 +19,7 @@ import {
   checkCardVersionWS,
   renderVersionBanner,
 } from "./shared-render.js";
-import { safeHttpsUri } from "./utils.js";
+import { deText, safeHttpsUri } from "./utils.js";
 import {
   LINE_TYPE_METRO,
   headerIconForType,
@@ -69,15 +69,6 @@ import "./editor.js";
       preview: true,
     });
   }
-}
-
-// Wrap API-sourced German strings (station names, destinations, disturbance
-// text) so assistive tech pronounces them correctly even when HA's dashboard
-// locale is not German. ASCII fallbacks like the raw entity ID are rendered
-// unwrapped — the lang hint would be inaccurate and AT handles ASCII fine.
-function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
-  if (raw) return html`<span lang="de">${raw}</span>`;
-  return fallback ?? "";
 }
 
 // Platform-prefix translation key by vehicle type. U-Bahn stations use
@@ -255,28 +246,30 @@ export class WienerLinienAustriaCard extends LitElement {
     }
   }
 
-  protected updated(changed: PropertyValues): void {
-    if (changed.has("_qrOpenFor") && this._qrOpenFor) {
-      // Panel just expanded — render the QR into its canvas wrapper.
-      // Re-render whenever the target URL changes (tab switch reuses
-      // the same Lit DOM element and just updates `data-qr-text`),
-      // so we compare want vs. last-rendered-for and only redraw on
-      // mismatch. Without this guard, the second tab would inherit
-      // the first tab's accent because the canvas would still hold
-      // the prior render.
-      const host = this.renderRoot.querySelector<HTMLElement>(
-        ".qr-panel.expanded .qr-canvas",
-      );
-      if (!host) return;
-      const wantText = host.getAttribute("data-qr-text") ?? "";
-      const haveText = host.getAttribute("data-qr-rendered-for") ?? "";
-      if (wantText && wantText !== haveText) {
-        // Don't clear `host` here — `_renderTintedQr` reads
-        // `getComputedStyle` before mutating the DOM so the layout
-        // engine doesn't have to flush twice (clear + re-append).
-        this._renderTintedQr(host);
-        host.setAttribute("data-qr-rendered-for", wantText);
-      }
+  protected updated(_changed: PropertyValues): void {
+    // Re-render the QR canvas any time the panel is open AND its
+    // target URL has actually changed since the last paint. Comparing
+    // `data-qr-text` to `data-qr-rendered-for` covers all the moving
+    // parts in one place: panel-open transition, tab switch (same DOM
+    // element with a new URL), AND late-arriving station coords (user
+    // opens the panel before the static catalogue resolves coords; the
+    // URL flips from a text-search OSM fallback to a `geo:lat,lon`
+    // link once the catalogue lands). Gating on `_qrOpenFor` alone
+    // missed the coords-arrived case because coords land on a `hass`
+    // change, not a `_qrOpenFor` change.
+    if (!this._qrOpenFor) return;
+    const host = this.renderRoot.querySelector<HTMLElement>(
+      ".qr-panel.expanded .qr-canvas",
+    );
+    if (!host) return;
+    const wantText = host.getAttribute("data-qr-text") ?? "";
+    const haveText = host.getAttribute("data-qr-rendered-for") ?? "";
+    if (wantText && wantText !== haveText) {
+      // Don't clear `host` here — `_renderTintedQr` reads
+      // `getComputedStyle` before mutating the DOM so the layout
+      // engine doesn't have to flush twice (clear + re-append).
+      this._renderTintedQr(host);
+      host.setAttribute("data-qr-rendered-for", wantText);
     }
   }
 

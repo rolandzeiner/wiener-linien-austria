@@ -6,6 +6,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
+import { deText } from "./utils.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { translate } from "./localize/localize.js";
 import {
@@ -45,13 +46,6 @@ const COUNTDOWN_TOTAL_MS = COUNTDOWN_DIGIT_MS * 3;
 // Race constants and physics live in `utils/race.ts`. The card keeps
 // only the DOM-touching `_measureRaceStartPositions` and the timer
 // state machine; the math is a pure function fed those measurements.
-
-// Wrap API-sourced German strings so assistive tech pronounces them correctly
-// under non-German HA locales. ASCII fallbacks stay unwrapped.
-function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
-  if (raw) return html`<span lang="de">${raw}</span>`;
-  return fallback ?? "";
-}
 
 // Dedupe by `type` so a double-load (cache-bust race, HMR, etc.)
 // doesn't surface the retro card twice in the picker.
@@ -173,8 +167,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     // HA rebuilds the dashboard on load — the card gets detached and
     // re-attached mid-race. Re-arm transitions against wall-clock time.
+    // Bail if the user toggled `wheelchair_race` off while the card was
+    // detached: the state machine would otherwise tick uselessly for a
+    // few seconds (CSS hides everything, but the timers run anyway).
     if (this._raceState !== "idle") {
-      this._armStateTransitions();
+      if (this._config?.wheelchair_race) {
+        this._armStateTransitions();
+      } else {
+        this._raceState = "idle";
+        this._clearRaceTimers();
+      }
     }
   }
 
