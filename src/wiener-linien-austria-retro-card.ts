@@ -83,7 +83,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // One-shot flag so the "configured entity missing → fell back" console
   // warning doesn't spam on every re-render.
   private _fallbackWarned = false;
-  private _raceTimers: Array<ReturnType<typeof setTimeout>> = [];
+  private _raceTimers = new Set<ReturnType<typeof setTimeout>>();
   // Wall-clock target times so state transitions survive the disconnect/
   // reconnect cycles HA triggers during dashboard rebuilds.
   private _countdownStartAt: number | null = null;
@@ -268,20 +268,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   private _clearRaceTimers(): void {
     for (const t of this._raceTimers) clearTimeout(t);
-    this._raceTimers = [];
+    this._raceTimers.clear();
   }
 
   /** Schedule a timeout AND track it on `_raceTimers` so a teardown can
-   *  cancel it. The handle self-removes from the array on fire so the
-   *  array doesn't accumulate dead handles between `_clearRaceTimers`
-   *  calls. Use this in place of bare `setTimeout` + manual push. */
+   *  cancel it. The handle self-removes on fire so the set doesn't
+   *  accumulate dead handles between `_clearRaceTimers` calls. Use this
+   *  in place of bare `setTimeout`. */
   private _scheduleRaceTimer(cb: () => void, delayMs: number): void {
     const handle = setTimeout(() => {
-      const idx = this._raceTimers.indexOf(handle);
-      if (idx >= 0) this._raceTimers.splice(idx, 1);
+      this._raceTimers.delete(handle);
       cb();
     }, delayMs);
-    this._raceTimers.push(handle);
+    this._raceTimers.add(handle);
   }
 
   private _scheduleRace(delayMs: number): void {

@@ -194,9 +194,56 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
         configuration_url="https://www.wienerlinien.at/",
     )
 
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    # If platform setup raises, HA puts the entry in setup-error state
+    # and may NOT call `async_unload_entry`. We've already incremented
+    # the counter and booted the timers above, so roll those back here
+    # to keep `ENTRY_COUNT_KEY` honest. Without this, a
+    # `forward_entry_setups` failure leaves a phantom entry in the
+    # count and a subsequent removal can prematurely tear down domain
+    # state that other live entries still need.
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:
+        await _rollback_setup_failure(hass, coordinator)
+        raise
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
+
+
+async def _rollback_setup_failure(
+    hass: HomeAssistant, coordinator: WienerLinienAustriaCoordinator
+) -> None:
+    """Decrement counter + tear down domain state on a partial-setup failure.
+
+    Called when `async_forward_entry_setups` raises after the bookkeeping
+    above already counted the entry. Mirrors the "remaining == 0" branch
+    of `async_unload_entry` because HA core won't call that path for a
+    setup that never reached the loaded state.
+    """
+    await coordinator.async_shutdown()
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data:
+        return
+    remaining = max(0, domain_data.get(ENTRY_COUNT_KEY, 1) - 1)
+    domain_data[ENTRY_COUNT_KEY] = remaining
+    if remaining == 0:
+        for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
+            unsub = domain_data.pop(unsub_key, None)
+            if callable(unsub):
+                unsub()
+        bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
+        if isinstance(bg_task, asyncio.Task) and not bg_task.done():
+            bg_task.cancel()
+        for stale_key in (
+            TRAFFIC_INFO_KEY,
+            ELEVATOR_INFO_KEY,
+            ALERT_CACHE_VALIDATORS_KEY,
+            DOMAIN_LAST_CALL_KEY,
+            LOCK_KEY,
+            LOCK_LOOP_KEY,
+            CATALOGUE_KEY,
+        ):
+            domain_data.pop(stale_key, None)
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> None:
@@ -215,7 +262,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry
     if not unloaded:
         return False
 
-    domain_data = hass.data.setdefault(DOMAIN, {})
+    # Bail if the domain dict is gone — entry was never fully set up
+    # (rare but possible after a setup-error rollback) and there's
+    # nothing to tear down. Using `.get` instead of `.setdefault` so we
+    # don't recreate an empty dict purely to put a 0 in it.
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data:
+        return True
     remaining = max(0, domain_data.get(ENTRY_COUNT_KEY, 1) - 1)
     domain_data[ENTRY_COUNT_KEY] = remaining
     if remaining == 0:

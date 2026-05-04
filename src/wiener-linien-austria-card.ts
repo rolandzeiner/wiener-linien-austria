@@ -232,17 +232,20 @@ export class WienerLinienAustriaCard extends LitElement {
     }
   }
 
-  protected updated(_changed: PropertyValues): void {
-    // Re-render the QR canvas any time the panel is open AND its
-    // target URL has actually changed since the last paint. Comparing
-    // `data-qr-text` to `data-qr-rendered-for` covers all the moving
-    // parts in one place: panel-open transition, tab switch (same DOM
-    // element with a new URL), AND late-arriving station coords (user
-    // opens the panel before the static catalogue resolves coords; the
-    // URL flips from a text-search OSM fallback to a `geo:lat,lon`
-    // link once the catalogue lands). Gating on `_qrOpenFor` alone
-    // missed the coords-arrived case because coords land on a `hass`
-    // change, not a `_qrOpenFor` change.
+  protected updated(changed: PropertyValues): void {
+    // Re-render the QR canvas only on changes that could flip the
+    // target URL: panel-open transition, hass change (late-arriving
+    // catalogue coords swap the OSM fallback for a `geo:lat,lon`
+    // link), or config change (user picked a different stop).
+    // Pre-gating on the relevant property changes keeps `updated()`
+    // a no-op for the typical render where nothing QR-relevant moved.
+    if (
+      !changed.has("_qrOpenFor") &&
+      !changed.has("hass") &&
+      !changed.has("_config")
+    ) {
+      return;
+    }
     if (!this._qrOpenFor) return;
     const host = this.renderRoot.querySelector<HTMLElement>(
       ".qr-panel.expanded .qr-canvas",

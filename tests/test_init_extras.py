@@ -110,6 +110,55 @@ async def test_unload_entry_returns_false_when_platforms_fail(
         assert await async_unload_entry(hass, entry) is False
 
 
+async def test_unload_entry_bails_when_domain_dict_missing(
+    hass: HomeAssistant, mock_fetch: AsyncMock
+) -> None:
+    """If hass.data[DOMAIN] was never created, unload returns True without
+    recreating an empty dict purely to record a 0 in it. Mirrors the
+    "setup failed before any bookkeeping" rollback path."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    # Pretend the entry never set up — the platform unload still resolves
+    # cleanly because nothing was actually loaded.
+    hass.data.pop(DOMAIN, None)
+    with patch.object(
+        hass.config_entries,
+        "async_unload_platforms",
+        new=AsyncMock(return_value=True),
+    ):
+        assert await async_unload_entry(hass, entry) is True
+    assert DOMAIN not in hass.data
+
+
+async def test_setup_entry_rolls_back_on_forward_setup_failure(
+    hass: HomeAssistant, mock_fetch: AsyncMock
+) -> None:
+    """A `forward_entry_setups` failure must decrement ENTRY_COUNT_KEY and
+    tear down domain timers — HA core may not call `async_unload_entry`
+    on a setup that never reached the loaded state, so the rollback has
+    to happen inline."""
+    from custom_components.wiener_linien_austria import async_setup_entry
+    from custom_components.wiener_linien_austria.const import ENTRY_COUNT_KEY
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+
+    with patch.object(
+        hass.config_entries,
+        "async_forward_entry_setups",
+        new=AsyncMock(side_effect=RuntimeError("platform boom")),
+    ):
+        try:
+            await async_setup_entry(hass, entry)
+        except RuntimeError:
+            pass
+    # Counter rolled back to 0; domain timers torn down.
+    domain_data = hass.data.get(DOMAIN, {})
+    assert domain_data.get(ENTRY_COUNT_KEY, 0) == 0
+    assert "static_refresh_unsub" not in domain_data
+    assert "alerts_refresh_unsub" not in domain_data
+
+
 # ---------------------------------------------------------------------------
 # async_migrate_entry — v1 → v2 collapses CONF_LINES triples to pairs
 # ---------------------------------------------------------------------------

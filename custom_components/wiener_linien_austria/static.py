@@ -532,11 +532,18 @@ async def _fetch_and_build(
         prior.validators.get("haltepunkte") if prior else None
     ) or CacheValidators()
     # Force a full body for linien + fahrwegverlaeufe whenever we don't
-    # yet have a parsed trip-pattern index. Otherwise stale validators
-    # could trigger a 304 with an empty body, leaving us unable to
-    # build the index this cycle and stuck on weekly cadence until
-    # both happen to flip fresh in the same tick.
-    needs_pattern_bodies = prior is None or prior.trip_patterns is None
+    # yet have a fully-built trip-pattern index. Stale validators would
+    # otherwise trigger a 304 with an empty body, leaving us unable to
+    # rebuild the missing parts this cycle and stuck on weekly cadence
+    # until BOTH CSVs happen to flip fresh in the same tick. Empty
+    # `lines_at_diva` is the migration tell for caches written before
+    # that index existed; without this branch the migration loops
+    # 304→304 forever.
+    needs_pattern_bodies = (
+        prior is None
+        or prior.trip_patterns is None
+        or not prior.trip_patterns.lines_at_diva
+    )
     linien_validators = (
         CacheValidators()
         if needs_pattern_bodies
