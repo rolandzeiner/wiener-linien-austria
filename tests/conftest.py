@@ -7,20 +7,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-
-def make_response_cm(resp: Any) -> MagicMock:
-    """Wrap a mock response as an async context manager.
-
-    Production code uses `async with session.get(...) as resp:` so the
-    return value of `session.get` must support `__aenter__` / `__aexit__`.
-    Real aiohttp's `_RequestContextManager` is both awaitable and a
-    context manager; mocks need to mimic the context-manager half.
-    """
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=resp)
-    cm.__aexit__ = AsyncMock(return_value=None)
-    return cm
 from homeassistant.const import CONF_SCAN_INTERVAL
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
@@ -41,6 +27,20 @@ from custom_components.wiener_linien_austria.static import (
 )
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+def make_response_cm(resp: Any) -> MagicMock:
+    """Wrap a mock response as an async context manager.
+
+    Production code uses `async with session.get(...) as resp:` so the
+    return value of `session.get` must support `__aenter__` / `__aexit__`.
+    Real aiohttp's `_RequestContextManager` is both awaitable and a
+    context manager; mocks need to mimic the context-manager half.
+    """
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=resp)
+    cm.__aexit__ = AsyncMock(return_value=None)
+    return cm
 
 
 @pytest.fixture
