@@ -63,6 +63,13 @@ jobs:
           # `pip show pydantic_core orjson Pillow` shows pyo3 0.25+ on
           # a fresh HA release.
           python-version: "3.13"
+      - name: Upgrade pip
+        # pip 26.1 ships the resolver fix for hard-pinned transitive
+        # constraints in pytest-homeassistant-custom-component. Older
+        # pip versions surface ResolutionImpossible on conflicts that
+        # 26.1 backtracks past. Pin so a future pip behaviour change
+        # doesn't quietly break the lockstep with the test floors.
+        run: python -m pip install --upgrade "pip==26.1"
       - name: Install dependencies
         run: pip install -r requirements_test.txt
       - name: Run Linter (Ruff)
