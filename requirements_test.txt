@@ -3,13 +3,13 @@
 # project intentionally adopts new behaviour from a newer release.
 # Local dev tracks the floor or higher; CI installs the floor's minor
 # resolved by pip.
-pytest-homeassistant-custom-component>=0.13.311,<0.14
+pytest-homeassistant-custom-component>=0.13.329,<0.14
 pytest-asyncio>=1.3.0,<2
-pytest-cov>=7.0.0,<8
-syrupy>=5.0.0,<6
-mypy>=1.20.2,<2
+pytest-cov>=7.1.0,<8
+syrupy>=5.1.0,<6
+mypy>=2.0.0,<3
 ruff>=0.15.12,<1
-# pycares cap removed 2026-05-04: PHACC 0.13.311 pins HA core 2026.2.0b2
-# which already pins aiodns==4.0.0; aiodns 4 uses the pycares 5 API
-# natively (no more ares_query_a_result reference). The transitive
-# resolver now picks pycares 5.x without breaking pytest collection.
+# Floors track PHACC 0.13.329's hard pins (pytest-cov==7.1.0,
+# syrupy==5.1.0, pytest-asyncio==1.3.0). PHACC ≥0.13.317 wraps HA core
+# 2026.5+ and requires Python ≥3.14, so the CI workflow bumped to 3.14
+# in lockstep — see validate.yml's tests job.
