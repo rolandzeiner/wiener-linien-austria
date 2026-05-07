@@ -1,133 +1,142 @@
-# IMPORTANT: review before committing — this default assumes a HACS integration
-# repo. Loosen only with intention. Order = most likely to leak first.
+# Unified .gitignore for the *-austria HACS portfolio (5 integrations,
+# all Lit 3 + TypeScript + Rollup card + HA Python integration).
+# Reviewed 2026-05-08 — composed from the union of all 5 existing files,
+# de-duplicated, with per-repo paths replaced by globbed equivalents.
 
-# ---------------------------------------------------------------------------
-# Secrets — API keys and credentials are the #1 leak vector for HA integrations
-# ---------------------------------------------------------------------------
-.env
-.env.*
-!.env.example
-secrets.yaml
-.secrets
-*.secret
-credentials.json
-token.json
-auth.json
-*.pem
-*.key
-*.p12
-*.pfx
-local_*.py
-private_*.py
+# ───────────────────────────────────────────────────────────────────
+# Python
+# ───────────────────────────────────────────────────────────────────
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyc
+*$py.class
+*.so
+.Python
 
-# ---------------------------------------------------------------------------
-# Claude / AI tooling — transcripts, plans, local state
-# ---------------------------------------------------------------------------
-.claude/
-.claude-cache/
-.claude-*
-CLAUDE.local.md
-*.local.md
-.aider*
+# Test / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+
+# Build / dist / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual envs
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.HA_VERSION
+
+# ───────────────────────────────────────────────────────────────────
+# Node / JS / TypeScript
+# ───────────────────────────────────────────────────────────────────
+node_modules/
+.npm/
+*.js.map
+
+# Bundler caches
+.rollup.cache/
+.vite-cache/
+.parcel-cache/
+
+# ───────────────────────────────────────────────────────────────────
+# OS metadata
+# ───────────────────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+Desktop.ini
+*.swp
+*.swo
+*~
+*.bak
+
+# ───────────────────────────────────────────────────────────────────
+# IDE / editor state
+# ───────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.iml
 .cursor/
 .cursorrules.local
 .continue/
 .windsurf/
 
-# ---------------------------------------------------------------------------
-# Virtual environments
-# ---------------------------------------------------------------------------
-.venv/
-venv/
-env/
-.python-version
+# ───────────────────────────────────────────────────────────────────
+# AI assistants — local state, transcripts, plans
+# ───────────────────────────────────────────────────────────────────
+.claude/
+.claude-cache/
+.claude-*
+.aider*
 
-# ---------------------------------------------------------------------------
-# HA-local test state (from running a local HA against the integration)
-# ---------------------------------------------------------------------------
-config/
-home-assistant.log*
-home-assistant_*.log*
-.storage/
-
-# ---------------------------------------------------------------------------
-# IDE / editor state
-# ---------------------------------------------------------------------------
-.vscode/
-.idea/
-*.iml
-*.swp
-*.swo
-*~
-Thumbs.db
-desktop.ini
-
-# ---------------------------------------------------------------------------
-# macOS
-# ---------------------------------------------------------------------------
-**/.DS_Store
-
-# ---------------------------------------------------------------------------
-# Python
-# ---------------------------------------------------------------------------
-__pycache__/
-**/__pycache__/
-*.pyc
-*.py[cod]
-.Python
-
-# ---------------------------------------------------------------------------
-# Tool caches
-# ---------------------------------------------------------------------------
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-
-# ---------------------------------------------------------------------------
-# Coverage & build artifacts
-# ---------------------------------------------------------------------------
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-build/
-dist/
-*.egg-info/
-
-# ---------------------------------------------------------------------------
-# Node (only relevant if the Lovelace-card subtree is in use)
-# package-lock.json should stay COMMITTED — do not add it here.
-# ---------------------------------------------------------------------------
-node_modules/
-.rollup.cache/
-.parcel-cache/
-.vite-cache/
-
-# ---------------------------------------------------------------------------
-# Logs / pip
-# ---------------------------------------------------------------------------
-*.log
-pip-log.txt
-pip-delete-this-directory.txt
-
-# ---------------------------------------------------------------------------
-# Backup files (e.g. *.vanilla.js.bak from pre-Lit migration)
-# ---------------------------------------------------------------------------
-*.bak
-
-# ---------------------------------------------------------------------------
-# Personal dev tooling — push/sync scripts that target a specific dev box.
-# Each contributor sets these up from the skill template; not shared.
-# ---------------------------------------------------------------------------
-scripts/
-dev-push.sh
-
-# ---------------------------------------------------------------------------
-# Fallow code-quality tool — config + caches. Personal tooling; ship the
-# repo without forcing fallow on contributors. Drop the rule if you decide
-# fallow should be a project-wide standard.
-# ---------------------------------------------------------------------------
+# ───────────────────────────────────────────────────────────────────
+# Static analysis tooling
+# ───────────────────────────────────────────────────────────────────
+.fallow/
 .fallowrc.json
 .fallowrc.jsonc
 fallow.toml
-.fallow/
+
+# ───────────────────────────────────────────────────────────────────
+# Secrets / credentials — NEVER commit
+# ───────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+.secrets
+*.secret
+secrets.json
+secrets.yaml
+auth.json
+credentials.json
+token.json
+*.pem
+*.key
+*.p12
+*.pfx
+tests/fixtures/secrets/
+
+# ───────────────────────────────────────────────────────────────────
+# HA local state — logs, config copies
+# ───────────────────────────────────────────────────────────────────
+.storage/
+home-assistant.log*
+home-assistant_*.log*
+*.log
+config/
+
+# ───────────────────────────────────────────────────────────────────
+# Personal dev tooling — push/sync scripts targeting a dev box, scratch
+# ───────────────────────────────────────────────────────────────────
+scripts/
+dev-push.sh
+dev/
+test/
+target/
+
+# Personal notes / scratch — *.local.md is the convention
+CLAUDE.local.md
+*.local.md
+local_*.py
+private_*.py
+
+# ───────────────────────────────────────────────────────────────────
+# Dev-only fixture hook (gitignored by design — per-repo file is local)
+# ───────────────────────────────────────────────────────────────────
+custom_components/*/_dev_fixture.py
