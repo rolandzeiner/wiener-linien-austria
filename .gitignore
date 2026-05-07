@@ -78,9 +78,14 @@ Desktop.ini
 .windsurf/
 
 # ───────────────────────────────────────────────────────────────────
-# AI assistants — local state, transcripts, plans
+# AI assistants — local state, transcripts, plans, project-level skills
 # ───────────────────────────────────────────────────────────────────
 .claude/
+# Defensive: re-ignore project-level skills explicitly so they stay
+# out of git even if someone later adds a !.claude/<something>
+# exception that would un-ignore the parent dir. Portfolio-wide rules
+# belong in the user-level austria-portfolio-workflow skill, not here.
+.claude/skills/
 .claude-cache/
 .claude-*
 .aider*
