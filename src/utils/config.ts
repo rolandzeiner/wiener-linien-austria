@@ -1,7 +1,6 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
 import type {
   LineColorsMap,
-  ModernStopConfig,
   RetroSize,
   RetroStationBg,
   RetroStyle,

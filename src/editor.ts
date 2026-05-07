@@ -77,7 +77,7 @@ export class WienerLinienAustriaCardEditor
     this._config = normaliseModernConfig(config);
   }
 
-  protected shouldUpdate(changed: PropertyValues): boolean {
+  protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (changed.has("_config")) return true;
     // hass fires on every state change anywhere in HA — only re-render when
@@ -341,7 +341,7 @@ export class WienerLinienAustriaCardEditor
   // Render
   // ------------------------------------------------------------------
 
-  protected render(): TemplateResult | typeof nothing {
+  protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     return html`
       <div class="editor">
@@ -713,7 +713,7 @@ export class WienerLinienAustriaCardEditor
     `;
   }
 
-  static styles: CSSResultGroup = [
+  static override styles: CSSResultGroup = [
     editorBaseStyles,
     css`
     .stop-filter {

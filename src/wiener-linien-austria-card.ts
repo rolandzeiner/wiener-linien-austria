@@ -196,7 +196,7 @@ export class WienerLinienAustriaCard extends LitElement {
     };
   }
 
-  public connectedCallback(): void {
+  public override connectedCallback(): void {
     super.connectedCallback();
     // One-shot WS version probe — per-instance, but cheap (HA caches the
     // command registration). Gated by _versionCheckDone so re-adding the
@@ -207,7 +207,7 @@ export class WienerLinienAustriaCard extends LitElement {
     }
   }
 
-  protected willUpdate(changed: PropertyValues): void {
+  protected override willUpdate(changed: PropertyValues): void {
     // Drop the per-render memo BEFORE Lit calls render() so every cycle
     // recomputes `_resolveStops()` / `_isNightlineHour()` exactly once
     // and threads the cached result through the rest of the pass.
@@ -246,7 +246,7 @@ export class WienerLinienAustriaCard extends LitElement {
   private _resolvedStopsMemo: NormalisedModernStop[] | null = null;
   private _nightlineHourMemo: boolean | null = null;
 
-  protected updated(changed: PropertyValues): void {
+  protected override updated(changed: PropertyValues): void {
     // Re-render the QR canvas only on changes that could flip the
     // target URL: panel-open transition, hass change (late-arriving
     // catalogue coords swap the OSM fallback for a `geo:lat,lon`
@@ -375,7 +375,7 @@ export class WienerLinienAustriaCard extends LitElement {
     }
   }
 
-  protected shouldUpdate(changed: PropertyValues): boolean {
+  protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (
       changed.has("_config") ||
@@ -461,7 +461,7 @@ export class WienerLinienAustriaCard extends LitElement {
   // Render
   // ------------------------------------------------------------------
 
-  protected render(): TemplateResult | typeof nothing {
+  protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     if (!this.hass) return html`<ha-card><div class="wrap"></div></ha-card>`;
 
@@ -1696,5 +1696,5 @@ export class WienerLinienAustriaCard extends LitElement {
   };
 
 
-  static styles = cardStyles;
+  static override styles = cardStyles;
 }

@@ -159,7 +159,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     };
   }
 
-  public connectedCallback(): void {
+  public override connectedCallback(): void {
     super.connectedCallback();
     if (!this._versionCheckDone && this.hass?.callWS) {
       this._versionCheckDone = true;
@@ -180,12 +180,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
   }
 
-  public disconnectedCallback(): void {
+  public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRaceTimers();
   }
 
-  protected shouldUpdate(changed: PropertyValues): boolean {
+  protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (
       changed.has("_config") ||
@@ -203,7 +203,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return prev.states[eid] !== this.hass.states[eid];
   }
 
-  protected updated(changed: PropertyValues): void {
+  protected override updated(changed: PropertyValues): void {
     super.updated(changed);
     if (!changed.has("_config")) return;
     const prev = changed.get("_config") as NormalisedRetroConfig | undefined;
@@ -225,10 +225,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._victoryEndAt = null;
       this._raceWinner = null;
     }
-  }
-
-  private _lang(): string {
-    return this.hass?.language?.startsWith("de") ? "de" : "en";
   }
 
   private _t(key: string, replacements?: Record<string, string | number>): string {
@@ -520,7 +516,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // Render
   // ------------------------------------------------------------------
 
-  protected render(): TemplateResult | typeof nothing {
+  protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     const cfg = this._config;
     const eid = this._resolveEntity();
@@ -772,7 +768,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // Styles — ported verbatim from the vanilla RETRO_STYLE
   // ------------------------------------------------------------------
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       /* Create a stacking context on the host so the high z-indexes

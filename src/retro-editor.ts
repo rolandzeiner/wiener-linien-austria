@@ -65,7 +65,7 @@ export class WienerLinienAustriaRetroCardEditor
     this._config = normaliseRetroConfig(config);
   }
 
-  protected shouldUpdate(changed: PropertyValues): boolean {
+  protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (changed.has("_config")) return true;
     // hass fires for every state tick across HA — only re-render when the
@@ -416,7 +416,7 @@ export class WienerLinienAustriaRetroCardEditor
     ev.stopPropagation();
   }
 
-  protected render(): TemplateResult | typeof nothing {
+  protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     // After this render lands, swap the saved direction to whichever
     // direction the stop actually has data for IF it's currently
@@ -536,5 +536,5 @@ export class WienerLinienAustriaRetroCardEditor
 
   // Retro editor needs only the shared base — no bespoke selectors
   // beyond what editor-shared-styles already provides.
-  static styles: CSSResultGroup = [editorBaseStyles];
+  static override styles: CSSResultGroup = [editorBaseStyles];
 }
