@@ -244,11 +244,14 @@ async def _resolve_lines_for_picker(
 class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a multi-step config flow for Wiener Linien Austria."""
 
-    # Bump + add async_migrate_entry when entry.data shape changes.
-    # Tracks the config-entry schema, not the integration release version.
+    # Bump VERSION + add async_migrate_entry when entry.data shape changes
+    # in a non-additive way (renames, removals, type changes). MINOR_VERSION
+    # bumps for additive changes that older HA versions can still load.
+    # Tracks the config-entry schema, NOT the integration release version.
     # v2: CONF_LINES stores `{line}|{direction}` pairs (was triples) —
     # line.towards is unstable across polls on branching termini.
     VERSION = 2
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Init in-flight selections."""
