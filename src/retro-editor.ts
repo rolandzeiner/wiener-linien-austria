@@ -412,6 +412,14 @@ export class WienerLinienAustriaRetroCardEditor
     // Deferred via Promise.resolve() so we never write to _config from
     // inside render() (Lit warns; queues a redundant re-render).
     this._scheduleDirectionAutocorrect();
+    // Entity disappeared from HA (integration removed, entity disabled,
+    // typo in saved config) — surface an explicit alert so the user
+    // knows why their walk-time table is empty. ha-form's entity
+    // selector flags the row visually but emits no user-readable
+    // error; this fills the WCAG 3.3.1 (Error Identification) gap.
+    const cfg = this._config;
+    const entityMissing =
+      !!cfg.entity && !this.hass?.states?.[cfg.entity];
     return html`
       <div class="editor">
         <ha-form
@@ -422,6 +430,13 @@ export class WienerLinienAustriaRetroCardEditor
           .computeHelper=${this._computeHelper}
           @value-changed=${this._onFormChanged}
         ></ha-form>
+        ${entityMissing
+          ? html`
+              <ha-alert alert-type="warning">
+                ${this._t("entity_missing").replace("{entity}", cfg.entity!)}
+              </ha-alert>
+            `
+          : nothing}
         ${this._renderWalkTimeSection()}
       </div>
     `;

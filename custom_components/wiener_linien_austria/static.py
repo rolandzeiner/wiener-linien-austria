@@ -338,8 +338,16 @@ async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
         result: StaticCatalogue = await cached
         return result
 
-    task: asyncio.Task[StaticCatalogue] = asyncio.create_task(
-        async_load_catalogue(hass)
+    # `hass.async_create_background_task` over raw `asyncio.create_task`
+    # so HA's task tracker sees this as a domain task — auto-cancelled
+    # on HA shutdown, surfaced in the developer-tools task list under
+    # the supplied name. The task is awaited inline (concurrent callers
+    # find it via `domain_data[CATALOGUE_KEY]` and await the same one),
+    # so the "background" label is about lifecycle ownership, not
+    # fire-and-forget semantics.
+    task: asyncio.Task[StaticCatalogue] = hass.async_create_background_task(
+        async_load_catalogue(hass),
+        name=f"{DOMAIN}_load_catalogue",
     )
     domain_data[CATALOGUE_KEY] = task
     try:

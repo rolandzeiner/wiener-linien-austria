@@ -407,7 +407,20 @@ export class WienerLinienAustriaCardEditor
 
   private _renderStopFilter(stop: NormalisedModernStop): TemplateResult {
     const attrs = this._attrs(stop.entity);
-    if (!attrs) return html``;
+    // Entity disappeared from HA (integration removed, entity disabled,
+    // typo in saved config) — surface an explicit alert under the
+    // entities selector instead of silently rendering nothing. ha-form's
+    // entity selector flags the row visually but emits no user-readable
+    // error; this fills the WCAG 3.3.1 (Error Identification) gap so
+    // the user knows the saved config references something that no
+    // longer exists. Card render path silently skips the same case.
+    if (!attrs) {
+      return html`
+        <ha-alert alert-type="warning">
+          ${this._t("entity_missing").replace("{entity}", stop.entity)}
+        </ha-alert>
+      `;
+    }
     const stopName = attrs.stop_name || stop.entity;
     const overrides = this._config!.line_colors;
     const lineColors = attrs.line_colors ?? {};

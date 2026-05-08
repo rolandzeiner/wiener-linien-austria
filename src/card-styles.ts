@@ -21,10 +21,10 @@ export const cardStyles = css`
     /* Semantic state tokens layered over HA's official semantic palette
        so theme authors can recolour the whole portfolio in one place;
        hard-coded fallbacks for older HA versions. */
-    --wl-rt:      var(--ha-color-success, #43a047);
-    --wl-warning: var(--ha-color-warning, #ffa000);
-    --wl-error:   var(--ha-color-error,   #db4437);
-    --wl-info:    var(--ha-color-info,    #1565c0);
+    --wl-rt:      var(--success-color, #43a047);
+    --wl-warning: var(--warning-color, #ffa000);
+    --wl-error:   var(--error-color,   #db4437);
+    --wl-info:    var(--info-color,    #1565c0);
     /* ISA / ISO 7001 accessibility blue (Pantone 285 C). Kept on its
        own token — separate from --wl-info — so the wheelchair pill
        always renders in the standards-correct colour, while themes can

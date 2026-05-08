@@ -226,6 +226,18 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
 
     Cancels timer subscriptions, in-flight bg tasks, and pops every
     cache + validator key.
+
+    Note on the modern HA alternative: per-resource cleanup
+    (one timer, one listener, one lock) is better expressed via
+    `entry.async_on_unload(callable)` — HA core invokes those
+    callbacks on BOTH successful unload AND setup-failure, so no
+    explicit rollback is needed for entry-scoped resources.
+    `_teardown_domain_state` exists because the cleanup here is
+    DOMAIN-WIDE (refcount-driven, shared across entries) and
+    `async_on_unload` is per-entry — which is the wrong granularity
+    for "fire when the LAST entry removes." Keep this pattern for
+    domain-wide state; for new per-entry cleanup, prefer
+    `entry.async_on_unload`. See PORTFOLIO_LIFTABLES.md item 6.
     """
     for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
         unsub = domain_data.pop(unsub_key, None)

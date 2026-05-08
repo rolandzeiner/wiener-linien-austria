@@ -257,5 +257,30 @@ class WienerLinienStopSensor(
         detect staleness via the `server_time` attribute if they care.
         If we've never had a successful fetch, the coordinator's
         `data` is None and we stay unavailable — nothing to show.
+
+        ⚠ Trade-off — this DELIBERATELY violates HA's documented
+        `available` contract: HA defines `available=False` as "this
+        entity has no current valid data; templates and automations
+        should treat it as unknown." With this override, templates
+        using `is_state(..., 'unavailable')`, `availability_template:`,
+        and automation conditions that gate on `unavailable` will
+        NEVER fire on a transient outage — the entity stays
+        `available=True` and the state keeps reporting the cached
+        last-known value.
+
+        Mitigation: surface staleness through the `server_time`
+        attribute (templates that care about freshness can compare
+        it to `now()` and decide). For users who need
+        availability-based automations to fire on actual outages,
+        document the workaround: a template binary_sensor that
+        flips on `(now() - server_time) > threshold`.
+
+        DO NOT lift this pattern naively to other integrations
+        without the same UX-vs-contract trade-off being made
+        deliberately. Especially not for entities driving
+        automations more than dashboards. See
+        `~/.claude/skills/austria-portfolio-workflow/PORTFOLIO_LIFTABLES.md`
+        item 13 for the cleaner alternative (separate
+        `binary_sensor.<...>_stale` entity).
         """
         return self.coordinator.data is not None
