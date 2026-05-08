@@ -119,6 +119,37 @@ export type NormalisedModernConfig = NormalisedModernConfigValidated & {
   [key: string]: unknown;
 };
 
+// Keys this normaliser actively handles — used to filter the raw
+// passthrough so a future schema addition can't accidentally surface
+// pre-normalisation through the spread. Includes both validated keys
+// AND the v0.1.x flat back-compat keys (`entity` / `lines` / `direction`
+// / `walk_times`) which are promoted into `entities[0]` and must NOT
+// leak through unchanged.
+const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "entities",
+  "entity",
+  "lines",
+  "direction",
+  "walk_times",
+  "max_departures",
+  "line_colors",
+  "show_accessibility",
+  "accessibility_only",
+  "show_traffic_info",
+  "show_elevator_info",
+  "show_delay",
+  "show_type_icon",
+  "show_platform",
+  "show_hero_metric",
+  "show_departures",
+  "show_stops_ahead",
+  "show_qr_button",
+  "hide_header",
+  "hide_attribution",
+  "layout",
+]);
+
 const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
@@ -180,11 +211,17 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     }
   }
 
+  // Filter raw to ONLY the keys this normaliser doesn't handle —
+  // passes through dashboard layout fields (grid_options, view_layout,
+  // visibility, layout_options) without smuggling pre-normalisation
+  // versions of validated keys into the result.
+  const passthrough: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!MODERN_VALIDATED_KEYS.has(k)) passthrough[k] = v;
+  }
+
   return {
-    // Spread raw first so dashboard passthrough fields (grid_options,
-    // view_layout, visibility, layout_options) survive the round-trip.
-    // Validated keys below override anything raw carried for them.
-    ...(raw as Record<string, unknown>),
+    ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
@@ -234,6 +271,23 @@ export type NormalisedRetroConfig = NormalisedRetroConfigValidated & {
   [key: string]: unknown;
 };
 
+// See MODERN_VALIDATED_KEYS — retro card's mirror set.
+const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "entity",
+  "direction",
+  "line",
+  "show_platform",
+  "show_station_name",
+  "station_bg",
+  "size",
+  "style",
+  "flicker",
+  "wheelchair_race",
+  "accessibility_only",
+  "walk_times",
+]);
+
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   const direction = raw.direction === "R" ? "R" : "H";
   const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize) ? (raw.size as RetroSize) : "regular";
@@ -243,10 +297,13 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
     ? (raw.style as RetroStyle)
     : "classic";
+  const passthrough: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!RETRO_VALIDATED_KEYS.has(k)) passthrough[k] = v;
+  }
+
   return {
-    // Spread raw first so dashboard passthrough fields (grid_options,
-    // view_layout, visibility, layout_options) survive the round-trip.
-    ...(raw as Record<string, unknown>),
+    ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,

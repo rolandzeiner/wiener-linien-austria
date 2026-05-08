@@ -259,7 +259,14 @@ def mock_aiohttp_session():
 
 @pytest.fixture(autouse=True)
 def mock_static_catalogue():
-    """Stub the static catalogue loader so tests never hit the network."""
+    """Stub the static catalogue loader so tests never hit the network.
+
+    Patch every binding the runtime can resolve `async_get_catalogue`
+    through: the source in `static.py` PLUS each module that imports it
+    at module-load time (`coordinator`, `config_flow`). Without the
+    per-importer patches, callers that bound the name at import would
+    sail past the source-module patch and call the real network path.
+    """
     catalogue = _sample_catalogue()
     with (
         patch(
@@ -269,6 +276,11 @@ def mock_static_catalogue():
         ),
         patch(
             "custom_components.wiener_linien_austria.static.async_get_catalogue",
+            new_callable=AsyncMock,
+            return_value=catalogue,
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.coordinator.async_get_catalogue",
             new_callable=AsyncMock,
             return_value=catalogue,
         ),

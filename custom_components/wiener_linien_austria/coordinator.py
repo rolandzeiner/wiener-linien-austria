@@ -31,10 +31,19 @@ from .const import (
 )
 from .http import CacheValidators, base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-# Hoisted to module level — called per-departure inside the monitor
-# parser's hot loop, so a per-call `from .static import …` would burn
-# `sys.modules` lookups on every row.
-from .static import stops_ahead_for_match
+# `static` is loaded eagerly: `stops_ahead_for_match` runs in the
+# /monitor parser's hot loop (was the original reason this file pulled
+# `static` to module level), and once that's eager every other name we
+# read from `static` is already in `sys.modules` — there's no
+# import-time saving from keeping `async_get_catalogue` /
+# `CATALOGUE_KEY` / `StaticCatalogue` lazy, just lint-suppression
+# annotations to maintain on a hot integration-load path.
+from .static import (
+    CATALOGUE_KEY,
+    StaticCatalogue,
+    async_get_catalogue,
+    stops_ahead_for_match,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -154,9 +163,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
-        # Local import — keeps coordinator.py import-time light.
-        # static.py loads the trip-pattern catalogue lazily on first call.
-        from .static import async_get_catalogue  # noqa: PLC0415
         try:
             catalogue = await async_get_catalogue(self.hass)
         except (
@@ -384,7 +390,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         useful for enrichment; the others fall through to None and
         the parser skips stops_ahead.
         """
-        from .static import CATALOGUE_KEY, StaticCatalogue  # noqa: PLC0415
         domain_data = self.hass.data.get(DOMAIN, {})
         cached = domain_data.get(CATALOGUE_KEY)
         if isinstance(cached, StaticCatalogue):
@@ -465,11 +470,21 @@ def _parse_monitor_body(
     # "Alaudagasse" depending on which vehicle is next), so a strict triple
     # match would intermittently drop the whole line block. Each departure
     # keeps its own `vehicle.towards` so the actual destination is preserved.
-    selected_pairs: set[tuple[str, str]] | None = (
-        {tuple(k.split("|", 2)[:2]) for k in selected}  # type: ignore[misc]
-        if selected is not None
-        else None
-    )
+    selected_pairs: set[tuple[str, str]] | None
+    if selected is None:
+        selected_pairs = None
+    else:
+        # Each key is `line|direction` (post-v2-migration shape). Build the
+        # pair set explicitly so mypy can narrow to `tuple[str, str]` —
+        # using `tuple(k.split("|", 2)[:2])` produced a `tuple[str, ...]`
+        # that needed a `# type: ignore[misc]` to land in the typed set.
+        # Malformed keys (no pipe) are dropped silently — they could never
+        # match `(line_name, direction)` anyway.
+        selected_pairs = set()
+        for k in selected:
+            parts = k.split("|", 2)
+            if len(parts) >= 2:
+                selected_pairs.add((parts[0], parts[1]))
 
     for monitor in monitors:
         for line in (monitor.get("lines") or []):
@@ -512,11 +527,15 @@ def _parse_monitor_body(
                         )
                     except Exception:  # noqa: BLE001
                         # Fail-soft: a single matcher hiccup must not poison
-                        # the rest of the parse. First time we see a line
-                        # blow up, log at WARNING so a real upstream schema
-                        # change is visible without enabling debug logging;
-                        # subsequent ticks for the same line stay quiet via
-                        # the per-coordinator warned set.
+                        # the rest of the parse. `except Exception` (not
+                        # `BaseException`) is deliberate — it lets
+                        # `asyncio.CancelledError` propagate so an HA
+                        # shutdown landing mid-parse is honoured rather
+                        # than swallowed. First time we see a line blow
+                        # up, log at WARNING so a real upstream schema
+                        # change is visible without enabling debug
+                        # logging; subsequent ticks for the same line
+                        # stay quiet via the per-coordinator warned set.
                         if warned_lines is not None and line_name not in warned_lines:
                             warned_lines.add(line_name)
                             _LOGGER.warning(

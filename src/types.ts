@@ -59,6 +59,15 @@ declare global {
   }
 }
 
+/** Window shape for the HA `customCards` registry. Both card entrypoints
+ *  push their picker descriptor into `window.customCards` at module
+ *  load — this interface is the canonical cast target so the two
+ *  registration blocks read identically and a future maintainer can't
+ *  drift the field name (`customCards` vs `customCardsRegistry`). */
+export interface WindowWithCustomCards extends Window {
+  customCards?: Array<Record<string, unknown>>;
+}
+
 // ---------------------------------------------------------------------------
 // ha-form schema types — keep narrow on purpose so the schema builder stays
 // strictly typed. `expandable` + `flatten: true` is non-negotiable —

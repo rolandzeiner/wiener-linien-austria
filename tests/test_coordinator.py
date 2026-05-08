@@ -705,8 +705,12 @@ async def test_async_setup_no_coords_when_catalogue_load_fails(
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
+    # Patch the binding `coordinator` resolves at runtime, not the source
+    # in `static`. After hoist (no more lazy import), patching the source
+    # module no longer affects `coordinator.async_get_catalogue` — it was
+    # bound at import time.
     with patch(
-        "custom_components.wiener_linien_austria.static.async_get_catalogue",
+        "custom_components.wiener_linien_austria.coordinator.async_get_catalogue",
         new_callable=AsyncMock,
         side_effect=RuntimeError("upstream unreachable"),
     ):

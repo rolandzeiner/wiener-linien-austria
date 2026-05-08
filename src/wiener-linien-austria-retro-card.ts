@@ -3,7 +3,11 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
+import type {
+  HomeAssistant,
+  LovelaceCardEditor,
+  WindowWithCustomCards,
+} from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
 import { deText } from "./utils.js";
@@ -50,9 +54,7 @@ const COUNTDOWN_TOTAL_MS = COUNTDOWN_DIGIT_MS * 3;
 // Dedupe by `type` so a double-load (cache-bust race, HMR, etc.)
 // doesn't surface the retro card twice in the picker.
 {
-  const win = window as unknown as {
-    customCards?: Array<Record<string, unknown>>;
-  };
+  const win = window as unknown as WindowWithCustomCards;
   win.customCards = win.customCards ?? [];
   if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-retro-card")) {
     win.customCards.push({

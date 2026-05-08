@@ -615,8 +615,9 @@ async def _fetch_and_build(
     # All-304 fast path: only valid if every optional fetch actually
     # happened (not failed) and also returned 304. A failed fetch is NOT
     # the same as 304 — we lose the freshness signal, so we fall through
-    # and rebuild from prior.
-    all_304 = (
+    # and rebuild from prior. `prior is not None` guards the early return
+    # so mypy can narrow the return type without a `# type: ignore`.
+    if prior is not None and (
         halte_text is None
         and punkte_text is None
         and linien_text is None
@@ -625,10 +626,8 @@ async def _fetch_and_build(
         and not linien_failed
         and not fahr_failed
         and not routes_failed
-        and prior is not None
-    )
-    if all_304:
-        return prior  # type: ignore[return-value]
+    ):
+        return prior
 
     # Stations: either freshly parsed or carried over from prior unchanged.
     if halte_text is None and prior is not None:

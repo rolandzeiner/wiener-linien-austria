@@ -10,7 +10,11 @@ import {
   mdiSubwayVariant,
   mdiTram,
 } from "@mdi/js";
-import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
+import type {
+  HomeAssistant,
+  LovelaceCardEditor,
+  WindowWithCustomCards,
+} from "./types.js";
 
 import { cardStyles } from "./card-styles.js";
 import { CARD_VERSION } from "./const.js";
@@ -61,9 +65,7 @@ import "./editor.js";
 // resource registration path) doesn't surface the same card twice in
 // the picker.
 {
-  const win = window as unknown as {
-    customCards?: Array<Record<string, unknown>>;
-  };
+  const win = window as unknown as WindowWithCustomCards;
   win.customCards = win.customCards ?? [];
   if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-card")) {
     win.customCards.push({
@@ -1628,10 +1630,14 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
-  private _randomFrom<T>(arr: T[]): T | null {
-    // `arr.length` truthy implies at least one element exists; the `?? null`
-    // satisfies noUncheckedIndexedAccess (which widens arr[i] to T | undefined).
-    return arr.length ? arr[Math.floor(Math.random() * arr.length)] ?? null : null;
+  private _randomFrom<T>(arr: readonly T[]): T | null {
+    if (arr.length === 0) return null;
+    // Length-guarded: `arr[idx]` is definitely `T`, but
+    // `noUncheckedIndexedAccess` widens any computed-index read to
+    // `T | undefined`. Cast at the boundary so callers don't pay for
+    // a synthetic `?? null` they can never observe.
+    const idx = Math.floor(Math.random() * arr.length);
+    return arr[idx] as T;
   }
 
   private _devTestTraffic = (): void => {
@@ -1671,8 +1677,12 @@ export class WienerLinienAustriaCard extends LitElement {
     const attrs = this._attrs(pick.entity);
     const station = attrs.stop_name || pick.entity;
     const deps = attrs.departures ?? [];
-    const anyLine = this._randomFrom(deps)?.line || "";
-    const towards = this._randomFrom(deps)?.towards || "Unbekannt";
+    // Pull both fields off ONE departure — two independent draws would
+    // happily pair the line "U6" with a "towards" from a U1 row,
+    // producing nonsense in the dev-mode preview banner.
+    const sample = this._randomFrom(deps);
+    const anyLine = sample?.line || "";
+    const towards = sample?.towards || "Unbekannt";
     const now = new Date();
     this._debugElevator = [
       ...this._debugElevator,

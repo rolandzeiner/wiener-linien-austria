@@ -203,7 +203,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
     # state that other live entries still need.
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # Catch broad: HA core may surface platform-setup failures from
+        # third-party libraries as anything from `ImportError` to
+        # `ValueError`; we don't want to enumerate them here. Reraise
+        # AFTER rolling back the bookkeeping above so the caller sees
+        # the original exception and HA's setup-error path runs.
         await _rollback_setup_failure(hass, coordinator)
         raise
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
