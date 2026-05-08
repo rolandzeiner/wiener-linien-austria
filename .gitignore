@@ -1,6 +1,6 @@
-# Unified .gitignore for the *-austria HACS portfolio (5 integrations,
+# Unified .gitignore for the *-austria HACS portfolio (6 integrations,
 # all Lit 3 + TypeScript + Rollup card + HA Python integration).
-# Reviewed 2026-05-08 — composed from the union of all 5 existing files,
+# Reviewed 2026-05-08 — composed from the union of all 6 existing files,
 # de-duplicated, with per-repo paths replaced by globbed equivalents.
 
 # ───────────────────────────────────────────────────────────────────
@@ -39,6 +39,10 @@ env/
 ENV/
 .python-version
 .HA_VERSION
+# uv lockfile — local-dev artifact only. CI installs from
+# requirements_test.txt (pip), not uv. Committing it would tie all
+# contributors to uv and produce a noisy diff on every dep sync.
+uv.lock
 
 # ───────────────────────────────────────────────────────────────────
 # Node / JS / TypeScript
