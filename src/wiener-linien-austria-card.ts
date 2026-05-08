@@ -598,6 +598,86 @@ export class WienerLinienAustriaCard extends LitElement {
     });
   }
 
+  /** The `<header>` block of the stop section: icon tile, title +
+   *  subtitle, action buttons (QR + open-in-maps). Self-contained
+   *  except for the locals it shares with the hero block (heroLead,
+   *  headerIcon) — those stay computed in `_renderStop`. */
+  private _renderStopHeader(
+    stopCfg: NormalisedModernStop,
+    apiName: string | undefined,
+    title: string,
+    heroLead: DepartureAttr | undefined,
+    headerIcon: string,
+    mapUrl: string | null,
+    showQrButton: boolean,
+  ): TemplateResult {
+    const openInMaps = this._t("open_in_maps");
+    const qrOpenLabel = this._t("qr_open");
+    return html`<header class="head">
+      <span class="icon-tile" aria-hidden="true">
+        <ha-icon icon=${headerIcon}></ha-icon>
+      </span>
+      <div class="title-block">
+        <h3 class="title">${deText(apiName, stopCfg.entity)}</h3>
+        ${heroLead?.line
+          ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
+          : nothing}
+      </div>
+      ${mapUrl || showQrButton
+        ? html`<div class="head-actions">
+            ${showQrButton
+              ? html`<button
+                  type="button"
+                  class=${classMap({
+                    "icon-action": true,
+                    "qr-toggle": true,
+                    expanded: this._qrOpenFor === stopCfg.entity,
+                  })}
+                  title=${qrOpenLabel}
+                  aria-label="${qrOpenLabel}: ${title}"
+                  aria-expanded=${this._qrOpenFor === stopCfg.entity ? "true" : "false"}
+                  aria-controls="wl-qr-${stopCfg.entity.replace(/[^a-z0-9_]/gi, "_")}"
+                  @click=${() => this._toggleQrFor(stopCfg.entity)}
+                ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
+              : nothing}
+            ${mapUrl
+              ? html`<a
+                  class="icon-action"
+                  href=${mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title=${openInMaps}
+                  aria-label="${openInMaps}: ${title}"
+                ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`
+              : nothing}
+          </div>`
+        : nothing}
+    </header>`;
+  }
+
+  /** The hero block: big countdown number + per-entry chip rows. The
+   *  hero panels (stops_ahead detail) are interleaved with the entries
+   *  via `_renderHeroPanelForEntry`. */
+  private _renderStopHero(
+    stopCfg: NormalisedModernStop,
+    heroGroup: DepartureAttr[],
+    heroValue: string,
+    heroUnit: string,
+  ): TemplateResult {
+    return html`<div class="hero-host">
+      <div class="hero">
+        <div class="hero-time" aria-live="polite" aria-atomic="true">
+          <span class="hero-min">${heroValue}</span>
+          ${heroUnit ? html`<span class="hero-unit">${heroUnit}</span>` : nothing}
+        </div>
+        ${heroGroup.flatMap((d) => [
+          this._renderHeroEntry(d, stopCfg.entity),
+          this._renderHeroPanelForEntry(d, stopCfg.entity),
+        ])}
+      </div>
+    </div>`;
+  }
+
   private _renderStop(stopCfg: NormalisedModernStop, tabIndex?: number): TemplateResult {
     const attrs = this._attrs(stopCfg.entity);
     const apiName = attrs.stop_name || attrs.friendly_name;
@@ -631,8 +711,6 @@ export class WienerLinienAustriaCard extends LitElement {
     // regardless of which app rendered the QR.
     const showQrButton =
       this._config!.show_qr_button !== false && geoUri !== null;
-    const openInMaps = this._t("open_in_maps");
-    const qrOpenLabel = this._t("qr_open");
 
     // Hero group — the set of departures shown in the big hero block.
     // The soonest departure leads, and any others tied on the exact
@@ -681,46 +759,15 @@ export class WienerLinienAustriaCard extends LitElement {
       >
         ${this._config!.hide_header
           ? nothing
-          : html`<header class="head">
-              <span class="icon-tile" aria-hidden="true">
-                <ha-icon icon=${headerIcon}></ha-icon>
-              </span>
-              <div class="title-block">
-                <h3 class="title">${deText(apiName, stopCfg.entity)}</h3>
-                ${heroLead?.line
-                  ? html`<p class="subtitle">${deText(heroLead.towards)}</p>`
-                  : nothing}
-              </div>
-              ${mapUrl || showQrButton
-                ? html`<div class="head-actions">
-                    ${showQrButton
-                      ? html`<button
-                          type="button"
-                          class=${classMap({
-                            "icon-action": true,
-                            "qr-toggle": true,
-                            expanded: this._qrOpenFor === stopCfg.entity,
-                          })}
-                          title=${qrOpenLabel}
-                          aria-label="${qrOpenLabel}: ${title}"
-                          aria-expanded=${this._qrOpenFor === stopCfg.entity ? "true" : "false"}
-                          aria-controls="wl-qr-${stopCfg.entity.replace(/[^a-z0-9_]/gi, "_")}"
-                          @click=${() => this._toggleQrFor(stopCfg.entity)}
-                        ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
-                      : nothing}
-                    ${mapUrl
-                      ? html`<a
-                          class="icon-action"
-                          href=${mapUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title=${openInMaps}
-                          aria-label="${openInMaps}: ${title}"
-                        ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`
-                      : nothing}
-                  </div>`
-                : nothing}
-            </header>`}
+          : this._renderStopHeader(
+              stopCfg,
+              apiName,
+              title,
+              heroLead,
+              headerIcon,
+              mapUrl,
+              showQrButton,
+            )}
         ${showQrButton && geoUri
           ? this._renderQrPanel(
               stopCfg.entity,
@@ -732,20 +779,7 @@ export class WienerLinienAustriaCard extends LitElement {
           : nothing}
 
         ${this._config!.show_hero_metric && heroLead
-          ? html`<div class="hero-host">
-              <div class="hero">
-                <div class="hero-time" aria-live="polite" aria-atomic="true">
-                  <span class="hero-min">${heroValue}</span>
-                  ${heroUnit
-                    ? html`<span class="hero-unit">${heroUnit}</span>`
-                    : nothing}
-                </div>
-                ${heroGroup.flatMap((d) => [
-                  this._renderHeroEntry(d, stopCfg.entity),
-                  this._renderHeroPanelForEntry(d, stopCfg.entity),
-                ])}
-              </div>
-            </div>`
+          ? this._renderStopHero(stopCfg, heroGroup, heroValue, heroUnit)
           : nothing}
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
         ${this._config!.show_departures && this._config!.max_departures > 0
@@ -993,6 +1027,66 @@ export class WienerLinienAustriaCard extends LitElement {
    * platform pill + optional wheelchair pill). Used inside the
    * hero-meta column; one entry per departure in the hero group.
    */
+  /** Resolve the expand-to-show-stops_ahead state for a departure rendered
+   *  either in the hero block or in the row list. Both surfaces share the
+   *  same `rowKey`, so opening the panel from one leaves the same panel
+   *  open on the other when both currently surface the same departure. */
+  private _expandState(
+    d: DepartureAttr,
+    entityId: string,
+    kind: "hero" | "row",
+  ): {
+    hasStopsAhead: boolean;
+    rowKey: string;
+    expanded: boolean;
+    panelId: string;
+    ariaLabel: string;
+  } {
+    const hasStopsAhead = shouldShowStopsAhead(
+      this._config!.show_stops_ahead,
+      d,
+    );
+    const rowKey = this._rowKey(d, entityId);
+    const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
+    const panelId = this._panelId(d, entityId, kind);
+    const ariaLabelKey = expanded
+      ? "stops_ahead_aria_hide"
+      : "stops_ahead_aria_show";
+    const ariaLabel = hasStopsAhead
+      ? this._t(ariaLabelKey, {
+          line: d.line || "?",
+          towards: d.towards || "",
+        })
+      : "";
+    return { hasStopsAhead, rowKey, expanded, panelId, ariaLabel };
+  }
+
+  /** The shared `<ol>` body rendered inside both the hero detail panel
+   *  and the row detail panel. Wrappers (`<div class="hero-detail">` /
+   *  `<li class="dep-row-detail">`) differ because each lives in a
+   *  different container, but the inner stops list is identical. */
+  private _renderStopsAheadInner(
+    stops: NonNullable<DepartureAttr["stops_ahead"]>,
+    currentLine: string,
+    rowKey: string,
+    entityId: string,
+  ): TemplateResult {
+    const overrides = this._config!.line_colors;
+    const lineColors = lineColorsFor(this.hass, entityId);
+    return html`
+      <ol
+        class="stops-ahead"
+        style=${styleMap({
+          "--stops-ahead-line": colorForLine(currentLine, overrides, lineColors),
+        })}
+      >
+        ${stops.map((s, idx) =>
+          this._renderStopAhead(s, idx, rowKey, overrides, lineColors),
+        )}
+      </ol>
+    `;
+  }
+
   private _renderHeroEntry(d: DepartureAttr, entityId: string): TemplateResult {
     const accentLine = d.line || "";
     const accentStyle = chipPalette(
@@ -1005,21 +1099,8 @@ export class WienerLinienAustriaCard extends LitElement {
     const isBarrierFree =
       !!d.barrier_free && this._config!.show_accessibility;
 
-    // Same expand-to-show-stops_ahead affordance as the row list. The
-    // hero entry shares the row's stable identifier so opening the
-    // panel from the hero leaves the same row's panel open in the list
-    // below (when both surface the same departure), and vice versa.
-    const hasStopsAhead = shouldShowStopsAhead(
-      this._config!.show_stops_ahead,
-      d,
-    );
-    const rowKey = this._rowKey(d, entityId);
-    const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
-    const panelId = this._panelId(d, entityId, "hero");
-    const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
-    const ariaLabel = hasStopsAhead
-      ? this._t(ariaLabelKey, { line: d.line || "?", towards: d.towards || "" })
-      : "";
+    const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
+      this._expandState(d, entityId, "hero");
 
     const entryClasses = {
       "hero-entry": true,
@@ -1078,20 +1159,17 @@ export class WienerLinienAustriaCard extends LitElement {
     d: DepartureAttr,
     entityId: string,
   ): TemplateResult | typeof nothing {
-    const hasStopsAhead = shouldShowStopsAhead(
-      this._config!.show_stops_ahead,
+    const { hasStopsAhead, rowKey, expanded, panelId } = this._expandState(
       d,
+      entityId,
+      "hero",
     );
     if (!hasStopsAhead) return nothing;
-    const rowKey = this._rowKey(d, entityId);
-    const expanded = this._expandedRows.has(rowKey);
-    const panelId = this._panelId(d, entityId, "hero");
-    const line = d.line || "?";
     return this._renderHeroStopsAheadPanel(
       d.stops_ahead!,
       panelId,
       expanded,
-      line,
+      d.line || "?",
       rowKey,
       entityId,
     );
@@ -1105,8 +1183,6 @@ export class WienerLinienAustriaCard extends LitElement {
     rowKey: string,
     entityId: string,
   ): TemplateResult {
-    const overrides = this._config!.line_colors;
-    const lineColors = lineColorsFor(this.hass, entityId);
     return html`
       <div
         class=${classMap({ "hero-detail": true, expanded })}
@@ -1115,12 +1191,7 @@ export class WienerLinienAustriaCard extends LitElement {
         aria-hidden=${expanded ? "false" : "true"}
       >
         <div class="hero-detail-inner">
-          <ol
-            class="stops-ahead"
-            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides, lineColors) })}
-          >
-            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides, lineColors))}
-          </ol>
+          ${this._renderStopsAheadInner(stops, currentLine, rowKey, entityId)}
         </div>
       </div>
     `;
@@ -1170,17 +1241,8 @@ export class WienerLinienAustriaCard extends LitElement {
     // are at the terminus" — still no panel, no chevron. A truncated list
     // (head + ellipsis + terminus) renders the same affordance as a full
     // short list.
-    const hasStopsAhead = shouldShowStopsAhead(
-      this._config!.show_stops_ahead,
-      d,
-    );
-    const rowKey = this._rowKey(d, entityId);
-    const expanded = hasStopsAhead && this._expandedRows.has(rowKey);
-    const panelId = this._panelId(d, entityId, "row");
-    const ariaLabelKey = expanded ? "stops_ahead_aria_hide" : "stops_ahead_aria_show";
-    const ariaLabel = hasStopsAhead
-      ? this._t(ariaLabelKey, { line, towards: d.towards || "" })
-      : "";
+    const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
+      this._expandState(d, entityId, "row");
 
     const rowClasses = {
       "dep-row": true,
@@ -1271,8 +1333,6 @@ export class WienerLinienAustriaCard extends LitElement {
     rowKey: string,
     entityId: string,
   ): TemplateResult {
-    const overrides = this._config!.line_colors;
-    const lineColors = lineColorsFor(this.hass, entityId);
     return html`
       <li
         class=${classMap({ "dep-row-detail": true, expanded })}
@@ -1281,12 +1341,7 @@ export class WienerLinienAustriaCard extends LitElement {
         aria-hidden=${expanded ? "false" : "true"}
       >
         <div class="dep-row-detail-inner">
-          <ol
-            class="stops-ahead"
-            style=${styleMap({ "--stops-ahead-line": colorForLine(currentLine, overrides, lineColors) })}
-          >
-            ${stops.map((s, idx) => this._renderStopAhead(s, idx, rowKey, overrides, lineColors))}
-          </ol>
+          ${this._renderStopsAheadInner(stops, currentLine, rowKey, entityId)}
         </div>
       </li>
     `;

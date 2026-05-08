@@ -12,43 +12,48 @@
 
 export type Racer = "A" | "B";
 
-export const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
+// Tuning constants — kept module-private. Only `RACE_FINISH_X_FALLBACK_CQW`
+// is `export`ed (consumed by the retro card as a fallback when the live
+// finish-line measurement isn't available yet); every other tunable is
+// referenced solely by `computeRaceParams` in this file. Re-exporting
+// them would bloat the bundle's public surface without buying anything.
+const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
   ["A", "A", "B"], ["B", "B", "A"],   // single late swap
   ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
   ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
 ];
 
 // Cross-time + animation duration spread.
-export const RACE_CROSS_BASE_MIN_MS = 2400;
-export const RACE_CROSS_BASE_MAX_MS = 2700;
-export const RACE_DUR_TAIL_MIN = 1.08;
-export const RACE_DUR_TAIL_MAX = 1.15;
+const RACE_CROSS_BASE_MIN_MS = 2400;
+const RACE_CROSS_BASE_MAX_MS = 2700;
+const RACE_DUR_TAIL_MIN = 1.08;
+const RACE_DUR_TAIL_MAX = 1.15;
 
 // Finish-margin distribution (ms between winner / loser crossings).
 // Close minimum is set high enough that even a photo finish has a
 // visible gap (~6cqw at 580px card width).
-export const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [100, 250];
-export const RACE_MARGIN_MEDIUM_MS: readonly [number, number] = [200, 500];
-export const RACE_MARGIN_DECISIVE_MS: readonly [number, number] = [500, 900];
-export const RACE_PROB_CLOSE = 0.4;
-export const RACE_PROB_MEDIUM = 0.35;
+const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [100, 250];
+const RACE_MARGIN_MEDIUM_MS: readonly [number, number] = [200, 500];
+const RACE_MARGIN_DECISIVE_MS: readonly [number, number] = [500, 900];
+const RACE_PROB_CLOSE = 0.4;
+const RACE_PROB_MEDIUM = 0.35;
 
 // Probability the swap pattern's 75% leader is actually the LOSER —
 // drives the "comeback" feel; the rest are led-from-front finishes.
-export const RACE_PROB_COMEBACK = 0.3;
+const RACE_PROB_COMEBACK = 0.3;
 
 // Track geometry, in cqw (relative to card width).
-export const RACE_TRACK_END_CQW = 92;
-export const RACE_TRACK_MIN_LENGTH_CQW = 20;
-export const RACE_CHECKPOINT_FRACS = [0.25, 0.5, 0.75] as const;
-export const RACE_CHECKPOINT_HALF_GAPS_CQW = [3, 2.5, 2.5] as const;
+const RACE_TRACK_END_CQW = 92;
+const RACE_TRACK_MIN_LENGTH_CQW = 20;
+const RACE_CHECKPOINT_FRACS = [0.25, 0.5, 0.75] as const;
+const RACE_CHECKPOINT_HALF_GAPS_CQW = [3, 2.5, 2.5] as const;
 export const RACE_FINISH_X_FALLBACK_CQW = 96;
 
 // Exit-position bounds (cqw). Outside this band the finish-margin math
 // is approximate; the announced winner is still reconciled from the
 // actual post-clamp trajectories.
-export const RACE_EXIT_MIN_CQW = 102;
-export const RACE_EXIT_MAX_CQW = 135;
+const RACE_EXIT_MIN_CQW = 102;
+const RACE_EXIT_MAX_CQW = 135;
 
 export interface RaceMeasurements {
   /** Racer A's natural start x (cqw, 0–100). */

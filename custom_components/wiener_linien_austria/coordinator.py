@@ -48,6 +48,18 @@ from .static import (
 _LOGGER = logging.getLogger(__name__)
 
 
+# Public type alias — threaded through every signature that reads
+# `entry.runtime_data` (Platinum `runtime-data` + `strict-typing` rules).
+# Signatures that only use the entry for construction (coordinator
+# `__init__`) or for IDs/title (sensor `__init__`, options-flow
+# staticmethod) keep plain `ConfigEntry`. Hoisted to the top of the
+# module so external readers see the public-API shape before the
+# implementation; PEP 695 `type` evaluates the RHS lazily, so the
+# forward reference to `WienerLinienAustriaCoordinator` resolves at
+# use-time, not definition-time.
+type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]
+
+
 @dataclass(slots=True)
 class Departure:
     """One departure row from the monitor endpoint."""
@@ -582,10 +594,3 @@ def _safe_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-# Threaded through every signature that reads `entry.runtime_data` — required
-# by Platinum `runtime-data` + `strict-typing`. Signatures that only use the
-# entry for construction (coordinator __init__) or for IDs/title (sensor
-# __init__, options-flow staticmethod) keep plain `ConfigEntry`.
-type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]

@@ -32,6 +32,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
+import { resolveEditorHelper, resolveEditorLabel } from "./editor-shared.js";
 import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -328,38 +329,24 @@ export class WienerLinienAustriaRetroCardEditor
     ];
   }
 
-  /** Field-label resolver. Three-step chain:
-   *  1. HA core's own translations for common field names ("entity",
-   *     "name"). `hass.localize` returns "" on miss, not the key.
-   *  2. The card's editor-namespaced bundle (`editor.<field>` first,
-   *     `<field>` second).
-   *  3. Last resort: raw field name (still functional, dev sees the gap). */
-  private _computeLabel = (field: { name: string }): string => {
-    const haKey = `ui.panel.lovelace.editor.card.generic.${field.name}`;
-    const ha = this.hass?.localize?.(haKey);
-    if (ha) return ha;
-    const editorTrans = this._et(field.name);
-    if (editorTrans !== `retro.editor.${field.name}` && editorTrans !== field.name) {
-      return editorTrans;
-    }
-    const cardTrans = this._t(field.name);
-    if (cardTrans !== `retro.${field.name}` && cardTrans !== field.name) {
-      return cardTrans;
-    }
-    return field.name;
-  };
+  /** Field-label / helper-text resolution lives in `editor-shared.ts`
+   *  so the modern and retro editors can't drift on the lookup chain.
+   *  Retro adds a second card-bundle fallback (`retro.<field>`) on top
+   *  of the modern editor's chain. */
+  private _computeLabel = (field: { name: string }): string =>
+    resolveEditorLabel(field, {
+      hass: this.hass,
+      et: (k) => this._et(k),
+      editorNamespace: "retro.editor",
+      cardLookup: (k) => this._t(k),
+      cardNamespace: "retro",
+    });
 
-  /** Helper-text resolver. Surfaces a helper only when an
-   *  `editor.<field>_helper` key actually exists in the bundle —
-   *  otherwise ha-form's empty helper line eats vertical space. */
-  private _computeHelper = (field: { name: string }): string | undefined => {
-    const key = `${field.name}_helper`;
-    const editorTrans = this._et(key);
-    if (editorTrans !== `retro.editor.${key}` && editorTrans !== key) {
-      return editorTrans;
-    }
-    return undefined;
-  };
+  private _computeHelper = (field: { name: string }): string | undefined =>
+    resolveEditorHelper(field, {
+      et: (k) => this._et(k),
+      editorNamespace: "retro.editor",
+    });
 
   /** ha-form input shape mirrors the saved-config shape one-to-one
    *  (no entity-array translation needed for the retro card). */

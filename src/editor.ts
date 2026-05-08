@@ -40,6 +40,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
+import { resolveEditorHelper, resolveEditorLabel } from "./editor-shared.js";
 import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -171,31 +172,20 @@ export class WienerLinienAustriaCardEditor
     ];
   }
 
-  /** Field-label resolver. Three-step chain:
-   *  1. HA core's own translations for common field names.
-   *  2. Card's editor-namespaced bundle (`editor.<field>`).
-   *  3. Last resort: raw field name. */
-  private _computeLabel = (field: { name: string }): string => {
-    const haKey = `ui.panel.lovelace.editor.card.generic.${field.name}`;
-    const ha = this.hass?.localize?.(haKey);
-    if (ha) return ha;
-    const editorTrans = this._et(field.name);
-    if (editorTrans !== `modern.editor.${field.name}` && editorTrans !== field.name) {
-      return editorTrans;
-    }
-    return field.name;
-  };
+  /** Field-label / helper-text resolution lives in `editor-shared.ts`
+   *  so the modern and retro editors can't drift on the lookup chain. */
+  private _computeLabel = (field: { name: string }): string =>
+    resolveEditorLabel(field, {
+      hass: this.hass,
+      et: (k) => this._et(k),
+      editorNamespace: "modern.editor",
+    });
 
-  /** Helper-text resolver. Returns undefined on miss so empty helper
-   *  lines don't eat vertical space. */
-  private _computeHelper = (field: { name: string }): string | undefined => {
-    const key = `${field.name}_helper`;
-    const editorTrans = this._et(key);
-    if (editorTrans !== `modern.editor.${key}` && editorTrans !== key) {
-      return editorTrans;
-    }
-    return undefined;
-  };
+  private _computeHelper = (field: { name: string }): string | undefined =>
+    resolveEditorHelper(field, {
+      et: (k) => this._et(k),
+      editorNamespace: "modern.editor",
+    });
 
   /** Translate the saved-config shape (Array<NormalisedModernStop>) to
    *  ha-form's input shape (flat string[]). Per-stop overrides are
