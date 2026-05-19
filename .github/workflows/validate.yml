@@ -127,6 +127,13 @@ jobs:
         # advisories (which never ship to users) flood the report and the
         # team learns to ignore failures.
         run: npm audit --omit=dev --audit-level=high
+      - name: Generate MDI icon names
+        # `src/mdi-icon-names.json` is gitignored (build artifact derived
+        # from @mdi/js's d.ts at build time). Generate it explicitly so
+        # `tsc --noEmit` can resolve the JSON import in retro-editor.ts.
+        # `npm run build` below also chains this step internally, but the
+        # typecheck runs first and needs the file on disk.
+        run: npm run gen-mdi-names
       - name: Type-check (strict)
         # Rollup's @rollup/plugin-typescript is more permissive than tsc
         # in strict mode. Run tsc separately so TS regressions surface in
