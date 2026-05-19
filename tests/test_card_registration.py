@@ -23,6 +23,7 @@ from custom_components.wiener_linien_austria.card_registration import (
 from custom_components.wiener_linien_austria.const import (
     CARD_URL,
     CARD_VERSION,
+    FONTS_URL,
     RETRO_CARD_URL,
     RETRO_CARD_VERSION,
 )
@@ -83,10 +84,14 @@ async def test_register_creates_both_resources_when_absent(
     await reg.async_register()
 
     static.assert_awaited_once()
-    # Static-paths call carries both URLs in one batch.
+    # Static-paths call carries all three URLs in one batch: the two
+    # card JS files plus the fonts directory (registered conditionally
+    # via `fonts_dir.is_dir()`; the committed `www/fonts/` makes that
+    # branch fire in CI and in any working tree that hasn't deleted
+    # the bundled WL webfonts).
     static_args = static.await_args.args[0]
     static_urls = {cfg.url_path for cfg in static_args}
-    assert static_urls == {CARD_URL, RETRO_CARD_URL}
+    assert static_urls == {CARD_URL, RETRO_CARD_URL, FONTS_URL}
 
     # Two create_item calls — one per card.
     assert lovelace.resources.async_create_item.await_count == 2
