@@ -300,6 +300,23 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_wc", selector: { boolean: {} } },
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
+              // Chip-style free-form text list. HA's `text` selector
+              // has no `multiple` flag — the canonical chip-input
+              // pattern is the `select` selector with `multiple: true`
+              // + `custom_value: true` + empty `options: []`. User
+              // types a label, presses Enter to commit, repeat; the
+              // bound value is `string[]`. Capped at 6 entries × 16
+              // chars by the normaliser.
+              {
+                name: "chips",
+                selector: {
+                  select: {
+                    multiple: true,
+                    custom_value: true,
+                    options: [],
+                  },
+                },
+              },
             ],
           },
           {
@@ -321,6 +338,23 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_wc", selector: { boolean: {} } },
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
+              // Chip-style free-form text list. HA's `text` selector
+              // has no `multiple` flag — the canonical chip-input
+              // pattern is the `select` selector with `multiple: true`
+              // + `custom_value: true` + empty `options: []`. User
+              // types a label, presses Enter to commit, repeat; the
+              // bound value is `string[]`. Capped at 6 entries × 16
+              // chars by the normaliser.
+              {
+                name: "chips",
+                selector: {
+                  select: {
+                    multiple: true,
+                    custom_value: true,
+                    options: [],
+                  },
+                },
+              },
             ],
           },
         ],

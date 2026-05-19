@@ -795,14 +795,24 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const wc = side.show_wc ? amenityKey("wc") : nothing;
     const esc = side.show_escalator ? amenityKey("escalator") : nothing;
     const elv = side.show_elevator ? amenityKey("elevator") : nothing;
+    // Text chips — same-height white boxes with dynamic width. Sit
+    // beyond WC in the ranking (further from the sign text than any
+    // amenity tile) so they read as the outer-edge content on each
+    // side. Mirrored across sides so chip[0] is always the
+    // closest-to-WC entry regardless of which side it lives on.
+    const chipNodes = (side.chips ?? []).map(
+      (chipText) => html`<span class="retro-station-header__chip">${chipText}</span>`,
+    );
+    const chipsLeftOrder = chipNodes;
+    const chipsRightOrder = [...chipNodes].reverse();
     // Canonical render order mirrors the original signage. Right side
     // mirrors the left: exit always at the outer edge of the card,
     // amenities ordered so the *same* glyph (elevator) is always
     // closest to the text on both sides — wheelchair-relevant info
     // gets the same visual prominence regardless of header side.
     return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}`
-      : html`${wc}${esc}${elv}${textNode}${exitNode}`;
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${chipsLeftOrder}`
+      : html`${chipsRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
@@ -1675,6 +1685,44 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-weight: 700;
       font-size: 0.75rem;
       line-height: 1;
+    }
+    .retro-station-header__chip {
+      /* Auxiliary text label — same height as the icon tiles
+         (1.4em) but with dynamic width so short labels (platform
+         numbers, line designators) sit in a snug white box and
+         longer labels grow horizontally. Composes visually with the
+         icon tiles next to it via the same height + colour scheme.
+         Padding is horizontal-only — the flex-centred line shares
+         vertical alignment with the icon glyphs on the same row.
+         Font matches the WC monogram so the chip reads as part of
+         the same signage family.
+         No explicit font-size: chip inherits the parent header's
+         em-scale (1em / 0.9em / 0.8em via retro--size-* tokens), so
+         height: 1.4em resolves to the SAME pixel value as the icon
+         tiles. Setting a different font-size here (e.g. 0.75rem)
+         would produce visibly shorter chips next to the tiles
+         because em is relative to the element's own font-size. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: #000;
+      flex-shrink: 0;
+      height: 1.4em;
+      padding: 0 0.4em;
+      box-sizing: border-box;
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+                   Arial, sans-serif;
+      font-weight: 700;
+      line-height: 1;
+      /* Reset the 0.02em letter-spacing inherited from .retro-station-header
+         — the condensed face is designed to sit tight, and the tracked-
+         out feel of the header text doesn't suit chip-style labels
+         where width is dynamic and longer entries (Schlafzimmer, etc.)
+         add up visibly. */
+      letter-spacing: 0;
+      white-space: nowrap;
     }
     /* Size-token alignment — match the .retro--size-* scale. */
     .retro--size-medium .retro-station-header {

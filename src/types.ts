@@ -335,6 +335,14 @@ export interface RetroHeaderSide {
   show_wc?: boolean | undefined;
   show_escalator?: boolean | undefined;
   show_elevator?: boolean | undefined;
+  /** Optional sequence of short text chips rendered as white
+   *  boxes after the WC tile (further from the sign text than
+   *  any amenity icon). Useful for short labels like platform
+   *  numbers, line designators, or auxiliary signage text.
+   *  Each chip is trimmed and bounded to 16 chars; the list is
+   *  capped at 6 entries to defensively guard against a
+   *  runaway config blowing out the strip. */
+  chips?: string[] | undefined;
 }
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {

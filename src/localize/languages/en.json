@@ -159,7 +159,9 @@
       "text_helper": "E.g. name of the next station.",
       "show_wc": "Show toilet icon",
       "show_escalator": "Show escalator icon",
-      "show_elevator": "Show elevator icon"
+      "show_elevator": "Show elevator icon",
+      "chips": "Extra labels",
+      "chips_helper": "Short text boxes after the toilet tile — platform numbers, line designators, anything signage-y. Up to 6, 16 characters each."
     }
   }
 }

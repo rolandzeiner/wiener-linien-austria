@@ -159,7 +159,9 @@
       "text_helper": "z. B. Name der nächsten Station.",
       "show_wc": "WC-Symbol anzeigen",
       "show_escalator": "Rolltreppen-Symbol anzeigen",
-      "show_elevator": "Aufzug-Symbol anzeigen"
+      "show_elevator": "Aufzug-Symbol anzeigen",
+      "chips": "Zusätzliche Beschriftungen",
+      "chips_helper": "Kurze Textfelder nach dem WC-Symbol – Gleisnummern, Liniennummern, Beschilderungstext. Maximal 6, je 16 Zeichen."
     }
   }
 }

@@ -50,12 +50,25 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   const show_wc = r.show_wc === true;
   const show_escalator = r.show_escalator === true;
   const show_elevator = r.show_elevator === true;
+  // Chip array: trim each entry, drop empties, cap text length and
+  // total count. Tolerant of YAML user error — non-string entries are
+  // skipped instead of failing the whole side.
+  let chips: string[] | undefined;
+  if (Array.isArray(r.chips)) {
+    const cleaned = r.chips
+      .filter((v): v is string => typeof v === "string")
+      .map((v) => v.trim().slice(0, 16))
+      .filter((v) => v.length > 0)
+      .slice(0, 6);
+    if (cleaned.length > 0) chips = cleaned;
+  }
   if (
     exit === "none" &&
     text === undefined &&
     !show_wc &&
     !show_escalator &&
-    !show_elevator
+    !show_elevator &&
+    chips === undefined
   ) {
     return undefined;
   }
@@ -65,6 +78,7 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (show_wc) out.show_wc = true;
   if (show_escalator) out.show_escalator = true;
   if (show_elevator) out.show_elevator = true;
+  if (chips !== undefined) out.chips = chips;
   return out;
 }
 
