@@ -86,6 +86,7 @@ export type HASelector =
       };
     }
   | { boolean: Record<string, never> }
+  | { icon: Record<string, never> }
   | { text: { type?: "text" | "password" | "url" | "email"; multiline?: boolean } }
   | {
       number: {
@@ -343,6 +344,17 @@ export interface RetroHeaderSide {
    *  capped at 6 entries to defensively guard against a
    *  runaway config blowing out the strip. */
   chips?: string[] | undefined;
+  /** Free-form MDI icon keys rendered as black-on-white tiles
+   *  between the WC tile and the text chips. Storage is a flat
+   *  `string[]` of `mdi:*` identifiers — same chip-input pattern
+   *  the editor uses for `chips`, because ha-form's icon selector
+   *  doesn't reliably commit clicks when nested inside a
+   *  `flatten: false` expandable (HA core only uses icon selectors
+   *  at the root data level or inside `flatten: true` expandables).
+   *  User types or pastes the MDI key (e.g. "mdi:parking"); the
+   *  normaliser drops entries that don't start with `mdi:`. Capped
+   *  at 3 entries. */
+  extra_icons?: string[] | undefined;
 }
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
@@ -361,6 +373,13 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   wheelchair_race?: boolean | undefined;
   accessibility_only?: boolean | undefined;
   walk_times?: WalkTimes | undefined;
+  /** Master toggle for the U-Bahn-style station-header strip above
+   *  the orange station-name band. When `false` (the default), the
+   *  strip is suppressed and the card renders as it did pre-1.5.0,
+   *  even if `header_left` / `header_right` are configured.
+   *  Per-side configs are preserved (so toggling back on restores
+   *  them); this just gates the render. */
+  show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
 }

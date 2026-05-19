@@ -143,6 +143,8 @@
       "wheelchair_race": "Wheelchair race",
       "section_header": "Station header",
       "section_header_helper": "Black strip above the station name, like on U-Bahn signs. Optional.",
+      "show_header": "Show station header",
+      "show_header_helper": "Turn on to show the black strip above the station name. Per-side settings stay saved when off.",
       "header_left": "Left side",
       "header_left_helper": "Exit icon sits on the left edge.",
       "header_right": "Right side",
@@ -160,8 +162,10 @@
       "show_wc": "Show toilet icon",
       "show_escalator": "Show escalator icon",
       "show_elevator": "Show elevator icon",
+      "extra_icons": "Extra icons",
+      "extra_icons_helper": "Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",
       "chips": "Extra labels",
-      "chips_helper": "Short text boxes after the toilet tile — platform numbers, line designators, anything signage-y. Up to 6, 16 characters each."
+      "chips_helper": "Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each."
     }
   }
 }

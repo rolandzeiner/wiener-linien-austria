@@ -108,7 +108,7 @@
       "icon_wc": "WC",
       "icon_escalator": "Rolltreppe",
       "icon_elevator": "Aufzug",
-      "icon_mdi_exit_run": "Ausgang (Person, laufend)",
+      "icon_mdi_exit_run": "Ausgang (laufende Person)",
       "icon_mdi_exit_to_app": "Ausgang (Tür)",
       "icon_mdi_door_open": "Offene Tür",
       "icon_mdi_stairs": "Treppe"
@@ -143,6 +143,8 @@
       "wheelchair_race": "Rollstuhl-Rennen",
       "section_header": "Stationskopfzeile",
       "section_header_helper": "Schwarzer Streifen über dem Stationsnamen, wie auf U-Bahn-Schildern. Optional.",
+      "show_header": "Stationskopfzeile anzeigen",
+      "show_header_helper": "Einschalten zeigt den schwarzen Streifen über dem Stationsnamen. Einstellungen pro Seite bleiben gespeichert.",
       "header_left": "Linke Seite",
       "header_left_helper": "Ausgangssymbol am linken Rand.",
       "header_right": "Rechte Seite",
@@ -151,7 +153,7 @@
       "header_exit_none": "Kein",
       "header_exit_regular": "Ausgang",
       "header_exit_accessible": "Stufenloser Ausgang",
-      "icon_mdi_exit_run": "Ausgang (Person, laufend)",
+      "icon_mdi_exit_run": "Ausgang (laufende Person)",
       "icon_mdi_exit_to_app": "Ausgang (Tür)",
       "icon_mdi_door_open": "Offene Tür",
       "icon_mdi_stairs": "Treppe",
@@ -160,8 +162,10 @@
       "show_wc": "WC-Symbol anzeigen",
       "show_escalator": "Rolltreppen-Symbol anzeigen",
       "show_elevator": "Aufzug-Symbol anzeigen",
+      "extra_icons": "Zusätzliche Symbole",
+      "extra_icons_helper": "Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",
       "chips": "Zusätzliche Beschriftungen",
-      "chips_helper": "Kurze Textfelder nach dem WC-Symbol – Gleisnummern, Liniennummern, Beschilderungstext. Maximal 6, je 16 Zeichen."
+      "chips_helper": "Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen."
     }
   }
 }

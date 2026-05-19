@@ -131,9 +131,13 @@ home-assistant_*.log*
 config/
 
 # ───────────────────────────────────────────────────────────────────
-# Personal dev tooling — push/sync scripts targeting a dev box, scratch
+# Personal dev tooling — push/sync scripts targeting a dev box, scratch.
+# `scripts/*` ignores all files in scripts/ by default, then the
+# `!scripts/build-mdi-icon-names.mjs` negation re-includes the build-
+# time MDI name extractor (required for `npm run build` to succeed).
 # ───────────────────────────────────────────────────────────────────
-scripts/
+scripts/*
+!scripts/build-mdi-icon-names.mjs
 dev-push.sh
 dev/
 test/
@@ -149,3 +153,9 @@ private_*.py
 # Dev-only fixture hook (gitignored by design — per-repo file is local)
 # ───────────────────────────────────────────────────────────────────
 custom_components/*/_dev_fixture.py
+
+# Generated at build time by scripts/build-mdi-icon-names.mjs — list of
+# MDI icon names extracted from @mdi/js so the retro editor's "Extra
+# icons" chip input can offer autocomplete. Regenerated on every
+# `npm run build` / `npm run dev`.
+src/mdi-icon-names.json

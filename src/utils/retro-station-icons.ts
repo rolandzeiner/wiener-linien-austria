@@ -235,3 +235,17 @@ export function renderRetroHeaderMdiIcon(
     <ha-icon class=${iconClass} icon=${mdiIcon}></ha-icon>
   </span>`;
 }
+
+/** Render a free-form, user-supplied MDI icon as a header-strip
+ *  tile. Same DOM as `renderRetroHeaderMdiIcon` but accepts any
+ *  string (the config normaliser already enforces the `mdi:` prefix
+ *  + sanity caps) and never flips — auto-flip is a directional
+ *  concept that only applies to the curated exit-arrow variants. */
+export function renderRetroHeaderMdiTile(
+  mdiIcon: string,
+  ariaLabel: string,
+): TemplateResult {
+  return html`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${ariaLabel}>
+    <ha-icon class="retro-station-header__mdi" icon=${mdiIcon}></ha-icon>
+  </span>`;
+}

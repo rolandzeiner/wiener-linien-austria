@@ -62,13 +62,27 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
       .slice(0, 6);
     if (cleaned.length > 0) chips = cleaned;
   }
+  // Free-form MDI icon array — same chip-input pattern as `chips`,
+  // but with a `mdi:` prefix filter. User types/pastes keys in the
+  // editor; we drop anything that isn't a string starting with
+  // `mdi:`, length 5..64, and cap the list at 3.
+  let extra_icons: string[] | undefined;
+  if (Array.isArray(r.extra_icons)) {
+    const cleaned = r.extra_icons
+      .filter((v): v is string => typeof v === "string")
+      .map((v) => v.trim())
+      .filter((v) => v.startsWith("mdi:") && v.length >= 5 && v.length <= 64)
+      .slice(0, 3);
+    if (cleaned.length > 0) extra_icons = cleaned;
+  }
   if (
     exit === "none" &&
     text === undefined &&
     !show_wc &&
     !show_escalator &&
     !show_elevator &&
-    chips === undefined
+    chips === undefined &&
+    extra_icons === undefined
   ) {
     return undefined;
   }
@@ -79,6 +93,7 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (show_escalator) out.show_escalator = true;
   if (show_elevator) out.show_elevator = true;
   if (chips !== undefined) out.chips = chips;
+  if (extra_icons !== undefined) out.extra_icons = extra_icons;
   return out;
 }
 
@@ -328,6 +343,7 @@ export interface NormalisedRetroConfigValidated {
   wheelchair_race: boolean;
   accessibility_only: boolean;
   walk_times?: WalkTimes | undefined;
+  show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
 }
@@ -353,6 +369,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "wheelchair_race",
   "accessibility_only",
   "walk_times",
+  "show_header",
   "header_left",
   "header_right",
 ]);
@@ -386,6 +403,11 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
+    // Master gate for the U-Bahn header strip. Defaults to false so
+    // pre-1.5.0 retro cards stay byte-identical until the user
+    // explicitly enables the feature; per-side configs are kept
+    // either way (toggling back on restores them).
+    show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
   };

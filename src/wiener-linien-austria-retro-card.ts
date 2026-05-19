@@ -33,6 +33,7 @@ import {
   isRetroHeaderMdiExit,
   renderRetroHeaderIcon,
   renderRetroHeaderMdiIcon,
+  renderRetroHeaderMdiTile,
   type RetroHeaderIconKey,
 } from "./utils/retro-station-icons.js";
 import {
@@ -566,7 +567,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           cfg.line,
         )
       : nothing;
-    const stationHeader = this._renderStationHeader(cfg.header_left, cfg.header_right);
+    // Master gate — when `show_header` is off (the default), the
+    // strip is suppressed regardless of per-side config. This keeps
+    // the per-side state in memory so toggling back on restores
+    // exactly what the user had set.
+    const stationHeader = cfg.show_header
+      ? this._renderStationHeader(cfg.header_left, cfg.header_right)
+      : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
     const raceActive = cfg.wheelchair_race && this._raceState === "racing";
@@ -795,11 +802,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const wc = side.show_wc ? amenityKey("wc") : nothing;
     const esc = side.show_escalator ? amenityKey("escalator") : nothing;
     const elv = side.show_elevator ? amenityKey("elevator") : nothing;
+    // Free-form MDI tiles — same-tile styling as the curated MDI exit
+    // variants (white square, --mdi padding modifier). Sit between
+    // the WC tile and the text chips. Aria-label is the MDI key
+    // itself, the closest semantic label we have without an
+    // explicit per-row label field.
+    const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
+      renderRetroHeaderMdiTile(icon, icon),
+    );
+    const mdiTilesLeftOrder = mdiTileNodes;
+    const mdiTilesRightOrder = [...mdiTileNodes].reverse();
     // Text chips — same-height white boxes with dynamic width. Sit
-    // beyond WC in the ranking (further from the sign text than any
-    // amenity tile) so they read as the outer-edge content on each
-    // side. Mirrored across sides so chip[0] is always the
-    // closest-to-WC entry regardless of which side it lives on.
+    // beyond the MDI tiles (further from the sign text than any
+    // amenity icon or extra icon) so they read as the outer-edge
+    // content on each side. Mirrored across sides so chip[0] is
+    // always the closest-to-extra-icons entry regardless of which
+    // side it lives on.
     const chipNodes = (side.chips ?? []).map(
       (chipText) => html`<span class="retro-station-header__chip">${chipText}</span>`,
     );
@@ -810,9 +828,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // amenities ordered so the *same* glyph (elevator) is always
     // closest to the text on both sides — wheelchair-relevant info
     // gets the same visual prominence regardless of header side.
+    // Mirror invariant for extra_icons + chips: index 0 of either
+    // array sits closest to the WC tile on both sides.
     return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}${chipsLeftOrder}`
-      : html`${chipsRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}`
+      : html`${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
