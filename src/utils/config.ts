@@ -1,6 +1,8 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
 import type {
   LineColorsMap,
+  RetroHeaderExit,
+  RetroHeaderSide,
   RetroSize,
   RetroStationBg,
   RetroStyle,
@@ -16,6 +18,48 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "black",
 ] as const);
 const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
+const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set([
+  "none",
+  "regular",
+  "accessible",
+] as const);
+
+/** Header-side normaliser. Returns `undefined` when every field is
+ *  unset / falsy / `"none"`, so the card's "is this side configured
+ *  at all?" check collapses to a single truthy test. Hard bounds on
+ *  `text` length defensively guard against a runaway YAML config
+ *  blowing out the strip width. */
+function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
+    ? (r.exit as RetroHeaderExit)
+    : "none";
+  let text: string | undefined;
+  if (typeof r.text === "string") {
+    const trimmed = r.text.trim().slice(0, 64);
+    if (trimmed) text = trimmed;
+  }
+  const show_wc = r.show_wc === true;
+  const show_escalator = r.show_escalator === true;
+  const show_elevator = r.show_elevator === true;
+  if (
+    exit === "none" &&
+    text === undefined &&
+    !show_wc &&
+    !show_escalator &&
+    !show_elevator
+  ) {
+    return undefined;
+  }
+  const out: RetroHeaderSide = {};
+  if (exit !== "none") out.exit = exit;
+  if (text !== undefined) out.text = text;
+  if (show_wc) out.show_wc = true;
+  if (show_escalator) out.show_escalator = true;
+  if (show_elevator) out.show_elevator = true;
+  return out;
+}
 
 function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -263,6 +307,8 @@ export interface NormalisedRetroConfigValidated {
   wheelchair_race: boolean;
   accessibility_only: boolean;
   walk_times?: WalkTimes | undefined;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
 }
 
 // See NormalisedModernConfig — same passthrough rule for dashboard
@@ -286,6 +332,8 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "wheelchair_race",
   "accessibility_only",
   "walk_times",
+  "header_left",
+  "header_right",
 ]);
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
@@ -317,6 +365,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
+    header_left: normaliseRetroHeaderSide(raw.header_left),
+    header_right: normaliseRetroHeaderSide(raw.header_right),
   };
 }
 

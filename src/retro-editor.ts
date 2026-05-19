@@ -244,6 +244,75 @@ export class WienerLinienAustriaRetroCardEditor
         },
       },
       {
+        // Station header strip — black band above the orange station
+        // band, mimics the real Wiener Linien U-Bahn signage. Sits
+        // *above* the station section in the editor to match the
+        // top-down visual order: header → station band → departures.
+        //
+        // `flatten: true` on the outer wrapper spreads `header_left`
+        // / `header_right` into the parent (root) config. The inner
+        // expandables use `flatten: false` (the inverse of every
+        // other expandable in this editor) because the config shape
+        // for each side IS nested — `RetroHeaderSide` is an object
+        // with `{exit, text, show_wc, show_escalator, show_elevator}`.
+        type: "expandable",
+        name: "header",
+        title: this._et("section_header"),
+        flatten: true,
+        schema: [
+          {
+            type: "expandable",
+            name: "header_left",
+            title: this._et("header_left"),
+            flatten: false,
+            schema: [
+              {
+                name: "exit",
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: [
+                      { value: "none", label: this._et("header_exit_none") },
+                      { value: "regular", label: this._et("header_exit_regular") },
+                      { value: "accessible", label: this._et("header_exit_accessible") },
+                    ],
+                  },
+                },
+              },
+              { name: "text", selector: { text: {} } },
+              { name: "show_wc", selector: { boolean: {} } },
+              { name: "show_escalator", selector: { boolean: {} } },
+              { name: "show_elevator", selector: { boolean: {} } },
+            ],
+          },
+          {
+            type: "expandable",
+            name: "header_right",
+            title: this._et("header_right"),
+            flatten: false,
+            schema: [
+              {
+                name: "exit",
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: [
+                      { value: "none", label: this._et("header_exit_none") },
+                      { value: "regular", label: this._et("header_exit_regular") },
+                      { value: "accessible", label: this._et("header_exit_accessible") },
+                    ],
+                  },
+                },
+              },
+              { name: "text", selector: { text: {} } },
+              { name: "show_wc", selector: { boolean: {} } },
+              { name: "show_escalator", selector: { boolean: {} } },
+              { name: "show_elevator", selector: { boolean: {} } },
+            ],
+          },
+        ],
+      },
+      {
         // `flatten: true` is non-negotiable — see HaFormExpandableSchema
         // docstring in types.ts.
         type: "expandable",

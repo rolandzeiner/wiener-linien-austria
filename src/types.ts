@@ -307,6 +307,26 @@ export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
 export type RetroStyle = "classic" | "warm" | "pixel";
 
+/** Exit-icon variant for one side of the station header strip.
+ *  `"none"` suppresses the icon entirely on that side. */
+export type RetroHeaderExit = "none" | "regular" | "accessible";
+
+/** Per-side config for the retro card's optional U-Bahn-signage
+ *  header strip (the black band above the orange station name).
+ *  When every field is unset / falsy / `"none"`, the side renders
+ *  nothing and — if both sides empty — the whole strip is omitted
+ *  (backward-compatible). */
+export interface RetroHeaderSide {
+  exit?: RetroHeaderExit | undefined;
+  /** Text label on this side — typically the name of the
+   *  adjacent station or passage. Bounded to 64 chars at
+   *  normalisation; ellipsised at render. */
+  text?: string | undefined;
+  show_wc?: boolean | undefined;
+  show_escalator?: boolean | undefined;
+  show_elevator?: boolean | undefined;
+}
+
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
   // `?: T | undefined` — dual form for `exactOptionalPropertyTypes`
@@ -323,4 +343,6 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   wheelchair_race?: boolean | undefined;
   accessibility_only?: boolean | undefined;
   walk_times?: WalkTimes | undefined;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
 }

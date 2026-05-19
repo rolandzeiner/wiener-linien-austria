@@ -17,10 +17,20 @@ import {
   checkCardVersionWS,
   renderVersionBanner,
 } from "./shared-render.js";
-import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
+import type {
+  DepartureAttr,
+  RetroHeaderSide,
+  WienerLinienAttrs,
+  WienerLinienRetroCardConfig,
+} from "./types.js";
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import {
+  RETRO_HEADER_ICONS,
+  renderRetroHeaderIcon,
+  type RetroHeaderIconKey,
+} from "./utils/retro-station-icons.js";
 import {
   RACE_FINISH_X_FALLBACK_CQW,
   computeRaceParams,
@@ -552,6 +562,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           cfg.line,
         )
       : nothing;
+    const stationHeader = this._renderStationHeader(cfg.header_left, cfg.header_right);
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
     const raceActive = cfg.wheelchair_race && this._raceState === "racing";
@@ -580,6 +591,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           class=${classMap(retroClasses)}
           @click=${this._handleCardClick}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
+          ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
@@ -701,6 +713,74 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         <div class="retro-gleis-number">${platform}</div>
       </div>
     `;
+  }
+
+  /** Render the black header strip above the orange station band —
+   *  a homage to the real Wiener Linien U-Bahn station signage.
+   *  Returns `nothing` when neither side is configured, so existing
+   *  retro cards (no `header_left`/`header_right` in YAML) are
+   *  byte-identical to pre-change behaviour.
+   *
+   *  Per-side render order:
+   *   - LEFT:  [exit] [text] [WC] [Escalator] [Elevator]
+   *   - RIGHT: [WC] [Escalator] [Elevator] [text] [exit]
+   *
+   *  Exit-icon auto-flip: `exit` glyph natively points LEFT; on the
+   *  right side it's flipped so the arrow points right. `exit-access`
+   *  is the mirror case — natively points RIGHT, flipped on left.
+   *  Users pick "regular" / "accessible" per side and the renderer
+   *  derives orientation; no separate config knob. */
+  private _renderStationHeader(
+    left: RetroHeaderSide | undefined,
+    right: RetroHeaderSide | undefined,
+  ): TemplateResult | typeof nothing {
+    if (!left && !right) return nothing;
+    return html`
+      <div class="retro-station-header" role="group">
+        <div class="retro-station-header__side retro-station-header__side--left">
+          ${left ? this._renderHeaderSide(left, "left") : nothing}
+        </div>
+        <div class="retro-station-header__side retro-station-header__side--right">
+          ${right ? this._renderHeaderSide(right, "right") : nothing}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderHeaderSide(
+    side: RetroHeaderSide,
+    pos: "left" | "right",
+  ): TemplateResult {
+    const exitIconKey: RetroHeaderIconKey | null =
+      side.exit === "regular"
+        ? "exit"
+        : side.exit === "accessible"
+          ? "exit-access"
+          : null;
+    const exitNode = exitIconKey
+      ? renderRetroHeaderIcon(exitIconKey, {
+          ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[exitIconKey].labelKey}`),
+          // Glyph's native direction is `pointsTo`. Flip when the side
+          // it sits on doesn't match — e.g. `exit` (points left) on
+          // the right side flips to point right.
+          flipX: RETRO_HEADER_ICONS[exitIconKey].glyphPointsTo !== pos,
+        })
+      : nothing;
+    const textNode = side.text
+      ? html`<span class="retro-station-header__text">${side.text}</span>`
+      : nothing;
+    const amenityKey = (key: RetroHeaderIconKey) =>
+      renderRetroHeaderIcon(key, {
+        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
+      });
+    const wc = side.show_wc ? amenityKey("wc") : nothing;
+    const esc = side.show_escalator ? amenityKey("escalator") : nothing;
+    const elv = side.show_elevator ? amenityKey("elevator") : nothing;
+    // Canonical render order mirrors the original signage. Right side
+    // mirrors the left: exit always at the outer edge of the card.
+    return pos === "left"
+      ? html`${exitNode}${textNode}${wc}${esc}${elv}`
+      : html`${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
@@ -1435,6 +1515,97 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro--size-small .retro-station {
       padding: 7px 10px;
       font-size: 1.35em;
+    }
+
+    /* ----- Station header strip -----------------------------------
+       A homage to the real Wiener Linien U-Bahn station signage —
+       a black band above the orange station name with per-side
+       exit / amenity icons + a destination label. Colours are
+       hardcoded (#000 / #fff) on purpose: the original signage is
+       intentionally black-and-white, the same authenticity rule the
+       .retro-station rule above follows. Spacing flows through HA
+       Design System tokens with px fallbacks per
+       ha-portfolio-design (§ 4). */
+    .retro-station-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #000;
+      color: #fff;
+      padding: var(--ha-spacing-2, 8px) var(--ha-spacing-3, 12px);
+      gap: var(--ha-spacing-2, 8px);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                   Helvetica, Arial, sans-serif;
+      font-weight: var(--ha-font-weight-medium, 600);
+      font-size: 1em;
+      letter-spacing: 0.02em;
+    }
+    .retro-station-header__side {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      flex: 1 1 0;
+    }
+    .retro-station-header__side--right {
+      justify-content: flex-end;
+    }
+    .retro-station-header__text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .retro-station-header__tile {
+      /* White SQUARE tile hosting the (black) glyph — mirrors the
+         real Wiener Linien station signage where each icon sits on
+         a small white square within the black header strip. The
+         square aspect is non-negotiable per the reference photo;
+         the inner SVG fits via preserveAspectRatio=meet so portrait
+         glyphs (elevator) and landscape glyphs (exit, wc) both
+         centre cleanly inside the same square. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: #000;
+      flex-shrink: 0;
+      width: 1.4em;
+      height: 1.4em;
+      padding: 0.12em;
+      box-sizing: border-box;
+    }
+    .retro-station-header__icon {
+      width: 100%;
+      height: 100%;
+      display: block;
+      /* SVG default fill is black per spec, but be explicit so the
+         tile's color: #000 propagates if a future glyph adopts
+         fill=currentColor. */
+      fill: currentColor;
+    }
+    .retro-station-header__icon--flip-x {
+      transform: scaleX(-1);
+    }
+    /* Size-token alignment — match the .retro--size-* scale. */
+    .retro--size-medium .retro-station-header {
+      font-size: 0.9em;
+      padding: 6px var(--ha-spacing-2, 10px);
+    }
+    .retro--size-small .retro-station-header {
+      font-size: 0.8em;
+      padding: 5px var(--ha-spacing-2, 8px);
+    }
+    /* Narrow-width reflow (WCAG 1.4.10 AA) — drop the destination
+       label so the icons stay visible at a 320 px section-view
+       column. Unnamed container query — matches the nearest
+       inline-size container, which is .retro (the outer wrapper).
+       The size containers on overlays are not ancestors of the
+       header strip, so they don't interfere. */
+    @container (inline-size < 320px) {
+      .retro-station-header__text {
+        display: none;
+      }
     }
     .retro-banner {
       background: #ffa000;
