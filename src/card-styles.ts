@@ -1,10 +1,20 @@
 import { css } from "lit";
+import { wlFontFaces } from "./font-face.js";
 
 // Tile-card visual language. Token-driven, container-query-paced.
 // Per-station accent is piped in via inline `style="--wl-accent: …;"` on
 // `.station`, so every accented surface (icon-tile, line badge, alert
 // surface, focus ring) reads from one prop.
+//
+// Webfonts (WL Sans / WL Sans Condensed / WL Mono) come from the shared
+// `./font-face` module — interpolated into the top of this template so
+// both Lovelace cards declare their @font-face rules from one source of
+// truth. font-display: swap so the card shows instantly in the HA
+// fallback and upgrades to WL Sans when the woff2 lands. See
+// www/fonts/NOTICE.md for provenance + GUST Font License terms.
 export const cardStyles = css`
+  ${wlFontFaces}
+
   :host {
     /* color-scheme enables light-dark() and steers forced-colors
        palette selection (WCAG 1.4.11). HA's active theme drives the
@@ -99,11 +109,23 @@ export const cardStyles = css`
   }
 
   /* Per-station section. Inline --wl-accent on this element drives the
-     icon-tile tint, line-badge fallback, alert tints, and CTA fill. */
+     icon-tile tint, line-badge fallback, alert tints, and CTA fill —
+     and the atmospheric radial wash below. */
   .station {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--wl-row-gap);
+    /* Soft radial wash from the top-left in the station's line accent.
+       Picks up the per-station --wl-accent automatically, adds depth
+       without competing with user themes. Tuned conservatively (6%
+       opacity, 70% radius) so it reads as a tint rather than a tile —
+       theme-agnostic atmosphere, frontend-design audit. */
+    background-image: radial-gradient(
+      ellipse 80% 70% at top left,
+      color-mix(in srgb, var(--wl-accent) 6%, transparent),
+      transparent 70%
+    );
   }
   .station + .station {
     margin-top: var(--wl-row-gap);
@@ -228,8 +250,9 @@ export const cardStyles = css`
     color: var(--wl-accent);
   }
   .hero-min {
+    font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     font-size: var(--wl-metric-size);
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
     letter-spacing: -0.5px;
@@ -713,7 +736,8 @@ export const cardStyles = css`
   }
   .line-badge {
     text-align: center;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
+    font-weight: 700;
     color: #fff;
     border-radius: 6px;
     padding: 3px 8px;
@@ -799,8 +823,9 @@ export const cardStyles = css`
     color: var(--wl-warning);
   }
   .countdown {
+    font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
+    font-weight: 700;
     min-width: 50px;
     text-align: right;
     color: var(--secondary-text-color);

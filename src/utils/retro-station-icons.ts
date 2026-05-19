@@ -2,13 +2,18 @@
 // card's header strip.
 //
 // Why inlined — the icons are bespoke transit-system glyphs (door +
-// directional arrow, door + wheelchair person, WC monogram,
-// escalator zigzag, lift box). MDI has no equivalents at the right
-// level of fidelity. Source SVGs live in `assets/retro-header/` for
-// provenance; the runtime authoritative copies are the `html\`…\``
-// templates below.
+// directional arrow, door + wheelchair person, escalator zigzag,
+// lift box). MDI has no equivalents at the right level of fidelity.
+// Source SVGs live in `assets/retro-header/` for provenance; the
+// runtime authoritative copies are the `html\`…\`` templates below.
 //
-// All glyphs use *default fill*, which inherits the parent's CSS
+// The WC tile is the exception: rather than tracing the monogram as
+// SVG paths we just type "WC" inside the white square — the result
+// is visually equivalent and avoids ~300 bytes of bezier data plus a
+// font-coupling failure mode (path-traced letterforms can't restyle
+// with the rest of the card's text). Marked with `kind: "text"`.
+//
+// All SVG glyphs use *default fill*, which inherits the parent's CSS
 // `color`. The header strip is `color: #fff`, so the icons render
 // white on the black strip without any explicit `fill` attribute.
 //
@@ -27,29 +32,52 @@ export type RetroHeaderIconKey =
   | "escalator"
   | "elevator";
 
-interface IconDef {
-  /** SVG viewBox — preserved verbatim from the source asset. */
-  viewBox: string;
-  /** Renderer for the inner SVG shapes. MUST be built with the
-   *  `svg\`\`` tag, NOT `html\`\``: Lit creates DOM nodes from a
-   *  template based on the tag, so `html\`<polygon/>\`` would
-   *  produce an unknown HTMLElement that the browser can't render.
-   *  Wrapped in `<svg>` by `renderRetroHeaderIcon` — outer `<svg>`
-   *  and Adobe `<g id="Ebene_*">` wrappers were stripped on
-   *  ingestion. */
-  shapes: () => SVGTemplateResult;
-  /** Localisation key under `retro.header.*` for the screen-reader
-   *  name. Composed at render time via `translate()`. */
-  labelKey: string;
-  /** Glyph's natural arrow direction. Consumed by the card render
-   *  to compute `flipX` per side (exit on right side auto-flips so
-   *  the arrow points right). `undefined` for amenity icons that
-   *  never flip. */
-  glyphPointsTo?: "left" | "right";
-}
+/** Discriminated by `kind`. The SVG variant is the default —
+ *  bespoke station-signage glyphs traced as path data. The TEXT
+ *  variant is the "letterform monogram" path used by WC: the tile
+ *  itself is already a white square, so we just type the letters
+ *  inside it. */
+type IconDef =
+  | {
+      kind: "svg";
+      /** SVG viewBox — preserved verbatim from the source asset. */
+      viewBox: string;
+      /** Renderer for the inner SVG shapes. MUST be built with the
+       *  `svg\`\`` tag, NOT `html\`\``: Lit creates DOM nodes from a
+       *  template based on the tag, so `html\`<polygon/>\`` would
+       *  produce an unknown HTMLElement that the browser can't
+       *  render. Wrapped in `<svg>` by `renderRetroHeaderIcon` —
+       *  outer `<svg>` and Adobe `<g id="Ebene_*">` wrappers were
+       *  stripped on ingestion. */
+      shapes: () => SVGTemplateResult;
+      /** Localisation key under `retro.header.*` for the screen-
+       *  reader name. Composed at render time via `translate()`. */
+      labelKey: string;
+      /** Glyph's natural arrow direction. Consumed by the card
+       *  render to compute `flipX` per side (exit on right side
+       *  auto-flips so the arrow points right). `undefined` for
+       *  amenity icons that never flip. */
+      glyphPointsTo?: "left" | "right";
+    }
+  | {
+      kind: "text";
+      /** Literal characters typed inside the white tile (e.g. "WC"). */
+      text: string;
+      /** Same role as the SVG variant's labelKey. */
+      labelKey: string;
+    };
 
-export const RETRO_HEADER_ICONS: Record<RetroHeaderIconKey, IconDef> = {
+/** Narrow-typed key sets so `RETRO_HEADER_ICONS[k]` can produce the
+ *  right variant at the call site without runtime narrowing — exit
+ *  / exit-access / escalator / elevator are statically known SVG. */
+export type RetroSvgIconKey = "exit" | "exit-access" | "escalator" | "elevator";
+export type RetroTextIconKey = "wc";
+
+export const RETRO_HEADER_ICONS: { [K in RetroSvgIconKey]: Extract<IconDef, { kind: "svg" }> } & {
+  [K in RetroTextIconKey]: Extract<IconDef, { kind: "text" }>;
+} = {
   exit: {
+    kind: "svg",
     viewBox: "0 0 36.29 29.04",
     glyphPointsTo: "left",
     labelKey: "icon_exit",
@@ -59,6 +87,7 @@ export const RETRO_HEADER_ICONS: Record<RetroHeaderIconKey, IconDef> = {
     `,
   },
   "exit-access": {
+    kind: "svg",
     viewBox: "0 0 36.29 29.04",
     glyphPointsTo: "right",
     labelKey: "icon_exit_access",
@@ -71,14 +100,12 @@ export const RETRO_HEADER_ICONS: Record<RetroHeaderIconKey, IconDef> = {
     `,
   },
   wc: {
-    viewBox: "0 0 34.41 16.58",
+    kind: "text",
+    text: "WC",
     labelKey: "icon_wc",
-    shapes: () => svg`
-      <path d="M16.76.3h3.36l-4.46,15.83h-3.16l-1.91-9.26-.56-3.06-.56,3.06-1.91,9.26h-3.07L0,.3h3.51l2.09,9.07.45,2.52.46-2.47L8.3.3h3.49l1.88,9.07.48,2.52.48-2.43L16.76.3Z"/>
-      <path d="M32.19,14.95c-1.18,1.08-2.69,1.62-4.53,1.62-2.28,0-4.07-.73-5.37-2.19-1.3-1.47-1.96-3.48-1.96-6.04,0-2.76.74-4.89,2.22-6.39,1.29-1.3,2.93-1.96,4.92-1.96,2.66,0,4.61.87,5.84,2.62.68.98,1.04,1.97,1.1,2.95h-3.31c-.21-.76-.49-1.33-.83-1.72-.6-.69-1.49-1.03-2.67-1.03s-2.15.49-2.85,1.46c-.7.97-1.04,2.34-1.04,4.12s.37,3.11,1.1,3.99c.73.88,1.67,1.33,2.8,1.33s2.04-.38,2.65-1.14c.34-.41.62-1.02.84-1.84h3.28c-.29,1.73-1.02,3.13-2.19,4.21Z"/>
-    `,
   },
   escalator: {
+    kind: "svg",
     viewBox: "0 0 36.74 28.3",
     labelKey: "icon_escalator",
     shapes: () => svg`
@@ -86,6 +113,7 @@ export const RETRO_HEADER_ICONS: Record<RetroHeaderIconKey, IconDef> = {
     `,
   },
   elevator: {
+    kind: "svg",
     viewBox: "0 0 24.01 36.69",
     labelKey: "icon_elevator",
     shapes: () => svg`
@@ -109,18 +137,27 @@ interface RenderOpts {
   flipX?: boolean;
 }
 
-/** Render an inline SVG icon for the retro header strip, wrapped in
- *  a white-background tile so the (black) glyph reads against the
- *  black header strip the way the original Wiener Linien signage
- *  does. The browser's HTML parser namespace-promotes the `<svg>`
- *  element automatically; child shapes inherit that namespace and
- *  the tile's `color: #000` cascades into the glyph's currentColor
- *  fill. */
+/** Render a retro-header glyph wrapped in a white-background tile
+ *  so the (black) glyph reads against the black header strip the
+ *  way the original Wiener Linien signage does.
+ *
+ *  Two render paths, picked by `def.kind`:
+ *   - `"svg"`: inline `<svg>`. Browser auto-namespace-promotes the
+ *     element; child shapes inherit that namespace and the tile's
+ *     `color: #000` cascades into the glyph's currentColor fill.
+ *   - `"text"`: a centred `<span>` containing literal characters
+ *     (WC). The tile's flex centering positions them — no manual
+ *     transform needed. */
 export function renderRetroHeaderIcon(
   key: RetroHeaderIconKey,
   opts: RenderOpts,
 ): TemplateResult {
   const def = RETRO_HEADER_ICONS[key];
+  if (def.kind === "text") {
+    return html`<span class="retro-station-header__tile" role="img" aria-label=${opts.ariaLabel}>
+      <span class="retro-station-header__monogram" aria-hidden="true">${def.text}</span>
+    </span>`;
+  }
   const iconClass = opts.flipX
     ? "retro-station-header__icon retro-station-header__icon--flip-x"
     : "retro-station-header__icon";

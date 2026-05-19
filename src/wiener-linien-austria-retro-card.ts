@@ -26,6 +26,7 @@ import type {
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import { wlFontFaces } from "./font-face.js";
 import {
   RETRO_HEADER_ICONS,
   renderRetroHeaderIcon,
@@ -721,8 +722,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
    *  retro cards (no `header_left`/`header_right` in YAML) are
    *  byte-identical to pre-change behaviour.
    *
-   *  Per-side render order:
-   *   - LEFT:  [exit] [text] [WC] [Escalator] [Elevator]
+   *  Per-side render order — amenity order is mirrored so the same
+   *  glyph always sits the same distance from the station name on
+   *  both sides: elevator nearest the text, then escalator, then WC:
+   *   - LEFT:  [exit] [text] [Elevator] [Escalator] [WC]
    *   - RIGHT: [WC] [Escalator] [Elevator] [text] [exit]
    *
    *  Exit-icon auto-flip: `exit` glyph natively points LEFT; on the
@@ -751,7 +754,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     side: RetroHeaderSide,
     pos: "left" | "right",
   ): TemplateResult {
-    const exitIconKey: RetroHeaderIconKey | null =
+    // Tightened to the SVG-variant keys so `RETRO_HEADER_ICONS[k]`
+    // narrows to the SVG IconDef variant — gives access to
+    // `glyphPointsTo` without a runtime kind check below.
+    const exitIconKey: "exit" | "exit-access" | null =
       side.exit === "regular"
         ? "exit"
         : side.exit === "accessible"
@@ -777,9 +783,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const esc = side.show_escalator ? amenityKey("escalator") : nothing;
     const elv = side.show_elevator ? amenityKey("elevator") : nothing;
     // Canonical render order mirrors the original signage. Right side
-    // mirrors the left: exit always at the outer edge of the card.
+    // mirrors the left: exit always at the outer edge of the card,
+    // amenities ordered so the *same* glyph (elevator) is always
+    // closest to the text on both sides — wheelchair-relevant info
+    // gets the same visual prominence regardless of header side.
     return pos === "left"
-      ? html`${exitNode}${textNode}${wc}${esc}${elv}`
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}`
       : html`${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
@@ -851,6 +860,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // ------------------------------------------------------------------
 
   static override styles = css`
+    ${wlFontFaces}
+
     :host {
       display: block;
       /* Create a stacking context on the host so the high z-indexes
@@ -882,7 +893,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       position: relative;
       display: flex;
       flex-direction: column;
-      font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
+      /* WL Mono is the subsetted TeX Gyre Cursor face shipped with
+         this integration — Courier-metric so the original Courier
+         New stack is a clean fallback during the woff2 fetch window
+         and on misconfigured installs. Bold-weight glyphs (line 894)
+         pick up the dedicated wl-mono-bold.woff2 variant rather than
+         relying on faux-bold synthesis. */
+      font-family: "WL Mono", "Courier New", Courier, monospace;
       font-weight: 700;
       letter-spacing: 0.08em;
       overflow: hidden;
@@ -1534,9 +1551,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       color: #fff;
       padding: var(--ha-spacing-2, 8px) var(--ha-spacing-3, 12px);
       gap: var(--ha-spacing-2, 8px);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-                   Helvetica, Arial, sans-serif;
-      font-weight: var(--ha-font-weight-medium, 600);
+      /* WL Sans Condensed is the subsetted TeX Gyre Heros Cn face —
+         the condensed proportion matches real Wiener Linien station
+         signage. Ships only at weight 700 (the only weight the
+         signage uses); a regular-weight request would fall through
+         to WL Sans regular, then the Apple system stack. */
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+                   Arial, sans-serif;
+      font-weight: 700;
       font-size: 1em;
       letter-spacing: 0.02em;
     }
@@ -1555,6 +1578,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      /* Bumped from inherited 1em — WL Sans Condensed is ~25% narrower
+         than the regular Apple-stack sans, so the sign text can scale
+         up without crowding the amenity tiles next to it. Stays
+         proportional with the retro--size-* tokens because the parent
+         .retro-station-header's font-size scales (1em / 0.9em / 0.8em),
+         and this multiplier compounds on top. */
+      font-size: 1.2em;
     }
     .retro-station-header__tile {
       /* White SQUARE tile hosting the (black) glyph — mirrors the
@@ -1586,6 +1616,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     .retro-station-header__icon--flip-x {
       transform: scaleX(-1);
+    }
+    .retro-station-header__monogram {
+      /* WC tile content. Tile is already flex-centred, so the span
+         positions itself. font-size stays in rem (not em) so the
+         monogram is a stable 0.75rem regardless of the retro--size-*
+         token's em-scale on the parent header. font-family + weight
+         are declared explicitly (rather than relying on inheritance
+         from .retro-station-header) so a future header-rule rewrite
+         can't accidentally regress the W/C letterforms back to a
+         non-condensed face. */
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+                   Arial, sans-serif;
+      font-weight: 700;
+      font-size: 0.75rem;
+      line-height: 1;
     }
     /* Size-token alignment — match the .retro--size-* scale. */
     .retro--size-medium .retro-station-header {

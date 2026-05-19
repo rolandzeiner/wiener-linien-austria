@@ -98,9 +98,9 @@ Disruption and elevator entries render as collapsible rows above the stop list �
 
 A focused single-stop, single-direction LED-display card mimicking real Wiener Linien platform signs. Dashboard → Add card → "Wiener Linien Austria Retro".
 
-- Next 2 departures for one direction; amber glyphs in a system monospace stack. Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on warm-brown substrate), and *pixel* (screen-door overlay turning every glyph into discrete LED dots). No Google-Fonts fetch (GDPR-clean).
+- Next 2 departures for one direction; amber glyphs in **WL Mono** — a subsetted TeX Gyre Cursor face bundled with the integration (no external font fetch, GDPR-clean). Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on warm-brown substrate), and *pixel* (screen-door overlay turning every glyph into discrete LED dots).
 - Amber **GLEIS** / **STEIG** panel when the API reports a platform — left-aligned for Gleis "2", right-aligned otherwise, mirroring the real signs.
-- Optional **station header strip** *(1.5.0)* — a black band above the station name with per-side exit icon (regular or step-free), sign text (typically the name of the adjacent station or passage), and toggleable WC / escalator / elevator icons. Mimics the real Wiener Linien U-Bahn station signage; exit arrows auto-flip per side so they always point outward. Off by default — appears once you configure at least one side in the editor. Hand-traced inline SVGs (no external icon fetch).
+- Optional **station header strip** *(1.5.0)* — a black band above the station name with per-side exit icon (regular or step-free), sign text (typically the name of the adjacent station or passage), and toggleable WC / escalator / elevator icons. Mimics the real Wiener Linien U-Bahn station signage, set in the bundled **WL Sans Condensed** face for signage-faithful proportions; exit arrows auto-flip per side so they always point outward. Off by default — appears once you configure at least one side in the editor. Hand-traced inline SVGs (no external icon fetch).
 - Wheelchair glyph after destinations on step-free departures; alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`).
 - "Betriebsschluss" / "End of service" rendering when the board is empty; differentiated empty-state hints for wrong direction or filtered-out lines.
 - Three size variants (small / medium / regular). Defaults to a full 12-column row in HA section view.
@@ -233,6 +233,8 @@ If you build a Lovelace card or other user-facing UI on top of this integration,
 ## License
 
 MIT — see [LICENSE](LICENSE). Integration code is MIT; the Wiener Linien data flowing through it is CC BY 4.0.
+
+**Bundled webfonts** (`custom_components/wiener_linien_austria/www/fonts/`) — `WL Sans`, `WL Sans Condensed`, and `WL Mono` are subsetted derivatives of the [TeX Gyre](https://www.gust.org.pl/projects/e-foundry/tex-gyre) family (Heros / Heros Cn / Cursor) by Bogusław Jackowski and Janusz M. Nowacki on behalf of GUST. The fonts ship under the [GUST Font License](custom_components/wiener_linien_austria/www/fonts/GUST-FONT-LICENSE.txt) (LPPL 1.3c+) and were renamed per the GFL's request that derivatives use new names. See [`www/fonts/NOTICE.md`](custom_components/wiener_linien_austria/www/fonts/NOTICE.md) for provenance, the exact subset (Latin + German diacritics + a handful of typographic glyphs), and reproduction steps.
 
 ## Disclaimer
 
