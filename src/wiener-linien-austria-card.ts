@@ -785,7 +785,7 @@ export class WienerLinienAustriaCard extends LitElement {
         ${this._config!.show_departures && this._config!.max_departures > 0
           ? rows.length
             ? html`<ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
-                ${rows.map((d) => this._renderRow(d, stopCfg.entity))}
+                ${rows.map((d, i) => this._renderRow(d, stopCfg.entity, i))}
               </ul>`
             : html`<div class="empty" role="status" aria-live="polite">
                 ${this._t(attrs.server_time ? "betriebsschluss" : "no_data")}
@@ -1200,6 +1200,7 @@ export class WienerLinienAustriaCard extends LitElement {
   private _renderRow(
     d: DepartureAttr,
     entityId: string,
+    rowIndex = 0,
   ): TemplateResult | TemplateResult[] {
     const overrides = this._config!.line_colors;
     const lineColors = lineColorsFor(this.hass, entityId);
@@ -1253,6 +1254,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const rowTpl = html`
       <li
         class=${classMap(rowClasses)}
+        style=${`--row-i: ${rowIndex}`}
         role=${hasStopsAhead ? "button" : nothing}
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}

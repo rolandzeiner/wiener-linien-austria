@@ -1021,6 +1021,30 @@ export const cardStyles = css`
     }
   }
 
+  /* First-paint stagger (frontend-design audit) — subtle cascading
+     reveal on initial mount. Each departure row inlines its
+     position-in-list via style="--row-i: N"; the keyframe runs once
+     forwards. Capped at 6 rows so long lists don't take ages to
+     settle. The motion-reduce catch-all below collapses the
+     animation duration to 0.01ms, leaving the end-state visible
+     instantly for users who opt out. */
+  @keyframes wlRowReveal {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .dep-row,
+  .hero-host,
+  .alert-row {
+    animation: wlRowReveal 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(min(var(--row-i, 0), 6) * 55ms);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

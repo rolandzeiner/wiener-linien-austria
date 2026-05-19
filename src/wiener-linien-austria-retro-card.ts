@@ -663,13 +663,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     void matching;
     return html`
       <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
-        ${rows.map((d) => this._renderRow(d))}
+        ${rows.map((d, i) => this._renderRow(d, i))}
       </ul>
       ${platform ? this._renderGleis(platform, platformLabel) : nothing}
     `;
   }
 
-  private _renderRow(d: DepartureAttr): TemplateResult {
+  private _renderRow(d: DepartureAttr, rowIndex = 0): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
     const line = d.line || "?";
@@ -683,7 +683,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
     const rowLabel = [line, towards, cdLabel, a11yLabel].filter(Boolean).join(" — ");
     return html`
-      <li class="retro-row" aria-label=${rowLabel}>
+      <li class="retro-row" style=${`--row-i: ${rowIndex}`} aria-label=${rowLabel}>
         <div class="retro-line" aria-hidden="true">${line}</div>
         <div class="retro-dest" aria-hidden="true">
           <span class="retro-dest-text">${deText(towards)}</span>
@@ -1638,6 +1638,28 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       outline: 2px solid var(--led-amber, #ffa000);
       outline-offset: 2px;
       border-radius: 4px;
+    }
+
+    /* First-paint stagger (frontend-design audit) — LED rows
+       cascade in like a real flip-board on mount. Each .retro-row
+       inlines its position via style="--row-i: N"; capped at 6 so
+       long boards don't take ages to settle. Pairs with the motion-
+       reduce catch-all below which collapses to instant. */
+    @keyframes retroRowReveal {
+      from {
+        opacity: 0;
+        transform: translateY(3px);
+        filter: brightness(0.4);
+      }
+      to {
+        opacity: 1;
+        transform: none;
+        filter: brightness(1);
+      }
+    }
+    .retro-row {
+      animation: retroRowReveal 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
     }
 
     /* Accessibility: honour user motion preference.
