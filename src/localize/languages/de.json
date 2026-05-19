@@ -107,7 +107,11 @@
       "icon_exit_access": "Stufenloser Ausgang",
       "icon_wc": "WC",
       "icon_escalator": "Rolltreppe",
-      "icon_elevator": "Aufzug"
+      "icon_elevator": "Aufzug",
+      "icon_mdi_exit_run": "Ausgang (Person, laufend)",
+      "icon_mdi_exit_to_app": "Ausgang (Tür)",
+      "icon_mdi_door_open": "Offene Tür",
+      "icon_mdi_stairs": "Treppe"
     },
     "editor": {
       "direction": "Richtung",
@@ -147,6 +151,10 @@
       "header_exit_none": "Kein",
       "header_exit_regular": "Ausgang",
       "header_exit_accessible": "Stufenloser Ausgang",
+      "icon_mdi_exit_run": "Ausgang (Person, laufend)",
+      "icon_mdi_exit_to_app": "Ausgang (Tür)",
+      "icon_mdi_door_open": "Offene Tür",
+      "icon_mdi_stairs": "Treppe",
       "text": "Beschriftung",
       "text_helper": "z. B. Name der nächsten Station.",
       "show_wc": "WC-Symbol anzeigen",

@@ -137,6 +137,51 @@ interface RenderOpts {
   flipX?: boolean;
 }
 
+/** Curated MDI icons offered alongside the WL-traced "regular" /
+ *  "accessible" exit glyphs on the header strip's exit corner.
+ *  Scope: exit-corner pictograms only — alternative exit arrows
+ *  (`mdi:exit-run`, `mdi:exit-to-app`) for when the WL traced glyph
+ *  isn't quite the right idiom, plus pedestrian-connection icons
+ *  (`mdi:door-open`, `mdi:stairs`) for non-arrow signage cases.
+ *
+ *  `glyphPointsTo` mirrors the WL svg variant's meaning — set ONLY on
+ *  exit-arrow style MDI icons so the render auto-flips them outward.
+ *  Doorway / stairs icons aren't directional and stay un-flipped on
+ *  both sides. */
+export const RETRO_HEADER_MDI_EXIT_KEYS = [
+  "mdi:exit-run",
+  "mdi:exit-to-app",
+  "mdi:door-open",
+  "mdi:stairs",
+] as const;
+
+export type RetroHeaderMdiExit = (typeof RETRO_HEADER_MDI_EXIT_KEYS)[number];
+
+interface MdiExitDef {
+  /** Localisation key under `retro.header.*` for the screen-reader
+   *  name and the editor dropdown label (the same key serves both
+   *  consumers — they want the same human noun phrase). */
+  labelKey: string;
+  /** Auto-flip metadata. Same semantics as the SVG variant —
+   *  `undefined` means "never flips" (used for non-directional
+   *  symbol glyphs like doorways or stairs). */
+  glyphPointsTo?: "left" | "right";
+}
+
+export const RETRO_HEADER_MDI_EXITS: Record<RetroHeaderMdiExit, MdiExitDef> = {
+  "mdi:exit-run":    { labelKey: "icon_mdi_exit_run",    glyphPointsTo: "right" },
+  "mdi:exit-to-app": { labelKey: "icon_mdi_exit_to_app", glyphPointsTo: "right" },
+  "mdi:door-open":   { labelKey: "icon_mdi_door_open"    },
+  "mdi:stairs":      { labelKey: "icon_mdi_stairs"       },
+};
+
+/** Runtime guard — narrows a `string` to a `RetroHeaderMdiExit`. The
+ *  config normaliser uses this to validate user-supplied values
+ *  against the curated set, dropping anything outside the registry. */
+export function isRetroHeaderMdiExit(v: unknown): v is RetroHeaderMdiExit {
+  return typeof v === "string" && v in RETRO_HEADER_MDI_EXITS;
+}
+
 /** Render a retro-header glyph wrapped in a white-background tile
  *  so the (black) glyph reads against the black header strip the
  *  way the original Wiener Linien signage does.
@@ -168,5 +213,25 @@ export function renderRetroHeaderIcon(
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
     >${def.shapes()}</svg>
+  </span>`;
+}
+
+/** Render an MDI icon for the header strip's exit corner — wrapped
+ *  in the same white tile the WL traced glyphs use, so MDI and SVG
+ *  variants compose visually on the same row. `<ha-icon>` inherits
+ *  the tile's `color: #000` via `currentColor`; the icon size token
+ *  set in the card's CSS keeps the glyph inside the tile padding. */
+export function renderRetroHeaderMdiIcon(
+  mdiIcon: RetroHeaderMdiExit,
+  opts: RenderOpts,
+): TemplateResult {
+  const iconClass = opts.flipX
+    ? "retro-station-header__mdi retro-station-header__mdi--flip-x"
+    : "retro-station-header__mdi";
+  // `--mdi` modifier on the tile drops its padding from 0.12em to
+  // 0.06em so MDI icons (which carry their own viewBox padding) read
+  // at the same visual weight as the WL-traced tiles next to them.
+  return html`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${opts.ariaLabel}>
+    <ha-icon class=${iconClass} icon=${mdiIcon}></ha-icon>
   </span>`;
 }

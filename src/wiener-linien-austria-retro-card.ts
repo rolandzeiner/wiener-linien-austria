@@ -29,7 +29,10 @@ import { findWienerLinienEntities } from "./utils/entities.js";
 import { wlFontFaces } from "./font-face.js";
 import {
   RETRO_HEADER_ICONS,
+  RETRO_HEADER_MDI_EXITS,
+  isRetroHeaderMdiExit,
   renderRetroHeaderIcon,
+  renderRetroHeaderMdiIcon,
   type RetroHeaderIconKey,
 } from "./utils/retro-station-icons.js";
 import {
@@ -754,24 +757,34 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     side: RetroHeaderSide,
     pos: "left" | "right",
   ): TemplateResult {
-    // Tightened to the SVG-variant keys so `RETRO_HEADER_ICONS[k]`
-    // narrows to the SVG IconDef variant — gives access to
-    // `glyphPointsTo` without a runtime kind check below.
-    const exitIconKey: "exit" | "exit-access" | null =
-      side.exit === "regular"
-        ? "exit"
-        : side.exit === "accessible"
-          ? "exit-access"
-          : null;
-    const exitNode = exitIconKey
-      ? renderRetroHeaderIcon(exitIconKey, {
-          ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[exitIconKey].labelKey}`),
-          // Glyph's native direction is `pointsTo`. Flip when the side
-          // it sits on doesn't match — e.g. `exit` (points left) on
-          // the right side flips to point right.
-          flipX: RETRO_HEADER_ICONS[exitIconKey].glyphPointsTo !== pos,
-        })
-      : nothing;
+    // Resolve the exit corner to a render node. Three paths:
+    //   "regular" / "accessible" → WL traced SVG glyph (auto-flips
+    //                              per side via glyphPointsTo).
+    //   "mdi:…"                  → curated MDI icon inside the same
+    //                              tile (auto-flip only for icons
+    //                              whose registry entry declares a
+    //                              `glyphPointsTo`).
+    //   anything else            → no icon.
+    let exitNode: TemplateResult | typeof nothing = nothing;
+    if (side.exit === "regular" || side.exit === "accessible") {
+      const key: "exit" | "exit-access" =
+        side.exit === "regular" ? "exit" : "exit-access";
+      exitNode = renderRetroHeaderIcon(key, {
+        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
+        // Glyph's native direction is `pointsTo`. Flip when the side
+        // it sits on doesn't match — e.g. `exit` (points left) on the
+        // right side flips to point right.
+        flipX: RETRO_HEADER_ICONS[key].glyphPointsTo !== pos,
+      });
+    } else if (side.exit && isRetroHeaderMdiExit(side.exit)) {
+      const meta = RETRO_HEADER_MDI_EXITS[side.exit];
+      exitNode = renderRetroHeaderMdiIcon(side.exit, {
+        ariaLabel: this._t(`header.${meta.labelKey}`),
+        // Only directional MDI icons (exit-run / exit-to-app) declare
+        // glyphPointsTo. Vehicle / amenity glyphs don't flip.
+        flipX: meta.glyphPointsTo !== undefined && meta.glyphPointsTo !== pos,
+      });
+    }
     const textNode = side.text
       ? html`<span class="retro-station-header__text">${side.text}</span>`
       : nothing;
@@ -1593,7 +1606,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          square aspect is non-negotiable per the reference photo;
          the inner SVG fits via preserveAspectRatio=meet so portrait
          glyphs (elevator) and landscape glyphs (exit, wc) both
-         centre cleanly inside the same square. */
+         centre cleanly inside the same square.
+         Default 0.12em padding suits the WL-traced glyphs and the
+         WC monogram — their authored paths use the full viewBox so a
+         small white margin matches the look of the real station-sign
+         photos. The --mdi modifier overrides to a tighter padding
+         (see rule below) because MDI icons carry their own viewBox
+         padding internally. */
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1605,6 +1624,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       padding: 0.12em;
       box-sizing: border-box;
     }
+    .retro-station-header__tile--mdi {
+      /* MDI glyphs ship with ~10% internal viewBox padding baked
+         into the icon set, so the default tile padding stacks on top
+         and makes them look noticeably smaller than the WL-traced
+         tiles next to them. Halving the tile padding to 0.06em
+         compensates — the rendered glyph ends up the same visual
+         weight as a WL-traced glyph in a default-padded tile. */
+      padding: 0.06em;
+    }
     .retro-station-header__icon {
       width: 100%;
       height: 100%;
@@ -1615,6 +1643,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       fill: currentColor;
     }
     .retro-station-header__icon--flip-x {
+      transform: scaleX(-1);
+    }
+    .retro-station-header__mdi {
+      /* MDI variant sibling to .retro-station-header__icon. ha-icon
+         renders an inline SVG sized by the --mdc-icon-size token; we
+         pin it to fill the tile's content box (1.4em tile − 2 ×
+         0.06em padding = 1.28em). Color cascades from the tile's
+         color: #000 via ha-icon's currentColor fill. */
+      --mdc-icon-size: 1.28em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: inherit;
+    }
+    .retro-station-header__mdi--flip-x {
       transform: scaleX(-1);
     }
     .retro-station-header__monogram {

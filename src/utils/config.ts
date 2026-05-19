@@ -1,4 +1,5 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
+import { RETRO_HEADER_MDI_EXIT_KEYS } from "./retro-station-icons.js";
 import type {
   LineColorsMap,
   RetroHeaderExit,
@@ -18,11 +19,17 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "black",
 ] as const);
 const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
-const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set([
+// Curated valid values for the header strip's exit corner. Combines
+// the three fixed variants ("none" / "regular" / "accessible") with
+// the curated MDI set from `retro-station-icons` so the normaliser
+// has one place to consult — adding a new MDI option there
+// auto-flows here without a second registration.
+const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>([
   "none",
   "regular",
   "accessible",
-] as const);
+  ...RETRO_HEADER_MDI_EXIT_KEYS,
+]);
 
 /** Header-side normaliser. Returns `undefined` when every field is
  *  unset / falsy / `"none"`, so the card's "is this side configured

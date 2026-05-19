@@ -308,8 +308,18 @@ export type RetroStationBg = "default" | "white" | "black";
 export type RetroStyle = "classic" | "warm" | "pixel";
 
 /** Exit-icon variant for one side of the station header strip.
- *  `"none"` suppresses the icon entirely on that side. */
-export type RetroHeaderExit = "none" | "regular" | "accessible";
+ *  Either `"none"` (suppresses the icon), one of the two WL-traced
+ *  signage glyphs (`"regular"` / `"accessible"`), or an MDI icon
+ *  identifier from the curated `RetroHeaderMdiExit` set in
+ *  utils/retro-station-icons.ts. Kept as a broad template literal
+ *  here (`mdi:${string}`) to avoid a circular `types.ts ↔ utils`
+ *  type import; the runtime normaliser validates against the
+ *  curated set. */
+export type RetroHeaderExit =
+  | "none"
+  | "regular"
+  | "accessible"
+  | `mdi:${string}`;
 
 /** Per-side config for the retro card's optional U-Bahn-signage
  *  header strip (the black band above the orange station name).

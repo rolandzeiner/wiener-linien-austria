@@ -107,7 +107,11 @@
       "icon_exit_access": "Step-free exit",
       "icon_wc": "Toilet",
       "icon_escalator": "Escalator",
-      "icon_elevator": "Elevator"
+      "icon_elevator": "Elevator",
+      "icon_mdi_exit_run": "Exit (running person)",
+      "icon_mdi_exit_to_app": "Exit (door)",
+      "icon_mdi_door_open": "Open door",
+      "icon_mdi_stairs": "Stairs"
     },
     "editor": {
       "direction": "Direction",
@@ -147,6 +151,10 @@
       "header_exit_none": "None",
       "header_exit_regular": "Exit",
       "header_exit_accessible": "Step-free exit",
+      "icon_mdi_exit_run": "Exit (running person)",
+      "icon_mdi_exit_to_app": "Exit (door)",
+      "icon_mdi_door_open": "Open door",
+      "icon_mdi_stairs": "Stairs",
       "text": "Sign text",
       "text_helper": "E.g. name of the next station.",
       "show_wc": "Show toilet icon",

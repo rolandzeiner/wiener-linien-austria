@@ -47,6 +47,10 @@ import {
   linesForDirection,
   pairsAtStop,
 } from "./utils/departures.js";
+import {
+  RETRO_HEADER_MDI_EXIT_KEYS,
+  RETRO_HEADER_MDI_EXITS,
+} from "./utils/retro-station-icons.js";
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor
@@ -183,6 +187,23 @@ export class WienerLinienAustriaRetroCardEditor
    *      render) flips the saved value to the available one. When the
    *      stop has no data yet, both options stay visible.
    */
+  /** Shared options list for both sides' "Exit icon" dropdown.
+   *  Built once so the two sides can never drift, and so new MDI
+   *  options added to `RETRO_HEADER_MDI_EXIT_KEYS` flow into the
+   *  editor automatically. */
+  private _exitOptions(): ReadonlyArray<{ value: string; label: string }> {
+    const base: { value: string; label: string }[] = [
+      { value: "none", label: this._et("header_exit_none") },
+      { value: "regular", label: this._et("header_exit_regular") },
+      { value: "accessible", label: this._et("header_exit_accessible") },
+    ];
+    const mdi = RETRO_HEADER_MDI_EXIT_KEYS.map((key) => ({
+      value: key,
+      label: this._et(RETRO_HEADER_MDI_EXITS[key].labelKey),
+    }));
+    return [...base, ...mdi];
+  }
+
   private _schema(): ReadonlyArray<HaFormSchema> {
     const liveLines = this._linesForCurrent();
     const savedLine = this._config?.line;
@@ -271,11 +292,7 @@ export class WienerLinienAustriaRetroCardEditor
                 selector: {
                   select: {
                     mode: "dropdown",
-                    options: [
-                      { value: "none", label: this._et("header_exit_none") },
-                      { value: "regular", label: this._et("header_exit_regular") },
-                      { value: "accessible", label: this._et("header_exit_accessible") },
-                    ],
+                    options: this._exitOptions(),
                   },
                 },
               },
@@ -296,11 +313,7 @@ export class WienerLinienAustriaRetroCardEditor
                 selector: {
                   select: {
                     mode: "dropdown",
-                    options: [
-                      { value: "none", label: this._et("header_exit_none") },
-                      { value: "regular", label: this._et("header_exit_regular") },
-                      { value: "accessible", label: this._et("header_exit_accessible") },
-                    ],
+                    options: this._exitOptions(),
                   },
                 },
               },
