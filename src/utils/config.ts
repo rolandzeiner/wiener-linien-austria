@@ -342,6 +342,8 @@ export interface NormalisedRetroConfigValidated {
   flicker: boolean;
   wheelchair_race: boolean;
   accessibility_only: boolean;
+  message_ticker: boolean;
+  message_text?: string | undefined;
   walk_times?: WalkTimes | undefined;
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
@@ -368,6 +370,8 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "flicker",
   "wheelchair_race",
   "accessibility_only",
+  "message_ticker",
+  "message_text",
   "walk_times",
   "show_header",
   "header_left",
@@ -402,6 +406,18 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     flicker: raw.flicker === true,
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,
+    message_ticker: raw.message_ticker === true,
+    // Cap the marquee text at 160 chars (bounds a runaway config) but
+    // do NOT trim it: this normaliser runs on every editor keystroke,
+    // and trimming the trailing space mid-sentence would re-render the
+    // input without it — making spaces impossible to type. Blank or
+    // whitespace-only collapses to undefined so the card treats
+    // "ticker on, no text" as inert; stray leading/trailing spaces in
+    // a real message are harmless in a scrolling marquee.
+    message_text:
+      typeof raw.message_text === "string" && raw.message_text.trim()
+        ? raw.message_text.slice(0, 160)
+        : undefined,
     walk_times: normaliseWalkTimes(raw.walk_times),
     // Master gate for the U-Bahn header strip. Defaults to false so
     // pre-1.5.0 retro cards stay byte-identical until the user

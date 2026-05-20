@@ -476,6 +476,14 @@ export class WienerLinienAustriaRetroCardEditor
           { name: "accessibility_only", selector: { boolean: {} } },
           { name: "flicker", selector: { boolean: {} } },
           { name: "wheelchair_race", selector: { boolean: {} } },
+          { name: "message_ticker", selector: { boolean: {} } },
+          // The message field appears only while the ticker is enabled.
+          // `_schema()` runs per render, so flipping `message_ticker`
+          // adds/removes this row live — no point asking for text the
+          // feature won't use while off.
+          ...(this._config?.message_ticker
+            ? [{ name: "message_text", selector: { text: {} } }]
+            : []),
           {
             // `grid` lays its child fields out side-by-side in a
             // two-column row — size + style are short enum-typed

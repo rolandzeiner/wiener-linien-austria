@@ -62,6 +62,17 @@ const NEXT_RACE_MAX_MS = 180_000;
 // "starting" than just appearing mid-screen.
 const COUNTDOWN_DIGIT_MS = 800;
 const COUNTDOWN_TOTAL_MS = COUNTDOWN_DIGIT_MS * 3;
+// Message ticker — when `message_ticker` is on, the LED panel clears
+// every MESSAGE_TICKER_INTERVAL_MS and scrolls `message_text` across
+// once as a marquee. Enabling the toggle or editing the text
+// reschedules a run after the short MESSAGE_TICKER_PREVIEW_DELAY_MS —
+// a burst of keystrokes debounces (the scheduler clears its prior
+// handle) into one near-instant in-editor preview. If a wheelchair
+// race is mid-flight when the ticker is due, it retries after
+// MESSAGE_TICKER_RACE_DEFER_MS.
+const MESSAGE_TICKER_INTERVAL_MS = 5 * 60_000;
+const MESSAGE_TICKER_PREVIEW_DELAY_MS = 1_500;
+const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
 // Race constants and physics live in `utils/race.ts`. The card keeps
 // only the DOM-touching `_measureRaceStartPositions` and the timer
 // state machine; the math is a pure function fed those measurements.
@@ -95,6 +106,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // bottom row). Drives the circular winner badge on the victory
   // overlay. null while idle or during the first race ever.
   @state() private _raceWinner: Racer | null = null;
+  // Message-ticker state. `_tickerActive` drives the marquee overlay;
+  // `_tickerTimer` is the single repeating scheduler handle (cleared on
+  // disconnect, re-armed on reconnect).
+  @state() private _tickerActive = false;
+  private _tickerTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back" console
@@ -198,11 +214,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         this._clearRaceTimers();
       }
     }
+    // Re-arm the message ticker after a detach/reattach (HA rebuilds
+    // the dashboard on load). `updated()` won't fire when `_config` is
+    // unchanged across the reconnect, so the repeating schedule has to
+    // be re-established here. A scroll interrupted by the detach is
+    // abandoned — reset the flag and let the interval queue the next.
+    if (this._config?.message_ticker && this._config?.message_text) {
+      this._tickerActive = false;
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+    }
   }
 
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRaceTimers();
+    this._clearTickerTimer();
   }
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
@@ -212,7 +238,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       changed.has("_versionMismatch") ||
       changed.has("_raceState") ||
       changed.has("_countdownDigit") ||
-      changed.has("_raceWinner")
+      changed.has("_raceWinner") ||
+      changed.has("_tickerActive")
     ) {
       return true;
     }
@@ -244,6 +271,28 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._freezeEndAt = null;
       this._victoryEndAt = null;
       this._raceWinner = null;
+    }
+
+    // Message ticker — "on" means the toggle is set AND there's text to
+    // scroll, so clearing the message counts as turning the feature
+    // off. Enabling it, or editing the text, reschedules a run for a
+    // near-instant preview; the falling edge stops the schedule and
+    // clears any in-flight scroll.
+    const tickerWasOn = prev?.message_ticker === true && !!prev?.message_text;
+    const tickerIsOn =
+      this._config?.message_ticker === true && !!this._config?.message_text;
+    const textChanged = prev?.message_text !== this._config?.message_text;
+    if (tickerIsOn && (!tickerWasOn || textChanged)) {
+      // Toggle just enabled, OR the message text changed (the user is
+      // editing it). Drop any in-flight scroll and reschedule after a
+      // short delay — _scheduleTicker clears the prior handle, so a
+      // burst of keystrokes debounces into a single run once typing
+      // pauses: a near-instant in-editor preview of the current text.
+      this._tickerActive = false;
+      this._scheduleTicker(MESSAGE_TICKER_PREVIEW_DELAY_MS);
+    } else if (!tickerIsOn && tickerWasOn) {
+      this._clearTickerTimer();
+      this._tickerActive = false;
     }
   }
 
@@ -308,6 +357,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // if the toggle is off, a race is already in progress, or
   // prefers-reduced-motion is set (matches the auto-loop's gating).
   private _handleCardClick = (): void => {
+    // Tap to dismiss an active scrolling message — this is also the
+    // WCAG 2.2.2 "hide" mechanism for the auto-starting marquee. The
+    // next run is rescheduled at the normal interval.
+    if (this._tickerActive) {
+      this._tickerActive = false;
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+      return;
+    }
     if (!this._config?.wheelchair_race) return;
     if (this._raceState !== "idle") return;
     if (
@@ -319,6 +376,63 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._clearRaceTimers();
     this._startRace();
   };
+
+  // ------------------------------------------------------------------
+  // Message ticker scheduler
+  // ------------------------------------------------------------------
+
+  private _clearTickerTimer(): void {
+    if (this._tickerTimer !== null) {
+      clearTimeout(this._tickerTimer);
+      this._tickerTimer = null;
+    }
+  }
+
+  /** Arm the single ticker timer. Clears any pending handle first so
+   *  the scheduler can never fan out into multiple overlapping runs. */
+  private _scheduleTicker(delayMs: number): void {
+    this._clearTickerTimer();
+    this._tickerTimer = setTimeout(() => {
+      this._tickerTimer = null;
+      this._runTicker();
+    }, delayMs);
+  }
+
+  /** Fire one marquee run — or defer it. The next run is armed by
+   *  `_onTickerDone` (on animationend), so the interval counts from
+   *  when a message finishes scrolling, not when it starts. */
+  private _runTicker(): void {
+    // Toggle flipped off / message cleared since the timer armed.
+    if (!this._config?.message_ticker || !this._config?.message_text) return;
+    // A wheelchair race owns the LED panel — wait it out, retry soon.
+    if (this._raceState !== "idle") {
+      this._scheduleTicker(MESSAGE_TICKER_RACE_DEFER_MS);
+      return;
+    }
+    // A marquee is moving content — respect `prefers-reduced-motion`.
+    // Skip the scroll for those users but keep the schedule alive so
+    // it resumes if the preference changes later.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+      return;
+    }
+    this._tickerActive = true;
+  }
+
+  private _onTickerDone = (): void => {
+    this._tickerActive = false;
+    this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+  };
+
+  /** Scroll duration in seconds — proportional to message length so the
+   *  reading pace stays roughly constant. Clamped so a one-word message
+   *  still lingers and a maxed-out 160-char message doesn't crawl. */
+  private _tickerDurationSeconds(text: string): number {
+    return Math.min(40, Math.max(8, 5 + text.length * 0.18));
+  }
 
   private _startRace(): void {
     if (!this._config?.wheelchair_race) return;
@@ -336,6 +450,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       return;
     }
     if (this._currentBarrierFreeCount() < 2) {
+      this._scheduleRace(this._nextRaceDelay());
+      return;
+    }
+    if (this._tickerActive) {
+      // The message ticker owns the LED panel right now — defer the
+      // race so the two LED takeovers never overlap.
       this._scheduleRace(this._nextRaceDelay());
       return;
     }
@@ -609,6 +729,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
+            ${this._tickerActive && cfg.message_text
+              ? html`<div class="retro-ticker" role="status" aria-live="polite">
+                  <div
+                    class="retro-ticker-text"
+                    style=${`animation-duration:${this._tickerDurationSeconds(
+                      cfg.message_text,
+                    )}s`}
+                    @animationend=${this._onTickerDone}
+                  >
+                    ${cfg.message_text}
+                  </div>
+                </div>`
+              : nothing}
             ${raceCountdown && this._countdownDigit !== null
               ? html`<div class="retro-countdown" role="status" aria-live="polite">
                   ${keyed(
@@ -1208,6 +1341,64 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro--race-victory.retro--flicker .retro-line {
       animation: none;
     }
+    /* Message-ticker overlay — when \`message_ticker\` is on, this fills
+       the LED panel every few minutes and scrolls \`message_text\`
+       across once as a marquee, then removes itself (animationend → a
+       JS handler clears _tickerActive). Opaque --led-bg plus the same
+       substrate dot-pattern as .retro-led so the departures vanish
+       cleanly and the panel material stays consistent. z-index 16
+       keeps it below the countdown (18) / victory (20) AND below the
+       pixel screen-door ::after (30), so in pixel style the scrolling
+       text is dotted like the rest of the board. */
+    .retro-ticker {
+      position: absolute;
+      inset: 0;
+      z-index: 16;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      background: var(--led-bg);
+      background-image: radial-gradient(
+        circle,
+        var(--led-substrate) var(--led-dot-size),
+        transparent var(--led-dot-edge)
+      );
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+      border-radius: inherit;
+      /* Query container so the scroll keyframes can start the text one
+         full panel-width off the right edge via 100cqw. */
+      container-type: inline-size;
+    }
+    .retro-ticker-text {
+      /* flex: none keeps the text's natural (over-wide) width — the
+         parent's overflow:hidden clips it. The parent's align-items:
+         center handles vertical centring, so the keyframes touch only
+         translateX and never fight a translateY. */
+      flex: none;
+      white-space: nowrap;
+      /* Match the departure rows: same amber, glow, size and uppercase
+         board lettering. Font, weight and tracking inherit from .retro. */
+      font-size: 1.9em;
+      line-height: 1;
+      color: var(--led-amber);
+      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-transform: uppercase;
+      will-change: transform;
+      animation-name: retroTickerScroll;
+      animation-timing-function: linear;
+      animation-iteration-count: 1;
+      /* both → text waits off-screen-right before the run and rests
+         off-screen-left after it, with no flash at the layout origin.
+         animation-duration is set inline, scaled to message length. */
+      animation-fill-mode: both;
+    }
+    @keyframes retroTickerScroll {
+      /* Start one full panel-width off the right (100cqw), end one
+         full text-width off the left (-100%). */
+      from { transform: translateX(100cqw); }
+      to   { transform: translateX(-100%); }
+    }
     /* Pixelated finish-line strip on the right edge during the race.
        Same conic-gradient checker technique as the victory flag, but
        as a narrow 14px column so ~2 squares wide read as chunky "8-bit
@@ -1604,7 +1795,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
                    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
                    Arial, sans-serif;
       font-weight: 700;
-      font-size: 1em;
+      /* 1.1em (up from 1em): more device pixels per glyph is the only
+         lever that genuinely de-steps the small condensed signage text
+         on every engine — CSS antialiasing can't. The whole strip is
+         em-based (text, chips, tiles), so this one knob scales it all
+         together. The retro--size-medium / -small variants below carry
+         their own absolute em values and are unaffected. */
+      font-size: 1.1em;
       letter-spacing: 0.02em;
     }
     .retro-station-header__side {
@@ -1629,6 +1826,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          .retro-station-header's font-size scales (1em / 0.9em / 0.8em),
          and this multiplier compounds on top. */
       font-size: 1.2em;
+      /* White-on-black signage text — render it with grayscale
+         antialiasing instead of subpixel. On a dark strip subpixel AA
+         fringes the glyph edges and blooms the condensed strokes
+         heavier than drawn; grayscale keeps them crisp. Scoped to this
+         element (NOT the strip) on purpose: the chips and WC monogram
+         are black-on-white, the opposite polarity, and keep the
+         default subpixel AA which renders dark-on-light more solidly.
+         A WebKit/Blink-on-macOS + iOS lever only — the Android System
+         WebView always uses grayscale AA, so it's a no-op there. */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
     .retro-station-header__tile {
       /* White SQUARE tile hosting the (black) glyph — mirrors the

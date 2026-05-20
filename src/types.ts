@@ -372,6 +372,14 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   flicker?: boolean | undefined;
   wheelchair_race?: boolean | undefined;
   accessibility_only?: boolean | undefined;
+  /** When `true`, every 5 minutes the LED panel clears and
+   *  `message_text` scrolls across it once as a marquee, then the
+   *  departures return. Default `false` — pre-feature cards render
+   *  unchanged. Inert while `message_text` is empty. */
+  message_ticker?: boolean | undefined;
+  /** Custom text scrolled by `message_ticker`. Trimmed and bounded
+   *  to 160 chars at normalisation. */
+  message_text?: string | undefined;
   walk_times?: WalkTimes | undefined;
   /** Master toggle for the U-Bahn-style station-header strip above
    *  the orange station-name band. When `false` (the default), the
