@@ -17,6 +17,7 @@ import type {
 } from "./types.js";
 
 import { cardStyles } from "./card-styles.js";
+import { registerWlFonts } from "./font-face.js";
 import { CARD_VERSION } from "./const.js";
 import { translate } from "./localize/localize.js";
 import {
@@ -200,6 +201,9 @@ export class WienerLinienAustriaCard extends LitElement {
 
   public override connectedCallback(): void {
     super.connectedCallback();
+    // Register the WL webfaces on document.head — see font-face.ts for
+    // why Shadow-DOM @font-face can't be trusted on Android WebView.
+    registerWlFonts();
     // One-shot WS version probe — per-instance, but cheap (HA caches the
     // command registration). Gated by _versionCheckDone so re-adding the
     // card in edit mode doesn't hammer the backend.

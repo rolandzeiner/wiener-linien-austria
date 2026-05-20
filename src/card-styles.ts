@@ -1,20 +1,17 @@
 import { css } from "lit";
-import { wlFontFaces } from "./font-face.js";
 
 // Tile-card visual language. Token-driven, container-query-paced.
 // Per-station accent is piped in via inline `style="--wl-accent: …;"` on
 // `.station`, so every accented surface (icon-tile, line badge, alert
 // surface, focus ring) reads from one prop.
 //
-// Webfonts (WL Sans / WL Sans Condensed / WL Mono) come from the shared
-// `./font-face` module — interpolated into the top of this template so
-// both Lovelace cards declare their @font-face rules from one source of
-// truth. font-display: swap so the card shows instantly in the HA
-// fallback and upgrades to WL Sans when the woff2 lands. See
-// www/fonts/NOTICE.md for provenance + GUST Font License terms.
+// Webfonts (WL Sans / WL Sans Condensed / WL Mono) are NOT declared
+// here: `@font-face` inside Shadow DOM is unreliable on older engines
+// (Android System WebView). `registerWlFonts()` from `./font-face`
+// injects the faces on `document.head` instead — the card just
+// references the families by name. See font-face.ts / www/fonts/
+// NOTICE.md for the rationale, provenance + GUST Font License terms.
 export const cardStyles = css`
-  ${wlFontFaces}
-
   :host {
     /* color-scheme enables light-dark() and steers forced-colors
        palette selection (WCAG 1.4.11). HA's active theme drives the

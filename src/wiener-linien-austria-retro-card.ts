@@ -26,7 +26,7 @@ import type {
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
-import { wlFontFaces } from "./font-face.js";
+import { registerWlFonts } from "./font-face.js";
 import {
   RETRO_HEADER_ICONS,
   RETRO_HEADER_MDI_EXITS,
@@ -178,6 +178,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   public override connectedCallback(): void {
     super.connectedCallback();
+    // Register the WL webfaces on document.head — see font-face.ts for
+    // why Shadow-DOM @font-face can't be trusted on Android WebView.
+    registerWlFonts();
     if (!this._versionCheckDone && this.hass?.callWS) {
       this._versionCheckDone = true;
       void this._checkCardVersion();
@@ -903,8 +906,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // ------------------------------------------------------------------
 
   static override styles = css`
-    ${wlFontFaces}
-
     :host {
       display: block;
       /* Create a stacking context on the host so the high z-indexes
@@ -1714,8 +1715,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          icon tiles next to it via the same height + colour scheme.
          Padding is horizontal-only — the flex-centred line shares
          vertical alignment with the icon glyphs on the same row.
-         Font matches the WC monogram so the chip reads as part of
-         the same signage family.
+         Font is WL Sans Condensed 700 — the SAME signage face as the
+         destination text and WC monogram. The strip is a signage
+         homage; one coherent typographic voice across the whole band
+         reads "station sign", whereas a regular-width or lighter face
+         reads "web UI element stuck onto a sign".
          No explicit font-size: chip inherits the parent header's
          em-scale (1em / 0.9em / 0.8em via retro--size-* tokens), so
          height: 1.4em resolves to the SAME pixel value as the icon
@@ -1734,13 +1738,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-family: "WL Sans Condensed", "WL Sans", -apple-system,
                    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
                    Arial, sans-serif;
+      /* 700 — WL Sans Condensed ships only at 700, and that IS the
+         intent: chips should read as solid signage, not as a lighter
+         UI tier. Hierarchy on the strip comes from size and position
+         (the destination text is condensed 1.2em), never from mixing
+         weight or width onto the same band. */
       font-weight: 700;
       line-height: 1;
       /* Reset the 0.02em letter-spacing inherited from .retro-station-header
-         — the condensed face is designed to sit tight, and the tracked-
-         out feel of the header text doesn't suit chip-style labels
-         where width is dynamic and longer entries (Schlafzimmer, etc.)
-         add up visibly. */
+         — the tracked-out feel of the header text doesn't suit
+         chip-style labels where width is dynamic and longer entries
+         (Schlafzimmer, etc.) add up visibly. */
       letter-spacing: 0;
       white-space: nowrap;
     }
