@@ -21,7 +21,10 @@ the TeX Gyre font family** (maintained by GUST, the Polish TeX Users Group):
   - U+2026 (horizontal ellipsis)
   - U+2192 (rightwards arrow — used in "towards" formatting)
 - OpenType layout features retained: kerning (`kern`) and standard ligatures (`liga`).
-- Cleared `DSIG`, `FFTM`; no hinting (woff2 doesn't need TTF hints); CFF desubroutinized.
+- Cleared `DSIG`, `FFTM`. **CFF hinting retained** (stem hints + blue zones):
+  the FreeType CFF rasterizer behind the Android System WebView uses it to
+  snap stems to the pixel grid, which keeps the small condensed signage text
+  crisp instead of stepped. CFF charstrings desubroutinized.
 - Converted from OTF (CFF) to WOFF2.
 - Renamed at the CSS `@font-face` layer to `WL Sans` / `WL Sans Condensed` /
   `WL Mono` per the GUST Font License's request that derivatives use new names.
@@ -65,6 +68,6 @@ for pair in \
   pyftsubset "$src" --output-file="$out" --flavor=woff2 \
     --unicodes='U+0020-007F,U+00A0-00FF,U+2013-2014,U+2019,U+2026,U+2192' \
     --layout-features='kern,liga' \
-    --drop-tables+=DSIG,FFTM --no-hinting --desubroutinize
+    --drop-tables+=DSIG,FFTM --desubroutinize
 done
 ```
