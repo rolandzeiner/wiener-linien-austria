@@ -31,12 +31,33 @@ from .const import (
 )
 from .http import CacheValidators, base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-# Hoisted to module level — called per-departure inside the monitor
-# parser's hot loop, so a per-call `from .static import …` would burn
-# `sys.modules` lookups on every row.
-from .static import stops_ahead_for_match
+# `static` is loaded eagerly: `stops_ahead_for_match` runs in the
+# /monitor parser's hot loop (was the original reason this file pulled
+# `static` to module level), and once that's eager every other name we
+# read from `static` is already in `sys.modules` — there's no
+# import-time saving from keeping `async_get_catalogue` /
+# `CATALOGUE_KEY` / `StaticCatalogue` lazy, just lint-suppression
+# annotations to maintain on a hot integration-load path.
+from .static import (
+    CATALOGUE_KEY,
+    StaticCatalogue,
+    async_get_catalogue,
+    stops_ahead_for_match,
+)
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# Public type alias — threaded through every signature that reads
+# `entry.runtime_data` (Platinum `runtime-data` + `strict-typing` rules).
+# Signatures that only use the entry for construction (coordinator
+# `__init__`) or for IDs/title (sensor `__init__`, options-flow
+# staticmethod) keep plain `ConfigEntry`. Hoisted to the top of the
+# module so external readers see the public-API shape before the
+# implementation; PEP 695 `type` evaluates the RHS lazily, so the
+# forward reference to `WienerLinienAustriaCoordinator` resolves at
+# use-time, not definition-time.
+type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]
 
 
 @dataclass(slots=True)
@@ -106,6 +127,10 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._diva: int = int(config[CONF_DIVA])
         self._latitude: float | None = None
         self._longitude: float | None = None
+        # De-dupe stops_ahead matcher exceptions per line label so a
+        # genuine schema change surfaces once at WARNING (loud enough to
+        # be noticed) without spamming the logbook every poll.
+        self._stops_ahead_warned_lines: set[str] = set()
         # Conditional-GET validators captured from the previous /monitor
         # response. The CDN sets ETag + Last-Modified on every reply; we
         # echo them back as If-None-Match / If-Modified-Since so unchanged
@@ -150,9 +175,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
-        # Local import — keeps coordinator.py import-time light.
-        # static.py loads the trip-pattern catalogue lazily on first call.
-        from .static import async_get_catalogue  # noqa: PLC0415
         try:
             catalogue = await async_get_catalogue(self.hass)
         except (
@@ -252,17 +274,88 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         headers.update(self._monitor_cache.to_request_headers())
         timeout = aiohttp.ClientTimeout(total=30)
 
+        # Single `async with` block keeps the response scoped tightly so
+        # aiohttp returns the connection to the pool the moment we're
+        # done — even on early `raise UpdateFailed(...)` paths. The
+        # body read AND the validator capture both need `resp`, so the
+        # whole parse/validate flow lives inside the context manager.
         try:
-            resp = await self._session.get(
+            async with self._session.get(
                 url, params=params, headers=headers, timeout=timeout
-            )
-            # 304 = our cached data is still fresh. Return the previous
-            # MonitorData unchanged; HA's coordinator handles "same value"
-            # by not re-emitting state changes to entities.
-            if resp.status == 304 and self.data is not None:
+            ) as resp:
+                status = resp.status
+                # 304 = our cached data is still fresh. Return the previous
+                # MonitorData unchanged; HA's coordinator handles "same value"
+                # by not re-emitting state changes to entities.
+                if status == 304:
+                    if self.data is not None:
+                        self._monitor_cache.update_from_response(resp)
+                        return self.data
+                    # First tick after restart with no `self.data` yet — a 304
+                    # has an empty body, so falling through to `resp.json()`
+                    # would surface as a misleading "invalid response". Treat
+                    # it as a transient and retry. Practically unreachable
+                    # today (validators reset on init), but defends against a
+                    # future change that persists them across restarts.
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_invalid_response",
+                        translation_placeholders={
+                            "status": "304",
+                            "error": "no cached data to revalidate",
+                        },
+                    )
+                resp.raise_for_status()
+
+                try:
+                    body = await resp.json()
+                except (aiohttp.ContentTypeError, ValueError) as err:
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_invalid_response",
+                        translation_placeholders={
+                            "status": str(status),
+                            "error": str(err),
+                        },
+                    ) from err
+
+                if not isinstance(body, dict):
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_invalid_response",
+                        translation_placeholders={
+                            "status": str(status),
+                            "error": f"expected object, got {type(body).__name__}",
+                        },
+                    )
+
+                message = body.get("message") or {}
+                code = _safe_int(message.get("messageCode"))
+                self._last_error_code = code
+                self._server_time = message.get("serverTime")
+
+                if code == ERR_RATE_LIMIT:
+                    self._raise_rate_limit_issue()
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_rate_limited",
+                    )
+
+                if code is not None and code != 1:
+                    raise UpdateFailed(
+                        translation_domain=DOMAIN,
+                        translation_key="api_upstream_error",
+                        translation_placeholders={
+                            "code": str(code),
+                            "value": str(message.get("value") or ""),
+                        },
+                    )
+
+                self._clear_rate_limit_issue()
+                # Capture validators only on a fully-validated 200 response —
+                # never store them for an error reply, else next tick would
+                # send If-None-Match against a payload we never accepted.
                 self._monitor_cache.update_from_response(resp)
-                return self.data
-            resp.raise_for_status()
         except asyncio.TimeoutError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
@@ -287,56 +380,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
                     "error": str(err),
                 },
             ) from err
-
-        try:
-            body = await resp.json()
-        except (aiohttp.ContentTypeError, ValueError) as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_invalid_response",
-                translation_placeholders={
-                    "status": str(resp.status),
-                    "error": str(err),
-                },
-            ) from err
-
-        if not isinstance(body, dict):
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_invalid_response",
-                translation_placeholders={
-                    "status": str(resp.status),
-                    "error": f"expected object, got {type(body).__name__}",
-                },
-            )
-
-        message = body.get("message") or {}
-        code = _safe_int(message.get("messageCode"))
-        self._last_error_code = code
-        self._server_time = message.get("serverTime")
-
-        if code == ERR_RATE_LIMIT:
-            self._raise_rate_limit_issue()
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_rate_limited",
-            )
-
-        if code is not None and code != 1:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_upstream_error",
-                translation_placeholders={
-                    "code": str(code),
-                    "value": str(message.get("value") or ""),
-                },
-            )
-
-        self._clear_rate_limit_issue()
-        # Capture validators only on a fully-validated 200 response —
-        # never store them for an error reply, else next tick would
-        # send If-None-Match against a payload we never accepted.
-        self._monitor_cache.update_from_response(resp)
         # Read the shared catalogue ref live so a background trip-pattern
         # refresh that lands after this coordinator's setup is picked up
         # on the very next parse — no restart needed.
@@ -347,6 +390,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             self._server_time,
             catalogue=catalogue,
             entry_rbls=self._rbls,
+            warned_lines=self._stops_ahead_warned_lines,
         )
 
     def _current_catalogue(self) -> Any:
@@ -358,7 +402,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         useful for enrichment; the others fall through to None and
         the parser skips stops_ahead.
         """
-        from .static import CATALOGUE_KEY, StaticCatalogue  # noqa: PLC0415
         domain_data = self.hass.data.get(DOMAIN, {})
         cached = domain_data.get(CATALOGUE_KEY)
         if isinstance(cached, StaticCatalogue):
@@ -382,14 +425,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         a sustained outage settles into a slow poll instead of hammering
         the API every minute. The next successful tick resets it.
         """
-        # Cap the counter at 20 — `2 ** 19` is already 524 288 ×
-        # interval, far past `BACKOFF_CAP_SECONDS`, and incrementing
-        # past that just makes the `2 ** N` exponentiation pointlessly
-        # large during a sustained outage. The min() below still clamps
-        # the backoff seconds, but limiting the exponent saves the CPU
-        # the bigint multiplication uses on every failed tick.
-        if self._consecutive_failures < 20:
-            self._consecutive_failures += 1
+        self._consecutive_failures += 1
         if self._consecutive_failures < 2:
             return
         normal_secs = self._normal_interval.total_seconds()
@@ -414,11 +450,6 @@ def _normalise_lines(raw: Any) -> set[str] | None:
     return {str(x) for x in raw} or None
 
 
-def _line_key(line: str, direction: str, towards: str) -> str:
-    """Stable identifier for a given (line, direction, towards) triple."""
-    return f"{line}|{direction}|{towards}"
-
-
 def _parse_monitor_body(
     body: dict[str, Any],
     selected: set[str] | None,
@@ -426,6 +457,7 @@ def _parse_monitor_body(
     *,
     catalogue: Any = None,
     entry_rbls: list[int] | None = None,
+    warned_lines: set[str] | None = None,
 ) -> MonitorData:
     """Parse a successful /monitor response into a MonitorData.
 
@@ -433,6 +465,10 @@ def _parse_monitor_body(
     `stops_ahead` enrichment via `static.stops_ahead_for_match`. Both are
     optional: tests construct MonitorData directly and this parser is
     re-used in fixtures that don't carry the static layer.
+
+    `warned_lines`, when supplied, is a per-coordinator de-dupe set so
+    a stops_ahead matcher exception logs once at WARNING per line label
+    rather than spamming on every poll.
     """
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
@@ -446,11 +482,21 @@ def _parse_monitor_body(
     # "Alaudagasse" depending on which vehicle is next), so a strict triple
     # match would intermittently drop the whole line block. Each departure
     # keeps its own `vehicle.towards` so the actual destination is preserved.
-    selected_pairs: set[tuple[str, str]] | None = (
-        {tuple(k.split("|", 2)[:2]) for k in selected}  # type: ignore[misc]
-        if selected is not None
-        else None
-    )
+    selected_pairs: set[tuple[str, str]] | None
+    if selected is None:
+        selected_pairs = None
+    else:
+        # Each key is `line|direction` (post-v2-migration shape). Build the
+        # pair set explicitly so mypy can narrow to `tuple[str, str]` —
+        # using `tuple(k.split("|", 2)[:2])` produced a `tuple[str, ...]`
+        # that needed a `# type: ignore[misc]` to land in the typed set.
+        # Malformed keys (no pipe) are dropped silently — they could never
+        # match `(line_name, direction)` anyway.
+        selected_pairs = set()
+        for k in selected:
+            parts = k.split("|", 2)
+            if len(parts) >= 2:
+                selected_pairs.add((parts[0], parts[1]))
 
     for monitor in monitors:
         for line in (monitor.get("lines") or []):
@@ -493,14 +539,31 @@ def _parse_monitor_body(
                         )
                     except Exception:  # noqa: BLE001
                         # Fail-soft: a single matcher hiccup must not poison
-                        # the rest of the parse. Logged at debug because
-                        # stops_ahead is non-essential.
-                        _LOGGER.debug(
-                            "stops_ahead lookup failed for %s towards %s",
-                            line_name,
-                            resolved_towards,
-                            exc_info=True,
-                        )
+                        # the rest of the parse. `except Exception` (not
+                        # `BaseException`) is deliberate — it lets
+                        # `asyncio.CancelledError` propagate so an HA
+                        # shutdown landing mid-parse is honoured rather
+                        # than swallowed. First time we see a line blow
+                        # up, log at WARNING so a real upstream schema
+                        # change is visible without enabling debug
+                        # logging; subsequent ticks for the same line
+                        # stay quiet via the per-coordinator warned set.
+                        if warned_lines is not None and line_name not in warned_lines:
+                            warned_lines.add(line_name)
+                            _LOGGER.warning(
+                                "stops_ahead lookup failed for %s towards %s "
+                                "(further failures for this line will be silent)",
+                                line_name,
+                                resolved_towards,
+                                exc_info=True,
+                            )
+                        else:
+                            _LOGGER.debug(
+                                "stops_ahead lookup failed for %s towards %s",
+                                line_name,
+                                resolved_towards,
+                                exc_info=True,
+                            )
                         stops_ahead = None
                 departures.append(
                     Departure(
@@ -531,10 +594,3 @@ def _safe_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-# Threaded through every signature that reads `entry.runtime_data` — required
-# by Platinum `runtime-data` + `strict-typing`. Signatures that only use the
-# entry for construction (coordinator __init__) or for IDs/title (sensor
-# __init__, options-flow staticmethod) keep plain `ConfigEntry`.
-type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]

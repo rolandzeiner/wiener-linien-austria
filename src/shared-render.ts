@@ -41,9 +41,12 @@ export async function checkCardVersionWS(
 /**
  * Best-effort cache-storage wipe followed by a hard reload. The reload
  * picks up the freshly-cached JS bundle so the version-mismatch banner
- * clears on next mount.
+ * clears on next mount. Stamps a sessionStorage flag BEFORE reloading
+ * so the next mount can detect a stuck-reload loop (Service Worker /
+ * CDN refusing to invalidate) and short-circuit instead of looping the
+ * banner forever — see `wasReloadAttemptedFor` below.
  */
-export function reloadAfterCacheWipe(): void {
+export function reloadAfterCacheWipe(forVersion?: string | null): void {
   try {
     window.caches?.keys?.().then((keys) => {
       keys.forEach((k) => window.caches?.delete?.(k));
@@ -51,7 +54,40 @@ export function reloadAfterCacheWipe(): void {
   } catch {
     // best-effort cache wipe
   }
+  if (forVersion) {
+    try {
+      window.sessionStorage?.setItem(
+        `wl-reload-attempted-${forVersion}`,
+        "1",
+      );
+    } catch {
+      // sessionStorage may be disabled (Safari private mode etc.) —
+      // fall through; worst case the user gets the regular reload
+      // banner twice instead of the stuck-state branch.
+    }
+  }
   window.location.reload();
+}
+
+/**
+ * Did the user already click reload for this exact mismatch in the
+ * current tab session? When true, the banner should switch from
+ * "Reload" to a stuck-state message (caches/Service Worker/CDN won't
+ * invalidate; reloading again will just loop). sessionStorage survives
+ * page reloads in the same tab but clears when the tab closes, which
+ * is the right scope: after closing and reopening, the user gets a
+ * fresh reload attempt.
+ */
+export function wasReloadAttemptedFor(version: string | null): boolean {
+  if (!version) return false;
+  try {
+    return (
+      window.sessionStorage?.getItem(`wl-reload-attempted-${version}`) ===
+      "1"
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -72,6 +108,20 @@ export function renderVersionBanner(
   className = "banner",
 ): TemplateResult | typeof nothing {
   if (!mismatch) return nothing;
+  // Stuck-reload anti-loop: if the user already clicked reload for
+  // this exact mismatch in the current tab session and the mismatch
+  // is STILL present, the cache invalidation didn't take effect
+  // (Service Worker, aggressive CDN, or a browser ignoring the
+  // versioned URL). Surface a "stuck" state instead of a second
+  // reload button so the banner can't loop indefinitely.
+  if (wasReloadAttemptedFor(mismatch)) {
+    const stuckMsg = t("version_reload_stuck");
+    return html`
+      <div class=${className} role="alert" aria-live="assertive">
+        <span>${stuckMsg}</span>
+      </div>
+    `;
+  }
   const updateMsg = t("version_update").replace("{v}", mismatch);
   const reloadLabel = t("version_reload");
   return html`
@@ -80,7 +130,7 @@ export function renderVersionBanner(
       <button
         type="button"
         aria-label=${reloadLabel}
-        @click=${reloadAfterCacheWipe}
+        @click=${() => reloadAfterCacheWipe(mismatch)}
       >
         ${reloadLabel}
       </button>

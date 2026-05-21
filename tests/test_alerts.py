@@ -5,6 +5,8 @@ import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from tests.conftest import make_response_cm
+
 import aiohttp
 import pytest
 from homeassistant.core import HomeAssistant
@@ -12,6 +14,7 @@ from homeassistant.core import HomeAssistant
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
     TrafficInfo,
+    _FetchFailed,
     _fetch_info_list,
     _parse_elevator,
     _parse_traffic,
@@ -21,8 +24,21 @@ from custom_components.wiener_linien_austria.alerts import (
 from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     ELEVATOR_INFO_KEY,
+    ENTRY_COUNT_KEY,
     TRAFFIC_INFO_KEY,
 )
+
+
+@pytest.fixture(autouse=True)
+def _seed_active_domain(hass: HomeAssistant) -> None:
+    """Seed `ENTRY_COUNT_KEY=1` so `async_refresh_alerts` doesn't bail.
+
+    Production code now bails when no entries are loaded (so a refresh
+    racing with last-unload can't re-poison `hass.data[DOMAIN]`). Tests
+    don't go through `async_setup_entry`, so we pretend an entry is
+    active here.
+    """
+    hass.data.setdefault(DOMAIN, {})[ENTRY_COUNT_KEY] = 1
 
 
 # ---------------------------------------------------------------------------
@@ -227,12 +243,14 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     resp_elevator.raise_for_status = MagicMock()
     resp_elevator.json = AsyncMock(return_value=elevator_body)
 
-    async def fake_get(url: str, **kwargs: object) -> MagicMock:
+    def fake_get(url: str, **kwargs: object) -> MagicMock:
         name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return resp_elevator if name == "aufzugsinfo" else resp_traffic
+        return make_response_cm(
+            resp_elevator if name == "aufzugsinfo" else resp_traffic
+        )
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=fake_get)
+    fake_session.get = MagicMock(side_effect=fake_get)
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -280,12 +298,14 @@ async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None
         r.json = AsyncMock(return_value=body)
         return r
 
-    async def fake_get(url: str, **kwargs: object) -> MagicMock:
+    def fake_get(url: str, **kwargs: object) -> MagicMock:
         name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
+        return make_response_cm(
+            _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
+        )
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=fake_get)
+    fake_session.get = MagicMock(side_effect=fake_get)
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -300,7 +320,7 @@ async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None
 async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None:
     """Fetch failures must not raise — alerts are advisory."""
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=asyncio.TimeoutError())
+    fake_session.get = MagicMock(side_effect=asyncio.TimeoutError())
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -326,7 +346,7 @@ async def test_fetch_info_list_propagates_unexpected_errors(
     async_track_time_interval logs the traceback for us.
     """
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=RuntimeError("unexpected"))
+    fake_session.get = MagicMock(side_effect=RuntimeError("unexpected"))
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -342,16 +362,22 @@ async def test_fetch_info_list_propagates_unexpected_errors(
 
 
 def _mock_session(resp: MagicMock) -> MagicMock:
-    """Build a fake aiohttp session whose .get() returns `resp`."""
+    """Build a fake aiohttp session whose .get() returns `resp`.
+
+    Production code uses `async with session.get(...) as resp:`, so the
+    return value of .get must be an async context manager. We use the
+    shared `make_response_cm` helper from conftest to wrap the response.
+    """
     fake = MagicMock()
-    fake.get = AsyncMock(return_value=resp)
+    fake.get = MagicMock(return_value=make_response_cm(resp))
     return fake
 
 
-async def test_fetch_info_list_http_error_returns_empty(
+async def test_fetch_info_list_http_error_returns_failed(
     hass: HomeAssistant,
 ) -> None:
-    """A 5xx from upstream yields []; advisory alerts never raise up."""
+    """A 5xx from upstream yields _FETCH_FAILED so the caller leaves the
+    cache untouched (vs an empty `[]`, which would now overwrite it)."""
     req_info = MagicMock()
     req_info.real_url = "https://example/trafficInfoList"
     err = aiohttp.ClientResponseError(
@@ -367,13 +393,14 @@ async def test_fetch_info_list_http_error_returns_empty(
         return_value=fake_session,
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == []
+    assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_non_ok_message_code_returns_empty(
+async def test_fetch_info_list_non_ok_message_code_returns_failed(
     hass: HomeAssistant,
 ) -> None:
-    """messageCode ≠ 1 drops the payload even if trafficInfos is populated."""
+    """messageCode ≠ 1 drops the payload as _FETCH_FAILED — the cache
+    survives instead of being overwritten with an empty list."""
     body = {
         "message": {"messageCode": 316, "value": "Rate limit"},
         "data": {"trafficInfos": [{"name": "T1", "title": "x"}]},
@@ -388,13 +415,14 @@ async def test_fetch_info_list_non_ok_message_code_returns_empty(
         return_value=fake_session,
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == []
+    assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_non_dict_body_returns_empty(
+async def test_fetch_info_list_non_dict_body_returns_failed(
     hass: HomeAssistant,
 ) -> None:
-    """JSON that decodes to a non-object falls through to []."""
+    """JSON that decodes to a non-object returns _FETCH_FAILED so the
+    cache isn't overwritten."""
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
     resp.json = AsyncMock(return_value=["not", "a", "dict"])
@@ -405,7 +433,7 @@ async def test_fetch_info_list_non_dict_body_returns_empty(
         return_value=fake_session,
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == []
+    assert isinstance(result, _FetchFailed)
 
 
 async def test_fetch_info_list_filters_non_dict_entries(
@@ -474,7 +502,7 @@ async def test_async_refresh_alerts_304_keeps_existing_cache(
     resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(return_value=resp_304)
+    fake_session.get = MagicMock(return_value=make_response_cm(resp_304))
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -507,7 +535,14 @@ async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
     resp_second.json = AsyncMock(return_value=body)
 
     fake_session = MagicMock()
-    fake_session.get = AsyncMock(side_effect=[resp_first, resp_first, resp_second, resp_second])
+    fake_session.get = MagicMock(
+        side_effect=[
+            make_response_cm(resp_first),
+            make_response_cm(resp_first),
+            make_response_cm(resp_second),
+            make_response_cm(resp_second),
+        ]
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",

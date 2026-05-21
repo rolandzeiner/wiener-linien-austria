@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import CONF_SCAN_INTERVAL
@@ -26,6 +27,20 @@ from custom_components.wiener_linien_austria.static import (
 )
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+def make_response_cm(resp: Any) -> MagicMock:
+    """Wrap a mock response as an async context manager.
+
+    Production code uses `async with session.get(...) as resp:` so the
+    return value of `session.get` must support `__aenter__` / `__aexit__`.
+    Real aiohttp's `_RequestContextManager` is both awaitable and a
+    context manager; mocks need to mimic the context-manager half.
+    """
+    cm = MagicMock()
+    cm.__aenter__ = AsyncMock(return_value=resp)
+    cm.__aexit__ = AsyncMock(return_value=None)
+    return cm
 
 
 @pytest.fixture
@@ -244,7 +259,14 @@ def mock_aiohttp_session():
 
 @pytest.fixture(autouse=True)
 def mock_static_catalogue():
-    """Stub the static catalogue loader so tests never hit the network."""
+    """Stub the static catalogue loader so tests never hit the network.
+
+    Patch every binding the runtime can resolve `async_get_catalogue`
+    through: the source in `static.py` PLUS each module that imports it
+    at module-load time (`coordinator`, `config_flow`). Without the
+    per-importer patches, callers that bound the name at import would
+    sail past the source-module patch and call the real network path.
+    """
     catalogue = _sample_catalogue()
     with (
         patch(
@@ -254,6 +276,11 @@ def mock_static_catalogue():
         ),
         patch(
             "custom_components.wiener_linien_austria.static.async_get_catalogue",
+            new_callable=AsyncMock,
+            return_value=catalogue,
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.coordinator.async_get_catalogue",
             new_callable=AsyncMock,
             return_value=catalogue,
         ),

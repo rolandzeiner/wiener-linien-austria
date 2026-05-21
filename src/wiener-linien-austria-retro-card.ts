@@ -3,19 +3,44 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
+import type {
+  HomeAssistant,
+  LovelaceCardEditor,
+  WindowWithCustomCards,
+} from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
+import { deText } from "./utils.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
   renderVersionBanner,
 } from "./shared-render.js";
-import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
+import type {
+  DepartureAttr,
+  RetroHeaderSide,
+  WienerLinienAttrs,
+  WienerLinienRetroCardConfig,
+} from "./types.js";
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import { registerWlFonts } from "./font-face.js";
+import {
+  RETRO_HEADER_ICONS,
+  RETRO_HEADER_MDI_EXITS,
+  isRetroHeaderMdiExit,
+  renderRetroHeaderIcon,
+  renderRetroHeaderMdiIcon,
+  renderRetroHeaderMdiTile,
+  type RetroHeaderIconKey,
+} from "./utils/retro-station-icons.js";
+import {
+  RACE_FINISH_X_FALLBACK_CQW,
+  computeRaceParams,
+  type Racer,
+} from "./utils/race.js";
 
 import "./retro-editor.js";
 
@@ -37,78 +62,25 @@ const NEXT_RACE_MAX_MS = 180_000;
 // "starting" than just appearing mid-screen.
 const COUNTDOWN_DIGIT_MS = 800;
 const COUNTDOWN_TOTAL_MS = COUNTDOWN_DIGIT_MS * 3;
-// Nailbiter racing — each race picks a lead-change pattern (who's ahead
-// at 25%, 50%, 75%) so there's at least one overtake per race. Winner of
-// the last checkpoint gets the shorter duration.
-type Racer = "A" | "B";
-const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
-  ["A", "A", "B"], ["B", "B", "A"],   // single late swap
-  ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
-  ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
-];
-// Wheelchair race — the WINNER is whoever crosses the finish line
-// (RACE_FINISH_X_CQW) first, computed from each racer's post-clamp
-// trajectory. The swap-pattern choreographs mid-race overtakes for
-// visual fun only; it doesn't decide the outcome. See
-// _randomizeRaceParams() for the full algorithm.
-//
-// When the winner crosses the finish line (ms from race start). The
-// winner duration runs slightly longer so the wheelchair smoothly
-// exits past the right edge after the cross.
-const RACE_CROSS_BASE_MIN_MS = 2400;
-const RACE_CROSS_BASE_MAX_MS = 2700;
-// Animation duration / cross time — the after-finish-line tail.
-const RACE_DUR_TAIL_MIN = 1.08;
-const RACE_DUR_TAIL_MAX = 1.15;
-// Finish-margin distribution (ms between winner's and loser's crossing
-// of the finish line). Mix of close (photo finish), medium and decisive
-// finishes so consecutive races feel different. Close minimum is set
-// high enough that even the photo finish has a clear visual gap (~6cqw
-// at 580px card width) — sub-100ms gaps were too tight to call by eye.
-const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [100, 250];
-const RACE_MARGIN_MEDIUM_MS: readonly [number, number] = [200, 500];
-const RACE_MARGIN_DECISIVE_MS: readonly [number, number] = [500, 900];
-const RACE_PROB_CLOSE = 0.4;
-const RACE_PROB_MEDIUM = 0.35;
-// (rest = decisive)
-// Probability the swap pattern's 75% leader is actually the LOSER —
-// i.e. the winner pulls ahead in the home stretch. Drives the
-// "comeback" feel; the rest are led-from-front finishes.
-const RACE_PROB_COMEBACK = 0.3;
-// Race "track" geometry, in cqw (relative to card width). Each
-// wheelchair starts at its natural position after its destination text
-// (preserving the gag that the wheelchair sits *on* the departure),
-// and we back out per-racer translate values from absolute checkpoint
-// targets. Targets are anchored to whichever racer starts furthest
-// right (`maxStart`) so both racers always move forward.
-const RACE_TRACK_END_CQW = 92;
-const RACE_TRACK_MIN_LENGTH_CQW = 20;
-const RACE_CHECKPOINT_FRACS = [0.25, 0.5, 0.75] as const;
-const RACE_CHECKPOINT_HALF_GAPS_CQW = [3, 2.5, 2.5] as const;
-// Fallback finish-line x (cqw) if the live strip position can't be
-// measured. The real value is the .retro-finish-line's left edge,
-// computed per race from card width — keeps the math glued to the
-// thing the user actually watches.
-const RACE_FINISH_X_FALLBACK_CQW = 96;
-// Absolute exit position bounds (cqw). Outside this band the
-// finish-margin math is approximate; the announced winner is still
-// reconciled from the actual post-clamp trajectories.
-const RACE_EXIT_MIN_CQW = 102;
-const RACE_EXIT_MAX_CQW = 135;
-
-// Wrap API-sourced German strings so assistive tech pronounces them correctly
-// under non-German HA locales. ASCII fallbacks stay unwrapped.
-function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
-  if (raw) return html`<span lang="de">${raw}</span>`;
-  return fallback ?? "";
-}
+// Message ticker — when `message_ticker` is on, the LED panel clears
+// every MESSAGE_TICKER_INTERVAL_MS and scrolls `message_text` across
+// once as a marquee. Enabling the toggle or editing the text
+// reschedules a run after the short MESSAGE_TICKER_PREVIEW_DELAY_MS —
+// a burst of keystrokes debounces (the scheduler clears its prior
+// handle) into one near-instant in-editor preview. If a wheelchair
+// race is mid-flight when the ticker is due, it retries after
+// MESSAGE_TICKER_RACE_DEFER_MS.
+const MESSAGE_TICKER_INTERVAL_MS = 5 * 60_000;
+const MESSAGE_TICKER_PREVIEW_DELAY_MS = 1_500;
+const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
+// Race constants and physics live in `utils/race.ts`. The card keeps
+// only the DOM-touching `_measureRaceStartPositions` and the timer
+// state machine; the math is a pure function fed those measurements.
 
 // Dedupe by `type` so a double-load (cache-bust race, HMR, etc.)
 // doesn't surface the retro card twice in the picker.
 {
-  const win = window as unknown as {
-    customCards?: Array<Record<string, unknown>>;
-  };
+  const win = window as unknown as WindowWithCustomCards;
   win.customCards = win.customCards ?? [];
   if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-retro-card")) {
     win.customCards.push({
@@ -134,9 +106,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // bottom row). Drives the circular winner badge on the victory
   // overlay. null while idle or during the first race ever.
   @state() private _raceWinner: Racer | null = null;
+  // Message-ticker state. `_tickerActive` drives the marquee overlay;
+  // `_tickerTimer` is the single repeating scheduler handle (cleared on
+  // disconnect, re-armed on reconnect).
+  @state() private _tickerActive = false;
+  private _tickerTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _versionCheckDone = false;
-  private _raceTimers: Array<ReturnType<typeof setTimeout>> = [];
+  // One-shot flag so the "configured entity missing → fell back" console
+  // warning doesn't spam on every re-render.
+  private _fallbackWarned = false;
+  private _raceTimers = new Set<ReturnType<typeof setTimeout>>();
   // Wall-clock target times so state transitions survive the disconnect/
   // reconnect cycles HA triggers during dashboard rebuilds.
   private _countdownStartAt: number | null = null;
@@ -212,32 +192,54 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     };
   }
 
-  public connectedCallback(): void {
+  public override connectedCallback(): void {
     super.connectedCallback();
+    // Register the WL webfaces on document.head — see font-face.ts for
+    // why Shadow-DOM @font-face can't be trusted on Android WebView.
+    registerWlFonts();
     if (!this._versionCheckDone && this.hass?.callWS) {
       this._versionCheckDone = true;
       void this._checkCardVersion();
     }
     // HA rebuilds the dashboard on load — the card gets detached and
     // re-attached mid-race. Re-arm transitions against wall-clock time.
+    // Bail if the user toggled `wheelchair_race` off while the card was
+    // detached: the state machine would otherwise tick uselessly for a
+    // few seconds (CSS hides everything, but the timers run anyway).
     if (this._raceState !== "idle") {
-      this._armStateTransitions();
+      if (this._config?.wheelchair_race) {
+        this._armStateTransitions();
+      } else {
+        this._raceState = "idle";
+        this._clearRaceTimers();
+      }
+    }
+    // Re-arm the message ticker after a detach/reattach (HA rebuilds
+    // the dashboard on load). `updated()` won't fire when `_config` is
+    // unchanged across the reconnect, so the repeating schedule has to
+    // be re-established here. A scroll interrupted by the detach is
+    // abandoned — reset the flag and let the interval queue the next.
+    if (this._config?.message_ticker && this._config?.message_text) {
+      this._tickerActive = false;
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
     }
   }
 
-  public disconnectedCallback(): void {
+  public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRaceTimers();
+    this._clearTickerTimer();
   }
 
-  protected shouldUpdate(changed: PropertyValues): boolean {
+  protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
       changed.has("_raceState") ||
       changed.has("_countdownDigit") ||
-      changed.has("_raceWinner")
+      changed.has("_raceWinner") ||
+      changed.has("_tickerActive")
     ) {
       return true;
     }
@@ -248,7 +250,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return prev.states[eid] !== this.hass.states[eid];
   }
 
-  protected updated(changed: PropertyValues): void {
+  protected override updated(changed: PropertyValues): void {
     super.updated(changed);
     if (!changed.has("_config")) return;
     const prev = changed.get("_config") as NormalisedRetroConfig | undefined;
@@ -270,10 +272,28 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._victoryEndAt = null;
       this._raceWinner = null;
     }
-  }
 
-  private _lang(): string {
-    return this.hass?.language?.startsWith("de") ? "de" : "en";
+    // Message ticker — "on" means the toggle is set AND there's text to
+    // scroll, so clearing the message counts as turning the feature
+    // off. Enabling it, or editing the text, reschedules a run for a
+    // near-instant preview; the falling edge stops the schedule and
+    // clears any in-flight scroll.
+    const tickerWasOn = prev?.message_ticker === true && !!prev?.message_text;
+    const tickerIsOn =
+      this._config?.message_ticker === true && !!this._config?.message_text;
+    const textChanged = prev?.message_text !== this._config?.message_text;
+    if (tickerIsOn && (!tickerWasOn || textChanged)) {
+      // Toggle just enabled, OR the message text changed (the user is
+      // editing it). Drop any in-flight scroll and reschedule after a
+      // short delay — _scheduleTicker clears the prior handle, so a
+      // burst of keystrokes debounces into a single run once typing
+      // pauses: a near-instant in-editor preview of the current text.
+      this._tickerActive = false;
+      this._scheduleTicker(MESSAGE_TICKER_PREVIEW_DELAY_MS);
+    } else if (!tickerIsOn && tickerWasOn) {
+      this._clearTickerTimer();
+      this._tickerActive = false;
+    }
   }
 
   private _t(key: string, replacements?: Record<string, string | number>): string {
@@ -293,7 +313,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       return this._config.entity;
     }
     const available = findWienerLinienEntities(this.hass);
-    return available[0] ?? null;
+    const first = available[0] ?? null;
+    if (first && this._config?.entity && !this._fallbackWarned) {
+      // Configured entity is gone (rename, integration removal). The
+      // fallback keeps the card useful, but make the swap auditable so
+      // the user notices their dashboard is now showing a different stop.
+      this._fallbackWarned = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria-retro-card] configured entity "${this._config.entity}" not in hass.states; falling back to "${first}"`,
+      );
+    }
+    return first;
   }
 
   // ------------------------------------------------------------------
@@ -302,12 +333,23 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   private _clearRaceTimers(): void {
     for (const t of this._raceTimers) clearTimeout(t);
-    this._raceTimers = [];
+    this._raceTimers.clear();
+  }
+
+  /** Schedule a timeout AND track it on `_raceTimers` so a teardown can
+   *  cancel it. The handle self-removes on fire so the set doesn't
+   *  accumulate dead handles between `_clearRaceTimers` calls. Use this
+   *  in place of bare `setTimeout`. */
+  private _scheduleRaceTimer(cb: () => void, delayMs: number): void {
+    const handle = setTimeout(() => {
+      this._raceTimers.delete(handle);
+      cb();
+    }, delayMs);
+    this._raceTimers.add(handle);
   }
 
   private _scheduleRace(delayMs: number): void {
-    const t = setTimeout(() => this._startRace(), delayMs);
-    this._raceTimers.push(t);
+    this._scheduleRaceTimer(() => this._startRace(), delayMs);
   }
 
   // Click-to-race: tapping the card while idle kicks off a race
@@ -315,6 +357,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // if the toggle is off, a race is already in progress, or
   // prefers-reduced-motion is set (matches the auto-loop's gating).
   private _handleCardClick = (): void => {
+    // Tap to dismiss an active scrolling message — this is also the
+    // WCAG 2.2.2 "hide" mechanism for the auto-starting marquee. The
+    // next run is rescheduled at the normal interval.
+    if (this._tickerActive) {
+      this._tickerActive = false;
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+      return;
+    }
     if (!this._config?.wheelchair_race) return;
     if (this._raceState !== "idle") return;
     if (
@@ -326,6 +376,63 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._clearRaceTimers();
     this._startRace();
   };
+
+  // ------------------------------------------------------------------
+  // Message ticker scheduler
+  // ------------------------------------------------------------------
+
+  private _clearTickerTimer(): void {
+    if (this._tickerTimer !== null) {
+      clearTimeout(this._tickerTimer);
+      this._tickerTimer = null;
+    }
+  }
+
+  /** Arm the single ticker timer. Clears any pending handle first so
+   *  the scheduler can never fan out into multiple overlapping runs. */
+  private _scheduleTicker(delayMs: number): void {
+    this._clearTickerTimer();
+    this._tickerTimer = setTimeout(() => {
+      this._tickerTimer = null;
+      this._runTicker();
+    }, delayMs);
+  }
+
+  /** Fire one marquee run — or defer it. The next run is armed by
+   *  `_onTickerDone` (on animationend), so the interval counts from
+   *  when a message finishes scrolling, not when it starts. */
+  private _runTicker(): void {
+    // Toggle flipped off / message cleared since the timer armed.
+    if (!this._config?.message_ticker || !this._config?.message_text) return;
+    // A wheelchair race owns the LED panel — wait it out, retry soon.
+    if (this._raceState !== "idle") {
+      this._scheduleTicker(MESSAGE_TICKER_RACE_DEFER_MS);
+      return;
+    }
+    // A marquee is moving content — respect `prefers-reduced-motion`.
+    // Skip the scroll for those users but keep the schedule alive so
+    // it resumes if the preference changes later.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+      return;
+    }
+    this._tickerActive = true;
+  }
+
+  private _onTickerDone = (): void => {
+    this._tickerActive = false;
+    this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
+  };
+
+  /** Scroll duration in seconds — proportional to message length so the
+   *  reading pace stays roughly constant. Clamped so a one-word message
+   *  still lingers and a maxed-out 160-char message doesn't crawl. */
+  private _tickerDurationSeconds(text: string): number {
+    return Math.min(40, Math.max(8, 5 + text.length * 0.18));
+  }
 
   private _startRace(): void {
     if (!this._config?.wheelchair_race) return;
@@ -343,6 +450,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       return;
     }
     if (this._currentBarrierFreeCount() < 2) {
+      this._scheduleRace(this._nextRaceDelay());
+      return;
+    }
+    if (this._tickerActive) {
+      // The message ticker owns the LED panel right now — defer the
+      // race so the two LED takeovers never overlap.
       this._scheduleRace(this._nextRaceDelay());
       return;
     }
@@ -389,7 +502,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._countdownStartAt +
       (Math.floor(elapsed / COUNTDOWN_DIGIT_MS) + 1) * COUNTDOWN_DIGIT_MS;
     const wait = Math.max(50, nextDigitAt - now);
-    this._raceTimers.push(setTimeout(() => this._scheduleCountdownTick(), wait));
+    this._scheduleRaceTimer(() => this._scheduleCountdownTick(), wait);
   }
 
   // Flips countdown → racing. Called from the countdown ticker once the
@@ -473,145 +586,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // the finish line. The state machine uses that to schedule the
   // photo-finish freeze and then victory.
   private _randomizeRaceParams(): { winnerCrossT: number } {
-    const rand = (min: number, max: number): number =>
-      min + Math.random() * (max - min);
-    const jitter = (base: number, amount: number): number =>
-      base + (Math.random() * 2 - 1) * amount;
-
-    // (1)(3)(4) Pick intended winner + comeback flag + swap pattern.
-    const intendedWinner: Racer = Math.random() < 0.5 ? "A" : "B";
-    const isComeback = Math.random() < RACE_PROB_COMEBACK;
-    const patternLeader: Racer = isComeback
-      ? intendedWinner === "A"
-        ? "B"
-        : "A"
-      : intendedWinner;
-    const patternPool = RACE_PATTERNS.filter((p) => p[2] === patternLeader);
-    const pattern =
-      patternPool[Math.floor(Math.random() * patternPool.length)]!;
-
-    // (2) Pick finish margin (ms between winner and loser crossings).
-    const marginRoll = Math.random();
-    const margin =
-      marginRoll < RACE_PROB_CLOSE
-        ? rand(RACE_MARGIN_CLOSE_MS[0], RACE_MARGIN_CLOSE_MS[1])
-        : marginRoll < RACE_PROB_CLOSE + RACE_PROB_MEDIUM
-          ? rand(RACE_MARGIN_MEDIUM_MS[0], RACE_MARGIN_MEDIUM_MS[1])
-          : rand(RACE_MARGIN_DECISIVE_MS[0], RACE_MARGIN_DECISIVE_MS[1]);
-
-    // Cross times + total animation durations. Each racer's animation
-    // runs slightly past their cross time (the "tail") so the
-    // wheelchair smoothly exits past the right edge after winning.
-    const winnerCrossT = rand(RACE_CROSS_BASE_MIN_MS, RACE_CROSS_BASE_MAX_MS);
-    const loserCrossT = winnerCrossT + margin;
-    const winnerDur = winnerCrossT * rand(RACE_DUR_TAIL_MIN, RACE_DUR_TAIL_MAX);
-    const loserDur = loserCrossT * rand(RACE_DUR_TAIL_MIN, RACE_DUR_TAIL_MAX);
-    const durA = intendedWinner === "A" ? winnerDur : loserDur;
-    const durB = intendedWinner === "B" ? winnerDur : loserDur;
-    const crossTargetA = intendedWinner === "A" ? winnerCrossT : loserCrossT;
-    const crossTargetB = intendedWinner === "B" ? winnerCrossT : loserCrossT;
-
-    // (5)(6) Measure starts + live finish line, then compute per-
-    // checkpoint absolute targets. finishX matches the actual left
-    // edge of the visible checkered strip — math winner == strip-
-    // crossing winner the user observes.
     const measured = this._measureRaceStartPositions();
-    const startA = measured?.a ?? 0;
-    const startB = measured?.b ?? 0;
-    const finishX = measured?.finishCqw ?? RACE_FINISH_X_FALLBACK_CQW;
-    const maxStart = Math.max(startA, startB);
-    const trackLength = Math.max(
-      RACE_TRACK_MIN_LENGTH_CQW,
-      RACE_TRACK_END_CQW - maxStart,
-    );
-    const targetXAbs = (racer: Racer, idx: 0 | 1 | 2): number => {
-      const center = maxStart + RACE_CHECKPOINT_FRACS[idx] * trackLength;
-      const isLead = pattern[idx] === racer;
-      const halfGap = RACE_CHECKPOINT_HALF_GAPS_CQW[idx];
-      return jitter(center + (isLead ? halfGap : -halfGap), 0.6);
-    };
-    const t25A = targetXAbs("A", 0);
-    const t50A = targetXAbs("A", 1);
-    const t75A = targetXAbs("A", 2);
-    const t25B = targetXAbs("B", 0);
-    const t50B = targetXAbs("B", 1);
-    const t75B = targetXAbs("B", 2);
-
-    // (7) Solve the linear interp 75%→100% segment for `exit` so this
-    // racer crosses finishX at their target time:
-    //   crossT = 0.75*dur + 0.25*dur * (finishX - t75) / (exit - t75)
-    //   => exit = t75 + (finishX - t75) * 0.25*dur / (crossT - 0.75*dur)
-    const computeExit = (
-      crossT: number,
-      dur: number,
-      t75: number,
-    ): number => {
-      const distance = finishX - t75;
-      const segmentTime = crossT - 0.75 * dur;
-      if (distance <= 0 || segmentTime <= 1) {
-        // Edge case: finish line was already passed by the 75%
-        // checkpoint. Let the racer exit naturally with a small offset.
-        return Math.max(t75 + 5, RACE_EXIT_MIN_CQW);
-      }
-      const exit = t75 + (distance * 0.25 * dur) / segmentTime;
-      return Math.max(RACE_EXIT_MIN_CQW, Math.min(RACE_EXIT_MAX_CQW, exit));
-    };
-    const exitA = computeExit(crossTargetA, durA, t75A);
-    const exitB = computeExit(crossTargetB, durB, t75B);
-
-    // (8) Recompute actual cross times by walking every animation
-    // segment in time order. Necessary because on the smaller card
-    // variants — where row font size is 1.25em vs 1.9em — long
-    // destination text pushes maxStart high enough that the wheelchair
-    // can already be past finishX by the 75% checkpoint. In that case
-    // the cross happens in the 50→75% segment (or earlier), and a
-    // hardcoded 75→100% formula collapses both racers to the same
-    // 0.75*dur, breaking winner reconciliation. Visible-on-screen
-    // winner is whoever crosses first; assign _raceWinner from that so
-    // the trophy badge always matches what the user just watched.
-    //
-    // Segment 0→25% actually uses ease-out (not linear), so the cross
-    // time in that segment is approximate — but a cross that early
-    // requires extreme maxStart values that don't occur in practice.
-    const actualCrossT = (
-      startX: number,
-      t25: number,
-      t50: number,
-      t75: number,
-      exit: number,
-      dur: number,
-    ): number => {
-      const segments: ReadonlyArray<readonly [number, number, number, number]> = [
-        [0, 0.25, startX, t25],
-        [0.25, 0.5, t25, t50],
-        [0.5, 0.75, t50, t75],
-        [0.75, 1.0, t75, exit],
-      ];
-      for (const [tStart, tEnd, xStart, xEnd] of segments) {
-        if (xStart >= finishX) return tStart * dur;
-        if (xEnd >= finishX) {
-          const frac = (finishX - xStart) / (xEnd - xStart);
-          return (tStart + frac * (tEnd - tStart)) * dur;
-        }
-      }
-      return Number.POSITIVE_INFINITY;
-    };
-    const crossA = actualCrossT(startA, t25A, t50A, t75A, exitA, durA);
-    const crossB = actualCrossT(startB, t25B, t50B, t75B, exitB, durB);
-    this._raceWinner = crossA <= crossB ? "A" : "B";
-
-    // Per-racer translate (cqw) = absolute target - measured start.
-    this.style.setProperty("--race-a-duration", `${durA}ms`);
-    this.style.setProperty("--race-b-duration", `${durB}ms`);
-    this.style.setProperty("--race-a-end", `${exitA - startA}cqw`);
-    this.style.setProperty("--race-b-end", `${exitB - startB}cqw`);
-    this.style.setProperty("--race-a-x-25", `${t25A - startA}cqw`);
-    this.style.setProperty("--race-a-x-50", `${t50A - startA}cqw`);
-    this.style.setProperty("--race-a-x-75", `${t75A - startA}cqw`);
-    this.style.setProperty("--race-b-x-25", `${t25B - startB}cqw`);
-    this.style.setProperty("--race-b-x-50", `${t50B - startB}cqw`);
-    this.style.setProperty("--race-b-x-75", `${t75B - startB}cqw`);
-    return { winnerCrossT: Math.min(crossA, crossB) };
+    const params = computeRaceParams({
+      a: measured?.a ?? 0,
+      b: measured?.b ?? 0,
+      finishCqw: measured?.finishCqw ?? RACE_FINISH_X_FALLBACK_CQW,
+    });
+    this._raceWinner = params.winner;
+    for (const [name, value] of Object.entries(params.cssVars)) {
+      this.style.setProperty(name, value);
+    }
+    return { winnerCrossT: params.winnerCrossT };
   }
 
   // Arms timers for whichever transition is pending next, based on the
@@ -626,34 +611,25 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       // right next-tick delay from elapsed wall-clock time.
       this._scheduleCountdownTick();
     } else if (this._raceState === "racing" && this._raceEndAt !== null) {
-      const delay = Math.max(0, this._raceEndAt - now);
-      this._raceTimers.push(
-        setTimeout(() => {
-          this._raceState = "freeze";
-          this._raceEndAt = null;
-          this._armStateTransitions();
-        }, delay),
-      );
+      this._scheduleRaceTimer(() => {
+        this._raceState = "freeze";
+        this._raceEndAt = null;
+        this._armStateTransitions();
+      }, Math.max(0, this._raceEndAt - now));
     } else if (this._raceState === "freeze" && this._freezeEndAt !== null) {
-      const delay = Math.max(0, this._freezeEndAt - now);
-      this._raceTimers.push(
-        setTimeout(() => {
-          this._raceState = "victory";
-          this._freezeEndAt = null;
-          this._armStateTransitions();
-        }, delay),
-      );
+      this._scheduleRaceTimer(() => {
+        this._raceState = "victory";
+        this._freezeEndAt = null;
+        this._armStateTransitions();
+      }, Math.max(0, this._freezeEndAt - now));
     } else if (this._raceState === "victory" && this._victoryEndAt !== null) {
-      const delay = Math.max(0, this._victoryEndAt - now);
-      this._raceTimers.push(
-        setTimeout(() => {
-          this._raceState = "idle";
-          this._victoryEndAt = null;
-          if (this._config?.wheelchair_race) {
-            this._scheduleRace(this._nextRaceDelay());
-          }
-        }, delay),
-      );
+      this._scheduleRaceTimer(() => {
+        this._raceState = "idle";
+        this._victoryEndAt = null;
+        if (this._config?.wheelchair_race) {
+          this._scheduleRace(this._nextRaceDelay());
+        }
+      }, Math.max(0, this._victoryEndAt - now));
     }
   }
 
@@ -680,7 +656,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // Render
   // ------------------------------------------------------------------
 
-  protected render(): TemplateResult | typeof nothing {
+  protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     const cfg = this._config;
     const eid = this._resolveEntity();
@@ -714,6 +690,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           cfg.line,
         )
       : nothing;
+    // Master gate — when `show_header` is off (the default), the
+    // strip is suppressed regardless of per-side config. This keeps
+    // the per-side state in memory so toggling back on restores
+    // exactly what the user had set.
+    const stationHeader = cfg.show_header
+      ? this._renderStationHeader(cfg.header_left, cfg.header_right)
+      : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
     const raceActive = cfg.wheelchair_race && this._raceState === "racing";
@@ -742,9 +725,23 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           class=${classMap(retroClasses)}
           @click=${this._handleCardClick}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
+          ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
+            ${this._tickerActive && cfg.message_text
+              ? html`<div class="retro-ticker" role="status" aria-live="polite">
+                  <div
+                    class="retro-ticker-text"
+                    style=${`animation-duration:${this._tickerDurationSeconds(
+                      cfg.message_text,
+                    )}s`}
+                    @animationend=${this._onTickerDone}
+                  >
+                    ${cfg.message_text}
+                  </div>
+                </div>`
+              : nothing}
             ${raceCountdown && this._countdownDigit !== null
               ? html`<div class="retro-countdown" role="status" aria-live="polite">
                   ${keyed(
@@ -813,13 +810,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     void matching;
     return html`
       <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
-        ${rows.map((d) => this._renderRow(d))}
+        ${rows.map((d, i) => this._renderRow(d, i))}
       </ul>
       ${platform ? this._renderGleis(platform, platformLabel) : nothing}
     `;
   }
 
-  private _renderRow(d: DepartureAttr): TemplateResult {
+  private _renderRow(d: DepartureAttr, rowIndex = 0): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
     const line = d.line || "?";
@@ -833,7 +830,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
     const rowLabel = [line, towards, cdLabel, a11yLabel].filter(Boolean).join(" — ");
     return html`
-      <li class="retro-row" aria-label=${rowLabel}>
+      <li class="retro-row" style=${`--row-i: ${rowIndex}`} aria-label=${rowLabel}>
         <div class="retro-line" aria-hidden="true">${line}</div>
         <div class="retro-dest" aria-hidden="true">
           <span class="retro-dest-text">${deText(towards)}</span>
@@ -863,6 +860,115 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         <div class="retro-gleis-number">${platform}</div>
       </div>
     `;
+  }
+
+  /** Render the black header strip above the orange station band —
+   *  a homage to the real Wiener Linien U-Bahn station signage.
+   *  Returns `nothing` when neither side is configured, so existing
+   *  retro cards (no `header_left`/`header_right` in YAML) are
+   *  byte-identical to pre-change behaviour.
+   *
+   *  Per-side render order — amenity order is mirrored so the same
+   *  glyph always sits the same distance from the station name on
+   *  both sides: elevator nearest the text, then escalator, then WC:
+   *   - LEFT:  [exit] [text] [Elevator] [Escalator] [WC]
+   *   - RIGHT: [WC] [Escalator] [Elevator] [text] [exit]
+   *
+   *  Exit-icon auto-flip: `exit` glyph natively points LEFT; on the
+   *  right side it's flipped so the arrow points right. `exit-access`
+   *  is the mirror case — natively points RIGHT, flipped on left.
+   *  Users pick "regular" / "accessible" per side and the renderer
+   *  derives orientation; no separate config knob. */
+  private _renderStationHeader(
+    left: RetroHeaderSide | undefined,
+    right: RetroHeaderSide | undefined,
+  ): TemplateResult | typeof nothing {
+    if (!left && !right) return nothing;
+    return html`
+      <div class="retro-station-header" role="group">
+        <div class="retro-station-header__side retro-station-header__side--left">
+          ${left ? this._renderHeaderSide(left, "left") : nothing}
+        </div>
+        <div class="retro-station-header__side retro-station-header__side--right">
+          ${right ? this._renderHeaderSide(right, "right") : nothing}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderHeaderSide(
+    side: RetroHeaderSide,
+    pos: "left" | "right",
+  ): TemplateResult {
+    // Resolve the exit corner to a render node. Three paths:
+    //   "regular" / "accessible" → WL traced SVG glyph (auto-flips
+    //                              per side via glyphPointsTo).
+    //   "mdi:…"                  → curated MDI icon inside the same
+    //                              tile (auto-flip only for icons
+    //                              whose registry entry declares a
+    //                              `glyphPointsTo`).
+    //   anything else            → no icon.
+    let exitNode: TemplateResult | typeof nothing = nothing;
+    if (side.exit === "regular" || side.exit === "accessible") {
+      const key: "exit" | "exit-access" =
+        side.exit === "regular" ? "exit" : "exit-access";
+      exitNode = renderRetroHeaderIcon(key, {
+        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
+        // Glyph's native direction is `pointsTo`. Flip when the side
+        // it sits on doesn't match — e.g. `exit` (points left) on the
+        // right side flips to point right.
+        flipX: RETRO_HEADER_ICONS[key].glyphPointsTo !== pos,
+      });
+    } else if (side.exit && isRetroHeaderMdiExit(side.exit)) {
+      const meta = RETRO_HEADER_MDI_EXITS[side.exit];
+      exitNode = renderRetroHeaderMdiIcon(side.exit, {
+        ariaLabel: this._t(`header.${meta.labelKey}`),
+        // Only directional MDI icons (exit-run / exit-to-app) declare
+        // glyphPointsTo. Vehicle / amenity glyphs don't flip.
+        flipX: meta.glyphPointsTo !== undefined && meta.glyphPointsTo !== pos,
+      });
+    }
+    const textNode = side.text
+      ? html`<span class="retro-station-header__text">${side.text}</span>`
+      : nothing;
+    const amenityKey = (key: RetroHeaderIconKey) =>
+      renderRetroHeaderIcon(key, {
+        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
+      });
+    const wc = side.show_wc ? amenityKey("wc") : nothing;
+    const esc = side.show_escalator ? amenityKey("escalator") : nothing;
+    const elv = side.show_elevator ? amenityKey("elevator") : nothing;
+    // Free-form MDI tiles — same-tile styling as the curated MDI exit
+    // variants (white square, --mdi padding modifier). Sit between
+    // the WC tile and the text chips. Aria-label is the MDI key
+    // itself, the closest semantic label we have without an
+    // explicit per-row label field.
+    const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
+      renderRetroHeaderMdiTile(icon, icon),
+    );
+    const mdiTilesLeftOrder = mdiTileNodes;
+    const mdiTilesRightOrder = [...mdiTileNodes].reverse();
+    // Text chips — same-height white boxes with dynamic width. Sit
+    // beyond the MDI tiles (further from the sign text than any
+    // amenity icon or extra icon) so they read as the outer-edge
+    // content on each side. Mirrored across sides so chip[0] is
+    // always the closest-to-extra-icons entry regardless of which
+    // side it lives on.
+    const chipNodes = (side.chips ?? []).map(
+      (chipText) => html`<span class="retro-station-header__chip">${chipText}</span>`,
+    );
+    const chipsLeftOrder = chipNodes;
+    const chipsRightOrder = [...chipNodes].reverse();
+    // Canonical render order mirrors the original signage. Right side
+    // mirrors the left: exit always at the outer edge of the card,
+    // amenities ordered so the *same* glyph (elevator) is always
+    // closest to the text on both sides — wheelchair-relevant info
+    // gets the same visual prominence regardless of header side.
+    // Mirror invariant for extra_icons + chips: index 0 of either
+    // array sits closest to the WC tile on both sides.
+    return pos === "left"
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}`
+      : html`${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
@@ -932,7 +1038,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // Styles — ported verbatim from the vanilla RETRO_STYLE
   // ------------------------------------------------------------------
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       /* Create a stacking context on the host so the high z-indexes
@@ -964,7 +1070,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       position: relative;
       display: flex;
       flex-direction: column;
-      font-family: 'Courier New', Courier, 'Lucida Console', Monaco, monospace;
+      /* WL Mono is the subsetted TeX Gyre Cursor face shipped with
+         this integration — Courier-metric so the original Courier
+         New stack is a clean fallback during the woff2 fetch window
+         and on misconfigured installs. Bold-weight glyphs (line 894)
+         pick up the dedicated wl-mono-bold.woff2 variant rather than
+         relying on faux-bold synthesis. */
+      font-family: "WL Mono", "Courier New", Courier, monospace;
       font-weight: 700;
       letter-spacing: 0.08em;
       overflow: hidden;
@@ -1228,6 +1340,64 @@ export class WienerLinienAustriaRetroCard extends LitElement {
        hides cleanly with the rest of the row text. */
     .retro--race-victory.retro--flicker .retro-line {
       animation: none;
+    }
+    /* Message-ticker overlay — when \`message_ticker\` is on, this fills
+       the LED panel every few minutes and scrolls \`message_text\`
+       across once as a marquee, then removes itself (animationend → a
+       JS handler clears _tickerActive). Opaque --led-bg plus the same
+       substrate dot-pattern as .retro-led so the departures vanish
+       cleanly and the panel material stays consistent. z-index 16
+       keeps it below the countdown (18) / victory (20) AND below the
+       pixel screen-door ::after (30), so in pixel style the scrolling
+       text is dotted like the rest of the board. */
+    .retro-ticker {
+      position: absolute;
+      inset: 0;
+      z-index: 16;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      background: var(--led-bg);
+      background-image: radial-gradient(
+        circle,
+        var(--led-substrate) var(--led-dot-size),
+        transparent var(--led-dot-edge)
+      );
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+      border-radius: inherit;
+      /* Query container so the scroll keyframes can start the text one
+         full panel-width off the right edge via 100cqw. */
+      container-type: inline-size;
+    }
+    .retro-ticker-text {
+      /* flex: none keeps the text's natural (over-wide) width — the
+         parent's overflow:hidden clips it. The parent's align-items:
+         center handles vertical centring, so the keyframes touch only
+         translateX and never fight a translateY. */
+      flex: none;
+      white-space: nowrap;
+      /* Match the departure rows: same amber, glow, size and uppercase
+         board lettering. Font, weight and tracking inherit from .retro. */
+      font-size: 1.9em;
+      line-height: 1;
+      color: var(--led-amber);
+      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-transform: uppercase;
+      will-change: transform;
+      animation-name: retroTickerScroll;
+      animation-timing-function: linear;
+      animation-iteration-count: 1;
+      /* both → text waits off-screen-right before the run and rests
+         off-screen-left after it, with no flash at the layout origin.
+         animation-duration is set inline, scaled to message length. */
+      animation-fill-mode: both;
+    }
+    @keyframes retroTickerScroll {
+      /* Start one full panel-width off the right (100cqw), end one
+         full text-width off the left (-100%). */
+      from { transform: translateX(100cqw); }
+      to   { transform: translateX(-100%); }
     }
     /* Pixelated finish-line strip on the right edge during the race.
        Same conic-gradient checker technique as the victory flag, but
@@ -1598,6 +1768,218 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       padding: 7px 10px;
       font-size: 1.35em;
     }
+
+    /* ----- Station header strip -----------------------------------
+       A homage to the real Wiener Linien U-Bahn station signage —
+       a black band above the orange station name with per-side
+       exit / amenity icons + a destination label. Colours are
+       hardcoded (#000 / #fff) on purpose: the original signage is
+       intentionally black-and-white, the same authenticity rule the
+       .retro-station rule above follows. Spacing flows through HA
+       Design System tokens with px fallbacks per
+       ha-portfolio-design (§ 4). */
+    .retro-station-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #000;
+      color: #fff;
+      padding: var(--ha-spacing-2, 8px) var(--ha-spacing-3, 12px);
+      gap: var(--ha-spacing-2, 8px);
+      /* WL Sans Condensed is the subsetted TeX Gyre Heros Cn face —
+         the condensed proportion matches real Wiener Linien station
+         signage. Ships only at weight 700 (the only weight the
+         signage uses); a regular-weight request would fall through
+         to WL Sans regular, then the Apple system stack. */
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+                   Arial, sans-serif;
+      font-weight: 700;
+      /* 1.1em (up from 1em): more device pixels per glyph is the only
+         lever that genuinely de-steps the small condensed signage text
+         on every engine — CSS antialiasing can't. The whole strip is
+         em-based (text, chips, tiles), so this one knob scales it all
+         together. The retro--size-medium / -small variants below carry
+         their own absolute em values and are unaffected. */
+      font-size: 1.1em;
+      letter-spacing: 0.02em;
+    }
+    .retro-station-header__side {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      flex: 1 1 0;
+    }
+    .retro-station-header__side--right {
+      justify-content: flex-end;
+    }
+    .retro-station-header__text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      /* Bumped from inherited 1em — WL Sans Condensed is ~25% narrower
+         than the regular Apple-stack sans, so the sign text can scale
+         up without crowding the amenity tiles next to it. Stays
+         proportional with the retro--size-* tokens because the parent
+         .retro-station-header's font-size scales (1em / 0.9em / 0.8em),
+         and this multiplier compounds on top. */
+      font-size: 1.2em;
+      /* White-on-black signage text — render it with grayscale
+         antialiasing instead of subpixel. On a dark strip subpixel AA
+         fringes the glyph edges and blooms the condensed strokes
+         heavier than drawn; grayscale keeps them crisp. Scoped to this
+         element (NOT the strip) on purpose: the chips and WC monogram
+         are black-on-white, the opposite polarity, and keep the
+         default subpixel AA which renders dark-on-light more solidly.
+         A WebKit/Blink-on-macOS + iOS lever only — the Android System
+         WebView always uses grayscale AA, so it's a no-op there. */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    .retro-station-header__tile {
+      /* White SQUARE tile hosting the (black) glyph — mirrors the
+         real Wiener Linien station signage where each icon sits on
+         a small white square within the black header strip. The
+         square aspect is non-negotiable per the reference photo;
+         the inner SVG fits via preserveAspectRatio=meet so portrait
+         glyphs (elevator) and landscape glyphs (exit, wc) both
+         centre cleanly inside the same square.
+         Default 0.12em padding suits the WL-traced glyphs and the
+         WC monogram — their authored paths use the full viewBox so a
+         small white margin matches the look of the real station-sign
+         photos. The --mdi modifier overrides to a tighter padding
+         (see rule below) because MDI icons carry their own viewBox
+         padding internally. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: #000;
+      flex-shrink: 0;
+      width: 1.4em;
+      height: 1.4em;
+      padding: 0.12em;
+      box-sizing: border-box;
+    }
+    .retro-station-header__tile--mdi {
+      /* MDI glyphs ship with ~10% internal viewBox padding baked
+         into the icon set, so the default tile padding stacks on top
+         and makes them look noticeably smaller than the WL-traced
+         tiles next to them. Halving the tile padding to 0.06em
+         compensates — the rendered glyph ends up the same visual
+         weight as a WL-traced glyph in a default-padded tile. */
+      padding: 0.06em;
+    }
+    .retro-station-header__icon {
+      width: 100%;
+      height: 100%;
+      display: block;
+      /* SVG default fill is black per spec, but be explicit so the
+         tile's color: #000 propagates if a future glyph adopts
+         fill=currentColor. */
+      fill: currentColor;
+    }
+    .retro-station-header__icon--flip-x {
+      transform: scaleX(-1);
+    }
+    .retro-station-header__mdi {
+      /* MDI variant sibling to .retro-station-header__icon. ha-icon
+         renders an inline SVG sized by the --mdc-icon-size token; we
+         pin it to fill the tile's content box (1.4em tile − 2 ×
+         0.06em padding = 1.28em). Color cascades from the tile's
+         color: #000 via ha-icon's currentColor fill. */
+      --mdc-icon-size: 1.28em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: inherit;
+    }
+    .retro-station-header__mdi--flip-x {
+      transform: scaleX(-1);
+    }
+    .retro-station-header__monogram {
+      /* WC tile content. Tile is already flex-centred, so the span
+         positions itself. font-size stays in rem (not em) so the
+         monogram is a stable 0.75rem regardless of the retro--size-*
+         token's em-scale on the parent header. font-family + weight
+         are declared explicitly (rather than relying on inheritance
+         from .retro-station-header) so a future header-rule rewrite
+         can't accidentally regress the W/C letterforms back to a
+         non-condensed face. */
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+                   Arial, sans-serif;
+      font-weight: 700;
+      font-size: 0.75rem;
+      line-height: 1;
+    }
+    .retro-station-header__chip {
+      /* Auxiliary text label — same height as the icon tiles
+         (1.4em) but with dynamic width so short labels (platform
+         numbers, line designators) sit in a snug white box and
+         longer labels grow horizontally. Composes visually with the
+         icon tiles next to it via the same height + colour scheme.
+         Padding is horizontal-only — the flex-centred line shares
+         vertical alignment with the icon glyphs on the same row.
+         Font is WL Sans Condensed 700 — the SAME signage face as the
+         destination text and WC monogram. The strip is a signage
+         homage; one coherent typographic voice across the whole band
+         reads "station sign", whereas a regular-width or lighter face
+         reads "web UI element stuck onto a sign".
+         No explicit font-size: chip inherits the parent header's
+         em-scale (1em / 0.9em / 0.8em via retro--size-* tokens), so
+         height: 1.4em resolves to the SAME pixel value as the icon
+         tiles. Setting a different font-size here (e.g. 0.75rem)
+         would produce visibly shorter chips next to the tiles
+         because em is relative to the element's own font-size. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      color: #000;
+      flex-shrink: 0;
+      height: 1.4em;
+      padding: 0 0.4em;
+      box-sizing: border-box;
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+                   Arial, sans-serif;
+      /* 700 — WL Sans Condensed ships only at 700, and that IS the
+         intent: chips should read as solid signage, not as a lighter
+         UI tier. Hierarchy on the strip comes from size and position
+         (the destination text is condensed 1.2em), never from mixing
+         weight or width onto the same band. */
+      font-weight: 700;
+      line-height: 1;
+      /* Reset the 0.02em letter-spacing inherited from .retro-station-header
+         — the tracked-out feel of the header text doesn't suit
+         chip-style labels where width is dynamic and longer entries
+         (Schlafzimmer, etc.) add up visibly. */
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+    /* Size-token alignment — match the .retro--size-* scale. */
+    .retro--size-medium .retro-station-header {
+      font-size: 0.9em;
+      padding: 6px var(--ha-spacing-2, 10px);
+    }
+    .retro--size-small .retro-station-header {
+      font-size: 0.8em;
+      padding: 5px var(--ha-spacing-2, 8px);
+    }
+    /* Narrow-width reflow (WCAG 1.4.10 AA) — drop the destination
+       label so the icons stay visible at a 320 px section-view
+       column. Unnamed container query — matches the nearest
+       inline-size container, which is .retro (the outer wrapper).
+       The size containers on overlays are not ancestors of the
+       header strip, so they don't interfere. */
+    @container (inline-size < 320px) {
+      .retro-station-header__text {
+        display: none;
+      }
+    }
     .retro-banner {
       background: #ffa000;
       color: #000;
@@ -1629,6 +2011,28 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       outline: 2px solid var(--led-amber, #ffa000);
       outline-offset: 2px;
       border-radius: 4px;
+    }
+
+    /* First-paint stagger (frontend-design audit) — LED rows
+       cascade in like a real flip-board on mount. Each .retro-row
+       inlines its position via style="--row-i: N"; capped at 6 so
+       long boards don't take ages to settle. Pairs with the motion-
+       reduce catch-all below which collapses to instant. */
+    @keyframes retroRowReveal {
+      from {
+        opacity: 0;
+        transform: translateY(3px);
+        filter: brightness(0.4);
+      }
+      to {
+        opacity: 1;
+        transform: none;
+        filter: brightness(1);
+      }
+    }
+    .retro-row {
+      animation: retroRowReveal 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+      animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
     }
 
     /* Accessibility: honour user motion preference.

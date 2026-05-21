@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from .alerts import get_alerts_for
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
 from .coordinator import WienerLinienConfigEntry
+from .static import CATALOGUE_KEY, StaticCatalogue
 
 # No credentials to redact today (Wiener Linien OGD has no API key), and
 # RBL/DIVA values are public station identifiers, not PII. Coordinates
@@ -38,7 +39,6 @@ TO_REDACT: set[str] = {
     "Cookie",
     "Set-Cookie",
     "Referer",
-    "host",
 }
 
 
@@ -65,7 +65,6 @@ async def async_get_config_entry_diagnostics(
     # session" not "is the data correct for stop X". Read the live
     # shared catalogue ref so a background refresh that hasn't been
     # picked up by the coordinator yet still reports as loaded.
-    from .static import CATALOGUE_KEY, StaticCatalogue  # noqa: PLC0415
     cached = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
     trip_patterns = (
         cached.trip_patterns if isinstance(cached, StaticCatalogue) else None
@@ -76,6 +75,13 @@ async def async_get_config_entry_diagnostics(
     if trip_patterns is not None:
         trip_pattern_summary["line_count"] = trip_patterns.line_count
         trip_pattern_summary["pattern_count"] = trip_patterns.pattern_count
+        # Surface migration health — empty dicts on either of these are
+        # the symptom of an older cache that hasn't completed its
+        # background refresh. Lets a user-supplied diagnostics dump
+        # answer "why don't I see transfer chips / line colours"
+        # without having to crack open the logs.
+        trip_pattern_summary["lines_at_diva_count"] = len(trip_patterns.lines_at_diva)
+        trip_pattern_summary["colors_by_line_count"] = len(trip_patterns.colors_by_line)
 
     return {
         "attribution": ATTRIBUTION,

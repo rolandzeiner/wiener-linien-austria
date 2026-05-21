@@ -16,8 +16,8 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, DOMAIN_COOLDOWN_SECONDS, DOMAIN_LAST_CALL_KEY
 
-_LOCK_KEY = "cooldown_lock"
-_LOCK_LOOP_KEY = "cooldown_lock_loop"
+LOCK_KEY = "cooldown_lock"
+LOCK_LOOP_KEY = "cooldown_lock_loop"
 
 
 async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
@@ -44,11 +44,11 @@ async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
     # against the current loop. The cooldown timestamp survives the
     # swap so we don't lose rate-limit state across the boundary.
     current_loop = asyncio.get_running_loop()
-    cached_loop = domain_data.get(_LOCK_LOOP_KEY)
+    cached_loop = domain_data.get(LOCK_LOOP_KEY)
     if cached_loop is not current_loop:
-        domain_data[_LOCK_KEY] = asyncio.Lock()
-        domain_data[_LOCK_LOOP_KEY] = current_loop
-    lock: asyncio.Lock = domain_data[_LOCK_KEY]
+        domain_data[LOCK_KEY] = asyncio.Lock()
+        domain_data[LOCK_LOOP_KEY] = current_loop
+    lock: asyncio.Lock = domain_data[LOCK_KEY]
     async with lock:
         last: datetime | None = domain_data.get(DOMAIN_LAST_CALL_KEY)
         now = dt_util.utcnow()

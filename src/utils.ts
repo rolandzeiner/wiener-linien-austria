@@ -6,6 +6,8 @@
 // localisation, departure filtering) stay in src/utils/* — this module
 // is reserved for primitives a future third card would also need.
 
+import { html, type TemplateResult } from "lit";
+
 /**
  * Trust-boundary guard for upstream-supplied URIs that get rendered into
  * `<a href>` attributes. Lit's `${}` interpolation is safe against
@@ -23,4 +25,30 @@
 export function safeHttpsUri(raw: unknown): string {
   if (typeof raw !== "string") return "";
   return /^https?:\/\//i.test(raw) ? raw : "";
+}
+
+/**
+ * Wrap API-sourced German strings (station names, destinations,
+ * disturbance text) in a `<span lang="de">` so screen readers pick the
+ * German voice even when the dashboard locale is non-German. ASCII
+ * fallbacks (entity ids, etc.) are returned unwrapped — the lang hint
+ * would be inaccurate and AT handles ASCII fine.
+ */
+export function deText(
+  raw: string | undefined | null,
+  fallback?: string,
+): TemplateResult | string {
+  if (raw) return html`<span lang="de">${raw}</span>`;
+  return fallback ?? "";
+}
+
+/**
+ * Dispatch a CustomEvent that crosses Shadow DOM. `bubbles: true` +
+ * `composed: true` are required so dashboard / card-editor listeners
+ * outside the card's shadow root receive it.
+ */
+export function fireEvent<T>(node: HTMLElement, type: string, detail: T): void {
+  node.dispatchEvent(
+    new CustomEvent(type, { detail, bubbles: true, composed: true }),
+  );
 }

@@ -3,7 +3,7 @@
 # redundant with this file but harmless. Trim them as confidence grows.
 
 [tool.ruff]
-target-version = "py313"
+target-version = "py314"
 line-length = 88
 
 [tool.mypy]

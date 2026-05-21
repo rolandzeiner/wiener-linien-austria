@@ -133,6 +133,13 @@ RETRO_CARD_URL: Final = (
 )
 RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
 
+# Webfonts directory — subsetted woff2 derivatives of TeX Gyre Heros +
+# TeX Gyre Cursor (GUST Font License). Served from www/fonts/ as a
+# directory-level static path so every card's @font-face URL resolves.
+# Provenance + license at www/fonts/NOTICE.md.
+FONTS_URL: Final = "/wiener-linien-austria/fonts"
+FONTS_DIRNAME: Final = "fonts"
+
 # Cap on how many departures we surface in sensor attributes. The card maxes
 # out at 20 per stop; matching that here keeps the per-departure stops_ahead
 # trail (now full route, not truncated) within HA's 16 KB recorder attribute

@@ -36,6 +36,8 @@ from .const import (
     CARD_FILENAME,
     CARD_URL,
     CARD_VERSION,
+    FONTS_DIRNAME,
+    FONTS_URL,
     RETRO_CARD_FILENAME,
     RETRO_CARD_URL,
     RETRO_CARD_VERSION,
@@ -136,6 +138,15 @@ class JSModuleRegistration:
                 _LOGGER.warning("Card JS not found at %s", card_path)
                 continue
             configs.append(StaticPathConfig(url, str(card_path), False))
+        # Webfonts — directory-level static path so the cards' @font-face
+        # URLs under /wiener-linien-austria/fonts/ all resolve. Optional:
+        # missing dir just skips the registration (cards fall back to the
+        # system font stack). cache_headers=False matches the cards' own
+        # cache behaviour — a font-subset refresh on the next release
+        # reaches users without a manual cache wipe.
+        fonts_dir = Path(__file__).parent / "www" / FONTS_DIRNAME
+        if fonts_dir.is_dir():
+            configs.append(StaticPathConfig(FONTS_URL, str(fonts_dir), False))
         if not configs:
             # No card JS at all on disk — the integration's user-visible
             # surface (both modern and retro Lovelace cards) is broken.

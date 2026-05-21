@@ -1,7 +1,9 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
+import { RETRO_HEADER_MDI_EXIT_KEYS } from "./retro-station-icons.js";
 import type {
   LineColorsMap,
-  ModernStopConfig,
+  RetroHeaderExit,
+  RetroHeaderSide,
   RetroSize,
   RetroStationBg,
   RetroStyle,
@@ -17,6 +19,83 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "black",
 ] as const);
 const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
+// Curated valid values for the header strip's exit corner. Combines
+// the three fixed variants ("none" / "regular" / "accessible") with
+// the curated MDI set from `retro-station-icons` so the normaliser
+// has one place to consult — adding a new MDI option there
+// auto-flows here without a second registration.
+const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>([
+  "none",
+  "regular",
+  "accessible",
+  ...RETRO_HEADER_MDI_EXIT_KEYS,
+]);
+
+/** Header-side normaliser. Returns `undefined` when every field is
+ *  unset / falsy / `"none"`, so the card's "is this side configured
+ *  at all?" check collapses to a single truthy test. Hard bounds on
+ *  `text` length defensively guard against a runaway YAML config
+ *  blowing out the strip width. */
+function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
+    ? (r.exit as RetroHeaderExit)
+    : "none";
+  let text: string | undefined;
+  if (typeof r.text === "string") {
+    const trimmed = r.text.trim().slice(0, 64);
+    if (trimmed) text = trimmed;
+  }
+  const show_wc = r.show_wc === true;
+  const show_escalator = r.show_escalator === true;
+  const show_elevator = r.show_elevator === true;
+  // Chip array: trim each entry, drop empties, cap text length and
+  // total count. Tolerant of YAML user error — non-string entries are
+  // skipped instead of failing the whole side.
+  let chips: string[] | undefined;
+  if (Array.isArray(r.chips)) {
+    const cleaned = r.chips
+      .filter((v): v is string => typeof v === "string")
+      .map((v) => v.trim().slice(0, 16))
+      .filter((v) => v.length > 0)
+      .slice(0, 6);
+    if (cleaned.length > 0) chips = cleaned;
+  }
+  // Free-form MDI icon array — same chip-input pattern as `chips`,
+  // but with a `mdi:` prefix filter. User types/pastes keys in the
+  // editor; we drop anything that isn't a string starting with
+  // `mdi:`, length 5..64, and cap the list at 3.
+  let extra_icons: string[] | undefined;
+  if (Array.isArray(r.extra_icons)) {
+    const cleaned = r.extra_icons
+      .filter((v): v is string => typeof v === "string")
+      .map((v) => v.trim())
+      .filter((v) => v.startsWith("mdi:") && v.length >= 5 && v.length <= 64)
+      .slice(0, 3);
+    if (cleaned.length > 0) extra_icons = cleaned;
+  }
+  if (
+    exit === "none" &&
+    text === undefined &&
+    !show_wc &&
+    !show_escalator &&
+    !show_elevator &&
+    chips === undefined &&
+    extra_icons === undefined
+  ) {
+    return undefined;
+  }
+  const out: RetroHeaderSide = {};
+  if (exit !== "none") out.exit = exit;
+  if (text !== undefined) out.text = text;
+  if (show_wc) out.show_wc = true;
+  if (show_escalator) out.show_escalator = true;
+  if (show_elevator) out.show_elevator = true;
+  if (chips !== undefined) out.chips = chips;
+  if (extra_icons !== undefined) out.extra_icons = extra_icons;
+  return out;
+}
 
 function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -120,6 +199,37 @@ export type NormalisedModernConfig = NormalisedModernConfigValidated & {
   [key: string]: unknown;
 };
 
+// Keys this normaliser actively handles — used to filter the raw
+// passthrough so a future schema addition can't accidentally surface
+// pre-normalisation through the spread. Includes both validated keys
+// AND the v0.1.x flat back-compat keys (`entity` / `lines` / `direction`
+// / `walk_times`) which are promoted into `entities[0]` and must NOT
+// leak through unchanged.
+const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "entities",
+  "entity",
+  "lines",
+  "direction",
+  "walk_times",
+  "max_departures",
+  "line_colors",
+  "show_accessibility",
+  "accessibility_only",
+  "show_traffic_info",
+  "show_elevator_info",
+  "show_delay",
+  "show_type_icon",
+  "show_platform",
+  "show_hero_metric",
+  "show_departures",
+  "show_stops_ahead",
+  "show_qr_button",
+  "hide_header",
+  "hide_attribution",
+  "layout",
+]);
+
 const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_colors" | "type"> = {
   max_departures: 6,
   show_accessibility: false,
@@ -181,11 +291,17 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
     }
   }
 
+  // Filter raw to ONLY the keys this normaliser doesn't handle —
+  // passes through dashboard layout fields (grid_options, view_layout,
+  // visibility, layout_options) without smuggling pre-normalisation
+  // versions of validated keys into the result.
+  const passthrough: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!MODERN_VALIDATED_KEYS.has(k)) passthrough[k] = v;
+  }
+
   return {
-    // Spread raw first so dashboard passthrough fields (grid_options,
-    // view_layout, visibility, layout_options) survive the round-trip.
-    // Validated keys below override anything raw carried for them.
-    ...(raw as Record<string, unknown>),
+    ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
@@ -226,7 +342,12 @@ export interface NormalisedRetroConfigValidated {
   flicker: boolean;
   wheelchair_race: boolean;
   accessibility_only: boolean;
+  message_ticker: boolean;
+  message_text?: string | undefined;
   walk_times?: WalkTimes | undefined;
+  show_header: boolean;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
 }
 
 // See NormalisedModernConfig — same passthrough rule for dashboard
@@ -234,6 +355,28 @@ export interface NormalisedRetroConfigValidated {
 export type NormalisedRetroConfig = NormalisedRetroConfigValidated & {
   [key: string]: unknown;
 };
+
+// See MODERN_VALIDATED_KEYS — retro card's mirror set.
+const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "entity",
+  "direction",
+  "line",
+  "show_platform",
+  "show_station_name",
+  "station_bg",
+  "size",
+  "style",
+  "flicker",
+  "wheelchair_race",
+  "accessibility_only",
+  "message_ticker",
+  "message_text",
+  "walk_times",
+  "show_header",
+  "header_left",
+  "header_right",
+]);
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   const direction = raw.direction === "R" ? "R" : "H";
@@ -244,10 +387,13 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
     ? (raw.style as RetroStyle)
     : "classic";
+  const passthrough: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!RETRO_VALIDATED_KEYS.has(k)) passthrough[k] = v;
+  }
+
   return {
-    // Spread raw first so dashboard passthrough fields (grid_options,
-    // view_layout, visibility, layout_options) survive the round-trip.
-    ...(raw as Record<string, unknown>),
+    ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
@@ -260,12 +406,34 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     flicker: raw.flicker === true,
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,
+    message_ticker: raw.message_ticker === true,
+    // Cap the marquee text at 160 chars (bounds a runaway config) but
+    // do NOT trim it: this normaliser runs on every editor keystroke,
+    // and trimming the trailing space mid-sentence would re-render the
+    // input without it — making spaces impossible to type. Blank or
+    // whitespace-only collapses to undefined so the card treats
+    // "ticker on, no text" as inert; stray leading/trailing spaces in
+    // a real message are harmless in a scrolling marquee.
+    message_text:
+      typeof raw.message_text === "string" && raw.message_text.trim()
+        ? raw.message_text.slice(0, 160)
+        : undefined,
     walk_times: normaliseWalkTimes(raw.walk_times),
+    // Master gate for the U-Bahn header strip. Defaults to false so
+    // pre-1.5.0 retro cards stay byte-identical until the user
+    // explicitly enables the feature; per-side configs are kept
+    // either way (toggling back on restores them).
+    show_header: raw.show_header === true,
+    header_left: normaliseRetroHeaderSide(raw.header_left),
+    header_right: normaliseRetroHeaderSide(raw.header_right),
   };
 }
 
-// Resolves a line label to its background hex (`#…`). Precedence:
-//   1. user-config `line_colors` (per-line override)
+// Resolves the paired (background, foreground) palette for a line chip.
+// Precedence:
+//   1. user-config `line_colors` (per-line override) — `color` is left
+//      unset so the card's CSS default (white) applies, since we can't
+//      know what reads well on an arbitrary user colour.
 //   2. nightline category rule (`^N\d`) — wins OVER GTFS for N-prefix
 //      lines. GTFS publishes nightlines as bus navy (`0A295D`), but
 //      Wiener Linien's signage convention pairs a deeper navy with
@@ -275,48 +443,35 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
 //   4. neutral fallback (`var(--primary-color)`)
 //
 // `overrides` keys are case-folded to uppercase to match the editor's
-// own normalisation; the GTFS map is keyed verbatim by line label and
-// is also probed both upper and as-given for robustness against any
-// future schema surprise.
-export function colorForLine(
-  line: string,
-  overrides: Record<string, string>,
-  gtfsColors: LineColorsMap = {},
-  fallback = "var(--primary-color)",
-): string {
-  const upper = line.toUpperCase();
-  if (overrides[upper] !== undefined) return overrides[upper];
-  // Nightline rule wins over GTFS — see precedence comment above.
-  if (/^N\d/.test(upper)) return NIGHTLINE_BG;
-  const gtfs = gtfsColors[line] ?? gtfsColors[upper];
-  if (gtfs?.bg) return `#${gtfs.bg}`;
-  return fallback;
-}
-
-// Resolves the paired (background, foreground) palette for a line chip.
-// The fg rule is coupled to where the bg came from so the two never
-// drift: nightline-yellow text only pairs with the nightline navy bg,
-// GTFS fg only pairs with the matching GTFS bg, and a user override
-// leaves the fg unset (the card's CSS default — white — applies because
-// we don't know what reads well on the user's custom colour). Nightline
-// rule wins over GTFS — see colorForLine precedence comment.
+// own normalisation; the GTFS map is probed by both upper and as-given
+// label for robustness against future schema surprises.
 export function chipPalette(
   line: string,
   overrides: Record<string, string>,
   gtfsColors: LineColorsMap = {},
+  fallback = "var(--primary-color)",
 ): { background: string; color?: string } {
   const upper = line.toUpperCase();
-  if (overrides[upper] !== undefined) {
-    return { background: overrides[upper] };
-  }
-  if (/^N\d/.test(upper)) {
-    return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
-  }
+  if (overrides[upper] !== undefined) return { background: overrides[upper] };
+  if (/^N\d/.test(upper)) return { background: NIGHTLINE_BG, color: NIGHTLINE_FG };
   const gtfs = gtfsColors[line] ?? gtfsColors[upper];
   if (gtfs?.bg) {
     return gtfs.fg
       ? { background: `#${gtfs.bg}`, color: `#${gtfs.fg}` }
       : { background: `#${gtfs.bg}` };
   }
-  return { background: "var(--primary-color)" };
+  return { background: fallback };
+}
+
+// Background-only convenience over `chipPalette` for callers that only
+// need the bg colour (badge swatches, filter pills). One ladder, two
+// surfaces — keeping these as separate ladders previously let the
+// nightline / GTFS precedence drift between bg-only and bg+fg sites.
+export function colorForLine(
+  line: string,
+  overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
+  fallback = "var(--primary-color)",
+): string {
+  return chipPalette(line, overrides, gtfsColors, fallback).background;
 }

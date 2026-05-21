@@ -89,14 +89,14 @@ async def _probe_monitor_lines(
     url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
     params = [("stopId", str(r)) for r in rbls]
     try:
-        resp = await session.get(
+        async with session.get(
             url,
             params=params,
             headers=base_request_headers(USER_AGENT),
             timeout=aiohttp.ClientTimeout(total=10),
-        )
-        resp.raise_for_status()
-        body = await resp.json()
+        ) as resp:
+            resp.raise_for_status()
+            body = await resp.json()
     except (asyncio.TimeoutError, aiohttp.ClientError, ValueError) as err:
         _LOGGER.warning("Line-probe failed for RBLs %s: %s", rbls, err)
         return []
@@ -179,7 +179,17 @@ def _static_lines_for_station(
             # Pattern must actually pass through this station — a line
             # can have multiple patterns (short turns, branches) and
             # only some visit a given DIVA's RBLs.
-            if not station_rbl_set.intersection(pattern.stops):
+            intersection = station_rbl_set.intersection(pattern.stops)
+            if not intersection:
+                continue
+            # Skip self-terminating short-turn patterns: when this
+            # station is itself the terminus, the picker would surface
+            # "U1 → Westbahnhof" while the user is configuring at
+            # Westbahnhof. The live /monitor never emits these (the
+            # vehicle has already arrived), so they only show up via
+            # the static merge.
+            terminus_rbl = pattern.stops[-1] if pattern.stops else None
+            if terminus_rbl is not None and terminus_rbl in station_rbl_set:
                 continue
             # Direction codes: H="hin" (CSV 1), R="retour" (CSV 2).
             # Mirrors the live /monitor convention so saved keys round-
@@ -188,7 +198,6 @@ def _static_lines_for_station(
             key = _line_key(label, direction_str)
             if key in seen:
                 continue
-            terminus_rbl = pattern.stops[-1] if pattern.stops else None
             terminus_entry = (
                 rbl_index.get(terminus_rbl) if terminus_rbl else None
             )
@@ -235,11 +244,14 @@ async def _resolve_lines_for_picker(
 class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a multi-step config flow for Wiener Linien Austria."""
 
-    # Bump + add async_migrate_entry when entry.data shape changes.
-    # Tracks the config-entry schema, not the integration release version.
+    # Bump VERSION + add async_migrate_entry when entry.data shape changes
+    # in a non-additive way (renames, removals, type changes). MINOR_VERSION
+    # bumps for additive changes that older HA versions can still load.
+    # Tracks the config-entry schema, NOT the integration release version.
     # v2: CONF_LINES stores `{line}|{direction}` pairs (was triples) —
     # line.towards is unstable across polls on branching termini.
     VERSION = 2
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Init in-flight selections."""

@@ -4,6 +4,13 @@ import { css } from "lit";
 // Per-station accent is piped in via inline `style="--wl-accent: …;"` on
 // `.station`, so every accented surface (icon-tile, line badge, alert
 // surface, focus ring) reads from one prop.
+//
+// Webfonts (WL Sans / WL Sans Condensed / WL Mono) are NOT declared
+// here: `@font-face` inside Shadow DOM is unreliable on older engines
+// (Android System WebView). `registerWlFonts()` from `./font-face`
+// injects the faces on `document.head` instead — the card just
+// references the families by name. See font-face.ts / www/fonts/
+// NOTICE.md for the rationale, provenance + GUST Font License terms.
 export const cardStyles = css`
   :host {
     /* color-scheme enables light-dark() and steers forced-colors
@@ -21,10 +28,10 @@ export const cardStyles = css`
     /* Semantic state tokens layered over HA's official semantic palette
        so theme authors can recolour the whole portfolio in one place;
        hard-coded fallbacks for older HA versions. */
-    --wl-rt:      var(--ha-color-success, #43a047);
-    --wl-warning: var(--ha-color-warning, #ffa000);
-    --wl-error:   var(--ha-color-error,   #db4437);
-    --wl-info:    var(--ha-color-info,    #1565c0);
+    --wl-rt:      var(--success-color, #43a047);
+    --wl-warning: var(--warning-color, #ffa000);
+    --wl-error:   var(--error-color,   #db4437);
+    --wl-info:    var(--info-color,    #1565c0);
     /* ISA / ISO 7001 accessibility blue (Pantone 285 C). Kept on its
        own token — separate from --wl-info — so the wheelchair pill
        always renders in the standards-correct colour, while themes can
@@ -99,11 +106,23 @@ export const cardStyles = css`
   }
 
   /* Per-station section. Inline --wl-accent on this element drives the
-     icon-tile tint, line-badge fallback, alert tints, and CTA fill. */
+     icon-tile tint, line-badge fallback, alert tints, and CTA fill —
+     and the atmospheric radial wash below. */
   .station {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--wl-row-gap);
+    /* Soft radial wash from the top-left in the station's line accent.
+       Picks up the per-station --wl-accent automatically, adds depth
+       without competing with user themes. Tuned conservatively (6%
+       opacity, 70% radius) so it reads as a tint rather than a tile —
+       theme-agnostic atmosphere, frontend-design audit. */
+    background-image: radial-gradient(
+      ellipse 80% 70% at top left,
+      color-mix(in srgb, var(--wl-accent) 6%, transparent),
+      transparent 70%
+    );
   }
   .station + .station {
     margin-top: var(--wl-row-gap);
@@ -228,8 +247,9 @@ export const cardStyles = css`
     color: var(--wl-accent);
   }
   .hero-min {
+    font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     font-size: var(--wl-metric-size);
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
     line-height: 1;
     letter-spacing: -0.5px;
@@ -713,7 +733,8 @@ export const cardStyles = css`
   }
   .line-badge {
     text-align: center;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
+    font-weight: 700;
     color: #fff;
     border-radius: 6px;
     padding: 3px 8px;
@@ -799,8 +820,9 @@ export const cardStyles = css`
     color: var(--wl-warning);
   }
   .countdown {
+    font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     font-variant-numeric: tabular-nums;
-    font-weight: 600;
+    font-weight: 700;
     min-width: 50px;
     text-align: right;
     color: var(--secondary-text-color);
@@ -850,7 +872,7 @@ export const cardStyles = css`
     margin-left: auto;
   }
 
-  /* Dev-mode strip — visible only on rpi25 / ?wl_debug=1 */
+  /* Dev-mode strip — visible only with ?wl_debug=1 or localStorage.wl_debug=1 */
   .dev-strip {
     display: flex;
     align-items: center;
@@ -1019,6 +1041,30 @@ export const cardStyles = css`
       forced-color-adjust: none;
       outline: 1px solid CanvasText;
     }
+  }
+
+  /* First-paint stagger (frontend-design audit) — subtle cascading
+     reveal on initial mount. Each departure row inlines its
+     position-in-list via style="--row-i: N"; the keyframe runs once
+     forwards. Capped at 6 rows so long lists don't take ages to
+     settle. The motion-reduce catch-all below collapses the
+     animation duration to 0.01ms, leaving the end-state visible
+     instantly for users who opt out. */
+  @keyframes wlRowReveal {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .dep-row,
+  .hero-host,
+  .alert-row {
+    animation: wlRowReveal 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(min(var(--row-i, 0), 6) * 55ms);
   }
 
   @media (prefers-reduced-motion: reduce) {

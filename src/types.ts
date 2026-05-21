@@ -59,6 +59,15 @@ declare global {
   }
 }
 
+/** Window shape for the HA `customCards` registry. Both card entrypoints
+ *  push their picker descriptor into `window.customCards` at module
+ *  load — this interface is the canonical cast target so the two
+ *  registration blocks read identically and a future maintainer can't
+ *  drift the field name (`customCards` vs `customCardsRegistry`). */
+export interface WindowWithCustomCards extends Window {
+  customCards?: Array<Record<string, unknown>>;
+}
+
 // ---------------------------------------------------------------------------
 // ha-form schema types — keep narrow on purpose so the schema builder stays
 // strictly typed. `expandable` + `flatten: true` is non-negotiable —
@@ -77,6 +86,7 @@ export type HASelector =
       };
     }
   | { boolean: Record<string, never> }
+  | { icon: Record<string, never> }
   | { text: { type?: "text" | "password" | "url" | "email"; multiline?: boolean } }
   | {
       number: {
@@ -298,6 +308,55 @@ export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
 export type RetroStyle = "classic" | "warm" | "pixel";
 
+/** Exit-icon variant for one side of the station header strip.
+ *  Either `"none"` (suppresses the icon), one of the two WL-traced
+ *  signage glyphs (`"regular"` / `"accessible"`), or an MDI icon
+ *  identifier from the curated `RetroHeaderMdiExit` set in
+ *  utils/retro-station-icons.ts. Kept as a broad template literal
+ *  here (`mdi:${string}`) to avoid a circular `types.ts ↔ utils`
+ *  type import; the runtime normaliser validates against the
+ *  curated set. */
+export type RetroHeaderExit =
+  | "none"
+  | "regular"
+  | "accessible"
+  | `mdi:${string}`;
+
+/** Per-side config for the retro card's optional U-Bahn-signage
+ *  header strip (the black band above the orange station name).
+ *  When every field is unset / falsy / `"none"`, the side renders
+ *  nothing and — if both sides empty — the whole strip is omitted
+ *  (backward-compatible). */
+export interface RetroHeaderSide {
+  exit?: RetroHeaderExit | undefined;
+  /** Text label on this side — typically the name of the
+   *  adjacent station or passage. Bounded to 64 chars at
+   *  normalisation; ellipsised at render. */
+  text?: string | undefined;
+  show_wc?: boolean | undefined;
+  show_escalator?: boolean | undefined;
+  show_elevator?: boolean | undefined;
+  /** Optional sequence of short text chips rendered as white
+   *  boxes after the WC tile (further from the sign text than
+   *  any amenity icon). Useful for short labels like platform
+   *  numbers, line designators, or auxiliary signage text.
+   *  Each chip is trimmed and bounded to 16 chars; the list is
+   *  capped at 6 entries to defensively guard against a
+   *  runaway config blowing out the strip. */
+  chips?: string[] | undefined;
+  /** Free-form MDI icon keys rendered as black-on-white tiles
+   *  between the WC tile and the text chips. Storage is a flat
+   *  `string[]` of `mdi:*` identifiers — same chip-input pattern
+   *  the editor uses for `chips`, because ha-form's icon selector
+   *  doesn't reliably commit clicks when nested inside a
+   *  `flatten: false` expandable (HA core only uses icon selectors
+   *  at the root data level or inside `flatten: true` expandables).
+   *  User types or pastes the MDI key (e.g. "mdi:parking"); the
+   *  normaliser drops entries that don't start with `mdi:`. Capped
+   *  at 3 entries. */
+  extra_icons?: string[] | undefined;
+}
+
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
   // `?: T | undefined` — dual form for `exactOptionalPropertyTypes`
@@ -313,5 +372,22 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   flicker?: boolean | undefined;
   wheelchair_race?: boolean | undefined;
   accessibility_only?: boolean | undefined;
+  /** When `true`, every 5 minutes the LED panel clears and
+   *  `message_text` scrolls across it once as a marquee, then the
+   *  departures return. Default `false` — pre-feature cards render
+   *  unchanged. Inert while `message_text` is empty. */
+  message_ticker?: boolean | undefined;
+  /** Custom text scrolled by `message_ticker`. Trimmed and bounded
+   *  to 160 chars at normalisation. */
+  message_text?: string | undefined;
   walk_times?: WalkTimes | undefined;
+  /** Master toggle for the U-Bahn-style station-header strip above
+   *  the orange station-name band. When `false` (the default), the
+   *  strip is suppressed and the card renders as it did pre-1.5.0,
+   *  even if `header_left` / `header_right` are configured.
+   *  Per-side configs are preserved (so toggling back on restores
+   *  them); this just gates the render. */
+  show_header?: boolean | undefined;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
 }

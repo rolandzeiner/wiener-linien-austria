@@ -21,8 +21,8 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
-import re
 import logging
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -36,6 +36,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
+    ENTRY_COUNT_KEY,
     MAX_STOPS_AHEAD,
     STATIC_FILES,
     USER_AGENT,
@@ -167,9 +168,15 @@ STORE_KEY = f"{DOMAIN}_static"
 # duplicating the bare string — a typo in any caller would silently break
 # the catalogue lookup on that one path only.
 CATALOGUE_KEY = "static_catalogue"
+# hass.data key for the background catalogue-refresh task spawned when an
+# older cache predates trip-patterns / colours / etc. Stored so the last-
+# entry unload cleanup can cancel an in-flight task — without that, the
+# task could complete after teardown and re-poison hass.data[DOMAIN] via
+# `async_set_cached_catalogue`.
+BACKGROUND_REFRESH_TASK_KEY = "static_bg_refresh_task"
 
 
-@dataclass
+@dataclass(slots=True)
 class Station:
     """One Wiener Linien station (DIVA) with its RBL platforms."""
 
@@ -198,7 +205,7 @@ class TripPattern:
     stops: tuple[int, ...]
 
 
-@dataclass
+@dataclass(slots=True)
 class TripPatternIndex:
     """Compact index over `fahrwegverlaeufe` + `linien` + GTFS `routes.txt`.
 
@@ -225,6 +232,21 @@ class TripPatternIndex:
     lines_at_diva: dict[int, tuple[str, ...]] = field(default_factory=dict)
     colors_by_line: dict[str, str] = field(default_factory=dict)
     text_colors_by_line: dict[str, str] = field(default_factory=dict)
+    # Reverse of `lines_by_label`. Built lazily in `__post_init__` —
+    # callers that need to resolve a LineID back to a label (the
+    # stops_ahead matcher does this once per departure row) get O(1)
+    # instead of an O(N) iteration over `lines_by_label.items()`.
+    label_for_line: dict[int, str] = field(default_factory=dict, repr=False)
+
+    def __post_init__(self) -> None:
+        """Build the LineID→label reverse index at construction.
+
+        Rebuilt unconditionally — the cost is microseconds even on the
+        full Wiener Linien catalogue, and rebuilding always means the
+        index can't drift away from `lines_by_label` if a future caller
+        constructs an instance with a stale or empty reverse map.
+        """
+        self.label_for_line = {v: k for k, v in self.lines_by_label.items()}
 
     @property
     def line_count(self) -> int:
@@ -237,7 +259,7 @@ class TripPatternIndex:
         return sum(len(v) for v in self.patterns_by_line.values())
 
 
-@dataclass
+@dataclass(slots=True)
 class StaticCatalogue:
     """In-memory catalogue of Wiener Linien stops and (optionally) trip patterns.
 
@@ -253,14 +275,25 @@ class StaticCatalogue:
     last_fetched: str  # ISO 8601 UTC
     validators: dict[str, CacheValidators] = field(default_factory=dict)
     trip_patterns: TripPatternIndex | None = None
-    # Reverse index: RBL → (DIVA, station name). Built lazily on first
-    # call to `index_by_rbl()` and cached on the dataclass instance so
-    # subsequent lookups are O(1). Without it, the trip-pattern matcher
-    # ran a linear `for station in stations_by_diva.values()` per RBL
-    # per departure per coordinator tick — ~9 k scans/min at busy hubs.
-    _rbl_index: dict[int, tuple[int, str]] | None = field(
-        default=None, repr=False, compare=False
+    # Reverse index: RBL → (DIVA, station name). Built eagerly in
+    # `__post_init__` so concurrent first-access from two coroutines
+    # can't both trigger a rebuild (lazy initialisation was a benign
+    # but wasteful race). Survives every poll and only rebuilds when a
+    # new catalogue is fetched (which replaces the whole instance).
+    # Tens of thousands of `_diva_for_rbl` / `_station_name_for_rbl`
+    # calls per coordinator tick collapse to dict lookups.
+    _rbl_index: dict[int, tuple[int, str]] = field(
+        default_factory=dict, repr=False, compare=False
     )
+
+    def __post_init__(self) -> None:
+        """Build the RBL→(DIVA, name) index once at construction."""
+        if not self._rbl_index:
+            index: dict[int, tuple[int, str]] = {}
+            for diva, station in self.stations_by_diva.items():
+                for rbl in station.rbls:
+                    index[rbl] = (diva, station.name)
+            self._rbl_index = index
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
         """Return stations whose name contains the query (case-insensitive)."""
@@ -278,21 +311,7 @@ class StaticCatalogue:
         return results[:limit]
 
     def index_by_rbl(self) -> dict[int, tuple[int, str]]:
-        """Return (cached) RBL → (DIVA, station name) reverse index.
-
-        Built once on first access by walking every Station's `rbls`. The
-        index lives on the catalogue instance, so it survives every poll
-        and only rebuilds when a new catalogue is fetched (which replaces
-        the whole instance). Tens of thousands of `_diva_for_rbl` /
-        `_station_name_for_rbl` calls per coordinator tick collapse to
-        dict lookups.
-        """
-        if self._rbl_index is None:
-            index: dict[int, tuple[int, str]] = {}
-            for diva, station in self.stations_by_diva.items():
-                for rbl in station.rbls:
-                    index[rbl] = (diva, station.name)
-            self._rbl_index = index
+        """Return the eager RBL → (DIVA, station name) reverse index."""
         return self._rbl_index
 
 
@@ -319,8 +338,16 @@ async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
         result: StaticCatalogue = await cached
         return result
 
-    task: asyncio.Task[StaticCatalogue] = asyncio.create_task(
-        async_load_catalogue(hass)
+    # `hass.async_create_background_task` over raw `asyncio.create_task`
+    # so HA's task tracker sees this as a domain task — auto-cancelled
+    # on HA shutdown, surfaced in the developer-tools task list under
+    # the supplied name. The task is awaited inline (concurrent callers
+    # find it via `domain_data[CATALOGUE_KEY]` and await the same one),
+    # so the "background" label is about lifecycle ownership, not
+    # fire-and-forget semantics.
+    task: asyncio.Task[StaticCatalogue] = hass.async_create_background_task(
+        async_load_catalogue(hass),
+        name=f"{DOMAIN}_load_catalogue",
     )
     domain_data[CATALOGUE_KEY] = task
     try:
@@ -343,8 +370,18 @@ def async_set_cached_catalogue(
     weeks-to-months cadence. This call ensures only that *new*
     coordinators (after entry reload) and the next config-flow
     invocation see the refreshed data.
+
+    No-op when the integration has been torn down (no entries left). A
+    background refresh task spawned earlier may otherwise complete
+    after `async_unload_entry` ran and re-poison `hass.data[DOMAIN]`
+    with a catalogue we just deliberately dropped. Checks the *value*
+    of `ENTRY_COUNT_KEY`, not just its presence — last-unload sets it
+    to 0 (rather than popping it) so a presence-only check would
+    silently let the race through.
     """
-    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
+        return
     domain_data[CATALOGUE_KEY] = catalogue
 
 
@@ -373,27 +410,55 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 err,
             )
         else:
-            needs_refresh_reason: str | None = None
-            if catalogue.trip_patterns is None:
-                needs_refresh_reason = "predates trip_patterns"
-            elif not catalogue.trip_patterns.lines_at_diva:
+            # First-match tells. Each tuple is (predicate, reason); the
+            # first predicate that returns True wins. Adding a new
+            # migration trigger means appending one tuple — no risk of
+            # forgetting to update the elif chain.
+            tp = catalogue.trip_patterns
+            migration_tells: tuple[tuple[bool, str], ...] = (
+                (tp is None, "predates trip_patterns"),
                 # Older cache wrote trip_patterns without the
-                # lines_at_diva index — refresh to populate it.
-                needs_refresh_reason = "missing lines_at_diva index"
-            elif not catalogue.trip_patterns.colors_by_line:
-                # Cache predates GTFS routes.txt — background-refresh
-                # so the card isn't stuck on the fallback palette until
-                # the next weekly tick.
-                needs_refresh_reason = "missing route colours"
+                # lines_at_diva index.
+                (tp is not None and not tp.lines_at_diva, "missing lines_at_diva index"),
+                # Cache predates GTFS routes.txt — refresh so the card
+                # isn't stuck on the fallback palette until the next
+                # weekly tick.
+                (tp is not None and not tp.colors_by_line, "missing route colours"),
+            )
+            needs_refresh_reason = next(
+                (reason for cond, reason in migration_tells if cond),
+                None,
+            )
             if needs_refresh_reason is not None:
+                domain_data = hass.data.setdefault(DOMAIN, {})
+                existing = domain_data.get(BACKGROUND_REFRESH_TASK_KEY)
+                if isinstance(existing, asyncio.Task) and not existing.done():
+                    # A migration is already in flight — don't queue a
+                    # second one. The first will finish and update the
+                    # shared catalogue ref.
+                    return catalogue
                 _LOGGER.warning(
                     "Static cache %s; scheduling background refresh",
                     needs_refresh_reason,
                 )
-                hass.async_create_background_task(
+                task = hass.async_create_background_task(
                     _async_background_refresh(hass, prior=catalogue, store=store),
                     name=f"{DOMAIN}_trip_patterns_migration",
                 )
+                domain_data[BACKGROUND_REFRESH_TASK_KEY] = task
+                # Self-clear the slot when the task finishes so a future
+                # refresh can be scheduled. Cancellation also fires this
+                # callback (asyncio guarantees done-callbacks on cancel),
+                # which keeps the slot tidy after unload.
+                bound_domain_data = domain_data
+
+                def _clear_bg_task_slot(
+                    _t: asyncio.Future[None],
+                    dd: dict[str, Any] = bound_domain_data,
+                ) -> None:
+                    dd.pop(BACKGROUND_REFRESH_TASK_KEY, None)
+
+                task.add_done_callback(_clear_bg_task_slot)
             return catalogue
 
     catalogue = await _fetch_and_build(hass, prior=None)
@@ -488,15 +553,39 @@ async def _fetch_and_build(
     punkte_validators = (
         prior.validators.get("haltepunkte") if prior else None
     ) or CacheValidators()
+    # Force a full body for linien + fahrwegverlaeufe whenever we don't
+    # yet have a fully-built trip-pattern index. Stale validators would
+    # otherwise trigger a 304 with an empty body, leaving us unable to
+    # rebuild the missing parts this cycle and stuck on weekly cadence
+    # until BOTH CSVs happen to flip fresh in the same tick. Empty
+    # `lines_at_diva` is the migration tell for caches written before
+    # that index existed; without this branch the migration loops
+    # 304→304 forever.
+    needs_pattern_bodies = (
+        prior is None
+        or prior.trip_patterns is None
+        or not prior.trip_patterns.lines_at_diva
+    )
     linien_validators = (
-        prior.validators.get("linien") if prior else None
-    ) or CacheValidators()
+        CacheValidators()
+        if needs_pattern_bodies
+        else (prior.validators.get("linien") if prior else None) or CacheValidators()
+    )
     fahr_validators = (
-        prior.validators.get("fahrwegverlaeufe") if prior else None
-    ) or CacheValidators()
+        CacheValidators()
+        if needs_pattern_bodies
+        else (prior.validators.get("fahrwegverlaeufe") if prior else None)
+        or CacheValidators()
+    )
+    # Same logic for the colour map: if we don't have it yet, force-fetch.
+    needs_routes_body = prior is None or not (
+        prior.trip_patterns and prior.trip_patterns.colors_by_line
+    )
     routes_validators = (
-        prior.validators.get("routes") if prior else None
-    ) or CacheValidators()
+        CacheValidators()
+        if needs_routes_body
+        else (prior.validators.get("routes") if prior else None) or CacheValidators()
+    )
 
     (
         haltestellen_result,
@@ -534,8 +623,9 @@ async def _fetch_and_build(
     # All-304 fast path: only valid if every optional fetch actually
     # happened (not failed) and also returned 304. A failed fetch is NOT
     # the same as 304 — we lose the freshness signal, so we fall through
-    # and rebuild from prior.
-    all_304 = (
+    # and rebuild from prior. `prior is not None` guards the early return
+    # so mypy can narrow the return type without a `# type: ignore`.
+    if prior is not None and (
         halte_text is None
         and punkte_text is None
         and linien_text is None
@@ -544,10 +634,8 @@ async def _fetch_and_build(
         and not linien_failed
         and not fahr_failed
         and not routes_failed
-        and prior is not None
-    )
-    if all_304:
-        return prior  # type: ignore[return-value]
+    ):
+        return prior
 
     # Stations: either freshly parsed or carried over from prior unchanged.
     if halte_text is None and prior is not None:
@@ -677,18 +765,18 @@ async def _download_text(
     The validators object is updated in-place from response headers and
     returned so callers can persist it.
     """
-    resp = await session.get(
+    async with session.get(
         url,
         headers={**base_request_headers(USER_AGENT), **validators.to_request_headers()},
         timeout=timeout,
-    )
-    if resp.status == 304:
+    ) as resp:
+        if resp.status == 304:
+            validators.update_from_response(resp)
+            return (None, validators)
+        resp.raise_for_status()
+        body = await resp.text()
         validators.update_from_response(resp)
-        return (None, validators)
-    resp.raise_for_status()
-    body = await resp.text()
-    validators.update_from_response(resp)
-    return (body, validators)
+        return (body, validators)
 
 
 async def _download_or_fail_soft(
@@ -1069,14 +1157,7 @@ def stops_ahead_for_match(
     # `diva` key is dropped from the attribute on purpose: keeping the
     # per-stop dict small lets MAX_STOPS_AHEAD-bounded full routes fit
     # under the 16 KB recorder cap on busy multi-line stops.
-    current_label = next(
-        (
-            label
-            for label, lid in catalogue.trip_patterns.lines_by_label.items()
-            if lid == best.line_id
-        ),
-        None,
-    )
+    current_label = catalogue.trip_patterns.label_for_line.get(best.line_id)
     lines_at_diva = catalogue.trip_patterns.lines_at_diva
 
     full: list[dict[str, Any]] = []

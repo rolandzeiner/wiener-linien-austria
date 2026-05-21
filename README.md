@@ -24,12 +24,16 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 
 <table>
   <tr>
-    <td align="center"><img src="screenshots/card.webp" height="320" alt="Lovelace card" /></td>
+    <td align="center" valign="top">
+      <img src="screenshots/card-2.webp" width="264" alt="Lovelace card (retro LED)" />
+      <br/>
+      <img src="screenshots/card.webp" height="320" alt="Lovelace card (modern)" />
+    </td>
     <td align="center"><img src="screenshots/card-config.webp" height="320" alt="Card editor" /></td>
     <td align="center"><img src="screenshots/config-flow.webp" height="320" alt="Config flow" /></td>
   </tr>
   <tr>
-    <td align="center"><em>Lovelace card</em></td>
+    <td align="center"><em>Lovelace cards (Retro · Modern)</em></td>
     <td align="center"><em>Card editor</em></td>
     <td align="center"><em>Config flow</em></td>
   </tr>
@@ -94,14 +98,16 @@ Disruption and elevator entries render as collapsible rows above the stop list �
 
 A focused single-stop, single-direction LED-display card mimicking real Wiener Linien platform signs. Dashboard → Add card → "Wiener Linien Austria Retro".
 
-- Next 2 departures for one direction; amber glyphs in a system monospace stack. Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on warm-brown substrate), and *pixel* (screen-door overlay turning every glyph into discrete LED dots). No Google-Fonts fetch (GDPR-clean).
+- Next 2 departures for one direction; amber glyphs in **WL Mono** — a subsetted TeX Gyre Cursor face bundled with the integration (no external font fetch, GDPR-clean). Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on warm-brown substrate), and *pixel* (screen-door overlay turning every glyph into discrete LED dots).
 - Amber **GLEIS** / **STEIG** panel when the API reports a platform — left-aligned for Gleis "2", right-aligned otherwise, mirroring the real signs.
+- Optional **station header strip** *(1.5.0)* — a black band above the station name, modelled on real Wiener Linien U-Bahn signage. Off by default; turn on the **Show station header** toggle in the editor to enable. **Per side:** exit icon (regular or step-free WL arrow, or one of four MDI alternatives — running person, door + arrow, open door, stairs), optional sign text (e.g. the next station's name), toggleable WC / escalator / elevator amenity tiles, up to 3 free-form MDI icons (any `mdi:*` — type to search HA's full catalogue), and up to 6 short text labels. Rendered in the bundled **WL Sans Condensed** face; exit arrows auto-flip per side so they always point outward. Hand-traced SVGs for the WL signage glyphs, `<ha-icon>` for MDI variants — no external icon fetch.
 - Wheelchair glyph after destinations on step-free departures; alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`).
 - "Betriebsschluss" / "End of service" rendering when the board is empty; differentiated empty-state hints for wrong direction or filtered-out lines.
 - Three size variants (small / medium / regular). Defaults to a full 12-column row in HA section view.
-- Editor: stop picker, H/R direction toggle (auto-corrects to the only-tracked direction when the stop is one-way OR when only one direction is tracked), single-line picker drawn from the **lines you tracked in the integration's config flow** (off-service nightlines appear regardless of time-of-day), station-name panel + background picker, size picker (small / medium / regular), style picker (classic / warm / pixel), flicker toggle, accessibility-only filter, show-platform toggle, and per-line walking-time inputs.
+- Editor: stop picker, H/R direction toggle (auto-corrects to the only-tracked direction when the stop is one-way OR when only one direction is tracked), single-line picker drawn from the **lines you tracked in the integration's config flow** (off-service nightlines appear regardless of time-of-day), station-name panel + background picker, optional station header strip (master toggle + per-side exit-icon variant, sign text, amenity toggles, free-form MDI icons, and text labels), size picker (small / medium / regular), style picker (classic / warm / pixel), flicker toggle, scrolling-message toggle + text, accessibility-only filter, show-platform toggle, and per-line walking-time inputs.
 - Station-name tile colour: when `Background = default`, the tile picks up the **configured line's** Wiener-Linien-published palette (nightline-blue + bright yellow for N-prefix lines via the signage rule, GTFS palette otherwise). The configured line wins over live departures, so a nightline-configured retro card renders in nightline-blue at noon instead of falling back to white.
 - Optional **wheelchair race** (toggle in editor) — when ≥ 2 upcoming departures are barrier-free, runs a "3, 2, 1" pre-race countdown and a finish overlay with a trophy badge for the winning lane. Tap the card while idle to trigger one immediately. Gated by `prefers-reduced-motion`.
+- Optional **scrolling message** *(1.5.0)* — a custom line of text that scrolls across the LED panel once every 5 minutes, then hands the board back to the live departures. Off by default; turn on the **Scrolling message** toggle in the editor and a text field appears (up to 160 characters). Tap the card to skip a scroll in progress; gated by `prefers-reduced-motion`. The scrolling message and the wheelchair race take turns — the two LED takeovers never overlap.
 
 Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
 
@@ -228,6 +234,8 @@ If you build a Lovelace card or other user-facing UI on top of this integration,
 ## License
 
 MIT — see [LICENSE](LICENSE). Integration code is MIT; the Wiener Linien data flowing through it is CC BY 4.0.
+
+**Bundled webfonts** (`custom_components/wiener_linien_austria/www/fonts/`) — `WL Sans`, `WL Sans Condensed`, and `WL Mono` are subsetted derivatives of the [TeX Gyre](https://www.gust.org.pl/projects/e-foundry/tex-gyre) family (Heros / Heros Cn / Cursor) by Bogusław Jackowski and Janusz M. Nowacki on behalf of GUST. The fonts ship under the [GUST Font License](custom_components/wiener_linien_austria/www/fonts/GUST-FONT-LICENSE.txt) (LPPL 1.3c+) and were renamed per the GFL's request that derivatives use new names. See [`www/fonts/NOTICE.md`](custom_components/wiener_linien_austria/www/fonts/NOTICE.md) for provenance, the exact subset (Latin + German diacritics + a handful of typographic glyphs), and reproduction steps.
 
 ## Disclaimer
 

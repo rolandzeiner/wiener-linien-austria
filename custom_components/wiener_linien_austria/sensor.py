@@ -71,6 +71,12 @@ class WienerLinienStopSensor(
             "traffic_info",
             "elevator_info",
             "next_by_line",
+            # Static structural metadata — useful to the card live, but
+            # never useful in history. On hub stops these are 30+ items
+            # each and would write to the recorder on every state tick.
+            "lines_at_stop",
+            "tracked_lines",
+            "tracked_line_keys",
         }
     )
 
@@ -133,11 +139,12 @@ class WienerLinienStopSensor(
             line_names = {d.line for d in departures if d.line}
         rbls = {int(r) for r in config.get(CONF_RBLS) or []}
 
-        # Use the coordinator's hass reference — `self.hass` is only set after
-        # async_added_to_hass, but tests instantiate the sensor directly.
-        traffic, elevator = get_alerts_for(
-            self.coordinator.hass, line_names, rbls
-        )
+        # Prefer `self.hass` (the standard Entity reference, set by HA
+        # during `async_added_to_hass`); fall back to the coordinator's
+        # ref so tests that read `extra_state_attributes` without
+        # routing through HA core still resolve.
+        hass = self.hass if self.hass is not None else self.coordinator.hass
+        traffic, elevator = get_alerts_for(hass, line_names, rbls)
 
         # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
         # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) stay under HA's
@@ -250,5 +257,30 @@ class WienerLinienStopSensor(
         detect staleness via the `server_time` attribute if they care.
         If we've never had a successful fetch, the coordinator's
         `data` is None and we stay unavailable — nothing to show.
+
+        ⚠ Trade-off — this DELIBERATELY violates HA's documented
+        `available` contract: HA defines `available=False` as "this
+        entity has no current valid data; templates and automations
+        should treat it as unknown." With this override, templates
+        using `is_state(..., 'unavailable')`, `availability_template:`,
+        and automation conditions that gate on `unavailable` will
+        NEVER fire on a transient outage — the entity stays
+        `available=True` and the state keeps reporting the cached
+        last-known value.
+
+        Mitigation: surface staleness through the `server_time`
+        attribute (templates that care about freshness can compare
+        it to `now()` and decide). For users who need
+        availability-based automations to fire on actual outages,
+        document the workaround: a template binary_sensor that
+        flips on `(now() - server_time) > threshold`.
+
+        DO NOT lift this pattern naively to other integrations
+        without the same UX-vs-contract trade-off being made
+        deliberately. Especially not for entities driving
+        automations more than dashboards. See
+        `~/.claude/skills/austria-portfolio-workflow/PORTFOLIO_LIFTABLES.md`
+        item 13 for the cleaner alternative (separate
+        `binary_sensor.<...>_stale` entity).
         """
         return self.coordinator.data is not None
