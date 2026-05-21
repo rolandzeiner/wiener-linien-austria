@@ -2,14 +2,17 @@
 # can't break green-on-main without a commit on our side. Bump when the
 # project intentionally adopts new behaviour from a newer release.
 # Local dev tracks the floor or higher; CI installs the floor's minor
-# resolved by pip.
+# resolved by pip. PHACC's `==` pins govern syrupy + pytest-cov etc.,
+# so the floors below stay non-conflicting with whatever PHACC pulls in.
 pytest-homeassistant-custom-component>=0.13.331,<0.14
 pytest-asyncio>=1.3.0,<2
 pytest-cov>=7.1.0,<8
-syrupy>=5.1.0,<6
+# syrupy floor intentionally omitted: PHACC pins syrupy with `==`, so any
+# floor here either matches PHACC (redundant) or contradicts it (unresolvable).
+# Let PHACC's transitive pin govern; dependabot bumps of syrupy can't apply.
 mypy>=2.1.0,<3
 ruff>=0.15.13,<1
-# Floors track PHACC 0.13.329's hard pins (pytest-cov==7.1.0,
+# Floors track PHACC 0.13.331's hard pins (pytest-cov==7.1.0,
 # syrupy==5.1.0, pytest-asyncio==1.3.0). PHACC ≥0.13.317 wraps HA core
 # 2026.5+ and requires Python ≥3.14, so the CI workflow bumped to 3.14
 # in lockstep — see validate.yml's tests job.
