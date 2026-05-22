@@ -1493,17 +1493,16 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   // Daily envelope ~23:55–05:15 captures the first/last NightLine bus
-  // spread across all routes. Computed in HA's configured timezone
-  // (`hass.config.time_zone`) — `Date.getHours()` would use the
-  // browser's local TZ, which diverges when a user remote-accesses
-  // a Vienna instance from another country, when the HA Companion
-  // app's WebView reports the device TZ, or for travellers checking
-  // their stops on the road at 02:00. Falls back to Europe/Vienna
-  // if hass isn't yet wired up (very early renders).
+  // spread across all routes. Evaluated in Europe/Vienna unconditionally:
+  // Wiener Linien NightLine service hours are a fixed property of the
+  // Vienna transit network, not of the viewer or the HA host. The
+  // browser TZ (`Date.getHours()`), and even `hass.config.time_zone`,
+  // would all be wrong for a traveller abroad, an HA Companion WebView
+  // reporting a device TZ, or an HA instance whose server TZ isn't
+  // Vienna — in every such case the buses still run on Vienna's clock.
   private _isNightlineHour(): boolean {
     if (this._nightlineHourMemo !== null) return this._nightlineHourMemo;
-    const tz = this.hass?.config?.time_zone || "Europe/Vienna";
-    const parts = _nightlineHourFormatter(tz).formatToParts(new Date());
+    const parts = _nightlineHourFormatter("Europe/Vienna").formatToParts(new Date());
     const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
     const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
     const minutesIntoDay = hour * 60 + minute;
@@ -1656,26 +1655,19 @@ export class WienerLinienAustriaCard extends LitElement {
   // ------------------------------------------------------------------
 
   private _isDevMode(): boolean {
-    // Cached on first access — `localStorage.getItem` and
-    // `window.location.search` would otherwise run on every render
-    // (footer + dev panel both call this). Cache is per-card-instance,
-    // not per-document: re-rendering the card doesn't reset, but a
-    // fresh card added later will read again. The answer can't change
-    // for a given instance without a page reload (URL flip / storage
-    // write don't propagate to a live card).
-    if (this._devModeCached !== null) return this._devModeCached;
-    let result = false;
+    // Read live, not cached: both reads are cheap, and a per-instance
+    // cache would miss a mid-session `localStorage`/URL flip while the
+    // card instance persists (HA reuses card instances across dashboard
+    // edit/exit cycles without a page reload).
     try {
       const search = window.location.search || "";
-      if (search.includes("wl_debug=1")) result = true;
-      else if (window.localStorage?.getItem("wl_debug") === "1") result = true;
+      if (search.includes("wl_debug=1")) return true;
+      if (window.localStorage?.getItem("wl_debug") === "1") return true;
     } catch {
       // SSR / restricted ctx (e.g. localStorage blocked) — default off
     }
-    this._devModeCached = result;
-    return result;
+    return false;
   }
-  private _devModeCached: boolean | null = null;
 
   private _renderDevModePanel(): TemplateResult | typeof nothing {
     if (!this._isDevMode()) return nothing;

@@ -36,11 +36,12 @@
 import { LitElement, css, html, nothing, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
-import { resolveEditorHelper, resolveEditorLabel } from "./editor-shared.js";
+import { resolveEditorHelper, resolveEditorLabel, swallowEditorKeys } from "./editor-shared.js";
 import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -232,8 +233,8 @@ export class WienerLinienAustriaCardEditor
     // Spread existing _config first to preserve dashboard passthrough
     // fields AND `type` (which ha-form's value never carries).
     const next = normaliseModernConfig({
-      ...(this._config as unknown as WienerLinienCardConfig),
-      ...(value as Partial<WienerLinienCardConfig>),
+      ...this._config,
+      ...value,
       entities: nextEntities,
     });
     this._fire(next);
@@ -315,12 +316,6 @@ export class WienerLinienAustriaCardEditor
     const line_colors = { ...this._config.line_colors };
     delete line_colors[line.toUpperCase()];
     this._fire({ ...this._config, line_colors });
-  }
-
-  // HA's card-editor steals arrow keys for navigation; stop propagation
-  // on number inputs so the user can actually edit values.
-  private _swallowKeys(ev: KeyboardEvent): void {
-    ev.stopPropagation();
   }
 
   private _attrs(eid: string): WienerLinienAttrs | undefined {
@@ -447,12 +442,6 @@ export class WienerLinienAustriaCardEditor
     const showPerLineDir = effectiveLines.length >= 2;
 
     const allTriplets = tripletsAtStop(attrs);
-    const triplets = allTriplets.filter((t) => {
-      if (picked.size > 0 && !picked.has(t.line)) return false;
-      const effDir = lineDirs[t.line] ?? dir;
-      if (effDir && t.direction !== effDir) return false;
-      return true;
-    });
 
     const dirsForLine = (line: string): Set<"H" | "R"> => {
       const out = new Set<"H" | "R">();
@@ -589,18 +578,16 @@ export class WienerLinienAustriaCardEditor
             `
           : nothing}
 
-        ${this._renderWalkTimes(stop, triplets, dir, lineDirs)}
+        ${this._renderWalkTimes(stop, dir, lineDirs)}
       </div>
     `;
   }
 
   private _renderWalkTimes(
     stop: NormalisedModernStop,
-    triplets: ReturnType<typeof tripletsAtStop>,
     dir: "H" | "R" | null,
     lineDirs: Record<string, "H" | "R">,
   ): TemplateResult | typeof nothing {
-    void triplets; // direction visibility handled per pair below
     const overrides = this._config!.line_colors;
     const attrs = this._attrs(stop.entity);
     const lineColors = attrs?.line_colors ?? {};
@@ -641,10 +628,10 @@ export class WienerLinienAustriaCardEditor
                   aria-label=${this._et("walk_time_aria")
                     .replace("{line}", p.line)
                     .replace("{towards}", terminusLabel)}
-                  .value=${val !== undefined ? String(val) : ""}
-                  @keydown=${this._swallowKeys}
-                  @keyup=${this._swallowKeys}
-                  @keypress=${this._swallowKeys}
+                  .value=${live(val !== undefined ? String(val) : "")}
+                  @keydown=${swallowEditorKeys}
+                  @keyup=${swallowEditorKeys}
+                  @keypress=${swallowEditorKeys}
                   @change=${(ev: Event) =>
                     this._setWalkTime(
                       stop.entity,
@@ -686,7 +673,7 @@ export class WienerLinienAustriaCardEditor
                   <span class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</span>
                   <label
                     class="color-swatch"
-                    style=${`--swatch-color: ${hex};`}
+                    style=${styleMap({ "--swatch-color": hex })}
                     title=${ariaPick}
                   >
                     <ha-icon icon="mdi:palette-swatch-variant" aria-hidden="true"></ha-icon>
@@ -882,6 +869,13 @@ export class WienerLinienAustriaCardEditor
       inset: 0;
       opacity: 0;
       cursor: pointer;
+    }
+    /* The real <input type="color"> is opacity:0, so its own focus ring
+       is invisible — lift the ring onto the label for keyboard users
+       (WCAG 2.4.7 Focus Visible). */
+    .color-swatch:focus-within {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
     .reset-btn {
       padding: 6px 12px;

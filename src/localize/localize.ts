@@ -43,7 +43,10 @@ export interface TranslateContext {
 // an empty blob.
 function resolveLang(ctx: TranslateContext): string {
   const raw = ctx.configLanguage || ctx.hassLanguage || "de";
-  const code = raw.replace("-", "_").split("_")[0] ?? "de";
+  // Take the primary subtag: handles `de`, `de-AT`, `de_AT`, and longer
+  // tags like `zh-Hans-CN` (→ `zh`). Splitting on both separators in one
+  // pass avoids the first-hyphen-only quirk of `.replace("-", "_")`.
+  const code = raw.split(/[-_]/)[0] ?? "de";
   return code === "en" ? "en" : "de";
 }
 

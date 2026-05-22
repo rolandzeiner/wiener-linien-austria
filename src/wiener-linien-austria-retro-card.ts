@@ -728,7 +728,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
-            ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
+            ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time)}
             ${this._tickerActive && cfg.message_text
               ? html`<div class="retro-ticker" role="status" aria-live="polite">
                   <div
@@ -781,7 +781,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderMain(
     eid: string | null,
     rows: DepartureAttr[],
-    matching: DepartureAttr[],
     allDepartures: DepartureAttr[],
     platform: string | null,
     platformLabel: string,
@@ -806,8 +805,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       }
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
     }
-    // Silence the noop-var warning until used.
-    void matching;
     return html`
       <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
         ${rows.map((d, i) => this._renderRow(d, i))}

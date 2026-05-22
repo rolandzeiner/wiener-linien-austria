@@ -8,9 +8,16 @@ import type {
   RetroStationBg,
   RetroStyle,
   WalkTimes,
-  WienerLinienCardConfig,
   WienerLinienRetroCardConfig,
 } from "../types.js";
+
+/** Coerce an unknown config value to a boolean. `true` / `false` pass
+ *  through; anything else (undefined, null, a YAML typo, a number)
+ *  falls back to `fallback`. Lets the modern normaliser take a raw,
+ *  untyped config record without trusting its field types. */
+function asBool(v: unknown, fallback: boolean): boolean {
+  return typeof v === "boolean" ? v : fallback;
+}
 
 const RETRO_SIZES: ReadonlySet<RetroSize> = new Set(["small", "medium", "regular"] as const);
 const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
@@ -248,7 +255,12 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   layout: "stacked",
 };
 
-export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedModernConfig {
+// Accepts a raw, untyped config record: callers pass either a fresh
+// `WienerLinienCardConfig` (card `setConfig`) or an already-normalised
+// config merged with ha-form's `Record<string, unknown>` output (the
+// editor). Both satisfy `Record<string, unknown>`; every field is
+// re-validated below, so no caller needs an `as` cast.
+export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedModernConfig {
   // Back-compat: flat single-entity shape gets promoted to entities[0].
   let rawEntities: unknown[] = [];
   if (Array.isArray(raw.entities)) {
@@ -296,29 +308,32 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   // visibility, layout_options) without smuggling pre-normalisation
   // versions of validated keys into the result.
   const passthrough: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+  for (const [k, v] of Object.entries(raw)) {
     if (!MODERN_VALIDATED_KEYS.has(k)) passthrough[k] = v;
   }
 
   return {
     ...passthrough,
-    type: raw.type || "custom:wiener-linien-austria-card",
+    type:
+      typeof raw.type === "string" && raw.type
+        ? raw.type
+        : "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
     line_colors: lineColors,
-    show_accessibility: raw.show_accessibility ?? MODERN_DEFAULTS.show_accessibility,
-    accessibility_only: raw.accessibility_only ?? MODERN_DEFAULTS.accessibility_only,
-    show_traffic_info: raw.show_traffic_info ?? MODERN_DEFAULTS.show_traffic_info,
-    show_elevator_info: raw.show_elevator_info ?? MODERN_DEFAULTS.show_elevator_info,
-    show_delay: raw.show_delay ?? MODERN_DEFAULTS.show_delay,
-    show_type_icon: raw.show_type_icon ?? MODERN_DEFAULTS.show_type_icon,
-    show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
-    show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
-    show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
-    show_stops_ahead: raw.show_stops_ahead ?? MODERN_DEFAULTS.show_stops_ahead,
-    show_qr_button: raw.show_qr_button ?? MODERN_DEFAULTS.show_qr_button,
-    hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
-    hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
+    show_accessibility: asBool(raw.show_accessibility, MODERN_DEFAULTS.show_accessibility),
+    accessibility_only: asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
+    show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
+    show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
+    show_delay: asBool(raw.show_delay, MODERN_DEFAULTS.show_delay),
+    show_type_icon: asBool(raw.show_type_icon, MODERN_DEFAULTS.show_type_icon),
+    show_platform: asBool(raw.show_platform, MODERN_DEFAULTS.show_platform),
+    show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
+    show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
+    show_stops_ahead: asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead),
+    show_qr_button: asBool(raw.show_qr_button, MODERN_DEFAULTS.show_qr_button),
+    hide_header: asBool(raw.hide_header, MODERN_DEFAULTS.hide_header),
+    hide_attribution: asBool(raw.hide_attribution, MODERN_DEFAULTS.hide_attribution),
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
   };
 }

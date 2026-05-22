@@ -1028,13 +1028,18 @@ def stops_ahead_for_match(
 
     Returns None when no pattern matched (unknown line, replacement service,
     short-turn variant not in the schedule), an empty list when the matched
-    pattern places `entry_rbls` at the terminus (no further stops), or the
-    truncated list of `{diva, name, is_terminus?, is_ellipsis?}` dicts.
+    pattern places `entry_rbls` at the terminus (no further stops), or an
+    ordered list of `{name, is_terminus?, lines?}` dicts: `name` is the
+    station name, `is_terminus` is True only on the final entry, and
+    `lines` (when present) lists the other lines passing through that stop.
+    The `diva` key is intentionally omitted to keep the per-stop dict small.
+    The list is hard-capped at MAX_STOPS_AHEAD entries to bound the recorder
+    attribute payload.
 
-    Truncation: when the raw tail exceeds STOPS_AHEAD_MAX_FULL items, returns
-    the first STOPS_AHEAD_HEAD_COUNT entries plus a single ellipsis marker
-    plus the terminus, preserving the user's mental anchor (destination)
-    while bounding the recorder attribute payload.
+    The only tail truncation is short-turn based: when the live `towards`
+    matches a stop on the pattern before its natural terminus, the tail is
+    cut there (e.g. an Alaudagasse-bound U1 on the Oberlaa pattern). There
+    is no head/ellipsis truncation — long routes are simply capped.
     """
     if catalogue.trip_patterns is None:
         return None

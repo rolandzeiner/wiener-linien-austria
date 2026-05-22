@@ -33,7 +33,7 @@ USER_AGENT: Final = (
 CONF_DIVA: Final = "diva"
 CONF_STOP_NAME: Final = "stop_name"
 CONF_RBLS: Final = "rbls"
-CONF_LINES: Final = "lines"  # selected {rbl}_{line}_{direction} ids
+CONF_LINES: Final = "lines"  # selected "{line}|{direction}" keys (see _line_key)
 CONF_SEARCH_QUERY: Final = "search_query"
 
 # Polling policy.
