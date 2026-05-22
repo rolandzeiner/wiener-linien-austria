@@ -477,6 +477,11 @@ async def _async_background_refresh(
     and logs at WARNING. On success, writes the new payload to Store and
     swaps the shared catalogue ref so coordinators that read it live see
     the refreshed data on their next parse.
+
+    Lost-update guard: if the weekly `async_refresh_catalogue` published
+    a newer catalogue while this slow migration was still fetching, the
+    result built here is discarded rather than clobbering the fresher
+    data on disk and in memory.
     """
     try:
         refreshed = await _fetch_and_build(hass, prior=prior)
@@ -492,8 +497,32 @@ async def _async_background_refresh(
             err,
         )
         return
-    if refreshed is not prior:
-        await store.async_save(_catalogue_to_store(refreshed))
+    if refreshed is prior:
+        # Nothing changed (e.g. every CSV returned 304). No write, and
+        # no re-publish — re-publishing `prior` could itself clobber a
+        # newer catalogue the weekly refresh installed meanwhile.
+        return
+    # Lost-update guard: this background fetch started from `prior`, but
+    # the weekly `async_refresh_catalogue` may have fetched and published
+    # a newer catalogue while we were downloading. Publishing `refreshed`
+    # (built from the older `prior`) would clobber that fresher data, so
+    # skip the write if a catalogue newer than `prior` is already current.
+    # `last_fetched` is a fixed-width ISO 8601 UTC string, so a lexical
+    # comparison is a chronological one.
+    domain_data = hass.data.get(DOMAIN)
+    current = domain_data.get(CATALOGUE_KEY) if domain_data else None
+    if (
+        isinstance(current, StaticCatalogue)
+        and current.last_fetched > prior.last_fetched
+    ):
+        _LOGGER.warning(
+            "Background refresh superseded by a newer catalogue "
+            "(current %s newer than spawn-time %s); discarding result",
+            current.last_fetched,
+            prior.last_fetched,
+        )
+        return
+    await store.async_save(_catalogue_to_store(refreshed))
     async_set_cached_catalogue(hass, refreshed)
     if refreshed.trip_patterns is not None:
         _LOGGER.warning(
