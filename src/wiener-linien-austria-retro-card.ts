@@ -1346,14 +1346,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
     }
     .retro--line-pill .retro-line__label {
-      /* Switch from WL Mono (Courier-derived, on the .retro root) to
-         WL Sans for the pill label. The real Wiener Linien line
-         indicators (U1/U2/…) use a bold sans rather than a mono
-         dot-matrix face — even on the LED-style board, the line
-         pill is rendered in the signage's print face, not the
-         board's display face. Falls through to the system sans
-         stack on installs where the WL woff2 didn't land.
-         Small upward nudge — WL Sans reserves descender space at
+      /* Inherits WL Mono from the .retro root — the LED board's
+         display face wins over the signage print face inside the
+         pill. (Tried WL Sans for a closer match to real WL line
+         indicators; reverted because it didn't sit right against
+         the dot-matrix row text.)
+         Small upward nudge — WL Mono reserves descender space at
          the bottom of every em-box even though uppercase glyphs
          have no descender, so the digit reads as bottom-heavy
          without correction. -0.04em is the empirical sweet spot:
@@ -1363,8 +1361,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          translates the glyph; an inline-level transform would
          silently no-op in some engines. */
       display: inline-block;
-      font-family: "WL Sans", -apple-system, BlinkMacSystemFont,
-                   "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       transform: translateY(-0.04em);
     }
     .retro-dest {
