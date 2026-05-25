@@ -178,6 +178,8 @@
       "section_tweaks_helper": "Optische Extras. Beeinflussen nichts an den Daten, ändern nur das Aussehen.",
       "show_unit": "Einheit „min“ anzeigen",
       "show_unit_helper": "Kleines „min“ in Amber-Versalien nach jeder Minutenzahl.",
+      "line_pill": "Linien-Plakette",
+      "line_pill_helper": "Liniencode als gefüllte Plakette in der offiziellen Linienfarbe mit weißer LED-Schrift.",
       "line_stripe": "Linien-Seitenstreifen",
       "line_stripe_helper": "4-Pixel-Balken am linken Rand jeder Zeile in der Linienfarbe.",
       "housing": "LED-Gehäuse",

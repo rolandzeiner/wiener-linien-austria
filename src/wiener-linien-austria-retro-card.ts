@@ -774,6 +774,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       "retro--race-freeze": raceFreeze,
       "retro--race-victory": raceVictory,
       "retro--clickable": clickable,
+      "retro--line-pill": cfg.line_pill,
       "retro--line-stripe": cfg.line_stripe,
       "retro--housing": cfg.housing,
     };
@@ -905,20 +906,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Resolve the line's WL palette through the same precedence ladder
     // chips use elsewhere: GTFS routes.txt first, then the nightline
     // override, then a CSS-var fallback that doesn't read well on the
-    // LED panel. The resolved colour feeds the line-stripe Tweak's
-    // left-edge bar; unknown lines fall back to amber so the stripe
-    // still looks at home on the board instead of breaking the
-    // aesthetic with the HA primary colour. The line code itself
-    // renders as plain amber text — the LED panel intentionally stays
-    // monochrome, the colour leaks out only via the optional stripe.
+    // LED panel. Unknown lines fall back to amber for the stripe (so
+    // it still looks at home on the board) and to white text on amber-
+    // glow-substrate for the pill (the LED-amber gloss would dissolve
+    // the digit). The resolved palette feeds two opt-in Tweaks:
+    //   --retro-line-color — pill background AND stripe colour.
+    //   --retro-line-fg    — pill foreground.
+    // Both Tweaks default off; without them the line code renders as
+    // plain amber text and the row matches the pre-Tweak look.
     const palette = chipPalette(line, {}, lineColors);
-    const stripeColor =
-      palette.background !== "var(--primary-color)"
-        ? palette.background
-        : "var(--led-amber)";
+    const hasResolvedColor = palette.background !== "var(--primary-color)";
+    const stripeColor = hasResolvedColor ? palette.background : "var(--led-amber)";
+    const pillFg = palette.color ?? (hasResolvedColor ? "#fff" : "var(--led-bg)");
     const rowStyle = styleMap({
       "--row-i": String(rowIndex),
       "--retro-line-color": stripeColor,
+      "--retro-line-fg": pillFg,
     });
     // Cross-fade towards ↔ via: render BOTH spans absolutely positioned
     // on top of each other, swap which one carries the visible-opacity
@@ -1089,7 +1092,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // arrived yet (no "NaN:NaN" while the integration warms up).
     const clockText = side.show_clock ? this._formatClock(serverTime) : null;
     const clockNode = clockText
-      ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">${clockText}</span>`
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">
+          <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
+          <span>${clockText}</span>
+        </span>`
       : nothing;
     // Canonical render order mirrors the original signage. Right side
     // mirrors the left: exit always at the outer edge of the card,
@@ -1295,7 +1301,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       display: grid;
       grid-template-columns: 2.5em 1fr auto;
-      align-items: baseline;
+      align-items: center;
       gap: 12px;
       white-space: nowrap;
       /* Position context for the line-stripe ::before Tweak and the
@@ -1303,15 +1309,46 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       position: relative;
     }
     .retro-line {
+      /* Default (no Tweak): plain amber text, left-aligned. The pill
+         layout below kicks in only under .retro--line-pill so the
+         pre-Tweak look is byte-identical. Center alignment matches
+         the row's align-items: center so the line cell vertically
+         lines up with the destination text and countdown digits. */
       font-weight: 400;
       text-align: left;
       transition: opacity 0.15s ease-out;
     }
+    /* Line-pill Tweak — render the line code inside a filled rounded
+       rectangle using --retro-line-color (resolved per row in JS).
+       Pill height is 1em so it slots flush inside the row's
+       line-height: 1 box; padding 0 0.4em is the design spec; the
+       glow is a 6 px box-shadow tinted in the pill colour. */
+    .retro--line-pill .retro-line {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      font-weight: 700;
+      text-align: center;
+      min-width: 2em;
+      height: 1em;
+      padding: 0 0.4em;
+      border-radius: 0.18em;
+      background: var(--retro-line-color, transparent);
+      color: var(--retro-line-fg, var(--led-amber));
+      text-shadow: none;
+      box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
+    }
     .retro-dest {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 0.35em;
-      overflow: hidden;
+      /* No overflow: hidden on the flex container itself — the
+         destination-text stack carries its own overflow:hidden /
+         text-overflow:ellipsis, and clipping at this level would
+         shave the bottom off the wheelchair icon at the row's
+         right edge. Keeping overflow visible lets the icon render
+         in full while the text inside still ellipsises. */
       text-transform: uppercase;
       min-width: 0;
       transition: opacity 0.15s ease-out;
@@ -1362,10 +1399,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;
-      --mdc-icon-size: 1em;
+      justify-content: center;
+      /* Sized slightly smaller than 1em so the icon sits comfortably
+         inside the row's line-height: 1 box with the row centred —
+         a full-em icon was clipping at the bottom under the previous
+         overflow:hidden + baseline-translate combo on smaller sizes. */
+      --mdc-icon-size: 0.9em;
+      width: 0.9em;
+      height: 0.9em;
       color: inherit;
       filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
-      transform: translateY(0.18em);
     }
     .retro-cd {
       font-variant-numeric: tabular-nums;
@@ -2264,15 +2307,26 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
     }
 
-    /* Optional clock chip inside the station-header strip. Inherits
-       the existing .retro-station-header__chip styling (white box,
-       black text, condensed WL signage face) so it sits coherently
-       next to the other chips. Tabular-nums keeps the digit columns
-       from breathing as minutes tick, and a wider letter-spacing
-       reads as a clock rather than as just another label. */
+    /* Optional clock chip inside the station-header strip. Renders
+       as a base .retro-station-header__chip (white box, black text,
+       condensed WL signage face) with a small clock glyph in front
+       of the HH:MM digits. Inherits everything else from the chip
+       rule — no font / weight / spacing override here, so it sits
+       indistinguishably next to the other chips except for the
+       leading icon. */
     .retro-station-header__chip--clock {
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.06em;
+      gap: 0.25em;
+    }
+    .retro-station-header__chip-icon {
+      /* MDI icon sized to the chip's cap height so it sits centred
+         next to the digits. ha-icon ships an inline SVG controlled
+         by --mdc-icon-size; pin it to 1em and let the chip's flex
+         centring handle vertical alignment. */
+      --mdc-icon-size: 1em;
+      display: inline-flex;
+      align-items: center;
+      color: inherit;
+      flex-shrink: 0;
     }
 
     /* Line-stripe Tweak — 4 px coloured bar at the left edge of each

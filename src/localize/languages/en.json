@@ -178,6 +178,8 @@
       "section_tweaks_helper": "Visual flourishes. No data behaviour, just looks.",
       "show_unit": "Show \"min\" unit",
       "show_unit_helper": "Trail each countdown number with a small amber \"min\" caption.",
+      "line_pill": "Line-colour pill",
+      "line_pill_helper": "Render the line code as a filled pill in the official line colour with white LED text.",
       "line_stripe": "Line-colour side stripe",
       "line_stripe_helper": "A 4 px coloured bar at the left edge of each row, matched to the line.",
       "housing": "LED housing",

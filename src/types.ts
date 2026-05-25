@@ -402,6 +402,11 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Tweak — render the line code as a filled rounded pill in the
+   *  line's resolved colour (GTFS routes.txt → nightline rule →
+   *  amber fallback) with a soft outer glow. Off by default; the LED
+   *  panel's canonical voice is monochrome amber. */
+  line_pill?: boolean | undefined;
   /** Tweak — paint a 4 px vertical bar at each row's left edge in the
    *  line's resolved colour with a faint matching glow. Off by default
    *  so pre-feature retro cards stay byte-identical. */

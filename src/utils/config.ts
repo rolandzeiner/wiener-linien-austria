@@ -366,6 +366,7 @@ export interface NormalisedRetroConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  line_pill: boolean;
   line_stripe: boolean;
   housing: boolean;
   show_unit: boolean;
@@ -397,6 +398,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_header",
   "header_left",
   "header_right",
+  "line_pill",
   "line_stripe",
   "housing",
   "show_unit",
@@ -450,6 +452,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
+    line_pill: raw.line_pill === true,
     line_stripe: raw.line_stripe === true,
     housing: raw.housing === true,
     show_unit: raw.show_unit === true,

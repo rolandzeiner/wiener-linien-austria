@@ -554,6 +554,7 @@ export class WienerLinienAustriaRetroCardEditor
         flatten: true,
         schema: [
           { name: "show_unit", selector: { boolean: {} } },
+          { name: "line_pill", selector: { boolean: {} } },
           { name: "line_stripe", selector: { boolean: {} } },
           { name: "housing", selector: { boolean: {} } },
         ],
