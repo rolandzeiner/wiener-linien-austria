@@ -14,9 +14,11 @@
 import type {
   FlapPlatformSide,
   FlapSize,
+  RetroHeaderSide,
   WalkTimes,
   WienerLinienFlapCardConfig,
 } from "../types.js";
+import { normaliseRetroHeaderSide } from "./config.js";
 
 const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
   "small",
@@ -70,6 +72,9 @@ export interface NormalisedFlapConfigValidated {
   show_accessibility: boolean;
   accessibility_only: boolean;
   walk_times?: WalkTimes | undefined;
+  show_header: boolean;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
 }
 
 // Mirror retro/modern: a NormalisedFlapConfig is the validated set + the
@@ -93,6 +98,9 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_accessibility",
   "accessibility_only",
   "walk_times",
+  "show_header",
+  "header_left",
+  "header_right",
 ]);
 
 export function normaliseFlapConfig(
@@ -139,5 +147,11 @@ export function normaliseFlapConfig(
     show_accessibility: asBool(raw.show_accessibility, true),
     accessibility_only: raw.accessibility_only === true,
     walk_times: normaliseWalkTimes(raw.walk_times),
+    // Master gate for the signage header strip — defaults `false` so
+    // pre-feature flap cards render byte-identical. Per-side configs
+    // are preserved either way (so toggling back on restores them).
+    show_header: raw.show_header === true,
+    header_left: normaliseRetroHeaderSide(raw.header_left),
+    header_right: normaliseRetroHeaderSide(raw.header_right),
   };
 }

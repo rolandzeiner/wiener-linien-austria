@@ -53,6 +53,7 @@ import type {
   HomeAssistant,
   LineColorPair,
   LovelaceCardEditor,
+  RetroHeaderSide,
   WienerLinienAttrs,
   WienerLinienFlapCardConfig,
   WindowWithCustomCards,
@@ -65,6 +66,16 @@ import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
 } from "./utils/flap-config.js";
+import { formatDate } from "./utils/time.js";
+import {
+  RETRO_HEADER_ICONS,
+  RETRO_HEADER_MDI_EXITS,
+  isRetroHeaderMdiExit,
+  renderRetroHeaderIcon,
+  renderRetroHeaderMdiIcon,
+  renderRetroHeaderMdiTile,
+  type RetroHeaderIconKey,
+} from "./utils/retro-station-icons.js";
 
 // Animation timing — single-leaf flip lasts FLAP_LEAF_MS; the stagger
 // delays each tile in a changed run by FLAP_STAGGER_MS × index so the
@@ -350,10 +361,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       "flap--gleis-right": !!platform && !gleisLeft,
     };
 
+    const stationHeaderStrip = cfg.show_header
+      ? this._renderStationHeader(cfg.header_left, cfg.header_right, attrs.server_time)
+      : nothing;
+
     return html`
       <ha-card style="padding:0;overflow:hidden;">
         <div class=${classMap(classes)}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
+          ${stationHeaderStrip}
           ${cfg.show_station_header
             ? html`<div class="flap-header" role="group">
                 <div class="flap-header__station">${stationName}</div>
@@ -365,6 +381,119 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         </div>
       </ha-card>
     `;
+  }
+
+  // ------------------------------------------------------------------
+  // Station-header strip — same per-side grammar as the retro card
+  // (RetroHeaderSide), recoloured for the cream / dark housing
+  // palette. Helpers from utils/retro-station-icons.ts are reused
+  // verbatim — they emit `.retro-station-header__*` classes that the
+  // flap card defines its own CSS for inside its shadow DOM. The
+  // retro card's CSS for the same classes lives in its own shadow
+  // root and can't bleed in either direction.
+  // ------------------------------------------------------------------
+
+  private _renderStationHeader(
+    left: RetroHeaderSide | undefined,
+    right: RetroHeaderSide | undefined,
+    serverTime: string | null | undefined,
+  ): TemplateResult | typeof nothing {
+    if (!left && !right) return nothing;
+    return html`
+      <div class="retro-station-header" role="group">
+        <div class="retro-station-header__side retro-station-header__side--left">
+          ${left ? this._renderHeaderSide(left, "left", serverTime) : nothing}
+        </div>
+        <div class="retro-station-header__side retro-station-header__side--right">
+          ${right ? this._renderHeaderSide(right, "right", serverTime) : nothing}
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderHeaderSide(
+    side: RetroHeaderSide,
+    pos: "left" | "right",
+    serverTime: string | null | undefined,
+  ): TemplateResult {
+    let exitNode: TemplateResult | typeof nothing = nothing;
+    if (side.exit === "regular" || side.exit === "accessible") {
+      const key: "exit" | "exit-access" =
+        side.exit === "regular" ? "exit" : "exit-access";
+      exitNode = renderRetroHeaderIcon(key, {
+        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
+        flipX: RETRO_HEADER_ICONS[key].glyphPointsTo !== pos,
+      });
+    } else if (side.exit && isRetroHeaderMdiExit(side.exit)) {
+      const meta = RETRO_HEADER_MDI_EXITS[side.exit];
+      exitNode = renderRetroHeaderMdiIcon(side.exit, {
+        ariaLabel: this._t(`header.${meta.labelKey}`),
+        flipX: meta.glyphPointsTo !== undefined && meta.glyphPointsTo !== pos,
+      });
+    }
+    const textNode = side.text
+      ? html`<span class="retro-station-header__text">${side.text}</span>`
+      : nothing;
+    const amenityKey = (key: RetroHeaderIconKey) =>
+      renderRetroHeaderIcon(key, {
+        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
+      });
+    const wc = side.show_wc ? amenityKey("wc") : nothing;
+    const esc = side.show_escalator ? amenityKey("escalator") : nothing;
+    const elv = side.show_elevator ? amenityKey("elevator") : nothing;
+    const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
+      renderRetroHeaderMdiTile(icon, icon),
+    );
+    const mdiTilesLeftOrder = mdiTileNodes;
+    const mdiTilesRightOrder = [...mdiTileNodes].reverse();
+    const chipNodes = (side.chips ?? []).map(
+      (chipText) =>
+        html`<span class="retro-station-header__chip">${chipText}</span>`,
+    );
+    const chipsLeftOrder = chipNodes;
+    const chipsRightOrder = [...chipNodes].reverse();
+    const clockText = side.show_clock ? this._formatClock(serverTime) : null;
+    const clockNode = clockText
+      ? html`<span
+          class="retro-station-header__chip retro-station-header__chip--clock"
+        >
+          <ha-icon
+            class="retro-station-header__chip-icon"
+            icon="mdi:clock-outline"
+          ></ha-icon>
+          <span>${clockText}</span>
+        </span>`
+      : nothing;
+    const dateText = side.show_date
+      ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
+      : null;
+    const dateNode = dateText
+      ? html`<span
+          class="retro-station-header__chip retro-station-header__chip--date"
+          >${dateText}</span
+        >`
+      : nothing;
+    return pos === "left"
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}${dateNode}${clockNode}`
+      : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
+  }
+
+  private _formatClock(serverTime: string | null | undefined): string | null {
+    if (!serverTime) return null;
+    const ts = Date.parse(serverTime);
+    if (!Number.isFinite(ts)) return null;
+    const d = new Date(ts);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  private _formatDateChip(
+    serverTime: string | null | undefined,
+    format: string | undefined,
+  ): string | null {
+    if (!serverTime || !format) return null;
+    const ts = Date.parse(serverTime);
+    if (!Number.isFinite(ts)) return null;
+    return formatDate(new Date(ts), format, this.hass?.language);
   }
 
   private _renderBoard(
@@ -1037,6 +1166,158 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       outline: 2px solid var(--flap-cream-hi);
       outline-offset: 2px;
       border-radius: 4px;
+    }
+
+    /* ====================================================================
+       Station-header strip (signage homage above the WL-orange band).
+       Reuses the retro card's helpers from utils/retro-station-icons.ts
+       — same .retro-station-header__* classes emitted by those
+       helpers — but recoloured for the flap card's warm-cream palette
+       so chips + amenity tiles read as flap-pocket material rather
+       than as bright-white signage chips. Each card's static-styles
+       block is shadow-DOM scoped, so the two cards' CSS for the same
+       class names live in independent worlds.
+       ==================================================================== */
+    .retro-station-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--flap-housing);
+      color: var(--flap-cream-hi);
+      padding: 6px 10px;
+      gap: 8px;
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      font-size: 1.1em;
+      letter-spacing: 0.02em;
+      border-radius: 4px 4px 0 0;
+      box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+    }
+    /* When the WL-orange .flap-header is also rendered below the
+       signage strip, drop the strip's bottom corners to seam cleanly
+       into the orange band. */
+    .retro-station-header + .flap-header {
+      border-radius: 0;
+    }
+    .retro-station-header__side {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      flex: 1 1 0;
+    }
+    .retro-station-header__side--right {
+      justify-content: flex-end;
+    }
+    .retro-station-header__text {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 1.2em;
+      color: var(--flap-cream-hi);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    /* Tile (exit / amenity icons) — recoloured from white-on-black
+       to cream-on-dark so the tiles read as flap-pocket material.
+       The cream chosen (var(--flap-cream-hi)) is the SAME warm
+       gradient top stop the flap tiles use; the icons inside
+       inherit dark ink via color: var(--flap-ink). */
+    .retro-station-header__tile {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--flap-cream-hi);
+      color: var(--flap-ink);
+      flex-shrink: 0;
+      width: 1.4em;
+      height: 1.4em;
+      padding: 0.12em;
+      box-sizing: border-box;
+      border-radius: 2px;
+    }
+    .retro-station-header__tile--mdi {
+      padding: 0.06em;
+    }
+    .retro-station-header__icon {
+      width: 100%;
+      height: 100%;
+      display: block;
+      fill: currentColor;
+    }
+    .retro-station-header__icon--flip-x {
+      transform: scaleX(-1);
+    }
+    .retro-station-header__mdi {
+      --mdc-icon-size: 1.28em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: inherit;
+    }
+    .retro-station-header__mdi--flip-x {
+      transform: scaleX(-1);
+    }
+    .retro-station-header__monogram {
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      font-size: 0.9em;
+      line-height: 1;
+    }
+    /* Chip — same cream pocket as the tile, dynamic width for short
+       text labels. Matches the flap tiles' warm-cream voice so the
+       strip reads as one cohesive material with the board below. */
+    .retro-station-header__chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--flap-cream-hi);
+      color: var(--flap-ink);
+      flex-shrink: 0;
+      height: 1.4em;
+      padding: 0 0.4em;
+      box-sizing: border-box;
+      border-radius: 2px;
+      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+        BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+    .retro-station-header__chip--clock {
+      gap: 0.25em;
+      font-variant-numeric: tabular-nums;
+    }
+    .retro-station-header__chip--date {
+      font-variant-numeric: tabular-nums;
+    }
+    .retro-station-header__chip-icon {
+      --mdc-icon-size: 1em;
+      display: inline-flex;
+      align-items: center;
+      color: inherit;
+      flex-shrink: 0;
+    }
+    /* Size-token alignment — match the .flap--size-* scale. */
+    .flap--size-medium .retro-station-header {
+      font-size: 1em;
+      padding: 5px 10px;
+    }
+    .flap--size-small .retro-station-header {
+      font-size: 0.9em;
+      padding: 4px 8px;
+    }
+    /* Narrow-width reflow — drop the destination label so the
+       icons stay visible at narrow widths. Container query matches
+       the nearest inline-size container. */
+    @container (inline-size < 360px) {
+      .retro-station-header__text {
+        display: none;
+      }
     }
 
     /* prefers-reduced-motion — Solari is showy and continuous. Drop

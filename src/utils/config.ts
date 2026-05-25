@@ -45,7 +45,11 @@ const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>
  *  at all?" check collapses to a single truthy test. Hard bounds on
  *  `text` length defensively guard against a runaway YAML config
  *  blowing out the strip width. */
-function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
+// Exported so the flap card's config normaliser can reuse the same
+// header-side validation (the two cards share `RetroHeaderSide`
+// shape: the chip / exit / amenity grammar is identical even though
+// each card paints the strip with its own palette).
+export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
   const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)

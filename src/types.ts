@@ -463,7 +463,7 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   /** Where the GLEIS column sits. `"auto"` (default) follows the WL
    *  signage convention — platform 2 left, everything else right. */
   platform_side?: FlapPlatformSide | undefined;
-  /** Show the WL-orange header band with station name + clock. */
+  /** Show the WL-orange header band with the station name. */
   show_station_header?: boolean | undefined;
   /** Show a small "min" caption after each countdown number. */
   show_min_unit?: boolean | undefined;
@@ -472,4 +472,14 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   /** Filter to step-free departures only. */
   accessibility_only?: boolean | undefined;
   walk_times?: WalkTimes | undefined;
+  /** Master toggle for the U-Bahn-style signage strip ABOVE the
+   *  orange station-name band. Black band with exit icons, amenity
+   *  tiles, chips, clock + date — visually identical to the retro
+   *  card's strip but recoloured with the flap card's cream
+   *  palette so chips read as flap-pocket material, not as bright
+   *  white. Defaults to `false`; per-side configs are preserved
+   *  when toggled, so flipping it back on restores everything. */
+  show_header?: boolean | undefined;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
 }

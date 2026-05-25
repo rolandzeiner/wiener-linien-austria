@@ -41,6 +41,17 @@ import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
 } from "./utils/flap-config.js";
+import {
+  RETRO_HEADER_MDI_EXIT_KEYS,
+  RETRO_HEADER_MDI_EXITS,
+} from "./utils/retro-station-icons.js";
+import mdiIconNames from "./mdi-icon-names.json";
+
+// Module-level memoised options for the MDI chip-input — same pattern
+// as retro-editor: built once at first reference so the ~7.5k-entry
+// array isn't re-allocated on every form change.
+const MDI_ICON_OPTIONS: ReadonlyArray<{ value: string; label: string }> =
+  mdiIconNames.map((name) => ({ value: name, label: name }));
 
 @customElement("wiener-linien-austria-flap-card-editor")
 export class WienerLinienAustriaFlapCardEditor
@@ -138,6 +149,23 @@ export class WienerLinienAustriaFlapCardEditor
       if (d.direction === "H" || d.direction === "R") out.add(d.direction);
     }
     return out;
+  }
+
+  /** Shared options list for both header sides' "Exit icon" dropdown.
+   *  Built once per render so the two sides can never drift, and so
+   *  new MDI options added to RETRO_HEADER_MDI_EXIT_KEYS flow into
+   *  the editor automatically. */
+  private _exitOptions(): ReadonlyArray<{ value: string; label: string }> {
+    const base: { value: string; label: string }[] = [
+      { value: "none", label: this._et("header_exit_none") },
+      { value: "regular", label: this._et("header_exit_regular") },
+      { value: "accessible", label: this._et("header_exit_accessible") },
+    ];
+    const mdi = RETRO_HEADER_MDI_EXIT_KEYS.map((key) => ({
+      value: key,
+      label: this._et(RETRO_HEADER_MDI_EXITS[key].labelKey),
+    }));
+    return [...base, ...mdi];
   }
 
   private _schema(): ReadonlyArray<HaFormSchema> {
@@ -240,6 +268,112 @@ export class WienerLinienAustriaFlapCardEditor
                 ],
               },
             },
+          },
+        ],
+      },
+      {
+        // Station-header strip (signage homage above the WL-orange
+        // band) — same per-side grammar as the retro card's header.
+        // See the retro editor's header section for the rationale on
+        // flatten: true on the outer wrapper vs flatten: false on the
+        // two per-side expandables.
+        type: "expandable",
+        name: "header",
+        title: this._et("section_header"),
+        flatten: true,
+        schema: [
+          { name: "show_header", selector: { boolean: {} } },
+          {
+            type: "expandable",
+            name: "header_left",
+            title: this._et("header_left"),
+            flatten: false,
+            schema: [
+              {
+                name: "exit",
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: this._exitOptions(),
+                  },
+                },
+              },
+              { name: "text", selector: { text: {} } },
+              { name: "show_wc", selector: { boolean: {} } },
+              { name: "show_escalator", selector: { boolean: {} } },
+              { name: "show_elevator", selector: { boolean: {} } },
+              { name: "show_clock", selector: { boolean: {} } },
+              { name: "show_date", selector: { boolean: {} } },
+              ...(this._config?.header_left?.show_date
+                ? [{ name: "date_format", selector: { text: {} } }]
+                : []),
+              {
+                name: "extra_icons",
+                selector: {
+                  select: {
+                    multiple: true,
+                    custom_value: true,
+                    options: MDI_ICON_OPTIONS,
+                  },
+                },
+              },
+              {
+                name: "chips",
+                selector: {
+                  select: {
+                    multiple: true,
+                    custom_value: true,
+                    options: [],
+                  },
+                },
+              },
+            ],
+          },
+          {
+            type: "expandable",
+            name: "header_right",
+            title: this._et("header_right"),
+            flatten: false,
+            schema: [
+              {
+                name: "exit",
+                selector: {
+                  select: {
+                    mode: "dropdown",
+                    options: this._exitOptions(),
+                  },
+                },
+              },
+              { name: "text", selector: { text: {} } },
+              { name: "show_wc", selector: { boolean: {} } },
+              { name: "show_escalator", selector: { boolean: {} } },
+              { name: "show_elevator", selector: { boolean: {} } },
+              { name: "show_clock", selector: { boolean: {} } },
+              { name: "show_date", selector: { boolean: {} } },
+              ...(this._config?.header_right?.show_date
+                ? [{ name: "date_format", selector: { text: {} } }]
+                : []),
+              {
+                name: "extra_icons",
+                selector: {
+                  select: {
+                    multiple: true,
+                    custom_value: true,
+                    options: MDI_ICON_OPTIONS,
+                  },
+                },
+              },
+              {
+                name: "chips",
+                selector: {
+                  select: {
+                    multiple: true,
+                    custom_value: true,
+                    options: [],
+                  },
+                },
+              },
+            ],
           },
         ],
       },
