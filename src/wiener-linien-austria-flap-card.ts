@@ -499,10 +499,16 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const isMetro = (rows[0]?.type ?? "") === LINE_TYPE_METRO;
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
+    // Light mode follows HA's theme, not OS/browser appearance.
+    // hass.themes.darkMode is `false` on a light HA theme, `true`
+    // on dark; `undefined` before themes have loaded — fall through
+    // to the dark default in that window so we never flash light.
+    const isLightTheme = this.hass?.themes?.darkMode === false;
     const classes = {
       flap: true,
       [`flap--size-${cfg.size}`]: cfg.size !== "regular",
       "flap--has-platform": hasAnyPlatform,
+      "flap--light": isLightTheme,
     };
 
     const stationHeaderStrip = cfg.show_header
@@ -937,12 +943,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
          HA dashboard chrome. */
       isolation: isolate;
       /* Tells the browser this card supports both light and dark
-         schemes so prefers-color-scheme media queries below can
-         flip the palette without HA-theme involvement. */
+         schemes so form controls / scrollbars match whichever
+         palette the .flap--light class below selects. */
       color-scheme: light dark;
       /* Solari palette — exposed as custom properties so the
-         prefers-color-scheme: light block below can flip the
-         board theme in one place. Default values = dark mode. */
+         .flap--light block below can flip the board theme in one
+         place. Default values = dark mode. */
       --flap-housing: #1a1612;
       --flap-bg: #0d0b08;
       --flap-cream-hi: #f3eacd;
@@ -966,27 +972,29 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       --flap-on-color-fg: #f3eacd;
       --flap-header-fg: #f3eacd;
       /* Quiet body text (empty state, ticker) — adapts via the
-         media query below so it stays readable on whichever
+         .flap--light block below so it stays readable on whichever
          board surface is current. */
       --flap-quiet-fg: rgba(255, 255, 255, 0.85);
     }
-    /* Light mode — bright browsers get a cream housing with
-       anthrazite tiles and white glyphs. Saturated coloured
-       surfaces (WL orange band, line tiles, ISA-blue pictogram
-       tile) keep their cream glyph via the --flap-*-fg vars
-       defined on :host. */
-    @media (prefers-color-scheme: light) {
-      :host {
-        --flap-housing: #e0d5b5;
-        --flap-bg: #f3eacd;
-        --flap-cream-hi: #3a3a3a;
-        --flap-cream: #2c2c2c;
-        --flap-cream-lo: #1f1f1f;
-        --flap-ink: #ffffff;
-        --flap-seam: rgba(0, 0, 0, 0.7);
-        --flap-pin: rgba(0, 0, 0, 0.85);
-        --flap-quiet-fg: rgba(0, 0, 0, 0.6);
-      }
+    /* Light mode — driven by HA's theme (hass.themes.darkMode === false),
+       not the OS/browser prefers-color-scheme. HA themes are
+       deliberately decoupled from system appearance, so a user on
+       a light HA theme inside a dark OS should still see the light
+       board. The flag is wired via a class on the .flap element so
+       CSS vars cascade to every descendant just like :host. Saturated
+       coloured surfaces (WL orange band, line tiles, ISA-blue
+       pictogram tile) keep their cream glyph via the --flap-*-fg
+       vars which stay constant across both modes. */
+    .flap--light {
+      --flap-housing: #e0d5b5;
+      --flap-bg: #f3eacd;
+      --flap-cream-hi: #3a3a3a;
+      --flap-cream: #2c2c2c;
+      --flap-cream-lo: #1f1f1f;
+      --flap-ink: #ffffff;
+      --flap-seam: rgba(0, 0, 0, 0.7);
+      --flap-pin: rgba(0, 0, 0, 0.85);
+      --flap-quiet-fg: rgba(0, 0, 0, 0.6);
     }
     .flap {
       background: var(--flap-housing);
