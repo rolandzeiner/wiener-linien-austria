@@ -213,6 +213,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   protected override willUpdate(_changed: PropertyValues): void {
     if (!this._config) return;
     const rows = this._gatherRows();
+    // Uniform-width destination column. Every visible row is padded
+    // to the longest destination's length with trailing spaces so the
+    // platform column lines up visually. The padding tiles are blank
+    // pockets (no glyph), so any spurious diff against a previously
+    // shorter snapshot flips one blank into another — invisible.
+    const maxDestLen = this._maxDestLen(rows);
     // Diff each visible row's three flip-card fields. Keys are row
     // INDEX (not departure ID) so the next train's content inherits
     // the previous row's snapshot and flaps from THAT — which is the
@@ -221,7 +227,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       const row = rows[i];
       if (!row) continue;
       this._diffFlipField(`row${i}-line`, (row.line ?? "").toUpperCase());
-      this._diffFlipField(`row${i}-dest`, (row.towards ?? "").toUpperCase());
+      this._diffFlipField(
+        `row${i}-dest`,
+        (row.towards ?? "").toUpperCase().padEnd(maxDestLen, " "),
+      );
       // Pad the cd snapshot to a fixed 2-char width — matches the
       // 2-tile render so per-position diff aligns with the rendered
       // tiles. A 9 → 10 transition flips both tiles (" 9" → "10");
@@ -319,6 +328,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       );
     }
     return out;
+  }
+
+  /** Longest destination text across the merged row set — drives the
+   *  trailing-blank padding so every row carries the same number of
+   *  destination tiles. Recomputed per render so a new long
+   *  destination arriving (or an old one leaving) updates the
+   *  column width on the next paint. */
+  private _maxDestLen(rows: DepartureAttr[]): number {
+    let max = 0;
+    for (const row of rows) {
+      const len = (row.towards ?? "").length;
+      if (len > max) max = len;
+    }
+    return max;
   }
 
   /** Gather and merge departures from every configured stop, applying
@@ -549,6 +572,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     platformLabel: string,
     lineColors: Record<string, LineColorPair>,
   ): TemplateResult {
+    const maxDestLen = this._maxDestLen(rows);
     if (eids.length === 0) {
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
@@ -590,7 +614,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
             </div>`
           : nothing}
         ${rows.map((d, i) =>
-          this._renderRow(d, i, lineColors, hasAnyPlatform),
+          this._renderRow(d, i, lineColors, hasAnyPlatform, maxDestLen),
         )}
       </div>
     `;
@@ -601,6 +625,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     rowIndex: number,
     lineColors: Record<string, LineColorPair>,
     hasAnyPlatform: boolean,
+    maxDestLen: number,
   ): TemplateResult {
     const cfg = this._config!;
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
@@ -669,7 +694,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
           ${this._renderFlipString(line, `row${rowIndex}-line`, lineTileOpts)}
         </div>
         <div class="flap-cell flap-cell--dest" aria-hidden="true">
-          ${this._renderFlipString(towards, `row${rowIndex}-dest`)}
+          ${this._renderFlipString(
+            towards.padEnd(maxDestLen, " "),
+            `row${rowIndex}-dest`,
+            { blankSpace: true },
+          )}
           ${cfg.show_accessibility && d.barrier_free
             ? this._renderPictogramTile(
                 "mdi:wheelchair-accessibility",
