@@ -341,7 +341,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
     const stationName = attrs.stop_name || attrs.friendly_name || "";
-    const clockText = this._formatClock(attrs.server_time);
     const lineColors = attrs.line_colors ?? {};
 
     const classes = {
@@ -357,9 +356,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${cfg.show_station_header
             ? html`<div class="flap-header" role="group">
-                <div class="flap-header__slot"></div>
                 <div class="flap-header__station">${stationName}</div>
-                <div class="flap-header__clock">${clockText ?? ""}</div>
               </div>`
             : nothing}
           <div class="flap-panel">
@@ -368,14 +365,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         </div>
       </ha-card>
     `;
-  }
-
-  private _formatClock(serverTime: string | null | undefined): string | null {
-    if (!serverTime) return null;
-    const ts = Date.parse(serverTime);
-    if (!Number.isFinite(ts)) return null;
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   }
 
   private _renderBoard(
@@ -543,16 +532,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     icon: string,
     ariaLabel: string,
   ): TemplateResult {
+    // Cream halves stay empty — the pictogram overlay paints a SINGLE
+    // ha-icon centred over the full tile, and the seam draws on top
+    // of it (z-index 2 on the seam vs 1 on the overlay). The earlier
+    // try at putting one ha-icon in EACH half rendered two stacked
+    // icons because ha-icon refuses to clip itself to its parent half.
     return html`<span
       class="flap-tile flap-tile--pictogram"
       aria-label=${ariaLabel}
     >
-      <span class="flap-tile__half flap-tile__half--top"
-        ><ha-icon class="flap-tile__pictogram" .icon=${icon}></ha-icon></span
-      >
-      <span class="flap-tile__half flap-tile__half--bottom"
-        ><ha-icon class="flap-tile__pictogram" .icon=${icon}></ha-icon></span
-      >
+      <span class="flap-tile__half flap-tile__half--top"></span>
+      <span class="flap-tile__half flap-tile__half--bottom"></span>
+      <span class="flap-tile__pictogram-overlay">
+        <ha-icon class="flap-tile__pictogram" .icon=${icon}></ha-icon>
+      </span>
       <span class="flap-tile__seam" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--l" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--r" aria-hidden="true"></span>
@@ -607,9 +600,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       background: var(--wl-orange);
       color: #fff;
       border-radius: 4px 4px 0 0;
-      display: grid;
-      grid-template-columns: 80px 1fr 80px;
+      display: flex;
       align-items: center;
+      justify-content: center;
       padding: 0 14px;
       height: 50px;
       font-family: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -622,16 +615,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       text-align: center;
       font-size: 22px;
       letter-spacing: 0.04em;
-    }
-    .flap-header__clock {
-      text-align: right;
-      font-family: "Barlow Condensed", "Saira Condensed",
-        "WL Sans Condensed", sans-serif;
-      font-weight: 700;
-      font-size: 22px;
-      letter-spacing: 0.05em;
-      font-variant-numeric: tabular-nums;
-      opacity: 0.95;
     }
     .flap-panel {
       background: var(--flap-bg);
@@ -851,20 +834,30 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap-tile--color .flap-tile__seam::after {
       background: rgba(255, 255, 255, 0.22);
     }
-    /* Pictogram tile — same housing as a glyph tile, the inner MDI
-       icon sized to ~60 % so it sits centred with the seam crossing
-       through it. */
-    .flap-tile--pictogram .flap-tile__half {
-      align-items: center;
-    }
-    .flap-tile__pictogram {
-      --mdc-icon-size: 26px;
-      width: 32px;
-      height: 26px;
-      color: var(--flap-ink);
+    /* Pictogram tile — same cream halves as a glyph tile but the
+       glyph is replaced by a single ha-icon centred OVER the tile
+       on an overlay layer. Seam still paints at z-index 2 so the
+       hinge cuts through the icon, matching the design spec
+       ("vertically centred so the seam crosses it"). */
+    .flap-tile__pictogram-overlay {
+      position: absolute;
+      inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      z-index: 1;
+      color: var(--flap-ink);
+      pointer-events: none;
+    }
+    .flap-tile__pictogram {
+      --mdc-icon-size: 26px;
+      color: var(--flap-ink);
+    }
+    .flap--size-medium .flap-tile__pictogram {
+      --mdc-icon-size: 22px;
+    }
+    .flap--size-small .flap-tile__pictogram {
+      --mdc-icon-size: 18px;
     }
     /* Leaf — the OLD top half hinged at the seam, rotating 0 → -90°
        to reveal the static-top NEW glyph underneath. Single leaf
