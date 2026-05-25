@@ -1346,12 +1346,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
     }
     .retro--line-pill .retro-line__label {
-      /* Same optical-centre correction the wheelchair icon needs (see
-         .retro-wheelchair). Inline-block is required so the transform
-         actually translates the glyph; an inline-level transform would
-         silently no-op in some engines. */
+      /* No translateY here — the pill height (1em) equals the text
+         line-box height, so the glyph already sits in the same
+         relative position it does in plain LED rows. The wheelchair
+         needed a 0.12em downward nudge because it's a smaller icon
+         floating in a larger row line-box; that situation does NOT
+         apply to a flush-fit pill. Earlier 0.08em over-corrected and
+         dropped the digit visibly into the lower half of the pill. */
       display: inline-block;
-      transform: translateY(0.08em);
     }
     .retro-dest {
       display: flex;
