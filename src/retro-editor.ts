@@ -334,6 +334,24 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
               { name: "show_clock", selector: { boolean: {} } },
+              // clock_style only renders when show_clock is on — a
+              // user with no clock chip doesn't need the style picker.
+              ...(this._config?.header_left?.show_clock
+                ? [
+                    {
+                      name: "clock_style",
+                      selector: {
+                        select: {
+                          mode: "dropdown" as const,
+                          options: [
+                            { value: "flat", label: this._et("clock_style_flat") },
+                            { value: "solari", label: this._et("clock_style_solari") },
+                          ],
+                        },
+                      },
+                    },
+                  ]
+                : []),
               { name: "show_date", selector: { boolean: {} } },
               // date_format only renders when show_date is on, so a
               // user disabling the chip doesn't have to look at a
@@ -409,6 +427,22 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
               { name: "show_clock", selector: { boolean: {} } },
+              ...(this._config?.header_right?.show_clock
+                ? [
+                    {
+                      name: "clock_style",
+                      selector: {
+                        select: {
+                          mode: "dropdown" as const,
+                          options: [
+                            { value: "flat", label: this._et("clock_style_flat") },
+                            { value: "solari", label: this._et("clock_style_solari") },
+                          ],
+                        },
+                      },
+                    },
+                  ]
+                : []),
               { name: "show_date", selector: { boolean: {} } },
               ...(this._config?.header_right?.show_date
                 ? [{ name: "date_format", selector: { text: {} } }]

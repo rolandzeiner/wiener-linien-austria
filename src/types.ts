@@ -354,6 +354,13 @@ export interface RetroHeaderSide {
    *  `header_right`), so the two clocks meet in the centre of the
    *  strip when both sides enable it. Off by default. */
   show_clock?: boolean | undefined;
+  /** Visual treatment for the clock chip when `show_clock` is on.
+   *  `"flat"` (default) — white chip with mdi:clock-outline + HH:MM
+   *  text, matches the other chips' signage voice.
+   *  `"solari"` — split-flap mechanical display, one flap per
+   *  digit, animates when the minute (or hour) rolls over.
+   *  Honours `prefers-reduced-motion` (instant swap, no flap). */
+  clock_style?: "flat" | "solari" | undefined;
   /** Render the current date as a white pill in this side's chip
    *  lane, formatted with `date_format`. Sits one slot outside the
    *  clock chip on the same side, so time stays innermost. Off by
