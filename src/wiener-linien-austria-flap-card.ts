@@ -836,6 +836,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       --flap-seam: rgba(0, 0, 0, 0.6);
       --flap-pin: rgba(0, 0, 0, 0.7);
       --wl-orange: #e97e00;
+      /* International Symbol of Access blue (PMS 285 ≈ #0079c2).
+         Used for wheelchair pictogram tiles so they read as the
+         universally-recognised accessibility marker instead of
+         blending into the cream voice of the rest of the board. */
+      --flap-a11y: #0079c2;
+      --flap-a11y-hi: #1c93d8;
+      --flap-a11y-lo: #006099;
     }
     .flap {
       background: var(--flap-housing);
@@ -1115,11 +1122,34 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap-tile--color .flap-tile__seam::after {
       background: rgba(255, 255, 255, 0.22);
     }
-    /* Pictogram tile — same cream halves as a glyph tile but the
-       glyph is replaced by a single ha-icon centred OVER the tile
-       on an overlay layer. Seam still paints at z-index 2 so the
-       hinge cuts through the icon, matching the design spec
-       ("vertically centred so the seam crosses it"). */
+    /* Pictogram tile — same flap geometry as a glyph tile but the
+       cream halves swap to the International Symbol of Access blue
+       and the ha-icon overlay paints in white. The seam still draws
+       at z-index 2 so the mechanical hinge visibly cuts through
+       the pictogram, matching the design spec ("vertically centred
+       so the seam crosses it"). */
+    .flap-tile--pictogram .flap-tile__half--top {
+      background: linear-gradient(
+        180deg,
+        var(--flap-a11y-hi) 0%,
+        var(--flap-a11y) 100%
+      );
+    }
+    .flap-tile--pictogram .flap-tile__half--bottom {
+      background: linear-gradient(
+        180deg,
+        var(--flap-a11y) 0%,
+        var(--flap-a11y-lo) 100%
+      );
+    }
+    /* Darker seam + slightly brighter highlight on the blue face —
+       the cream-palette seam vanishes against the saturated blue. */
+    .flap-tile--pictogram .flap-tile__seam {
+      background: rgba(0, 0, 0, 0.45);
+    }
+    .flap-tile--pictogram .flap-tile__seam::after {
+      background: rgba(255, 255, 255, 0.28);
+    }
     .flap-tile__pictogram-overlay {
       position: absolute;
       inset: 0;
@@ -1127,12 +1157,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       align-items: center;
       justify-content: center;
       z-index: 1;
-      color: var(--flap-ink);
+      color: #fff;
       pointer-events: none;
     }
     .flap-tile__pictogram {
       --mdc-icon-size: 26px;
-      color: var(--flap-ink);
+      color: #fff;
     }
     .flap--size-medium .flap-tile__pictogram {
       --mdc-icon-size: 22px;
