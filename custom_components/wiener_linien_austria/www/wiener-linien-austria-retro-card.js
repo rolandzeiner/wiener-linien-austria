@@ -1508,18 +1508,30 @@ const ge=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
         inset 0 1px 0 rgba(0, 0, 0, 0.08),
         inset 0 -1px 0 rgba(0, 0, 0, 0.18);
     }
-    /* Hinge line separating top and bottom halves — a dark 1 px
-       seam across the centre reads as the mechanical meeting
-       point of the two flaps. No paired highlight on the light
-       polarity (it would just disappear). */
+    /* Hinge seam separating top and bottom halves — 3 px-tall soft
+       gradient band centred on 50 %. The previous sharp 1 px solid
+       line read as a hard CSS edge rather than a mechanical join;
+       the gradient peaks at ~22 % darkness in the centre and fades
+       to transparent at the band's edges, so the seam reads as the
+       slot where the two flap cards meet, not as a divider painted
+       on top. Pointer-events off so the seam never eats clicks
+       (the chip itself is non-interactive but defensive against a
+       future click handler). */
     .solari-digit::after {
       content: '';
       position: absolute;
-      top: 50%;
+      top: calc(50% - 1px);
       left: 0;
       right: 0;
-      height: 1px;
-      background: rgba(0, 0, 0, 0.35);
+      height: 3px;
+      background: linear-gradient(
+        180deg,
+        transparent 0%,
+        rgba(0, 0, 0, 0.06) 30%,
+        rgba(0, 0, 0, 0.22) 50%,
+        rgba(0, 0, 0, 0.06) 70%,
+        transparent 100%
+      );
       pointer-events: none;
       z-index: 5;
     }
