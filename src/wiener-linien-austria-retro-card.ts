@@ -1133,11 +1133,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const dateText = side.show_date
       ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
       : null;
+    // Date chip — text-only, no leading icon. The calendar glyph fought
+    // the chip's signage-label voice (it read more like a UI element
+    // than part of the sign); plain text matches the user-provided
+    // chips in the same lane. The clock chip keeps its icon because
+    // the icon there reads as the station-clock symbol, not a UI
+    // affordance.
     const dateNode = dateText
-      ? html`<span class="retro-station-header__chip retro-station-header__chip--date">
-          <ha-icon class="retro-station-header__chip-icon" icon="mdi:calendar"></ha-icon>
-          <span>${dateText}</span>
-        </span>`
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--date">${dateText}</span>`
       : nothing;
     // Canonical render order mirrors the original signage. Right side
     // mirrors the left: exit always at the outer edge of the card,
