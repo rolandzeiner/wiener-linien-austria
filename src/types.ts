@@ -178,6 +178,12 @@ export interface DepartureAttr {
   barrier_free?: boolean;
   traffic_jam?: boolean;
   platform?: string | null;
+  // Via / over routing — when present, the retro card alternates the
+  // destination text with `ÜBER {via}` / `VIA {via}` every few seconds.
+  // Absent on every departure today; reserved for a future sensor
+  // extension so the renderer is forward-compatible without a schema
+  // change later.
+  via?: string | null;
   // Optional per-departure list of upcoming stops on this trip. Absent
   // (or empty) means "no panel" — the row renders without a chevron.
   stops_ahead?: StopAheadAttr[];
@@ -390,4 +396,13 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Tweak — paint a 4 px vertical bar at each row's left edge in the
+   *  line's resolved colour with a faint matching glow. Off by default
+   *  so pre-feature retro cards stay byte-identical. */
+  line_stripe?: boolean | undefined;
+  /** Tweak — wrap the LED panel in an outer dark bezel with a soft
+   *  inner highlight and a subtle glass-reflection gradient over the
+   *  display. Off by default; existing dashboards keep the flush
+   *  edge-to-edge look. */
+  housing?: boolean | undefined;
 }

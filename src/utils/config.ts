@@ -363,6 +363,8 @@ export interface NormalisedRetroConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  line_stripe: boolean;
+  housing: boolean;
 }
 
 // See NormalisedModernConfig — same passthrough rule for dashboard
@@ -391,6 +393,8 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_header",
   "header_left",
   "header_right",
+  "line_stripe",
+  "housing",
 ]);
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
@@ -441,6 +445,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
+    line_stripe: raw.line_stripe === true,
+    housing: raw.housing === true,
   };
 }
 

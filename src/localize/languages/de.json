@@ -102,6 +102,8 @@
     "race_starting_in": "Rennen startet in {n}",
     "race_winner_announce": "Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",
     "barrier_free_title": "Barrierefrei zugänglich",
+    "unit_min": "min",
+    "via_prefix": "ÜBER",
     "header": {
       "icon_exit": "Ausgang",
       "icon_exit_access": "Stufenloser Ausgang",
@@ -169,7 +171,13 @@
       "extra_icons": "Zusätzliche Symbole",
       "extra_icons_helper": "Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",
       "chips": "Zusätzliche Beschriftungen",
-      "chips_helper": "Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen."
+      "chips_helper": "Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen.",
+      "section_tweaks": "Feinschliff",
+      "section_tweaks_helper": "Optische Extras. Beeinflussen nichts an den Daten, ändern nur das Aussehen.",
+      "line_stripe": "Linien-Seitenstreifen",
+      "line_stripe_helper": "4-Pixel-Balken am linken Rand jeder Zeile in der Linienfarbe.",
+      "housing": "LED-Gehäuse",
+      "housing_helper": "Dunkler Rahmen um die LED-Anzeige mit dezentem Glas-Reflex obenauf."
     }
   }
 }

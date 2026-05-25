@@ -26,6 +26,7 @@ import type {
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
 import {
   RETRO_HEADER_ICONS,
@@ -46,6 +47,12 @@ import "./retro-editor.js";
 
 type RaceState = "idle" | "countdown" | "racing" | "freeze" | "victory";
 const VICTORY_DURATION_MS = 4000;
+// Via / over alternation tick. When any visible row carries a `via`
+// hint, the destination text cross-fades with `ÜBER {via}` every
+// VIA_TICK_MS. Chosen at 4 s so each phase has time to register
+// without the row feeling restless. Cross-fade duration lives in the
+// CSS .retro-dest-text transition (0.4 s) — keep them in sync.
+const VIA_TICK_MS = 4000;
 // Hold both wheelchair animations paused for this long after the winner
 // crosses the finish line. Gives the viewer a still frame of the photo
 // finish — winner at the strip, loser caught a step behind — before
@@ -111,6 +118,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // disconnect, re-armed on reconnect).
   @state() private _tickerActive = false;
   private _tickerTimer: ReturnType<typeof setTimeout> | null = null;
+  // Via / over alternation. `_viaPhase` flips between "towards" and
+  // "via" every VIA_TICK_MS so the destination text cross-fades to
+  // `ÜBER {via}` when any visible row carries via routing. The
+  // interval handle is held in `_viaTimer`; both are reset on
+  // disconnect and re-armed on reconnect.
+  @state() private _viaPhase: "towards" | "via" = "towards";
+  private _viaTimer: ReturnType<typeof setInterval> | null = null;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back" console
@@ -197,6 +211,23 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Register the WL webfaces on document.head — see font-face.ts for
     // why Shadow-DOM @font-face can't be trusted on Android WebView.
     registerWlFonts();
+    // Font-loading diagnostic. WL Mono is the authentic departure-board
+    // face; the Courier-New fallback is visibly less accurate. If the
+    // woff2 didn't land — fetch blocked, MIME misconfigured, integration
+    // static path off — warn so installers don't silently end up on the
+    // fallback. `document.fonts.ready` resolves once every pending
+    // font-face has settled (loaded or errored); the check runs against
+    // the actual computed availability at that point.
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      void document.fonts.ready.then(() => {
+        if (!document.fonts.check('700 16px "WL Mono"')) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            '[wiener-linien-austria-retro-card] "WL Mono" 700 not loaded — falling back to Courier New (less authentic). Check /wiener-linien-austria/fonts/ is served by the integration.',
+          );
+        }
+      });
+    }
     if (!this._versionCheckDone && this.hass?.callWS) {
       this._versionCheckDone = true;
       void this._checkCardVersion();
@@ -223,12 +254,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._tickerActive = false;
       this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
     }
+    this._armViaTimer();
   }
 
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRaceTimers();
     this._clearTickerTimer();
+    this._clearViaTimer();
   }
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
@@ -239,7 +272,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       changed.has("_raceState") ||
       changed.has("_countdownDigit") ||
       changed.has("_raceWinner") ||
-      changed.has("_tickerActive")
+      changed.has("_tickerActive") ||
+      changed.has("_viaPhase")
     ) {
       return true;
     }
@@ -432,6 +466,29 @@ export class WienerLinienAustriaRetroCard extends LitElement {
    *  still lingers and a maxed-out 160-char message doesn't crawl. */
   private _tickerDurationSeconds(text: string): number {
     return Math.min(40, Math.max(8, 5 + text.length * 0.18));
+  }
+
+  // ------------------------------------------------------------------
+  // Via / over alternation
+  // ------------------------------------------------------------------
+
+  /** Arm the single via-tick interval. Idempotent — bail out if a timer
+   *  is already running. Runs unconditionally on (re)connect: the
+   *  render gates each row's overlay on `d.via`, so the tick is a
+   *  cheap no-op when no row carries via routing. */
+  private _armViaTimer(): void {
+    if (this._viaTimer !== null) return;
+    this._viaTimer = setInterval(() => {
+      this._viaPhase = this._viaPhase === "towards" ? "via" : "towards";
+    }, VIA_TICK_MS);
+  }
+
+  private _clearViaTimer(): void {
+    if (this._viaTimer !== null) {
+      clearInterval(this._viaTimer);
+      this._viaTimer = null;
+    }
+    this._viaPhase = "towards";
   }
 
   private _startRace(): void {
@@ -717,6 +774,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       "retro--race-freeze": raceFreeze,
       "retro--race-victory": raceVictory,
       "retro--clickable": clickable,
+      "retro--line-stripe": cfg.line_stripe,
+      "retro--housing": cfg.housing,
     };
 
     return html`
@@ -728,7 +787,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
-            ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time)}
+            ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time, attrs.line_colors ?? {})}
             ${this._tickerActive && cfg.message_text
               ? html`<div class="retro-ticker" role="status" aria-live="polite">
                   <div
@@ -785,6 +844,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     platform: string | null,
     platformLabel: string,
     serverTime: string | null | undefined,
+    lineColors: LineColorsMap,
   ): TemplateResult {
     if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
@@ -807,17 +867,35 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     return html`
       <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
-        ${rows.map((d, i) => this._renderRow(d, i))}
+        ${rows.map((d, i) => this._renderRow(d, i, lineColors))}
       </ul>
+      ${this._renderClock(serverTime)}
       ${platform ? this._renderGleis(platform, platformLabel) : nothing}
     `;
   }
 
-  private _renderRow(d: DepartureAttr, rowIndex = 0): TemplateResult {
+  /** Top-right DMI-style clock — HH:MM in the LED amber, sized so it
+   *  reads as a station-board service clock rather than a primary
+   *  metric. Returns `nothing` when the upstream server_time is
+   *  missing or unparseable; a CSS container query (.retro-clock at
+   *  inline-size < 320 px) hides it on narrow widths so the row
+   *  countdowns always win the spare-width contest. */
+  private _renderClock(serverTime: string | null | undefined): TemplateResult | typeof nothing {
+    if (!serverTime) return nothing;
+    const ts = Date.parse(serverTime);
+    if (!Number.isFinite(ts)) return nothing;
+    const d = new Date(ts);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return html`<div class="retro-clock" aria-hidden="true">${hh}:${mm}</div>`;
+  }
+
+  private _renderRow(d: DepartureAttr, rowIndex: number, lineColors: LineColorsMap): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
     const line = d.line || "?";
     const towards = d.towards || "";
+    const via = typeof d.via === "string" && d.via.trim() ? d.via.trim() : null;
     const cdLabel =
       cd === null
         ? this._t("no_data")
@@ -825,12 +903,61 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
     const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
-    const rowLabel = [line, towards, cdLabel, a11yLabel].filter(Boolean).join(" — ");
+    const viaA11y = via ? `${this._t("via_prefix")} ${via}` : "";
+    const rowLabel = [line, towards, viaA11y, cdLabel, a11yLabel].filter(Boolean).join(" — ");
+    // Resolve the line's WL palette through the same precedence ladder
+    // chips use elsewhere: GTFS routes.txt first, then the nightline
+    // override, then a CSS-var fallback that doesn't read well on the
+    // LED panel. When we hit that fallback, paint the pill with the
+    // amber substrate so unknown lines (one-off promo routes, lines
+    // not yet in routes.txt) still look at home on the board instead
+    // of breaking the aesthetic with the HA primary colour.
+    const palette = chipPalette(line, {}, lineColors);
+    const hasResolvedColor = palette.background !== "var(--primary-color)";
+    const pillBg = hasResolvedColor ? palette.background : "rgb(var(--led-glow-rgb) / 0.18)";
+    const pillFg = palette.color ?? (hasResolvedColor ? "#fff" : "var(--led-amber)");
+    // CSS var feeds three things at once: the pill background, the
+    // pill's outer glow (~6 px blur in the rule), and — when the
+    // line_stripe Tweak is on — the row's left-edge stripe + its
+    // matching faint glow. One var, one source of truth.
+    const rowStyle = styleMap({
+      "--row-i": String(rowIndex),
+      "--retro-line-color": pillBg,
+      "--retro-line-fg": pillFg,
+    });
+    // Cross-fade towards ↔ via: render BOTH spans absolutely positioned
+    // on top of each other, swap which one carries the visible-opacity
+    // class on _viaPhase ticks. The fallback span keeps the row sized
+    // (it sets the layout height) so the absolute pair don't collapse
+    // to zero. When there's no via, the absolute pair are omitted and
+    // the layout span carries the only label.
+    const showVia = !!via;
     return html`
-      <li class="retro-row" style=${`--row-i: ${rowIndex}`} aria-label=${rowLabel}>
+      <li class="retro-row" style=${rowStyle} aria-label=${rowLabel}>
         <div class="retro-line" aria-hidden="true">${line}</div>
         <div class="retro-dest" aria-hidden="true">
-          <span class="retro-dest-text">${deText(towards)}</span>
+          <span class="retro-dest-stack">
+            <span class="retro-dest-text retro-dest-text--layout">${deText(towards)}</span>
+            ${showVia
+              ? html`
+                  <span
+                    class=${classMap({
+                      "retro-dest-text": true,
+                      "retro-dest-text--absolute": true,
+                      "retro-dest-text--visible": this._viaPhase === "towards",
+                    })}
+                  >${deText(towards)}</span>
+                  <span
+                    class=${classMap({
+                      "retro-dest-text": true,
+                      "retro-dest-text--absolute": true,
+                      "retro-dest-text--via": true,
+                      "retro-dest-text--visible": this._viaPhase === "via",
+                    })}
+                  >${this._t("via_prefix")} ${deText(via)}</span>
+                `
+              : nothing}
+          </span>
           ${d.barrier_free
             ? html`<ha-icon
                 class="retro-wheelchair"
@@ -844,7 +971,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
             ? "--"
             : isAtPlatform
               ? html`<span class="retro-stars"><span>*</span><span>*</span></span>`
-              : String(cd)}
+              : html`<span class="retro-cd-num">${cd}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`}
         </div>
       </li>
     `;
@@ -1158,29 +1285,91 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       display: grid;
       grid-template-columns: 2.5em 1fr auto;
-      align-items: baseline;
+      align-items: center;
       gap: 12px;
       white-space: nowrap;
+      /* Position context for the line-stripe ::before Tweak and the
+         absolute via-cross-fade pair inside .retro-dest. */
+      position: relative;
     }
     .retro-line {
-      font-weight: 400;
-      text-align: left;
+      /* Line-colour pill. Background + colour come from inline styleMap
+         (resolved through chipPalette so the GTFS routes.txt feed wins
+         over the nightline rule wins over the var-fallback ladder).
+         The pill scale is em-tied: height: 1em matches the row's
+         line-height: 1 cap height, padding 0 0.4em is the spec.
+         font-weight: 700 (up from the 400 of the pre-pill amber-text
+         look) so the inline white numerals carry visual weight against
+         the saturated WL colours. The glow uses --retro-line-color
+         (the resolved pill bg) so it always matches the pill colour;
+         text-shadow is reset because the row's parent --led-glow text-
+         shadow would bloom the white numerals into mush at small sizes. */
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      font-weight: 700;
+      text-align: center;
+      min-width: 2em;
+      height: 1em;
+      padding: 0 0.4em;
+      border-radius: 0.18em;
+      background: var(--retro-line-color, transparent);
+      color: var(--retro-line-fg, var(--led-amber));
+      text-shadow: none;
+      box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
       transition: opacity 0.15s ease-out;
     }
     .retro-dest {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 0.35em;
       overflow: hidden;
       text-transform: uppercase;
       min-width: 0;
       transition: opacity 0.15s ease-out;
     }
+    /* Stack the towards / via labels on top of each other. The
+       --layout span occupies the row height (so the row never
+       collapses on cross-fade); the two --absolute spans sit on top
+       and swap visibility via --visible. Rows with no via payload
+       skip the absolute pair entirely and render only the layout span,
+       so existing dashboards are unaffected. */
+    .retro-dest-stack {
+      position: relative;
+      display: inline-block;
+      overflow: hidden;
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
+    }
     .retro-dest-text {
       overflow: hidden;
       text-overflow: ellipsis;
-      flex: 0 1 auto;
+      white-space: nowrap;
       min-width: 0;
+      max-width: 100%;
+      display: block;
+    }
+    .retro-dest-text--layout {
+      /* Sized but invisible while via-cross-fade is mounted — the two
+         absolute siblings carry the painted text. A row without a via
+         payload omits the absolute pair, so the layout span stays
+         visible and renders the towards text directly. */
+      visibility: visible;
+    }
+    .retro-dest-stack:has(.retro-dest-text--absolute) .retro-dest-text--layout {
+      visibility: hidden;
+    }
+    .retro-dest-text--absolute {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+      will-change: opacity;
+    }
+    .retro-dest-text--visible {
+      opacity: 1;
     }
     .retro-wheelchair {
       flex: 0 0 auto;
@@ -1196,6 +1385,33 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-align: right;
       min-width: 2.5em;
       transition: opacity 0.4s ease-out;
+      display: inline-flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 0.25em;
+    }
+    .retro-cd-num {
+      /* Holds the tabular-nums alignment for the digit while letting
+         the unit sit at a smaller size next to it without throwing off
+         the right-edge alignment of the column. */
+      display: inline-block;
+    }
+    .retro-cd-unit {
+      /* Small amber-caps unit ("min") trailing the countdown number.
+         Tied to em so it tracks the row's font-size token. Hidden at
+         narrow widths via a container query below — the row prefers
+         to surrender the unit over the destination text when room is
+         tight. The text-shadow inherited from .retro-rows is already
+         the right glow, so no overrides here. */
+      display: inline-block;
+      font-size: 0.5em;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+      transform: translateY(-0.05em);
+    }
+    @container (inline-size < 360px) {
+      .retro-cd-unit { display: none; }
     }
     .retro-stars {
       display: inline-flex;
@@ -1660,15 +1876,40 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       margin-left: 12px;
       color: var(--led-amber);
       text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
-      border-left: 1px solid rgb(var(--led-glow-rgb) / 0.25);
       transition: opacity 0.4s ease-out;
+      /* Position context for the dotted-divider pseudo. The previous
+         border-left: 1px hairline read as a CSS edge, not LED material.
+         A 2 px-wide column painted with the same substrate radial-
+         gradient as the panel renders the divider as missing pixels —
+         i.e. an unlit column on the dot-matrix. Pitch + dot size + dot
+         edge inherit from the same custom properties .retro-led uses
+         (4 px classic, 3 px warm / pixel) so the column always lines
+         up with the substrate behind it. */
+      position: relative;
+    }
+    .retro-gleis::before {
+      content: '';
+      position: absolute;
+      top: 8%;
+      bottom: 8%;
+      left: 0;
+      width: 2px;
+      background-image: radial-gradient(
+        circle,
+        rgb(var(--led-glow-rgb) / 0.55) var(--led-dot-size),
+        transparent var(--led-dot-edge)
+      );
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+      pointer-events: none;
     }
     .retro--gleis-left .retro-gleis {
       padding: 0 18px 0 14px;
       margin-left: 0;
       margin-right: 12px;
-      border-left: none;
-      border-right: 1px solid rgb(var(--led-glow-rgb) / 0.25);
+    }
+    .retro--gleis-left .retro-gleis::before {
+      left: auto;
+      right: 0;
     }
     .retro-gleis-label {
       font-size: 0.9em;
@@ -1898,18 +2139,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     .retro-station-header__monogram {
       /* WC tile content. Tile is already flex-centred, so the span
-         positions itself. font-size stays in rem (not em) so the
-         monogram is a stable 0.75rem regardless of the retro--size-*
-         token's em-scale on the parent header. font-family + weight
-         are declared explicitly (rather than relying on inheritance
-         from .retro-station-header) so a future header-rule rewrite
-         can't accidentally regress the W/C letterforms back to a
-         non-condensed face. */
+         positions itself. font-size is 1em so the monogram scales
+         with the parent header's em-scale (1em / 0.9em / 0.8em via
+         retro--size-* tokens) — landing the W/C letterforms at the
+         same visual weight as the chips and condensed sign text on
+         every size variant. The previous 0.75rem hard-locked to
+         document root and shrank visibly on a small-size header
+         while everything else on the strip scaled. font-family +
+         weight are declared explicitly (rather than relying on
+         inheritance from .retro-station-header) so a future
+         header-rule rewrite can't accidentally regress the
+         letterforms back to a non-condensed face. */
       font-family: "WL Sans Condensed", "WL Sans", -apple-system,
                    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
                    Arial, sans-serif;
       font-weight: 700;
-      font-size: 0.75rem;
+      font-size: 1em;
       line-height: 1;
     }
     .retro-station-header__chip {
@@ -2030,6 +2275,108 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       animation: retroRowReveal 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
       animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
+    }
+
+    /* DMI-style service clock in the top-right of the LED panel.
+       Sits above the row text via z=2 (below the pixel screen-door
+       at z=30, victory at z=20, etc.) so it doesn't get covered by
+       race choreography, but stays above the rows during normal
+       operation. Hidden at narrow widths so the row countdowns
+       always win the spare-width contest — the spec gates this on
+       "row has spare width". */
+    .retro-clock {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      z-index: 2;
+      font-family: "WL Mono", "Courier New", Courier, monospace;
+      font-weight: 700;
+      font-size: 0.9em;
+      letter-spacing: 0.08em;
+      color: var(--led-amber);
+      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      font-variant-numeric: tabular-nums;
+      pointer-events: none;
+    }
+    .retro--gleis-right .retro-clock {
+      /* Step in past the gleis right-edge padding so the clock
+         doesn't crowd the GLEIS number when the right column is on. */
+      right: calc(var(--retro-pad-r, 14px) + 32px);
+    }
+    @container (inline-size < 320px) {
+      .retro-clock { display: none; }
+    }
+    /* Race / countdown / freeze / victory / ticker all own the panel
+       exclusively — hide the clock so it doesn't fight the overlay. */
+    .retro--race-countdown .retro-clock,
+    .retro--race-active .retro-clock,
+    .retro--race-freeze .retro-clock,
+    .retro--race-victory .retro-clock {
+      display: none;
+    }
+
+    /* Line-stripe Tweak — 4 px coloured bar at the left edge of each
+       row in the line's resolved colour with a faint matching glow.
+       --retro-line-color is the same var the line pill paints with, so
+       the stripe always matches the pill (one source of truth). */
+    .retro--line-stripe .retro-row {
+      padding-left: 10px;
+    }
+    .retro--line-stripe .retro-row::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 4px;
+      background: var(--retro-line-color, var(--led-amber));
+      filter: drop-shadow(0 0 4px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.45)));
+      pointer-events: none;
+      border-radius: 1px;
+    }
+
+    /* Housing Tweak — wrap the LED panel in an outer dark frame with
+       a soft inner highlight and a glass-reflection gradient over
+       the display. Defaults off; existing dashboards keep their
+       flush edge-to-edge look. */
+    .retro--housing {
+      padding: 6px;
+      background: #111;
+      border-radius: 10px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+    .retro--housing .retro-led {
+      border-radius: 6px;
+    }
+    /* Glass reflection — a 30 % top gradient sitting OVER the LED
+       content (z=2). 4 % white is subtle enough to not wash out the
+       row text but reads as a real reflection on a glossy bezel. */
+    .retro--housing .retro-led::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
+      pointer-events: none;
+      z-index: 2;
+      border-radius: inherit;
+    }
+    /* Housing-on station header and station name plate also pick up
+       the inner border-radius so the bezel corners look right. */
+    .retro--housing .retro-station-header {
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+    }
+    .retro--housing .retro-station {
+      /* Station-name plate sits between the header and the LED — no
+         radius on its bottom corners so the LED's top edge can keep
+         a sharp seam against the plate. */
+    }
+    .retro--housing .retro-station:last-child,
+    .retro--housing .retro-station-header:last-child {
+      border-bottom-left-radius: 6px;
+      border-bottom-right-radius: 6px;
     }
 
     /* Accessibility: honour user motion preference.

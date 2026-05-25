@@ -102,6 +102,8 @@
     "race_starting_in": "Race starting in {n}",
     "race_winner_announce": "Wheelchair {n} wins the accessibility race",
     "barrier_free_title": "Step-free access",
+    "unit_min": "min",
+    "via_prefix": "VIA",
     "header": {
       "icon_exit": "Exit",
       "icon_exit_access": "Step-free exit",
@@ -169,7 +171,13 @@
       "extra_icons": "Extra icons",
       "extra_icons_helper": "Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",
       "chips": "Extra labels",
-      "chips_helper": "Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each."
+      "chips_helper": "Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each.",
+      "section_tweaks": "Tweaks",
+      "section_tweaks_helper": "Visual flourishes. No data behaviour, just looks.",
+      "line_stripe": "Line-colour side stripe",
+      "line_stripe_helper": "A 4 px coloured bar at the left edge of each row, matched to the line.",
+      "housing": "LED housing",
+      "housing_helper": "Dark bezel around the LED panel with a subtle glass reflection on top."
     }
   }
 }

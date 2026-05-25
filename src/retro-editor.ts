@@ -541,6 +541,20 @@ export class WienerLinienAustriaRetroCardEditor
           },
         ],
       },
+      {
+        // Visual flourishes that change appearance only — no data
+        // behaviour, no schema changes for existing YAML. Each Tweak
+        // defaults to `false` in normaliseRetroConfig so pre-1.5.x
+        // cards render byte-identical until the user opts in.
+        type: "expandable",
+        name: "tweaks",
+        title: this._et("section_tweaks"),
+        flatten: true,
+        schema: [
+          { name: "line_stripe", selector: { boolean: {} } },
+          { name: "housing", selector: { boolean: {} } },
+        ],
+      },
     ];
   }
 
