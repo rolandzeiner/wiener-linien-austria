@@ -333,6 +333,7 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_wc", selector: { boolean: {} } },
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
+              { name: "show_clock", selector: { boolean: {} } },
               // Free-form MDI icon list — chip-input pattern.
               // ha-form's `icon` selector exists and HA core uses it,
               // but ha-icon-picker (its underlying UI) uses the
@@ -400,6 +401,7 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_wc", selector: { boolean: {} } },
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
+              { name: "show_clock", selector: { boolean: {} } },
               // Free-form MDI icon list — chip-input pattern.
               // ha-form's `icon` selector exists and HA core uses it,
               // but ha-icon-picker (its underlying UI) uses the
@@ -551,6 +553,7 @@ export class WienerLinienAustriaRetroCardEditor
         title: this._et("section_tweaks"),
         flatten: true,
         schema: [
+          { name: "show_unit", selector: { boolean: {} } },
           { name: "line_stripe", selector: { boolean: {} } },
           { name: "housing", selector: { boolean: {} } },
         ],

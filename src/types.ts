@@ -342,6 +342,12 @@ export interface RetroHeaderSide {
   show_wc?: boolean | undefined;
   show_escalator?: boolean | undefined;
   show_elevator?: boolean | undefined;
+  /** Render the current server_time as a white HH:MM pill in this
+   *  side's chip lane. The pill always sits at the innermost edge
+   *  of its side (rightmost on `header_left`, leftmost on
+   *  `header_right`), so the two clocks meet in the centre of the
+   *  strip when both sides enable it. Off by default. */
+  show_clock?: boolean | undefined;
   /** Optional sequence of short text chips rendered as white
    *  boxes after the WC tile (further from the sign text than
    *  any amenity icon). Useful for short labels like platform
@@ -405,4 +411,8 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
    *  display. Off by default; existing dashboards keep the flush
    *  edge-to-edge look. */
   housing?: boolean | undefined;
+  /** Tweak — trail each countdown number with a small amber-caps
+   *  unit ("min" / "min"). Off by default; the LED board's canonical
+   *  voice is digits only. */
+  show_unit?: boolean | undefined;
 }

@@ -752,7 +752,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // the per-side state in memory so toggling back on restores
     // exactly what the user had set.
     const stationHeader = cfg.show_header
-      ? this._renderStationHeader(cfg.header_left, cfg.header_right)
+      ? this._renderStationHeader(cfg.header_left, cfg.header_right, attrs.server_time)
       : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
@@ -869,25 +869,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
         ${rows.map((d, i) => this._renderRow(d, i, lineColors))}
       </ul>
-      ${this._renderClock(serverTime)}
       ${platform ? this._renderGleis(platform, platformLabel) : nothing}
     `;
   }
 
-  /** Top-right DMI-style clock — HH:MM in the LED amber, sized so it
-   *  reads as a station-board service clock rather than a primary
-   *  metric. Returns `nothing` when the upstream server_time is
-   *  missing or unparseable; a CSS container query (.retro-clock at
-   *  inline-size < 320 px) hides it on narrow widths so the row
-   *  countdowns always win the spare-width contest. */
-  private _renderClock(serverTime: string | null | undefined): TemplateResult | typeof nothing {
-    if (!serverTime) return nothing;
+  /** Format an ISO timestamp as HH:MM in the user's locale. Returns
+   *  `null` on missing / unparseable input so the caller can omit the
+   *  rendering entirely instead of painting "NaN:NaN". Shared by the
+   *  optional left- and right-side header clock chips. */
+  private _formatClock(serverTime: string | null | undefined): string | null {
+    if (!serverTime) return null;
     const ts = Date.parse(serverTime);
-    if (!Number.isFinite(ts)) return nothing;
+    if (!Number.isFinite(ts)) return null;
     const d = new Date(ts);
     const hh = String(d.getHours()).padStart(2, "0");
     const mm = String(d.getMinutes()).padStart(2, "0");
-    return html`<div class="retro-clock" aria-hidden="true">${hh}:${mm}</div>`;
+    return `${hh}:${mm}`;
   }
 
   private _renderRow(d: DepartureAttr, rowIndex: number, lineColors: LineColorsMap): TemplateResult {
@@ -908,22 +905,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Resolve the line's WL palette through the same precedence ladder
     // chips use elsewhere: GTFS routes.txt first, then the nightline
     // override, then a CSS-var fallback that doesn't read well on the
-    // LED panel. When we hit that fallback, paint the pill with the
-    // amber substrate so unknown lines (one-off promo routes, lines
-    // not yet in routes.txt) still look at home on the board instead
-    // of breaking the aesthetic with the HA primary colour.
+    // LED panel. The resolved colour feeds the line-stripe Tweak's
+    // left-edge bar; unknown lines fall back to amber so the stripe
+    // still looks at home on the board instead of breaking the
+    // aesthetic with the HA primary colour. The line code itself
+    // renders as plain amber text — the LED panel intentionally stays
+    // monochrome, the colour leaks out only via the optional stripe.
     const palette = chipPalette(line, {}, lineColors);
-    const hasResolvedColor = palette.background !== "var(--primary-color)";
-    const pillBg = hasResolvedColor ? palette.background : "rgb(var(--led-glow-rgb) / 0.18)";
-    const pillFg = palette.color ?? (hasResolvedColor ? "#fff" : "var(--led-amber)");
-    // CSS var feeds three things at once: the pill background, the
-    // pill's outer glow (~6 px blur in the rule), and — when the
-    // line_stripe Tweak is on — the row's left-edge stripe + its
-    // matching faint glow. One var, one source of truth.
+    const stripeColor =
+      palette.background !== "var(--primary-color)"
+        ? palette.background
+        : "var(--led-amber)";
     const rowStyle = styleMap({
       "--row-i": String(rowIndex),
-      "--retro-line-color": pillBg,
-      "--retro-line-fg": pillFg,
+      "--retro-line-color": stripeColor,
     });
     // Cross-fade towards ↔ via: render BOTH spans absolutely positioned
     // on top of each other, swap which one carries the visible-opacity
@@ -971,7 +966,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
             ? "--"
             : isAtPlatform
               ? html`<span class="retro-stars"><span>*</span><span>*</span></span>`
-              : html`<span class="retro-cd-num">${cd}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`}
+              : this._config?.show_unit
+                ? html`<span class="retro-cd-num">${cd}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`
+                : String(cd)}
         </div>
       </li>
     `;
@@ -1006,15 +1003,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderStationHeader(
     left: RetroHeaderSide | undefined,
     right: RetroHeaderSide | undefined,
+    serverTime: string | null | undefined,
   ): TemplateResult | typeof nothing {
     if (!left && !right) return nothing;
     return html`
       <div class="retro-station-header" role="group">
         <div class="retro-station-header__side retro-station-header__side--left">
-          ${left ? this._renderHeaderSide(left, "left") : nothing}
+          ${left ? this._renderHeaderSide(left, "left", serverTime) : nothing}
         </div>
         <div class="retro-station-header__side retro-station-header__side--right">
-          ${right ? this._renderHeaderSide(right, "right") : nothing}
+          ${right ? this._renderHeaderSide(right, "right", serverTime) : nothing}
         </div>
       </div>
     `;
@@ -1023,6 +1021,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderHeaderSide(
     side: RetroHeaderSide,
     pos: "left" | "right",
+    serverTime: string | null | undefined,
   ): TemplateResult {
     // Resolve the exit corner to a render node. Three paths:
     //   "regular" / "accessible" → WL traced SVG glyph (auto-flips
@@ -1083,16 +1082,27 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     );
     const chipsLeftOrder = chipNodes;
     const chipsRightOrder = [...chipNodes].reverse();
+    // Optional clock chip — `show_clock` per side. Always painted at
+    // the innermost edge of its side: rightmost on `left`, leftmost
+    // on `right`. So when both sides enable it the two clocks meet
+    // in the centre of the strip. Suppressed if server_time hasn't
+    // arrived yet (no "NaN:NaN" while the integration warms up).
+    const clockText = side.show_clock ? this._formatClock(serverTime) : null;
+    const clockNode = clockText
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">${clockText}</span>`
+      : nothing;
     // Canonical render order mirrors the original signage. Right side
     // mirrors the left: exit always at the outer edge of the card,
     // amenities ordered so the *same* glyph (elevator) is always
     // closest to the text on both sides — wheelchair-relevant info
     // gets the same visual prominence regardless of header side.
     // Mirror invariant for extra_icons + chips: index 0 of either
-    // array sits closest to the WC tile on both sides.
+    // array sits closest to the WC tile on both sides. The clock
+    // chip, when enabled, sits beyond the chips at the innermost
+    // edge — last on left, first on right.
     return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}`
-      : html`${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}${clockNode}`
+      : html`${clockNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
@@ -1285,7 +1295,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       display: grid;
       grid-template-columns: 2.5em 1fr auto;
-      align-items: center;
+      align-items: baseline;
       gap: 12px;
       white-space: nowrap;
       /* Position context for the line-stripe ::before Tweak and the
@@ -1293,36 +1303,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       position: relative;
     }
     .retro-line {
-      /* Line-colour pill. Background + colour come from inline styleMap
-         (resolved through chipPalette so the GTFS routes.txt feed wins
-         over the nightline rule wins over the var-fallback ladder).
-         The pill scale is em-tied: height: 1em matches the row's
-         line-height: 1 cap height, padding 0 0.4em is the spec.
-         font-weight: 700 (up from the 400 of the pre-pill amber-text
-         look) so the inline white numerals carry visual weight against
-         the saturated WL colours. The glow uses --retro-line-color
-         (the resolved pill bg) so it always matches the pill colour;
-         text-shadow is reset because the row's parent --led-glow text-
-         shadow would bloom the white numerals into mush at small sizes. */
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-      font-weight: 700;
-      text-align: center;
-      min-width: 2em;
-      height: 1em;
-      padding: 0 0.4em;
-      border-radius: 0.18em;
-      background: var(--retro-line-color, transparent);
-      color: var(--retro-line-fg, var(--led-amber));
-      text-shadow: none;
-      box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
+      font-weight: 400;
+      text-align: left;
       transition: opacity 0.15s ease-out;
     }
     .retro-dest {
       display: flex;
-      align-items: center;
+      align-items: baseline;
       gap: 0.35em;
       overflow: hidden;
       text-transform: uppercase;
@@ -2277,42 +2264,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
     }
 
-    /* DMI-style service clock in the top-right of the LED panel.
-       Sits above the row text via z=2 (below the pixel screen-door
-       at z=30, victory at z=20, etc.) so it doesn't get covered by
-       race choreography, but stays above the rows during normal
-       operation. Hidden at narrow widths so the row countdowns
-       always win the spare-width contest — the spec gates this on
-       "row has spare width". */
-    .retro-clock {
-      position: absolute;
-      top: 6px;
-      right: 8px;
-      z-index: 2;
-      font-family: "WL Mono", "Courier New", Courier, monospace;
-      font-weight: 700;
-      font-size: 0.9em;
-      letter-spacing: 0.08em;
-      color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+    /* Optional clock chip inside the station-header strip. Inherits
+       the existing .retro-station-header__chip styling (white box,
+       black text, condensed WL signage face) so it sits coherently
+       next to the other chips. Tabular-nums keeps the digit columns
+       from breathing as minutes tick, and a wider letter-spacing
+       reads as a clock rather than as just another label. */
+    .retro-station-header__chip--clock {
       font-variant-numeric: tabular-nums;
-      pointer-events: none;
-    }
-    .retro--gleis-right .retro-clock {
-      /* Step in past the gleis right-edge padding so the clock
-         doesn't crowd the GLEIS number when the right column is on. */
-      right: calc(var(--retro-pad-r, 14px) + 32px);
-    }
-    @container (inline-size < 320px) {
-      .retro-clock { display: none; }
-    }
-    /* Race / countdown / freeze / victory / ticker all own the panel
-       exclusively — hide the clock so it doesn't fight the overlay. */
-    .retro--race-countdown .retro-clock,
-    .retro--race-active .retro-clock,
-    .retro--race-freeze .retro-clock,
-    .retro--race-victory .retro-clock {
-      display: none;
+      letter-spacing: 0.06em;
     }
 
     /* Line-stripe Tweak — 4 px coloured bar at the left edge of each

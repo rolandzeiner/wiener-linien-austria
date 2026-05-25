@@ -57,6 +57,7 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   const show_wc = r.show_wc === true;
   const show_escalator = r.show_escalator === true;
   const show_elevator = r.show_elevator === true;
+  const show_clock = r.show_clock === true;
   // Chip array: trim each entry, drop empties, cap text length and
   // total count. Tolerant of YAML user error — non-string entries are
   // skipped instead of failing the whole side.
@@ -88,6 +89,7 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
     !show_wc &&
     !show_escalator &&
     !show_elevator &&
+    !show_clock &&
     chips === undefined &&
     extra_icons === undefined
   ) {
@@ -99,6 +101,7 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (show_wc) out.show_wc = true;
   if (show_escalator) out.show_escalator = true;
   if (show_elevator) out.show_elevator = true;
+  if (show_clock) out.show_clock = true;
   if (chips !== undefined) out.chips = chips;
   if (extra_icons !== undefined) out.extra_icons = extra_icons;
   return out;
@@ -365,6 +368,7 @@ export interface NormalisedRetroConfigValidated {
   header_right?: RetroHeaderSide | undefined;
   line_stripe: boolean;
   housing: boolean;
+  show_unit: boolean;
 }
 
 // See NormalisedModernConfig — same passthrough rule for dashboard
@@ -395,6 +399,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "header_right",
   "line_stripe",
   "housing",
+  "show_unit",
 ]);
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
@@ -447,6 +452,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     header_right: normaliseRetroHeaderSide(raw.header_right),
     line_stripe: raw.line_stripe === true,
     housing: raw.housing === true,
+    show_unit: raw.show_unit === true,
   };
 }
 
