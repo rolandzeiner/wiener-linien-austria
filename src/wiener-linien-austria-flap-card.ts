@@ -936,9 +936,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
          so they only compete with each other, not the surrounding
          HA dashboard chrome. */
       isolation: isolate;
-      /* Solari palette — exposed as custom properties so a future
-         dark-housing / light-housing toggle could swap one rule
-         instead of every shadow. */
+      /* Tells the browser this card supports both light and dark
+         schemes so prefers-color-scheme media queries below can
+         flip the palette without HA-theme involvement. */
+      color-scheme: light dark;
+      /* Solari palette — exposed as custom properties so the
+         prefers-color-scheme: light block below can flip the
+         board theme in one place. Default values = dark mode. */
       --flap-housing: #1a1612;
       --flap-bg: #0d0b08;
       --flap-cream-hi: #f3eacd;
@@ -955,6 +959,34 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       --flap-a11y: #0079c2;
       --flap-a11y-hi: #1c93d8;
       --flap-a11y-lo: #006099;
+      /* Cross-theme semantic values. The board palette flips
+         between light and dark modes, but these stay constant so
+         saturated coloured surfaces (line tiles, ISA blue tile,
+         WL orange band) keep their light glyph in both modes. */
+      --flap-on-color-fg: #f3eacd;
+      --flap-header-fg: #f3eacd;
+      /* Quiet body text (empty state, ticker) — adapts via the
+         media query below so it stays readable on whichever
+         board surface is current. */
+      --flap-quiet-fg: rgba(255, 255, 255, 0.85);
+    }
+    /* Light mode — bright browsers get a cream housing with
+       anthrazite tiles and white glyphs. Saturated coloured
+       surfaces (WL orange band, line tiles, ISA-blue pictogram
+       tile) keep their cream glyph via the --flap-*-fg vars
+       defined on :host. */
+    @media (prefers-color-scheme: light) {
+      :host {
+        --flap-housing: #e0d5b5;
+        --flap-bg: #f3eacd;
+        --flap-cream-hi: #3a3a3a;
+        --flap-cream: #2c2c2c;
+        --flap-cream-lo: #1f1f1f;
+        --flap-ink: #ffffff;
+        --flap-seam: rgba(0, 0, 0, 0.7);
+        --flap-pin: rgba(0, 0, 0, 0.85);
+        --flap-quiet-fg: rgba(0, 0, 0, 0.6);
+      }
     }
     .flap {
       background: var(--flap-housing);
@@ -978,7 +1010,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        flap card's own header, intentionally just the orange band. */
     .flap-header {
       background: var(--wl-orange);
-      color: var(--flap-cream-hi);
+      color: var(--flap-header-fg);
       border-radius: 4px 4px 0 0;
       display: flex;
       align-items: center;
@@ -1218,7 +1250,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         color-mix(in oklab, var(--tile-bg, #888) 78%, white 22%) 0%,
         var(--tile-bg, #888) 100%
       );
-      color: var(--tile-fg, var(--flap-cream-hi));
+      color: var(--tile-fg, var(--flap-on-color-fg));
     }
     .flap-tile--color .flap-tile__half--bottom {
       background: linear-gradient(
@@ -1226,7 +1258,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         var(--tile-bg, #888) 0%,
         color-mix(in oklab, var(--tile-bg, #888) 84%, black 16%) 100%
       );
-      color: var(--tile-fg, var(--flap-cream-hi));
+      color: var(--tile-fg, var(--flap-on-color-fg));
     }
     .flap-tile--color .flap-tile__seam {
       background: rgba(0, 0, 0, 0.4);
@@ -1276,12 +1308,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       align-items: center;
       justify-content: center;
       z-index: 1;
-      color: var(--flap-cream-hi);
+      color: var(--flap-on-color-fg);
       pointer-events: none;
     }
     .flap-tile__pictogram {
       --mdc-icon-size: 26px;
-      color: var(--flap-cream-hi);
+      color: var(--flap-on-color-fg);
     }
     .flap--size-medium .flap-tile__pictogram {
       --mdc-icon-size: 22px;
@@ -1325,7 +1357,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         color-mix(in oklab, var(--tile-bg, #888) 78%, white 22%) 0%,
         var(--tile-bg, #888) 100%
       );
-      color: var(--tile-fg, var(--flap-cream-hi));
+      color: var(--tile-fg, var(--flap-on-color-fg));
     }
     /* Each tile's leaf rotates 0° → -90° in one flap. With marching,
        every tile re-mounts (via keyed()) on the next step so this
@@ -1358,7 +1390,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       font-size: 20px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--flap-cream-lo);
+      color: var(--flap-quiet-fg);
     }
     .flap-stars {
       display: inline-flex;
