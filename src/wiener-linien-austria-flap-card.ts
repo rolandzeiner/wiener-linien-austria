@@ -38,6 +38,7 @@ import {
 } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { FLAP_CARD_VERSION } from "./const.js";
@@ -83,11 +84,40 @@ import {
 // 12-tile destination row has finished, plus a small grace so the
 // flap stays parked at -90° momentarily before the static halves
 // take over (avoids any 1-frame seam at the cleanup boundary).
-const FLAP_LEAF_MS = 180;
-const FLAP_STAGGER_MS = 70;
-const FLAP_MAX_TILES = 16;
-const FLAP_CLEANUP_MS =
-  FLAP_LEAF_MS + FLAP_STAGGER_MS * FLAP_MAX_TILES + 80;
+// March tick interval — matches the CSS leaf animation duration
+// (130 ms, see .flap-tile--flipping rule below) so each tick is one
+// complete flap with no half-rotation overlap between steps. 130 ms
+// is the Solari sweet spot: fast enough that a 13-letter walk lands
+// in ~1.7 s, slow enough that each individual flap reads as a
+// discrete mechanical motion.
+const FLAP_MARCH_INTERVAL_MS = 130;
+
+// Letter + digit sequences for marching. Real Solari drums are split
+// by section — letters cycle through letters, digits cycle through
+// digits. Cross-section transitions (letter → digit, space → letter)
+// jump directly because a real board would have a separate drum and
+// would set the new value in one step.
+const FLAP_LETTER_SEQUENCE = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß";
+const FLAP_DIGIT_SEQUENCE = "0123456789";
+
+function flapNextChar(from: string, to: string): string {
+  if (from === to) return to;
+  if (
+    FLAP_LETTER_SEQUENCE.includes(from) &&
+    FLAP_LETTER_SEQUENCE.includes(to)
+  ) {
+    const i = FLAP_LETTER_SEQUENCE.indexOf(from);
+    return FLAP_LETTER_SEQUENCE[(i + 1) % FLAP_LETTER_SEQUENCE.length]!;
+  }
+  if (
+    FLAP_DIGIT_SEQUENCE.includes(from) &&
+    FLAP_DIGIT_SEQUENCE.includes(to)
+  ) {
+    const i = FLAP_DIGIT_SEQUENCE.indexOf(from);
+    return FLAP_DIGIT_SEQUENCE[(i + 1) % FLAP_DIGIT_SEQUENCE.length]!;
+  }
+  return to;
+}
 
 // Dedupe by `type` so a double-load (cache-bust race, HMR) doesn't
 // surface the card twice in the picker.
@@ -112,13 +142,21 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
   @state() private _config?: NormalisedFlapConfig;
   @state() private _versionMismatch: string | null = null;
-  // Flip-card diff state. Key shape: `row${i}-${field}` where field is
-  // "line" / "dest" / "cd". The same shared engine drives every flap
-  // surface on the card so a destination change and a countdown
-  // change can flap together but only on the positions that moved.
-  @state() private _flipSnapshots: Record<string, string> = {};
-  @state() private _flipFlipping: Record<string, Record<number, string>> = {};
-  private _flipCleanupTimer: ReturnType<typeof setTimeout> | null = null;
+  // Marching-flap state. Each text field on the board is keyed by an
+  // opaque id like row0-line / row0-dest / row1-cd.
+  //   _displayed[key]   — the string currently painted on screen.
+  //   _target[key]      — the string we want to land on.
+  //   _justFlipped[key] — for each position that ADVANCED on the
+  //                       most recent tick, the OLD char that's now
+  //                       rotating away on the leaf.
+  // A single march timer ticks every FLAP_MARCH_INTERVAL_MS; each
+  // tick advances every active tile by ONE step along its letter /
+  // digit sequence (see flapNextChar). When every displayed string
+  // equals its target, the timer is cleared.
+  @state() private _displayed: Record<string, string> = {};
+  @state() private _target: Record<string, string> = {};
+  @state() private _justFlipped: Record<string, Record<number, string>> = {};
+  private _marchTimer: ReturnType<typeof setInterval> | null = null;
 
   private _versionCheckDone = false;
   // One-shot guard so the "configured entity gone → fell back" warning
@@ -198,7 +236,8 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
-      changed.has("_flipFlipping")
+      changed.has("_displayed") ||
+      changed.has("_justFlipped")
     ) {
       return true;
     }
@@ -254,47 +293,83 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   // ------------------------------------------------------------------
-  // Flip-card diff engine
+  // Marching-flap engine — Solari boards rotate their drums one card
+  // at a time until the target glyph faces forward. Each text field
+  // (line / dest / cd, keyed by row index) walks independently; the
+  // single march timer advances every active field by one step per
+  // tick.
   // ------------------------------------------------------------------
 
   private _clearFlipTimer(): void {
-    if (this._flipCleanupTimer !== null) {
-      clearTimeout(this._flipCleanupTimer);
-      this._flipCleanupTimer = null;
+    if (this._marchTimer !== null) {
+      clearInterval(this._marchTimer);
+      this._marchTimer = null;
     }
   }
 
+  /** Push a new target value for a field. First sighting adopts the
+   *  value without marching (initial paint shouldn't flap from
+   *  emptiness through the whole alphabet). Subsequent calls set
+   *  the target and arm the march timer; the tick handler advances
+   *  the displayed string toward the target one char at a time. */
   private _diffFlipField(key: string, currentValue: string | null): void {
     if (currentValue === null) {
-      delete this._flipSnapshots[key];
-      delete this._flipFlipping[key];
+      delete this._displayed[key];
+      delete this._target[key];
+      delete this._justFlipped[key];
       return;
     }
-    const prev = this._flipSnapshots[key];
-    if (prev === undefined) {
-      // First sighting — adopt without flagging, so the initial
-      // paint doesn't flap every position from emptiness.
-      this._flipSnapshots[key] = currentValue;
+    if (this._displayed[key] === undefined) {
+      // First sighting — adopt instantly.
+      this._displayed = { ...this._displayed, [key]: currentValue };
+      this._target = { ...this._target, [key]: currentValue };
       return;
     }
-    if (prev === currentValue) return;
-    const maxLen = Math.max(prev.length, currentValue.length);
-    const flipping: Record<number, string> = {};
-    for (let i = 0; i < maxLen; i++) {
-      const prevChar = prev[i] ?? "";
-      const currChar = currentValue[i] ?? "";
-      if (prevChar !== currChar) {
-        flipping[i] = prevChar;
+    if (this._target[key] === currentValue) return;
+    this._target = { ...this._target, [key]: currentValue };
+    this._ensureMarchTimer();
+  }
+
+  private _ensureMarchTimer(): void {
+    if (this._marchTimer !== null) return;
+    this._marchTimer = setInterval(
+      () => this._marchTick(),
+      FLAP_MARCH_INTERVAL_MS,
+    );
+  }
+
+  private _marchTick(): void {
+    const nextDisplayed: Record<string, string> = { ...this._displayed };
+    const nextJustFlipped: Record<string, Record<number, string>> = {};
+    let activeAny = false;
+    for (const [key, target] of Object.entries(this._target)) {
+      const cur = nextDisplayed[key] ?? "";
+      if (cur === target) continue;
+      const maxLen = Math.max(cur.length, target.length);
+      const newChars: string[] = [];
+      const flipped: Record<number, string> = {};
+      for (let i = 0; i < maxLen; i++) {
+        const c = cur[i] ?? " ";
+        const t = target[i] ?? " ";
+        if (c === t) {
+          newChars.push(c);
+        } else {
+          flipped[i] = c;
+          newChars.push(flapNextChar(c, t));
+        }
+      }
+      const joined = newChars.join("");
+      nextDisplayed[key] = joined;
+      if (Object.keys(flipped).length > 0) {
+        nextJustFlipped[key] = flipped;
+        activeAny = true;
       }
     }
-    this._flipSnapshots = { ...this._flipSnapshots, [key]: currentValue };
-    if (Object.keys(flipping).length === 0) return;
-    this._flipFlipping = { ...this._flipFlipping, [key]: flipping };
-    this._clearFlipTimer();
-    this._flipCleanupTimer = setTimeout(() => {
-      this._flipCleanupTimer = null;
-      this._flipFlipping = {};
-    }, FLAP_CLEANUP_MS);
+    this._displayed = nextDisplayed;
+    this._justFlipped = nextJustFlipped;
+    if (!activeAny) {
+      this._clearFlipTimer();
+    }
   }
 
   private async _checkCardVersion(): Promise<void> {
@@ -730,10 +805,23 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     key: string,
     opts: { tileBg?: string; tileFg?: string; blankSpace?: boolean } = {},
   ): TemplateResult {
-    const chars = text.split("");
-    const flipping = this._flipFlipping[key] ?? {};
+    // _displayed[key] is the currently-painted string — advances one
+    // step per march tick toward _target[key]. Falls back to `text`
+    // for the very first render (willUpdate adopts the value before
+    // the next render, so this fallback only matters when
+    // _displayed hasn't been initialised yet, e.g. an empty board).
+    const displayed = this._displayed[key] ?? text;
+    const chars = displayed.split("");
+    const flipping = this._justFlipped[key] ?? {};
+    // keyed() forces Lit to re-mount the tile when its current char
+    // changes — which restarts the CSS flap animation from 0° each
+    // tick, giving the marching cycle its discrete flap-per-step
+    // motion. Tiles whose char is unchanged (already at target)
+    // keep their key and don't re-mount, so no spurious animation.
     return html`<span class="flap-tiles" aria-label=${text}
-      >${chars.map((char, i) => this._renderTile(char, flipping[i], i, opts))}</span
+      >${chars.map((char, i) =>
+        keyed(`${i}:${char}`, this._renderTile(char, flipping[i], i, opts)),
+      )}</span
     >`;
   }
 
@@ -1239,9 +1327,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       );
       color: var(--tile-fg, var(--flap-cream-hi));
     }
+    /* Each tile's leaf rotates 0° → -90° in one flap. With marching,
+       every tile re-mounts (via keyed()) on the next step so this
+       animation re-fires from the start every tick — visually
+       producing the continuous cycle of physical flap cards. Per-
+       tile stagger dropped because marching tiles desync naturally
+       (each tile reaches its target after a different number of
+       steps based on its letter distance). */
     .flap-tile--flipping .flap-tile__leaf {
-      animation: flapLeaf 180ms cubic-bezier(0.4, 0, 0.7, 1) forwards;
-      animation-delay: calc(var(--tile-i, 0) * 70ms);
+      animation: flapLeaf 130ms cubic-bezier(0.4, 0, 0.7, 1) forwards;
     }
     @keyframes flapLeaf {
       to {
