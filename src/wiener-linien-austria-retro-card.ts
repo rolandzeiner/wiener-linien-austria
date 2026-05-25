@@ -1346,9 +1346,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
     }
     .retro--line-pill .retro-line__label {
-      /* Small upward nudge — WL Mono's descender area shows as empty
-         space at the bottom of a 1em pill even though uppercase
-         glyphs have no descender, so the digit reads as bottom-heavy
+      /* Switch from WL Mono (Courier-derived, on the .retro root) to
+         WL Sans for the pill label. The real Wiener Linien line
+         indicators (U1/U2/…) use a bold sans rather than a mono
+         dot-matrix face — even on the LED-style board, the line
+         pill is rendered in the signage's print face, not the
+         board's display face. Falls through to the system sans
+         stack on installs where the WL woff2 didn't land.
+         Small upward nudge — WL Sans reserves descender space at
+         the bottom of every em-box even though uppercase glyphs
+         have no descender, so the digit reads as bottom-heavy
          without correction. -0.04em is the empirical sweet spot:
          enough to balance the visible ink against the pill box but
          not so much that the glyph collides with the pill's top
@@ -1356,6 +1363,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          translates the glyph; an inline-level transform would
          silently no-op in some engines. */
       display: inline-block;
+      font-family: "WL Sans", -apple-system, BlinkMacSystemFont,
+                   "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       transform: translateY(-0.04em);
     }
     .retro-dest {
@@ -2196,22 +2205,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     .retro-station-header__monogram {
       /* WC tile content. Tile is already flex-centred, so the span
-         positions itself. font-size is 1em so the monogram scales
-         with the parent header's em-scale (1em / 0.9em / 0.8em via
-         retro--size-* tokens) — landing the W/C letterforms at the
-         same visual weight as the chips and condensed sign text on
-         every size variant. The previous 0.75rem hard-locked to
-         document root and shrank visibly on a small-size header
-         while everything else on the strip scaled. font-family +
-         weight are declared explicitly (rather than relying on
-         inheritance from .retro-station-header) so a future
-         header-rule rewrite can't accidentally regress the
+         positions itself. font-size is 0.9em — em-tied so it
+         scales with the parent header's em-scale (1em / 0.9em /
+         0.8em via retro--size-* tokens), shrunk ~10 % from the
+         original 1em so the W / C letterforms don't overpower the
+         surrounding amenity glyphs (the WL signage WC monogram
+         reads as a small, paired label, not a heavyweight chip).
+         font-family + weight are declared explicitly (rather than
+         relying on inheritance from .retro-station-header) so a
+         future header-rule rewrite can't accidentally regress the
          letterforms back to a non-condensed face. */
       font-family: "WL Sans Condensed", "WL Sans", -apple-system,
                    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
                    Arial, sans-serif;
       font-weight: 700;
-      font-size: 1em;
+      font-size: 0.9em;
       line-height: 1;
     }
     .retro-station-header__chip {
