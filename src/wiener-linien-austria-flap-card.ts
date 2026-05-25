@@ -204,24 +204,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
-    const eid = this._resolveEntity();
-    if (!eid) return false;
-    return prev.states[eid] !== this.hass.states[eid];
+    // Multi-stop: re-render when ANY configured stop's state changed.
+    const eids = this._resolveStopEids();
+    if (eids.length === 0) return false;
+    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
   }
 
   protected override willUpdate(_changed: PropertyValues): void {
     if (!this._config) return;
-    const eid = this._resolveEntity();
-    if (!eid) return;
-    const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
-    const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
-    const matching = filterDepartures(departures, {
-      direction: this._config.direction,
-      lines: this._config.line ? [this._config.line] : undefined,
-      walk_times: this._config.walk_times,
-      accessibility_only: this._config.accessibility_only,
-    });
-    const rows = matching.slice(0, this._config.max_rows);
+    const rows = this._gatherRows();
     // Diff each visible row's three flip-card fields. Keys are row
     // INDEX (not departure ID) so the next train's content inherits
     // the previous row's snapshot and flaps from THAT — which is the
@@ -296,20 +287,69 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     );
   }
 
-  private _resolveEntity(): string | null {
-    if (this._config?.entity && this.hass?.states?.[this._config.entity]) {
-      return this._config.entity;
+  /** Configured stop entity ids that actually exist in hass.states.
+   *  When `entities` is empty (fresh card from the picker), fall back
+   *  to the first auto-discovered WL sensor so the preview is
+   *  populated. */
+  private _resolveStopEids(): string[] {
+    const stops = this._config?.entities ?? [];
+    const states = this.hass?.states;
+    const out: string[] = [];
+    for (const s of stops) {
+      if (states?.[s.entity]) out.push(s.entity);
     }
-    const available = findWienerLinienEntities(this.hass);
-    const first = available[0] ?? null;
-    if (first && this._config?.entity && !this._fallbackWarned) {
+    if (out.length === 0 && stops.length === 0) {
+      const first = findWienerLinienEntities(this.hass)[0];
+      if (first) out.push(first);
+    }
+    if (out.length === 0 && stops.length > 0 && !this._fallbackWarned) {
       this._fallbackWarned = true;
       // eslint-disable-next-line no-console
       console.warn(
-        `[wiener-linien-austria-flap-card] configured entity "${this._config.entity}" not in hass.states; falling back to "${first}"`,
+        `[wiener-linien-austria-flap-card] none of the configured entities exist in hass.states (${stops.map((s) => s.entity).join(", ")})`,
       );
     }
-    return first;
+    return out;
+  }
+
+  /** Gather and merge departures from every configured stop, applying
+   *  per-stop filters (lines, direction, walk_times) + the card-wide
+   *  `accessibility_only`. Result is sorted by countdown ascending
+   *  and sliced to `max_rows`. Used by both willUpdate (to feed the
+   *  flip diff) and render (to paint the rows). */
+  private _gatherRows(): DepartureAttr[] {
+    if (!this._config) return [];
+    const stops = this._config.entities ?? [];
+    const accessibilityOnly = this._config.accessibility_only;
+    const merged: DepartureAttr[] = [];
+    for (const stop of stops) {
+      const attrs = (this.hass?.states?.[stop.entity]?.attributes ?? {}) as WienerLinienAttrs;
+      const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
+      // `filterDepartures` accepts direction `"H" | "R" | undefined`.
+      // Undefined / empty-string direction = both directions. The
+      // ModernStopFilter shape carries optional lines / walk_times so
+      // per-stop scoping comes for free.
+      const dir =
+        stop.direction === "H" || stop.direction === "R"
+          ? stop.direction
+          : undefined;
+      const filtered = filterDepartures(departures, {
+        ...(dir !== undefined ? { direction: dir } : {}),
+        ...(stop.lines && stop.lines.length ? { lines: stop.lines } : {}),
+        ...(stop.walk_times ? { walk_times: stop.walk_times } : {}),
+        accessibility_only: accessibilityOnly,
+      });
+      merged.push(...filtered);
+    }
+    // Stable sort by countdown ascending. Departures with non-finite
+    // countdown sink to the bottom so the visible rows start with
+    // imminent trains.
+    merged.sort((a, b) => {
+      const ac = Number.isFinite(a.countdown) ? a.countdown : Number.POSITIVE_INFINITY;
+      const bc = Number.isFinite(b.countdown) ? b.countdown : Number.POSITIVE_INFINITY;
+      return ac - bc;
+    });
+    return merged.slice(0, this._config.max_rows);
   }
 
   private _t(key: string, replacements?: Record<string, string | number>): string {
@@ -327,18 +367,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     const cfg = this._config;
-    const eid = this._resolveEntity();
-    const attrs = (eid
-      ? this.hass?.states?.[eid]?.attributes ?? {}
+    const eids = this._resolveStopEids();
+    const rows = this._gatherRows();
+    // Card-wide metadata sourced from the FIRST stop: WL-orange band
+    // station name, server_time for the header chips, GTFS palette
+    // for line tiles. line_colors come from the same GTFS feed so a
+    // multi-stop board uses identical colours for shared lines.
+    const firstEid = eids[0] ?? "";
+    const firstAttrs = (firstEid
+      ? this.hass?.states?.[firstEid]?.attributes ?? {}
       : {}) as WienerLinienAttrs;
-    const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
-    const matching = filterDepartures(departures, {
-      direction: cfg.direction,
-      lines: cfg.line ? [cfg.line] : undefined,
-      walk_times: cfg.walk_times,
-      accessibility_only: cfg.accessibility_only,
-    });
-    const rows = matching.slice(0, cfg.max_rows);
+    const stationName =
+      firstAttrs.stop_name || firstAttrs.friendly_name || "";
+    const lineColors = firstAttrs.line_colors ?? {};
+    const serverTime = firstAttrs.server_time;
 
     const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
     const platform = cfg.show_platform ? rawPlatform : null;
@@ -351,9 +393,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const isMetro = (rows[0]?.type ?? "") === LINE_TYPE_METRO;
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
-    const stationName = attrs.stop_name || attrs.friendly_name || "";
-    const lineColors = attrs.line_colors ?? {};
-
     const classes = {
       flap: true,
       [`flap--size-${cfg.size}`]: cfg.size !== "regular",
@@ -362,7 +401,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     };
 
     const stationHeaderStrip = cfg.show_header
-      ? this._renderStationHeader(cfg.header_left, cfg.header_right, attrs.server_time)
+      ? this._renderStationHeader(cfg.header_left, cfg.header_right, serverTime)
       : nothing;
 
     return html`
@@ -376,7 +415,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               </div>`
             : nothing}
           <div class="flap-panel">
-            ${this._renderBoard(eid, rows, departures, platform, platformLabel, lineColors, gleisLeft)}
+            ${this._renderBoard(eids, rows, platform, platformLabel, lineColors, gleisLeft)}
           </div>
         </div>
       </ha-card>
@@ -497,26 +536,29 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   private _renderBoard(
-    eid: string | null,
+    eids: string[],
     rows: DepartureAttr[],
-    allDepartures: DepartureAttr[],
     platform: string | null,
     platformLabel: string,
     lineColors: Record<string, LineColorPair>,
     gleisLeft: boolean,
   ): TemplateResult {
-    if (!eid) {
+    if (eids.length === 0) {
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
     if (rows.length === 0) {
-      const dir = this._config!.direction;
-      const lineFilter = this._config!.line;
-      const inDirection = allDepartures.filter((d) => d.direction === dir);
-      let key = "no_data";
-      if (allDepartures.length === 0) key = "betriebsschluss";
-      else if (allDepartures.length > 0 && inDirection.length === 0)
-        key = "no_data_wrong_direction";
-      else if (lineFilter && inDirection.length > 0) key = "no_data_wrong_line";
+      // Empty-state diagnosis — aggregate across every configured
+      // stop so the message reflects the merged feed, not just one
+      // stop's state. If NO stop has departures we treat it as end-
+      // of-service; if SOME do, the per-stop filters are excluding
+      // everything (wrong direction / wrong line filter / walk
+      // times all clipping).
+      let totalDepartures = 0;
+      for (const eid of eids) {
+        const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
+        if (Array.isArray(attrs.departures)) totalDepartures += attrs.departures.length;
+      }
+      const key = totalDepartures === 0 ? "betriebsschluss" : "no_data";
       return html`<div class="flap-empty">${this._t(key)}</div>`;
     }
     return html`

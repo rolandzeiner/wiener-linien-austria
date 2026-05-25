@@ -10,10 +10,17 @@
 // dashboard layout fields (grid_options, view_layout, visibility) round-
 // trip unchanged while no pre-normalised value of a validated key
 // sneaks through via the spread.
+//
+// Multi-stop model: the canonical config shape carries an `entities`
+// array of `NormalisedFlapStop` entries. Legacy single-stop YAML
+// (entity + direction + line/lines + walk_times at the root) is
+// promoted into entities[0] at normalise time, so old configs keep
+// working without migration.
 
 import type {
   FlapPlatformSide,
   FlapSize,
+  FlapStopConfig,
   RetroHeaderSide,
   WalkTimes,
   WienerLinienFlapCardConfig,
@@ -55,14 +62,60 @@ function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+function normaliseLineDirections(
+  raw: unknown,
+): Record<string, "H" | "R"> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const out: Record<string, "H" | "R"> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof k !== "string" || !k.length) continue;
+    if (v === "H" || v === "R") out[k] = v;
+    // Any other value ("Both" / "" / undefined) = no override = absence.
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** A stop after normalisation. `direction` `undefined` means BOTH —
+ *  the renderer treats absence as "no direction filter". `""` from a
+ *  raw config is normalised to undefined so the renderer only ever
+ *  sees `"H" | "R" | undefined`. */
+export interface NormalisedFlapStop {
+  entity: string;
+  lines?: string[];
+  direction?: "H" | "R" | undefined;
+  line_directions?: Record<string, "H" | "R"> | undefined;
+  walk_times?: WalkTimes | undefined;
+}
+
+function normaliseStopEntry(raw: unknown): NormalisedFlapStop | null {
+  if (typeof raw === "string") {
+    return raw.startsWith("sensor.") ? { entity: raw } : null;
+  }
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const entity = typeof r.entity === "string" ? r.entity : null;
+  if (!entity?.startsWith("sensor.")) return null;
+  const stop: NormalisedFlapStop = { entity };
+  if (Array.isArray(r.lines)) {
+    const lines = r.lines.filter(
+      (l): l is string => typeof l === "string" && l.length > 0,
+    );
+    if (lines.length) stop.lines = lines;
+  }
+  if (r.direction === "H" || r.direction === "R") stop.direction = r.direction;
+  const lineDirs = normaliseLineDirections(r.line_directions);
+  if (lineDirs) stop.line_directions = lineDirs;
+  const walk = normaliseWalkTimes(r.walk_times);
+  if (walk) stop.walk_times = walk;
+  return stop;
+}
+
 export interface NormalisedFlapConfigValidated {
   // HA's Lovelace editor wrapper re-validates every `config-changed`
   // payload against `type` — preserving the raw value (including any
   // `custom:` prefix) lets yaml-registered installs round-trip cleanly.
   type: string;
-  entity?: string | undefined;
-  direction: "H" | "R";
-  line?: string | undefined;
+  entities: NormalisedFlapStop[];
   size: FlapSize;
   max_rows: number;
   show_platform: boolean;
@@ -71,7 +124,6 @@ export interface NormalisedFlapConfigValidated {
   show_min_unit: boolean;
   show_accessibility: boolean;
   accessibility_only: boolean;
-  walk_times?: WalkTimes | undefined;
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
@@ -84,11 +136,19 @@ export type NormalisedFlapConfig = NormalisedFlapConfigValidated & {
   [key: string]: unknown;
 };
 
+// Keys this normaliser actively handles — used to filter the raw
+// passthrough so dashboard layout fields survive while no
+// pre-normalisation version of a validated key leaks through.
+// Includes legacy flat fields (entity / line / lines / direction /
+// walk_times) that get promoted to entities[0] and must NOT leak.
 const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "type",
+  "entities",
   "entity",
-  "direction",
   "line",
+  "lines",
+  "direction",
+  "walk_times",
   "size",
   "max_rows",
   "show_platform",
@@ -97,7 +157,6 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_min_unit",
   "show_accessibility",
   "accessibility_only",
-  "walk_times",
   "show_header",
   "header_left",
   "header_right",
@@ -106,7 +165,6 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
 export function normaliseFlapConfig(
   raw: WienerLinienFlapCardConfig,
 ): NormalisedFlapConfig {
-  const direction: "H" | "R" = raw.direction === "R" ? "R" : "H";
   const size: FlapSize = FLAP_SIZES.has(raw.size as FlapSize)
     ? (raw.size as FlapSize)
     : "regular";
@@ -116,13 +174,47 @@ export function normaliseFlapConfig(
     ? (raw.platform_side as FlapPlatformSide)
     : "auto";
 
-  // Clamp max_rows to a reasonable range. 1..4 keeps the board readable
-  // at any size variant; 0 would render an empty board (bad UX), >4
-  // overflows the WL signage convention (a real DFI usually shows 2-3).
+  // Clamp max_rows to 1..8 — bumped from the original 1..4 for
+  // multi-stop boards where merging two stops easily produces 6-8
+  // pending departures within the visible horizon.
   const maxRowsRaw = Number(raw.max_rows);
   const max_rows = Number.isFinite(maxRowsRaw)
-    ? Math.max(1, Math.min(4, Math.round(maxRowsRaw)))
+    ? Math.max(1, Math.min(8, Math.round(maxRowsRaw)))
     : 2;
+
+  // Back-compat: flat single-entity shape gets promoted to entities[0].
+  let rawEntities: unknown[] = [];
+  if (Array.isArray(raw.entities)) {
+    rawEntities = raw.entities;
+  } else if (typeof raw.entity === "string") {
+    const legacyLines: string[] | undefined = Array.isArray(raw.lines)
+      ? raw.lines.filter(
+          (l): l is string => typeof l === "string" && l.length > 0,
+        )
+      : typeof raw.line === "string" && raw.line
+        ? [raw.line]
+        : undefined;
+    rawEntities = [
+      {
+        entity: raw.entity,
+        ...(legacyLines && legacyLines.length ? { lines: legacyLines } : {}),
+        ...(raw.direction !== undefined ? { direction: raw.direction } : {}),
+        ...(raw.walk_times !== undefined
+          ? { walk_times: raw.walk_times }
+          : {}),
+      } satisfies Partial<FlapStopConfig> & { entity: string },
+    ];
+  }
+
+  const entities: NormalisedFlapStop[] = [];
+  const seen = new Set<string>();
+  for (const r of rawEntities) {
+    const stop = normaliseStopEntry(r);
+    if (!stop) continue;
+    if (seen.has(stop.entity)) continue;
+    seen.add(stop.entity);
+    entities.push(stop);
+  }
 
   const passthrough: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -132,12 +224,7 @@ export function normaliseFlapConfig(
   return {
     ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-flap-card",
-    entity:
-      typeof raw.entity === "string" && raw.entity.startsWith("sensor.")
-        ? raw.entity
-        : undefined,
-    direction,
-    line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
+    entities,
     size,
     max_rows,
     show_platform: asBool(raw.show_platform, true),
@@ -146,7 +233,6 @@ export function normaliseFlapConfig(
     show_min_unit: asBool(raw.show_min_unit, true),
     show_accessibility: asBool(raw.show_accessibility, true),
     accessibility_only: raw.accessibility_only === true,
-    walk_times: normaliseWalkTimes(raw.walk_times),
     // Master gate for the signage header strip — defaults `false` so
     // pre-feature flap cards render byte-identical. Per-side configs
     // are preserved either way (so toggling back on restores them).

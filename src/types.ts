@@ -450,13 +450,37 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
 export type FlapSize = "small" | "medium" | "regular";
 export type FlapPlatformSide = "auto" | "left" | "right";
 
+/** Per-stop config inside `WienerLinienFlapCardConfig.entities`.
+ *  Same grammar as the modern card's `ModernStopConfig`: an entity
+ *  plus optional filters that scope the merged departure feed.
+ *  `direction` `""` (or undefined) keeps both directions. */
+export interface FlapStopConfig {
+  entity: string;
+  lines?: string[];
+  direction?: "H" | "R" | "";
+  /** Per-line direction override. Absence of an entry for a given
+   *  line means the stop-wide `direction` applies. */
+  line_directions?: Record<string, "H" | "R">;
+  walk_times?: WalkTimes;
+}
+
 export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   type: string;
+  /** Multi-stop array. Each entry is either a bare sensor entity id
+   *  (string) or a full `FlapStopConfig` object. Mirrors the
+   *  modern card so a flap card can show departures from up to 8
+   *  stops on one board, sorted by countdown across the whole
+   *  feed. */
+  entities?: Array<FlapStopConfig | string> | undefined;
+  /** v1.5.x back-compat: single-entity legacy shape — promoted into
+   *  `entities[0]` inside the normaliser. Both shapes round-trip;
+   *  only `entities` survives the normalise pass. */
   entity?: string | undefined;
-  direction?: "H" | "R" | undefined;
+  direction?: "H" | "R" | "" | undefined;
   line?: string | undefined;
+  lines?: string[] | undefined;
   size?: FlapSize | undefined;
-  /** Number of departure rows rendered. Clamped to 1..4. Default 2. */
+  /** Number of departure rows rendered. Clamped to 1..8. Default 2. */
   max_rows?: number | undefined;
   /** Show the GLEIS / STEIG platform column on the side of the board. */
   show_platform?: boolean | undefined;
