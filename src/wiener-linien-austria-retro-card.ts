@@ -1151,21 +1151,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // array sits closest to the WC tile on both sides. Date and
     // clock chips sit at the innermost edge: date one slot out,
     // clock at the very edge so time stays closest to the centre.
-    //
-    // Build the chain as an array and filter out every `nothing` slot
-    // before handing it to Lit. The parent .retro-station-header__side
-    // is a flex container with `gap: 5px`; even though a `nothing`
-    // expression renders no element, an explicit slot in the chain can
-    // still appear to inflate the visual gap around it (the empty
-    // "Beschriftung" slot was widening the elv → exit gap visibly).
-    // Filtering ahead of time guarantees the gap budget is spent only
-    // on real flex items.
-    const chain: ReadonlyArray<TemplateResult | typeof nothing> =
-      pos === "left"
-        ? [exitNode, textNode, elv, esc, wc, ...mdiTilesLeftOrder, ...chipsLeftOrder, dateNode, clockNode]
-        : [clockNode, dateNode, ...chipsRightOrder, ...mdiTilesRightOrder, wc, esc, elv, textNode, exitNode];
-    const realSlots = chain.filter((n): n is TemplateResult => n !== nothing);
-    return html`${realSlots}`;
+    return pos === "left"
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}${dateNode}${clockNode}`
+      : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
