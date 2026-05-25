@@ -15,7 +15,7 @@ Vienna public transport departures for Home Assistant. Type a stop name, pick th
 - **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap. See [Lovelace Cards](#lovelace-cards).
 - **Service + elevator alerts** filtered to your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` attributes and rendered inline by every card.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail showing every upcoming stop on that trip with transfer-line chips.
-- **Multi-step setup** — search → pick stop → pick lines, with a live `/monitor` probe so the picker only lists lines actually serving the stop.
+- **Multi-step setup** — search → pick stop → pick lines. The picker merges the live `/monitor` window with the static schedule catalogue, so day-only and nightline services both stay selectable regardless of when you configure.
 - **Reconfigure** to add or remove lines without losing the entry; **Configure** to change the polling interval.
 
 ## Screenshots
@@ -161,7 +161,7 @@ Four OGD endpoints, on different cadences:
 | Static stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 
-All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — well below the conventional 15-second minimum circulated for the OGD real-time endpoint. Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the cached payload, halving steady-state bandwidth. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
+All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — at or above the conventional 15-second minimum interval circulated for the OGD real-time endpoint (Wiener Linien doesn't publish a numeric rate cap, so the 15 s figure is convention rather than written rule). Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the cached payload, halving steady-state bandwidth. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
 > **After a Home Assistant restart**: the alert feeds (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min before the first refresh lands. Departures fetch immediately on the per-entry cadence.
 
