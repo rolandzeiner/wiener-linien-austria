@@ -995,6 +995,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       --flap-seam: rgba(0, 0, 0, 0.7);
       --flap-pin: rgba(0, 0, 0, 0.85);
       --flap-quiet-fg: rgba(0, 0, 0, 0.6);
+      /* Drop the housing's inset bevel and softer drop shadow in
+         light mode — the bevel is a depth cue tuned for dark-on-dark
+         and reads as a hard black line on cream. Keep a softened
+         outer drop shadow so the card still lifts off the dashboard. */
+      box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
     }
     .flap {
       background: var(--flap-housing);
