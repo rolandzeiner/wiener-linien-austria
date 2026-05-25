@@ -1344,6 +1344,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       color: var(--retro-line-fg, var(--led-amber));
       text-shadow: none;
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
+      /* Pill BOX optical nudge — geometric centring against the row
+         lands the pill a hair high relative to the destination text
+         next to it. Empirical sweet spot: +0.03em down. The previous
+         attempt at -0.05em went the wrong direction; small downward
+         is the right one for this row layout. */
+      transform: translateY(0.03em);
     }
     .retro--line-pill .retro-line__label {
       /* Inherits WL Mono from the .retro root — the LED board's
