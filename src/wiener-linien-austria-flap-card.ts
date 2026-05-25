@@ -1504,6 +1504,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        class names live in independent worlds.
        ==================================================================== */
     .retro-station-header {
+      /* Pin the signage strip to dark-palette values so it stays
+         visually consistent across HA's light/dark themes. The
+         strip is part of the card's branded chrome (like the WL
+         orange band below) — it shouldn't recolour with the user's
+         dashboard theme. Re-declaring the three flap vars locally
+         scopes the override to this block and its descendants. */
+      --flap-housing: #1a1612;
+      --flap-cream-hi: #f3eacd;
+      --flap-ink: #1a1410;
       display: flex;
       align-items: center;
       justify-content: space-between;
