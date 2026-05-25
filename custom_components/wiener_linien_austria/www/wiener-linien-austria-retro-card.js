@@ -420,14 +420,17 @@ const pe=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
     }
     .retro--line-pill .retro-line__label {
-      /* No translateY here — the pill height (1em) equals the text
-         line-box height, so the glyph already sits in the same
-         relative position it does in plain LED rows. The wheelchair
-         needed a 0.12em downward nudge because it's a smaller icon
-         floating in a larger row line-box; that situation does NOT
-         apply to a flush-fit pill. Earlier 0.08em over-corrected and
-         dropped the digit visibly into the lower half of the pill. */
+      /* Small upward nudge — WL Mono's descender area shows as empty
+         space at the bottom of a 1em pill even though uppercase
+         glyphs have no descender, so the digit reads as bottom-heavy
+         without correction. -0.04em is the empirical sweet spot:
+         enough to balance the visible ink against the pill box but
+         not so much that the glyph collides with the pill's top
+         edge. Inline-block is required so the transform actually
+         translates the glyph; an inline-level transform would
+         silently no-op in some engines. */
       display: inline-block;
+      transform: translateY(-0.04em);
     }
     .retro-dest {
       display: flex;
