@@ -1458,22 +1458,16 @@ const ge=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
     .retro-station-header__chip--clock {
       gap: 0.25em;
     }
-    /* Solari (split-flap) clock — overrides the chip's default white
-       box because the digits are dark "flap pockets" that wouldn't
-       read against a white chip background. Padding stays for the
-       chip's outer rhythm but the inner row owns its own background.
-       Background is the same #000 as the header strip so the chip
-       blends into the strip; the flap edges and inner shadow do the
-       visual heavy lifting. */
+    /* Solari (split-flap) clock — inherits the chip's white bg /
+       black text so the digit pockets read as light cards on the
+       header strip, matching the other chips' polarity. Padding +
+       gap tighten the digit row inside the chip's outer rhythm;
+       the font swaps to WL Mono (the LED display face) with
+       tabular nums so identical numerals have identical widths
+       regardless of flap state. */
     .retro-station-header__chip--solari {
-      background: #000;
-      color: #fff;
       padding: 0 0.2em;
       gap: 1px;
-      /* Reset the chip's font — Solari digits use the LED mono face
-         (same as the board itself), tabular so identical numerals
-         have identical widths. WL Sans Condensed reads as signage,
-         not as a mechanical display. */
       font-family: "WL Mono", "Courier New", Courier, monospace;
       font-variant-numeric: tabular-nums;
     }
@@ -1497,19 +1491,27 @@ const ge=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
       display: inline-block;
       width: 0.85em;
       height: 100%;
-      background: #111;
-      color: #fff;
+      /* Slightly off-white so the digit pockets are distinguishable
+         from the parent chip's pure-white background — reads as
+         "cards in a slot" rather than text painted directly on the
+         chip. The black flap glyphs get the full contrast they need. */
+      background: #f4f4f4;
+      color: #000;
       border-radius: 0.08em;
       overflow: hidden;
-      /* Flap-pocket depth: a subtle inset shadow at the top and
-         bottom edges sells the "cards stacked in a slot" look. */
+      /* Flap-pocket depth on a light surface — top edge gets a
+         faint dark line (the "lip" of the slot the card slides
+         into), bottom edge gets a slightly darker one (the
+         shadow cast inside the pocket). Both subtle so the chip
+         still reads as a single coherent shape. */
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.08),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+        inset 0 1px 0 rgba(0, 0, 0, 0.08),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.18);
     }
-    /* Hinge line separating top and bottom halves — a 1 px shadow
-       across the centre reads as the mechanical seam where the two
-       flaps meet. */
+    /* Hinge line separating top and bottom halves — a dark 1 px
+       seam across the centre reads as the mechanical meeting
+       point of the two flaps. No paired highlight on the light
+       polarity (it would just disappear). */
     .solari-digit::after {
       content: '';
       position: absolute;
@@ -1517,8 +1519,7 @@ const ge=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
       left: 0;
       right: 0;
       height: 1px;
-      background: rgba(0, 0, 0, 0.6);
-      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06);
+      background: rgba(0, 0, 0, 0.35);
       pointer-events: none;
       z-index: 5;
     }
