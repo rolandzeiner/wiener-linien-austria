@@ -199,23 +199,6 @@ export class WienerLinienAustriaRetroCardEditor
     return out;
   }
 
-  /** Build the ha-form schema. Called per render so option labels
-   *  pick up the current `hass.language` AND the current selected
-   *  entity (which determines the line dropdown options).
-   *
-   *  Two saved-state robustness rules:
-   *    - The line dropdown's `options` always includes the currently-saved
-   *      `line` even if it's not flowing right now (off-hours, cold
-   *      sensor, the line not yet observed in this direction). Without
-   *      this, ha-form renders the trigger empty and the user thinks
-   *      their config got wiped.
-   *    - The direction dropdown hides the option for a direction with
-   *      no live departures so the user can't pick a one-way stop's
-   *      missing direction. When ONLY one direction has data and the
-   *      saved value is the other, _scheduleDirectionAutocorrect (in
-   *      render) flips the saved value to the available one. When the
-   *      stop has no data yet, both options stay visible.
-   */
   /** Shared options list for both sides' "Exit icon" dropdown.
    *  Built once so the two sides can never drift, and so new MDI
    *  options added to `RETRO_HEADER_MDI_EXIT_KEYS` flow into the
@@ -233,6 +216,23 @@ export class WienerLinienAustriaRetroCardEditor
     return [...base, ...mdi];
   }
 
+  /** Build the ha-form schema. Called per render so option labels
+   *  pick up the current `hass.language` AND the current selected
+   *  entity (which determines the line dropdown options).
+   *
+   *  Two saved-state robustness rules:
+   *    - The line dropdown's `options` always includes the currently-saved
+   *      `line` even if it's not flowing right now (off-hours, cold
+   *      sensor, the line not yet observed in this direction). Without
+   *      this, ha-form renders the trigger empty and the user thinks
+   *      their config got wiped.
+   *    - The direction dropdown hides the option for a direction with
+   *      no live departures so the user can't pick a one-way stop's
+   *      missing direction. When ONLY one direction has data and the
+   *      saved value is the other, _scheduleDirectionAutocorrect (in
+   *      render) flips the saved value to the available one. When the
+   *      stop has no data yet, both options stay visible.
+   */
   private _schema(): ReadonlyArray<HaFormSchema> {
     const liveLines = this._linesForCurrent();
     const savedLine = this._config?.line;
@@ -661,8 +661,18 @@ export class WienerLinienAustriaRetroCardEditor
 
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
-    const n = parseInt(raw, 10);
-    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
+    const trimmed = raw.trim();
+    const n = trimmed === "" ? NaN : Number(trimmed);
+    // Distinguish "" (intentional clear) from typed garbage. Without
+    // the warning a typo like "5min" silently clears the value and the
+    // user has no signal that their input was rejected.
+    if (trimmed !== "" && !Number.isFinite(n)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria-retro-card-editor] walk-time "${raw}" for ${key} is not a number — clearing`,
+      );
+    }
+    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
     const cur = { ...(this._config.walk_times ?? {}) };
     if (clean === null) delete cur[key];
     else cur[key] = clean;
@@ -738,6 +748,14 @@ export class WienerLinienAustriaRetroCardEditor
       if (!next.line || !linesNow.includes(next.line)) {
         next.line = linesNow[0];
       }
+      // Surface the autocorrect — silently rewriting saved config is
+      // user-meaningful (their typed direction just changed). Console
+      // only, since the editor's auto-correct is by design; a future
+      // pass could replace this with a render-time hint.
+      // eslint-disable-next-line no-console
+      console.info(
+        `[wiener-linien-austria-retro-card-editor] direction autocorrected to "${target}" for entity "${next.entity ?? ""}" — only one direction has live data`,
+      );
       this._commit(next);
     });
   }

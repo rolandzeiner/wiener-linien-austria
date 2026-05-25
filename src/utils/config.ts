@@ -126,13 +126,35 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
   return out;
 }
 
+/** Returns the subset of `raw` whose keys are NOT in `validated` —
+ *  the HA-injected dashboard layout fields (grid_options, view_layout,
+ *  visibility) that must survive a normalise round-trip unchanged.
+ *  Filtering by an allowlist of validated keys also prevents the raw
+ *  pre-normalisation value of a validated key from leaking through. */
+export function filterPassthrough(
+  raw: unknown,
+  validated: ReadonlySet<string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!validated.has(k)) out[k] = v;
+  }
+  return out;
+}
+
 function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const out: WalkTimes = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-    if (!Number.isFinite(n)) continue;
-    if (n < 0 || n > 120) continue;
+    if (!Number.isFinite(n) || n < 0 || n > 120) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria] walk_times["${k}"] = ${JSON.stringify(v)} is not a finite number in 0..120 — dropping`,
+      );
+      continue;
+    }
     // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the
     // current shape is a (line, direction) pair ("U1|R") so the
     // threshold applies to every train on that direction regardless of
@@ -329,10 +351,7 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
   // passes through dashboard layout fields (grid_options, view_layout,
   // visibility, layout_options) without smuggling pre-normalisation
   // versions of validated keys into the result.
-  const passthrough: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw)) {
-    if (!MODERN_VALIDATED_KEYS.has(k)) passthrough[k] = v;
-  }
+  const passthrough = filterPassthrough(raw, MODERN_VALIDATED_KEYS);
 
   return {
     ...passthrough,
@@ -434,10 +453,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
     ? (raw.style as RetroStyle)
     : "classic";
-  const passthrough: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!RETRO_VALIDATED_KEYS.has(k)) passthrough[k] = v;
-  }
+  const passthrough = filterPassthrough(raw, RETRO_VALIDATED_KEYS);
 
   return {
     ...passthrough,

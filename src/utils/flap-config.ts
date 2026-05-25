@@ -24,7 +24,7 @@ import type {
   WalkTimes,
   WienerLinienFlapCardConfig,
 } from "../types.js";
-import { normaliseRetroHeaderSide } from "./config.js";
+import { filterPassthrough, normaliseRetroHeaderSide } from "./config.js";
 
 const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
   "small",
@@ -222,10 +222,7 @@ export function normaliseFlapConfig(
     entities.push(stop);
   }
 
-  const passthrough: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!FLAP_VALIDATED_KEYS.has(k)) passthrough[k] = v;
-  }
+  const passthrough = filterPassthrough(raw, FLAP_VALIDATED_KEYS);
 
   return {
     ...passthrough,

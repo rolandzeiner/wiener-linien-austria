@@ -104,6 +104,8 @@
     "barrier_free_title": "Barrierefrei zugänglich",
     "unit_min": "min",
     "via_prefix": "ÜBER",
+    "aria_start_race": "Barrierefreiheits-Rennen starten",
+    "aria_dismiss_message": "Lauftext schließen",
     "header": {
       "icon_exit": "Ausgang",
       "icon_exit_access": "Stufenloser Ausgang",

@@ -104,6 +104,8 @@
     "barrier_free_title": "Step-free access",
     "unit_min": "min",
     "via_prefix": "VIA",
+    "aria_start_race": "Start accessibility race",
+    "aria_dismiss_message": "Dismiss scrolling message",
     "header": {
       "icon_exit": "Exit",
       "icon_exit_access": "Step-free exit",
