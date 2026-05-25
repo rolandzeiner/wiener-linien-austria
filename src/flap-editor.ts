@@ -38,7 +38,6 @@ import type {
 import { fireEvent } from "./utils.js";
 import {
   lineDirKey,
-  linesForDirection,
   linesAtStop,
   pairsAtStop,
 } from "./utils/departures.js";
@@ -69,6 +68,19 @@ export class WienerLinienAustriaFlapCardEditor
   @state() private _config?: NormalisedFlapConfig;
 
   public setConfig(config: WienerLinienFlapCardConfig): void {
+    // Mirror the card's setConfig guards. Without them, malformed YAML
+    // silently becomes an empty config in the editor — the user opens
+    // it, sees defaults, may overwrite a broken-but-recoverable file.
+    if (!config || typeof config !== "object") {
+      throw new Error(
+        "wiener-linien-austria-flap-card-editor: config must be an object",
+      );
+    }
+    if (config.entity !== undefined && typeof config.entity !== "string") {
+      throw new Error(
+        "wiener-linien-austria-flap-card-editor: 'entity' must be a string",
+      );
+    }
     this._config = normaliseFlapConfig(config);
   }
 
@@ -337,8 +349,18 @@ export class WienerLinienAustriaFlapCardEditor
 
   private _setWalkTime(eid: string, key: string, raw: string): void {
     if (!this._config) return;
-    const n = parseInt(raw, 10);
-    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
+    const trimmed = raw.trim();
+    const n = trimmed === "" ? NaN : Number(trimmed);
+    // Distinguish "empty input = clear" from "typed garbage = warn but
+    // still clear". Without the warning a typo silently clears the
+    // value and the user has no signal that their input was rejected.
+    if (trimmed !== "" && !Number.isFinite(n)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria-flap-card-editor] walk-time "${raw}" for ${eid}/${key} is not a number — clearing`,
+      );
+    }
+    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
     this._updateStop(eid, (s) => {
       const cur = { ...(s.walk_times ?? {}) };
       if (clean === null) delete cur[key];
@@ -397,6 +419,7 @@ export class WienerLinienAustriaFlapCardEditor
       const active =
         (dir === null && currentDir === undefined) || currentDir === dir;
       return html`<button
+        type="button"
         class=${"editor-pill" + (active ? " editor-pill--active" : "")}
         @click=${() => this._setStopDirection(stop.entity, dir)}
       >
@@ -425,6 +448,7 @@ export class WienerLinienAustriaFlapCardEditor
                 ${allLines.map((line) => {
                   const active = selectedLines.includes(line);
                   return html`<button
+                    type="button"
                     class=${"editor-pill" + (active ? " editor-pill--active" : "")}
                     @click=${() =>
                       this._setStopLines(
@@ -505,10 +529,3 @@ export class WienerLinienAustriaFlapCardEditor
 
   static override styles: CSSResultGroup = [editorBaseStyles];
 }
-
-// linesForDirection is intentionally NOT used by the v1 flap editor —
-// we surface every line at the stop (linesAtStop) and let the user
-// pick freely. Direction filtering happens inside the card render
-// path, not the editor. Kept imported so a future "only show lines
-// available in selected direction" UX upgrade can reach for it.
-void linesForDirection;

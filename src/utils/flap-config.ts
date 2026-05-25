@@ -69,16 +69,19 @@ function normaliseLineDirections(
   return Object.keys(out).length ? out : undefined;
 }
 
-/** A stop after normalisation. `direction` `undefined` means BOTH —
- *  the renderer treats absence as "no direction filter". `""` from a
- *  raw config is normalised to undefined so the renderer only ever
- *  sees `"H" | "R" | undefined`. */
+/** A stop after normalisation. Optional fields use plain `?:` (no
+ *  `| undefined`) so under `exactOptionalPropertyTypes` callers can't
+ *  set them to explicit `undefined` — the normaliser only ever
+ *  produces absence, and absence is what the rest of the renderer
+ *  branches on (e.g. `stop.direction === undefined` = "no direction
+ *  filter"). The raw config interface keeps `| undefined` because
+ *  user-authored YAML can legitimately carry the explicit form. */
 export interface NormalisedFlapStop {
   entity: string;
   lines?: string[];
-  direction?: "H" | "R" | undefined;
-  line_directions?: Record<string, "H" | "R"> | undefined;
-  walk_times?: WalkTimes | undefined;
+  direction?: "H" | "R";
+  line_directions?: Record<string, "H" | "R">;
+  walk_times?: WalkTimes;
 }
 
 function normaliseStopEntry(raw: unknown): NormalisedFlapStop | null {
@@ -161,26 +164,35 @@ export function normaliseFlapConfig(
     ? (raw.size as FlapSize)
     : "regular";
 
-  // Clamp max_rows to 1..8 — bumped from the original 1..4 for
-  // multi-stop boards where merging two stops easily produces 6-8
-  // pending departures within the visible horizon.
+  // max_rows 1..8 — multi-stop merge can produce 6-8 imminent departures.
   const maxRowsRaw = Number(raw.max_rows);
-  const max_rows = Number.isFinite(maxRowsRaw)
+  const max_rowsValid = Number.isFinite(maxRowsRaw);
+  if (raw.max_rows !== undefined && !max_rowsValid) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria-flap-card] max_rows ${JSON.stringify(raw.max_rows)} is not a number — falling back to 2`,
+    );
+  }
+  const max_rows = max_rowsValid
     ? Math.max(1, Math.min(8, Math.round(maxRowsRaw)))
     : 2;
 
   // Back-compat: flat single-entity shape gets promoted to entities[0].
+  // Conditional spread (not undefined-pass-through) because
+  // `exactOptionalPropertyTypes` rejects `{ lines: undefined }` against
+  // the `lines?: string[]` declaration in FlapStopConfig.
   let rawEntities: unknown[] = [];
   if (Array.isArray(raw.entities)) {
     rawEntities = raw.entities;
   } else if (typeof raw.entity === "string") {
-    const legacyLines: string[] | undefined = Array.isArray(raw.lines)
-      ? raw.lines.filter(
-          (l): l is string => typeof l === "string" && l.length > 0,
-        )
-      : typeof raw.line === "string" && raw.line
-        ? [raw.line]
-        : undefined;
+    let legacyLines: string[] | undefined;
+    if (Array.isArray(raw.lines)) {
+      legacyLines = raw.lines.filter(
+        (l): l is string => typeof l === "string" && l.length > 0,
+      );
+    } else if (typeof raw.line === "string" && raw.line) {
+      legacyLines = [raw.line];
+    }
     rawEntities = [
       {
         entity: raw.entity,
@@ -197,7 +209,14 @@ export function normaliseFlapConfig(
   const seen = new Set<string>();
   for (const r of rawEntities) {
     const stop = normaliseStopEntry(r);
-    if (!stop) continue;
+    if (!stop) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[wiener-linien-austria-flap-card] dropping malformed stop entry",
+        r,
+      );
+      continue;
+    }
     if (seen.has(stop.entity)) continue;
     seen.add(stop.entity);
     entities.push(stop);

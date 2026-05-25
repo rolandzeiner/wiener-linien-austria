@@ -1,32 +1,10 @@
 // Wiener Linien Austria — Flap Card (Solari split-flap board).
 //
-// A standalone Lovelace card distinct from the LED retro card. Every
-// visible character — line code, destination, countdown digit, GLEIS
-// number, wheelchair pictogram — renders as a warm-cream mechanical
-// flap tile on a dark housing. Only positions that actually changed
-// since the last render flap, ripple-staggered left-to-right.
-//
-// Design language: classic Italian Solari di Udine boards as
-// historically used in ÖBB / WL stations. Not backlit, not amber-LED:
-// printed cream cards with overhead light, visible seam through every
-// glyph, hinge pins at the slot edges, soft drop shadow under each
-// card. The aesthetic is the entire point of the card — themes are
-// out of scope.
-//
-// State model:
-//   _flipSnapshots: Record<string, string>      — last-rendered text per field
-//   _flipFlipping:  Record<string, Record<i, string>> — pending OLD-char map
-//   _flipCleanupTimer: one shared timer that clears _flipFlipping after
-//                     the longest stagger-delayed animation has settled.
-//
-// willUpdate diffs each visible row's line / destination / countdown
-// against its keyed snapshot, populates flipping maps, schedules the
-// cleanup. Per Lit lifecycle, state set in willUpdate folds into the
-// same render cycle that paints the new value — no extra render.
-//
-// Reduced motion: the rotation is replaced with a 60 ms cross-fade so
-// motion-sensitive users still get a smooth swap rather than an
-// abrupt snap. WCAG 2.3.3.
+// Standalone card; sibling to the LED retro card. Every visible
+// character renders as a warm-cream mechanical flap tile on a dark
+// housing. State + lifecycle for the marching engine is documented at
+// the @state declarations below; reduced-motion fallback swaps the
+// rotation for a 60 ms cross-fade per WCAG 2.3.3.
 
 import {
   LitElement,
@@ -78,18 +56,9 @@ import {
   type RetroHeaderIconKey,
 } from "./utils/retro-station-icons.js";
 
-// Animation timing — single-leaf flip lasts FLAP_LEAF_MS; the stagger
-// delays each tile in a changed run by FLAP_STAGGER_MS × index so the
-// row ripples left-to-right. Cleanup waits until the last tile in a
-// 12-tile destination row has finished, plus a small grace so the
-// flap stays parked at -90° momentarily before the static halves
-// take over (avoids any 1-frame seam at the cleanup boundary).
-// March tick interval — matches the CSS leaf animation duration
-// (130 ms, see .flap-tile--flipping rule below) so each tick is one
-// complete flap with no half-rotation overlap between steps. 130 ms
-// is the Solari sweet spot: fast enough that a 13-letter walk lands
-// in ~1.7 s, slow enough that each individual flap reads as a
-// discrete mechanical motion.
+// Must equal the .flap-tile--flipping leaf-animation duration in CSS
+// (search "flapLeaf" below) — one tick = one full flap, no half-step
+// overlap. 130 ms is the Solari sweet spot.
 const FLAP_MARCH_INTERVAL_MS = 130;
 
 // Letter + digit sequences for marching. Real Solari drums are split
@@ -100,23 +69,37 @@ const FLAP_MARCH_INTERVAL_MS = 130;
 const FLAP_LETTER_SEQUENCE = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß";
 const FLAP_DIGIT_SEQUENCE = "0123456789";
 
+function nextInSeq(seq: string, from: string, to: string): string | null {
+  if (!seq.includes(from) || !seq.includes(to)) return null;
+  return seq[(seq.indexOf(from) + 1) % seq.length]!;
+}
+
 function flapNextChar(from: string, to: string): string {
   if (from === to) return to;
-  if (
-    FLAP_LETTER_SEQUENCE.includes(from) &&
-    FLAP_LETTER_SEQUENCE.includes(to)
-  ) {
-    const i = FLAP_LETTER_SEQUENCE.indexOf(from);
-    return FLAP_LETTER_SEQUENCE[(i + 1) % FLAP_LETTER_SEQUENCE.length]!;
-  }
-  if (
-    FLAP_DIGIT_SEQUENCE.includes(from) &&
-    FLAP_DIGIT_SEQUENCE.includes(to)
-  ) {
-    const i = FLAP_DIGIT_SEQUENCE.indexOf(from);
-    return FLAP_DIGIT_SEQUENCE[(i + 1) % FLAP_DIGIT_SEQUENCE.length]!;
-  }
-  return to;
+  return (
+    nextInSeq(FLAP_LETTER_SEQUENCE, from, to) ??
+    nextInSeq(FLAP_DIGIT_SEQUENCE, from, to) ??
+    to
+  );
+}
+
+// Flip-state keys are `row{i}-{kind}`. Centralising the grammar in a
+// typed helper means a typo can't silently fail to march — the kind
+// set is exhaustive-checked by the union.
+type FlipFieldKind = "line" | "dest" | "cd";
+function flipKey(rowIdx: number, kind: FlipFieldKind): string {
+  return `row${rowIdx}-${kind}`;
+}
+
+// Two-tile countdown snapshot. Single-digit values pad with a leading
+// blank so the visual width is constant on the 10→9 / 0→N boundaries.
+// Negative or at-platform countdowns collapse to 0 (rendered as " 0").
+function padCountdown(countdown: number | undefined | null): string {
+  const cd = typeof countdown === "number" && Number.isFinite(countdown)
+    ? countdown
+    : null;
+  if (cd === null) return "--";
+  return String(cd <= 0 ? 0 : cd).padStart(2, " ");
 }
 
 // Dedupe by `type` so a double-load (cache-bust race, HMR) doesn't
@@ -125,7 +108,7 @@ function flapNextChar(from: string, to: string): string {
   const win = window as unknown as WindowWithCustomCards;
   win.customCards = win.customCards ?? [];
   if (
-    !win.customCards.some((c) => c["type"] === "wiener-linien-austria-flap-card")
+    !win.customCards.some((c) => c.type === "wiener-linien-austria-flap-card")
   ) {
     win.customCards.push({
       type: "wiener-linien-austria-flap-card",
@@ -173,6 +156,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       );
     }
     this._config = normaliseFlapConfig(config);
+    // Reset the marching engine on every config swap. Otherwise lowering
+    // max_rows leaves orphan flip-state keys for the dropped rows, and a
+    // mid-flight march timer keeps ticking toward targets that no longer
+    // correspond to any visible row.
+    this._clearFlipTimer();
+    this._displayed = {};
+    this._target = {};
+    this._justFlipped = {};
   }
 
   public getCardSize(): number {
@@ -202,9 +193,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     ) as LovelaceCardEditor;
   }
 
-  public static getStubConfig(hass: HomeAssistant): Record<string, unknown> {
+  public static getStubConfig(
+    hass: HomeAssistant,
+  ): Partial<WienerLinienFlapCardConfig> {
     const entities = findWienerLinienEntities(hass);
-    const first = entities[0] || "";
+    const first = entities[0];
+    if (!first) return {};
     let direction: "H" | "R" = "H";
     const deps = hass?.states?.[first]?.attributes?.departures as
       | DepartureAttr[]
@@ -220,6 +214,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   public override connectedCallback(): void {
     super.connectedCallback();
     registerWlFonts();
+    // Only flip _versionCheckDone after we've actually had hass available
+    // to probe — without this, a connect before hass is assigned would
+    // mark "done" and never run the check.
     if (!this._versionCheckDone && this.hass?.callWS) {
       this._versionCheckDone = true;
       void this._checkCardVersion();
@@ -237,6 +234,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
       changed.has("_displayed") ||
+      changed.has("_target") ||
       changed.has("_justFlipped")
     ) {
       return true;
@@ -249,46 +247,36 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
   }
 
-  protected override willUpdate(_changed: PropertyValues): void {
+  protected override willUpdate(changed: PropertyValues): void {
     if (!this._config) return;
+    // Only re-diff the flip queue when hass or config actually changed —
+    // march-tick re-renders (where only _displayed/_justFlipped/_target
+    // changed) don't need to re-compare every row, the diff is short-
+    // circuit but the iteration still costs O(rows × maxDestLen).
+    if (!changed.has("hass") && !changed.has("_config")) return;
     const rows = this._gatherRows();
-    // Uniform-width destination column. Every visible row is padded
-    // to the longest destination's length with trailing spaces so the
-    // platform column lines up visually. The padding tiles are blank
-    // pockets (no glyph), so any spurious diff against a previously
-    // shorter snapshot flips one blank into another — invisible.
     const maxDestLen = this._maxDestLen(rows);
-    // Diff each visible row's three flip-card fields. Keys are row
-    // INDEX (not departure ID) so the next train's content inherits
-    // the previous row's snapshot and flaps from THAT — which is the
-    // intuitive behaviour ("the next departure just flipped in").
+    // Keys are row INDEX (not departure id) so the next train's
+    // content inherits the previous row's snapshot — flap reads as
+    // "the next departure just flipped in" instead of "row appeared
+    // from blank."
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row) continue;
-      this._diffFlipField(`row${i}-line`, (row.line ?? "").toUpperCase());
+      this._diffFlipField(flipKey(i, "line"), (row.line ?? "").toUpperCase());
       this._diffFlipField(
-        `row${i}-dest`,
+        flipKey(i, "dest"),
         (row.towards ?? "").toUpperCase().padEnd(maxDestLen, " "),
       );
-      // Pad the cd snapshot to a fixed 2-char width — matches the
-      // 2-tile render so per-position diff aligns with the rendered
-      // tiles. A 9 → 10 transition flips both tiles (" 9" → "10");
-      // a 10 → 9 flips both (because the blank slides in). 0 ↔ N
-      // also flips the digit position cleanly.
-      const cd = Number.isFinite(row.countdown) ? row.countdown : null;
-      const cdSnapshot =
-        cd === null
-          ? "--"
-          : String(cd <= 0 ? 0 : cd).padStart(2, " ");
-      this._diffFlipField(`row${i}-cd`, cdSnapshot);
+      this._diffFlipField(flipKey(i, "cd"), padCountdown(row.countdown));
     }
     // Drop snapshots for rows the departure queue no longer holds, so
     // a re-appearance many minutes later doesn't flap from a stale
     // value.
     for (let i = rows.length; i < this._config.max_rows; i++) {
-      this._diffFlipField(`row${i}-line`, null);
-      this._diffFlipField(`row${i}-dest`, null);
-      this._diffFlipField(`row${i}-cd`, null);
+      this._diffFlipField(flipKey(i, "line"), null);
+      this._diffFlipField(flipKey(i, "dest"), null);
+      this._diffFlipField(flipKey(i, "cd"), null);
     }
   }
 
@@ -314,9 +302,22 @@ export class WienerLinienAustriaFlapCard extends LitElement {
    *  the displayed string toward the target one char at a time. */
   private _diffFlipField(key: string, currentValue: string | null): void {
     if (currentValue === null) {
-      delete this._displayed[key];
-      delete this._target[key];
-      delete this._justFlipped[key];
+      // Drop via rest-spread so the @state Records get fresh refs —
+      // an in-place `delete` would mutate the previous-cycle value
+      // Lit kept for change detection, and shouldUpdate would miss
+      // the drop.
+      if (key in this._displayed) {
+        const { [key]: _d, ...restD } = this._displayed;
+        this._displayed = restD;
+      }
+      if (key in this._target) {
+        const { [key]: _t, ...restT } = this._target;
+        this._target = restT;
+      }
+      if (key in this._justFlipped) {
+        const { [key]: _f, ...restF } = this._justFlipped;
+        this._justFlipped = restF;
+      }
       return;
     }
     if (this._displayed[key] === undefined) {
@@ -339,6 +340,8 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   private _marchTick(): void {
+    // Build fresh Records (not in-place mutation) so Lit's change
+    // detection sees new refs — see _diffFlipField for the same dance.
     const nextDisplayed: Record<string, string> = { ...this._displayed };
     const nextJustFlipped: Record<string, Record<number, string>> = {};
     let activeAny = false;
@@ -373,11 +376,19 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    this._versionMismatch = await checkCardVersionWS(
-      this.hass,
-      "wiener_linien_austria/flap_card_version",
-      FLAP_CARD_VERSION,
-    );
+    try {
+      this._versionMismatch = await checkCardVersionWS(
+        this.hass,
+        "wiener_linien_austria/flap_card_version",
+        FLAP_CARD_VERSION,
+      );
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[wiener-linien-austria-flap-card] version probe failed",
+        err,
+      );
+    }
   }
 
   /** Configured stop entity ids that actually exist in hass.states.
@@ -387,10 +398,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   private _resolveStopEids(): string[] {
     const stops = this._config?.entities ?? [];
     const states = this.hass?.states;
-    const out: string[] = [];
-    for (const s of stops) {
-      if (states?.[s.entity]) out.push(s.entity);
-    }
+    const out = stops.map((s) => s.entity).filter((eid) => states?.[eid]);
     if (out.length === 0 && stops.length === 0) {
       const first = findWienerLinienEntities(this.hass)[0];
       if (first) out.push(first);
@@ -411,12 +419,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
    *  destination arriving (or an old one leaving) updates the
    *  column width on the next paint. */
   private _maxDestLen(rows: DepartureAttr[]): number {
-    let max = 0;
-    for (const row of rows) {
-      const len = (row.towards ?? "").length;
-      if (len > max) max = len;
-    }
-    return max;
+    return Math.max(0, ...rows.map((r) => (r.towards ?? "").length));
   }
 
   /** Gather and merge departures from every configured stop, applying
@@ -432,18 +435,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     for (const stop of stops) {
       const attrs = (this.hass?.states?.[stop.entity]?.attributes ?? {}) as WienerLinienAttrs;
       const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
-      // `filterDepartures` accepts direction `"H" | "R" | undefined`.
-      // Undefined / empty-string direction = both directions. The
-      // ModernStopFilter shape carries optional lines / walk_times so
-      // per-stop scoping comes for free.
-      const dir =
-        stop.direction === "H" || stop.direction === "R"
-          ? stop.direction
-          : undefined;
+      // ModernStopFilter accepts undefined for direction/lines/walk_times;
+      // pass them straight through. The normaliser already shaped
+      // stop.direction to "H" | "R" | undefined.
       const filtered = filterDepartures(departures, {
-        ...(dir !== undefined ? { direction: dir } : {}),
-        ...(stop.lines && stop.lines.length ? { lines: stop.lines } : {}),
-        ...(stop.walk_times ? { walk_times: stop.walk_times } : {}),
+        direction: stop.direction,
+        lines: stop.lines,
+        line_directions: stop.line_directions,
+        walk_times: stop.walk_times,
         accessibility_only: accessibilityOnly,
       });
       merged.push(...filtered);
@@ -451,11 +450,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // Stable sort by countdown ascending. Departures with non-finite
     // countdown sink to the bottom so the visible rows start with
     // imminent trains.
-    merged.sort((a, b) => {
-      const ac = Number.isFinite(a.countdown) ? a.countdown : Number.POSITIVE_INFINITY;
-      const bc = Number.isFinite(b.countdown) ? b.countdown : Number.POSITIVE_INFINITY;
-      return ac - bc;
-    });
+    const cd = (d: DepartureAttr): number =>
+      Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
+    merged.sort((a, b) => cd(a) - cd(b));
     return merged.slice(0, this._config.max_rows);
   }
 
@@ -658,12 +655,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
     if (rows.length === 0) {
-      let totalDepartures = 0;
-      for (const eid of eids) {
+      const anyDepartures = eids.some((eid) => {
         const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
-        if (Array.isArray(attrs.departures)) totalDepartures += attrs.departures.length;
-      }
-      const key = totalDepartures === 0 ? "betriebsschluss" : "no_data";
+        return Array.isArray(attrs.departures) && attrs.departures.length > 0;
+      });
+      const key = anyDepartures ? "no_data" : "betriebsschluss";
       return html`<div class="flap-empty">${this._t(key)}</div>`;
     }
     // Optional thin column-header caption above the rows. Renders
@@ -727,30 +723,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // tiles — rather than dragging in the HA primary colour which
     // would clash with the cream palette.
     const palette = chipPalette(line, {}, lineColors);
-    const hasResolvedColor = palette.background !== "var(--primary-color)";
     // Only the BACKGROUND comes from the GTFS palette. Foreground
     // stays at the cream-hi default (set in CSS on .flap-tile--color)
     // so every line letter reads as one cohesive material with the
     // rest of the cream tiles — even on lines whose GTFS fg is
-    // white or nightline-yellow.
-    const lineTileOpts: { tileBg?: string; tileFg?: string } = {};
-    if (hasResolvedColor) {
-      lineTileOpts.tileBg = palette.background;
-    }
+    // white or nightline-yellow. Unknown lines fall through to the
+    // cream default (no GTFS palette → primary-color sentinel → skip).
+    const lineTileOpts: { tileBg?: string; tileFg?: string } =
+      palette.background !== "var(--primary-color)"
+        ? { tileBg: palette.background }
+        : {};
 
-    // Always two countdown tiles. Single-digit values (including the
-    // at-platform 0) pad with a leading blank tile so the visual
-    // width is constant — no jumping width on the 10→9 boundary, no
-    // tile disappearing when a train pulls in. The previous blinking-
-    // asterisks variant for at-platform broke the mechanical material
-    // (it wasn't a flap card) and made the row briefly narrower.
-    const cdText =
-      cd === null
-        ? "--"
-        : String(isAtPlatform ? 0 : cd).padStart(2, " ");
     const cdContent = this._renderFlipString(
-      cdText,
-      `row${rowIndex}-cd`,
+      padCountdown(d.countdown),
+      flipKey(rowIndex, "cd"),
       { blankSpace: true },
     );
 
@@ -772,12 +758,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     return html`
       <div class="flap-row" role="listitem" aria-label=${rowLabel}>
         <div class="flap-cell flap-cell--line" aria-hidden="true">
-          ${this._renderFlipString(line, `row${rowIndex}-line`, lineTileOpts)}
+          ${this._renderFlipString(line, flipKey(rowIndex, "line"), lineTileOpts)}
         </div>
         <div class="flap-cell flap-cell--dest" aria-hidden="true">
           ${this._renderFlipString(
             towards.padEnd(maxDestLen, " "),
-            `row${rowIndex}-dest`,
+            flipKey(rowIndex, "dest"),
             { blankSpace: true },
           )}
           ${cfg.show_accessibility
@@ -891,11 +877,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     icon: string,
     ariaLabel: string,
   ): TemplateResult {
-    // Cream halves stay empty — the pictogram overlay paints a SINGLE
-    // ha-icon centred over the full tile, and the seam draws on top
-    // of it (z-index 2 on the seam vs 1 on the overlay). The earlier
-    // try at putting one ha-icon in EACH half rendered two stacked
-    // icons because ha-icon refuses to clip itself to its parent half.
+    // Single ha-icon overlay (NOT one per half) — ha-icon refuses to
+    // clip itself to its parent half, so two halves = two visible
+    // icons. Seam draws on top via z-index 2 vs the overlay's 1.
     return html`<span
       class="flap-tile flap-tile--pictogram"
       aria-label=${ariaLabel}
@@ -1213,10 +1197,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       font-weight: 700;
       font-feature-settings: "tnum" 1;
     }
-    .flap-tile--wide .flap-tile__half {
-      /* Wide tile (GLEIS digit) — same glyph height, just a wider
-         pocket so a 2-digit platform doesn't crowd the seam. */
-    }
     .flap-tile--wide .flap-tile__glyph {
       font-size: 32px;
     }
@@ -1315,13 +1295,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap-tile--pictogram .flap-tile__seam::after {
       background: rgba(255, 255, 255, 0.28);
     }
-    /* Blank a11y tile — used when a row is NOT step-free, so the
-       accessibility column always carries a tile and the column
-       width stays uniform across rows. Inherits the cream face +
-       seam + pins from the base .flap-tile rule (no overrides
-       needed — the tile is intentionally identical in material to
-       a destination tile, just faceless). The semantic
-       differentiator is the absence of the wheelchair icon. */
     .flap-tile__pictogram-overlay {
       position: absolute;
       inset: 0;
@@ -1380,13 +1353,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       );
       color: var(--tile-fg, var(--flap-on-color-fg));
     }
-    /* Each tile's leaf rotates 0° → -90° in one flap. With marching,
-       every tile re-mounts (via keyed()) on the next step so this
-       animation re-fires from the start every tick — visually
-       producing the continuous cycle of physical flap cards. Per-
-       tile stagger dropped because marching tiles desync naturally
-       (each tile reaches its target after a different number of
-       steps based on its letter distance). */
+    /* One leaf rotation 0° → -90° per march tick. keyed() re-mounts
+       the tile each tick so the animation restarts from 0° instead
+       of jumping mid-rotation. */
     .flap-tile--flipping .flap-tile__leaf {
       animation: flapLeaf 130ms cubic-bezier(0.4, 0, 0.7, 1) forwards;
     }
@@ -1395,10 +1364,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         transform: rotateX(-90deg);
       }
     }
-
-    /* GLEIS column moved to per-row tiles — see .flap-cell--platform
-       above and the .flap-colheader caption that sits above it. No
-       more global side column. */
 
     /* Empty state — same cream / quiet voice as the cd-unit caption
        so the board reads as one cohesive material when no
@@ -1412,29 +1377,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--flap-quiet-fg);
-    }
-    .flap-stars {
-      display: inline-flex;
-      gap: 4px;
-      color: var(--flap-cream);
-      font-weight: 700;
-      font-size: 28px;
-    }
-    .flap-stars > span {
-      animation: flapStarBlink 1s infinite;
-    }
-    .flap-stars > span:nth-child(2) {
-      animation-delay: 0.5s;
-    }
-    @keyframes flapStarBlink {
-      0%,
-      49.99% {
-        opacity: 1;
-      }
-      50%,
-      100% {
-        opacity: 0;
-      }
     }
 
     /* Size variants — shrink the tile + glyph proportionally. The
@@ -1675,9 +1617,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       .flap-tile--flipping .flap-tile__leaf {
         animation: flapLeafFade 60ms ease-out forwards;
         animation-delay: 0ms;
-      }
-      .flap-stars > span {
-        animation: none;
       }
       @keyframes flapLeafFade {
         to {
