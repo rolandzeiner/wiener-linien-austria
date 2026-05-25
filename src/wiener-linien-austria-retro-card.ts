@@ -1303,7 +1303,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       display: grid;
       grid-template-columns: 2.5em 1fr auto;
-      align-items: center;
+      /* Baseline alignment — not center. Both grid cells render the
+         same uppercase WL Mono at the same font-size, so aligning by
+         alphabetic baseline makes the cap-tops line up automatically
+         (by construction, not by tuning). Center alignment used to
+         centre the cells' BOXES, but WL Mono's uppercase glyphs sit
+         in the upper-middle of their line-box — so identical boxes
+         centred geometrically still showed mismatched visible ink.
+         Baseline alignment retires both empirical translateY hacks
+         that used to live on the pill and its inner label. */
+      align-items: baseline;
       gap: 12px;
       white-space: nowrap;
       /* Position context for the line-stripe ::before Tweak and the
@@ -1322,52 +1331,47 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     /* Line-pill Tweak — render the line code inside a filled rounded
        rectangle using --retro-line-color (resolved per row in JS).
-       Pill height is 1em so it slots flush inside the row's
-       line-height: 1 box; padding 0 0.4em is the design spec; the
-       glow is a 6 px box-shadow tinted in the pill colour.
-       Glyph optical-centre correction lives on .retro-line__label
-       below — geometric centring of the text BOX lands its visible
-       ink high inside the pill because of WL Mono's ascender-heavy
-       metrics, so the inner span carries a small translateY. */
+       Structural decisions (NOT empirical magic numbers — see below
+       for the history):
+       1. align-items: baseline (inherited from .retro-row). Pill text
+          shares its baseline with the destination text in the next
+          grid cell; same font + same size means cap-tops line up by
+          construction. No translateY needed.
+       2. NO fixed height. Pill grows from symmetric em padding
+          around its inner label, so the visual capsule is always
+          centred top-to-bottom on the text. Previous height: 1em
+          made the pill BOX drift relative to its visible glyph,
+          which every per-em translateY hack was empirically fighting.
+       3. NO transform optical-nudge. Earlier passes tried -0.05em,
+          0, +0.03em on the pill and -0.04em, 0, +0.08em on the
+          label; baseline alignment retires all of them.
+       Padding 0.08em block / 0.4em inline is the design spec; em
+       sizing lets medium / small variants inherit proportions
+       automatically. */
     .retro--line-pill .retro-line {
       display: inline-flex;
-      align-items: center;
+      align-items: baseline;
       justify-content: center;
       box-sizing: border-box;
       font-weight: 700;
       text-align: center;
       min-width: 2em;
-      height: 1em;
-      padding: 0 0.4em;
+      padding: 0.08em 0.4em;
       border-radius: 0.18em;
       background: var(--retro-line-color, transparent);
       color: var(--retro-line-fg, var(--led-amber));
       text-shadow: none;
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
-      /* Pill BOX optical nudge — geometric centring against the row
-         lands the pill a hair high relative to the destination text
-         next to it. Empirical sweet spot: +0.03em down. The previous
-         attempt at -0.05em went the wrong direction; small downward
-         is the right one for this row layout. */
-      transform: translateY(0.03em);
     }
     .retro--line-pill .retro-line__label {
-      /* Inherits WL Mono from the .retro root — the LED board's
-         display face wins over the signage print face inside the
-         pill. (Tried WL Sans for a closer match to real WL line
-         indicators; reverted because it didn't sit right against
-         the dot-matrix row text.)
-         Small upward nudge — WL Mono reserves descender space at
-         the bottom of every em-box even though uppercase glyphs
-         have no descender, so the digit reads as bottom-heavy
-         without correction. -0.04em is the empirical sweet spot:
-         enough to balance the visible ink against the pill box but
-         not so much that the glyph collides with the pill's top
-         edge. Inline-block is required so the transform actually
-         translates the glyph; an inline-level transform would
-         silently no-op in some engines. */
+      /* Kept as a render-time wrapper so the markup stays uniform
+         across pill and non-pill modes (the renderer always emits
+         the span — keying off it from --race-victory or future
+         tweaks stays cheap). inline-block makes the span a valid
+         transform target if a future tweak needs one; currently no
+         transform is applied because baseline alignment on the
+         grid row handles centring structurally. */
       display: inline-block;
-      transform: translateY(-0.04em);
     }
     .retro-dest {
       display: flex;
