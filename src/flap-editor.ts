@@ -178,19 +178,6 @@ export class WienerLinienAustriaFlapCardEditor
         flatten: true,
         schema: [
           { name: "show_platform", selector: { boolean: {} } },
-          {
-            name: "platform_side",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "auto", label: this._et("platform_side_auto") },
-                  { value: "left", label: this._et("platform_side_left") },
-                  { value: "right", label: this._et("platform_side_right") },
-                ],
-              },
-            },
-          },
         ],
       },
       {

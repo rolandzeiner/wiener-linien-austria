@@ -391,22 +391,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const lineColors = firstAttrs.line_colors ?? {};
     const serverTime = firstAttrs.server_time;
 
-    const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
-    const platform = cfg.show_platform ? rawPlatform : null;
-    const gleisLeft =
-      cfg.platform_side === "left"
-        ? true
-        : cfg.platform_side === "right"
-          ? false
-          : platform === "2";
+    // Per-row platform column. The column is allocated when
+    // show_platform is on AND at least one visible row actually has
+    // a platform value — otherwise (tram / bus stops with no
+    // platform metadata) the column would just be empty cream
+    // pockets next to the cd, wasted horizontal space.
+    const hasAnyPlatform =
+      cfg.show_platform && rows.some((d) => d.platform);
     const isMetro = (rows[0]?.type ?? "") === LINE_TYPE_METRO;
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
     const classes = {
       flap: true,
       [`flap--size-${cfg.size}`]: cfg.size !== "regular",
-      "flap--gleis-left": !!platform && gleisLeft,
-      "flap--gleis-right": !!platform && !gleisLeft,
+      "flap--has-platform": hasAnyPlatform,
     };
 
     const stationHeaderStrip = cfg.show_header
@@ -424,7 +422,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               </div>`
             : nothing}
           <div class="flap-panel">
-            ${this._renderBoard(eids, rows, platform, platformLabel, lineColors, gleisLeft)}
+            ${this._renderBoard(eids, rows, hasAnyPlatform, platformLabel, lineColors)}
           </div>
         </div>
       </ha-card>
@@ -547,21 +545,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   private _renderBoard(
     eids: string[],
     rows: DepartureAttr[],
-    platform: string | null,
+    hasAnyPlatform: boolean,
     platformLabel: string,
     lineColors: Record<string, LineColorPair>,
-    gleisLeft: boolean,
   ): TemplateResult {
     if (eids.length === 0) {
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
     if (rows.length === 0) {
-      // Empty-state diagnosis — aggregate across every configured
-      // stop so the message reflects the merged feed, not just one
-      // stop's state. If NO stop has departures we treat it as end-
-      // of-service; if SOME do, the per-stop filters are excluding
-      // everything (wrong direction / wrong line filter / walk
-      // times all clipping).
       let totalDepartures = 0;
       for (const eid of eids) {
         const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
@@ -570,17 +561,23 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       const key = totalDepartures === 0 ? "betriebsschluss" : "no_data";
       return html`<div class="flap-empty">${this._t(key)}</div>`;
     }
+    // Optional thin column-header caption above the rows. Renders
+    // only when the platform column is allocated, gives the new
+    // column reading context ("GLEIS" / "STEIG") without repeating
+    // a label on every row. Aligned to the platform column via the
+    // same grid template the rows use.
     return html`
       <div class="flap-board">
-        <ul class="flap-rows" role="list" aria-label=${this._t("departures_list")}>
-          ${rows.map((d, i) => this._renderRow(d, i, lineColors))}
-        </ul>
-        ${platform
-          ? html`<div class=${gleisLeft ? "flap-gleis flap-gleis--left" : "flap-gleis"}>
-              <div class="flap-gleis__label">${platformLabel}</div>
-              ${this._renderTile(platform, undefined, 0, { wide: true })}
+        ${hasAnyPlatform
+          ? html`<div class="flap-colheader" aria-hidden="true">
+              <span></span><span></span><span class="flap-colheader__platform"
+                >${platformLabel}</span
+              ><span></span>
             </div>`
           : nothing}
+        <ul class="flap-rows" role="list" aria-label=${this._t("departures_list")}>
+          ${rows.map((d, i) => this._renderRow(d, i, lineColors, hasAnyPlatform))}
+        </ul>
       </div>
     `;
   }
@@ -589,6 +586,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     d: DepartureAttr,
     rowIndex: number,
     lineColors: Record<string, LineColorPair>,
+    hasAnyPlatform: boolean,
   ): TemplateResult {
     const cfg = this._config!;
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
@@ -636,6 +634,21 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       { blankSpace: true },
     );
 
+    // Per-row platform tile — wide tile in its own column between
+    // dest and cd. When the row has no platform value, render a
+    // blank tile placeholder so the column stays aligned for all
+    // rows in the same board.
+    const platformCell = hasAnyPlatform
+      ? html`<div class="flap-cell flap-cell--platform" aria-hidden="true">
+          ${d.platform
+            ? this._renderTile(d.platform, undefined, 0, { wide: true })
+            : this._renderTile(" ", undefined, 0, {
+                wide: true,
+                blankSpace: true,
+              })}
+        </div>`
+      : nothing;
+
     return html`
       <li class="flap-row" aria-label=${rowLabel}>
         <div class="flap-cell flap-cell--line" aria-hidden="true">
@@ -650,6 +663,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               )
             : nothing}
         </div>
+        ${platformCell}
         <div class="flap-cell flap-cell--cd" aria-hidden="true">
           <span class="flap-cd-tiles">${cdContent}</span>
           ${cfg.show_min_unit && cd !== null && !isAtPlatform
@@ -837,13 +851,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       border-radius: 4px;
     }
     .flap-board {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      column-gap: 14px;
-      align-items: center;
-    }
-    .flap--gleis-left .flap-board {
-      grid-template-columns: auto 1fr;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .flap-rows {
       list-style: none;
@@ -853,12 +863,38 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       flex-direction: column;
       gap: 6px;
     }
+    /* Row grid — line | dest (1fr) | (cd). When the platform column
+       is allocated via .flap--has-platform on the root, a 4th
+       column slips in between dest and cd via the rule below. */
     .flap-row {
       display: grid;
       grid-template-columns: auto 1fr auto;
       align-items: center;
       column-gap: 14px;
       min-height: 44px;
+    }
+    .flap--has-platform .flap-row {
+      grid-template-columns: auto 1fr auto auto;
+    }
+    /* Column-header caption above the rows. Same grid template +
+       column-gap as .flap-row so the "GLEIS" / "STEIG" word sits
+       directly above the platform column. Small, faded, no glyph
+       weight — context for the new column without per-row noise. */
+    .flap-colheader {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      column-gap: 14px;
+      align-items: end;
+      padding-bottom: 2px;
+      font-family: "Work Sans", "WL Sans", sans-serif;
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--flap-cream-lo);
+    }
+    .flap-colheader__platform {
+      text-align: center;
     }
     .flap-cell--line {
       display: inline-flex;
@@ -868,6 +904,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       align-items: center;
       gap: 6px;
       overflow: hidden;
+    }
+    .flap-cell--platform {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .flap-cell--cd {
       display: inline-flex;
@@ -1111,31 +1152,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       }
     }
 
-    /* GLEIS column */
-    .flap-gleis {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      padding: 0 6px;
-      min-width: 60px;
-    }
-    .flap-gleis--left {
-      grid-column: 1;
-      grid-row: 1;
-    }
-    .flap--gleis-left .flap-rows {
-      grid-column: 2;
-      grid-row: 1;
-    }
-    .flap-gleis__label {
-      font-family: "Work Sans", "WL Sans", sans-serif;
-      font-weight: 600;
-      font-size: 10px;
-      color: var(--flap-cream-lo);
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-    }
+    /* GLEIS column moved to per-row tiles — see .flap-cell--platform
+       above and the .flap-colheader caption that sits above it. No
+       more global side column. */
 
     /* Empty state — same cream / quiet voice as the cd-unit caption
        so the board reads as one cohesive material when no

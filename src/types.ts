@@ -448,7 +448,6 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
 // ---------------------------------------------------------------------------
 
 export type FlapSize = "small" | "medium" | "regular";
-export type FlapPlatformSide = "auto" | "left" | "right";
 
 /** Per-stop config inside `WienerLinienFlapCardConfig.entities`.
  *  Same grammar as the modern card's `ModernStopConfig`: an entity
@@ -482,11 +481,14 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   size?: FlapSize | undefined;
   /** Number of departure rows rendered. Clamped to 1..8. Default 2. */
   max_rows?: number | undefined;
-  /** Show the GLEIS / STEIG platform column on the side of the board. */
+  /** Render a per-row GLEIS / STEIG platform tile in its own column,
+   *  immediately before the countdown. Each row carries its OWN
+   *  platform value (multi-stop boards can mix platforms from
+   *  different stops). Fixed position, no side configuration —
+   *  per-row platforms remove the "global column jumps when the
+   *  first row's platform changes" problem the old side-toggle was
+   *  there to work around. */
   show_platform?: boolean | undefined;
-  /** Where the GLEIS column sits. `"auto"` (default) follows the WL
-   *  signage convention — platform 2 left, everything else right. */
-  platform_side?: FlapPlatformSide | undefined;
   /** Show the WL-orange header band with the station name. */
   show_station_header?: boolean | undefined;
   /** Show a small "min" caption after each countdown number. */

@@ -18,7 +18,6 @@
 // working without migration.
 
 import type {
-  FlapPlatformSide,
   FlapSize,
   FlapStopConfig,
   RetroHeaderSide,
@@ -31,11 +30,6 @@ const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
   "small",
   "medium",
   "regular",
-] as const);
-const FLAP_PLATFORM_SIDES: ReadonlySet<FlapPlatformSide> = new Set([
-  "auto",
-  "left",
-  "right",
 ] as const);
 
 function asBool(v: unknown, fallback: boolean): boolean {
@@ -119,7 +113,6 @@ export interface NormalisedFlapConfigValidated {
   size: FlapSize;
   max_rows: number;
   show_platform: boolean;
-  platform_side: FlapPlatformSide;
   show_station_header: boolean;
   show_min_unit: boolean;
   show_accessibility: boolean;
@@ -152,7 +145,6 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "size",
   "max_rows",
   "show_platform",
-  "platform_side",
   "show_station_header",
   "show_min_unit",
   "show_accessibility",
@@ -168,11 +160,6 @@ export function normaliseFlapConfig(
   const size: FlapSize = FLAP_SIZES.has(raw.size as FlapSize)
     ? (raw.size as FlapSize)
     : "regular";
-  const platform_side: FlapPlatformSide = FLAP_PLATFORM_SIDES.has(
-    raw.platform_side as FlapPlatformSide,
-  )
-    ? (raw.platform_side as FlapPlatformSide)
-    : "auto";
 
   // Clamp max_rows to 1..8 — bumped from the original 1..4 for
   // multi-stop boards where merging two stops easily produces 6-8
@@ -228,7 +215,6 @@ export function normaliseFlapConfig(
     size,
     max_rows,
     show_platform: asBool(raw.show_platform, true),
-    platform_side,
     show_station_header: asBool(raw.show_station_header, true),
     show_min_unit: asBool(raw.show_min_unit, true),
     show_accessibility: asBool(raw.show_accessibility, true),
