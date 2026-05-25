@@ -1176,16 +1176,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     /* Blank a11y tile — used when a row is NOT step-free, so the
        accessibility column always carries a tile and the column
-       width stays uniform across rows. Pure-white face (vs the
-       cream face the destination tiles wear) so the absence reads
-       as a distinct "no accessibility info" tile, not as more
-       destination text. */
-    .flap-tile--a11y-blank .flap-tile__half--top {
-      background: linear-gradient(180deg, #ffffff 0%, #f6f6f6 100%);
-    }
-    .flap-tile--a11y-blank .flap-tile__half--bottom {
-      background: linear-gradient(180deg, #f6f6f6 0%, #e6e6e6 100%);
-    }
+       width stays uniform across rows. Inherits the cream face +
+       seam + pins from the base .flap-tile rule (no overrides
+       needed — the tile is intentionally identical in material to
+       a destination tile, just faceless). The semantic
+       differentiator is the absence of the wheelchair icon. */
     .flap-tile__pictogram-overlay {
       position: absolute;
       inset: 0;
@@ -1193,12 +1188,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       align-items: center;
       justify-content: center;
       z-index: 1;
-      color: #fff;
+      color: var(--flap-cream-hi);
       pointer-events: none;
     }
     .flap-tile__pictogram {
       --mdc-icon-size: 26px;
-      color: #fff;
+      color: var(--flap-cream-hi);
     }
     .flap--size-medium .flap-tile__pictogram {
       --mdc-icon-size: 22px;
