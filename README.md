@@ -113,7 +113,7 @@ Designed for wall-tablet kiosks and entryway displays.
 
 ### Flap card — `wiener-linien-austria-flap-card`
 
-A Solari-style split-flap board. Each character lands as a warm-cream mechanical flap on a dark housing — tiles march one step per ~130 ms toward the target letter until they settle, exactly like the real Italian boards at ÖBB and historic WL stations.
+A Solari-style split-flap board, modelled on the Italian mechanical displays that dominated European stations and airports from the 1960s to the 1990s. Each character lands as a warm-cream flap on a dark housing — tiles cycle one step per ~130 ms toward the target letter until they settle, mimicking the cascading rattle of the real boards.
 
 - **Multi-stop merge.** Configure up to 8 stops; departures merge and sort by countdown across the whole board. Per-stop filters for direction, lines, and walking time.
 - Up to **8 rows**, each with a per-row GLEIS / STEIG tile in its own column so the platform numbers line up across rows regardless of width.
