@@ -60,8 +60,6 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   const show_escalator = r.show_escalator === true;
   const show_elevator = r.show_elevator === true;
   const show_clock = r.show_clock === true;
-  const clock_style: "flat" | "solari" =
-    r.clock_style === "solari" ? "solari" : "flat";
   const show_date = r.show_date === true;
   // Bound the format string defensively (a runaway YAML config
   // shouldn't blow out the strip width) but don't trim — the user
@@ -117,7 +115,6 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (show_escalator) out.show_escalator = true;
   if (show_elevator) out.show_elevator = true;
   if (show_clock) out.show_clock = true;
-  if (clock_style !== "flat") out.clock_style = clock_style;
   if (show_date) out.show_date = true;
   if (date_format !== undefined) out.date_format = date_format;
   if (chips !== undefined) out.chips = chips;

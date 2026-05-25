@@ -48,15 +48,6 @@ import "./retro-editor.js";
 
 type RaceState = "idle" | "countdown" | "racing" | "freeze" | "victory";
 const VICTORY_DURATION_MS = 4000;
-// Solari split-flap timing. Total cycle = UPPER (top flap rotates
-// down) + LOWER (bottom flap rotates up). Tuned to ~0.7 s — long
-// enough to read as mechanical, short enough that hour rollovers
-// (4 simultaneous flips) don't drag. CLEANUP_MS waits past the
-// total so the flap stays parked at end-state momentarily before
-// the static halves take over (avoids any 1-frame seam).
-const SOLARI_FLAP_UPPER_MS = 320;
-const SOLARI_FLAP_LOWER_MS = 320;
-const SOLARI_CLEANUP_MS = SOLARI_FLAP_UPPER_MS + SOLARI_FLAP_LOWER_MS + 60;
 // Via / over alternation tick. When any visible row carries a `via`
 // hint, the destination text cross-fades with `ÜBER {via}` every
 // VIA_TICK_MS. Chosen at 4 s so each phase has time to register
@@ -135,16 +126,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // disconnect and re-armed on reconnect.
   @state() private _viaPhase: "towards" | "via" = "towards";
   private _viaTimer: ReturnType<typeof setInterval> | null = null;
-  // Solari clock state. `_solariSnapshot` is the last clock text the
-  // card committed to display (the OLD value, source for flap fronts).
-  // `_solariFlipping` maps a position in the clock string (0..N) to
-  // the OLD digit at that position — only positions that changed
-  // appear in the map, so a 09:59 → 10:00 rollover sets four entries
-  // while 10:00 → 10:01 sets one. The map is cleared after the flap
-  // animation finishes by `_solariCleanupTimer`.
-  @state() private _solariSnapshot: string | null = null;
-  @state() private _solariFlipping: Record<number, string> = {};
-  private _solariCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back" console
@@ -282,54 +263,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._clearRaceTimers();
     this._clearTickerTimer();
     this._clearViaTimer();
-    this._clearSolariTimer();
-  }
-
-  private _clearSolariTimer(): void {
-    if (this._solariCleanupTimer !== null) {
-      clearTimeout(this._solariCleanupTimer);
-      this._solariCleanupTimer = null;
-    }
-  }
-
-  /** Diff the current clock value against `_solariSnapshot` and
-   *  populate `_solariFlipping` for positions that changed. Called
-   *  from willUpdate so the per-digit flap state is folded into the
-   *  same render cycle that paints the new digits. Schedules a single
-   *  cleanup timer to clear the map after the flap animation
-   *  completes — same pattern as the race timers. */
-  private _maybeStartSolariFlip(currentClock: string | null): void {
-    if (!currentClock) return;
-    if (this._solariSnapshot === null) {
-      // First clock value the card sees — adopt it without flagging
-      // any digit as flipping, so the initial paint doesn't flap from
-      // an empty state to the first time.
-      this._solariSnapshot = currentClock;
-      return;
-    }
-    if (currentClock === this._solariSnapshot) return;
-    if (currentClock.length !== this._solariSnapshot.length) {
-      // Length change shouldn't happen for HH:MM, but if it ever
-      // does (locale switch, format change), reset cleanly without
-      // flapping garbage characters into existence.
-      this._solariSnapshot = currentClock;
-      this._solariFlipping = {};
-      return;
-    }
-    const flipping: Record<number, string> = {};
-    for (let i = 0; i < currentClock.length; i++) {
-      if (currentClock[i] !== this._solariSnapshot[i]) {
-        flipping[i] = this._solariSnapshot[i]!;
-      }
-    }
-    this._solariSnapshot = currentClock;
-    if (Object.keys(flipping).length === 0) return;
-    this._solariFlipping = flipping;
-    this._clearSolariTimer();
-    this._solariCleanupTimer = setTimeout(() => {
-      this._solariCleanupTimer = null;
-      this._solariFlipping = {};
-    }, SOLARI_CLEANUP_MS);
   }
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
@@ -350,27 +283,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const eid = this._resolveEntity();
     if (!eid) return false;
     return prev.states[eid] !== this.hass.states[eid];
-  }
-
-  protected override willUpdate(changed: PropertyValues): void {
-    super.willUpdate(changed);
-    if (!this._config) return;
-    // Solari flap diff — runs only when either side has show_clock +
-    // clock_style "solari". Off-path users pay nothing here. Folds
-    // into the current cycle so the per-digit flap state is set
-    // before render() paints the new clock text.
-    const leftSolari =
-      this._config.header_left?.show_clock &&
-      this._config.header_left?.clock_style === "solari";
-    const rightSolari =
-      this._config.header_right?.show_clock &&
-      this._config.header_right?.clock_style === "solari";
-    if (!leftSolari && !rightSolari) return;
-    const eid = this._resolveEntity();
-    const attrs = eid
-      ? ((this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs)
-      : ({} as WienerLinienAttrs);
-    this._maybeStartSolariFlip(this._formatClock(attrs.server_time));
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -989,64 +901,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return `${hh}:${mm}`;
   }
 
-  /** Render the clock as a split-flap Solari display. One `.solari-
-   *  digit` per character (digits + colon); colons are static, only
-   *  digit positions can flap. Per-position OLD value comes from
-   *  `_solariFlipping` (populated by `_maybeStartSolariFlip` in
-   *  willUpdate); absence means "no flip in flight at this position"
-   *  and the digit renders as a single static letterform. */
-  private _renderSolariClock(text: string): TemplateResult {
-    const chars = text.split("");
-    return html`
-      <span
-        class="retro-station-header__chip retro-station-header__chip--clock retro-station-header__chip--solari"
-        aria-label=${text}
-      >
-        <span class="solari-row" aria-hidden="true">
-          ${chars.map((char, i) => this._renderSolariDigit(char, this._solariFlipping[i]))}
-        </span>
-      </span>
-    `;
-  }
-
-  /** Render a single Solari digit. Colon is a static separator (no
-   *  flap structure). Digits ALWAYS render the two static halves;
-   *  the flap pair is added only when a flip is in flight at this
-   *  position. The flap fronts show the OLD digit (top) and NEW
-   *  digit (bottom) so the visible sequence reads:
-   *    t=0   OLD top (flap-top) + OLD bottom (static-bottom)
-   *    t=mid NEW top (static-top, flap-top rotated away) + OLD bottom
-   *    t=end NEW top + NEW bottom (flap-bottom rotated in covers OLD) */
-  private _renderSolariDigit(
-    current: string,
-    flippingFrom: string | undefined,
-  ): TemplateResult {
-    if (current === ":") {
-      return html`<span class="solari-colon" aria-hidden="true">:</span>`;
-    }
-    const isFlipping = flippingFrom !== undefined;
-    return html`
-      <span class="solari-digit" ?data-flipping=${isFlipping}>
-        <span class="solari-half solari-half--top">
-          <span class="solari-glyph">${current}</span>
-        </span>
-        <span class="solari-half solari-half--bottom">
-          <span class="solari-glyph">${isFlipping ? flippingFrom : current}</span>
-        </span>
-        ${isFlipping
-          ? html`
-              <span class="solari-flap solari-flap--top">
-                <span class="solari-glyph">${flippingFrom}</span>
-              </span>
-              <span class="solari-flap solari-flap--bottom">
-                <span class="solari-glyph">${current}</span>
-              </span>
-            `
-          : nothing}
-      </span>
-    `;
-  }
-
   /** Format an ISO timestamp as a PHP-style date string for the
    *  optional header date chip. Returns `null` when server_time is
    *  missing/unparseable or the format string is empty — caller
@@ -1271,12 +1125,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // user's format string evaluates empty.
     const clockText = side.show_clock ? this._formatClock(serverTime) : null;
     const clockNode = clockText
-      ? side.clock_style === "solari"
-        ? this._renderSolariClock(clockText)
-        : html`<span class="retro-station-header__chip retro-station-header__chip--clock">
-            <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
-            <span>${clockText}</span>
-          </span>`
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">
+          <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
+          <span>${clockText}</span>
+        </span>`
       : nothing;
     const dateText = side.show_date
       ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
@@ -2548,170 +2400,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
        leading icon. */
     .retro-station-header__chip--clock {
       gap: 0.25em;
-    }
-    /* Solari (split-flap) clock — inherits the chip's white bg /
-       black text so the digit pockets read as light cards on the
-       header strip, matching the other chips' polarity. Padding +
-       gap tighten the digit row inside the chip's outer rhythm;
-       the font swaps to WL Mono (the LED display face) with
-       tabular nums so identical numerals have identical widths
-       regardless of flap state. */
-    .retro-station-header__chip--solari {
-      padding: 0 0.2em;
-      gap: 1px;
-      font-family: "WL Mono", "Courier New", Courier, monospace;
-      font-variant-numeric: tabular-nums;
-    }
-    .solari-row {
-      display: inline-flex;
-      align-items: stretch;
-      gap: 1px;
-      height: 1.2em;
-      line-height: 1;
-      perspective: 220px;
-      /* Anchor for the full-width hinge band ::after — see rule
-         below. position: relative on the inline-flex container
-         creates a positioning context without a stacking context,
-         letting the band float over digits while flaps stay under
-         it (the band's z-index 5 vs the flap's z-index 3). */
-      position: relative;
-    }
-    /* Continuous hinge across the whole clock — spans digits AND
-       colons AND the 1 px gaps between them, so the chip reads as
-       one mechanical slot of horizontally-arranged flap cards
-       rather than a row of independent pockets. 3 px-tall gradient
-       band peaking at ~22 % darkness in the centre, fading to
-       transparent at the band's edges — sells the seam as the slot
-       where flap cards meet, not as a CSS divider painted on top.
-       Replaces the per-.solari-digit::after hinge that left visible
-       discontinuities at the colon and inter-digit gaps. */
-    .solari-row::after {
-      content: '';
-      position: absolute;
-      top: calc(50% - 1px);
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(
-        180deg,
-        transparent 0%,
-        rgba(0, 0, 0, 0.06) 30%,
-        rgba(0, 0, 0, 0.22) 50%,
-        rgba(0, 0, 0, 0.06) 70%,
-        transparent 100%
-      );
-      pointer-events: none;
-      z-index: 5;
-    }
-    .solari-colon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 0.45em;
-      font-weight: 700;
-    }
-    .solari-digit {
-      position: relative;
-      display: inline-block;
-      width: 0.85em;
-      height: 100%;
-      /* Slightly off-white so the digit pockets are distinguishable
-         from the parent chip's pure-white background — reads as
-         "cards in a slot" rather than text painted directly on the
-         chip. The black flap glyphs get the full contrast they need. */
-      background: #f4f4f4;
-      color: #000;
-      border-radius: 0.08em;
-      overflow: hidden;
-      /* Flap-pocket depth on a light surface — top edge gets a
-         faint dark line (the "lip" of the slot the card slides
-         into), bottom edge gets a slightly darker one (the
-         shadow cast inside the pocket). Both subtle so the chip
-         still reads as a single coherent shape. */
-      box-shadow:
-        inset 0 1px 0 rgba(0, 0, 0, 0.08),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-    }
-    /* Per-digit hinge removed — the full-width row-level hinge on
-       .solari-row::after above carries the seam now, so there is
-       no discontinuity at colons or inter-digit gaps. */
-    .solari-half,
-    .solari-flap {
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 50%;
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      background: inherit;
-      color: inherit;
-      backface-visibility: hidden;
-    }
-    .solari-half--top,
-    .solari-flap--top {
-      top: 0;
-      align-items: flex-start;
-    }
-    .solari-half--bottom,
-    .solari-flap--bottom {
-      bottom: 0;
-      align-items: flex-end;
-    }
-    /* Glyph spans the FULL digit height (1em) inside a half-height
-       container; the half's overflow:hidden + align-items clips the
-       glyph to its top or bottom half. flex-start on top keeps the
-       top of the glyph visible; flex-end on bottom keeps the bottom
-       visible. Same trick for the flap fronts. */
-    .solari-glyph {
-      display: block;
-      height: 1em;
-      font-size: 1em;
-      line-height: 1;
-      font-weight: 700;
-    }
-    .solari-flap--top {
-      transform-origin: bottom center;
-      transform: rotateX(0deg);
-      z-index: 3;
-    }
-    .solari-flap--bottom {
-      transform-origin: top center;
-      transform: rotateX(90deg);
-      z-index: 3;
-    }
-    .solari-digit[data-flipping] .solari-flap--top {
-      animation: solariFlapTop var(--solari-upper, 320ms) cubic-bezier(0.55, 0, 0.5, 1) forwards;
-    }
-    .solari-digit[data-flipping] .solari-flap--bottom {
-      animation: solariFlapBottom var(--solari-lower, 320ms) cubic-bezier(0.55, 0, 0.4, 1.04) var(--solari-upper, 320ms) forwards;
-    }
-    @keyframes solariFlapTop {
-      to { transform: rotateX(-90deg); }
-    }
-    @keyframes solariFlapBottom {
-      from { transform: rotateX(90deg); }
-      /* Tiny overshoot at 92% lands the flap with a subtle bounce
-         that reads as the mechanical card catching its stop pin —
-         this is the detail that pushes the effect from "plausible"
-         to "satisfying". The 1.04 cubic-bezier P2.y above pairs with
-         the keyframe to deliver the bounce without a second
-         keyframe step. */
-      to { transform: rotateX(0deg); }
-    }
-    /* prefers-reduced-motion — Solari is showy and continuous (~60×
-       per hour minimum). Drop the flap mechanism entirely and let
-       the static halves carry the time. The willUpdate diff still
-       runs but the visible swap is instant. */
-    @media (prefers-reduced-motion: reduce) {
-      .solari-flap { display: none; }
-    }
-    /* Size-token alignment — match the .retro--size-* scale. */
-    .retro--size-medium .retro-station-header__chip--solari .solari-row {
-      height: 1.15em;
-    }
-    .retro--size-small .retro-station-header__chip--solari .solari-row {
-      height: 1.1em;
     }
     .retro-station-header__chip-icon {
       /* MDI icon sized to the chip's cap height so it sits centred
