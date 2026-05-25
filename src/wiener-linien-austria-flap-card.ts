@@ -995,10 +995,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       --flap-seam: rgba(0, 0, 0, 0.7);
       --flap-pin: rgba(0, 0, 0, 0.85);
       --flap-quiet-fg: rgba(0, 0, 0, 0.6);
-      /* Drop the housing's inset bevel and softer drop shadow in
-         light mode — the bevel is a depth cue tuned for dark-on-dark
-         and reads as a hard black line on cream. Keep a softened
-         outer drop shadow so the card still lifts off the dashboard. */
+    }
+    /* Drop the housing's inset bevel and softer drop shadow in
+       light mode — the bevel is a depth cue tuned for dark-on-dark
+       and reads as a hard black line on cream. Doubled selector
+       (.flap.flap--light) bumps specificity above the bare .flap
+       rule below so the override actually wins; .flap is declared
+       later in source so equal specificity would lose to it. */
+    .flap.flap--light {
       box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
     }
     .flap {
