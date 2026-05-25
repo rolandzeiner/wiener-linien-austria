@@ -1079,10 +1079,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       grid-column: 1 / -1;
       align-items: end;
       padding-bottom: 2px;
+      /* Match the .flap-cd-unit (MIN) label voice so the two
+         column markers — GLEIS above the platform tile and MIN
+         beside the countdown — read as one consistent caption
+         system rather than two unrelated labels. */
       font-family: "Work Sans", "WL Sans", sans-serif;
       font-weight: 600;
-      font-size: 10px;
-      letter-spacing: 0.22em;
+      font-size: 13px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
       color: var(--flap-cream-lo);
     }
