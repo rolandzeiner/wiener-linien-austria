@@ -601,10 +601,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // would clash with the cream palette.
     const palette = chipPalette(line, {}, lineColors);
     const hasResolvedColor = palette.background !== "var(--primary-color)";
+    // Only the BACKGROUND comes from the GTFS palette. Foreground
+    // stays at the cream-hi default (set in CSS on .flap-tile--color)
+    // so every line letter reads as one cohesive material with the
+    // rest of the cream tiles — even on lines whose GTFS fg is
+    // white or nightline-yellow.
     const lineTileOpts: { tileBg?: string; tileFg?: string } = {};
     if (hasResolvedColor) {
       lineTileOpts.tileBg = palette.background;
-      lineTileOpts.tileFg = palette.color ?? "#fff";
     }
 
     const cdContent =
@@ -769,7 +773,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        flap card's own header, intentionally just the orange band. */
     .flap-header {
       background: var(--wl-orange);
-      color: #fff;
+      color: var(--flap-cream-hi);
       border-radius: 4px 4px 0 0;
       display: flex;
       align-items: center;
@@ -989,7 +993,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         color-mix(in oklab, var(--tile-bg, #888) 78%, white 22%) 0%,
         var(--tile-bg, #888) 100%
       );
-      color: var(--tile-fg, #fff);
+      color: var(--tile-fg, var(--flap-cream-hi));
     }
     .flap-tile--color .flap-tile__half--bottom {
       background: linear-gradient(
@@ -997,7 +1001,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         var(--tile-bg, #888) 0%,
         color-mix(in oklab, var(--tile-bg, #888) 84%, black 16%) 100%
       );
-      color: var(--tile-fg, #fff);
+      color: var(--tile-fg, var(--flap-cream-hi));
     }
     .flap-tile--color .flap-tile__seam {
       background: rgba(0, 0, 0, 0.4);
@@ -1066,7 +1070,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         color-mix(in oklab, var(--tile-bg, #888) 78%, white 22%) 0%,
         var(--tile-bg, #888) 100%
       );
-      color: var(--tile-fg, #fff);
+      color: var(--tile-fg, var(--flap-cream-hi));
     }
     .flap-tile--flipping .flap-tile__leaf {
       animation: flapLeaf 180ms cubic-bezier(0.4, 0, 0.7, 1) forwards;

@@ -238,7 +238,7 @@ const oe=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
               ${this._renderTile(t,void 0,0,{wide:!0})}
             </div>`:G}
       </div>
-    `}_renderRow(i,e,t){const o=this._config,d=Number.isFinite(i.countdown)?i.countdown:null,m=null!==d&&d<=0,a=(i.line??"?").toUpperCase(),r=(i.towards??"").toUpperCase(),n=[a,r,null===d?this._t("no_data"):m?this._t("at_platform"):this._t("countdown_minutes",{n:String(d)})].filter(Boolean).join(" — "),l=function(i,e,t={},o="var(--primary-color)"){const d=i.toUpperCase();if(void 0!==e[d])return{background:e[d]};if(/^N\d/.test(d))return{background:"#1b1464",color:"#fef200"};const m=t[i]??t[d];return m?.bg?m.fg?{background:`#${m.bg}`,color:`#${m.fg}`}:{background:`#${m.bg}`}:{background:o}}(a,{},t),s={};"var(--primary-color)"!==l.background&&(s.tileBg=l.background,s.tileFg=l.color??"#fff");const c=null===d?U`${this._renderTile("-",void 0,0)}${this._renderTile("-",void 0,1)}`:m?U`<span class="flap-stars" aria-hidden="true"
+    `}_renderRow(i,e,t){const o=this._config,d=Number.isFinite(i.countdown)?i.countdown:null,m=null!==d&&d<=0,a=(i.line??"?").toUpperCase(),r=(i.towards??"").toUpperCase(),n=[a,r,null===d?this._t("no_data"):m?this._t("at_platform"):this._t("countdown_minutes",{n:String(d)})].filter(Boolean).join(" — "),l=function(i,e,t={},o="var(--primary-color)"){const d=i.toUpperCase();if(void 0!==e[d])return{background:e[d]};if(/^N\d/.test(d))return{background:"#1b1464",color:"#fef200"};const m=t[i]??t[d];return m?.bg?m.fg?{background:`#${m.bg}`,color:`#${m.fg}`}:{background:`#${m.bg}`}:{background:o}}(a,{},t),s={};"var(--primary-color)"!==l.background&&(s.tileBg=l.background);const c=null===d?U`${this._renderTile("-",void 0,0)}${this._renderTile("-",void 0,1)}`:m?U`<span class="flap-stars" aria-hidden="true"
               ><span>*</span><span>*</span></span
             >`:this._renderFlipString(String(d),`row${e}-cd`);return U`
       <li class="flap-row" aria-label=${n}>
@@ -323,7 +323,7 @@ const oe=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
        flap card's own header, intentionally just the orange band. */
     .flap-header {
       background: var(--wl-orange);
-      color: #fff;
+      color: var(--flap-cream-hi);
       border-radius: 4px 4px 0 0;
       display: flex;
       align-items: center;
@@ -543,7 +543,7 @@ const oe=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
         color-mix(in oklab, var(--tile-bg, #888) 78%, white 22%) 0%,
         var(--tile-bg, #888) 100%
       );
-      color: var(--tile-fg, #fff);
+      color: var(--tile-fg, var(--flap-cream-hi));
     }
     .flap-tile--color .flap-tile__half--bottom {
       background: linear-gradient(
@@ -551,7 +551,7 @@ const oe=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
         var(--tile-bg, #888) 0%,
         color-mix(in oklab, var(--tile-bg, #888) 84%, black 16%) 100%
       );
-      color: var(--tile-fg, #fff);
+      color: var(--tile-fg, var(--flap-cream-hi));
     }
     .flap-tile--color .flap-tile__seam {
       background: rgba(0, 0, 0, 0.4);
@@ -620,7 +620,7 @@ const oe=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
         color-mix(in oklab, var(--tile-bg, #888) 78%, white 22%) 0%,
         var(--tile-bg, #888) 100%
       );
-      color: var(--tile-fg, #fff);
+      color: var(--tile-fg, var(--flap-cream-hi));
     }
     .flap-tile--flipping .flap-tile__leaf {
       animation: flapLeaf 180ms cubic-bezier(0.4, 0, 0.7, 1) forwards;
