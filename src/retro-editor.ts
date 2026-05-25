@@ -489,6 +489,23 @@ export class WienerLinienAustriaRetroCardEditor
         flatten: true,
         schema: [
           { name: "show_platform", selector: { boolean: {} } },
+          {
+            // Three-option dropdown rather than radio-list — the
+            // option set is short but each option name ("Automatisch
+            // (1 = rechts, 2 = links)") is longer than the radio
+            // column comfortably accommodates without wrapping.
+            name: "platform_side",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "auto", label: this._et("platform_side_auto") },
+                  { value: "left", label: this._et("platform_side_left") },
+                  { value: "right", label: this._et("platform_side_right") },
+                ],
+              },
+            },
+          },
           { name: "accessibility_only", selector: { boolean: {} } },
           { name: "flicker", selector: { boolean: {} } },
           { name: "wheelchair_race", selector: { boolean: {} } },

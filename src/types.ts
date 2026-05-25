@@ -313,6 +313,12 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
 export type RetroStyle = "classic" | "warm" | "pixel";
+/** Side the GLEIS / STEIG column appears on. `"auto"` is the
+ *  pre-feature default — platform "2" lands on the left, everything
+ *  else on the right (the U-Bahn signage convention). `"left"` /
+ *  `"right"` are explicit overrides for users who want their card to
+ *  mirror a real station view that disagrees with the heuristic. */
+export type RetroPlatformSide = "auto" | "left" | "right";
 
 /** Exit-icon variant for one side of the station header strip.
  *  Either `"none"` (suppresses the icon), one of the two WL-traced
@@ -377,6 +383,7 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   direction?: "H" | "R" | undefined;
   line?: string | undefined;
   show_platform?: boolean | undefined;
+  platform_side?: RetroPlatformSide | undefined;
   show_station_name?: boolean | undefined;
   station_bg?: RetroStationBg | undefined;
   size?: RetroSize | undefined;

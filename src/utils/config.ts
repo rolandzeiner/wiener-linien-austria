@@ -4,6 +4,7 @@ import type {
   LineColorsMap,
   RetroHeaderExit,
   RetroHeaderSide,
+  RetroPlatformSide,
   RetroSize,
   RetroStationBg,
   RetroStyle,
@@ -26,6 +27,7 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "black",
 ] as const);
 const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
+const RETRO_PLATFORM_SIDES: ReadonlySet<RetroPlatformSide> = new Set(["auto", "left", "right"] as const);
 // Curated valid values for the header strip's exit corner. Combines
 // the three fixed variants ("none" / "regular" / "accessible") with
 // the curated MDI set from `retro-station-icons` so the normaliser
@@ -353,6 +355,7 @@ export interface NormalisedRetroConfigValidated {
   direction: "H" | "R";
   line?: string | undefined;
   show_platform: boolean;
+  platform_side: RetroPlatformSide;
   show_station_name: boolean;
   station_bg: RetroStationBg;
   size: RetroSize;
@@ -385,6 +388,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "direction",
   "line",
   "show_platform",
+  "platform_side",
   "show_station_name",
   "station_bg",
   "size",
@@ -425,6 +429,9 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     direction,
     line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
     show_platform: raw.show_platform ?? true,
+    platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
+      ? (raw.platform_side as RetroPlatformSide)
+      : "auto",
     show_station_name: raw.show_station_name ?? false,
     station_bg,
     size,

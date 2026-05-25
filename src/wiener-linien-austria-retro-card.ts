@@ -730,7 +730,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
     const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
     const platform = cfg.show_platform ? rawPlatform : null;
-    const gleisLeft = platform === "2";
+    // Side resolution: explicit user override wins over the auto rule
+    // (platform "2" lands on the left, else right — the U-Bahn signage
+    // convention). "auto" preserves pre-feature behaviour; "left" /
+    // "right" let users mirror a real-station view that disagrees
+    // with the heuristic (e.g. a tram stop where the published platform
+    // is "1" but the user wants the GLEIS column on the left for
+    // consistency with the next card on their dashboard).
+    const gleisLeft =
+      cfg.platform_side === "left"
+        ? true
+        : cfg.platform_side === "right"
+          ? false
+          : platform === "2";
     const type = rows[0]?.type ?? "";
     const isMetro = type === LINE_TYPE_METRO;
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
