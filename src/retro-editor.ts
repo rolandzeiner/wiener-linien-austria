@@ -334,6 +334,13 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
               { name: "show_clock", selector: { boolean: {} } },
+              { name: "show_date", selector: { boolean: {} } },
+              // date_format only renders when show_date is on, so a
+              // user disabling the chip doesn't have to look at a
+              // field they're not using.
+              ...(this._config?.header_left?.show_date
+                ? [{ name: "date_format", selector: { text: {} } }]
+                : []),
               // Free-form MDI icon list — chip-input pattern.
               // ha-form's `icon` selector exists and HA core uses it,
               // but ha-icon-picker (its underlying UI) uses the
@@ -402,6 +409,10 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
               { name: "show_clock", selector: { boolean: {} } },
+              { name: "show_date", selector: { boolean: {} } },
+              ...(this._config?.header_right?.show_date
+                ? [{ name: "date_format", selector: { text: {} } }]
+                : []),
               // Free-form MDI icon list — chip-input pattern.
               // ha-form's `icon` selector exists and HA core uses it,
               // but ha-icon-picker (its underlying UI) uses the

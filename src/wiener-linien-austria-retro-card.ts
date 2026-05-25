@@ -26,6 +26,7 @@ import type {
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import { formatDate } from "./utils/time.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
 import {
@@ -900,6 +901,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return `${hh}:${mm}`;
   }
 
+  /** Format an ISO timestamp as a PHP-style date string for the
+   *  optional header date chip. Returns `null` when server_time is
+   *  missing/unparseable or the format string is empty — caller
+   *  omits the chip rather than painting an obvious placeholder. */
+  private _formatDateChip(
+    serverTime: string | null | undefined,
+    format: string | undefined,
+  ): string | null {
+    if (!serverTime || !format) return null;
+    const ts = Date.parse(serverTime);
+    if (!Number.isFinite(ts)) return null;
+    return formatDate(new Date(ts), format, this.hass?.language);
+  }
+
   private _renderRow(d: DepartureAttr, rowIndex: number, lineColors: LineColorsMap): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
@@ -1099,16 +1114,29 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     );
     const chipsLeftOrder = chipNodes;
     const chipsRightOrder = [...chipNodes].reverse();
-    // Optional clock chip — `show_clock` per side. Always painted at
-    // the innermost edge of its side: rightmost on `left`, leftmost
-    // on `right`. So when both sides enable it the two clocks meet
-    // in the centre of the strip. Suppressed if server_time hasn't
-    // arrived yet (no "NaN:NaN" while the integration warms up).
+    // Optional clock + date chips — `show_clock` / `show_date` per
+    // side. Both sit beyond the chips at the innermost edge of their
+    // side (rightmost on `left`, leftmost on `right`). Order from
+    // outermost to innermost: chips → date → clock. So when a side
+    // enables both, the time is closest to the centre of the strip
+    // (the primary station-board info), with the supporting date
+    // one slot further out. Suppressed if server_time hasn't arrived
+    // yet (no "NaN:NaN" while the integration warms up) or if the
+    // user's format string evaluates empty.
     const clockText = side.show_clock ? this._formatClock(serverTime) : null;
     const clockNode = clockText
       ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">
           <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
           <span>${clockText}</span>
+        </span>`
+      : nothing;
+    const dateText = side.show_date
+      ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
+      : null;
+    const dateNode = dateText
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--date">
+          <ha-icon class="retro-station-header__chip-icon" icon="mdi:calendar"></ha-icon>
+          <span>${dateText}</span>
         </span>`
       : nothing;
     // Canonical render order mirrors the original signage. Right side
@@ -1117,12 +1145,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // closest to the text on both sides — wheelchair-relevant info
     // gets the same visual prominence regardless of header side.
     // Mirror invariant for extra_icons + chips: index 0 of either
-    // array sits closest to the WC tile on both sides. The clock
-    // chip, when enabled, sits beyond the chips at the innermost
-    // edge — last on left, first on right.
+    // array sits closest to the WC tile on both sides. Date and
+    // clock chips sit at the innermost edge: date one slot out,
+    // clock at the very edge so time stays closest to the centre.
     return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}${clockNode}`
-      : html`${clockNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}${dateNode}${clockNode}`
+      : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(

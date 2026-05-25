@@ -60,6 +60,16 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   const show_escalator = r.show_escalator === true;
   const show_elevator = r.show_elevator === true;
   const show_clock = r.show_clock === true;
+  const show_date = r.show_date === true;
+  // Bound the format string defensively (a runaway YAML config
+  // shouldn't blow out the strip width) but don't trim — the user
+  // may legitimately use leading/trailing spaces as separators
+  // (e.g. " d.m " to pad the chip).
+  let date_format: string | undefined;
+  if (typeof r.date_format === "string") {
+    const sliced = r.date_format.slice(0, 32);
+    if (sliced) date_format = sliced;
+  }
   // Chip array: trim each entry, drop empties, cap text length and
   // total count. Tolerant of YAML user error — non-string entries are
   // skipped instead of failing the whole side.
@@ -92,6 +102,7 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
     !show_escalator &&
     !show_elevator &&
     !show_clock &&
+    !show_date &&
     chips === undefined &&
     extra_icons === undefined
   ) {
@@ -104,6 +115,8 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (show_escalator) out.show_escalator = true;
   if (show_elevator) out.show_elevator = true;
   if (show_clock) out.show_clock = true;
+  if (show_date) out.show_date = true;
+  if (date_format !== undefined) out.date_format = date_format;
   if (chips !== undefined) out.chips = chips;
   if (extra_icons !== undefined) out.extra_icons = extra_icons;
   return out;

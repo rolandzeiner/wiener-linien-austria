@@ -354,6 +354,17 @@ export interface RetroHeaderSide {
    *  `header_right`), so the two clocks meet in the centre of the
    *  strip when both sides enable it. Off by default. */
   show_clock?: boolean | undefined;
+  /** Render the current date as a white pill in this side's chip
+   *  lane, formatted with `date_format`. Sits one slot outside the
+   *  clock chip on the same side, so time stays innermost. Off by
+   *  default. */
+  show_date?: boolean | undefined;
+  /** PHP-style date format string used by `show_date`. Supported
+   *  tokens: d j (day), m n (month), Y y (year), D l (weekday),
+   *  M F (month name), H G h g (hour), i (minute), s (second).
+   *  Backslash escapes a literal character. Default `"d.m.Y"`.
+   *  Bounded to 32 chars at normalisation. */
+  date_format?: string | undefined;
   /** Optional sequence of short text chips rendered as white
    *  boxes after the WC tile (further from the sign text than
    *  any amenity icon). Useful for short labels like platform
