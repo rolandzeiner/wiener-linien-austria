@@ -699,11 +699,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
             `row${rowIndex}-dest`,
             { blankSpace: true },
           )}
-          ${cfg.show_accessibility && d.barrier_free
-            ? this._renderPictogramTile(
-                "mdi:wheelchair-accessibility",
-                this._t("barrier_free_title"),
-              )
+          ${cfg.show_accessibility
+            ? d.barrier_free
+              ? this._renderPictogramTile(
+                  "mdi:wheelchair-accessibility",
+                  this._t("barrier_free_title"),
+                )
+              : this._renderAccessibilityBlankTile(
+                  this._t("not_barrier_free_title"),
+                )
             : nothing}
         </div>
         ${platformCell}
@@ -807,6 +811,26 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       <span class="flap-tile__pictogram-overlay">
         <ha-icon class="flap-tile__pictogram" .icon=${icon}></ha-icon>
       </span>
+      <span class="flap-tile__seam" aria-hidden="true"></span>
+      <span class="flap-tile__pin flap-tile__pin--l" aria-hidden="true"></span>
+      <span class="flap-tile__pin flap-tile__pin--r" aria-hidden="true"></span>
+    </span>`;
+  }
+
+  /** Empty white-faced tile used in the accessibility slot when a
+   *  departure is NOT step-free. Same flap geometry as the cream +
+   *  blue tiles — keeps the column width consistent across rows so
+   *  the wheelchair tile, when it does appear, sits in the same
+   *  horizontal position every time. White (vs cream) so the
+   *  "no accessibility info here" reading is distinct from the
+   *  cream destination tiles next to it. */
+  private _renderAccessibilityBlankTile(ariaLabel: string): TemplateResult {
+    return html`<span
+      class="flap-tile flap-tile--a11y-blank"
+      aria-label=${ariaLabel}
+    >
+      <span class="flap-tile__half flap-tile__half--top"></span>
+      <span class="flap-tile__half flap-tile__half--bottom"></span>
       <span class="flap-tile__seam" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--l" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--r" aria-hidden="true"></span>
@@ -1149,6 +1173,18 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     .flap-tile--pictogram .flap-tile__seam::after {
       background: rgba(255, 255, 255, 0.28);
+    }
+    /* Blank a11y tile — used when a row is NOT step-free, so the
+       accessibility column always carries a tile and the column
+       width stays uniform across rows. Pure-white face (vs the
+       cream face the destination tiles wear) so the absence reads
+       as a distinct "no accessibility info" tile, not as more
+       destination text. */
+    .flap-tile--a11y-blank .flap-tile__half--top {
+      background: linear-gradient(180deg, #ffffff 0%, #f6f6f6 100%);
+    }
+    .flap-tile--a11y-blank .flap-tile__half--bottom {
+      background: linear-gradient(180deg, #f6f6f6 0%, #e6e6e6 100%);
     }
     .flap-tile__pictogram-overlay {
       position: absolute;

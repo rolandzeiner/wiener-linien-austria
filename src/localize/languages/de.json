@@ -215,6 +215,7 @@
     "at_platform": "Einfahrt",
     "countdown_minutes": "{n} Minuten",
     "barrier_free_title": "Barrierefrei zugänglich",
+    "not_barrier_free_title": "Nicht barrierefrei",
     "unit_min": "min",
     "dir_both": "Beide",
     "header": {

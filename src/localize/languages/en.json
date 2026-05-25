@@ -215,6 +215,7 @@
     "at_platform": "Arriving",
     "countdown_minutes": "{n} minutes",
     "barrier_free_title": "Step-free access",
+    "not_barrier_free_title": "Step-free access not available",
     "unit_min": "min",
     "dir_both": "Both",
     "header": {
