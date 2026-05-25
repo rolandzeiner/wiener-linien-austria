@@ -932,7 +932,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const showVia = !!via;
     return html`
       <li class="retro-row" style=${rowStyle} aria-label=${rowLabel}>
-        <div class="retro-line" aria-hidden="true">${line}</div>
+        <div class="retro-line" aria-hidden="true">
+          <span class="retro-line__label">${line}</span>
+        </div>
         <div class="retro-dest" aria-hidden="true">
           <span class="retro-dest-stack">
             <span class="retro-dest-text retro-dest-text--layout">${deText(towards)}</span>
@@ -1322,7 +1324,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
        rectangle using --retro-line-color (resolved per row in JS).
        Pill height is 1em so it slots flush inside the row's
        line-height: 1 box; padding 0 0.4em is the design spec; the
-       glow is a 6 px box-shadow tinted in the pill colour. */
+       glow is a 6 px box-shadow tinted in the pill colour.
+       Glyph optical-centre correction lives on .retro-line__label
+       below — geometric centring of the text BOX lands its visible
+       ink high inside the pill because of WL Mono's ascender-heavy
+       metrics, so the inner span carries a small translateY. */
     .retro--line-pill .retro-line {
       display: inline-flex;
       align-items: center;
@@ -1338,6 +1344,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       color: var(--retro-line-fg, var(--led-amber));
       text-shadow: none;
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
+    }
+    .retro--line-pill .retro-line__label {
+      /* Same optical-centre correction the wheelchair icon needs (see
+         .retro-wheelchair). Inline-block is required so the transform
+         actually translates the glyph; an inline-level transform would
+         silently no-op in some engines. */
+      display: inline-block;
+      transform: translateY(0.08em);
     }
     .retro-dest {
       display: flex;
@@ -1409,6 +1423,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       height: 0.9em;
       color: inherit;
       filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
+      /* Optical-centre correction. WL Mono is a Courier-derived face
+         with a tall ascender / shallow descender, so uppercase glyphs
+         (SIMMERING) sit in the upper-middle of their line-box. An
+         icon centred in the line-box geometrically ends up visibly
+         above the cap-height of the text next to it. Nudging the
+         icon down ~0.12em lands its visual centre on the cap-height
+         centre of the adjacent SIMMERING glyphs. */
+      transform: translateY(0.12em);
     }
     .retro-cd {
       font-variant-numeric: tabular-nums;
