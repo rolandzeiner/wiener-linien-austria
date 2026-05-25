@@ -566,18 +566,32 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // column reading context ("GLEIS" / "STEIG") without repeating
     // a label on every row. Aligned to the platform column via the
     // same grid template the rows use.
+    // The board is one outer CSS grid; the colheader + each row are
+    // subgrids that inherit its column tracks. That's how the GLEIS
+    // caption stays pinned to the platform column — auto-sized
+    // tracks across independent grids resolve independently, so the
+    // pre-subgrid layout drifted whenever line/dest content widths
+    // changed. role="list" + role="listitem" preserve the list
+    // semantics that the dropped <ul>/<li> pair was carrying.
     return html`
-      <div class="flap-board">
+      <div
+        class=${classMap({
+          "flap-board": true,
+          "flap-board--has-platform": hasAnyPlatform,
+        })}
+        role="list"
+        aria-label=${this._t("departures_list")}
+      >
         ${hasAnyPlatform
           ? html`<div class="flap-colheader" aria-hidden="true">
-              <span></span><span></span><span class="flap-colheader__platform"
-                >${platformLabel}</span
+              <span></span><span></span
+              ><span class="flap-colheader__platform">${platformLabel}</span
               ><span></span>
             </div>`
           : nothing}
-        <ul class="flap-rows" role="list" aria-label=${this._t("departures_list")}>
-          ${rows.map((d, i) => this._renderRow(d, i, lineColors, hasAnyPlatform))}
-        </ul>
+        ${rows.map((d, i) =>
+          this._renderRow(d, i, lineColors, hasAnyPlatform),
+        )}
       </div>
     `;
   }
@@ -650,7 +664,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       : nothing;
 
     return html`
-      <li class="flap-row" aria-label=${rowLabel}>
+      <div class="flap-row" role="listitem" aria-label=${rowLabel}>
         <div class="flap-cell flap-cell--line" aria-hidden="true">
           ${this._renderFlipString(line, `row${rowIndex}-line`, lineTileOpts)}
         </div>
@@ -666,11 +680,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         ${platformCell}
         <div class="flap-cell flap-cell--cd" aria-hidden="true">
           <span class="flap-cd-tiles">${cdContent}</span>
-          ${cfg.show_min_unit && cd !== null && !isAtPlatform
+          ${cfg.show_min_unit && cd !== null
             ? html`<span class="flap-cd-unit">${this._t("unit_min")}</span>`
             : nothing}
         </div>
-      </li>
+      </div>
     `;
   }
 
@@ -850,40 +864,26 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap > .flap-panel:first-of-type {
       border-radius: 4px;
     }
+    /* Board layout — single CSS grid containing the optional column
+       header + every row. The header and rows are subgrids that
+       inherit the board's column tracks, so the "GLEIS" caption
+       aligns to the platform column by construction (vs the
+       pre-subgrid version where each row was its own grid and the
+       auto-track widths drifted independently). */
     .flap-board {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-    .flap-rows {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    /* Row grid — line | dest (1fr) | (cd). When the platform column
-       is allocated via .flap--has-platform on the root, a 4th
-       column slips in between dest and cd via the rule below. */
-    .flap-row {
       display: grid;
       grid-template-columns: auto 1fr auto;
-      align-items: center;
       column-gap: 14px;
-      min-height: 44px;
+      row-gap: 6px;
+      align-items: center;
     }
-    .flap--has-platform .flap-row {
+    .flap-board--has-platform {
       grid-template-columns: auto 1fr auto auto;
     }
-    /* Column-header caption above the rows. Same grid template +
-       column-gap as .flap-row so the "GLEIS" / "STEIG" word sits
-       directly above the platform column. Small, faded, no glyph
-       weight — context for the new column without per-row noise. */
     .flap-colheader {
       display: grid;
-      grid-template-columns: auto 1fr auto auto;
-      column-gap: 14px;
+      grid-template-columns: subgrid;
+      grid-column: 1 / -1;
       align-items: end;
       padding-bottom: 2px;
       font-family: "Work Sans", "WL Sans", sans-serif;
@@ -895,6 +895,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     .flap-colheader__platform {
       text-align: center;
+    }
+    .flap-row {
+      display: grid;
+      grid-template-columns: subgrid;
+      grid-column: 1 / -1;
+      align-items: center;
+      min-height: 44px;
     }
     .flap-cell--line {
       display: inline-flex;
