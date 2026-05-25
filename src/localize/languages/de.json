@@ -34,6 +34,7 @@
     "qr_open": "QR-Code anzeigen",
     "qr_dialog_title": "QR-Code für Haltestelle",
     "qr_dialog_hint": "Mit dem Smartphone scannen — öffnet die Haltestelle in der Karten-App.",
+    "qr_dialog_close": "QR-Code schließen",
     "delay_singular": "1 Min. verspätet",
     "delay_plural": "{n} Min. verspätet",
     "devmode_title": "DEV",

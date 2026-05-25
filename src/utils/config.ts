@@ -185,21 +185,54 @@ function normaliseLineDirections(
   const out: Record<string, "H" | "R"> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof k !== "string" || !k.length) continue;
-    if (v === "H" || v === "R") out[k] = v;
-    // Any other value (including "Both" / "" / undefined) means
-    // "no override" — which is encoded as the absence of the key.
+    // Case-fold the line key so a YAML user typing `u1` doesn't
+    // silently fail to override `U1`. The departure feed uses
+    // upper-case line codes throughout.
+    const lineKey = k.toUpperCase();
+    if (v === "H" || v === "R") {
+      out[lineKey] = v;
+      continue;
+    }
+    // "Both" / "" / undefined are documented "no override" — encoded
+    // as the absence of the key. Anything else is a typo we surface
+    // so the user can fix it rather than wondering why their override
+    // is ignored.
+    if (v !== undefined && v !== "" && v !== "Both") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria] line_directions["${k}"] = ${JSON.stringify(v)} is not "H" / "R" / "Both" — dropping`,
+      );
+    }
   }
   return Object.keys(out).length ? out : undefined;
 }
 
 function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   if (typeof raw === "string") {
-    return raw.startsWith("sensor.") ? { entity: raw } : null;
+    if (raw.startsWith("sensor.")) return { entity: raw };
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria] entities[] entry ${JSON.stringify(raw)} is not a sensor.* entity — dropping`,
+    );
+    return null;
   }
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria] entities[] entry ${JSON.stringify(raw)} is not a string or object — dropping`,
+    );
+    return null;
+  }
   const r = raw as Record<string, unknown>;
   const entity = typeof r.entity === "string" ? r.entity : null;
-  if (!entity?.startsWith("sensor.")) return null;
+  if (!entity?.startsWith("sensor.")) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria] entities[] entry has missing or non-sensor.* entity field`,
+      raw,
+    );
+    return null;
+  }
   const stop: NormalisedModernStop = { entity };
   if (Array.isArray(r.lines)) {
     const lines = r.lines.filter((l): l is string => typeof l === "string" && l.length > 0);
@@ -340,8 +373,13 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
 
   const lineColors: Record<string, string> = {};
   if (raw.line_colors && typeof raw.line_colors === "object") {
+    // Only the four valid CSS hex shapes — #RGB, #RGBA, #RRGGBB,
+    // #RRGGBBAA. The prior /^#[0-9A-Fa-f]{3,8}$/ accepted #abcde and
+    // #abcdefg, which CSS silently falls back to inherited colour on,
+    // so a typo'd swatch broke without a visible cue.
+    const HEX_RE = /^#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
     for (const [k, v] of Object.entries(raw.line_colors)) {
-      if (typeof v === "string" && /^#[0-9A-Fa-f]{3,8}$/.test(v.trim())) {
+      if (typeof v === "string" && HEX_RE.test(v.trim())) {
         lineColors[k.toUpperCase()] = v.trim();
       }
     }
