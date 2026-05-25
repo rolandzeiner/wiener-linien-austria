@@ -1325,14 +1325,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
        Pill height is 1em so it slots flush inside the row's
        line-height: 1 box; padding 0 0.4em is the design spec; the
        glow is a 6 px box-shadow tinted in the pill colour.
-       Pill BOX optical-centre correction — translateY(-0.05em) lifts
-       the pill so its centre lands on the destination text's
-       cap-height centre (not its line-box centre). WL Mono uppercase
-       glyphs sit in the upper-middle of their line-box, so geometric
-       centring leaves the pill background visibly low relative to
-       the destination text next to it.
-       Glyph correction inside the pill lives on .retro-line__label
-       below. */
+       Glyph optical-centre correction lives on .retro-line__label
+       below — geometric centring of the text BOX lands its visible
+       ink high inside the pill because of WL Mono's ascender-heavy
+       metrics, so the inner span carries a small translateY. */
     .retro--line-pill .retro-line {
       display: inline-flex;
       align-items: center;
@@ -1348,7 +1344,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       color: var(--retro-line-fg, var(--led-amber));
       text-shadow: none;
       box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
-      transform: translateY(-0.05em);
     }
     .retro--line-pill .retro-line__label {
       /* Inherits WL Mono from the .retro root — the LED board's
