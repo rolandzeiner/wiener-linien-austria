@@ -132,6 +132,11 @@ RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
 RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
+FLAP_CARD_VERSION: Final = INTEGRATION_VERSION
+FLAP_CARD_URL: Final = (
+    "/wiener-linien-austria/wiener-linien-austria-flap-card.js"
+)
+FLAP_CARD_FILENAME: Final = "wiener-linien-austria-flap-card.js"
 
 # Webfonts directory — subsetted woff2 derivatives of TeX Gyre Heros +
 # TeX Gyre Cursor (GUST Font License). Served from www/fonts/ as a

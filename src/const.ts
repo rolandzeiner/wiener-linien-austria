@@ -1,10 +1,12 @@
-// CARD_VERSION and RETRO_CARD_VERSION must match the corresponding
-// constants in custom_components/wiener_linien_austria/const.py
-// byte-for-byte. If they drift, the WebSocket version check sees a
-// mismatch, shows a reload banner, the reload re-serves the same JS,
-// and the banner loops forever.
+// CARD_VERSION / RETRO_CARD_VERSION / FLAP_CARD_VERSION must match
+// the corresponding constants in
+// custom_components/wiener_linien_austria/const.py byte-for-byte.
+// If they drift, the WebSocket version check sees a mismatch, shows
+// a reload banner, the reload re-serves the same JS, and the banner
+// loops forever.
 export const CARD_VERSION = "1.5.0";
 export const RETRO_CARD_VERSION = "1.5.0";
+export const FLAP_CARD_VERSION = "1.5.0";
 
 export const DOMAIN = "wiener_linien_austria";
 

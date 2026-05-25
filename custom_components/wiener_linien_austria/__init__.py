@@ -32,6 +32,7 @@ from .const import (
     DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
+    FLAP_CARD_VERSION,
     RETRO_CARD_VERSION,
     STATIC_CACHE_REFRESH_HOURS,
     TRAFFIC_INFO_KEY,
@@ -79,6 +80,19 @@ async def _websocket_retro_card_version(
     connection.send_result(msg["id"], {"version": RETRO_CARD_VERSION})
 
 
+@websocket_command(
+    {vol.Required("type"): "wiener_linien_austria/flap_card_version"}
+)
+@async_response
+async def _websocket_flap_card_version(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Return the flap card version so its frontend can detect mismatches."""
+    connection.send_result(msg["id"], {"version": FLAP_CARD_VERSION})
+
+
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the Wiener Linien Austria component.
 
@@ -95,6 +109,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     # registration can't happen.
     async_register_command(hass, _websocket_card_version)
     async_register_command(hass, _websocket_retro_card_version)
+    async_register_command(hass, _websocket_flap_card_version)
 
     registration = JSModuleRegistration(hass)
 

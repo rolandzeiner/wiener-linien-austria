@@ -446,3 +446,37 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
    *  voice is digits only. */
   show_unit?: boolean | undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Flap card config — the warm-cream Solari split-flap board card.
+// A separate card type (not a retro-card theme); each visible character
+// renders as its own mechanical flap tile and only changed positions
+// animate.
+// ---------------------------------------------------------------------------
+
+export type FlapSize = "small" | "medium" | "regular";
+export type FlapPlatformSide = "auto" | "left" | "right";
+
+export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
+  type: string;
+  entity?: string | undefined;
+  direction?: "H" | "R" | undefined;
+  line?: string | undefined;
+  size?: FlapSize | undefined;
+  /** Number of departure rows rendered. Clamped to 1..4. Default 2. */
+  max_rows?: number | undefined;
+  /** Show the GLEIS / STEIG platform column on the side of the board. */
+  show_platform?: boolean | undefined;
+  /** Where the GLEIS column sits. `"auto"` (default) follows the WL
+   *  signage convention — platform 2 left, everything else right. */
+  platform_side?: FlapPlatformSide | undefined;
+  /** Show the WL-orange header band with station name + clock. */
+  show_station_header?: boolean | undefined;
+  /** Show a small "min" caption after each countdown number. */
+  show_min_unit?: boolean | undefined;
+  /** Show the wheelchair pictogram tile when a departure is step-free. */
+  show_accessibility?: boolean | undefined;
+  /** Filter to step-free departures only. */
+  accessibility_only?: boolean | undefined;
+  walk_times?: WalkTimes | undefined;
+}
