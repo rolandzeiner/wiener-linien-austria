@@ -222,8 +222,17 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       if (!row) continue;
       this._diffFlipField(`row${i}-line`, (row.line ?? "").toUpperCase());
       this._diffFlipField(`row${i}-dest`, (row.towards ?? "").toUpperCase());
+      // Pad the cd snapshot to a fixed 2-char width — matches the
+      // 2-tile render so per-position diff aligns with the rendered
+      // tiles. A 9 → 10 transition flips both tiles (" 9" → "10");
+      // a 10 → 9 flips both (because the blank slides in). 0 ↔ N
+      // also flips the digit position cleanly.
       const cd = Number.isFinite(row.countdown) ? row.countdown : null;
-      this._diffFlipField(`row${i}-cd`, cd === null ? "--" : String(cd));
+      const cdSnapshot =
+        cd === null
+          ? "--"
+          : String(cd <= 0 ? 0 : cd).padStart(2, " ");
+      this._diffFlipField(`row${i}-cd`, cdSnapshot);
     }
     // Drop snapshots for rows the departure queue no longer holds, so
     // a re-appearance many minutes later doesn't flap from a stale
@@ -611,18 +620,21 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       lineTileOpts.tileBg = palette.background;
     }
 
-    const cdContent =
+    // Always two countdown tiles. Single-digit values (including the
+    // at-platform 0) pad with a leading blank tile so the visual
+    // width is constant — no jumping width on the 10→9 boundary, no
+    // tile disappearing when a train pulls in. The previous blinking-
+    // asterisks variant for at-platform broke the mechanical material
+    // (it wasn't a flap card) and made the row briefly narrower.
+    const cdText =
       cd === null
-        ? html`${this._renderTile("-", undefined, 0)}${this._renderTile(
-            "-",
-            undefined,
-            1,
-          )}`
-        : isAtPlatform
-          ? html`<span class="flap-stars" aria-hidden="true"
-              ><span>*</span><span>*</span></span
-            >`
-          : this._renderFlipString(String(cd), `row${rowIndex}-cd`);
+        ? "--"
+        : String(isAtPlatform ? 0 : cd).padStart(2, " ");
+    const cdContent = this._renderFlipString(
+      cdText,
+      `row${rowIndex}-cd`,
+      { blankSpace: true },
+    );
 
     return html`
       <li class="flap-row" aria-label=${rowLabel}>
@@ -655,7 +667,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   private _renderFlipString(
     text: string,
     key: string,
-    opts: { tileBg?: string; tileFg?: string } = {},
+    opts: { tileBg?: string; tileFg?: string; blankSpace?: boolean } = {},
   ): TemplateResult {
     const chars = text.split("");
     const flipping = this._flipFlipping[key] ?? {};
@@ -668,9 +680,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     current: string,
     flippingFrom: string | undefined,
     index: number,
-    opts: { tileBg?: string; tileFg?: string; wide?: boolean } = {},
+    opts: {
+      tileBg?: string;
+      tileFg?: string;
+      wide?: boolean;
+      /** When true, spaces render as a full blank tile (cream pocket
+       *  + seam + pins, no glyph) instead of a thin inline space.
+       *  Used by the countdown padder so single-digit countdowns
+       *  keep a stable 2-tile footprint instead of jumping width on
+       *  every 10→9 / 9→10 boundary. Destination text leaves this
+       *  off so word separators stay as natural spaces. */
+      blankSpace?: boolean;
+    } = {},
   ): TemplateResult {
-    if (current === " ") {
+    if (current === " " && !opts.blankSpace) {
       return html`<span class="flap-space" aria-hidden="true">&nbsp;</span>`;
     }
     const isFlipping = flippingFrom !== undefined;
@@ -684,20 +707,26 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       "flap-tile--wide": opts.wide === true,
       "flap-tile--color": opts.tileBg !== undefined,
       "flap-tile--flipping": isFlipping,
+      // Blank tile — full pocket structure with no glyph. The
+      // overflow:hidden on each half already clips any whitespace
+      // content; the empty glyph spans below preserve the layout
+      // box so the seam + pins still paint at the right positions.
+      "flap-tile--blank": current === " ",
     });
+    const glyphContent = current === " " ? "" : current;
     return html`<span class=${tileClass} style=${tileStyle}>
       <span class="flap-tile__half flap-tile__half--top"
-        ><span class="flap-tile__glyph">${current}</span></span
+        ><span class="flap-tile__glyph">${glyphContent}</span></span
       >
       <span class="flap-tile__half flap-tile__half--bottom"
-        ><span class="flap-tile__glyph">${current}</span></span
+        ><span class="flap-tile__glyph">${glyphContent}</span></span
       >
       <span class="flap-tile__seam" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--l" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--r" aria-hidden="true"></span>
       ${isFlipping
         ? html`<span class="flap-tile__leaf"
-            ><span class="flap-tile__glyph">${flippingFrom}</span></span
+            ><span class="flap-tile__glyph">${flippingFrom === " " ? "" : flippingFrom}</span></span
           >`
         : nothing}
     </span>`;
