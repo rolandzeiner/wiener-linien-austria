@@ -250,7 +250,7 @@ const ge=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
   </span>`),s=l,c=[...l].reverse(),u=(i.chips??[]).map(i=>F`<span class="retro-station-header__chip">${i}</span>`),h=u,p=[...u].reverse(),f=i.show_clock?this._formatClock(t):null,g=f?F`<span class="retro-station-header__chip retro-station-header__chip--clock">
           <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
           <span>${f}</span>
-        </span>`:V,b=i.show_date?this._formatDateChip(t,i.date_format??"d.m.Y"):null,w=b?F`<span class="retro-station-header__chip retro-station-header__chip--date">${b}</span>`:V;return"left"===e?F`${o}${r}${m}${n}${a}${s}${h}${w}${g}`:F`${g}${w}${p}${c}${a}${n}${m}${r}${o}`}_renderStationName(i,e,t,o,r,d){let a,n;if("white"===o)a="#fff",n="#000";else if("black"===o)a="#000",n="#fff";else{const i=e.length?e:t,o=d||i[0]?.line;if(o){const i=Ji(o,{},r);a=i.background,n=i.color??"#fff","var(--primary-color)"===a&&(a="#fff",n="#000")}else a="#fff",n="#000"}return F`
+        </span>`:V,b=i.show_date?this._formatDateChip(t,i.date_format??"d.m.Y"):null,w=b?F`<span class="retro-station-header__chip retro-station-header__chip--date">${b}</span>`:V,k=("left"===e?[o,r,m,n,a,...s,...h,w,g]:[g,w,...p,...c,a,n,m,r,o]).filter(i=>i!==V);return F`${k}`}_renderStationName(i,e,t,o,r,d){let a,n;if("white"===o)a="#fff",n="#000";else if("black"===o)a="#000",n="#fff";else{const i=e.length?e:t,o=d||i[0]?.line;if(o){const i=Ji(o,{},r);a=i.background,n=i.color??"#fff","var(--primary-color)"===a&&(a="#fff",n="#000")}else a="#fff",n="#000"}return F`
       <div class="retro-station" style=${Ai({background:a,color:n})}>
         <div class="retro-station-name">${qi(i)}</div>
       </div>
