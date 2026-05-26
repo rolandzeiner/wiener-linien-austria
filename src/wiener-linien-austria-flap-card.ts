@@ -553,6 +553,16 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       ? this._renderStationHeader(cfg.header_left, cfg.header_right, serverTime)
       : nothing;
 
+    // CC-BY data-source credit. Default visible (Wiener Linien OGD
+    // licence requires attribution unless the user opts out via
+    // hide_attribution). Sourced from the first stop's sensor; falls
+    // back to the literal string so the credit appears even before
+    // the integration has reported state.
+    const attribution = cfg.hide_attribution
+      ? ""
+      : (typeof firstAttrs.attribution === "string" && firstAttrs.attribution) ||
+        "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
+
     return html`
       <ha-card style="padding:0;overflow:hidden;">
         <div class=${classMap(classes)}>
@@ -577,6 +587,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               cfg.line_pill,
               lineColors,
             )}
+            ${attribution
+              ? html`<div class="flap-foot">${attribution}</div>`
+              : nothing}
           </div>
         </div>
       </ha-card>
@@ -629,9 +642,16 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       palette.background === "var(--primary-color)"
         ? "var(--wl-orange)"
         : palette.background;
-    return palette.color
-      ? { background, color: palette.color }
-      : { background };
+    // Foreground is deliberately cream-hi, NOT palette.color. GTFS
+    // publishes white (FFFFFF) for most line fg values, but a white
+    // station name breaks the flap card's cohesive cream voice — the
+    // line tiles, MIN caption, column captions and pictogram glyphs
+    // are all painted with --flap-on-color-fg (cream-hi). Same
+    // reasoning as `.flap-tile--color` in the line cell render: one
+    // material across all coloured surfaces. Cream-hi keeps AAA
+    // contrast on WL line colours (red U1, orange U3, purple U2,
+    // green U4, brown U6, blue U-Bahn fallback).
+    return { background, color: "var(--flap-on-color-fg)" };
   }
 
   // ------------------------------------------------------------------
@@ -1176,6 +1196,28 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       text-align: center;
       font-size: 22px;
       letter-spacing: 0.04em;
+    }
+    /* CC-BY data-source credit — last child INSIDE the dark panel,
+       so the panel surface extends all the way to the bottom of the
+       cabinet (no cream/dark housing strip showing between rows and
+       credit). Same quiet caption voice as the colheader captions
+       and MIN unit; word-breaks gracefully on narrow boards. */
+    .flap-foot {
+      margin-top: 8px;
+      font-family: "Work Sans", "WL Sans", sans-serif;
+      font-size: 11px;
+      line-height: 1.3;
+      letter-spacing: 0.02em;
+      color: var(--flap-quiet-fg);
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+    /* When the footer is present, shrink the panel's bottom padding
+       so the credit hugs the panel edge tightly instead of floating
+       above a 12 px gap. :has() keeps the rows-only layout (no
+       footer rendered) at its original 12 px breathing room. */
+    .flap-panel:has(.flap-foot) {
+      padding-bottom: 6px;
     }
     /* housing off — drop the cabinet surround (bg, padding, bevel,
        drop shadow). The panel sits flush with the dashboard.

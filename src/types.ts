@@ -532,6 +532,11 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Hide the CC-BY data-source attribution footer. Default `false`
+   *  (footer visible) — mirrors the modern card's `hide_attribution`
+   *  and complies with the Wiener Linien OGD licence requirement
+   *  unless the user explicitly opts out. */
+  hide_attribution?: boolean | undefined;
   /** Tweak — hide the line column entirely. Useful for single-line
    *  setups where the line is implicit (e.g. a card scoped to one
    *  metro line via per-stop `lines` filter). Default `false`. The

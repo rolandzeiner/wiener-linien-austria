@@ -118,31 +118,55 @@ export class WienerLinienAustriaFlapCardEditor
 
   /** Options for the station-band background selector.
    *
-   *  Order: sentinel ("First line"), per-line entries (one per line
-   *  in the live `line_colors` palette from the first stop's sensor),
-   *  then the two static colour options (white, black).
+   *  Order: sentinel ("First line"), per-line entries scoped to the
+   *  lines the user is actually tracking on this board, then the two
+   *  static colour options (white, black).
    *
-   *  Per-line entries come from the SENSOR's `line_colors` attribute
-   *  rather than the user's `lines` config because (a) sensors carry
-   *  the full GTFS palette regardless of which lines the user filters
-   *  on (so the editor can offer transfer-line colours too), and (b)
-   *  a fresh entry with no lines filter still produces meaningful
-   *  options. Falls back to sentinel-only when no sensor data is
-   *  loaded yet (rare — but a fresh dashboard preview hits this). */
+   *  Per-line entries come from the union of:
+   *    1. Each stop's per-stop `lines` filter (card-level scope), OR
+   *    2. The sensor's `tracked_lines` attribute when no per-stop
+   *       filter is set (integration-level scope — the lines the
+   *       user picked in the integration's config flow).
+   *
+   *  Falls back to the sensor's full `line_colors` keys only when
+   *  neither source produced any lines — guarantees the dropdown
+   *  always has at least the sentinel + colour options + something
+   *  to point at even on a fresh stop with no live data. */
   private _stationBgOptions(): ReadonlyArray<{ value: string; label: string }> {
     const options: { value: string; label: string }[] = [
       { value: "line", label: this._et("station_bg_line") },
     ];
-    const firstEid = this._config?.entities?.[0]?.entity;
-    const lineColors = firstEid
-      ? (this.hass?.states?.[firstEid]?.attributes as
-          | WienerLinienAttrs
-          | undefined)?.line_colors
-      : undefined;
-    if (lineColors) {
-      for (const line of Object.keys(lineColors).sort()) {
-        options.push({ value: `line:${line}`, label: line });
+    const tracked = new Set<string>();
+    for (const stop of this._config?.entities ?? []) {
+      const attrs = this.hass?.states?.[stop.entity]?.attributes as
+        | WienerLinienAttrs
+        | undefined;
+      const stopLines = stop.lines && stop.lines.length > 0
+        ? stop.lines
+        : attrs?.tracked_lines;
+      if (stopLines) {
+        for (const ln of stopLines) {
+          if (typeof ln === "string" && ln) tracked.add(ln);
+        }
       }
+    }
+    // Fallback: if no stop produced any tracked lines (fresh entry,
+    // sensor not yet reporting, no per-stop filter and integration
+    // unconfigured), surface every line in the live palette so the
+    // dropdown isn't trapped at sentinel-only.
+    if (tracked.size === 0) {
+      const firstEid = this._config?.entities?.[0]?.entity;
+      const lineColors = firstEid
+        ? (this.hass?.states?.[firstEid]?.attributes as
+            | WienerLinienAttrs
+            | undefined)?.line_colors
+        : undefined;
+      if (lineColors) {
+        for (const ln of Object.keys(lineColors)) tracked.add(ln);
+      }
+    }
+    for (const line of [...tracked].sort()) {
+      options.push({ value: `line:${line}`, label: line });
     }
     options.push({ value: "white", label: this._et("station_bg_white") });
     options.push({ value: "black", label: this._et("station_bg_black") });
@@ -263,6 +287,10 @@ export class WienerLinienAustriaFlapCardEditor
               },
             ],
           },
+          // Last entry in display, mirroring the modern card. CC-BY
+          // footer is opt-out, so the toggle reads as "hide" not
+          // "show" — keeps the safe default obvious.
+          { name: "hide_attribution", selector: { boolean: {} } },
         ],
       },
       {

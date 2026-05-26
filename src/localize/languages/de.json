@@ -273,6 +273,8 @@
       "accessibility_only": "Nur barrierefreie Abfahrten anzeigen",
       "show_min_unit": "Einheit „min“ anzeigen",
       "show_min_unit_helper": "Kleines „min“ neben der Minutenzahl, wie auf echten Stationstafeln.",
+      "hide_attribution": "Datenquelle ausblenden",
+      "hide_attribution_helper": "Wenn aktiv, wird die CC-BY-Quellenangabe am unteren Rand der Karte ausgeblendet. Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern der Hinweis nicht an anderer Stelle im Dashboard erscheint.",
       "size_small": "Normal",
       "size_medium": "Mittel",
       "size_regular": "Groß",

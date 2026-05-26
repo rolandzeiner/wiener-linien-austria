@@ -149,6 +149,7 @@ export interface NormalisedFlapConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  hide_attribution: boolean;
   line_pill: boolean;
   housing: boolean;
 }
@@ -187,6 +188,7 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_header",
   "header_left",
   "header_right",
+  "hide_attribution",
   "line_pill",
   "housing",
 ]);
@@ -295,6 +297,10 @@ export function normaliseFlapConfig(
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
+    // Footer is opt-out, not opt-in — Wiener Linien OGD requires
+    // visible CC-BY credit unless the user deliberately suppresses
+    // it. Mirrors the modern card's default.
+    hide_attribution: raw.hide_attribution === true,
     // Tweaks — default values preserve the pre-tweak look:
     //   line_pill = false → line column visible
     //   housing  = true  → cream cabinet wraps the board

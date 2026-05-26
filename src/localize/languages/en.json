@@ -273,6 +273,8 @@
       "accessibility_only": "Only show step-free departures",
       "show_min_unit": "Show \"min\" caption",
       "show_min_unit_helper": "Small label next to the countdown number, like real station boards.",
+      "hide_attribution": "Hide data source",
+      "hide_attribution_helper": "When on, the CC-BY credit at the bottom of the card is hidden. The Wiener Linien Open Government Data licence requires visible attribution unless you keep the credit elsewhere on the dashboard.",
       "size_small": "Normal",
       "size_medium": "Medium",
       "size_regular": "Large",
