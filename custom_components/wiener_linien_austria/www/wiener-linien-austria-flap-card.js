@@ -261,20 +261,20 @@ const se="ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß",ce="0123456789";function ue(i,e,t)
         </div>
         ${e.map((i,e)=>this._renderRow(i,e,r,t,a,m,n))}
       </div>
-    `}_renderRow(i,e,t,o,d,a,r){const m=this._config,n=Number.isFinite(i.countdown)?i.countdown:null,l=null!==n&&n<=0,s=(i.line??"?").toUpperCase().padStart(r," "),c=(i.towards??"").toUpperCase(),u=[s,c,null===n?this._t("no_data"):l?this._t("at_platform"):this._t("countdown_minutes",{n:String(n)})].filter(Boolean).join(" — "),p=Ji(s,{},t),h="var(--primary-color)"!==p.background?{tileBg:p.background,blankSpace:!0}:{blankSpace:!0},f=this._renderFlipString(ge(i.countdown),he(e,"cd"),{blankSpace:!0}),g=o?F`<div class="flap-cell flap-cell--platform" aria-hidden="true">
+    `}_renderRow(i,e,t,o,d,a,r){const m=this._config,n=Number.isFinite(i.countdown)?i.countdown:null,l=null!==n&&n<=0,s=(i.line??"?").toUpperCase(),c=s.padStart(r," "),u=(i.towards??"").toUpperCase(),p=[s,u,null===n?this._t("no_data"):l?this._t("at_platform"):this._t("countdown_minutes",{n:String(n)})].filter(Boolean).join(" — "),h=Ji(s,{},t),f="var(--primary-color)"!==h.background?{tileBg:h.background,blankSpace:!0}:{blankSpace:!0},g=this._renderFlipString(ge(i.countdown),he(e,"cd"),{blankSpace:!0}),b=o?F`<div class="flap-cell flap-cell--platform" aria-hidden="true">
           ${i.platform?this._renderTile(i.platform,void 0,0,{wide:!0}):this._renderTile(" ",void 0,0,{wide:!0,blankSpace:!0})}
         </div>`:G;return F`
-      <div class="flap-row" role="listitem" aria-label=${u}>
+      <div class="flap-row" role="listitem" aria-label=${p}>
         ${d?G:F`<div class="flap-cell flap-cell--line" aria-hidden="true">
-              ${this._renderFlipString(s,he(e,"line"),h)}
+              ${this._renderFlipString(c,he(e,"line"),f)}
             </div>`}
         <div class="flap-cell flap-cell--dest" aria-hidden="true">
-          ${this._renderFlipString(c.padEnd(a," "),he(e,"dest"),{blankSpace:!0})}
+          ${this._renderFlipString(u.padEnd(a," "),he(e,"dest"),{blankSpace:!0})}
           ${m.show_accessibility?i.barrier_free?this._renderPictogramTile("mdi:wheelchair-accessibility",this._t("barrier_free_title")):this._renderAccessibilityBlankTile(this._t("not_barrier_free_title")):G}
         </div>
-        ${g}
+        ${b}
         <div class="flap-cell flap-cell--cd" aria-hidden="true">
-          <span class="flap-cd-tiles">${f}</span>
+          <span class="flap-cd-tiles">${g}</span>
           ${m.show_min_unit&&null!==n?F`<span class="flap-cd-unit">${this._t("unit_min")}</span>`:G}
         </div>
       </div>

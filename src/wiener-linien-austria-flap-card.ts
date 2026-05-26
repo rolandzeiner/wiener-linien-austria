@@ -908,10 +908,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const cfg = this._config!;
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
-    // padStart to maxLineLen so the line column is right-aligned —
-    // e.g. a "48A" row makes every "U1" row render as a leading blank
-    // tile + "U1" so the line-pill glyphs all end at the same x.
-    const line = (d.line ?? "?").toUpperCase().padStart(maxLineLen, " ");
+    // Look up the palette with the RAW line code — padStart adds
+    // leading spaces that chipPalette would otherwise treat as an
+    // unknown line, dropping every padded row back to the cream
+    // fallback. The padded form is for rendering only.
+    const rawLine = (d.line ?? "?").toUpperCase();
+    const line = rawLine.padStart(maxLineLen, " ");
     const towards = (d.towards ?? "").toUpperCase();
     const cdLabel =
       cd === null
@@ -919,14 +921,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         : isAtPlatform
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
-    const rowLabel = [line, towards, cdLabel].filter(Boolean).join(" — ");
+    const rowLabel = [rawLine, towards, cdLabel].filter(Boolean).join(" — ");
 
     // Resolve the line palette through chipPalette so each character
     // tile in the line column is painted with the official WL line
     // colour. Fallback (unknown line) stays cream — same as text
     // tiles — rather than dragging in the HA primary colour which
     // would clash with the cream palette.
-    const palette = chipPalette(line, {}, lineColors);
+    const palette = chipPalette(rawLine, {}, lineColors);
     // Only the BACKGROUND comes from the GTFS palette. Foreground
     // stays at the cream-hi default (set in CSS on .flap-tile--color)
     // so every line letter reads as one cohesive material with the
