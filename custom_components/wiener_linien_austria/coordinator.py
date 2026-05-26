@@ -489,7 +489,12 @@ def _parse_monitor_body(
     """
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
-    _trip_patterns_loaded = catalogue is not None and catalogue.trip_patterns is not None
+    # Narrow `catalogue` once for the loop below — mypy carries the
+    # narrowing across the closure boundary if we hand it through a
+    # local alias that's either the catalogue or None.
+    pattern_catalogue: StaticCatalogue | None = (
+        catalogue if catalogue is not None and catalogue.trip_patterns is not None else None
+    )
 
     # Match the user's selection on (line, direction) only — `line.towards`
     # is unstable for branching termini (e.g. U1/R reports "Oberlaa" or
@@ -530,10 +535,10 @@ def _parse_monitor_body(
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
                 resolved_towards = vehicle_towards or line_towards
                 stops_ahead: list[dict[str, Any]] | None = None
-                if _trip_patterns_loaded and entry_rbls:
+                if pattern_catalogue is not None and entry_rbls:
                     try:
                         stops_ahead = stops_ahead_for_match(
-                            catalogue,
+                            pattern_catalogue,
                             line_name,
                             entry_rbls,
                             resolved_towards,
