@@ -82,50 +82,39 @@ Three cards ship with the integration. All three auto-register as Lovelace resou
 
 ### Modern card — `wiener-linien-austria-card`
 
-The everyday departure board. Add via Dashboard → **Add card** → "Wiener Linien Austria".
+The everyday departure board. Themed to your HA palette; each stop auto-tints to its next-departure line colour.
 
-Visual editor:
-- **Stops** — multi-select picker. Each stop carries its own line list (drawn from what you tracked in the integration's config flow), direction filter (H / R / both, also per-line), and per-line walking time in minutes (departures leaving before you can reach the platform are hidden).
-- **Line colours** — per-line override pills; defaults come from the GTFS `routes.txt` palette the integration ships as a sensor attribute.
-- **Display** — multi-stop layout (*stacked* / *tabs*), departures-per-stop slider (0–20), and toggles for hero countdown, departure list, stops-ahead trail, QR map button, platform pill, step-free icon, accessibility-only filter, vehicle-type icon, disruption banner, elevator badge, delay text, header, and attribution.
+- **Multi-stop layout** — stacked or tabbed; up to 20 departures per stop.
+- **Hero countdown** — next departure rendered large, full board beneath.
+- **Stops-ahead trail** — click any row to expand a metro-map trail down to the terminus, with transfer chips at each station.
+- **Per-line walking time** — hides departures you can't reach in time.
+- **QR map button** — encodes the stop as a `geo:` URI for phone scanners.
+- **Disruption + elevator banners** — collapsible rows above the board.
 
-Each station section auto-tints to the next-departure line colour. Rows show a colour-coded line badge, destination with optional inline delay text, optional traffic-jam / step-free icons, and a countdown (`N min` or `jetzt`). Stop titles link to the official [Vienna city map](https://stadtplan.wien.gv.at) pinned by coordinates, with OpenStreetMap as fallback; an optional QR button encodes a `geo:` URI for phone scanners. Empty boards render `Betriebsschluss` / `End of service`.
-
-**Stops-ahead trail.** Click any row (or the hero block) to expand a metro-map trail beneath: vertical line in the operating line's brand colour, dot per stop, hollow ring at the terminus. Each station carries inline transfer chips for U-Bahn lines; tram, bus, and nightlines fold behind a `+N` toggle. Nightlines get promoted to inline during night service hours (~23:55–05:15). Panels survive realtime polls (keyed by scheduled time, not the live countdown).
-
-Disruption and elevator entries render as collapsible rows above the stop list.
+Add via Dashboard → **Add card** → "Wiener Linien Austria".
 
 ### Retro card — `wiener-linien-austria-retro-card`
 
-A focused single-stop, single-direction LED-display card mimicking real Wiener Linien platform signs.
+A focused LED panel, modelled on the amber-on-violet signs hanging from Wiener Linien platforms. The station-name tile picks up the configured line's colour (nightline blue + yellow on N-lines).
 
-- Next 2 departures; amber glyphs in **WL Mono** (a subsetted TeX Gyre Cursor face bundled with the integration — no external font fetch).
-- Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on brown), *pixel* (screen-door overlay).
-- Amber **GLEIS** / **STEIG** panel when the API reports a platform.
-- Optional **station header strip** modelled on real WL U-Bahn signage — per side: exit icon, sign text, WC / escalator / elevator amenity tiles, up to 3 free-form `mdi:*` icons, up to 6 short text labels. Rendered in **WL Sans Condensed**; exit arrows auto-flip to point outward.
-- Wheelchair glyph on step-free departures; alternating asterisks when a train is at the platform.
-- Three size variants (small / medium / regular); defaults to a full 12-column row in HA section view.
-- Station-name tile picks up the **configured line's** signage palette (nightline blue + yellow for N-prefix lines; GTFS palette otherwise) so a nightline retro card renders in nightline colours at noon.
-- Optional **wheelchair race** — when ≥ 2 departures are barrier-free, runs a "3, 2, 1" countdown and a trophy finish overlay. Tap to trigger immediately. Gated by `prefers-reduced-motion`.
-- Optional **scrolling message** — custom text scrolls across the LED panel every 5 min, then hands back to live departures. Up to 160 characters. Tap to skip; gated by `prefers-reduced-motion`.
+- **Three style variants** — *classic*, *warm*, *pixel* (screen-door overlay).
+- **GLEIS / STEIG panel** — amber platform tile when the API reports one.
+- **Signage header strip** — exit icon, sign text, WC / escalator / elevator tiles, free-form MDI icons, short labels. Per side.
+- **Wheelchair race** — when ≥ 2 departures are step-free, runs a "3, 2, 1" countdown to the trophy finish. Tap to trigger.
+- **Scrolling message** — custom text scrolls every 5 min, then hands back to live departures.
 
-Designed for wall-tablet kiosks and entryway displays.
+Add via Dashboard → **Add card** → "Wiener Linien Austria — Retro".
 
 ### Flap card — `wiener-linien-austria-flap-card`
 
-A Solari-style split-flap board, modelled on the Italian mechanical displays that dominated European stations and airports from the 1960s to the 1990s. Each character lands as a flap tile on a cream-or-dark cabinet — tiles cycle one step per ~130 ms toward the target letter until they settle, mimicking the cascading rattle of the real boards.
+A Solari split-flap board — characters cascade one tile at a time toward the target letter, mimicking the rattle of the mechanical originals from European stations.
 
-- **Multi-stop merge.** Configure up to 8 stops; departures merge and sort by countdown across the whole board. Per-stop filters for direction, lines, and walking time.
-- Up to **8 rows**, each with a per-row GLEIS / STEIG tile in its own column so the platform numbers line up across rows regardless of width.
-- **Column headers** above the board — *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT* — in the same caption voice as the MIN unit beside the countdown. STUFENLOS pin-aligns to the wheelchair pictogram's right edge instead of the stretched column.
-- **Signage header strip** — same per-side grammar as the retro card (exit icon, sign text, amenities, MDI icons, labels) recoloured for the cabinet palette.
-- **Station-name band** auto-tints to the first tracked line's GTFS colour (e.g. red for U1, orange for U3); editor dropdown lists each tracked line on multi-line boards plus a *White* / *Black* override. Station name stays in cream for cohesive voice across line-coloured surfaces.
-- **Accessibility column** — a blue ISA-style wheelchair tile on step-free departures, blank cream tile otherwise. Column stays the same width regardless.
-- **Editor mirrors the retro card's structure** — *Header → Station → Display → Tweaks* sections with parallel field ordering, so users moving between cards keep the same spatial mnemonic.
-- **Tweaks** — hide the line column entirely (useful for single-line boards where the line is implicit), or drop the cabinet surround so the board sits flush with the dashboard.
-- **CC-BY data-source credit** at the bottom of the panel by default; toggle off if the dashboard carries the credit elsewhere.
-- **Light / dark palette** follows the active HA theme (`hass.themes.darkMode`) — not the OS — so a light HA theme on a dark OS still renders the light board. Cabinet colour adapts in lockstep (cream in light, dark in dark).
-- **Reduced motion** swaps the rotation for a 60 ms cross-fade per WCAG 2.3.3.
+- **Multi-stop merge** — up to 8 stops, sorted by countdown across the whole board.
+- **Column headers** — *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT* above the board.
+- **Per-row GLEIS / STEIG tile** — own column, aligned across all rows.
+- **Station-name band** — auto-tints to the first tracked line's colour; editor dropdown lists each tracked line plus *White* and *Black*.
+- **Signage header strip** — same grammar as the retro card, recoloured for the cabinet palette.
+- **Compact mode** — hide the line column (single-line boards) or drop the cabinet for a flush mount.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
