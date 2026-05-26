@@ -1141,6 +1141,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   // ------------------------------------------------------------------
 
   static override styles = css`
+    /* Register --tile-bg as a typed color so CSS can interpolate it
+       inside the half / leaf gradients. Without this, transitioning
+       a generic --tile-bg would swap as strings — no cross-fade. */
+    @property --tile-bg {
+      syntax: "<color>";
+      inherits: true;
+      initial-value: transparent;
+    }
     :host {
       display: block;
       /* Stacking context for the housing shadow + tile drop-shadows
@@ -1450,7 +1458,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       overflow: visible;
       filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.5));
       /* When opts.tileBg / opts.tileFg are set, --tile-bg / --tile-fg
-         override the cream gradient on every face below. */
+         override the cream gradient on every face below. The
+         transition cross-fades the line palette when a row's
+         underlying departure swaps line — visible on shared-char
+         positions (e.g. U1 to U3, both U in slot 0); flipping tiles
+         re-mount fresh each tick via keyed() so they pick up the
+         new colour instantly without a cross-fade. */
+      transition: --tile-bg 320ms ease;
     }
     .flap-tile--wide {
       width: 38px;
@@ -1916,6 +1930,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        carries the value; user sees a smooth swap rather than an
        abrupt snap. */
     @media (prefers-reduced-motion: reduce) {
+      .flap-tile {
+        /* Skip the --tile-bg cross-fade for motion-sensitive users —
+           colour changes snap instantly instead. */
+        transition: none;
+      }
       .flap-tile--flipping .flap-tile__leaf {
         animation: flapLeafFade 60ms ease-out forwards;
         animation-delay: 0ms;
