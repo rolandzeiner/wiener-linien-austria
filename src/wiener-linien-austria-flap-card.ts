@@ -295,6 +295,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (!changed.has("hass") && !changed.has("_config")) return;
     const rows = this._gatherRows();
     const maxDestLen = this._maxDestLen(rows);
+    const maxLineLen = this._maxLineLen(rows);
     // Keys are row INDEX (not departure id) so the next train's
     // content inherits the previous row's snapshot — flap reads as
     // "the next departure just flipped in" instead of "row appeared
@@ -302,7 +303,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       if (!row) continue;
-      this._diffFlipField(flipKey(i, "line"), (row.line ?? "").toUpperCase());
+      this._diffFlipField(
+        flipKey(i, "line"),
+        (row.line ?? "").toUpperCase().padStart(maxLineLen, " "),
+      );
       this._diffFlipField(
         flipKey(i, "dest"),
         (row.towards ?? "").toUpperCase().padEnd(maxDestLen, " "),
@@ -459,6 +463,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
    *  column width on the next paint. */
   private _maxDestLen(rows: DepartureAttr[]): number {
     return Math.max(0, ...rows.map((r) => (r.towards ?? "").length));
+  }
+
+  /** Longest line label across the merged row set — drives the
+   *  leading-blank padding so every row's line column carries the same
+   *  number of tiles. A "48A" row (3 chars) makes every "U1" row
+   *  (2 chars) render as a blank + "U1" right-aligned to width 3. */
+  private _maxLineLen(rows: DepartureAttr[]): number {
+    return Math.max(0, ...rows.map((r) => (r.line ?? "?").length));
   }
 
   /** Gather and merge departures from every configured stop, applying
@@ -797,6 +809,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     lineColors: Record<string, LineColorPair>,
   ): TemplateResult {
     const maxDestLen = this._maxDestLen(rows);
+    const maxLineLen = this._maxLineLen(rows);
     if (eids.length === 0) {
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
@@ -876,6 +889,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
             hasAnyPlatform,
             hideLineColumn,
             maxDestLen,
+            maxLineLen,
           ),
         )}
       </div>
@@ -889,11 +903,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     hasAnyPlatform: boolean,
     hideLineColumn: boolean,
     maxDestLen: number,
+    maxLineLen: number,
   ): TemplateResult {
     const cfg = this._config!;
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
-    const line = (d.line ?? "?").toUpperCase();
+    // padStart to maxLineLen so the line column is right-aligned —
+    // e.g. a "48A" row makes every "U1" row render as a leading blank
+    // tile + "U1" so the line-pill glyphs all end at the same x.
+    const line = (d.line ?? "?").toUpperCase().padStart(maxLineLen, " ");
     const towards = (d.towards ?? "").toUpperCase();
     const cdLabel =
       cd === null
@@ -915,10 +933,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // rest of the cream tiles — even on lines whose GTFS fg is
     // white or nightline-yellow. Unknown lines fall through to the
     // cream default (no GTFS palette → primary-color sentinel → skip).
-    const lineTileOpts: { tileBg?: string; tileFg?: string } =
+    // blankSpace forces leading padStart spaces (when a shorter line
+    // is padded up to maxLineLen) to render as full cream blank
+    // tiles rather than thin inline gaps. _renderTile zeros tileBg
+    // for blank tiles so the cream shows through even when the
+    // line's GTFS palette is set.
+    const lineTileOpts: { tileBg?: string; tileFg?: string; blankSpace: true } =
       palette.background !== "var(--primary-color)"
-        ? { tileBg: palette.background }
-        : {};
+        ? { tileBg: palette.background, blankSpace: true }
+        : { blankSpace: true };
 
     const cdContent = this._renderFlipString(
       padCountdown(d.countdown),
@@ -1025,22 +1048,30 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (current === " " && !opts.blankSpace) {
       return html`<span class="flap-space" aria-hidden="true">&nbsp;</span>`;
     }
+    // Blank tiles drop tileBg / tileFg so a coloured line tile (e.g.
+    // red "U1") padded left for column alignment shows CREAM blanks
+    // in the leading slots, not red squares. Also cleans up the leaf
+    // during a flip — the rotating leaf inherits the cream face
+    // instead of briefly showing the line colour.
+    const isBlank = current === " ";
+    const effectiveBg = isBlank ? undefined : opts.tileBg;
+    const effectiveFg = isBlank ? undefined : opts.tileFg;
     const isFlipping = flippingFrom !== undefined;
     const tileStyle = styleMap({
       "--tile-i": String(index),
-      ...(opts.tileBg ? { "--tile-bg": opts.tileBg } : {}),
-      ...(opts.tileFg ? { "--tile-fg": opts.tileFg } : {}),
+      ...(effectiveBg ? { "--tile-bg": effectiveBg } : {}),
+      ...(effectiveFg ? { "--tile-fg": effectiveFg } : {}),
     });
     const tileClass = classMap({
       "flap-tile": true,
       "flap-tile--wide": opts.wide === true,
-      "flap-tile--color": opts.tileBg !== undefined,
+      "flap-tile--color": effectiveBg !== undefined,
       "flap-tile--flipping": isFlipping,
       // Blank tile — full pocket structure with no glyph. The
       // overflow:hidden on each half already clips any whitespace
       // content; the empty glyph spans below preserve the layout
       // box so the seam + pins still paint at the right positions.
-      "flap-tile--blank": current === " ",
+      "flap-tile--blank": isBlank,
     });
     const glyphContent = current === " " ? "" : current;
     return html`<span class=${tileClass} style=${tileStyle}>
