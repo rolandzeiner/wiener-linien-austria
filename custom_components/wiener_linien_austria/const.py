@@ -92,6 +92,11 @@ ALERT_CACHE_VALIDATORS_KEY: Final = "alert_cache_validators"
 # cleanup (cancelling the alerts + static refresh timers, dropping the
 # in-memory caches) when the *last* entry is removed.
 ENTRY_COUNT_KEY: Final = "entry_count"
+# Sentinel that the Lovelace resources have been registered for the
+# current "run" (first entry → last entry → … → first entry again).
+# Popped by `_teardown_domain_state` so the next first-entry boot
+# re-registers after an async_remove_entry tore the resources down.
+RESOURCES_REGISTERED_KEY: Final = "resources_registered"
 
 STATIC_FILES: Final = {
     "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",

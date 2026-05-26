@@ -33,6 +33,7 @@ from .const import (
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
     FLAP_CARD_VERSION,
+    RESOURCES_REGISTERED_KEY,
     RETRO_CARD_VERSION,
     STATIC_CACHE_REFRESH_HOURS,
     TRAFFIC_INFO_KEY,
@@ -115,6 +116,12 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
 
     async def _register_frontend(_event: Event | None = None) -> None:
         await registration.async_register()
+        # Flag the sentinel so the first-entry boot doesn't double-
+        # register on the happy path. _ensure_domain_timers re-runs
+        # registration on its own if the sentinel is missing — which
+        # is exactly what we want after async_remove_entry tore the
+        # resources down.
+        hass.data.setdefault(DOMAIN, {})[RESOURCES_REGISTERED_KEY] = True
 
     if hass.state == CoreState.running:
         await _register_frontend()
@@ -132,6 +139,22 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
     entry, torn down by the last entry, recreated on a re-add.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
+
+    # Re-register Lovelace resources every time `_ensure_domain_timers`
+    # finds the sentinel missing. `async_setup` only runs ONCE per HA
+    # process — its JSModuleRegistration call can't recover from an
+    # async_remove_entry that fired on a previous (now-deleted) last
+    # entry. The delete + re-add cycle would otherwise leave the cards
+    # silently unloaded until a full HA restart. `_teardown_domain_state`
+    # pops the sentinel so the next first-entry boot re-runs this.
+    # async_register is idempotent — short-circuits on already-current
+    # resources, skips entirely in yaml-mode Lovelace.
+    if RESOURCES_REGISTERED_KEY not in domain_data:
+        domain_data[RESOURCES_REGISTERED_KEY] = True
+        hass.async_create_task(
+            JSModuleRegistration(hass).async_register(),
+            name=f"{DOMAIN}_resource_register",
+        )
 
     if STATIC_REFRESH_UNSUB_KEY not in domain_data:
         async def _periodic_refresh(_now: Any) -> None:
@@ -285,6 +308,9 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         bg_task.cancel()
     # Drop the rest of the domain-wide state — caches and validators
     # are stale by definition once no entry is around to consume them.
+    # RESOURCES_REGISTERED_KEY pops too so the next first-entry boot
+    # re-runs JSModuleRegistration.async_register — covers the user's
+    # delete-last-entry + async_remove_entry-tore-down-resources case.
     for stale_key in (
         TRAFFIC_INFO_KEY,
         ELEVATOR_INFO_KEY,
@@ -293,6 +319,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         LOCK_KEY,
         LOCK_LOOP_KEY,
         CATALOGUE_KEY,
+        RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)
 
