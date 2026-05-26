@@ -25,13 +25,15 @@ Vienna public transport departures for Home Assistant. Type a stop name, pick th
     <td align="center" valign="top">
       <img src="screenshots/card-2.webp" width="264" alt="Lovelace card (retro LED)" />
       <br/>
+      <img src="screenshots/card-3.webp" width="264" alt="Lovelace card (flap board)" />
+      <br/>
       <img src="screenshots/card.webp" height="320" alt="Lovelace card (modern)" />
     </td>
     <td align="center"><img src="screenshots/card-config.webp" height="320" alt="Card editor" /></td>
     <td align="center"><img src="screenshots/config-flow.webp" height="320" alt="Config flow" /></td>
   </tr>
   <tr>
-    <td align="center"><em>Lovelace cards (Retro · Modern)</em></td>
+    <td align="center"><em>Lovelace cards (Retro · Flap · Modern)</em></td>
     <td align="center"><em>Card editor</em></td>
     <td align="center"><em>Config flow</em></td>
   </tr>
