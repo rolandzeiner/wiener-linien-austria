@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from homeassistant.const import __version__ as _HA_VERSION
 
@@ -33,7 +33,7 @@ USER_AGENT: Final = (
 CONF_DIVA: Final = "diva"
 CONF_STOP_NAME: Final = "stop_name"
 CONF_RBLS: Final = "rbls"
-CONF_LINES: Final = "lines"  # selected {rbl}_{line}_{direction} ids
+CONF_LINES: Final = "lines"  # selected "{line}|{direction}" keys (see _line_key)
 CONF_SEARCH_QUERY: Final = "search_query"
 
 # Polling policy.
@@ -78,6 +78,12 @@ ALERTS_REFRESH_SECONDS: Final = 300
 TRAFFIC_INFO_KEY: Final = "traffic_info"
 ELEVATOR_INFO_KEY: Final = "elevator_info"
 ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
+# Monotonic counter bumped on every successful alerts refresh. Sensors
+# memoise their `extra_state_attributes` dict (which embeds the matched
+# alerts) and use this counter as the cache-validity tag — when alerts
+# refresh on their own ~5-min cadence (independent of the per-stop
+# coordinator tick), the sensor sees the bump and rebuilds.
+ALERTS_SEQ_KEY: Final = "alerts_seq"
 # Cache validators (ETag / Last-Modified) per alert feed, captured from
 # the previous /trafficInfoList response so unchanged feeds come back
 # as 304 Not Modified instead of full bodies.
@@ -86,6 +92,11 @@ ALERT_CACHE_VALIDATORS_KEY: Final = "alert_cache_validators"
 # cleanup (cancelling the alerts + static refresh timers, dropping the
 # in-memory caches) when the *last* entry is removed.
 ENTRY_COUNT_KEY: Final = "entry_count"
+# Sentinel that the Lovelace resources have been registered for the
+# current "run" (first entry → last entry → … → first entry again).
+# Popped by `_teardown_domain_state` so the next first-entry boot
+# re-registers after an async_remove_entry tore the resources down.
+RESOURCES_REGISTERED_KEY: Final = "resources_registered"
 
 STATIC_FILES: Final = {
     "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",
@@ -112,11 +123,19 @@ ATTRIBUTION: Final = (
 # publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
-# MeansOfTransport values → rough categorisation for UI icons
+# MeansOfTransport values → rough categorisation for UI icons. Mirrored
+# in src/utils/mot.ts; tests/test_card_version.py:test_line_type_constants
+# asserts byte-identity. `LineType` carries the same set as a Literal so
+# call sites can declare the narrow shape without restating the strings.
 LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
 LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
+LineType = Literal["ptMetro", "ptTram", "ptBusCity", "ptBusNight"]
+
+# Direction codes from the /monitor feed. "H" = Hinfahrt (outbound),
+# "R" = Rückfahrt (return). Used as keys in CONF_LINES ("U1|H").
+Direction = Literal["H", "R"]
 
 # Lovelace cards — each JS file carries a `const CARD_VERSION` that must
 # match the corresponding Python constant below byte-for-byte, else the
@@ -132,6 +151,11 @@ RETRO_CARD_URL: Final = (
     "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 )
 RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
+FLAP_CARD_VERSION: Final = INTEGRATION_VERSION
+FLAP_CARD_URL: Final = (
+    "/wiener-linien-austria/wiener-linien-austria-flap-card.js"
+)
+FLAP_CARD_FILENAME: Final = "wiener-linien-austria-flap-card.js"
 
 # Webfonts directory — subsetted woff2 derivatives of TeX Gyre Heros +
 # TeX Gyre Cursor (GUST Font License). Served from www/fonts/ as a

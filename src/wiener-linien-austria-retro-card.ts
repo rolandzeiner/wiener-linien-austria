@@ -26,6 +26,8 @@ import type {
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
+import { formatDate } from "./utils/time.js";
+import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
 import {
   RETRO_HEADER_ICONS,
@@ -46,6 +48,12 @@ import "./retro-editor.js";
 
 type RaceState = "idle" | "countdown" | "racing" | "freeze" | "victory";
 const VICTORY_DURATION_MS = 4000;
+// Via / over alternation tick. When any visible row carries a `via`
+// hint, the destination text cross-fades with `ÜBER {via}` every
+// VIA_TICK_MS. Chosen at 4 s so each phase has time to register
+// without the row feeling restless. Cross-fade duration lives in the
+// CSS .retro-dest-text transition (0.4 s) — keep them in sync.
+const VIA_TICK_MS = 4000;
 // Hold both wheelchair animations paused for this long after the winner
 // crosses the finish line. Gives the viewer a still frame of the photo
 // finish — winner at the strip, loser caught a step behind — before
@@ -111,11 +119,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // disconnect, re-armed on reconnect).
   @state() private _tickerActive = false;
   private _tickerTimer: ReturnType<typeof setTimeout> | null = null;
+  // Via / over alternation. `_viaPhase` flips between "towards" and
+  // "via" every VIA_TICK_MS so the destination text cross-fades to
+  // `ÜBER {via}` when any visible row carries via routing. The
+  // interval handle is held in `_viaTimer`; both are reset on
+  // disconnect and re-armed on reconnect.
+  @state() private _viaPhase: "towards" | "via" = "towards";
+  private _viaTimer: ReturnType<typeof setInterval> | null = null;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back" console
   // warning doesn't spam on every re-render.
   private _fallbackWarned = false;
+  // Resolved entity id cached across hass ticks — _resolveEntity is hot
+  // path (called from both shouldUpdate and render) and was iterating
+  // hass.states for the fallback path on every tick.
+  private _cachedEid: string | null = null;
   private _raceTimers = new Set<ReturnType<typeof setTimeout>>();
   // Wall-clock target times so state transitions survive the disconnect/
   // reconnect cycles HA triggers during dashboard rebuilds.
@@ -141,6 +160,24 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       );
     }
     this._config = normaliseRetroConfig(config);
+    // Reset every timer / state-machine handle on config swap. Without
+    // this, toggling `wheelchair_race` off mid-race leaves a victory
+    // overlay + orphan timers ticking against absent CSS hooks, and
+    // swapping the message text mid-marquee leaves `_tickerActive=true`
+    // forever.
+    this._clearRaceTimers();
+    this._clearTickerTimer();
+    this._clearViaTimer();
+    this._raceState = "idle";
+    this._countdownDigit = null;
+    this._countdownStartAt = null;
+    this._raceEndAt = null;
+    this._freezeEndAt = null;
+    this._victoryEndAt = null;
+    this._raceWinner = null;
+    this._tickerActive = false;
+    this._fallbackWarned = false;
+    this._cachedEid = null;
   }
 
   public getCardSize(): number {
@@ -197,6 +234,31 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Register the WL webfaces on document.head — see font-face.ts for
     // why Shadow-DOM @font-face can't be trusted on Android WebView.
     registerWlFonts();
+    // Font-loading diagnostic. WL Mono is the authentic departure-board
+    // face; the Courier-New fallback is visibly less accurate. If the
+    // woff2 didn't land — fetch blocked, MIME misconfigured, integration
+    // static path off — warn so installers don't silently end up on the
+    // fallback. `document.fonts.ready` resolves once every pending
+    // font-face has settled (loaded or errored); the check runs against
+    // the actual computed availability at that point.
+    if (typeof document !== "undefined" && document.fonts?.ready) {
+      document.fonts.ready
+        .then(() => {
+          if (!document.fonts.check('700 16px "WL Mono"')) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              '[wiener-linien-austria-retro-card] "WL Mono" 700 not loaded — falling back to Courier New (less authentic). Check /wiener-linien-austria/fonts/ is served by the integration.',
+            );
+          }
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[wiener-linien-austria-retro-card] document.fonts.ready rejected",
+            err,
+          );
+        });
+    }
     if (!this._versionCheckDone && this.hass?.callWS) {
       this._versionCheckDone = true;
       void this._checkCardVersion();
@@ -220,15 +282,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // be re-established here. A scroll interrupted by the detach is
     // abandoned — reset the flag and let the interval queue the next.
     if (this._config?.message_ticker && this._config?.message_text) {
-      this._tickerActive = false;
       this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
     }
+    // Via timer is armed on demand from render() when a visible row
+    // carries via routing — no unconditional arm here.
   }
 
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRaceTimers();
     this._clearTickerTimer();
+    this._clearViaTimer();
   }
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
@@ -239,7 +303,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       changed.has("_raceState") ||
       changed.has("_countdownDigit") ||
       changed.has("_raceWinner") ||
-      changed.has("_tickerActive")
+      changed.has("_tickerActive") ||
+      changed.has("_viaPhase")
     ) {
       return true;
     }
@@ -250,8 +315,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return prev.states[eid] !== this.hass.states[eid];
   }
 
-  protected override updated(changed: PropertyValues): void {
-    super.updated(changed);
+  protected override willUpdate(changed: PropertyValues): void {
     if (!changed.has("_config")) return;
     const prev = changed.get("_config") as NormalisedRetroConfig | undefined;
     const wasOn = prev?.wheelchair_race === true;
@@ -301,29 +365,50 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    this._versionMismatch = await checkCardVersionWS(
-      this.hass,
-      "wiener_linien_austria/retro_card_version",
-      RETRO_CARD_VERSION,
-    );
+    try {
+      this._versionMismatch = await checkCardVersionWS(
+        this.hass,
+        "wiener_linien_austria/retro_card_version",
+        RETRO_CARD_VERSION,
+      );
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "[wiener-linien-austria-retro-card] version probe failed",
+        err,
+      );
+    }
   }
 
+  /** Cache-aware: returns the configured entity if it's in hass.states,
+   *  else the first auto-discovered WL sensor as a fallback. Cached on
+   *  this._cachedEid because both shouldUpdate and render call it on
+   *  every hass tick — recomputing the fallback (which iterates
+   *  hass.states) on every tick adds up on large dashboards. The cache
+   *  is invalidated on setConfig and when the configured entity's
+   *  presence in hass.states changes. */
   private _resolveEntity(): string | null {
-    if (this._config?.entity && this.hass?.states?.[this._config.entity]) {
-      return this._config.entity;
+    const configured = this._config?.entity;
+    if (configured && this.hass?.states?.[configured]) {
+      this._cachedEid = configured;
+      return configured;
+    }
+    if (this._cachedEid && this.hass?.states?.[this._cachedEid]) {
+      return this._cachedEid;
     }
     const available = findWienerLinienEntities(this.hass);
     const first = available[0] ?? null;
-    if (first && this._config?.entity && !this._fallbackWarned) {
+    if (first && configured && !this._fallbackWarned) {
       // Configured entity is gone (rename, integration removal). The
       // fallback keeps the card useful, but make the swap auditable so
       // the user notices their dashboard is now showing a different stop.
       this._fallbackWarned = true;
       // eslint-disable-next-line no-console
       console.warn(
-        `[wiener-linien-austria-retro-card] configured entity "${this._config.entity}" not in hass.states; falling back to "${first}"`,
+        `[wiener-linien-austria-retro-card] configured entity "${configured}" not in hass.states; falling back to "${first}"`,
       );
     }
+    this._cachedEid = first;
     return first;
   }
 
@@ -375,6 +460,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     this._clearRaceTimers();
     this._startRace();
+  };
+
+  /** Keyboard equivalent of the tap handler — Enter or Space triggers
+   *  the same path. Without this, keyboard-only users can't dismiss
+   *  the marquee (WCAG 2.1.1) or start a race when wheelchair_race is
+   *  on, even though the click handler exists. */
+  private _handleCardKeydown = (e: KeyboardEvent): void => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault();
+    this._handleCardClick();
   };
 
   // ------------------------------------------------------------------
@@ -434,6 +529,42 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return Math.min(40, Math.max(8, 5 + text.length * 0.18));
   }
 
+  // ------------------------------------------------------------------
+  // Via / over alternation
+  // ------------------------------------------------------------------
+
+  /** Arm the via-tick interval only when at least one visible row
+   *  actually carries `via`. _viaPhase is in shouldUpdate's change-key
+   *  list, so an always-on tick would re-render every retro card on
+   *  every dashboard every VIA_TICK_MS — a non-trivial cost when
+   *  multiplied across the board. Re-evaluated on hass / config tick
+   *  via _evaluateViaTimer. */
+  private _armViaTimer(): void {
+    if (this._viaTimer !== null) return;
+    this._viaTimer = setInterval(() => {
+      this._viaPhase = this._viaPhase === "towards" ? "via" : "towards";
+    }, VIA_TICK_MS);
+  }
+
+  /** Arm or clear the via timer based on whether any visible row
+   *  currently carries via routing. Called on every render. */
+  private _evaluateViaTimer(rows: DepartureAttr[]): void {
+    const anyVia = rows.some((d) => !!d.via);
+    if (anyVia) {
+      this._armViaTimer();
+    } else if (this._viaTimer !== null) {
+      this._clearViaTimer();
+    }
+  }
+
+  private _clearViaTimer(): void {
+    if (this._viaTimer !== null) {
+      clearInterval(this._viaTimer);
+      this._viaTimer = null;
+    }
+    this._viaPhase = "towards";
+  }
+
   private _startRace(): void {
     if (!this._config?.wheelchair_race) return;
     // Respect `prefers-reduced-motion: reduce` at the scheduler level.
@@ -481,9 +612,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._scheduleCountdownTick();
   }
 
-  // Countdown ticker: walks the visible digit from 3 → 2 → 1 → race.
-  // Computes the digit from elapsed wall-clock time so a disconnect/
-  // reconnect mid-countdown lands on the correct digit instead of
+  // Digit derives from elapsed wall-clock time so a disconnect /
+  // reconnect mid-countdown resumes on the correct digit instead of
   // restarting from 3.
   private _scheduleCountdownTick(): void {
     if (this._raceState !== "countdown" || this._countdownStartAt === null) return;
@@ -505,11 +635,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._scheduleRaceTimer(() => this._scheduleCountdownTick(), wait);
   }
 
-  // Flips countdown → racing. Called from the countdown ticker once the
-  // total countdown duration has elapsed. The race-end / victory-end
-  // wall-clock targets were already computed in _startRace so this
-  // doesn't recompute them — guarantees the winner badge matches the
-  // animation that just played.
+  // Race-end / victory-end targets were computed once in _startRace
+  // and aren't recomputed here — guarantees the winner badge matches
+  // the animation that just played.
   private _beginRacing(): void {
     this._raceState = "racing";
     this._countdownDigit = null;
@@ -599,37 +727,55 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return { winnerCrossT: params.winnerCrossT };
   }
 
-  // Arms timers for whichever transition is pending next, based on the
-  // wall-clock target times stored in _raceEndAt / _victoryEndAt. Safe to
-  // call repeatedly — clears prior timers first.
+  // Safe to call repeatedly — clears prior timers first. Re-entered
+  // on every state advance and on reconnect-mid-race.
   private _armStateTransitions(): void {
     this._clearRaceTimers();
     const now = Date.now();
-    if (this._raceState === "countdown" && this._countdownStartAt !== null) {
-      // Reconnect-mid-countdown: resume ticking from wherever we left
-      // off. _scheduleCountdownTick computes the right digit and the
-      // right next-tick delay from elapsed wall-clock time.
-      this._scheduleCountdownTick();
-    } else if (this._raceState === "racing" && this._raceEndAt !== null) {
-      this._scheduleRaceTimer(() => {
-        this._raceState = "freeze";
-        this._raceEndAt = null;
-        this._armStateTransitions();
-      }, Math.max(0, this._raceEndAt - now));
-    } else if (this._raceState === "freeze" && this._freezeEndAt !== null) {
-      this._scheduleRaceTimer(() => {
-        this._raceState = "victory";
-        this._freezeEndAt = null;
-        this._armStateTransitions();
-      }, Math.max(0, this._freezeEndAt - now));
-    } else if (this._raceState === "victory" && this._victoryEndAt !== null) {
-      this._scheduleRaceTimer(() => {
-        this._raceState = "idle";
-        this._victoryEndAt = null;
-        if (this._config?.wheelchair_race) {
-          this._scheduleRace(this._nextRaceDelay());
+    // Switch + exhaustive `never` check so a future RaceState arm
+    // can't silently fall through with no timer armed.
+    switch (this._raceState) {
+      case "idle":
+        return;
+      case "countdown":
+        if (this._countdownStartAt !== null) {
+          // Reconnect-mid-countdown: resume from elapsed wall-clock.
+          this._scheduleCountdownTick();
         }
-      }, Math.max(0, this._victoryEndAt - now));
+        return;
+      case "racing":
+        if (this._raceEndAt !== null) {
+          this._scheduleRaceTimer(() => {
+            this._raceState = "freeze";
+            this._raceEndAt = null;
+            this._armStateTransitions();
+          }, Math.max(0, this._raceEndAt - now));
+        }
+        return;
+      case "freeze":
+        if (this._freezeEndAt !== null) {
+          this._scheduleRaceTimer(() => {
+            this._raceState = "victory";
+            this._freezeEndAt = null;
+            this._armStateTransitions();
+          }, Math.max(0, this._freezeEndAt - now));
+        }
+        return;
+      case "victory":
+        if (this._victoryEndAt !== null) {
+          this._scheduleRaceTimer(() => {
+            this._raceState = "idle";
+            this._victoryEndAt = null;
+            if (this._config?.wheelchair_race) {
+              this._scheduleRace(this._nextRaceDelay());
+            }
+          }, Math.max(0, this._victoryEndAt - now));
+        }
+        return;
+      default: {
+        const _exhaustive: never = this._raceState;
+        throw new Error(`unhandled race state: ${String(_exhaustive)}`);
+      }
     }
   }
 
@@ -673,7 +819,24 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
     const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
     const platform = cfg.show_platform ? rawPlatform : null;
-    const gleisLeft = platform === "2";
+    // Side resolution: explicit user override wins over the auto rule
+    // (platform "2" lands on the left, else right — the U-Bahn signage
+    // convention). "auto" preserves pre-feature behaviour; "left" /
+    // "right" let users mirror a real-station view that disagrees
+    // with the heuristic (e.g. a tram stop where the published platform
+    // is "1" but the user wants the GLEIS column on the left for
+    // consistency with the next card on their dashboard).
+    let gleisLeft: boolean;
+    switch (cfg.platform_side) {
+      case "left":
+        gleisLeft = true;
+        break;
+      case "right":
+        gleisLeft = false;
+        break;
+      default:
+        gleisLeft = platform === "2";
+    }
     const type = rows[0]?.type ?? "";
     const isMetro = type === LINE_TYPE_METRO;
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
@@ -695,15 +858,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // the per-side state in memory so toggling back on restores
     // exactly what the user had set.
     const stationHeader = cfg.show_header
-      ? this._renderStationHeader(cfg.header_left, cfg.header_right)
+      ? this._renderStationHeader(cfg.header_left, cfg.header_right, attrs.server_time)
       : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
     const raceActive = cfg.wheelchair_race && this._raceState === "racing";
     const raceFreeze = cfg.wheelchair_race && this._raceState === "freeze";
     const raceVictory = cfg.wheelchair_race && this._raceState === "victory";
-    const clickable = cfg.wheelchair_race && this._raceState === "idle";
-    const winnerLane = this._raceWinner === "A" ? 1 : this._raceWinner === "B" ? 2 : null;
+    // Card is interactive when it can accept a tap to start a race OR
+    // to dismiss the scrolling message — both paths are handled by
+    // _handleCardClick / _handleCardKeydown.
+    const clickable =
+      (cfg.wheelchair_race && this._raceState === "idle") || this._tickerActive;
+    const winnerLane: 1 | 2 | null =
+      this._raceWinner === "A" ? 1 : this._raceWinner === "B" ? 2 : null;
+    this._evaluateViaTimer(rows);
     const retroClasses = {
       retro: true,
       "retro--gleis-left": !!platform && gleisLeft,
@@ -717,18 +886,39 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       "retro--race-freeze": raceFreeze,
       "retro--race-victory": raceVictory,
       "retro--clickable": clickable,
+      "retro--line-pill": cfg.line_pill,
+      "retro--line-stripe": cfg.line_stripe,
+      "retro--housing": cfg.housing,
     };
 
+    // When the card is clickable, expose it as a button to assistive
+    // tech (role + label) AND make it reachable via keyboard (tabindex +
+    // keydown). Without the keyboard path, screen-reader / keyboard-only
+    // users have no way to dismiss the marquee (WCAG 2.2.2) or start a
+    // race — a WCAG 2.1.1 (Keyboard) + 4.1.2 (Name/Role/Value) fail.
+    const interactiveAttrs = clickable
+      ? {
+          role: "button",
+          tabindex: "0",
+          "aria-label": this._tickerActive
+            ? this._t("aria_dismiss_message")
+            : this._t("aria_start_race"),
+        }
+      : {};
     return html`
       <ha-card style="padding:0;overflow:hidden;">
         <div
           class=${classMap(retroClasses)}
-          @click=${this._handleCardClick}>
+          role=${interactiveAttrs.role ?? nothing}
+          tabindex=${interactiveAttrs.tabindex ?? nothing}
+          aria-label=${interactiveAttrs["aria-label"] ?? nothing}
+          @click=${this._handleCardClick}
+          @keydown=${clickable ? this._handleCardKeydown : nothing}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
-            ${this._renderMain(eid, rows, matching, departures, platform, platformLabel, attrs.server_time)}
+            ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time, attrs.line_colors ?? {})}
             ${this._tickerActive && cfg.message_text
               ? html`<div class="retro-ticker" role="status" aria-live="polite">
                   <div
@@ -781,11 +971,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderMain(
     eid: string | null,
     rows: DepartureAttr[],
-    matching: DepartureAttr[],
     allDepartures: DepartureAttr[],
     platform: string | null,
     platformLabel: string,
     serverTime: string | null | undefined,
+    lineColors: LineColorsMap,
   ): TemplateResult {
     if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
@@ -806,21 +996,48 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       }
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
     }
-    // Silence the noop-var warning until used.
-    void matching;
     return html`
       <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
-        ${rows.map((d, i) => this._renderRow(d, i))}
+        ${rows.map((d, i) => this._renderRow(d, i, lineColors))}
       </ul>
       ${platform ? this._renderGleis(platform, platformLabel) : nothing}
     `;
   }
 
-  private _renderRow(d: DepartureAttr, rowIndex = 0): TemplateResult {
+  /** Format an ISO timestamp as HH:MM in the user's locale. Returns
+   *  `null` on missing / unparseable input so the caller can omit the
+   *  rendering entirely instead of painting "NaN:NaN". Shared by the
+   *  optional left- and right-side header clock chips. */
+  private _formatClock(serverTime: string | null | undefined): string | null {
+    if (!serverTime) return null;
+    const ts = Date.parse(serverTime);
+    if (!Number.isFinite(ts)) return null;
+    const d = new Date(ts);
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+
+  /** Format an ISO timestamp as a PHP-style date string for the
+   *  optional header date chip. Returns `null` when server_time is
+   *  missing/unparseable or the format string is empty — caller
+   *  omits the chip rather than painting an obvious placeholder. */
+  private _formatDateChip(
+    serverTime: string | null | undefined,
+    format: string | undefined,
+  ): string | null {
+    if (!serverTime || !format) return null;
+    const ts = Date.parse(serverTime);
+    if (!Number.isFinite(ts)) return null;
+    return formatDate(new Date(ts), format, this.hass?.language);
+  }
+
+  private _renderRow(d: DepartureAttr, rowIndex: number, lineColors: LineColorsMap): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
     const line = d.line || "?";
     const towards = d.towards || "";
+    const via = typeof d.via === "string" && d.via.trim() ? d.via.trim() : null;
     const cdLabel =
       cd === null
         ? this._t("no_data")
@@ -828,12 +1045,63 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
     const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
-    const rowLabel = [line, towards, cdLabel, a11yLabel].filter(Boolean).join(" — ");
+    const viaA11y = via ? `${this._t("via_prefix")} ${via}` : "";
+    const rowLabel = [line, towards, viaA11y, cdLabel, a11yLabel].filter(Boolean).join(" — ");
+    // Resolve the line's WL palette through the same precedence ladder
+    // chips use elsewhere: GTFS routes.txt first, then the nightline
+    // override, then a CSS-var fallback that doesn't read well on the
+    // LED panel. Unknown lines fall back to amber for the stripe (so
+    // it still looks at home on the board) and to white text on amber-
+    // glow-substrate for the pill (the LED-amber gloss would dissolve
+    // the digit). The resolved palette feeds two opt-in Tweaks:
+    //   --retro-line-color — pill background AND stripe colour.
+    //   --retro-line-fg    — pill foreground.
+    // Both Tweaks default off; without them the line code renders as
+    // plain amber text and the row matches the pre-Tweak look.
+    const palette = chipPalette(line, {}, lineColors);
+    const hasResolvedColor = palette.background !== "var(--primary-color)";
+    const stripeColor = hasResolvedColor ? palette.background : "var(--led-amber)";
+    const pillFg = palette.color ?? (hasResolvedColor ? "#fff" : "var(--led-bg)");
+    const rowStyle = styleMap({
+      "--row-i": String(rowIndex),
+      "--retro-line-color": stripeColor,
+      "--retro-line-fg": pillFg,
+    });
+    // Cross-fade towards ↔ via: render BOTH spans absolutely positioned
+    // on top of each other, swap which one carries the visible-opacity
+    // class on _viaPhase ticks. The fallback span keeps the row sized
+    // (it sets the layout height) so the absolute pair don't collapse
+    // to zero. When there's no via, the absolute pair are omitted and
+    // the layout span carries the only label.
+    const showVia = !!via;
     return html`
-      <li class="retro-row" style=${`--row-i: ${rowIndex}`} aria-label=${rowLabel}>
-        <div class="retro-line" aria-hidden="true">${line}</div>
+      <li class="retro-row" style=${rowStyle} aria-label=${rowLabel}>
+        <div class="retro-line" aria-hidden="true">
+          <span class="retro-line__label">${line}</span>
+        </div>
         <div class="retro-dest" aria-hidden="true">
-          <span class="retro-dest-text">${deText(towards)}</span>
+          <span class="retro-dest-stack">
+            <span class="retro-dest-text retro-dest-text--layout">${deText(towards)}</span>
+            ${showVia
+              ? html`
+                  <span
+                    class=${classMap({
+                      "retro-dest-text": true,
+                      "retro-dest-text--absolute": true,
+                      "retro-dest-text--visible": this._viaPhase === "towards",
+                    })}
+                  >${deText(towards)}</span>
+                  <span
+                    class=${classMap({
+                      "retro-dest-text": true,
+                      "retro-dest-text--absolute": true,
+                      "retro-dest-text--via": true,
+                      "retro-dest-text--visible": this._viaPhase === "via",
+                    })}
+                  >${this._t("via_prefix")} ${deText(via)}</span>
+                `
+              : nothing}
+          </span>
           ${d.barrier_free
             ? html`<ha-icon
                 class="retro-wheelchair"
@@ -847,7 +1115,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
             ? "--"
             : isAtPlatform
               ? html`<span class="retro-stars"><span>*</span><span>*</span></span>`
-              : String(cd)}
+              : this._config?.show_unit
+                ? html`<span class="retro-cd-num">${cd}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`
+                : String(cd)}
         </div>
       </li>
     `;
@@ -882,15 +1152,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderStationHeader(
     left: RetroHeaderSide | undefined,
     right: RetroHeaderSide | undefined,
+    serverTime: string | null | undefined,
   ): TemplateResult | typeof nothing {
     if (!left && !right) return nothing;
     return html`
       <div class="retro-station-header" role="group">
         <div class="retro-station-header__side retro-station-header__side--left">
-          ${left ? this._renderHeaderSide(left, "left") : nothing}
+          ${left ? this._renderHeaderSide(left, "left", serverTime) : nothing}
         </div>
         <div class="retro-station-header__side retro-station-header__side--right">
-          ${right ? this._renderHeaderSide(right, "right") : nothing}
+          ${right ? this._renderHeaderSide(right, "right", serverTime) : nothing}
         </div>
       </div>
     `;
@@ -899,6 +1170,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _renderHeaderSide(
     side: RetroHeaderSide,
     pos: "left" | "right",
+    serverTime: string | null | undefined,
   ): TemplateResult {
     // Resolve the exit corner to a render node. Three paths:
     //   "regular" / "accessible" → WL traced SVG glyph (auto-flips
@@ -946,7 +1218,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
       renderRetroHeaderMdiTile(icon, icon),
     );
-    const mdiTilesLeftOrder = mdiTileNodes;
     const mdiTilesRightOrder = [...mdiTileNodes].reverse();
     // Text chips — same-height white boxes with dynamic width. Sit
     // beyond the MDI tiles (further from the sign text than any
@@ -957,18 +1228,47 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const chipNodes = (side.chips ?? []).map(
       (chipText) => html`<span class="retro-station-header__chip">${chipText}</span>`,
     );
-    const chipsLeftOrder = chipNodes;
     const chipsRightOrder = [...chipNodes].reverse();
+    // Optional clock + date chips — `show_clock` / `show_date` per
+    // side. Both sit beyond the chips at the innermost edge of their
+    // side (rightmost on `left`, leftmost on `right`). Order from
+    // outermost to innermost: chips → date → clock. So when a side
+    // enables both, the time is closest to the centre of the strip
+    // (the primary station-board info), with the supporting date
+    // one slot further out. Suppressed if server_time hasn't arrived
+    // yet (no "NaN:NaN" while the integration warms up) or if the
+    // user's format string evaluates empty.
+    const clockText = side.show_clock ? this._formatClock(serverTime) : null;
+    const clockNode = clockText
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">
+          <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
+          <span>${clockText}</span>
+        </span>`
+      : nothing;
+    const dateText = side.show_date
+      ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
+      : null;
+    // Date chip — text-only, no leading icon. The calendar glyph fought
+    // the chip's signage-label voice (it read more like a UI element
+    // than part of the sign); plain text matches the user-provided
+    // chips in the same lane. The clock chip keeps its icon because
+    // the icon there reads as the station-clock symbol, not a UI
+    // affordance.
+    const dateNode = dateText
+      ? html`<span class="retro-station-header__chip retro-station-header__chip--date">${dateText}</span>`
+      : nothing;
     // Canonical render order mirrors the original signage. Right side
     // mirrors the left: exit always at the outer edge of the card,
     // amenities ordered so the *same* glyph (elevator) is always
     // closest to the text on both sides — wheelchair-relevant info
     // gets the same visual prominence regardless of header side.
     // Mirror invariant for extra_icons + chips: index 0 of either
-    // array sits closest to the WC tile on both sides.
+    // array sits closest to the WC tile on both sides. Date and
+    // clock chips sit at the innermost edge: date one slot out,
+    // clock at the very edge so time stays closest to the centre.
     return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}`
-      : html`${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
+      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTileNodes}${chipNodes}${dateNode}${clockNode}`
+      : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
@@ -1031,11 +1331,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     `;
   }
 
-  // Banner is rendered via the shared `renderVersionBanner` helper —
-  // see shared-render.ts. Cache-wipe + reload also lives there.
-
   // ------------------------------------------------------------------
-  // Styles — ported verbatim from the vanilla RETRO_STYLE
+  // Styles
   // ------------------------------------------------------------------
 
   static override styles = css`
@@ -1071,11 +1368,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       display: flex;
       flex-direction: column;
       /* WL Mono is the subsetted TeX Gyre Cursor face shipped with
-         this integration — Courier-metric so the original Courier
-         New stack is a clean fallback during the woff2 fetch window
-         and on misconfigured installs. Bold-weight glyphs (line 894)
-         pick up the dedicated wl-mono-bold.woff2 variant rather than
-         relying on faux-bold synthesis. */
+         this integration — Courier-metric so the Courier New stack is
+         a clean fallback during the woff2 fetch window. The bold
+         variant ships separately so weight: 700 picks up real glyphs
+         instead of faux-bold synthesis. */
       font-family: "WL Mono", "Courier New", Courier, monospace;
       font-weight: 700;
       letter-spacing: 0.08em;
@@ -1152,8 +1448,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
       font-size: 1.9em;
       line-height: 1;
-      /* Was a <div>; now a <ul> for semantic departure list. Reset the
-         default user-agent list chrome so layout is unchanged. */
+      /* <ul> for semantic departure list — reset UA list chrome. */
       list-style: none;
       margin: 0;
       padding: 0;
@@ -1161,44 +1456,187 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       display: grid;
       grid-template-columns: 2.5em 1fr auto;
+      /* Baseline alignment — not center. Both grid cells render the
+         same uppercase WL Mono at the same font-size, so aligning by
+         alphabetic baseline makes the cap-tops line up automatically
+         (by construction, not by tuning). Center alignment used to
+         centre the cells' BOXES, but WL Mono's uppercase glyphs sit
+         in the upper-middle of their line-box — so identical boxes
+         centred geometrically still showed mismatched visible ink.
+         Baseline alignment retires both empirical translateY hacks
+         that used to live on the pill and its inner label. */
       align-items: baseline;
       gap: 12px;
       white-space: nowrap;
+      /* Position context for the line-stripe ::before Tweak and the
+         absolute via-cross-fade pair inside .retro-dest. */
+      position: relative;
     }
     .retro-line {
+      /* Default (no Tweak): plain amber text, left-aligned. The pill
+         layout below kicks in only under .retro--line-pill so the
+         pre-Tweak look is byte-identical. Center alignment matches
+         the row's align-items: center so the line cell vertically
+         lines up with the destination text and countdown digits. */
       font-weight: 400;
       text-align: left;
       transition: opacity 0.15s ease-out;
     }
+    /* Line-pill Tweak — render the line code inside a filled rounded
+       rectangle using --retro-line-color (resolved per row in JS).
+       Structural decisions (NOT empirical magic numbers — see below
+       for the history):
+       1. align-items: baseline (inherited from .retro-row). Pill text
+          shares its baseline with the destination text in the next
+          grid cell; same font + same size means cap-tops line up by
+          construction. No translateY needed.
+       2. NO fixed height. Pill grows from symmetric em padding
+          around its inner label, so the visual capsule is always
+          centred top-to-bottom on the text. Previous height: 1em
+          made the pill BOX drift relative to its visible glyph,
+          which every per-em translateY hack was empirically fighting.
+       3. NO transform optical-nudge. Earlier passes tried -0.05em,
+          0, +0.03em on the pill and -0.04em, 0, +0.08em on the
+          label; baseline alignment retires all of them.
+       Padding 0.08em block / 0.4em inline is the design spec; em
+       sizing lets medium / small variants inherit proportions
+       automatically. */
+    .retro--line-pill .retro-line {
+      display: inline-flex;
+      align-items: baseline;
+      justify-content: center;
+      box-sizing: border-box;
+      font-weight: 700;
+      text-align: center;
+      min-width: 2em;
+      padding: 0.08em 0.4em;
+      border-radius: 0.18em;
+      background: var(--retro-line-color, transparent);
+      color: var(--retro-line-fg, var(--led-amber));
+      text-shadow: none;
+      box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
+    }
+    .retro--line-pill .retro-line__label {
+      /* Kept as a render-time wrapper so the markup stays uniform
+         across pill and non-pill modes (the renderer always emits
+         the span — keying off it from --race-victory or future
+         tweaks stays cheap). inline-block makes the span a valid
+         transform target if a future tweak needs one; currently no
+         transform is applied because baseline alignment on the
+         grid row handles centring structurally. */
+      display: inline-block;
+    }
     .retro-dest {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 0.35em;
-      overflow: hidden;
+      /* No overflow: hidden on the flex container itself — the
+         destination-text stack carries its own overflow:hidden /
+         text-overflow:ellipsis, and clipping at this level would
+         shave the bottom off the wheelchair icon at the row's
+         right edge. Keeping overflow visible lets the icon render
+         in full while the text inside still ellipsises. */
       text-transform: uppercase;
       min-width: 0;
       transition: opacity 0.15s ease-out;
     }
+    /* Stack the towards / via labels on top of each other. The
+       --layout span occupies the row height (so the row never
+       collapses on cross-fade); the two --absolute spans sit on top
+       and swap visibility via --visible. Rows with no via payload
+       skip the absolute pair entirely and render only the layout span,
+       so existing dashboards are unaffected. */
+    .retro-dest-stack {
+      position: relative;
+      display: inline-block;
+      overflow: hidden;
+      flex: 0 1 auto;
+      min-width: 0;
+      max-width: 100%;
+    }
     .retro-dest-text {
       overflow: hidden;
       text-overflow: ellipsis;
-      flex: 0 1 auto;
+      white-space: nowrap;
       min-width: 0;
+      max-width: 100%;
+      display: block;
+    }
+    .retro-dest-text--layout {
+      /* Sized but invisible while via-cross-fade is mounted — the two
+         absolute siblings carry the painted text. A row without a via
+         payload omits the absolute pair, so the layout span stays
+         visible and renders the towards text directly. */
+      visibility: visible;
+    }
+    .retro-dest-stack:has(.retro-dest-text--absolute) .retro-dest-text--layout {
+      visibility: hidden;
+    }
+    .retro-dest-text--absolute {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity 0.4s ease-in-out;
+      will-change: opacity;
+    }
+    .retro-dest-text--visible {
+      opacity: 1;
     }
     .retro-wheelchair {
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;
-      --mdc-icon-size: 1em;
+      justify-content: center;
+      /* Sized slightly smaller than 1em so the icon sits comfortably
+         inside the row's line-height: 1 box with the row centred —
+         a full-em icon was clipping at the bottom under the previous
+         overflow:hidden + baseline-translate combo on smaller sizes. */
+      --mdc-icon-size: 0.9em;
+      width: 0.9em;
+      height: 0.9em;
       color: inherit;
       filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
-      transform: translateY(0.18em);
+      /* Optical-centre correction. WL Mono is a Courier-derived face
+         with a tall ascender / shallow descender, so uppercase glyphs
+         (SIMMERING) sit in the upper-middle of their line-box. An
+         icon centred in the line-box geometrically ends up visibly
+         above the cap-height of the text next to it. Nudging the
+         icon down ~0.12em lands its visual centre on the cap-height
+         centre of the adjacent SIMMERING glyphs. */
+      transform: translateY(0.12em);
     }
     .retro-cd {
       font-variant-numeric: tabular-nums;
       text-align: right;
       min-width: 2.5em;
       transition: opacity 0.4s ease-out;
+      display: inline-flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 0.25em;
+    }
+    .retro-cd-num {
+      /* Holds the tabular-nums alignment for the digit while letting
+         the unit sit at a smaller size next to it without throwing off
+         the right-edge alignment of the column. */
+      display: inline-block;
+    }
+    .retro-cd-unit {
+      /* Small amber-caps unit ("min") trailing the countdown number.
+         Tied to em so it tracks the row's font-size token. Hidden at
+         narrow widths via a container query below — the row prefers
+         to surrender the unit over the destination text when room is
+         tight. The text-shadow inherited from .retro-rows is already
+         the right glow, so no overrides here. */
+      display: inline-block;
+      font-size: 0.5em;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      opacity: 0.85;
+      transform: translateY(-0.05em);
+    }
+    @container (inline-size < 360px) {
+      .retro-cd-unit { display: none; }
     }
     .retro-stars {
       display: inline-flex;
@@ -1663,15 +2101,40 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       margin-left: 12px;
       color: var(--led-amber);
       text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
-      border-left: 1px solid rgb(var(--led-glow-rgb) / 0.25);
       transition: opacity 0.4s ease-out;
+      /* Position context for the dotted-divider pseudo. The previous
+         border-left: 1px hairline read as a CSS edge, not LED material.
+         A 2 px-wide column painted with the same substrate radial-
+         gradient as the panel renders the divider as missing pixels —
+         i.e. an unlit column on the dot-matrix. Pitch + dot size + dot
+         edge inherit from the same custom properties .retro-led uses
+         (4 px classic, 3 px warm / pixel) so the column always lines
+         up with the substrate behind it. */
+      position: relative;
+    }
+    .retro-gleis::before {
+      content: '';
+      position: absolute;
+      top: 8%;
+      bottom: 8%;
+      left: 0;
+      width: 2px;
+      background-image: radial-gradient(
+        circle,
+        rgb(var(--led-glow-rgb) / 0.55) var(--led-dot-size),
+        transparent var(--led-dot-edge)
+      );
+      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+      pointer-events: none;
     }
     .retro--gleis-left .retro-gleis {
       padding: 0 18px 0 14px;
       margin-left: 0;
       margin-right: 12px;
-      border-left: none;
-      border-right: 1px solid rgb(var(--led-glow-rgb) / 0.25);
+    }
+    .retro--gleis-left .retro-gleis::before {
+      left: auto;
+      right: 0;
     }
     .retro-gleis-label {
       font-size: 0.9em;
@@ -1901,18 +2364,21 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     .retro-station-header__monogram {
       /* WC tile content. Tile is already flex-centred, so the span
-         positions itself. font-size stays in rem (not em) so the
-         monogram is a stable 0.75rem regardless of the retro--size-*
-         token's em-scale on the parent header. font-family + weight
-         are declared explicitly (rather than relying on inheritance
-         from .retro-station-header) so a future header-rule rewrite
-         can't accidentally regress the W/C letterforms back to a
-         non-condensed face. */
+         positions itself. font-size is 0.9em — em-tied so it
+         scales with the parent header's em-scale (1em / 0.9em /
+         0.8em via retro--size-* tokens), shrunk ~10 % from the
+         original 1em so the W / C letterforms don't overpower the
+         surrounding amenity glyphs (the WL signage WC monogram
+         reads as a small, paired label, not a heavyweight chip).
+         font-family + weight are declared explicitly (rather than
+         relying on inheritance from .retro-station-header) so a
+         future header-rule rewrite can't accidentally regress the
+         letterforms back to a non-condensed face. */
       font-family: "WL Sans Condensed", "WL Sans", -apple-system,
                    BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
                    Arial, sans-serif;
       font-weight: 700;
-      font-size: 0.75rem;
+      font-size: 0.9em;
       line-height: 1;
     }
     .retro-station-header__chip {
@@ -2013,11 +2479,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       border-radius: 4px;
     }
 
-    /* First-paint stagger (frontend-design audit) — LED rows
-       cascade in like a real flip-board on mount. Each .retro-row
-       inlines its position via style="--row-i: N"; capped at 6 so
-       long boards don't take ages to settle. Pairs with the motion-
-       reduce catch-all below which collapses to instant. */
+    /* First-paint stagger — LED rows cascade in on mount via
+       per-row style="--row-i: N"; capped at 6 so long boards don't
+       take ages to settle. Collapsed to instant by the
+       prefers-reduced-motion catch-all below. */
     @keyframes retroRowReveal {
       from {
         opacity: 0;
@@ -2033,6 +2498,87 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-row {
       animation: retroRowReveal 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
       animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
+    }
+
+    /* Optional clock chip inside the station-header strip. Renders
+       as a base .retro-station-header__chip (white box, black text,
+       condensed WL signage face) with a small clock glyph in front
+       of the HH:MM digits. Inherits everything else from the chip
+       rule — no font / weight / spacing override here, so it sits
+       indistinguishably next to the other chips except for the
+       leading icon. */
+    .retro-station-header__chip--clock {
+      gap: 0.25em;
+    }
+    .retro-station-header__chip-icon {
+      /* MDI icon sized to the chip's cap height so it sits centred
+         next to the digits. ha-icon ships an inline SVG controlled
+         by --mdc-icon-size; pin it to 1em and let the chip's flex
+         centring handle vertical alignment. */
+      --mdc-icon-size: 1em;
+      display: inline-flex;
+      align-items: center;
+      color: inherit;
+      flex-shrink: 0;
+    }
+
+    /* Line-stripe Tweak — 4 px coloured bar at the left edge of each
+       row in the line's resolved colour with a faint matching glow.
+       --retro-line-color is the same var the line pill paints with, so
+       the stripe always matches the pill (one source of truth). */
+    .retro--line-stripe .retro-row {
+      padding-left: 10px;
+    }
+    .retro--line-stripe .retro-row::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 4px;
+      background: var(--retro-line-color, var(--led-amber));
+      filter: drop-shadow(0 0 4px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.45)));
+      pointer-events: none;
+      border-radius: 1px;
+    }
+
+    /* Housing Tweak — wrap the LED panel in an outer dark frame with
+       a soft inner highlight and a glass-reflection gradient over
+       the display. Defaults off; existing dashboards keep their
+       flush edge-to-edge look. */
+    .retro--housing {
+      padding: 6px;
+      background: #111;
+      border-radius: 10px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+    .retro--housing .retro-led {
+      border-radius: 6px;
+    }
+    /* Glass reflection — a 30 % top gradient sitting OVER the LED
+       content (z=2). 4 % white is subtle enough to not wash out the
+       row text but reads as a real reflection on a glossy bezel. */
+    .retro--housing .retro-led::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
+      pointer-events: none;
+      z-index: 2;
+      border-radius: inherit;
+    }
+    /* Housing-on station header and station name plate also pick up
+       the inner border-radius so the bezel corners look right. */
+    .retro--housing .retro-station-header {
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+    }
+    .retro--housing .retro-station:last-child,
+    .retro--housing .retro-station-header:last-child {
+      border-bottom-left-radius: 6px;
+      border-bottom-right-radius: 6px;
     }
 
     /* Accessibility: honour user motion preference.

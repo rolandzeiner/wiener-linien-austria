@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import random
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -12,6 +13,7 @@ import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
@@ -31,13 +33,9 @@ from .const import (
 )
 from .http import CacheValidators, base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-# `static` is loaded eagerly: `stops_ahead_for_match` runs in the
-# /monitor parser's hot loop (was the original reason this file pulled
-# `static` to module level), and once that's eager every other name we
-# read from `static` is already in `sys.modules` — there's no
-# import-time saving from keeping `async_get_catalogue` /
-# `CATALOGUE_KEY` / `StaticCatalogue` lazy, just lint-suppression
-# annotations to maintain on a hot integration-load path.
+# Eager import — `stops_ahead_for_match` runs in the /monitor parser's
+# hot loop, so the other names from `static` are already in sys.modules
+# anyway. No import-time saving from lazy imports here.
 from .static import (
     CATALOGUE_KEY,
     StaticCatalogue,
@@ -116,7 +114,18 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         """Initialise the coordinator."""
         config = {**entry.data, **entry.options}
         self._entry = entry
-        self._rbls: list[int] = [int(x) for x in config[CONF_RBLS]]
+        # Filter non-int RBLs before the empty-check below so corrupt
+        # entries (hand-edited storage, fork migration) hit
+        # ConfigEntryError with an actionable message rather than a
+        # generic KeyError / ValueError from __init__.
+        raw_rbls = config.get(CONF_RBLS) or []
+        self._rbls: list[int] = [
+            rbl for rbl in (_safe_int(x) for x in raw_rbls) if rbl is not None
+        ]
+        if not self._rbls:
+            raise ConfigEntryError(
+                f"Entry has no valid integer RBLs (received {raw_rbls!r})"
+            )
         self._selected_lines: set[str] | None = _normalise_lines(
             config.get(CONF_LINES)
         )
@@ -124,7 +133,23 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
-        self._diva: int = int(config[CONF_DIVA])
+        # Memoised `extra_state_attributes` payload — HA calls that
+        # property on every state read AND every attribute read, so a
+        # busy dashboard can hammer it 10+ Hz. The build path queries
+        # hass.data (alerts, line colours, catalogue) and re-parses
+        # CONF_LINES every time; caching collapses that to once per
+        # coordinator tick OR alerts refresh. Invalidated by:
+        #   • `_async_update_data` setting cache=None at the top, and
+        #   • sensor.py noticing `ALERTS_SEQ_KEY` advanced past
+        #     `_attrs_cache_alerts_seq`.
+        self._attrs_cache: dict[str, Any] | None = None
+        self._attrs_cache_alerts_seq: int | None = None
+        diva_int = _safe_int(config.get(CONF_DIVA))
+        if diva_int is None:
+            raise ConfigEntryError(
+                f"Entry has no valid DIVA (received {config.get(CONF_DIVA)!r})"
+            )
+        self._diva: int = diva_int
         self._latitude: float | None = None
         self._longitude: float | None = None
         # De-dupe stops_ahead matcher exceptions per line label so a
@@ -141,9 +166,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # cadence; self.update_interval is what HA actually reads, and we
         # bump it temporarily after consecutive UpdateFailed.
         self._consecutive_failures = 0
-        self._normal_interval = timedelta(
-            seconds=int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
-        )
+        scan_secs = _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_SCAN_INTERVAL
+        self._normal_interval = timedelta(seconds=scan_secs)
 
         super().__init__(
             hass,
@@ -254,6 +278,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
 
     async def _async_update_data(self) -> MonitorData:
         """Fetch departures and return a sorted MonitorData."""
+        # Drop the attrs cache before the fetch, not after — failures
+        # also produce a state change (CoordinatorEntity flips to
+        # unavailable per its own logic), and a stale cached attrs
+        # dict would survive that transition.
+        self._attrs_cache = None
+        self._attrs_cache_alerts_seq = None
         try:
             data = await self._fetch_monitor_data()
         except UpdateFailed:
@@ -393,7 +423,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             warned_lines=self._stops_ahead_warned_lines,
         )
 
-    def _current_catalogue(self) -> Any:
+    def _current_catalogue(self) -> StaticCatalogue | None:
         """Fetch the live catalogue ref from hass.data, or None.
 
         The catalogue may be a `StaticCatalogue` (resolved), an
@@ -424,6 +454,11 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         update interval doubles each time, capped at BACKOFF_CAP_SECONDS so
         a sustained outage settles into a slow poll instead of hammering
         the API every minute. The next successful tick resets it.
+
+        Jitter (±10 %) prevents thundering-herd retries when the API
+        recovers — without it, every entry across every HA instance
+        configured against this integration would line up on identical
+        backoff intervals.
         """
         self._consecutive_failures += 1
         if self._consecutive_failures < 2:
@@ -433,9 +468,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             normal_secs * (2 ** (self._consecutive_failures - 1)),
             BACKOFF_CAP_SECONDS,
         )
-        new_interval = timedelta(seconds=backoff_secs)
-        if self.update_interval != new_interval:
-            self.update_interval = new_interval
+        jittered = backoff_secs * random.uniform(0.9, 1.1)
+        self.update_interval = timedelta(seconds=jittered)
 
 
 def _normalise_lines(raw: Any) -> set[str] | None:
@@ -455,7 +489,7 @@ def _parse_monitor_body(
     selected: set[str] | None,
     server_time: str | None,
     *,
-    catalogue: Any = None,
+    catalogue: StaticCatalogue | None = None,
     entry_rbls: list[int] | None = None,
     warned_lines: set[str] | None = None,
 ) -> MonitorData:
@@ -472,9 +506,11 @@ def _parse_monitor_body(
     """
     departures: list[Departure] = []
     monitors = (body.get("data") or {}).get("monitors") or []
-    # Resolve once per parse — cheap, but no point doing it per row.
-    _trip_patterns_loaded = (
-        catalogue is not None and getattr(catalogue, "trip_patterns", None) is not None
+    # Narrow `catalogue` once for the loop below — mypy carries the
+    # narrowing across the closure boundary if we hand it through a
+    # local alias that's either the catalogue or None.
+    pattern_catalogue: StaticCatalogue | None = (
+        catalogue if catalogue is not None and catalogue.trip_patterns is not None else None
     )
 
     # Match the user's selection on (line, direction) only — `line.towards`
@@ -482,21 +518,14 @@ def _parse_monitor_body(
     # "Alaudagasse" depending on which vehicle is next), so a strict triple
     # match would intermittently drop the whole line block. Each departure
     # keeps its own `vehicle.towards` so the actual destination is preserved.
-    selected_pairs: set[tuple[str, str]] | None
-    if selected is None:
-        selected_pairs = None
-    else:
-        # Each key is `line|direction` (post-v2-migration shape). Build the
-        # pair set explicitly so mypy can narrow to `tuple[str, str]` —
-        # using `tuple(k.split("|", 2)[:2])` produced a `tuple[str, ...]`
-        # that needed a `# type: ignore[misc]` to land in the typed set.
-        # Malformed keys (no pipe) are dropped silently — they could never
-        # match `(line_name, direction)` anyway.
-        selected_pairs = set()
-        for k in selected:
-            parts = k.split("|", 2)
-            if len(parts) >= 2:
-                selected_pairs.add((parts[0], parts[1]))
+    # Malformed keys (no pipe) are dropped silently — they could never
+    # match `(line_name, direction)` anyway. The walrus binds the split
+    # once per key so the comp can both length-check and index it.
+    selected_pairs: set[tuple[str, str]] | None = (
+        None
+        if selected is None
+        else {(parts[0], parts[1]) for k in selected if len((parts := k.split("|", 2))) >= 2}
+    )
 
     for monitor in monitors:
         for line in (monitor.get("lines") or []):
@@ -509,12 +538,7 @@ def _parse_monitor_body(
             barrier_free = bool(line.get("barrierFree"))
             realtime = bool(line.get("realtimeSupported"))
             traffic_jam = bool(line.get("trafficjam"))
-            platform_raw = line.get("platform")
-            platform = (
-                str(platform_raw).strip()
-                if platform_raw is not None and str(platform_raw).strip()
-                else None
-            )
+            platform = str(line.get("platform") or "").strip() or None
 
             if selected_pairs is not None and (line_name, direction) not in selected_pairs:
                 continue
@@ -528,10 +552,10 @@ def _parse_monitor_body(
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
                 resolved_towards = vehicle_towards or line_towards
                 stops_ahead: list[dict[str, Any]] | None = None
-                if _trip_patterns_loaded and entry_rbls:
+                if pattern_catalogue is not None and entry_rbls:
                     try:
                         stops_ahead = stops_ahead_for_match(
-                            catalogue,
+                            pattern_catalogue,
                             line_name,
                             entry_rbls,
                             resolved_towards,

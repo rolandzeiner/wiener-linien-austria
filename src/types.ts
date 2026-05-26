@@ -178,6 +178,12 @@ export interface DepartureAttr {
   barrier_free?: boolean;
   traffic_jam?: boolean;
   platform?: string | null;
+  // Via / over routing — when present, the retro card alternates the
+  // destination text with `ÜBER {via}` / `VIA {via}` every few seconds.
+  // Absent on every departure today; reserved for a future sensor
+  // extension so the renderer is forward-compatible without a schema
+  // change later.
+  via?: string | null;
   // Optional per-departure list of upcoming stops on this trip. Absent
   // (or empty) means "no panel" — the row renders without a chevron.
   stops_ahead?: StopAheadAttr[];
@@ -307,6 +313,12 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 export type RetroSize = "small" | "medium" | "regular";
 export type RetroStationBg = "default" | "white" | "black";
 export type RetroStyle = "classic" | "warm" | "pixel";
+/** Side the GLEIS / STEIG column appears on. `"auto"` is the
+ *  pre-feature default — platform "2" lands on the left, everything
+ *  else on the right (the U-Bahn signage convention). `"left"` /
+ *  `"right"` are explicit overrides for users who want their card to
+ *  mirror a real station view that disagrees with the heuristic. */
+export type RetroPlatformSide = "auto" | "left" | "right";
 
 /** Exit-icon variant for one side of the station header strip.
  *  Either `"none"` (suppresses the icon), one of the two WL-traced
@@ -336,6 +348,23 @@ export interface RetroHeaderSide {
   show_wc?: boolean | undefined;
   show_escalator?: boolean | undefined;
   show_elevator?: boolean | undefined;
+  /** Render the current server_time as a white HH:MM pill in this
+   *  side's chip lane. The pill always sits at the innermost edge
+   *  of its side (rightmost on `header_left`, leftmost on
+   *  `header_right`), so the two clocks meet in the centre of the
+   *  strip when both sides enable it. Off by default. */
+  show_clock?: boolean | undefined;
+  /** Render the current date as a white pill in this side's chip
+   *  lane, formatted with `date_format`. Sits one slot outside the
+   *  clock chip on the same side, so time stays innermost. Off by
+   *  default. */
+  show_date?: boolean | undefined;
+  /** PHP-style date format string used by `show_date`. Supported
+   *  tokens: d j (day), m n (month), Y y (year), D l (weekday),
+   *  M F (month name), H G h g (hour), i (minute), s (second).
+   *  Backslash escapes a literal character. Default `"d.m.Y"`.
+   *  Bounded to 32 chars at normalisation. */
+  date_format?: string | undefined;
   /** Optional sequence of short text chips rendered as white
    *  boxes after the WC tile (further from the sign text than
    *  any amenity icon). Useful for short labels like platform
@@ -365,6 +394,7 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   direction?: "H" | "R" | undefined;
   line?: string | undefined;
   show_platform?: boolean | undefined;
+  platform_side?: RetroPlatformSide | undefined;
   show_station_name?: boolean | undefined;
   station_bg?: RetroStationBg | undefined;
   size?: RetroSize | undefined;
@@ -390,4 +420,134 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Tweak — render the line code as a filled rounded pill in the
+   *  line's resolved colour (GTFS routes.txt → nightline rule →
+   *  amber fallback) with a soft outer glow. Off by default; the LED
+   *  panel's canonical voice is monochrome amber. */
+  line_pill?: boolean | undefined;
+  /** Tweak — paint a 4 px vertical bar at each row's left edge in the
+   *  line's resolved colour with a faint matching glow. Off by default
+   *  so pre-feature retro cards stay byte-identical. */
+  line_stripe?: boolean | undefined;
+  /** Tweak — wrap the LED panel in an outer dark bezel with a soft
+   *  inner highlight and a subtle glass-reflection gradient over the
+   *  display. Off by default; existing dashboards keep the flush
+   *  edge-to-edge look. */
+  housing?: boolean | undefined;
+  /** Tweak — trail each countdown number with a small amber-caps
+   *  unit ("min" / "min"). Off by default; the LED board's canonical
+   *  voice is digits only. */
+  show_unit?: boolean | undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Flap card config — the warm-cream Solari split-flap board card.
+// A separate card type (not a retro-card theme); each visible character
+// renders as its own mechanical flap tile and only changed positions
+// animate.
+// ---------------------------------------------------------------------------
+
+export type FlapSize = "small" | "medium" | "regular";
+
+/** Station-name band background.
+ *  - `"line"`     — sentinel: use the first tracked line's GTFS colour
+ *                   at render time (e.g. U1 → red, U3 → orange).
+ *  - `"line:U1"`  — explicit per-line colour, picked from the editor's
+ *                   per-line dropdown when the user wants a specific
+ *                   line's tint on a multi-line board.
+ *  - `"white"`    — solid white.
+ *  - `"black"`    — solid black.
+ *  String-template form keeps the union open without compile-time
+ *  enumeration of every Wiener Linien line; the normaliser validates
+ *  the prefix and the renderer falls back to WL-orange if the named
+ *  line isn't in the live `line_colors` map. */
+export type FlapStationBg = "line" | "white" | "black" | `line:${string}`;
+
+/** Per-stop config inside `WienerLinienFlapCardConfig.entities`.
+ *  Same grammar as the modern card's `ModernStopConfig`: an entity
+ *  plus optional filters that scope the merged departure feed.
+ *  `direction` `""` (or undefined) keeps both directions. */
+export interface FlapStopConfig {
+  entity: string;
+  lines?: string[];
+  direction?: "H" | "R" | "";
+  /** Per-line direction override. Absence of an entry for a given
+   *  line means the stop-wide `direction` applies. */
+  line_directions?: Record<string, "H" | "R">;
+  walk_times?: WalkTimes;
+}
+
+export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
+  type: string;
+  /** Multi-stop array. Each entry is either a bare sensor entity id
+   *  (string) or a full `FlapStopConfig` object. Mirrors the
+   *  modern card so a flap card can show departures from up to 8
+   *  stops on one board, sorted by countdown across the whole
+   *  feed. */
+  entities?: Array<FlapStopConfig | string> | undefined;
+  /** v1.5.x back-compat: single-entity legacy shape — promoted into
+   *  `entities[0]` inside the normaliser. Both shapes round-trip;
+   *  only `entities` survives the normalise pass. */
+  entity?: string | undefined;
+  direction?: "H" | "R" | "" | undefined;
+  line?: string | undefined;
+  lines?: string[] | undefined;
+  size?: FlapSize | undefined;
+  /** Number of departure rows rendered. Clamped to 1..8. Default 2. */
+  max_rows?: number | undefined;
+  /** Render a per-row GLEIS / STEIG platform tile in its own column,
+   *  immediately before the countdown. Each row carries its OWN
+   *  platform value (multi-stop boards can mix platforms from
+   *  different stops). Fixed position, no side configuration —
+   *  per-row platforms remove the "global column jumps when the
+   *  first row's platform changes" problem the old side-toggle was
+   *  there to work around. */
+  show_platform?: boolean | undefined;
+  /** Show the WL-orange station-name band. Mirrors the retro card's
+   *  field of the same name. Default `true`. */
+  show_station_name?: boolean | undefined;
+  /** Background colour for the station-name band. Defaults to the
+   *  first tracked line's GTFS colour (sentinel `"line"`); user can
+   *  pick a specific line (`"line:U3"`), `"white"`, or `"black"`. */
+  station_bg?: FlapStationBg | undefined;
+  /** @deprecated Renamed to `show_station_name` to match retro card.
+   *  Accepted by the normaliser for back-compat (existing configs
+   *  using the old key keep working); new configs should use
+   *  `show_station_name`. */
+  show_station_header?: boolean | undefined;
+  /** Show a small "min" caption after each countdown number. */
+  show_min_unit?: boolean | undefined;
+  /** Show the wheelchair pictogram tile when a departure is step-free. */
+  show_accessibility?: boolean | undefined;
+  /** Filter to step-free departures only. */
+  accessibility_only?: boolean | undefined;
+  walk_times?: WalkTimes | undefined;
+  /** Master toggle for the U-Bahn-style signage strip ABOVE the
+   *  orange station-name band. Black band with exit icons, amenity
+   *  tiles, chips, clock + date — visually identical to the retro
+   *  card's strip but recoloured with the flap card's cream
+   *  palette so chips read as flap-pocket material, not as bright
+   *  white. Defaults to `false`; per-side configs are preserved
+   *  when toggled, so flipping it back on restores everything. */
+  show_header?: boolean | undefined;
+  header_left?: RetroHeaderSide | undefined;
+  header_right?: RetroHeaderSide | undefined;
+  /** Hide the CC-BY data-source attribution footer. Default `false`
+   *  (footer visible) — mirrors the modern card's `hide_attribution`
+   *  and complies with the Wiener Linien OGD licence requirement
+   *  unless the user explicitly opts out. */
+  hide_attribution?: boolean | undefined;
+  /** Tweak — hide the line column entirely. Useful for single-line
+   *  setups where the line is implicit (e.g. a card scoped to one
+   *  metro line via per-stop `lines` filter). Default `false`. The
+   *  name mirrors the retro card's `line_pill` toggle by convention,
+   *  even though the flap-card effect is different (column hide vs
+   *  pill render); both are presentation tweaks on the line slot. */
+  line_pill?: boolean | undefined;
+  /** Tweak — wrap the board in the cream-cabinet housing (bevel +
+   *  drop shadow). Default `true` (preserves the original flap-card
+   *  look). When `false`, the board sits flush against the dashboard
+   *  with no surround — matches the retro card's `housing` semantics
+   *  (off = flush, on = bezel). */
+  housing?: boolean | undefined;
 }

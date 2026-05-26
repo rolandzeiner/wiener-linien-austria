@@ -5,7 +5,7 @@ reference-counted teardown. The card-registration internals moved to
 `tests/test_card_registration.py` after the JSModuleRegistration extraction.
 This file fills in:
 
-- Both WebSocket `card_version` handlers
+- All three WebSocket `card_version` handlers (modern + retro + flap)
 - The HOMEASSISTANT_STARTED-deferred frontend registration
 - async_migrate_entry placeholder
 - async_unload_entry's "platform unload failed" early return
@@ -19,6 +19,7 @@ from homeassistant.core import CoreState, HomeAssistant
 
 from custom_components.wiener_linien_austria import (
     _websocket_card_version,
+    _websocket_flap_card_version,
     _websocket_retro_card_version,
     async_migrate_entry,
     async_setup,
@@ -27,6 +28,7 @@ from custom_components.wiener_linien_austria import (
 from custom_components.wiener_linien_austria.const import (
     CARD_VERSION,
     DOMAIN,
+    FLAP_CARD_VERSION,
     RETRO_CARD_VERSION,
 )
 
@@ -58,6 +60,15 @@ async def test_websocket_retro_card_version(hass: HomeAssistant) -> None:
         hass, conn, {"id": 18, "type": "x"}
     )
     conn.send_result.assert_called_once_with(18, {"version": RETRO_CARD_VERSION})
+
+
+async def test_websocket_flap_card_version(hass: HomeAssistant) -> None:
+    """The undecorated handler returns the flap card version."""
+    conn = _make_connection()
+    await _websocket_flap_card_version.__wrapped__(
+        hass, conn, {"id": 19, "type": "x"}
+    )
+    conn.send_result.assert_called_once_with(19, {"version": FLAP_CARD_VERSION})
 
 
 # ---------------------------------------------------------------------------

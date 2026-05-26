@@ -7,18 +7,16 @@
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 [![Live demo](https://img.shields.io/badge/live-demo-2196F3.svg)](https://demo.rolandzeiner.at/#wien)
 
-Home Assistant integration for Vienna public transport departures. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data) — no API key, no YAML editing, no manual RBL lookups.
-
-Type a stop name, pick it from a list, choose which lines to track. Done.
+Vienna public transport departures for Home Assistant. Type a stop name, pick the lines you care about — done. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data): no API key, no YAML, no RBL lookups.
 
 ## Supported Functions
 
-- Real-time departures for any Wiener Linien stop (U-Bahn, Straßenbahn, Autobus, Nightline). One sensor per configured stop; state is the next-departure countdown, attributes carry the full board (see [Sensor Attributes](#sensor-attributes)).
-- Multi-step config flow (search → pick stop → pick lines) with a live `/monitor` probe so you only see lines actually serving the stop.
-- Reconfigure flow to add/remove lines without losing the entry; options flow to change the polling interval.
-- **Service disruption alerts** (`trafficInfoList`) and **elevator outage alerts** (`Aufzugsinfo`) filtered to your tracked lines and stop RBLs — surfaced as `traffic_info` / `elevator_info` sensor attributes and rendered inline by both bundled cards.
-- **Stops-ahead trail** *(1.4.0)* — every departure on the modern card (hero block and row list) can be expanded into a metro-style trail that shows every upcoming stop on that exact trip down to the terminus. The trail renders a vertical line in the operating line's brand colour with a dot per stop, marks the terminus with a hollow ring, and surfaces transfer-line chips at every station — U-Bahn always inline, tram/bus folded behind a `+N` toggle. Nightline (N-prefix) chips get promoted to the always-inline tier during night service hours (~23:55–05:15) so you can see them at a glance when they're actually running. Panels persist across polls (keyed by scheduled time) so opening a row stays open as the countdown ticks. Sourced from the static `fahrwegverlaeufe.csv` + `linien.csv` (CC BY 4.0) and joined against the existing stop catalogue.
-- **Two bundled Lovelace cards** — modern full-feature board + retro LED-display style.
+- **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; state is the next-departure countdown, attributes carry the full board.
+- **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap. See [Lovelace Cards](#lovelace-cards).
+- **Service + elevator alerts** filtered to your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` attributes and rendered inline by every card.
+- **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail showing every upcoming stop on that trip with transfer-line chips.
+- **Multi-step setup** — search → pick stop → pick lines. The picker merges the live `/monitor` window with the static schedule catalogue, so day-only and nightline services both stay selectable regardless of when you configure.
+- **Reconfigure** to add or remove lines without losing the entry; **Configure** to change the polling interval.
 
 ## Screenshots
 
@@ -27,13 +25,15 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
     <td align="center" valign="top">
       <img src="screenshots/card-2.webp" width="264" alt="Lovelace card (retro LED)" />
       <br/>
+      <img src="screenshots/card-3.webp" width="264" alt="Lovelace card (flap board)" />
+      <br/>
       <img src="screenshots/card.webp" height="320" alt="Lovelace card (modern)" />
     </td>
     <td align="center"><img src="screenshots/card-config.webp" height="320" alt="Card editor" /></td>
     <td align="center"><img src="screenshots/config-flow.webp" height="320" alt="Config flow" /></td>
   </tr>
   <tr>
-    <td align="center"><em>Lovelace cards (Retro · Modern)</em></td>
+    <td align="center"><em>Lovelace cards (Retro · Flap · Modern)</em></td>
     <td align="center"><em>Card editor</em></td>
     <td align="center"><em>Config flow</em></td>
   </tr>
@@ -41,121 +41,134 @@ Type a stop name, pick it from a list, choose which lines to track. Done.
 
 ## Requirements
 
-- Home Assistant **2025.1** or newer.
-- **No API key** needed — the Wiener Linien OGD service is key-free since 2019.
-- Outbound HTTPS access to `wienerlinien.at`.
+- Home Assistant **2025.1** or newer
+- Outbound HTTPS to `wienerlinien.at`
+- No API key (Wiener Linien OGD has been key-free since 2019)
 
 ## Installation
 
 ### HACS (recommended)
 
-1. HACS → **Integrations** → ⋯ → **Custom repositories**.
-2. Add `https://github.com/rolandzeiner/wiener-linien-austria` as type **Integration**.
-3. Search for "Wiener Linien Austria" and install.
-4. Restart Home Assistant.
+1. HACS → **Integrations** → ⋯ → **Custom repositories**
+2. Add `https://github.com/rolandzeiner/wiener-linien-austria`, category **Integration**
+3. Search for "Wiener Linien Austria" and install
+4. Restart Home Assistant
 
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=wiener-linien-austria&category=integration)
 
 ### Manual
 
-1. Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_components/`.
-2. Restart Home Assistant.
+Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_components/` and restart.
 
 ## Setup
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=wiener_linien_austria)
 
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
-2. Type part of a stop name (e.g. `Stephans`) and submit.
+2. Type part of a stop name (e.g. `Stephans`) and submit. Search is case-insensitive; umlauts matter.
 3. Pick the matching stop from the dropdown.
-4. The integration lists every line that serves that stop — live `/monitor` rows are merged with the static schedule catalogue, so off-service lines (nightlines during the day, day-only lines after midnight) stay selectable. Pick the one or two you want to track — busy stops list 20+ lines.
-5. Set a polling interval (default 60 s, min 30 s, max 600 s) and save.
+4. Pick the lines to track. Off-service lines (nightlines during the day, day-only lines after midnight) stay selectable — the picker merges live `/monitor` data with the static catalogue.
+5. Set a polling interval (default 60 s, range 30–600 s) and save.
 
-Change tracked lines later via **Reconfigure**; change polling interval via **Configure** (options).
+Tracked lines change via **Reconfigure**; polling interval via **Configure**.
 
 ## Lovelace Cards
 
-Two custom cards ship with the integration. Both register themselves as Lovelace resources automatically and discover Wiener Linien sensors by attribute fingerprint (no entity-name prefix required). Hard-refresh the browser (⌘⇧R / Ctrl⇧R) after upgrading to pick up new JS.
+Three cards ship with the integration. All three auto-register as Lovelace resources, discover Wiener Linien sensors by attribute fingerprint (no entity-name prefix required), and version independently with a WebSocket handshake — a reload banner appears if your browser is on stale JS. Hard-refresh (⌘⇧R / Ctrl⇧R) after upgrading.
 
-Each card is served under a versioned URL (`/wiener-linien-austria/*-card.js?v=X.Y.Z`). A WebSocket version check warns users with a reload banner if old JS is cached. The two cards version independently.
+| Card | Best for | Stops | Style |
+|---|---|---|---|
+| **Modern** | Everyday dashboard, full feature set | Multi-stop | Themed HA card |
+| **Retro** | Wall-tablet kiosks, entryway displays | Single stop / direction | Wiener Linien LED platform sign |
+| **Flap** | Decorative boards, signage walls | Multi-stop | Solari split-flap mechanical board |
 
 ### Modern card — `wiener-linien-austria-card`
 
-The everyday departure board. Dashboard → Add card → "Wiener Linien Austria" (under *Custom*).
+The everyday departure board. Themed to your HA palette; each stop auto-tints to its next-departure line colour.
 
-Visual editor covers:
-- **Stops** — multi-select chip picker. For each stop, a second row lists only the **lines you tracked in the integration's config flow** (independent of whether they're driving right now — a nightline tracked at 12:30 still appears), direction (H / R / both, also per-line for mixed routing like "U1 toward city, U3 toward home"), and per-line **walking time** in minutes (departures leaving before you can reach the platform are hidden; inclusive, so you can run for the last minute).
-- **Line colours** — pill swatch picker. Defaults come live from the GTFS `routes.txt` palette the integration ships as a sensor attribute; per-line overrides are stored on the card config.
-- **Display** — multi-stop layout (*stacked* or *tabs*), departures-per-stop slider (0–20), and toggles for hero countdown, departure list, stops-ahead trail, QR map button, platform pill, step-free icon, accessibility-only filter, vehicle-type icon, disruption banner, elevator badge, delay text, header, and "hide attribution" (the sensor attribute keeps the CC-BY string regardless).
+- **Multi-stop layout** — stacked or tabbed; up to 20 departures per stop.
+- **Hero countdown** — next departure rendered large, full board beneath.
+- **Stops-ahead trail** — click any row to expand a metro-map trail down to the terminus, with transfer chips at each station.
+- **Per-line walking time** — hides departures you can't reach in time.
+- **QR map button** — encodes the stop as a `geo:` URI for phone scanners.
+- **Disruption + elevator banners** — collapsible rows above the board.
 
-Each station section auto-tints to the next-departure's line colour and picks an icon for that vehicle type. Departure rows show a colour-coded line badge, destination + optional inline delay ("3 Minuten verspätet" when `time_real` lags `time_planned` by ≥ 1 min), optional traffic-jam and step-free icons, and a countdown cell (`N min` or `jetzt`). Stop titles link to the official Vienna city map (`stadtplan.wien.gv.at`) pinned by `latitude` / `longitude`, with an OpenStreetMap fallback when no coordinates are available; an optional QR button next to the map link encodes a `geo:` URI so phone scanners hand off to the user's default maps app (Apple Maps / Organic Maps / OsmAnd / …). Empty boards render "Betriebsschluss" / "End of service".
-
-**Stops-ahead trail.** Departures with a known schedule pattern grow a chevron; click the row (or the hero block) to expand a metro-map-style trail beneath: a vertical 2 px line in the operating line's brand colour, a filled dot per stop, a hollow ring at the terminus, and the station name in a row-per-stop list. Each station carries inline chips for U-Bahn lines that pass through it (always visible); tram, bus, and night transfers fold behind a small `+N` toggle on the right (per-stop expanded state, click to reveal). Nightline chips get promoted to the always-inline tier between ~23:55 and ~05:15 so they're visible when actual service is running; outside that window they stay in `+N`. Nightline chips default to WL signage colours (`#1b1464` background, `#fef200` text). Panels survive realtime polls because they're keyed by the departure's scheduled time, not the live countdown.
-
-Disruption and elevator entries render as collapsible rows above the stop list — always-visible summary, click to expand details + timestamps.
+Add via Dashboard → **Add card** → "Wiener Linien Austria".
 
 ### Retro card — `wiener-linien-austria-retro-card`
 
-A focused single-stop, single-direction LED-display card mimicking real Wiener Linien platform signs. Dashboard → Add card → "Wiener Linien Austria Retro".
+A focused LED panel, modelled on the amber-on-violet signs hanging from Wiener Linien platforms. The station-name tile picks up the configured line's colour (nightline blue + yellow on N-lines).
 
-- Next 2 departures for one direction; amber glyphs in **WL Mono** — a subsetted TeX Gyre Cursor face bundled with the integration (no external font fetch, GDPR-clean). Three style variants: *classic* (amber-on-violet), *warm* (deeper amber on warm-brown substrate), and *pixel* (screen-door overlay turning every glyph into discrete LED dots).
-- Amber **GLEIS** / **STEIG** panel when the API reports a platform — left-aligned for Gleis "2", right-aligned otherwise, mirroring the real signs.
-- Optional **station header strip** *(1.5.0)* — a black band above the station name, modelled on real Wiener Linien U-Bahn signage. Off by default; turn on the **Show station header** toggle in the editor to enable. **Per side:** exit icon (regular or step-free WL arrow, or one of four MDI alternatives — running person, door + arrow, open door, stairs), optional sign text (e.g. the next station's name), toggleable WC / escalator / elevator amenity tiles, up to 3 free-form MDI icons (any `mdi:*` — type to search HA's full catalogue), and up to 6 short text labels. Rendered in the bundled **WL Sans Condensed** face; exit arrows auto-flip per side so they always point outward. Hand-traced SVGs for the WL signage glyphs, `<ha-icon>` for MDI variants — no external icon fetch.
-- Wheelchair glyph after destinations on step-free departures; alternating asterisks blink in place of the countdown when a train is at the platform (`countdown ≤ 0`).
-- "Betriebsschluss" / "End of service" rendering when the board is empty; differentiated empty-state hints for wrong direction or filtered-out lines.
-- Three size variants (small / medium / regular). Defaults to a full 12-column row in HA section view.
-- Editor: stop picker, H/R direction toggle (auto-corrects to the only-tracked direction when the stop is one-way OR when only one direction is tracked), single-line picker drawn from the **lines you tracked in the integration's config flow** (off-service nightlines appear regardless of time-of-day), station-name panel + background picker, optional station header strip (master toggle + per-side exit-icon variant, sign text, amenity toggles, free-form MDI icons, and text labels), size picker (small / medium / regular), style picker (classic / warm / pixel), flicker toggle, scrolling-message toggle + text, accessibility-only filter, show-platform toggle, and per-line walking-time inputs.
-- Station-name tile colour: when `Background = default`, the tile picks up the **configured line's** Wiener-Linien-published palette (nightline-blue + bright yellow for N-prefix lines via the signage rule, GTFS palette otherwise). The configured line wins over live departures, so a nightline-configured retro card renders in nightline-blue at noon instead of falling back to white.
-- Optional **wheelchair race** (toggle in editor) — when ≥ 2 upcoming departures are barrier-free, runs a "3, 2, 1" pre-race countdown and a finish overlay with a trophy badge for the winning lane. Tap the card while idle to trigger one immediately. Gated by `prefers-reduced-motion`.
-- Optional **scrolling message** *(1.5.0)* — a custom line of text that scrolls across the LED panel once every 5 minutes, then hands the board back to the live departures. Off by default; turn on the **Scrolling message** toggle in the editor and a text field appears (up to 160 characters). Tap the card to skip a scroll in progress; gated by `prefers-reduced-motion`. The scrolling message and the wheelchair race take turns — the two LED takeovers never overlap.
+- **Three style variants** — *classic*, *warm*, *pixel* (screen-door overlay).
+- **GLEIS / STEIG panel** — amber platform tile when the API reports one.
+- **Signage header strip** — exit icon, sign text, WC / escalator / elevator tiles, free-form MDI icons, short labels. Per side.
+- **Wheelchair race** — when ≥ 2 departures are step-free, runs a "3, 2, 1" countdown to the trophy finish. Tap to trigger.
+- **Scrolling message** — custom text scrolls every 5 min, then hands back to live departures.
 
-Designed for wall-tablet kiosks, entryway displays, and anyone who wants their HA dashboard to feel like an actual station board.
+Add via Dashboard → **Add card** → "Wiener Linien Austria — Retro".
+
+### Flap card — `wiener-linien-austria-flap-card`
+
+A Solari split-flap board — characters cascade one tile at a time toward the target letter, mimicking the rattle of the mechanical originals from European stations.
+
+- **Multi-stop merge** — up to 8 stops, sorted by countdown across the whole board.
+- **Column headers** — *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT* above the board.
+- **Per-row GLEIS / STEIG tile** — own column, aligned across all rows.
+- **Station-name band** — auto-tints to the first tracked line's colour; editor dropdown lists each tracked line plus *White* and *Black*.
+- **Signage header strip** — same grammar as the retro card, recoloured for the cabinet palette.
+- **Compact mode** — hide the line column (single-line boards) or drop the cabinet for a flush mount.
+
+Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
 ## Sensor Attributes
 
 Every `sensor.{stop}_abfahrten` entity carries:
 
-| Attribute | Type | Example / notes |
+| Attribute | Type | Notes |
 |---|---|---|
-| `state` (native value) | int \| None | Countdown of the next overall departure, in minutes. `None` at end of service. |
-| `attribution` | string | `"Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"` — always present. |
+| `state` (native value) | int \| None | Next-departure countdown in minutes. `None` at end of service. |
+| `attribution` | string | `Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0` |
 | `diva` | int | Station identifier (e.g. `60201012` for Stephansplatz). |
 | `stop_name` | string | Human-readable station name. |
 | `latitude` / `longitude` | float \| None | Station coordinates from the static catalogue. |
-| `server_time` | ISO string \| None | Wiener Linien `serverTime` from the last successful fetch. |
-| `departures` | list[dict] | Capped at 20 entries, sorted by countdown. Each dict: `line`, `towards`, `direction` ("H"/"R"), `type` (`ptMetro`/`ptTram`/`ptBusCity`/`ptBusNight`), `countdown`, `time_planned` (ISO), `time_real` (ISO), `realtime` (bool), `barrier_free` (bool), `traffic_jam` (bool), `platform` (string, e.g. `"1"`), and (when the static schedule index has resolved a matching trip) `stops_ahead`: an ordered `[{name, is_terminus?, lines?}]` list of upcoming stops on that exact trip down to the terminus. `lines` carries the OTHER lines that pass through each stop, used by the card to render transfer chips. |
-| `next_by_line` | dict[str, int] | Per-line map to the earliest countdown. E.g. `{"U1": 2, "U4": 6}`. |
-| `lines_at_stop` | list[str] | Every line serving this DIVA per the static Wiener-Linien schedule, regardless of whether it has a live departure right now. Empty until the trip-pattern catalogue has loaded. Used by the card editors to populate line pickers without depending on the live `/monitor` window. |
-| `tracked_lines` | list[str] | Sorted unique line labels tracked in this entry (derived from `CONF_LINES`). Card editors filter their pickers to this set so users only see lines they opted into. |
-| `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys from `CONF_LINES`. Used by the retro card editor to filter the line dropdown by the selected direction without losing off-service lines. |
-| `traffic_info` | list[dict] | Service disruptions matching the tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
+| `server_time` | ISO string \| None | `serverTime` from the last successful fetch. |
+| `departures` | list[dict] | See [Departure shape](#departure-shape) below. Capped at 20 entries, sorted by countdown. |
+| `next_by_line` | dict[str, int] | Per-line map to the earliest countdown — e.g. `{"U1": 2, "U4": 6}`. |
+| `lines_at_stop` | list[str] | Every line serving this DIVA per the static schedule, regardless of live status. Populated once the trip-pattern catalogue has loaded. |
+| `tracked_lines` | list[str] | Lines tracked in this entry. Card editors filter their pickers to this set. |
+| `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys used by the retro card editor to filter by direction. |
+| `traffic_info` | list[dict] | Service disruptions matching tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
-The 20-departure cap keeps busy multi-line stops under HA's 16 KB recorder attribute limit even when each row carries the full `stops_ahead` trail. The card's `max_departures` slider also tops out at 20, so nothing displayed is ever clipped.
+The 20-departure cap keeps busy multi-line stops under HA's 16 KB recorder attribute limit even when each row carries the full `stops_ahead` trail. The card's `max_departures` slider tops out at 20, so nothing displayed is clipped.
+
+### Departure shape
+
+Each entry in `departures` is a dict with: `line`, `towards`, `direction` (`"H"` / `"R"`), `type` (`ptMetro` / `ptTram` / `ptBusCity` / `ptBusNight`), `countdown`, `time_planned` (ISO), `time_real` (ISO), `realtime` (bool), `barrier_free` (bool), `traffic_jam` (bool), `platform` (e.g. `"1"`), and — when the static schedule resolves a matching trip — `stops_ahead`, an ordered list of `{name, is_terminus?, lines?}` down to the terminus. `lines` carries the *other* lines passing through each stop, used by the card to render transfer chips.
 
 ## Data Updates
 
-Four Wiener Linien OGD endpoints, on different cadences:
+Four OGD endpoints, on different cadences:
 
 | What | Endpoint | Cadence |
 |---|---|---|
-| Live departures per stop | `/monitor?stopId=…` | Per-entry, default 60 s (min 30 s, max 600 s) |
+| Live departures per stop | `/monitor?stopId=…` | Per-entry, default 60 s (30–600 s) |
 | Traffic + elevator alerts | `/trafficInfoList` (×2) | Domain-wide, 5 min — shared across all entries |
 | Static stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 
-All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — both well below the conventional 15-second minimum interval circulated for the OGD real-time endpoint. Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the previously-parsed payload, halving steady-state bandwidth without changing freshness. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
+All outbound calls share a **15 s domain-wide cooldown** plus a 30 s per-entry floor — at or above the conventional 15-second minimum interval circulated for the OGD real-time endpoint (Wiener Linien doesn't publish a numeric rate cap, so the 15 s figure is convention rather than written rule). Every request sends `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`) so unchanged ticks return `304 Not Modified` and reuse the cached payload, halving steady-state bandwidth. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
-> **First five minutes after a Home Assistant restart**: the alerts feeds (`traffic_info` / `elevator_info`) refresh on a domain-wide 5-minute cadence, so they may be empty for up to 5 min after startup before the first refresh lands. Departures are unaffected — they fetch immediately on the per-entry cadence.
+> **After a Home Assistant restart**: the alert feeds (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min before the first refresh lands. Departures fetch immediately on the per-entry cadence.
 
-**Failure handling.** A single failed poll keeps the user-configured cadence and serves the last successful board (templates can detect staleness via `server_time`). From the second consecutive failure, the interval doubles each tick, capped at 30 minutes, until the next successful fetch resets it. If the API responds with error code 316 (rate limit), a Repairs issue is raised and cleared automatically when the API recovers. Only a never-successful integration stays unavailable.
+**Failure handling.** A single failed poll keeps the user-configured cadence and serves the last successful board (templates can detect staleness via `server_time`). From the second consecutive failure, the interval doubles each tick, capped at 30 min, until a successful fetch resets it. If the API responds with rate-limit error 316, a Repairs issue is raised and cleared automatically when the API recovers. Only a never-successful integration stays unavailable.
 
 ## Use Cases
 
-- **Leave-now notifications** — "if the next U1 towards Leopoldau is < 3 min, notify me".
-- **Dashboard departure board** — bundled card or your own attribute-driven card shows the upcoming departures per stop.
-- **Automations triggered by specific lines** — e.g. turn on the entrance light when the tram arrives.
-- **Travel time comparison** — track two stops (home + alternate) and let a template sensor pick whichever has the sooner departure.
+- **Leave-now notifications** — "if the next U1 toward Leopoldau is under 3 min, notify me".
+- **Dashboard departure board** — one of the bundled cards, or your own attribute-driven card.
+- **Line-triggered automations** — turn on the entrance light when the tram is approaching.
+- **Travel-time comparison** — track two stops and pick whichever has the sooner departure.
 
 ## Automation Examples
 
@@ -193,13 +206,13 @@ template:
 
 ## Troubleshooting
 
-**"Cannot reach the Wiener Linien real-time API" during setup.** The integration probes `/monitor` with the chosen station's RBLs before saving. If the probe fails, either the API is temporarily down or outbound HTTPS from your HA host is blocked. Retry after a minute.
+**"Cannot reach the Wiener Linien real-time API" during setup.** The integration probes `/monitor` with the chosen stop's RBLs before saving. The API is temporarily down or outbound HTTPS from your HA host is blocked. Retry in a minute.
 
-**"No stops match this search".** Try shorter/partial names (e.g. `Karls` matches Karlsplatz, Karlskirche, …). Search is case-insensitive but umlauts matter.
+**"No stops match this search".** Try shorter or partial names (`Karls` matches Karlsplatz, Karlskirche, …). Case-insensitive; umlauts matter.
 
-**A Repairs issue "Wiener Linien rate limit hit" appeared.** The default 60 s interval is well above the conventional 15-second minimum interval circulated for the OGD endpoint, so this typically only happens when many HA instances behind the same outbound IP saturate the shared allowance. Raise the scan interval, reduce concurrent entries, or ignore — the integration recovers automatically.
+**Repairs issue "Wiener Linien rate limit hit".** Usually means many HA instances behind the same outbound IP share the OGD allowance. Raise the scan interval, reduce concurrent entries, or ignore — the integration recovers automatically.
 
-**Bug reports.** Settings → Devices & Services → Wiener Linien Austria → ⋯ → Download diagnostics. The JSON includes attribution, RBL list, last error code, and coordinator timing. No personal data.
+**Bug reports.** Settings → Devices & Services → Wiener Linien Austria → ⋯ → **Download diagnostics**. The JSON includes attribution, RBL list, last error code, and coordinator timing. No personal data.
 
 **Debug logs:**
 
@@ -213,33 +226,33 @@ logger:
 
 ## Known Limitations
 
-- **Vienna only.** ÖBB / VOR / regional services are out of scope.
-- **No journey planning.** The OGD monitor endpoint returns departures at a stop; routing is not provided.
+- **Vienna only.** ÖBB, VOR, and regional services are out of scope.
+- **No journey planning.** The OGD monitor returns departures at a stop; routing is not provided.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
-- **Stops-ahead is best effort.** Short-turn services may show the full scheduled path (the short-turn pattern often isn't published as its own variant). Replacement-bus services (SEV) and unscheduled detours produce no panel — the row stays as today, no chevron.
+- **Stops-ahead is best-effort.** Short-turn services may show the full scheduled path. Replacement bus (SEV) and unscheduled detours produce no panel — the row stays as today, no chevron.
+
+## Removal
+
+1. **Settings → Devices & Services** → Wiener Linien Austria → ⋯ → **Delete**.
+2. Remove `custom_components/wiener_linien_austria/` from HA config (manual installs only; HACS handles it).
 
 ## Attribution
 
-All live data is © Wiener Linien and published under the [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license. The integration emits this attribution on every sensor (`attribution` attribute) and in every diagnostics download:
+All live data is © Wiener Linien and published under the [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) license. The integration surfaces this on every sensor (`attribution` attribute) and in every diagnostics download:
 
 > Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0
 
 If you build a Lovelace card or other user-facing UI on top of this integration, please keep the attribution visible.
 
-## Removal
-
-1. **Settings → Devices & Services** → find Wiener Linien Austria → ⋯ → **Delete**.
-2. Remove `custom_components/wiener_linien_austria/` from the HA config (manual installs only; HACS removes it automatically).
-
 ## License
 
 MIT — see [LICENSE](LICENSE). Integration code is MIT; the Wiener Linien data flowing through it is CC BY 4.0.
 
-**Bundled webfonts** (`custom_components/wiener_linien_austria/www/fonts/`) — `WL Sans`, `WL Sans Condensed`, and `WL Mono` are subsetted derivatives of the [TeX Gyre](https://www.gust.org.pl/projects/e-foundry/tex-gyre) family (Heros / Heros Cn / Cursor) by Bogusław Jackowski and Janusz M. Nowacki on behalf of GUST. The fonts ship under the [GUST Font License](custom_components/wiener_linien_austria/www/fonts/GUST-FONT-LICENSE.txt) (LPPL 1.3c+) and were renamed per the GFL's request that derivatives use new names. See [`www/fonts/NOTICE.md`](custom_components/wiener_linien_austria/www/fonts/NOTICE.md) for provenance, the exact subset (Latin + German diacritics + a handful of typographic glyphs), and reproduction steps.
+**Bundled webfonts** (`custom_components/wiener_linien_austria/www/fonts/`) — `WL Sans`, `WL Sans Condensed`, and `WL Mono` are subsetted derivatives of the [TeX Gyre](https://www.gust.org.pl/projects/e-foundry/tex-gyre) family (Heros / Heros Cn / Cursor) by Bogusław Jackowski and Janusz M. Nowacki on behalf of GUST. The fonts ship under the [GUST Font License](custom_components/wiener_linien_austria/www/fonts/GUST-FONT-LICENSE.txt) (LPPL 1.3c+) and were renamed per the GFL's request that derivatives use new names. See [`www/fonts/NOTICE.md`](custom_components/wiener_linien_austria/www/fonts/NOTICE.md) for provenance, the exact subset, and reproduction steps.
 
 ## Disclaimer
 
-This integration is not affiliated with or endorsed by Wiener Linien GmbH & Co KG. All departure and stop data is provided by the [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data) and published under the Creative Commons Attribution (CC BY 4.0) license. The developer assumes no liability for the accuracy, completeness, or timeliness of the displayed departures, including delays, cancellations, or disruptions. Use at your own risk.
+This integration is not affiliated with or endorsed by Wiener Linien GmbH & Co KG. All departure and stop data is provided by the [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data) under the Creative Commons Attribution (CC BY 4.0) license. The developer assumes no liability for the accuracy, completeness, or timeliness of the displayed departures, including delays, cancellations, or disruptions. Use at your own risk.
 
 ---
 

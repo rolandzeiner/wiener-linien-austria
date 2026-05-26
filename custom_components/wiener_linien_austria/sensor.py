@@ -12,8 +12,9 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .alerts import get_alerts_for
+from .alerts import get_alerts_for, line_names_from_keys
 from .const import (
+    ALERTS_SEQ_KEY,
     ATTRIBUTION,
     CONF_DIVA,
     CONF_LINES,
@@ -108,6 +109,21 @@ class WienerLinienStopSensor(
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the departure board + grouped views + matched alerts."""
+        # HA calls this property on every state read AND every attribute
+        # read — a busy dashboard easily hits double-digit Hz. The cache
+        # below collapses repeat builds to one per coordinator tick OR
+        # alerts refresh; see WienerLinienAustriaCoordinator._attrs_cache
+        # for invalidation rules.
+        hass = self.hass if self.hass is not None else self.coordinator.hass
+        domain_data = hass.data.get(DOMAIN, {})
+        current_alerts_seq = int(domain_data.get(ALERTS_SEQ_KEY, 0))
+        cached = self.coordinator._attrs_cache
+        if (
+            cached is not None
+            and self.coordinator._attrs_cache_alerts_seq == current_alerts_seq
+        ):
+            return cached
+
         config = {**self._entry.data, **self._entry.options}
         diva = int(config[CONF_DIVA])
         stop_name = str(config.get(CONF_STOP_NAME, self._entry.title))
@@ -130,20 +146,16 @@ class WienerLinienStopSensor(
         # selection, stable even when no departures are flowing right now.
         # Fall back to live departures for the "all lines" case.
         selected_line_keys = config.get(CONF_LINES) or []
-        line_names: set[str] = {
-            k.split("|", 1)[0]
-            for k in selected_line_keys
-            if isinstance(k, str) and k
-        }
+        line_names = line_names_from_keys(selected_line_keys)
         if not line_names:
             line_names = {d.line for d in departures if d.line}
         rbls = {int(r) for r in config.get(CONF_RBLS) or []}
 
-        # Prefer `self.hass` (the standard Entity reference, set by HA
-        # during `async_added_to_hass`); fall back to the coordinator's
-        # ref so tests that read `extra_state_attributes` without
-        # routing through HA core still resolve.
-        hass = self.hass if self.hass is not None else self.coordinator.hass
+        # `hass` was resolved above the cache check — same reasoning:
+        # prefer `self.hass` (set by HA during `async_added_to_hass`)
+        # and fall back to the coordinator's ref so tests that read
+        # `extra_state_attributes` without routing through HA core
+        # still resolve.
         traffic, elevator = get_alerts_for(hass, line_names, rbls)
 
         # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
@@ -186,7 +198,7 @@ class WienerLinienStopSensor(
         # `attribution` lives on the entity class via `_attr_attribution`
         # (HA core renders it in the same dict) — don't duplicate here, that
         # would just add bytes to every recorder write at busy stops.
-        return {
+        attrs: dict[str, Any] = {
             "diva": diva,
             "stop_name": stop_name,
             "latitude": self.coordinator.latitude,
@@ -201,6 +213,9 @@ class WienerLinienStopSensor(
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
         }
+        self.coordinator._attrs_cache = attrs
+        self.coordinator._attrs_cache_alerts_seq = current_alerts_seq
+        return attrs
 
     def _lines_at_stop(self, diva: int) -> list[str]:
         """Static-catalogue line list for this DIVA.

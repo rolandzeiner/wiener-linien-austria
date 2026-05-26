@@ -29,10 +29,11 @@
 
 import { LitElement, html, nothing, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { live } from "lit/directives/live.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
-import { resolveEditorHelper, resolveEditorLabel } from "./editor-shared.js";
+import { resolveEditorHelper, resolveEditorLabel, swallowEditorKeys } from "./editor-shared.js";
 import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -65,7 +66,7 @@ import mdiIconNames from "./mdi-icon-names.json";
  *  itself — the chip-input renders the label, the bound value is
  *  the string we save. */
 const MDI_ICON_OPTIONS: ReadonlyArray<{ value: string; label: string }> =
-  mdiIconNames.map((name: string) => ({ value: name, label: name }));
+  mdiIconNames.map((name) => ({ value: name, label: name }));
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor
@@ -97,6 +98,17 @@ export class WienerLinienAustriaRetroCardEditor
     const eid = this._config.entity;
     if (!eid) return true;
     return prev.states[eid] !== this.hass.states[eid];
+  }
+
+  protected override willUpdate(changed: PropertyValues): void {
+    // Direction-autocorrect is a derive-and-correct step, not render
+    // output: it can dispatch `config-changed`, and Lit requires
+    // `render()` to be side-effect-free. `willUpdate` is the documented
+    // home for derive-from-state logic — the actual config write is
+    // still deferred via `Promise.resolve()` inside the method.
+    if (changed.has("_config") || changed.has("hass")) {
+      this._scheduleDirectionAutocorrect();
+    }
   }
 
   /** Translate `key` against the active HA language for retro-card UI strings. */
@@ -169,8 +181,10 @@ export class WienerLinienAustriaRetroCardEditor
    *  finishes configuring the retro card. Falls back to live departures
    *  for older sensor caches; empty result lets the schema show both
    *  options as a last resort. */
-  private _availableDirections(): Set<"H" | "R"> {
-    const attrs = this._attrs(this._config?.entity);
+  private _availableDirections(
+    entity: string | undefined = this._config?.entity,
+  ): Set<"H" | "R"> {
+    const attrs = this._attrs(entity);
     const out = new Set<"H" | "R">();
     if (attrs?.tracked_line_keys?.length) {
       for (const key of attrs.tracked_line_keys) {
@@ -183,6 +197,23 @@ export class WienerLinienAustriaRetroCardEditor
       if (d.direction === "H" || d.direction === "R") out.add(d.direction);
     }
     return out;
+  }
+
+  /** Shared options list for both sides' "Exit icon" dropdown.
+   *  Built once so the two sides can never drift, and so new MDI
+   *  options added to `RETRO_HEADER_MDI_EXIT_KEYS` flow into the
+   *  editor automatically. */
+  private _exitOptions(): ReadonlyArray<{ value: string; label: string }> {
+    const base: { value: string; label: string }[] = [
+      { value: "none", label: this._et("header_exit_none") },
+      { value: "regular", label: this._et("header_exit_regular") },
+      { value: "accessible", label: this._et("header_exit_accessible") },
+    ];
+    const mdi = RETRO_HEADER_MDI_EXIT_KEYS.map((key) => ({
+      value: key,
+      label: this._et(RETRO_HEADER_MDI_EXITS[key].labelKey),
+    }));
+    return [...base, ...mdi];
   }
 
   /** Build the ha-form schema. Called per render so option labels
@@ -202,23 +233,6 @@ export class WienerLinienAustriaRetroCardEditor
    *      render) flips the saved value to the available one. When the
    *      stop has no data yet, both options stay visible.
    */
-  /** Shared options list for both sides' "Exit icon" dropdown.
-   *  Built once so the two sides can never drift, and so new MDI
-   *  options added to `RETRO_HEADER_MDI_EXIT_KEYS` flow into the
-   *  editor automatically. */
-  private _exitOptions(): ReadonlyArray<{ value: string; label: string }> {
-    const base: { value: string; label: string }[] = [
-      { value: "none", label: this._et("header_exit_none") },
-      { value: "regular", label: this._et("header_exit_regular") },
-      { value: "accessible", label: this._et("header_exit_accessible") },
-    ];
-    const mdi = RETRO_HEADER_MDI_EXIT_KEYS.map((key) => ({
-      value: key,
-      label: this._et(RETRO_HEADER_MDI_EXITS[key].labelKey),
-    }));
-    return [...base, ...mdi];
-  }
-
   private _schema(): ReadonlyArray<HaFormSchema> {
     const liveLines = this._linesForCurrent();
     const savedLine = this._config?.line;
@@ -319,6 +333,14 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_wc", selector: { boolean: {} } },
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
+              { name: "show_clock", selector: { boolean: {} } },
+              { name: "show_date", selector: { boolean: {} } },
+              // date_format only renders when show_date is on, so a
+              // user disabling the chip doesn't have to look at a
+              // field they're not using.
+              ...(this._config?.header_left?.show_date
+                ? [{ name: "date_format", selector: { text: {} } }]
+                : []),
               // Free-form MDI icon list — chip-input pattern.
               // ha-form's `icon` selector exists and HA core uses it,
               // but ha-icon-picker (its underlying UI) uses the
@@ -386,6 +408,11 @@ export class WienerLinienAustriaRetroCardEditor
               { name: "show_wc", selector: { boolean: {} } },
               { name: "show_escalator", selector: { boolean: {} } },
               { name: "show_elevator", selector: { boolean: {} } },
+              { name: "show_clock", selector: { boolean: {} } },
+              { name: "show_date", selector: { boolean: {} } },
+              ...(this._config?.header_right?.show_date
+                ? [{ name: "date_format", selector: { text: {} } }]
+                : []),
               // Free-form MDI icon list — chip-input pattern.
               // ha-form's `icon` selector exists and HA core uses it,
               // but ha-icon-picker (its underlying UI) uses the
@@ -473,6 +500,23 @@ export class WienerLinienAustriaRetroCardEditor
         flatten: true,
         schema: [
           { name: "show_platform", selector: { boolean: {} } },
+          {
+            // Three-option dropdown rather than radio-list — the
+            // option set is short but each option name ("Automatisch
+            // (1 = rechts, 2 = links)") is longer than the radio
+            // column comfortably accommodates without wrapping.
+            name: "platform_side",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "auto", label: this._et("platform_side_auto") },
+                  { value: "left", label: this._et("platform_side_left") },
+                  { value: "right", label: this._et("platform_side_right") },
+                ],
+              },
+            },
+          },
           { name: "accessibility_only", selector: { boolean: {} } },
           { name: "flicker", selector: { boolean: {} } },
           { name: "wheelchair_race", selector: { boolean: {} } },
@@ -527,6 +571,22 @@ export class WienerLinienAustriaRetroCardEditor
           },
         ],
       },
+      {
+        // Visual flourishes that change appearance only — no data
+        // behaviour, no schema changes for existing YAML. Each Tweak
+        // defaults to `false` in normaliseRetroConfig so pre-1.5.x
+        // cards render byte-identical until the user opts in.
+        type: "expandable",
+        name: "tweaks",
+        title: this._et("section_tweaks"),
+        flatten: true,
+        schema: [
+          { name: "show_unit", selector: { boolean: {} } },
+          { name: "line_pill", selector: { boolean: {} } },
+          { name: "line_stripe", selector: { boolean: {} } },
+          { name: "housing", selector: { boolean: {} } },
+        ],
+      },
     ];
   }
 
@@ -569,50 +629,64 @@ export class WienerLinienAustriaRetroCardEditor
       ...(value as Partial<WienerLinienRetroCardConfig>),
     });
     // Entity changed → the previous `line` is meaningless on the new
-    // stop. Drop it and auto-pick the first tracked line in the
-    // (possibly auto-corrected) direction. Tracked list survives off
-    // hours (a nightline configured for an N-prefix entity still picks
-    // the nightline at noon); falls back to the live-departure
-    // derivation when the cache predates `tracked_line_keys`.
+    // stop. Drop it and auto-pick the first tracked line. The carried-
+    // over `direction` may not exist at the new stop: if the new stop
+    // is one-way, snap `direction` to the served direction FIRST so the
+    // line is picked for a direction the stop actually has (and
+    // _scheduleDirectionAutocorrect then finds nothing to fix). Without
+    // this, the line is chosen for the about-to-be-corrected direction
+    // and ends up stranded on a direction the stop doesn't serve.
     if (next.entity !== prevEntity) {
+      const availNext = this._availableDirections(next.entity);
+      if (availNext.size === 1) {
+        next.direction = availNext.has("H") ? "H" : "R";
+      }
       const sorted = linesForDirection(this._attrs(next.entity), next.direction);
       next.line = sorted[0];
     }
-    // CRITICAL: set _config BEFORE fireEvent. Custom editors don't
-    // receive a re-setConfig after config-changed, so a fireEvent-only
-    // path leaves _config stale and the next render reverts the form
-    // to its pre-change value.
+    this._commit(next);
+  };
+
+  /** Commit a new config: assign `_config` BEFORE dispatching
+   *  `config-changed`. Custom-card editors do NOT receive a
+   *  re-`setConfig()` after the event, so a fireEvent-only path leaves
+   *  `_config` stale and the next render reverts the form to its
+   *  pre-change value. Centralised so the three write paths
+   *  (`_onFormChanged`, `_setWalkTime`, `_scheduleDirectionAutocorrect`)
+   *  can't drift on this invariant. */
+  private _commit(next: NormalisedRetroConfig): void {
     this._config = next;
     fireEvent(this, "config-changed", { config: next });
-  };
+  }
 
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
-    const n = parseInt(raw, 10);
-    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
+    const trimmed = raw.trim();
+    const n = trimmed === "" ? NaN : Number(trimmed);
+    // Distinguish "" (intentional clear) from typed garbage. Without
+    // the warning a typo like "5min" silently clears the value and the
+    // user has no signal that their input was rejected.
+    if (trimmed !== "" && !Number.isFinite(n)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria-retro-card-editor] walk-time "${raw}" for ${key} is not a number — clearing`,
+      );
+    }
+    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
     const cur = { ...(this._config.walk_times ?? {}) };
     if (clean === null) delete cur[key];
     else cur[key] = clean;
     const next: NormalisedRetroConfig = { ...this._config };
     if (Object.keys(cur).length) next.walk_times = cur;
     else delete next.walk_times;
-    this._config = next;
-    fireEvent(this, "config-changed", { config: next });
-  }
-
-  private _swallowKeys(ev: KeyboardEvent): void {
-    ev.stopPropagation();
+    this._commit(next);
   }
 
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
-    // After this render lands, swap the saved direction to whichever
-    // direction the stop actually has data for IF it's currently
-    // mismatched (e.g. user picked a one-way terminus stop while
-    // direction was set to "R" from a previous bidirectional stop).
-    // Deferred via Promise.resolve() so we never write to _config from
-    // inside render() (Lit warns; queues a redundant re-render).
-    this._scheduleDirectionAutocorrect();
+    // Direction-autocorrect runs in willUpdate(), not here — render()
+    // must stay side-effect-free (it can dispatch config-changed).
+    //
     // Entity disappeared from HA (integration removed, entity disabled,
     // typo in saved config) — surface an explicit alert so the user
     // knows why their walk-time table is empty. ha-form's entity
@@ -657,19 +731,39 @@ export class WienerLinienAustriaRetroCardEditor
     if (this._config.direction === onlyAvail) return;
     this._pendingDirectionFix = true;
     Promise.resolve().then(() => {
-      this._pendingDirectionFix = false;
-      if (!this._config) return;
-      // Re-check after the async hop — entity might have changed in
-      // the meantime; the new entity might have both directions again.
-      const stillAvail = this._availableDirections();
-      if (stillAvail.size !== 1) return;
-      const target = stillAvail.has("H") ? "H" : "R";
-      if (this._config.direction === target) return;
-      const next: NormalisedRetroConfig = { ...this._config, direction: target };
-      // CRITICAL: assign _config BEFORE fireEvent, same lifecycle rule
-      // as _onFormChanged — otherwise the next render reads stale data.
-      this._config = next;
-      fireEvent(this, "config-changed", { config: next });
+      try {
+        if (!this._config) return;
+        // Re-check after the async hop — entity might have changed in
+        // the meantime; the new entity might have both directions again.
+        const stillAvail = this._availableDirections();
+        if (stillAvail.size !== 1) return;
+        const target = stillAvail.has("H") ? "H" : "R";
+        if (this._config.direction === target) return;
+        const next: NormalisedRetroConfig = { ...this._config, direction: target };
+        // Direction flipped — re-pick `line` if the saved one doesn't run
+        // in the new direction (mirrors _onFormChanged so a one-way stop
+        // whose departures streamed in late ends up with a coherent line,
+        // not one stranded on the direction we just corrected away from).
+        const linesNow = linesForDirection(this._attrs(next.entity), target);
+        if (!next.line || !linesNow.includes(next.line)) {
+          next.line = linesNow[0];
+        }
+        // Surface the autocorrect — silently rewriting saved config is
+        // user-meaningful (their typed direction just changed). Console
+        // only, since the editor's auto-correct is by design; a future
+        // pass could replace this with a render-time hint.
+        // eslint-disable-next-line no-console
+        console.info(
+          `[wiener-linien-austria-retro-card-editor] direction autocorrected to "${target}" for entity "${next.entity ?? ""}" — only one direction has live data`,
+        );
+        this._commit(next);
+      } finally {
+        // Clear AFTER the work runs: if we cleared at the top, a rapid
+        // entity change between schedule and microtask would let a
+        // second autocorrect queue against the same render frame and
+        // double-fire when both microtasks resolved.
+        this._pendingDirectionFix = false;
+      }
     });
   }
 
@@ -718,10 +812,10 @@ export class WienerLinienAustriaRetroCardEditor
                       aria-label=${this._et("walk_time_aria")
                         .replace("{line}", p.line)
                         .replace("{towards}", terminusLabel)}
-                      .value=${val !== undefined ? String(val) : ""}
-                      @keydown=${this._swallowKeys}
-                      @keyup=${this._swallowKeys}
-                      @keypress=${this._swallowKeys}
+                      .value=${live(val !== undefined ? String(val) : "")}
+                      @keydown=${swallowEditorKeys}
+                      @keyup=${swallowEditorKeys}
+                      @keypress=${swallowEditorKeys}
                       @change=${(ev: Event) =>
                         this._setWalkTime(
                           key,

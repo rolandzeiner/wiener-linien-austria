@@ -26,6 +26,7 @@ from homeassistant.config_entries import (
 )
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     NumberSelector,
@@ -325,7 +326,15 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 return await self.async_step_user()
             try:
                 diva = int(diva_str) if diva_str is not None else None
-            except ValueError:
+            except ValueError as err:
+                # Selector should only ever feed us numeric strings — a
+                # non-numeric value here means the selector contract
+                # changed (HA upgrade) or someone hand-edited the flow
+                # state. DEBUG only since the user-visible behaviour
+                # (invalid_stop error) is already correct.
+                _LOGGER.debug(
+                    "Failed to parse diva %r: %s", diva_str, err
+                )
                 diva = None
             station = next(
                 (s for s in self._matches if s.diva == diva), None
@@ -389,12 +398,28 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._lines = await _resolve_lines_for_picker(
                     self.hass, catalogue, station
                 )
+                # Catalogue is healthy again — drop any prior Repairs
+                # issue from a previous failed attempt so the user's
+                # dashboard doesn't carry stale warnings forever.
+                ir.async_delete_issue(
+                    self.hass, DOMAIN, "catalogue_unavailable"
+                )
             else:
                 # Catalogue unavailable — fall back to the live-only
                 # path so the user can still proceed if the OGD data
                 # store is temporarily down. Picker will be missing
-                # any currently-out-of-service lines, but that's the
-                # pre-fix behaviour and better than blocking entirely.
+                # any currently-out-of-service lines (e.g. nightlines
+                # during the day), so surface a Repairs issue too —
+                # the warning log alone is invisible to anyone who
+                # isn't tailing the HA logs.
+                ir.async_create_issue(
+                    self.hass,
+                    DOMAIN,
+                    "catalogue_unavailable",
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key="catalogue_unavailable",
+                )
                 self._lines = await _probe_monitor_lines(
                     self.hass, station.rbls
                 )

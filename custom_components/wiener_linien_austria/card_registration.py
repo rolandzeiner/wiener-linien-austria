@@ -3,30 +3,20 @@
 Canonical pattern from the HA developer community guide:
 https://community.home-assistant.io/t/developer-guide-embedded-lovelace-card-in-a-home-assistant-integration/974909
 
-This integration ships TWO bundled cards (modern + retro). The
-``JSMODULES`` list below registers both via a single
-``JSModuleRegistration`` instance — adding a third card is just an
-append to the list.
+This integration ships three bundled cards (modern + retro + flap)
+registered via a single ``JSModuleRegistration`` instance — adding a
+fourth card is one row in ``JSMODULES`` below.
 
-Storage-vs-yaml detection — the LovelaceData field name varies across
-HA versions:
-
-  * HA ≤ 2026.1: ``LovelaceData.mode: str``
-  * HA ≥ 2026.2: ``LovelaceData.resource_mode: str``
-
-``_is_storage_mode`` reads whichever attribute is present, preferring
-``resource_mode``. Duck-typed by design so we don't have to track every
-micro-rename across HA versions. ``resources`` itself is a
-``ResourceYAMLCollection | ResourceStorageCollection`` union; the
-type-only import + ``cast`` below narrow it for storage-only mutation
-calls without a runtime dependency on the typed class existing on
-every HA version.
+``resources`` itself is a ``ResourceYAMLCollection |
+ResourceStorageCollection`` union; the type-only import + ``cast``
+below narrow it for storage-only mutation calls without a runtime
+dependency on the typed class existing on every HA version.
 """
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, cast
 
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.core import HomeAssistant
@@ -36,6 +26,9 @@ from .const import (
     CARD_FILENAME,
     CARD_URL,
     CARD_VERSION,
+    FLAP_CARD_FILENAME,
+    FLAP_CARD_URL,
+    FLAP_CARD_VERSION,
     FONTS_DIRNAME,
     FONTS_URL,
     RETRO_CARD_FILENAME,
@@ -71,12 +64,19 @@ _LOGGER = logging.getLogger(__name__)
 _LOVELACE_LOAD_RETRY_MAX = 60
 _LOVELACE_LOAD_RETRY_INTERVAL_S = 5
 
-# All cards registered by this integration. Each tuple is
-# (lovelace-served URL, version string, on-disk filename in www/).
-# Adding a third card = append a tuple.
-JSMODULES: tuple[tuple[str, str, str], ...] = (
-    (CARD_URL, CARD_VERSION, CARD_FILENAME),
-    (RETRO_CARD_URL, RETRO_CARD_VERSION, RETRO_CARD_FILENAME),
+class CardModule(NamedTuple):
+    """One bundled card — URL served by lovelace, version string, on-disk filename."""
+
+    url: str
+    version: str
+    filename: str
+
+
+# All cards registered by this integration. Adding a fourth card = append a row.
+JSMODULES: tuple[CardModule, ...] = (
+    CardModule(CARD_URL, CARD_VERSION, CARD_FILENAME),
+    CardModule(RETRO_CARD_URL, RETRO_CARD_VERSION, RETRO_CARD_FILENAME),
+    CardModule(FLAP_CARD_URL, FLAP_CARD_VERSION, FLAP_CARD_FILENAME),
 )
 
 
@@ -118,16 +118,16 @@ class JSModuleRegistration:
         The field was renamed across HA versions:
           - HA ≤ 2026.1: ``mode``
           - HA ≥ 2026.2: ``resource_mode``
-        Whichever is present, we read it; the other won't exist on
-        that HA version. See the module docstring for source links.
-        Returns False if neither attribute is set (fail closed).
+        Whichever is present we read; the other won't exist on that HA
+        version. Returns False if neither attribute equals "storage"
+        (fail closed — yaml mode means the user manages resources, we
+        must not write).
         """
         assert self.lovelace is not None
-        for attr in ("resource_mode", "mode"):
-            value = getattr(self.lovelace, attr, None)
-            if value is not None:
-                return bool(value == "storage")
-        return False
+        return any(
+            getattr(self.lovelace, attr, None) == "storage"
+            for attr in ("resource_mode", "mode")
+        )
 
     async def _async_register_paths(self) -> None:
         """Register the static HTTP paths that serve every card JS file."""

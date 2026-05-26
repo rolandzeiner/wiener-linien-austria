@@ -72,3 +72,11 @@ export function resolveEditorHelper(
   }
   return undefined;
 }
+
+/** HA's card-editor dialog steals arrow keys (and others) for its own
+ *  navigation. Number/text inputs in the bespoke editor sections must
+ *  stop propagation so the user can actually edit values. Shared so the
+ *  modern and retro editors bind one identical handler. */
+export function swallowEditorKeys(ev: KeyboardEvent): void {
+  ev.stopPropagation();
+}

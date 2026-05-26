@@ -6,21 +6,16 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .alerts import get_alerts_for
+from .alerts import get_alerts_for, line_names_from_keys
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
 from .coordinator import WienerLinienConfigEntry
 from .static import CATALOGUE_KEY, StaticCatalogue
 
-# No credentials to redact today (Wiener Linien OGD has no API key), and
-# RBL/DIVA values are public station identifiers, not PII. Coordinates
-# are not currently surfaced in the diagnostics output, but redact them
-# defensively: the user's *chosen* stop coords reveal location, so a
-# future field addition that exposes lat/lon would otherwise leak it
-# silently. The credential / header keys are defensive future-proofing —
-# diagnostics dumps end up in public GitHub issues, so over-redacting is
-# essentially free and protects against a future contributor adding a
-# generically-named credential or header-bag field without remembering to
-# update this set. Treat the set as monotonically growing — never shrink.
+# Treat as monotonically growing — never shrink. Diagnostics dumps end
+# up in public GitHub issues, so over-redacting is essentially free and
+# defends future generically-named credential / coord fields against a
+# silent leak. Today: no credentials, but coords leak the user's chosen
+# stop location; the credential keys are defensive future-proofing.
 TO_REDACT: set[str] = {
     "lat",
     "lon",
@@ -50,12 +45,7 @@ async def async_get_config_entry_diagnostics(
     data = coordinator.data
 
     config = {**entry.data, **entry.options}
-    selected_line_keys = config.get(CONF_LINES) or []
-    line_names: set[str] = {
-        k.split("|", 1)[0]
-        for k in selected_line_keys
-        if isinstance(k, str) and k
-    }
+    line_names = line_names_from_keys(config.get(CONF_LINES))
     rbls = {int(r) for r in config.get(CONF_RBLS) or []}
     traffic, elevator = get_alerts_for(hass, line_names, rbls)
 

@@ -24,6 +24,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ALERT_CACHE_VALIDATORS_KEY,
+    ALERTS_SEQ_KEY,
     API_BASE_URL,
     DOMAIN,
     ELEVATOR_INFO_KEY,
@@ -276,6 +277,12 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     elif ELEVATOR_INFO_KEY not in domain_data:
         domain_data[ELEVATOR_INFO_KEY] = []
 
+    # Bump even on the 304/no-change path: the sensor cache treats
+    # "alerts seq advanced" as "rebuild," and that's the cheapest signal
+    # we have. A spurious rebuild every ~5 min is fine; missing a real
+    # change for hours because the cache key didn't move is not.
+    domain_data[ALERTS_SEQ_KEY] = int(domain_data.get(ALERTS_SEQ_KEY, 0)) + 1
+
     _LOGGER.debug(
         "Alerts refreshed: %d traffic, %d elevator (traffic_304=%s, elevator_304=%s)",
         len(domain_data.get(TRAFFIC_INFO_KEY, [])),
@@ -296,11 +303,11 @@ def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
     related_lines = _as_str_list(raw.get("relatedLines"))
     attrs = raw.get("attributes") or {}
     line_types_raw = attrs.get("relatedLineTypes") or {}
-    line_types: dict[str, str] = {}
-    if isinstance(line_types_raw, dict):
-        for k, v in line_types_raw.items():
-            if isinstance(k, str) and isinstance(v, str):
-                line_types[k] = v
+    line_types: dict[str, str] = (
+        {k: v for k, v in line_types_raw.items() if isinstance(k, str) and isinstance(v, str)}
+        if isinstance(line_types_raw, dict)
+        else {}
+    )
     return TrafficInfo(
         name=str(raw.get("name") or ""),
         title=str(raw.get("title") or "").strip(),
@@ -326,13 +333,12 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
     attrs = raw.get("attributes") or {}
     time = raw.get("time") or {}
 
-    related_lines = _as_str_list(raw.get("relatedLines"))
-    if not related_lines:
-        related_lines = _as_str_list(attrs.get("relatedLines"))
-
-    related_stops = _as_int_list(raw.get("relatedStops"))
-    if not related_stops:
-        related_stops = _as_int_list(attrs.get("relatedStops"))
+    related_lines = _as_str_list(raw.get("relatedLines")) or _as_str_list(
+        attrs.get("relatedLines")
+    )
+    related_stops = _as_int_list(raw.get("relatedStops")) or _as_int_list(
+        attrs.get("relatedStops")
+    )
 
     station = str(
         attrs.get("station") or raw.get("title") or ""
@@ -391,6 +397,19 @@ def _str_or_none(val: Any) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def line_names_from_keys(keys: Any) -> set[str]:
+    """Extract the line-name prefix of every `line|direction` key.
+
+    Centralises the "split on the first pipe, keep the line code" rule
+    so the alert-filter callers in `diagnostics` and `sensor` agree on
+    one parse. Non-string / empty entries are dropped silently — they
+    can never carry a line name anyway.
+    """
+    if not keys:
+        return set()
+    return {k.split("|", 1)[0] for k in keys if isinstance(k, str) and k}
+
+
 def get_alerts_for(
     hass: HomeAssistant,
     lines: set[str] | None,
@@ -408,13 +427,11 @@ def get_alerts_for(
     all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
     all_elevator: list[ElevatorInfo] = domain_data.get(ELEVATOR_INFO_KEY, []) or []
 
-    matched_traffic: list[TrafficInfo] = []
-    if lines:
-        for t in all_traffic:
-            if t.related_lines_set & lines:
-                matched_traffic.append(t)
-    else:
-        matched_traffic = list(all_traffic)
+    matched_traffic: list[TrafficInfo] = (
+        [t for t in all_traffic if t.related_lines_set & lines]
+        if lines
+        else list(all_traffic)
+    )
 
     matched_elevator: list[ElevatorInfo] = []
     if rbls:

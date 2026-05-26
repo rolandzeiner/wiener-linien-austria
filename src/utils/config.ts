@@ -4,13 +4,21 @@ import type {
   LineColorsMap,
   RetroHeaderExit,
   RetroHeaderSide,
+  RetroPlatformSide,
   RetroSize,
   RetroStationBg,
   RetroStyle,
   WalkTimes,
-  WienerLinienCardConfig,
   WienerLinienRetroCardConfig,
 } from "../types.js";
+
+/** Coerce an unknown config value to a boolean. `true` / `false` pass
+ *  through; anything else (undefined, null, a YAML typo, a number)
+ *  falls back to `fallback`. Lets the modern normaliser take a raw,
+ *  untyped config record without trusting its field types. */
+function asBool(v: unknown, fallback: boolean): boolean {
+  return typeof v === "boolean" ? v : fallback;
+}
 
 const RETRO_SIZES: ReadonlySet<RetroSize> = new Set(["small", "medium", "regular"] as const);
 const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
@@ -19,6 +27,7 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "black",
 ] as const);
 const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
+const RETRO_PLATFORM_SIDES: ReadonlySet<RetroPlatformSide> = new Set(["auto", "left", "right"] as const);
 // Curated valid values for the header strip's exit corner. Combines
 // the three fixed variants ("none" / "regular" / "accessible") with
 // the curated MDI set from `retro-station-icons` so the normaliser
@@ -36,7 +45,11 @@ const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>
  *  at all?" check collapses to a single truthy test. Hard bounds on
  *  `text` length defensively guard against a runaway YAML config
  *  blowing out the strip width. */
-function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
+// Exported so the flap card's config normaliser can reuse the same
+// header-side validation (the two cards share `RetroHeaderSide`
+// shape: the chip / exit / amenity grammar is identical even though
+// each card paints the strip with its own palette).
+export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
   const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
@@ -50,6 +63,17 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   const show_wc = r.show_wc === true;
   const show_escalator = r.show_escalator === true;
   const show_elevator = r.show_elevator === true;
+  const show_clock = r.show_clock === true;
+  const show_date = r.show_date === true;
+  // Bound the format string defensively (a runaway YAML config
+  // shouldn't blow out the strip width) but don't trim — the user
+  // may legitimately use leading/trailing spaces as separators
+  // (e.g. " d.m " to pad the chip).
+  let date_format: string | undefined;
+  if (typeof r.date_format === "string") {
+    const sliced = r.date_format.slice(0, 32);
+    if (sliced) date_format = sliced;
+  }
   // Chip array: trim each entry, drop empties, cap text length and
   // total count. Tolerant of YAML user error — non-string entries are
   // skipped instead of failing the whole side.
@@ -81,6 +105,8 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
     !show_wc &&
     !show_escalator &&
     !show_elevator &&
+    !show_clock &&
+    !show_date &&
     chips === undefined &&
     extra_icons === undefined
   ) {
@@ -92,8 +118,28 @@ function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (show_wc) out.show_wc = true;
   if (show_escalator) out.show_escalator = true;
   if (show_elevator) out.show_elevator = true;
+  if (show_clock) out.show_clock = true;
+  if (show_date) out.show_date = true;
+  if (date_format !== undefined) out.date_format = date_format;
   if (chips !== undefined) out.chips = chips;
   if (extra_icons !== undefined) out.extra_icons = extra_icons;
+  return out;
+}
+
+/** Returns the subset of `raw` whose keys are NOT in `validated` —
+ *  the HA-injected dashboard layout fields (grid_options, view_layout,
+ *  visibility) that must survive a normalise round-trip unchanged.
+ *  Filtering by an allowlist of validated keys also prevents the raw
+ *  pre-normalisation value of a validated key from leaking through. */
+export function filterPassthrough(
+  raw: unknown,
+  validated: ReadonlySet<string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!validated.has(k)) out[k] = v;
+  }
   return out;
 }
 
@@ -102,8 +148,13 @@ function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   const out: WalkTimes = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-    if (!Number.isFinite(n)) continue;
-    if (n < 0 || n > 120) continue;
+    if (!Number.isFinite(n) || n < 0 || n > 120) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria] walk_times["${k}"] = ${JSON.stringify(v)} is not a finite number in 0..120 — dropping`,
+      );
+      continue;
+    }
     // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the
     // current shape is a (line, direction) pair ("U1|R") so the
     // threshold applies to every train on that direction regardless of
@@ -134,21 +185,54 @@ function normaliseLineDirections(
   const out: Record<string, "H" | "R"> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     if (typeof k !== "string" || !k.length) continue;
-    if (v === "H" || v === "R") out[k] = v;
-    // Any other value (including "Both" / "" / undefined) means
-    // "no override" — which is encoded as the absence of the key.
+    // Case-fold the line key so a YAML user typing `u1` doesn't
+    // silently fail to override `U1`. The departure feed uses
+    // upper-case line codes throughout.
+    const lineKey = k.toUpperCase();
+    if (v === "H" || v === "R") {
+      out[lineKey] = v;
+      continue;
+    }
+    // "Both" / "" / undefined are documented "no override" — encoded
+    // as the absence of the key. Anything else is a typo we surface
+    // so the user can fix it rather than wondering why their override
+    // is ignored.
+    if (v !== undefined && v !== "" && v !== "Both") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria] line_directions["${k}"] = ${JSON.stringify(v)} is not "H" / "R" / "Both" — dropping`,
+      );
+    }
   }
   return Object.keys(out).length ? out : undefined;
 }
 
 function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   if (typeof raw === "string") {
-    return raw.startsWith("sensor.") ? { entity: raw } : null;
+    if (raw.startsWith("sensor.")) return { entity: raw };
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria] entities[] entry ${JSON.stringify(raw)} is not a sensor.* entity — dropping`,
+    );
+    return null;
   }
-  if (!raw || typeof raw !== "object") return null;
+  if (!raw || typeof raw !== "object") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria] entities[] entry ${JSON.stringify(raw)} is not a string or object — dropping`,
+    );
+    return null;
+  }
   const r = raw as Record<string, unknown>;
   const entity = typeof r.entity === "string" ? r.entity : null;
-  if (!entity?.startsWith("sensor.")) return null;
+  if (!entity?.startsWith("sensor.")) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[wiener-linien-austria] entities[] entry has missing or non-sensor.* entity field`,
+      raw,
+    );
+    return null;
+  }
   const stop: NormalisedModernStop = { entity };
   if (Array.isArray(r.lines)) {
     const lines = r.lines.filter((l): l is string => typeof l === "string" && l.length > 0);
@@ -248,7 +332,12 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   layout: "stacked",
 };
 
-export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedModernConfig {
+// Accepts a raw, untyped config record: callers pass either a fresh
+// `WienerLinienCardConfig` (card `setConfig`) or an already-normalised
+// config merged with ha-form's `Record<string, unknown>` output (the
+// editor). Both satisfy `Record<string, unknown>`; every field is
+// re-validated below, so no caller needs an `as` cast.
+export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedModernConfig {
   // Back-compat: flat single-entity shape gets promoted to entities[0].
   let rawEntities: unknown[] = [];
   if (Array.isArray(raw.entities)) {
@@ -284,8 +373,13 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
 
   const lineColors: Record<string, string> = {};
   if (raw.line_colors && typeof raw.line_colors === "object") {
+    // Only the four valid CSS hex shapes — #RGB, #RGBA, #RRGGBB,
+    // #RRGGBBAA. The prior /^#[0-9A-Fa-f]{3,8}$/ accepted #abcde and
+    // #abcdefg, which CSS silently falls back to inherited colour on,
+    // so a typo'd swatch broke without a visible cue.
+    const HEX_RE = /^#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
     for (const [k, v] of Object.entries(raw.line_colors)) {
-      if (typeof v === "string" && /^#[0-9A-Fa-f]{3,8}$/.test(v.trim())) {
+      if (typeof v === "string" && HEX_RE.test(v.trim())) {
         lineColors[k.toUpperCase()] = v.trim();
       }
     }
@@ -295,30 +389,30 @@ export function normaliseModernConfig(raw: WienerLinienCardConfig): NormalisedMo
   // passes through dashboard layout fields (grid_options, view_layout,
   // visibility, layout_options) without smuggling pre-normalisation
   // versions of validated keys into the result.
-  const passthrough: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!MODERN_VALIDATED_KEYS.has(k)) passthrough[k] = v;
-  }
+  const passthrough = filterPassthrough(raw, MODERN_VALIDATED_KEYS);
 
   return {
     ...passthrough,
-    type: raw.type || "custom:wiener-linien-austria-card",
+    type:
+      typeof raw.type === "string" && raw.type
+        ? raw.type
+        : "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
     line_colors: lineColors,
-    show_accessibility: raw.show_accessibility ?? MODERN_DEFAULTS.show_accessibility,
-    accessibility_only: raw.accessibility_only ?? MODERN_DEFAULTS.accessibility_only,
-    show_traffic_info: raw.show_traffic_info ?? MODERN_DEFAULTS.show_traffic_info,
-    show_elevator_info: raw.show_elevator_info ?? MODERN_DEFAULTS.show_elevator_info,
-    show_delay: raw.show_delay ?? MODERN_DEFAULTS.show_delay,
-    show_type_icon: raw.show_type_icon ?? MODERN_DEFAULTS.show_type_icon,
-    show_platform: raw.show_platform ?? MODERN_DEFAULTS.show_platform,
-    show_hero_metric: raw.show_hero_metric ?? MODERN_DEFAULTS.show_hero_metric,
-    show_departures: raw.show_departures ?? MODERN_DEFAULTS.show_departures,
-    show_stops_ahead: raw.show_stops_ahead ?? MODERN_DEFAULTS.show_stops_ahead,
-    show_qr_button: raw.show_qr_button ?? MODERN_DEFAULTS.show_qr_button,
-    hide_header: raw.hide_header ?? MODERN_DEFAULTS.hide_header,
-    hide_attribution: raw.hide_attribution ?? MODERN_DEFAULTS.hide_attribution,
+    show_accessibility: asBool(raw.show_accessibility, MODERN_DEFAULTS.show_accessibility),
+    accessibility_only: asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
+    show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
+    show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
+    show_delay: asBool(raw.show_delay, MODERN_DEFAULTS.show_delay),
+    show_type_icon: asBool(raw.show_type_icon, MODERN_DEFAULTS.show_type_icon),
+    show_platform: asBool(raw.show_platform, MODERN_DEFAULTS.show_platform),
+    show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
+    show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
+    show_stops_ahead: asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead),
+    show_qr_button: asBool(raw.show_qr_button, MODERN_DEFAULTS.show_qr_button),
+    hide_header: asBool(raw.hide_header, MODERN_DEFAULTS.hide_header),
+    hide_attribution: asBool(raw.hide_attribution, MODERN_DEFAULTS.hide_attribution),
     layout: raw.layout === "tabs" ? "tabs" : "stacked",
   };
 }
@@ -335,6 +429,7 @@ export interface NormalisedRetroConfigValidated {
   direction: "H" | "R";
   line?: string | undefined;
   show_platform: boolean;
+  platform_side: RetroPlatformSide;
   show_station_name: boolean;
   station_bg: RetroStationBg;
   size: RetroSize;
@@ -348,6 +443,10 @@ export interface NormalisedRetroConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  line_pill: boolean;
+  line_stripe: boolean;
+  housing: boolean;
+  show_unit: boolean;
 }
 
 // See NormalisedModernConfig — same passthrough rule for dashboard
@@ -363,6 +462,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "direction",
   "line",
   "show_platform",
+  "platform_side",
   "show_station_name",
   "station_bg",
   "size",
@@ -376,6 +476,10 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_header",
   "header_left",
   "header_right",
+  "line_pill",
+  "line_stripe",
+  "housing",
+  "show_unit",
 ]);
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
@@ -387,10 +491,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
     ? (raw.style as RetroStyle)
     : "classic";
-  const passthrough: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (!RETRO_VALIDATED_KEYS.has(k)) passthrough[k] = v;
-  }
+  const passthrough = filterPassthrough(raw, RETRO_VALIDATED_KEYS);
 
   return {
     ...passthrough,
@@ -399,6 +500,9 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     direction,
     line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
     show_platform: raw.show_platform ?? true,
+    platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
+      ? (raw.platform_side as RetroPlatformSide)
+      : "auto",
     show_station_name: raw.show_station_name ?? false,
     station_bg,
     size,
@@ -426,6 +530,10 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
+    line_pill: raw.line_pill === true,
+    line_stripe: raw.line_stripe === true,
+    housing: raw.housing === true,
+    show_unit: raw.show_unit === true,
   };
 }
 

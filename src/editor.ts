@@ -1,46 +1,30 @@
 // Schema-driven Lovelace editor for the Wiener Linien Austria modern card.
 //
-// Design notes
-// ------------
-// * Static fields go through `<ha-form>`: the `entities` selector
-//   (multi-select sensor picker, integration-filtered), `layout`, the
-//   `max_departures` slider, and the boolean toggles in the "display"
-//   expandable. ha-form is the canonical HA editor component: theme
-//   integration, label/helper localisation chain, a11y / forced-colors
-//   / focus-visible all match HA core.
-//
-// * **Two bespoke sections** stay below `<ha-form>` because their
-//   row lists are derived from the live data (lines/direction/walk-time
-//   per stop, colour swatches per line in the user's selection):
-//   - Per-stop filters (line chips + direction picker + per-line dir
-//     overrides + walk-times) — one block per configured entity.
-//   - Per-line colour swatches — native `<input type="color">` is the
-//     right primitive for this; ha-form has no equivalent selector.
+// Gotchas (the WHYs that bite, not the design map):
 //
 // * **Storage-shape translator** at the form-changed boundary —
 //   ha-form's entity selector with `multiple: true` emits a flat
 //   `string[]`; the saved config carries `Array<NormalisedModernStop>`
-//   to preserve per-stop overrides (lines, direction, walk_times) when
-//   the user adds/removes a stop. Without the translator, every
+//   to preserve per-stop overrides. Without the translator, every
 //   add/remove cycle would wipe every per-stop override silently.
 //
-// * **Editor `_config` lifecycle gotcha** — custom editors do NOT
-//   receive a re-`setConfig()` after dispatching `config-changed`. The
-//   form-handler must therefore set `this._config = next` BEFORE
-//   firing the event; otherwise the next render reads stale state.
+// * **Editor `_config` lifecycle** — custom editors do NOT receive a
+//   re-`setConfig()` after dispatching `config-changed`. The form
+//   handler must set `this._config = next` BEFORE firing the event,
+//   else the next render reads stale state.
 //
-// * **`expandable` + `flatten: true`** — without `flatten`, ha-form
-//   scopes inner-schema values under `data[name]` and the card's
-//   flat-key reads (`this._config.show_platform`) silently default.
+// (The `expandable` + `flatten: true` gotcha is documented at its call
+// site in `_schema()`.)
 
 import { LitElement, css, html, nothing, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
-import { resolveEditorHelper, resolveEditorLabel } from "./editor-shared.js";
+import { resolveEditorHelper, resolveEditorLabel, swallowEditorKeys } from "./editor-shared.js";
 import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -81,12 +65,8 @@ export class WienerLinienAustriaCardEditor
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (changed.has("_config")) return true;
-    // hass fires on every state change anywhere in HA — only re-render when
-    // a state we actually read changed. The form schema, line chips, walk
-    // times and colour swatches all derive from the configured stops, so
-    // restrict comparison to those entities. Without this guard, every
-    // unrelated state tick repeats pairsAtStop / tripletsAtStop /
-    // collectLinesInSelection while the dialog is open.
+    // hass fires for every state change anywhere in HA — only re-render
+    // when one of the configured entities actually changed.
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
     const eids = this._config.entities.map((s) => s.entity);
@@ -232,8 +212,8 @@ export class WienerLinienAustriaCardEditor
     // Spread existing _config first to preserve dashboard passthrough
     // fields AND `type` (which ha-form's value never carries).
     const next = normaliseModernConfig({
-      ...(this._config as unknown as WienerLinienCardConfig),
-      ...(value as Partial<WienerLinienCardConfig>),
+      ...this._config,
+      ...value,
       entities: nextEntities,
     });
     this._fire(next);
@@ -289,8 +269,18 @@ export class WienerLinienAustriaCardEditor
   }
 
   private _setWalkTime(eid: string, key: string, raw: string): void {
-    const n = parseInt(raw, 10);
-    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, n) : null;
+    const trimmed = raw.trim();
+    const n = trimmed === "" ? NaN : Number(trimmed);
+    // Distinguish "" (intentional clear) from typed garbage. Without
+    // the warning a typo like "5min" silently clears the value and the
+    // user has no signal that their input was rejected.
+    if (trimmed !== "" && !Number.isFinite(n)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[wiener-linien-austria-card-editor] walk-time "${raw}" for ${eid}/${key} is not a number — clearing`,
+      );
+    }
+    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
     this._updateStop(eid, (s) => {
       const cur = { ...(s.walk_times ?? {}) };
       if (clean === null) delete cur[key];
@@ -315,12 +305,6 @@ export class WienerLinienAustriaCardEditor
     const line_colors = { ...this._config.line_colors };
     delete line_colors[line.toUpperCase()];
     this._fire({ ...this._config, line_colors });
-  }
-
-  // HA's card-editor steals arrow keys for navigation; stop propagation
-  // on number inputs so the user can actually edit values.
-  private _swallowKeys(ev: KeyboardEvent): void {
-    ev.stopPropagation();
   }
 
   private _attrs(eid: string): WienerLinienAttrs | undefined {
@@ -349,24 +333,14 @@ export class WienerLinienAustriaCardEditor
     `;
   }
 
-  /** One bespoke per-stop section per configured entity. Holds the
-   *  line chips + direction picker + per-line direction overrides +
-   *  walk-time inputs. Derived from the live sensor's departures so
-   *  the row list can't be expressed as a static schema. */
   private _renderPerStopSections(): TemplateResult | typeof nothing {
     const cfg = this._config!;
     if (!cfg.entities.length) return nothing;
     return html`${cfg.entities.map((stop) => this._renderStopFilter(stop))}`;
   }
 
-  /** Build a direction-button label that prefers the live terminus(es)
-   *  with a compact "H:" / "R:" prefix; falls back to the full word
-   *  ("Hinfahrt" / "Rückfahrt") when no terminus data is available.
-   *  Caps at 3 termini joined by " / " plus a trailing "+N" so hub
-   *  stops with many lines stay readable in narrow pills. */
-  /** Localised strings the shared `formatDirectionPillLabel` helper
-   *  needs. Resolved per call so a language change at runtime is
-   *  picked up on the next render. */
+  /** Per-call resolution so a runtime language change is picked up on
+   *  the next render. */
   private _dirPillStrings(dir: "H" | "R"): { full: string; short: string } {
     return {
       full: this._t(dir === "H" ? "dir_h" : "dir_r"),
@@ -424,11 +398,6 @@ export class WienerLinienAustriaCardEditor
     const stopName = attrs.stop_name || stop.entity;
     const overrides = this._config!.line_colors;
     const lineColors = attrs.line_colors ?? {};
-    // Tracked subset wins — only surface lines the user opted into via
-    // the integration's config flow. Falls back to the static catalogue
-    // unioned with live departures via `linesAtStop` so a line that
-    // appears in the realtime feed but not yet in the static catalogue
-    // is still listed.
     const lines = linesAtStop(attrs);
     // Per-line vehicle type lookup so each chip can render its MoT icon
     // (mdi:subway-variant / mdi:tram / mdi:bus). First-seen-wins on
@@ -447,12 +416,6 @@ export class WienerLinienAustriaCardEditor
     const showPerLineDir = effectiveLines.length >= 2;
 
     const allTriplets = tripletsAtStop(attrs);
-    const triplets = allTriplets.filter((t) => {
-      if (picked.size > 0 && !picked.has(t.line)) return false;
-      const effDir = lineDirs[t.line] ?? dir;
-      if (effDir && t.direction !== effDir) return false;
-      return true;
-    });
 
     const dirsForLine = (line: string): Set<"H" | "R"> => {
       const out = new Set<"H" | "R">();
@@ -546,10 +509,6 @@ export class WienerLinienAustriaCardEditor
                     const lineActiveBoth = lineDir === null && !lineOnlyOne;
                     const ariaLabel = this._et("per_line_direction_aria").replace("{line}", l);
                     const dirUnavailable = this._et("direction_unavailable");
-                    // Show this line's actual termini per direction
-                    // (e.g. "H: Oberlaa") so the user picks by destination,
-                    // not abstract H/R. Falls back to the full word
-                    // ("Hinfahrt"/"Rückfahrt") when no data flows.
                     const labelFor = (d: "H" | "R"): string =>
                       this._perLineDirectionLabel(allTriplets, l, d);
                     return html`
@@ -589,18 +548,16 @@ export class WienerLinienAustriaCardEditor
             `
           : nothing}
 
-        ${this._renderWalkTimes(stop, triplets, dir, lineDirs)}
+        ${this._renderWalkTimes(stop, dir, lineDirs)}
       </div>
     `;
   }
 
   private _renderWalkTimes(
     stop: NormalisedModernStop,
-    triplets: ReturnType<typeof tripletsAtStop>,
     dir: "H" | "R" | null,
     lineDirs: Record<string, "H" | "R">,
   ): TemplateResult | typeof nothing {
-    void triplets; // direction visibility handled per pair below
     const overrides = this._config!.line_colors;
     const attrs = this._attrs(stop.entity);
     const lineColors = attrs?.line_colors ?? {};
@@ -641,10 +598,10 @@ export class WienerLinienAustriaCardEditor
                   aria-label=${this._et("walk_time_aria")
                     .replace("{line}", p.line)
                     .replace("{towards}", terminusLabel)}
-                  .value=${val !== undefined ? String(val) : ""}
-                  @keydown=${this._swallowKeys}
-                  @keyup=${this._swallowKeys}
-                  @keypress=${this._swallowKeys}
+                  .value=${live(val !== undefined ? String(val) : "")}
+                  @keydown=${swallowEditorKeys}
+                  @keyup=${swallowEditorKeys}
+                  @keypress=${swallowEditorKeys}
                   @change=${(ev: Event) =>
                     this._setWalkTime(
                       stop.entity,
@@ -686,7 +643,7 @@ export class WienerLinienAustriaCardEditor
                   <span class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</span>
                   <label
                     class="color-swatch"
-                    style=${`--swatch-color: ${hex};`}
+                    style=${styleMap({ "--swatch-color": hex })}
                     title=${ariaPick}
                   >
                     <ha-icon icon="mdi:palette-swatch-variant" aria-hidden="true"></ha-icon>
@@ -882,6 +839,13 @@ export class WienerLinienAustriaCardEditor
       inset: 0;
       opacity: 0;
       cursor: pointer;
+    }
+    /* The real <input type="color"> is opacity:0, so its own focus ring
+       is invisible — lift the ring onto the label for keyboard users
+       (WCAG 2.4.7 Focus Visible). */
+    .color-swatch:focus-within {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
     .reset-btn {
       padding: 6px 12px;

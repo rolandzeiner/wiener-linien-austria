@@ -57,4 +57,16 @@ export default [
     plugins: basePlugins(),
     onwarn,
   },
+  {
+    input: "src/wiener-linien-austria-flap-card.ts",
+    output: {
+      file: "custom_components/wiener_linien_austria/www/wiener-linien-austria-flap-card.js",
+      format: "es",
+      sourcemap: dev,
+      banner,
+      inlineDynamicImports: true,
+    },
+    plugins: basePlugins(),
+    onwarn,
+  },
 ];

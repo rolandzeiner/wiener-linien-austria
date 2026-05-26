@@ -271,6 +271,88 @@ async def test_async_load_catalogue_no_cache_fetches_and_saves(
     assert any(s["diva"] == 12345 for s in saved["stations"])
 
 
+async def test_async_load_catalogue_store_read_error_falls_through(
+    hass: HomeAssistant,
+) -> None:
+    """OSError from Store.async_load → log + fall through to fresh fetch.
+
+    A disk-error / partial-write on the cache file must not crash the
+    integration setup; the in-memory catalogue from the fresh fetch
+    is enough to keep coordinators running.
+    """
+    fresh = _sample(diva=77777, name="ReadErrorFallback")
+    with (
+        patch(
+            "homeassistant.helpers.storage.Store.async_load",
+            new_callable=AsyncMock,
+            side_effect=OSError("simulated disk error"),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            return_value=fresh,
+        ) as mock_fetch,
+    ):
+        result = await async_load_catalogue(hass)
+
+    mock_fetch.assert_awaited_once()
+    assert 77777 in result.stations_by_diva
+
+
+async def test_async_load_catalogue_store_save_error_still_returns_catalogue(
+    hass: HomeAssistant,
+) -> None:
+    """OSError from Store.async_save on first load → still return the catalogue.
+
+    Persistence is best-effort; an in-memory catalogue is fine until
+    the next refresh retries the write.
+    """
+    fresh = _sample(diva=88888, name="SaveErrorInMemory")
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            return_value=fresh,
+        ),
+        patch(
+            "homeassistant.helpers.storage.Store.async_save",
+            new_callable=AsyncMock,
+            side_effect=OSError("simulated disk full"),
+        ),
+    ):
+        result = await async_load_catalogue(hass)
+
+    assert 88888 in result.stations_by_diva
+
+
+async def test_async_refresh_catalogue_store_save_error_still_returns_fresh(
+    hass: HomeAssistant,
+) -> None:
+    """OSError from Store.async_save during refresh → still return the new catalogue.
+
+    Sensors hold a ref to the catalogue, so swallowing the save error
+    while still returning the fresh result keeps the in-memory state
+    consistent until the next refresh retries the write.
+    """
+    fresh = _sample(diva=99000, name="RefreshSaveErr")
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            return_value=fresh,
+        ),
+        patch(
+            "homeassistant.helpers.storage.Store.async_save",
+            new_callable=AsyncMock,
+            side_effect=OSError("simulated disk full"),
+        ),
+    ):
+        result = await async_refresh_catalogue(hass)
+
+    assert result is not None
+    assert 99000 in result.stations_by_diva
+
+
 # ---------------------------------------------------------------------------
 # _fetch_and_build: live network simulation, conditional GET branches
 # ---------------------------------------------------------------------------

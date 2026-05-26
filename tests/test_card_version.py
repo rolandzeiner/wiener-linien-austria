@@ -2,7 +2,7 @@
 
 Three places carry the version: `manifest.json`, `src/const.ts`, and
 `const.py` (which now reads `manifest.json` at import for INTEGRATION_VERSION
-and aliases both card consts to it). The tests below derive expected values
+and aliases the card consts to it). The tests below derive expected values
 from `INTEGRATION_VERSION`, which itself derives from the manifest — so a
 manifest-only bump still trips CI when `src/const.ts` is forgotten.
 
@@ -10,9 +10,9 @@ If these drift, HA's frontend WebSocket check sees a mismatch, shows a
 reload banner, the reload re-serves the same mismatched JS, and the
 banner reappears — infinite loop for every user on an old card.
 
-Wiener Linien ships *two* card variants (modern + retro), each with its
-own constant. The test asserts both pairs separately so a failure
-points at exactly which constant drifted.
+Wiener Linien ships *three* card variants (modern + retro + flap), each
+with its own constant. The test asserts all three separately so a
+failure points at exactly which constant drifted.
 """
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from pathlib import Path
 
 from custom_components.wiener_linien_austria.const import (
     CARD_VERSION,
+    FLAP_CARD_VERSION,
     INTEGRATION_VERSION,
     RETRO_CARD_VERSION,
 )
@@ -35,6 +36,7 @@ _MANIFEST = (
 )
 _CARD_PATTERN = re.compile(r'\bCARD_VERSION\s*=\s*"([^"]+)"')
 _RETRO_PATTERN = re.compile(r'\bRETRO_CARD_VERSION\s*=\s*"([^"]+)"')
+_FLAP_PATTERN = re.compile(r'\bFLAP_CARD_VERSION\s*=\s*"([^"]+)"')
 
 
 def _read_ts_source() -> str:
@@ -74,6 +76,15 @@ def test_retro_card_version_aliases_integration_version() -> None:
     )
 
 
+def test_flap_card_version_aliases_integration_version() -> None:
+    """`FLAP_CARD_VERSION` is in lockstep with `INTEGRATION_VERSION`."""
+    assert FLAP_CARD_VERSION == INTEGRATION_VERSION, (
+        f"FLAP_CARD_VERSION drift: {FLAP_CARD_VERSION!r} vs "
+        f"INTEGRATION_VERSION={INTEGRATION_VERSION!r} "
+        "— FLAP_CARD_VERSION should alias INTEGRATION_VERSION"
+    )
+
+
 def test_card_version_matches_ts() -> None:
     """`src/const.ts:CARD_VERSION` must equal the manifest version.
 
@@ -104,6 +115,21 @@ def test_retro_card_version_matches_ts() -> None:
     ts_version = match.group(1)
     assert ts_version == expected, (
         f"RETRO_CARD_VERSION drift: src/const.ts={ts_version!r} vs "
+        f"manifest.json={expected!r} — bump both in the same commit"
+    )
+
+
+def test_flap_card_version_matches_ts() -> None:
+    """`src/const.ts:FLAP_CARD_VERSION` must equal the manifest version."""
+    expected = _expected_version()
+    ts_source = _read_ts_source()
+    match = _FLAP_PATTERN.search(ts_source)
+    assert match is not None, (
+        f"FLAP_CARD_VERSION literal not found in {_TS_CONST}; regex may be stale"
+    )
+    ts_version = match.group(1)
+    assert ts_version == expected, (
+        f"FLAP_CARD_VERSION drift: src/const.ts={ts_version!r} vs "
         f"manifest.json={expected!r} — bump both in the same commit"
     )
 
