@@ -12,7 +12,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .alerts import get_alerts_for
+from .alerts import get_alerts_for, line_names_from_keys
 from .const import (
     ATTRIBUTION,
     CONF_DIVA,
@@ -130,11 +130,7 @@ class WienerLinienStopSensor(
         # selection, stable even when no departures are flowing right now.
         # Fall back to live departures for the "all lines" case.
         selected_line_keys = config.get(CONF_LINES) or []
-        line_names: set[str] = {
-            k.split("|", 1)[0]
-            for k in selected_line_keys
-            if isinstance(k, str) and k
-        }
+        line_names = line_names_from_keys(selected_line_keys)
         if not line_names:
             line_names = {d.line for d in departures if d.line}
         rbls = {int(r) for r in config.get(CONF_RBLS) or []}

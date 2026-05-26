@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import json
 import logging
 import re
 from collections.abc import Iterable
@@ -159,14 +160,11 @@ def _sort_line_labels(
 STORE_VERSION = 1
 STORE_KEY = f"{DOMAIN}_static"
 
-# hass.data key for the shared catalogue (or in-flight load task). Holding it
-# in domain_data means a multi-entry user only pays the static-fetch cost
-# once per HA session — without this, each coordinator setup independently
-# triggered _fetch_and_build, multiplying the bandwidth and Wiener-Linien
-# Pi stresses by N entries. Exported (no leading underscore) so coordinator,
-# sensor, and diagnostics consumers reference the same constant rather than
-# duplicating the bare string — a typo in any caller would silently break
-# the catalogue lookup on that one path only.
+# hass.data key for the shared catalogue (or in-flight load task). A
+# multi-entry user pays the static-fetch cost once per HA session.
+# Exported so coordinator / sensor / diagnostics agree on the name —
+# a typo in any caller would silently break catalogue lookup on that
+# one path only.
 CATALOGUE_KEY = "static_catalogue"
 # hass.data key for the background catalogue-refresh task spawned when an
 # older cache predates trip-patterns / colours / etc. Stored so the last-
@@ -289,11 +287,11 @@ class StaticCatalogue:
     def __post_init__(self) -> None:
         """Build the RBL→(DIVA, name) index once at construction."""
         if not self._rbl_index:
-            index: dict[int, tuple[int, str]] = {}
-            for diva, station in self.stations_by_diva.items():
-                for rbl in station.rbls:
-                    index[rbl] = (diva, station.name)
-            self._rbl_index = index
+            self._rbl_index = {
+                rbl: (diva, station.name)
+                for diva, station in self.stations_by_diva.items()
+                for rbl in station.rbls
+            }
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
         """Return stations whose name contains the query (case-insensitive)."""
@@ -400,7 +398,19 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     restart.
     """
     store: Store[dict[str, Any]] = Store(hass, STORE_VERSION, STORE_KEY)
-    cached = await store.async_load()
+    # Store.async_load is normally exception-safe (returns None on missing
+    # file), but partial / truncated / disk-error states can surface
+    # OSError or JSONDecodeError. Treat any read failure as "no cache"
+    # and fall through to the fresh fetch below — the in-memory catalogue
+    # is fine without persistence.
+    try:
+        cached = await store.async_load()
+    except (OSError, json.JSONDecodeError) as err:
+        _LOGGER.warning(
+            "Failed to read static cache (%s); refetching from upstream",
+            err,
+        )
+        cached = None
     if cached:
         try:
             catalogue = _catalogue_from_store(cached)
@@ -462,7 +472,16 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
             return catalogue
 
     catalogue = await _fetch_and_build(hass, prior=None)
-    await store.async_save(_catalogue_to_store(catalogue))
+    # Best-effort persistence — a disk-full / read-only-FS error must
+    # not crash the integration setup; the in-memory catalogue is fine
+    # without a Store write, and the next refresh will retry.
+    try:
+        await store.async_save(_catalogue_to_store(catalogue))
+    except OSError as err:
+        _LOGGER.warning(
+            "Failed to persist static cache (%s); catalogue is in-memory only",
+            err,
+        )
     return catalogue
 
 
@@ -522,7 +541,13 @@ async def _async_background_refresh(
             prior.last_fetched,
         )
         return
-    await store.async_save(_catalogue_to_store(refreshed))
+    try:
+        await store.async_save(_catalogue_to_store(refreshed))
+    except OSError as err:
+        _LOGGER.warning(
+            "Failed to persist refreshed static cache (%s); in-memory only",
+            err,
+        )
     async_set_cached_catalogue(hass, refreshed)
     if refreshed.trip_patterns is not None:
         _LOGGER.warning(
@@ -538,7 +563,14 @@ async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None
     Returns the new catalogue on success, None on failure or 304.
     """
     store: Store[dict[str, Any]] = Store(hass, STORE_VERSION, STORE_KEY)
-    cached_payload = await store.async_load()
+    try:
+        cached_payload = await store.async_load()
+    except (OSError, json.JSONDecodeError) as err:
+        _LOGGER.warning(
+            "Failed to read static cache for refresh (%s); starting from scratch",
+            err,
+        )
+        cached_payload = None
     prior: StaticCatalogue | None = None
     if cached_payload:
         try:
@@ -558,7 +590,13 @@ async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None
         _LOGGER.debug("Static catalogue unchanged (all CSVs 304); skipping rewrite")
         return None
 
-    await store.async_save(_catalogue_to_store(catalogue))
+    try:
+        await store.async_save(_catalogue_to_store(catalogue))
+    except OSError as err:
+        _LOGGER.warning(
+            "Failed to persist refreshed static cache (%s); in-memory only",
+            err,
+        )
     return catalogue
 
 
@@ -595,26 +633,15 @@ async def _fetch_and_build(
         or prior.trip_patterns is None
         or not prior.trip_patterns.lines_at_diva
     )
-    linien_validators = (
-        CacheValidators()
-        if needs_pattern_bodies
-        else (prior.validators.get("linien") if prior else None) or CacheValidators()
-    )
-    fahr_validators = (
-        CacheValidators()
-        if needs_pattern_bodies
-        else (prior.validators.get("fahrwegverlaeufe") if prior else None)
-        or CacheValidators()
+    linien_validators = _pick_validators(prior, "linien", force=needs_pattern_bodies)
+    fahr_validators = _pick_validators(
+        prior, "fahrwegverlaeufe", force=needs_pattern_bodies
     )
     # Same logic for the colour map: if we don't have it yet, force-fetch.
     needs_routes_body = prior is None or not (
         prior.trip_patterns and prior.trip_patterns.colors_by_line
     )
-    routes_validators = (
-        CacheValidators()
-        if needs_routes_body
-        else (prior.validators.get("routes") if prior else None) or CacheValidators()
-    )
+    routes_validators = _pick_validators(prior, "routes", force=needs_routes_body)
 
     (
         haltestellen_result,
@@ -963,11 +990,7 @@ def _parse_trip_patterns(
     # Build label → MoT for the per-stop chip sort: groups Metro / Tram /
     # Bus / Nightline together so the colour-coded chips on the card line
     # up by mode rather than interleaving every mode by number.
-    mot_by_label: dict[str, str] = {}
-    for label, line_id in lines_by_label.items():
-        mot = means_by_line.get(line_id)
-        if mot:
-            mot_by_label[label] = mot
+    mot_by_label = _mot_by_label(lines_by_label, means_by_line)
 
     lines_at_diva: dict[int, tuple[str, ...]] = {
         diva: _sort_line_labels(labels, mot_by_label)
@@ -1225,10 +1248,40 @@ def _first_index_in_pattern(
     pattern: TripPattern, rbl_set: set[int]
 ) -> int:
     """Index of the first matching RBL in `pattern.stops`, or -1."""
-    for i, rbl in enumerate(pattern.stops):
-        if rbl in rbl_set:
-            return i
-    return -1
+    return next(
+        (i for i, rbl in enumerate(pattern.stops) if rbl in rbl_set),
+        -1,
+    )
+
+
+def _mot_by_label(
+    lines_by_label: dict[str, int], means_by_line: dict[int, str]
+) -> dict[str, str]:
+    """Label → MoT lookup; drops labels with no MoT.
+
+    Used at both the parse path and the load-from-store path so the
+    chip sort key stays identical regardless of which one populated the
+    in-memory state.
+    """
+    return {
+        label: mot
+        for label, line_id in lines_by_label.items()
+        if (mot := means_by_line.get(line_id))
+    }
+
+
+def _pick_validators(
+    prior: StaticCatalogue | None, key: str, *, force: bool
+) -> CacheValidators:
+    """Pick the validators to send on the next request for `key`.
+
+    `force=True` (e.g. first-load, or the prior cache lacks the index
+    we need) drops any saved validators so the upstream replies with
+    a full body. Otherwise reuse the saved validators if any.
+    """
+    if force or prior is None:
+        return CacheValidators()
+    return prior.validators.get(key) or CacheValidators()
 
 
 def _station_name_for_rbl(
@@ -1319,11 +1372,7 @@ def _trip_patterns_from_store(
         # parse path. Re-sort on read so a cache written under the old
         # numeric-only sort gets reordered to the new MoT-grouped order
         # without a network refresh.
-        mot_by_label_load: dict[str, str] = {}
-        for label, line_id in lines_by_label.items():
-            mot = means_by_line.get(line_id)
-            if mot:
-                mot_by_label_load[label] = mot
+        mot_by_label_load = _mot_by_label(lines_by_label, means_by_line)
         lines_at_diva = {
             int(k): _sort_line_labels(
                 [str(label) for label in (v or [])], mot_by_label_load

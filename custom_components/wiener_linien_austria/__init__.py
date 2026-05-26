@@ -135,7 +135,19 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
 
     if STATIC_REFRESH_UNSUB_KEY not in domain_data:
         async def _periodic_refresh(_now: Any) -> None:
-            refreshed = await async_refresh_catalogue(hass)
+            # Belt-and-braces: async_refresh_catalogue catches the known
+            # network / parse errors, but Store I/O can still raise
+            # OSError / JSONDecodeError. Without this guard, a refresh
+            # failure inside an async_track_time_interval callback only
+            # logs to HA core's generic listener log — invisible to the
+            # user under this integration's namespace.
+            try:
+                refreshed = await async_refresh_catalogue(hass)
+            except Exception as err:  # noqa: BLE001 — periodic callback safety net
+                _LOGGER.warning(
+                    "Static-catalogue periodic refresh failed: %s", err
+                )
+                return
             if refreshed is not None:
                 # Surface the new catalogue to future config-flow / entry-load
                 # callers. Already-running coordinators keep their captured
@@ -152,7 +164,16 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
 
     if ALERTS_REFRESH_UNSUB_KEY not in domain_data:
         async def _periodic_alerts(_now: Any) -> None:
-            await async_refresh_alerts(hass)
+            # Same safety-net rationale as _periodic_refresh above —
+            # exceptions inside an async_track_time_interval callback
+            # log to HA core's generic listener log, not under this
+            # integration's namespace.
+            try:
+                await async_refresh_alerts(hass)
+            except Exception as err:  # noqa: BLE001 — periodic callback safety net
+                _LOGGER.warning(
+                    "Alerts periodic refresh failed: %s", err
+                )
 
         # No eager first fetch — the periodic timer populates the cache after
         # ALERTS_REFRESH_SECONDS. During the warm-up window (up to 5 min after
@@ -189,13 +210,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
     # cannot do.
     _ensure_domain_timers(hass)
 
-    # Register shutdown AFTER first_refresh succeeds so a half-initialised
-    # coordinator that raised ConfigEntryNotReady doesn't leak listeners.
-    # `async_shutdown` is the canonical DataUpdateCoordinator cleanup hook
-    # (HA 2024.4+) — cancels the interval timer + debouncer task so the
-    # next entry reload doesn't accrete listeners.
-    entry.async_on_unload(coordinator.async_shutdown)
-
     entry.runtime_data = coordinator
 
     # Register the device up-front so the Devices panel shows the entry
@@ -226,6 +240,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
         # the original exception and HA's setup-error path runs.
         await _rollback_setup_failure(hass, coordinator)
         raise
+    # Register cleanup ONLY after platform forwarding succeeds. The
+    # rollback path above already runs `coordinator.async_shutdown()`;
+    # registering before forward_entry_setups would mean a double call
+    # on setup-failure rollback (HA invokes `async_on_unload` callbacks
+    # on both successful unload AND setup-failure paths).
+    entry.async_on_unload(coordinator.async_shutdown)
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
     return True
 
@@ -235,9 +255,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
 
     Single source of truth used by both `async_unload_entry` (normal
     last-unload path) and `_rollback_setup_failure` (setup-failure
-    path). Drift between the two used to be a recurring audit finding
-    — when a new key joins the cleanup tuple it has to land here, in
-    one place.
+    path) so a new cleanup key only has to land in one place.
 
     Cancels timer subscriptions, in-flight bg tasks, and pops every
     cache + validator key.
@@ -369,17 +387,14 @@ async def async_migrate_entry(hass: HomeAssistant, entry: WienerLinienConfigEntr
         config = {**entry.data, **entry.options}
         raw = config.get(CONF_LINES)
         if isinstance(raw, list):
-            collapsed: list[str] = []
-            seen: set[str] = set()
-            for item in raw:
-                if not isinstance(item, str) or not item:
-                    continue
-                parts = item.split("|", 2)
-                key = "|".join(parts[:2]) if len(parts) >= 2 else item
-                if key in seen:
-                    continue
-                seen.add(key)
-                collapsed.append(key)
+            # dict.fromkeys preserves first-seen order while deduping.
+            collapsed = list(
+                dict.fromkeys(
+                    "|".join(item.split("|", 2)[:2])
+                    for item in raw
+                    if isinstance(item, str) and item
+                )
+            )
             new_data = {**entry.data}
             new_options = {**entry.options}
             # CONF_LINES may live in either bucket depending on whether

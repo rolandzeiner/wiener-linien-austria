@@ -825,7 +825,12 @@ async def test_backoff_does_not_kick_in_on_single_failure(
 async def test_backoff_doubles_on_consecutive_failures(
     hass: HomeAssistant,
 ) -> None:
-    """Each failure past the first doubles the interval, up to BACKOFF_CAP_SECONDS."""
+    """Each failure past the first doubles the interval, up to BACKOFF_CAP_SECONDS.
+
+    `_note_failure` adds ±10 % jitter on top of the doubling to prevent
+    thundering-herd retries when the API recovers, so assert each
+    interval is within that envelope rather than equal to it.
+    """
     from custom_components.wiener_linien_austria.const import BACKOFF_CAP_SECONDS
 
     entry = _make_entry()
@@ -833,18 +838,27 @@ async def test_backoff_doubles_on_consecutive_failures(
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     base_secs = coordinator.update_interval.total_seconds()
 
-    # 1st failure: still at base. 2nd: 2x. 3rd: 4x. … capped at BACKOFF_CAP.
+    def _within_jitter(actual: timedelta, expected_secs: float) -> bool:
+        return (
+            expected_secs * 0.9
+            <= actual.total_seconds()
+            <= expected_secs * 1.1
+        )
+
+    # 1st failure: still at base. 2nd: 2x ± 10 %. 3rd: 4x ± 10 %. … capped.
     coordinator._note_failure()
     coordinator._note_failure()
-    assert coordinator.update_interval == timedelta(seconds=base_secs * 2)
+    assert _within_jitter(coordinator.update_interval, base_secs * 2)
 
     coordinator._note_failure()
-    assert coordinator.update_interval == timedelta(seconds=base_secs * 4)
+    assert _within_jitter(coordinator.update_interval, base_secs * 4)
 
-    # Drive past the cap by piling on failures.
+    # Drive past the cap by piling on failures. Once the un-jittered value
+    # would hit BACKOFF_CAP_SECONDS, every subsequent failure stays
+    # within ±10 % of the cap (the jitter applies after the cap clamp).
     for _ in range(20):
         coordinator._note_failure()
-    assert coordinator.update_interval == timedelta(seconds=BACKOFF_CAP_SECONDS)
+    assert _within_jitter(coordinator.update_interval, BACKOFF_CAP_SECONDS)
 
 
 async def test_backoff_resets_on_success(hass: HomeAssistant) -> None:

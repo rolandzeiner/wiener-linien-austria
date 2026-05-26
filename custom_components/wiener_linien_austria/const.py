@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from homeassistant.const import __version__ as _HA_VERSION
 
@@ -112,11 +112,19 @@ ATTRIBUTION: Final = (
 # publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
-# MeansOfTransport values → rough categorisation for UI icons
+# MeansOfTransport values → rough categorisation for UI icons. Mirrored
+# in src/utils/mot.ts; tests/test_card_version.py:test_line_type_constants
+# asserts byte-identity. `LineType` carries the same set as a Literal so
+# call sites can declare the narrow shape without restating the strings.
 LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
 LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
+LineType = Literal["ptMetro", "ptTram", "ptBusCity", "ptBusNight"]
+
+# Direction codes from the /monitor feed. "H" = Hinfahrt (outbound),
+# "R" = Rückfahrt (return). Used as keys in CONF_LINES ("U1|H").
+Direction = Literal["H", "R"]
 
 # Lovelace cards — each JS file carries a `const CARD_VERSION` that must
 # match the corresponding Python constant below byte-for-byte, else the
