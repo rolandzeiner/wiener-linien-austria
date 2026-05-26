@@ -65,24 +65,44 @@ const FLAP_MARCH_INTERVAL_MS = 130;
 
 // Letter + digit sequences for marching. Real Solari drums are split
 // by section — letters cycle through letters, digits cycle through
-// digits. Cross-section transitions (letter → digit, space → letter)
-// jump directly because a real board would have a separate drum and
-// would set the new value in one step.
+// digits. Each drum carries an extra "wildcard" slot at the end
+// (position seq.length) for blanks / punctuation / any non-sequence
+// char; a row growing or shrinking destination text then marches
+// through the drum to / from the wildcard slot rather than 1-step
+// jumping, so a blank tile flipping in or out reads as mechanical.
+// True cross-section transitions (letter ↔ digit) still jump in one
+// step — different physical drum, no rotation path between them.
 const FLAP_LETTER_SEQUENCE = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß";
 const FLAP_DIGIT_SEQUENCE = "0123456789";
 
-function nextInSeq(seq: string, from: string, to: string): string | null {
-  if (!seq.includes(from) || !seq.includes(to)) return null;
-  return seq[(seq.indexOf(from) + 1) % seq.length]!;
+function nextInSeq(seq: string, from: string, to: string): string {
+  // Non-sequence chars (space, hyphen, punctuation) map to the
+  // wildcard slot at index seq.length — the extra "blank face" on the
+  // drum. From the wildcard slot, the next step wraps to seq[0].
+  const fromIdx = seq.includes(from) ? seq.indexOf(from) : seq.length;
+  const next = (fromIdx + 1) % (seq.length + 1);
+  // Landing on the wildcard slot renders as the literal target char
+  // so the tile shows exactly what the caller asked for (e.g. " ").
+  return next === seq.length ? to : seq[next]!;
 }
 
 function flapNextChar(from: string, to: string): string {
   if (from === to) return to;
-  return (
-    nextInSeq(FLAP_LETTER_SEQUENCE, from, to) ??
-    nextInSeq(FLAP_DIGIT_SEQUENCE, from, to) ??
-    to
-  );
+  const fromIsLetter = FLAP_LETTER_SEQUENCE.includes(from);
+  const fromIsDigit = FLAP_DIGIT_SEQUENCE.includes(from);
+  const toIsLetter = FLAP_LETTER_SEQUENCE.includes(to);
+  const toIsDigit = FLAP_DIGIT_SEQUENCE.includes(to);
+  // Pick the drum: one side must be a real char in that drum AND
+  // the other side must not be a real char in the OTHER drum.
+  // (Cross-section letter ↔ digit can't march on either drum, so it
+  // falls through to the 1-step jump.)
+  if ((fromIsLetter || toIsLetter) && !fromIsDigit && !toIsDigit) {
+    return nextInSeq(FLAP_LETTER_SEQUENCE, from, to);
+  }
+  if ((fromIsDigit || toIsDigit) && !fromIsLetter && !toIsLetter) {
+    return nextInSeq(FLAP_DIGIT_SEQUENCE, from, to);
+  }
+  return to;
 }
 
 // Flip-state keys are `row{i}-{kind}`. Centralising the grammar in a
