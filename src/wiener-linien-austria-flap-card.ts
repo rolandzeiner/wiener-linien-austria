@@ -1203,21 +1203,30 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        credit). Same quiet caption voice as the colheader captions
        and MIN unit; word-breaks gracefully on narrow boards. */
     .flap-foot {
-      margin-top: 8px;
+      /* margin-top ≈ 1× line-height (14 px for an 11 px / 1.3 caption)
+         — clear separator from the dense row above without dragging
+         the credit into the rows' visual zone. */
+      margin-top: 14px;
       font-family: "Work Sans", "WL Sans", sans-serif;
       font-size: 11px;
       line-height: 1.3;
       letter-spacing: 0.02em;
-      color: var(--flap-quiet-fg);
+      /* --flap-cream-lo (not --flap-quiet-fg) — matches the column
+         captions and MIN unit voice so all small captions on the
+         board read as one material. --flap-quiet-fg is white-ish in
+         dark mode and would break the cream voice. */
+      color: var(--flap-cream-lo);
       text-align: center;
       overflow-wrap: anywhere;
     }
-    /* When the footer is present, shrink the panel's bottom padding
-       so the credit hugs the panel edge tightly instead of floating
-       above a 12 px gap. :has() keeps the rows-only layout (no
-       footer rendered) at its original 12 px breathing room. */
+    /* When the footer is present, keep the panel's bottom padding at
+       12 px — slightly less than the top margin (14 px) for optical
+       centring: small caps render top-heavy because their x-height
+       pulls the visual centre below the geometric one, so symmetric
+       padding would LOOK bottom-heavy. :has() keeps the rows-only
+       layout (no footer rendered) at the default 12 px. */
     .flap-panel:has(.flap-foot) {
-      padding-bottom: 6px;
+      padding-bottom: 12px;
     }
     /* housing off — drop the cabinet surround (bg, padding, bevel,
        drop shadow). The panel sits flush with the dashboard.

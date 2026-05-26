@@ -113,13 +113,18 @@ Designed for wall-tablet kiosks and entryway displays.
 
 ### Flap card — `wiener-linien-austria-flap-card`
 
-A Solari-style split-flap board, modelled on the Italian mechanical displays that dominated European stations and airports from the 1960s to the 1990s. Each character lands as a warm-cream flap on a dark housing — tiles cycle one step per ~130 ms toward the target letter until they settle, mimicking the cascading rattle of the real boards.
+A Solari-style split-flap board, modelled on the Italian mechanical displays that dominated European stations and airports from the 1960s to the 1990s. Each character lands as a flap tile on a cream-or-dark cabinet — tiles cycle one step per ~130 ms toward the target letter until they settle, mimicking the cascading rattle of the real boards.
 
 - **Multi-stop merge.** Configure up to 8 stops; departures merge and sort by countdown across the whole board. Per-stop filters for direction, lines, and walking time.
 - Up to **8 rows**, each with a per-row GLEIS / STEIG tile in its own column so the platform numbers line up across rows regardless of width.
-- **Station header strip** — same per-side grammar as the retro card (exit icon, sign text, amenities, MDI icons, labels) recoloured for the cream / dark housing.
+- **Column headers** above the board — *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT* — in the same caption voice as the MIN unit beside the countdown. STUFENLOS pin-aligns to the wheelchair pictogram's right edge instead of the stretched column.
+- **Signage header strip** — same per-side grammar as the retro card (exit icon, sign text, amenities, MDI icons, labels) recoloured for the cabinet palette.
+- **Station-name band** auto-tints to the first tracked line's GTFS colour (e.g. red for U1, orange for U3); editor dropdown lists each tracked line on multi-line boards plus a *White* / *Black* override. Station name stays in cream for cohesive voice across line-coloured surfaces.
 - **Accessibility column** — a blue ISA-style wheelchair tile on step-free departures, blank cream tile otherwise. Column stays the same width regardless.
-- **Light / dark palette** follows the active HA theme (`hass.themes.darkMode`) — not the OS — so a light HA theme on a dark OS still renders the light board.
+- **Editor mirrors the retro card's structure** — *Header → Station → Display → Tweaks* sections with parallel field ordering, so users moving between cards keep the same spatial mnemonic.
+- **Tweaks** — hide the line column entirely (useful for single-line boards where the line is implicit), or drop the cabinet surround so the board sits flush with the dashboard.
+- **CC-BY data-source credit** at the bottom of the panel by default; toggle off if the dashboard carries the credit elsewhere.
+- **Light / dark palette** follows the active HA theme (`hass.themes.darkMode`) — not the OS — so a light HA theme on a dark OS still renders the light board. Cabinet colour adapts in lockstep (cream in light, dark in dark).
 - **Reduced motion** swaps the rotation for a 60 ms cross-fade per WCAG 2.3.3.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
