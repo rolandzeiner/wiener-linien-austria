@@ -24,6 +24,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     ALERT_CACHE_VALIDATORS_KEY,
+    ALERTS_SEQ_KEY,
     API_BASE_URL,
     DOMAIN,
     ELEVATOR_INFO_KEY,
@@ -275,6 +276,12 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
         domain_data[ELEVATOR_INFO_KEY] = [_parse_elevator(x) for x in elevator_result]
     elif ELEVATOR_INFO_KEY not in domain_data:
         domain_data[ELEVATOR_INFO_KEY] = []
+
+    # Bump even on the 304/no-change path: the sensor cache treats
+    # "alerts seq advanced" as "rebuild," and that's the cheapest signal
+    # we have. A spurious rebuild every ~5 min is fine; missing a real
+    # change for hours because the cache key didn't move is not.
+    domain_data[ALERTS_SEQ_KEY] = int(domain_data.get(ALERTS_SEQ_KEY, 0)) + 1
 
     _LOGGER.debug(
         "Alerts refreshed: %d traffic, %d elevator (traffic_304=%s, elevator_304=%s)",

@@ -78,6 +78,12 @@ ALERTS_REFRESH_SECONDS: Final = 300
 TRAFFIC_INFO_KEY: Final = "traffic_info"
 ELEVATOR_INFO_KEY: Final = "elevator_info"
 ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
+# Monotonic counter bumped on every successful alerts refresh. Sensors
+# memoise their `extra_state_attributes` dict (which embeds the matched
+# alerts) and use this counter as the cache-validity tag — when alerts
+# refresh on their own ~5-min cadence (independent of the per-stop
+# coordinator tick), the sensor sees the bump and rebuilds.
+ALERTS_SEQ_KEY: Final = "alerts_seq"
 # Cache validators (ETag / Last-Modified) per alert feed, captured from
 # the previous /trafficInfoList response so unchanged feeds come back
 # as 304 Not Modified instead of full bodies.

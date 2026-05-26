@@ -93,6 +93,10 @@
     "rate_limited": {
       "title": "Wiener-Linien-Rate-Limit erreicht",
       "description": "Die Wiener Linien antworteten mit Fehler 316 (Rate-Limit überschritten) auf Abfragen für **{entry_title}**. Das konventionell für die OGD-Schnittstelle zirkulierte Mindestintervall beträgt 15 s; diese Integration nutzt 60 s Standard und mindestens 30 s, daher tritt das üblicherweise nur auf, wenn mehrere HA-Instanzen dieselbe Ausgangs-IP nutzen. Intervall erhöhen oder parallele Einträge reduzieren."
+    },
+    "catalogue_unavailable": {
+      "title": "Wiener-Linien-Haltestellenkatalog nicht verfügbar",
+      "description": "Der statische Haltestellenkatalog (Open Government Data) konnte während der Einrichtung nicht geladen werden. Die Linienauswahl ist auf eine reine Live-Abfrage zurückgefallen, in der aktuell außer Betrieb stehende Linien fehlen (z. B. Nightlines tagsüber oder saisonaler Verkehr). Konfiguration erneut durchführen, sobald die OGD-Schnittstelle wieder erreichbar ist, um die vollständige Auswahl zu erhalten."
     }
   }
 }

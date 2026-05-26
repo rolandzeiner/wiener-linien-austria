@@ -342,9 +342,15 @@ export class WienerLinienAustriaCard extends LitElement {
       host,
     );
     const canvas = host.querySelector("canvas");
-    if (!(canvas instanceof HTMLCanvasElement)) return;
+    if (!(canvas instanceof HTMLCanvasElement)) {
+      console.error("[wiener-linien-austria-card] QR canvas unavailable");
+      return;
+    }
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) {
+      console.error("[wiener-linien-austria-card] QR canvas unavailable");
+      return;
+    }
     const iconName = host.getAttribute("data-qr-icon") ?? "mdi:bus-stop";
     const iconPath = this._mdiPathFor(iconName);
     if (!iconPath) return;
@@ -736,10 +742,11 @@ export class WienerLinienAustriaCard extends LitElement {
     const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
     // Phone-first QR target: geo: URI hands off to the user's default
     // maps app (Apple Maps, Organic Maps, OsmAnd, …), no Google preference.
-    // Falls back to the HTTPS OSM URL when we don't have coordinates so
-    // the QR still resolves to something useful.
-    const geoUri =
-      this._stopGeoUri(title, attrs.latitude, attrs.longitude) ?? mapUrl;
+    // Stays null when coords are missing — falling back to the OSM web
+    // URL would make the QR open a browser tab, breaking the button's
+    // "hands off to your maps app" promise. The button is suppressed
+    // instead.
+    const geoUri = this._stopGeoUri(title, attrs.latitude, attrs.longitude);
     // Click target stays on the HTTPS stadtplan URL across all devices.
     // The HA Companion app embeds the dashboard in a WebView whose
     // navigation interceptor only forwards http(s):// schemes to the
@@ -1670,8 +1677,11 @@ export class WienerLinienAustriaCard extends LitElement {
       const search = window.location.search || "";
       if (search.includes("wl_debug=1")) return true;
       if (window.localStorage?.getItem("wl_debug") === "1") return true;
-    } catch {
-      // SSR / restricted ctx (e.g. localStorage blocked) — default off
+    } catch (err) {
+      console.warn(
+        "[wiener-linien-austria-card] dev-mode probe failed (SSR/restricted ctx?)",
+        err,
+      );
     }
     return false;
   }

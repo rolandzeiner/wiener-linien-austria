@@ -133,6 +133,17 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
+        # Memoised `extra_state_attributes` payload — HA calls that
+        # property on every state read AND every attribute read, so a
+        # busy dashboard can hammer it 10+ Hz. The build path queries
+        # hass.data (alerts, line colours, catalogue) and re-parses
+        # CONF_LINES every time; caching collapses that to once per
+        # coordinator tick OR alerts refresh. Invalidated by:
+        #   • `_async_update_data` setting cache=None at the top, and
+        #   • sensor.py noticing `ALERTS_SEQ_KEY` advanced past
+        #     `_attrs_cache_alerts_seq`.
+        self._attrs_cache: dict[str, Any] | None = None
+        self._attrs_cache_alerts_seq: int | None = None
         diva_int = _safe_int(config.get(CONF_DIVA))
         if diva_int is None:
             raise ConfigEntryError(
@@ -267,6 +278,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
 
     async def _async_update_data(self) -> MonitorData:
         """Fetch departures and return a sorted MonitorData."""
+        # Drop the attrs cache before the fetch, not after — failures
+        # also produce a state change (CoordinatorEntity flips to
+        # unavailable per its own logic), and a stale cached attrs
+        # dict would survive that transition.
+        self._attrs_cache = None
+        self._attrs_cache_alerts_seq = None
         try:
             data = await self._fetch_monitor_data()
         except UpdateFailed:

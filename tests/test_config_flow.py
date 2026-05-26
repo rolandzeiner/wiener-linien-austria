@@ -535,3 +535,83 @@ def test_static_catalogue_index_by_rbl_caches() -> None:
     assert first[90015] == (60201470, "Leopoldau")
     assert 99999 not in first
 
+
+# ---------------------------------------------------------------------------
+# Repairs issue surfacing when the catalogue load fails inside select_lines.
+# The pre-fix fallback was silent — picker just lost any off-service lines
+# (nightlines during the day) with no user-visible signal.
+# ---------------------------------------------------------------------------
+
+
+async def test_select_lines_raises_repairs_issue_when_catalogue_fails(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Catalogue failure during select_lines must create a Repairs issue."""
+    from homeassistant.helpers import issue_registry as ir
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
+    )
+    assert result["step_id"] == "select_stop"
+
+    # Override the autouse-success patch for the select_lines call only.
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
+        new_callable=AsyncMock,
+        side_effect=aiohttp.ClientError("OGD endpoint down"),
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_DIVA: "60201012"}
+        )
+
+    # Flow still progresses to select_lines — the degraded picker is
+    # better than blocking entirely on a transient OGD outage.
+    assert result["step_id"] == "select_lines"
+
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable")
+    assert issue is not None
+    assert issue.translation_key == "catalogue_unavailable"
+    assert issue.severity == ir.IssueSeverity.WARNING
+
+
+async def test_select_lines_clears_repairs_issue_on_recovery(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """A successful catalogue load clears any prior catalogue_unavailable issue."""
+    from homeassistant.helpers import issue_registry as ir
+
+    # Pre-seed the issue as if a previous attempt failed.
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "catalogue_unavailable",
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key="catalogue_unavailable",
+    )
+    assert (
+        ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable")
+        is not None
+    )
+
+    # Run the flow normally — the autouse mock_static_catalogue fixture
+    # makes async_get_catalogue succeed, so the issue should be cleared.
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "60201012"}
+    )
+    assert result["step_id"] == "select_lines"
+
+    assert (
+        ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable")
+        is None
+    )
+

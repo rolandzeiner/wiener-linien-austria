@@ -486,3 +486,105 @@ async def test_attributes_include_matched_alerts(hass: HomeAssistant) -> None:
     assert [t["name"] for t in attrs["traffic_info"]] == ["T1"]
     # Only the RBL 4111 elevator alert is surfaced (CONF_RBLS filters).
     assert [e["name"] for e in attrs["elevator_info"]] == ["E1"]
+
+
+# ---------------------------------------------------------------------------
+# extra_state_attributes caching (HA calls this on every read; cache collapses
+# the rebuild to once per coordinator tick OR alerts refresh — see
+# WienerLinienAustriaCoordinator._attrs_cache for the invalidation contract.)
+# ---------------------------------------------------------------------------
+
+
+async def test_extra_state_attributes_cached_within_tick(
+    hass: HomeAssistant,
+) -> None:
+    """Repeat reads inside the same tick return the cached dict object."""
+    from unittest.mock import patch
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+
+    with patch(
+        "custom_components.wiener_linien_austria.sensor.get_alerts_for",
+        return_value=([], []),
+    ) as mock_alerts:
+        first = sensor.extra_state_attributes
+        second = sensor.extra_state_attributes
+        third = sensor.extra_state_attributes
+
+    # Same object identity — the cache returned the stored ref, not a fresh
+    # build. The build path is what calls get_alerts_for; if the assertion
+    # below ever rises above 1, the cache regressed.
+    assert first is second is third
+    assert mock_alerts.call_count == 1
+
+
+async def test_extra_state_attributes_rebuilt_when_alerts_seq_bumps(
+    hass: HomeAssistant,
+) -> None:
+    """Alerts refreshing on its own cadence must invalidate the cached attrs."""
+    from unittest.mock import patch
+
+    from custom_components.wiener_linien_austria.const import ALERTS_SEQ_KEY
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    hass.data.setdefault(DOMAIN, {})[ALERTS_SEQ_KEY] = 1
+
+    with patch(
+        "custom_components.wiener_linien_austria.sensor.get_alerts_for",
+        return_value=([], []),
+    ) as mock_alerts:
+        sensor.extra_state_attributes  # build + cache at seq=1
+        sensor.extra_state_attributes  # served from cache
+        hass.data[DOMAIN][ALERTS_SEQ_KEY] = 2  # alerts refresh tick
+        sensor.extra_state_attributes  # rebuild at seq=2
+        sensor.extra_state_attributes  # served from cache at seq=2
+
+    assert mock_alerts.call_count == 2
+
+
+async def test_async_update_data_clears_attrs_cache(
+    hass: HomeAssistant,
+) -> None:
+    """Coordinator update wipes the attrs cache so the next read rebuilds."""
+    from unittest.mock import AsyncMock, patch
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+
+    with patch(
+        "custom_components.wiener_linien_austria.sensor.get_alerts_for",
+        return_value=([], []),
+    ) as mock_alerts:
+        sensor.extra_state_attributes
+        sensor.extra_state_attributes
+        # Drive a successful coordinator tick — the cache must drop even
+        # though departures + alerts didn't change, because the recorder
+        # writes the attrs dict per state and a stale cache would freeze
+        # whatever was captured at the previous tick.
+        new_data = MonitorData(departures=[], server_time="2026-04-20T14:41:00+0200")
+        with patch.object(
+            coordinator,
+            "_fetch_monitor_data",
+            new=AsyncMock(return_value=new_data),
+        ):
+            await coordinator._async_update_data()
+        sensor.extra_state_attributes
+
+    assert mock_alerts.call_count == 2

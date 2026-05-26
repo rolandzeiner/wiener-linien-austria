@@ -731,32 +731,39 @@ export class WienerLinienAustriaRetroCardEditor
     if (this._config.direction === onlyAvail) return;
     this._pendingDirectionFix = true;
     Promise.resolve().then(() => {
-      this._pendingDirectionFix = false;
-      if (!this._config) return;
-      // Re-check after the async hop — entity might have changed in
-      // the meantime; the new entity might have both directions again.
-      const stillAvail = this._availableDirections();
-      if (stillAvail.size !== 1) return;
-      const target = stillAvail.has("H") ? "H" : "R";
-      if (this._config.direction === target) return;
-      const next: NormalisedRetroConfig = { ...this._config, direction: target };
-      // Direction flipped — re-pick `line` if the saved one doesn't run
-      // in the new direction (mirrors _onFormChanged so a one-way stop
-      // whose departures streamed in late ends up with a coherent line,
-      // not one stranded on the direction we just corrected away from).
-      const linesNow = linesForDirection(this._attrs(next.entity), target);
-      if (!next.line || !linesNow.includes(next.line)) {
-        next.line = linesNow[0];
+      try {
+        if (!this._config) return;
+        // Re-check after the async hop — entity might have changed in
+        // the meantime; the new entity might have both directions again.
+        const stillAvail = this._availableDirections();
+        if (stillAvail.size !== 1) return;
+        const target = stillAvail.has("H") ? "H" : "R";
+        if (this._config.direction === target) return;
+        const next: NormalisedRetroConfig = { ...this._config, direction: target };
+        // Direction flipped — re-pick `line` if the saved one doesn't run
+        // in the new direction (mirrors _onFormChanged so a one-way stop
+        // whose departures streamed in late ends up with a coherent line,
+        // not one stranded on the direction we just corrected away from).
+        const linesNow = linesForDirection(this._attrs(next.entity), target);
+        if (!next.line || !linesNow.includes(next.line)) {
+          next.line = linesNow[0];
+        }
+        // Surface the autocorrect — silently rewriting saved config is
+        // user-meaningful (their typed direction just changed). Console
+        // only, since the editor's auto-correct is by design; a future
+        // pass could replace this with a render-time hint.
+        // eslint-disable-next-line no-console
+        console.info(
+          `[wiener-linien-austria-retro-card-editor] direction autocorrected to "${target}" for entity "${next.entity ?? ""}" — only one direction has live data`,
+        );
+        this._commit(next);
+      } finally {
+        // Clear AFTER the work runs: if we cleared at the top, a rapid
+        // entity change between schedule and microtask would let a
+        // second autocorrect queue against the same render frame and
+        // double-fire when both microtasks resolved.
+        this._pendingDirectionFix = false;
       }
-      // Surface the autocorrect — silently rewriting saved config is
-      // user-meaningful (their typed direction just changed). Console
-      // only, since the editor's auto-correct is by design; a future
-      // pass could replace this with a render-time hint.
-      // eslint-disable-next-line no-console
-      console.info(
-        `[wiener-linien-austria-retro-card-editor] direction autocorrected to "${target}" for entity "${next.entity ?? ""}" — only one direction has live data`,
-      );
-      this._commit(next);
     });
   }
 
