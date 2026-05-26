@@ -19,6 +19,7 @@
 
 import type {
   FlapSize,
+  FlapStationBg,
   FlapStopConfig,
   RetroHeaderSide,
   WalkTimes,
@@ -31,6 +32,30 @@ const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
   "medium",
   "regular",
 ] as const);
+
+/** Whitelist for station_bg. `"line"` (sentinel) and the two literal
+ *  colour values are exact-match; `"line:<X>"` is matched by prefix in
+ *  the normaliser. The renderer resolves `"line"`/`"line:<X>"` against
+ *  the live GTFS palette at paint time. */
+const FLAP_STATION_BG_LITERALS: ReadonlySet<FlapStationBg> = new Set([
+  "line",
+  "white",
+  "black",
+] as const);
+
+function normaliseStationBg(raw: unknown): FlapStationBg {
+  if (typeof raw !== "string") return "line";
+  if (FLAP_STATION_BG_LITERALS.has(raw as FlapStationBg)) {
+    return raw as FlapStationBg;
+  }
+  if (raw.startsWith("line:") && raw.length > 5) {
+    // Trust whatever line key the user typed — the renderer falls
+    // back gracefully if the line isn't in the live `line_colors`
+    // map (typo, removed line, off-network sensor).
+    return raw as FlapStationBg;
+  }
+  return "line";
+}
 
 function asBool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
@@ -116,13 +141,16 @@ export interface NormalisedFlapConfigValidated {
   size: FlapSize;
   max_rows: number;
   show_platform: boolean;
-  show_station_header: boolean;
+  show_station_name: boolean;
+  station_bg: FlapStationBg;
   show_min_unit: boolean;
   show_accessibility: boolean;
   accessibility_only: boolean;
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  line_pill: boolean;
+  housing: boolean;
 }
 
 // Mirror retro/modern: a NormalisedFlapConfig is the validated set + the
@@ -148,21 +176,31 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "size",
   "max_rows",
   "show_platform",
+  "show_station_name",
+  // Legacy alias for show_station_name — accepted by the normaliser
+  // for back-compat, must NOT leak into the passthrough.
   "show_station_header",
+  "station_bg",
   "show_min_unit",
   "show_accessibility",
   "accessibility_only",
   "show_header",
   "header_left",
   "header_right",
+  "line_pill",
+  "housing",
 ]);
 
 export function normaliseFlapConfig(
   raw: WienerLinienFlapCardConfig,
 ): NormalisedFlapConfig {
+  // Default = "small" (which the editor surfaces as "Normal"). The
+  // smaller pitch keeps the board readable in mixed-height dashboard
+  // grids; users who want the bigger pitch can opt into "regular"
+  // (now labelled "Groß" / "Large").
   const size: FlapSize = FLAP_SIZES.has(raw.size as FlapSize)
     ? (raw.size as FlapSize)
-    : "regular";
+    : "small";
 
   // max_rows 1..8 — multi-stop merge can produce 6-8 imminent departures.
   const maxRowsRaw = Number(raw.max_rows);
@@ -224,6 +262,21 @@ export function normaliseFlapConfig(
 
   const passthrough = filterPassthrough(raw, FLAP_VALIDATED_KEYS);
 
+  const station_bg = normaliseStationBg(raw.station_bg);
+
+  // Accept either `show_station_name` (current) or the legacy
+  // `show_station_header` so configs from before the rename keep
+  // working. Existing field wins only if explicitly set; otherwise
+  // fall through to the new name's default (true).
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
+  const legacyStation = raw.show_station_header;
+  const show_station_name =
+    typeof raw.show_station_name === "boolean"
+      ? raw.show_station_name
+      : typeof legacyStation === "boolean"
+        ? legacyStation
+        : true;
+
   return {
     ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-flap-card",
@@ -231,7 +284,8 @@ export function normaliseFlapConfig(
     size,
     max_rows,
     show_platform: asBool(raw.show_platform, true),
-    show_station_header: asBool(raw.show_station_header, true),
+    show_station_name,
+    station_bg,
     show_min_unit: asBool(raw.show_min_unit, true),
     show_accessibility: asBool(raw.show_accessibility, true),
     accessibility_only: raw.accessibility_only === true,
@@ -241,5 +295,10 @@ export function normaliseFlapConfig(
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
+    // Tweaks — default values preserve the pre-tweak look:
+    //   line_pill = false → line column visible
+    //   housing  = true  → cream cabinet wraps the board
+    line_pill: raw.line_pill === true,
+    housing: asBool(raw.housing, true),
   };
 }

@@ -449,6 +449,20 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
 
 export type FlapSize = "small" | "medium" | "regular";
 
+/** Station-name band background.
+ *  - `"line"`     — sentinel: use the first tracked line's GTFS colour
+ *                   at render time (e.g. U1 → red, U3 → orange).
+ *  - `"line:U1"`  — explicit per-line colour, picked from the editor's
+ *                   per-line dropdown when the user wants a specific
+ *                   line's tint on a multi-line board.
+ *  - `"white"`    — solid white.
+ *  - `"black"`    — solid black.
+ *  String-template form keeps the union open without compile-time
+ *  enumeration of every Wiener Linien line; the normaliser validates
+ *  the prefix and the renderer falls back to WL-orange if the named
+ *  line isn't in the live `line_colors` map. */
+export type FlapStationBg = "line" | "white" | "black" | `line:${string}`;
+
 /** Per-stop config inside `WienerLinienFlapCardConfig.entities`.
  *  Same grammar as the modern card's `ModernStopConfig`: an entity
  *  plus optional filters that scope the merged departure feed.
@@ -489,7 +503,17 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  first row's platform changes" problem the old side-toggle was
    *  there to work around. */
   show_platform?: boolean | undefined;
-  /** Show the WL-orange header band with the station name. */
+  /** Show the WL-orange station-name band. Mirrors the retro card's
+   *  field of the same name. Default `true`. */
+  show_station_name?: boolean | undefined;
+  /** Background colour for the station-name band. Defaults to the
+   *  first tracked line's GTFS colour (sentinel `"line"`); user can
+   *  pick a specific line (`"line:U3"`), `"white"`, or `"black"`. */
+  station_bg?: FlapStationBg | undefined;
+  /** @deprecated Renamed to `show_station_name` to match retro card.
+   *  Accepted by the normaliser for back-compat (existing configs
+   *  using the old key keep working); new configs should use
+   *  `show_station_name`. */
   show_station_header?: boolean | undefined;
   /** Show a small "min" caption after each countdown number. */
   show_min_unit?: boolean | undefined;
@@ -508,4 +532,17 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Tweak — hide the line column entirely. Useful for single-line
+   *  setups where the line is implicit (e.g. a card scoped to one
+   *  metro line via per-stop `lines` filter). Default `false`. The
+   *  name mirrors the retro card's `line_pill` toggle by convention,
+   *  even though the flap-card effect is different (column hide vs
+   *  pill render); both are presentation tweaks on the line slot. */
+  line_pill?: boolean | undefined;
+  /** Tweak — wrap the board in the cream-cabinet housing (bevel +
+   *  drop shadow). Default `true` (preserves the original flap-card
+   *  look). When `false`, the board sits flush against the dashboard
+   *  with no surround — matches the retro card's `housing` semantics
+   *  (off = flush, on = bezel). */
+  housing?: boolean | undefined;
 }

@@ -29,6 +29,7 @@ import {
 import "./flap-editor.js";
 import type {
   DepartureAttr,
+  FlapSize,
   HomeAssistant,
   LineColorPair,
   LovelaceCardEditor,
@@ -44,6 +45,7 @@ import { findWienerLinienEntities } from "./utils/entities.js";
 import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
+  type NormalisedFlapStop,
 } from "./utils/flap-config.js";
 import { formatDate } from "./utils/time.js";
 import {
@@ -90,6 +92,23 @@ type FlipFieldKind = "line" | "dest" | "cd";
 function flipKey(rowIdx: number, kind: FlipFieldKind): string {
   return `row${rowIdx}-${kind}`;
 }
+
+// Tile widths per size variant. Mirrors `.flap-tile { width: … }` in
+// the stylesheet below; kept here so the column-header layout can pin
+// labels to actual content coordinates (e.g. STUFENLOS hugs the
+// pictogram's right edge rather than the stretched 1fr column edge).
+// Bump in lockstep with the CSS — a divergence would silently mis-
+// align the headers.
+const TILE_W_BY_SIZE: Record<FlapSize, number> = {
+  small: 22,
+  medium: 28,
+  regular: 32,
+};
+// Inter-tile gap inside `.flap-tiles` (`gap: 2px`) and between the
+// dest tile-strip and the pictogram inside `.flap-cell--dest`
+// (`gap: 6px`). Same lockstep caveat as TILE_W_BY_SIZE.
+const TILE_GAP_PX = 2;
+const DEST_PICTOGRAM_GAP_PX = 6;
 
 // Two-tile countdown snapshot. Single-digit values pad with a leading
 // blank so the visual width is constant on the 10→9 / 0→N boundaries.
@@ -506,7 +525,29 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       [`flap--size-${cfg.size}`]: cfg.size !== "regular",
       "flap--has-platform": hasAnyPlatform,
       "flap--light": isLightTheme,
+      // line_pill — flap-card semantics: hide the entire line column.
+      // Mirrors retro's `line_pill` tweak NAME but not its effect
+      // (retro renders the line as a pill; flap has no LED voice to
+      // pill against, so the equivalent presentation tweak is column
+      // suppression — useful on single-line setups).
+      "flap--no-line": cfg.line_pill,
+      // housing — when off, drop the cabinet surround so the panel
+      // sits flush. Default on, so existing dashboards keep the
+      // cabinet look.
+      "flap--no-housing": !cfg.housing,
     };
+
+    // Resolve the station-band bg/fg from cfg.station_bg + the live
+    // GTFS palette. Done at render time (not normalise) because the
+    // line colour comes from sensor state, not config. Falls back to
+    // WL-orange when the named line isn't in line_colors (typo,
+    // off-network sensor, etc.).
+    const headerStyle = this._resolveStationHeaderStyle(
+      cfg.station_bg,
+      cfg.entities,
+      rows,
+      lineColors,
+    );
 
     const stationHeaderStrip = cfg.show_header
       ? this._renderStationHeader(cfg.header_left, cfg.header_right, serverTime)
@@ -517,17 +558,80 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         <div class=${classMap(classes)}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${stationHeaderStrip}
-          ${cfg.show_station_header
-            ? html`<div class="flap-header" role="group">
+          ${cfg.show_station_name
+            ? html`<div
+                class="flap-header"
+                role="group"
+                style=${styleMap(headerStyle)}
+              >
                 <div class="flap-header__station">${stationName}</div>
               </div>`
             : nothing}
           <div class="flap-panel">
-            ${this._renderBoard(eids, rows, hasAnyPlatform, platformLabel, lineColors)}
+            ${this._renderBoard(
+              eids,
+              rows,
+              hasAnyPlatform,
+              platformLabel,
+              cfg.show_accessibility,
+              cfg.line_pill,
+              lineColors,
+            )}
           </div>
         </div>
       </ha-card>
     `;
+  }
+
+  /** Resolve the station-name band's bg + fg from cfg.station_bg.
+   *
+   *  - `"white"` / `"black"`  → static colour pair (text colour picked
+   *                              for AAA contrast on each surface).
+   *  - `"line"`               → sentinel: use the FIRST tracked line's
+   *                              GTFS colour at render time. Looks at
+   *                              `entities[0].lines[0]` first (user's
+   *                              explicit config), falls back to the
+   *                              first row's line (live data) when no
+   *                              `lines` filter is set.
+   *  - `"line:<X>"`           → use line `<X>`'s GTFS colour
+   *                              regardless of which line is dominant.
+   *
+   *  Returns a `styleMap`-compatible object. WL-orange is the ultimate
+   *  fallback so a fresh entry without sensor data ever renders blank.
+   */
+  private _resolveStationHeaderStyle(
+    bg: NormalisedFlapConfig["station_bg"],
+    entities: NormalisedFlapStop[],
+    rows: DepartureAttr[],
+    lineColors: Record<string, LineColorPair>,
+  ): Record<string, string> {
+    if (bg === "white") {
+      return { background: "#ffffff", color: "#1a1410" };
+    }
+    if (bg === "black") {
+      return { background: "#000000", color: "var(--flap-cream-hi)" };
+    }
+    let line: string | undefined;
+    if (bg === "line") {
+      line = entities[0]?.lines?.[0] ?? rows[0]?.line;
+    } else if (bg.startsWith("line:")) {
+      line = bg.slice(5);
+    }
+    if (!line) {
+      return { background: "var(--wl-orange)" };
+    }
+    const palette = chipPalette(line, {}, lineColors);
+    // chipPalette emits `var(--primary-color)` as the unknown-line
+    // fallback — swap that for WL-orange so the station band keeps a
+    // coherent Wiener Linien voice when the named line isn't yet in
+    // the live palette (e.g. integration just started, sensor warm-up).
+    const background =
+      palette.background === "var(--primary-color)"
+        ? "var(--wl-orange)"
+        : palette.background;
+    return palette.color
+      ? { background, color: palette.color }
+      : { background };
   }
 
   // ------------------------------------------------------------------
@@ -648,6 +752,8 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     rows: DepartureAttr[],
     hasAnyPlatform: boolean,
     platformLabel: string,
+    showAccessibility: boolean,
+    hideLineColumn: boolean,
     lineColors: Record<string, LineColorPair>,
   ): TemplateResult {
     const maxDestLen = this._maxDestLen(rows);
@@ -662,36 +768,75 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       const key = anyDepartures ? "no_data" : "betriebsschluss";
       return html`<div class="flap-empty">${this._t(key)}</div>`;
     }
-    // Optional thin column-header caption above the rows. Renders
-    // only when the platform column is allocated, gives the new
-    // column reading context ("GLEIS" / "STEIG") without repeating
-    // a label on every row. Aligned to the platform column via the
-    // same grid template the rows use.
+    // Thin column-header caption above the rows — gives every column
+    // reading context (LINE / DIRECTION / STEP-FREE / GLEIS) using the
+    // same caption voice as the MIN unit beside the countdown.
     // The board is one outer CSS grid; the colheader + each row are
-    // subgrids that inherit its column tracks. That's how the GLEIS
-    // caption stays pinned to the platform column — auto-sized
-    // tracks across independent grids resolve independently, so the
-    // pre-subgrid layout drifted whenever line/dest content widths
-    // changed. role="list" + role="listitem" preserve the list
-    // semantics that the dropped <ul>/<li> pair was carrying.
+    // subgrids that inherit its column tracks. That's how each caption
+    // stays pinned to its column — auto-sized tracks across independent
+    // grids resolve independently, so the pre-subgrid layout drifted
+    // whenever line/dest content widths changed.
+    // The STEP-FREE marker shares the dest column header span with the
+    // DIRECTION label (justify-content: space-between in CSS) rather
+    // than its own grid track, because the wheelchair pictogram is
+    // already a sibling of the towards text inside .flap-cell--dest —
+    // promoting it to its own column would force a larger layout
+    // restructure with no visual win.
+    // We cap the dest header span's max-width to the actual content
+    // width (tile-strip + gap + pictogram tile), so STUFENLOS lands
+    // at the pictogram's right edge instead of the stretched 1fr
+    // column edge — pixel-aligning the caption with what it describes.
+    // role="list" + role="listitem" preserve the list semantics that
+    // the dropped <ul>/<li> pair was carrying.
+    const tileW = TILE_W_BY_SIZE[this._config?.size ?? "regular"];
+    const destStripPx =
+      maxDestLen * tileW + Math.max(0, maxDestLen - 1) * TILE_GAP_PX;
+    const destContentPx = showAccessibility
+      ? destStripPx + DEST_PICTOGRAM_GAP_PX + tileW
+      : destStripPx;
     return html`
       <div
         class=${classMap({
           "flap-board": true,
           "flap-board--has-platform": hasAnyPlatform,
+          "flap-board--no-line": hideLineColumn,
         })}
         role="list"
         aria-label=${this._t("departures_list")}
       >
-        ${hasAnyPlatform
-          ? html`<div class="flap-colheader" aria-hidden="true">
-              <span></span><span></span
-              ><span class="flap-colheader__platform">${platformLabel}</span
-              ><span></span>
-            </div>`
-          : nothing}
+        <div class="flap-colheader" aria-hidden="true">
+          ${hideLineColumn
+            ? nothing
+            : html`<span class="flap-colheader__line"
+                >${this._t("col_line")}</span
+              >`}
+          <span
+            class="flap-colheader__dest"
+            style=${styleMap({ maxWidth: `${destContentPx}px` })}
+          >
+            <span>${this._t("col_dest")}</span>
+            ${showAccessibility
+              ? html`<span class="flap-colheader__step-free"
+                  >${this._t("col_step_free")}</span
+                >`
+              : nothing}
+          </span>
+          ${hasAnyPlatform
+            ? html`<span class="flap-colheader__platform"
+                >${platformLabel}</span
+              >`
+            : nothing}
+          <span class="flap-colheader__cd">${this._t("col_cd")}</span>
+        </div>
         ${rows.map((d, i) =>
-          this._renderRow(d, i, lineColors, hasAnyPlatform, maxDestLen),
+          this._renderRow(
+            d,
+            i,
+            lineColors,
+            hasAnyPlatform,
+            hideLineColumn,
+            maxDestLen,
+          ),
         )}
       </div>
     `;
@@ -702,6 +847,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     rowIndex: number,
     lineColors: Record<string, LineColorPair>,
     hasAnyPlatform: boolean,
+    hideLineColumn: boolean,
     maxDestLen: number,
   ): TemplateResult {
     const cfg = this._config!;
@@ -757,9 +903,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
     return html`
       <div class="flap-row" role="listitem" aria-label=${rowLabel}>
-        <div class="flap-cell flap-cell--line" aria-hidden="true">
-          ${this._renderFlipString(line, flipKey(rowIndex, "line"), lineTileOpts)}
-        </div>
+        ${hideLineColumn
+          ? nothing
+          : html`<div class="flap-cell flap-cell--line" aria-hidden="true">
+              ${this._renderFlipString(line, flipKey(rowIndex, "line"), lineTileOpts)}
+            </div>`}
         <div class="flap-cell flap-cell--dest" aria-hidden="true">
           ${this._renderFlipString(
             towards.padEnd(maxDestLen, " "),
@@ -1029,6 +1177,22 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       font-size: 22px;
       letter-spacing: 0.04em;
     }
+    /* housing off — drop the cabinet surround (bg, padding, bevel,
+       drop shadow). The panel sits flush with the dashboard.
+       .flap-header loses its rounded top corners with the surrounding
+       padding gone, so we re-pin them here so the band still reads as
+       a contained band rather than a bleeding rectangle. */
+    .flap--no-housing.flap {
+      background: transparent;
+      padding: 0;
+      box-shadow: none;
+    }
+    .flap--no-housing .flap-header {
+      border-radius: 4px 4px 0 0;
+    }
+    .flap--no-housing > .flap-panel:first-of-type {
+      border-radius: 4px;
+    }
     .flap-panel {
       background: var(--flap-bg);
       border-radius: 0 0 4px 4px;
@@ -1061,6 +1225,17 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap-board--has-platform {
       grid-template-columns: auto 1fr auto auto;
     }
+    /* line_pill (flap-card semantics: hide line column) — the line
+       cell + line colheader span are skipped in the template, so the
+       grid loses its first auto track and shifts dest into column 1.
+       Subgrids on .flap-colheader / .flap-row pick up the new track
+       count automatically; no per-cell rules needed. */
+    .flap-board--no-line {
+      grid-template-columns: 1fr auto;
+    }
+    .flap-board--no-line.flap-board--has-platform {
+      grid-template-columns: 1fr auto auto;
+    }
     .flap-colheader {
       display: grid;
       grid-template-columns: subgrid;
@@ -1080,6 +1255,30 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     .flap-colheader__platform {
       text-align: center;
+    }
+    .flap-colheader__line {
+      text-align: start;
+    }
+    .flap-colheader__dest {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+    .flap-colheader__step-free {
+      /* Sits at the right edge of the dest column via the parent's
+         space-between. The wheelchair pictogram lives inside
+         .flap-cell--dest at varying x (its position depends on
+         maxDestLen), so the caption can't be pixel-pinned to the
+         pictogram; instead it labels the column as a whole, matching
+         how GLEIS labels the platform column. */
+      text-align: end;
+    }
+    .flap-colheader__cd {
+      /* Mirrors .flap-cell--cd justify-content:flex-end so ANKUNFT
+         lands above the right-packed countdown digits + MIN suffix. */
+      text-align: end;
     }
     .flap-row {
       display: grid;

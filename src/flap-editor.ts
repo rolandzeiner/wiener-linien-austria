@@ -116,6 +116,39 @@ export class WienerLinienAustriaFlapCardEditor
       : undefined;
   }
 
+  /** Options for the station-band background selector.
+   *
+   *  Order: sentinel ("First line"), per-line entries (one per line
+   *  in the live `line_colors` palette from the first stop's sensor),
+   *  then the two static colour options (white, black).
+   *
+   *  Per-line entries come from the SENSOR's `line_colors` attribute
+   *  rather than the user's `lines` config because (a) sensors carry
+   *  the full GTFS palette regardless of which lines the user filters
+   *  on (so the editor can offer transfer-line colours too), and (b)
+   *  a fresh entry with no lines filter still produces meaningful
+   *  options. Falls back to sentinel-only when no sensor data is
+   *  loaded yet (rare — but a fresh dashboard preview hits this). */
+  private _stationBgOptions(): ReadonlyArray<{ value: string; label: string }> {
+    const options: { value: string; label: string }[] = [
+      { value: "line", label: this._et("station_bg_line") },
+    ];
+    const firstEid = this._config?.entities?.[0]?.entity;
+    const lineColors = firstEid
+      ? (this.hass?.states?.[firstEid]?.attributes as
+          | WienerLinienAttrs
+          | undefined)?.line_colors
+      : undefined;
+    if (lineColors) {
+      for (const line of Object.keys(lineColors).sort()) {
+        options.push({ value: `line:${line}`, label: line });
+      }
+    }
+    options.push({ value: "white", label: this._et("station_bg_white") });
+    options.push({ value: "black", label: this._et("station_bg_black") });
+    return options;
+  }
+
   /** Shared options list for both header sides' "Exit icon" dropdown. */
   private _exitOptions(): ReadonlyArray<{ value: string; label: string }> {
     const base: { value: string; label: string }[] = [
@@ -147,20 +180,69 @@ export class WienerLinienAustriaFlapCardEditor
         },
       },
       {
+        // Station-header strip — same per-side grammar as retro card.
+        // Placed before "Station" + "Display" because the header is the
+        // topmost visual element; the editor section order mirrors the
+        // visual stack so top-down scanning finds the right knob.
+        type: "expandable",
+        name: "header",
+        title: this._et("section_header"),
+        flatten: true,
+        schema: [
+          { name: "show_header", selector: { boolean: {} } },
+          this._headerSideSchema("header_left"),
+          this._headerSideSchema("header_right"),
+        ],
+      },
+      {
+        // Station-name band — mirrors retro-card's `station` section
+        // verbatim (show_station_name + station_bg). Sits between the
+        // signage header above and the departure board below to match
+        // the on-card vertical order.
+        type: "expandable",
+        name: "station",
+        title: this._et("section_station"),
+        flatten: true,
+        schema: [
+          { name: "show_station_name", selector: { boolean: {} } },
+          {
+            // Dropdown mode — the per-line options expand with every
+            // tracked line, so a "list" (radio column) would grow
+            // tall on multi-line boards. Dropdown stays compact.
+            name: "station_bg",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: this._stationBgOptions(),
+              },
+            },
+          },
+        ],
+      },
+      {
+        // Field order mirrors retro-card's `display` section:
+        // column-allocation feature toggles (show_platform-equivalent
+        // in retro is also first), then accessibility-related filter,
+        // then the behaviour knob (max_rows is flap-specific — retro
+        // has no max-rows because it tracks one line/direction), then
+        // presentation (min caption), then the size grid at the
+        // bottom. Keeping the two cards in step lets users move
+        // between them without re-learning the editor's spatial
+        // mnemonic.
         type: "expandable",
         name: "display",
         title: this._et("section_display"),
         flatten: true,
         schema: [
+          { name: "show_platform", selector: { boolean: {} } },
+          { name: "show_accessibility", selector: { boolean: {} } },
+          { name: "accessibility_only", selector: { boolean: {} } },
           {
             name: "max_rows",
             selector: {
               number: { min: 1, max: 8, step: 1, mode: "slider" },
             },
           },
-          { name: "show_station_header", selector: { boolean: {} } },
-          { name: "show_accessibility", selector: { boolean: {} } },
-          { name: "accessibility_only", selector: { boolean: {} } },
           { name: "show_min_unit", selector: { boolean: {} } },
           {
             type: "grid",
@@ -184,24 +266,19 @@ export class WienerLinienAustriaFlapCardEditor
         ],
       },
       {
+        // Visual flourishes — mirrors retro-card's `tweaks` section.
+        // Subset only: flap doesn't have an LED-amber voice, so
+        // retro's `show_unit` / `line_stripe` have no analogue. The
+        // two flap tweaks both mirror retro's relative order:
+        // `line_pill` first (line-slot presentation), `housing` last
+        // (outer chrome).
         type: "expandable",
-        name: "platform_section",
-        title: this._et("section_platform"),
+        name: "tweaks",
+        title: this._et("section_tweaks"),
         flatten: true,
         schema: [
-          { name: "show_platform", selector: { boolean: {} } },
-        ],
-      },
-      {
-        // Station-header strip — same per-side grammar as retro card.
-        type: "expandable",
-        name: "header",
-        title: this._et("section_header"),
-        flatten: true,
-        schema: [
-          { name: "show_header", selector: { boolean: {} } },
-          this._headerSideSchema("header_left"),
-          this._headerSideSchema("header_right"),
+          { name: "line_pill", selector: { boolean: {} } },
+          { name: "housing", selector: { boolean: {} } },
         ],
       },
     ];
