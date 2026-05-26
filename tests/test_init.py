@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
 
+from unittest.mock import AsyncMock, patch
+
 from custom_components.wiener_linien_austria.const import (
     ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_UNSUB_KEY,
@@ -16,6 +18,7 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
+    RESOURCES_REGISTERED_KEY,
     TRAFFIC_INFO_KEY,
 )
 
@@ -91,3 +94,58 @@ async def test_unload_with_remaining_entry_keeps_domain_state(
     # One entry remains → timer must still be live, count drops to 1.
     assert hass.data[DOMAIN][ENTRY_COUNT_KEY] == 1
     assert ALERTS_REFRESH_UNSUB_KEY in hass.data[DOMAIN]
+
+
+async def test_delete_then_readd_re_registers_resources(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Regression: re-adding an entry after the last delete must re-register cards.
+
+    Reproducer (bug introduced 2026-04-30, fixed 2026-05-26):
+    1. User deletes the last config entry → async_remove_entry runs,
+       JSModuleRegistration.async_unregister tears down Lovelace
+       resource records for every bundled card.
+    2. User re-adds via the config flow → async_setup_entry runs but
+       async_setup does NOT (it's process-scoped, runs once per HA
+       boot). Resources stay torn down; every dashboard referencing
+       custom:wiener-linien-austria-card resolves to 'unknown custom
+       element' until a full HA restart.
+
+    The fix routes re-registration through _ensure_domain_timers via
+    the RESOURCES_REGISTERED_KEY sentinel — popped by
+    _teardown_domain_state on last-entry unload, re-set on the next
+    first-entry boot. This test drives the full cycle and asserts the
+    register helper fires the second time around.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # First boot: async_setup's register call already set the sentinel.
+    assert hass.data[DOMAIN].get(RESOURCES_REGISTERED_KEY) is True
+
+    # Unload + remove the last entry — async_remove_entry fires its
+    # unregister, _teardown_domain_state pops the sentinel.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert RESOURCES_REGISTERED_KEY not in hass.data.get(DOMAIN, {})
+
+    # Re-add a fresh entry — different DIVA so unique_id is unique vs
+    # whatever HA cached. Patch async_register so we can assert the
+    # NEW first-entry boot called it (the bug's symptom: it didn't).
+    with patch(
+        "custom_components.wiener_linien_austria.JSModuleRegistration.async_register",
+        new_callable=AsyncMock,
+    ) as register_mock:
+        entry_new = _make_entry({"diva": 60200007, "stop_name": "Praterstern"})
+        entry_new.add_to_hass(hass)
+        await hass.config_entries.async_setup(entry_new.entry_id)
+        await hass.async_block_till_done()
+
+    # The fix's contract: _ensure_domain_timers re-runs the register
+    # helper after the sentinel was popped on the previous teardown.
+    register_mock.assert_awaited()
+    # And the sentinel is re-flagged for the duration of this run so a
+    # second entry add doesn't double-register.
+    assert hass.data[DOMAIN].get(RESOURCES_REGISTERED_KEY) is True
