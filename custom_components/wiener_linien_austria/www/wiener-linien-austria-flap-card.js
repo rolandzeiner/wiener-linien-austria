@@ -842,9 +842,8 @@ const se="ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß",ce="0123456789";function ue(i,e,t)
       }
     }
 
-    /* Empty state — same cream / quiet voice as the cd-unit caption
-       so the board reads as one cohesive material when no
-       departures are flowing. */
+    /* Empty state — body cream so the board stays one cohesive
+       cream-on-dark material when no departures are flowing. */
     .flap-empty {
       text-align: center;
       padding: 24px 0;
@@ -853,7 +852,7 @@ const se="ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß",ce="0123456789";function ue(i,e,t)
       font-size: 20px;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: var(--flap-quiet-fg);
+      color: var(--flap-cream);
     }
 
     /* Size variants — shrink the tile + glyph proportionally. The
