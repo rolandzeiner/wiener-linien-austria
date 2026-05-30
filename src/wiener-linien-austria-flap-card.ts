@@ -33,7 +33,6 @@ import type {
   HomeAssistant,
   LineColorPair,
   LovelaceCardEditor,
-  RetroHeaderSide,
   WienerLinienAttrs,
   WienerLinienFlapCardConfig,
   WindowWithCustomCards,
@@ -47,16 +46,7 @@ import {
   type NormalisedFlapConfig,
   type NormalisedFlapStop,
 } from "./utils/flap-config.js";
-import { formatDate, formatClock } from "./utils/time.js";
-import {
-  RETRO_HEADER_ICONS,
-  RETRO_HEADER_MDI_EXITS,
-  isRetroHeaderMdiExit,
-  renderRetroHeaderIcon,
-  renderRetroHeaderMdiIcon,
-  renderRetroHeaderMdiTile,
-  type RetroHeaderIconKey,
-} from "./utils/retro-station-icons.js";
+import { renderStationHeader } from "./utils/station-header.js";
 
 // Must equal the .flap-tile--flipping leaf-animation duration in CSS
 // (search "flapLeaf" below) — one tick = one full flap, no half-step
@@ -585,7 +575,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     );
 
     const stationHeaderStrip = cfg.show_header
-      ? this._renderStationHeader(cfg.header_left, cfg.header_right, serverTime)
+      ? renderStationHeader({
+          left: cfg.header_left,
+          right: cfg.header_right,
+          serverTime,
+          t: (k) => this._t(k),
+          lang: this.hass?.language,
+        })
       : nothing;
 
     // CC-BY data-source credit. Default visible (Wiener Linien OGD
@@ -687,115 +683,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // contrast on WL line colours (red U1, orange U3, purple U2,
     // green U4, brown U6, blue U-Bahn fallback).
     return { background, color: "var(--flap-on-color-fg)" };
-  }
-
-  // ------------------------------------------------------------------
-  // Station-header strip — same per-side grammar as the retro card
-  // (RetroHeaderSide), recoloured for the cream / dark housing
-  // palette. Helpers from utils/retro-station-icons.ts are reused
-  // verbatim — they emit `.retro-station-header__*` classes that the
-  // flap card defines its own CSS for inside its shadow DOM. The
-  // retro card's CSS for the same classes lives in its own shadow
-  // root and can't bleed in either direction.
-  // ------------------------------------------------------------------
-
-  private _renderStationHeader(
-    left: RetroHeaderSide | undefined,
-    right: RetroHeaderSide | undefined,
-    serverTime: string | null | undefined,
-  ): TemplateResult | typeof nothing {
-    if (!left && !right) return nothing;
-    return html`
-      <div class="retro-station-header" role="group">
-        <div class="retro-station-header__side retro-station-header__side--left">
-          ${left ? this._renderHeaderSide(left, "left", serverTime) : nothing}
-        </div>
-        <div class="retro-station-header__side retro-station-header__side--right">
-          ${right ? this._renderHeaderSide(right, "right", serverTime) : nothing}
-        </div>
-      </div>
-    `;
-  }
-
-  private _renderHeaderSide(
-    side: RetroHeaderSide,
-    pos: "left" | "right",
-    serverTime: string | null | undefined,
-  ): TemplateResult {
-    let exitNode: TemplateResult | typeof nothing = nothing;
-    if (side.exit === "regular" || side.exit === "accessible") {
-      const key: "exit" | "exit-access" =
-        side.exit === "regular" ? "exit" : "exit-access";
-      exitNode = renderRetroHeaderIcon(key, {
-        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
-        flipX: RETRO_HEADER_ICONS[key].glyphPointsTo !== pos,
-      });
-    } else if (side.exit && isRetroHeaderMdiExit(side.exit)) {
-      const meta = RETRO_HEADER_MDI_EXITS[side.exit];
-      exitNode = renderRetroHeaderMdiIcon(side.exit, {
-        ariaLabel: this._t(`header.${meta.labelKey}`),
-        flipX: meta.glyphPointsTo !== undefined && meta.glyphPointsTo !== pos,
-      });
-    }
-    const textNode = side.text
-      ? html`<span class="retro-station-header__text">${side.text}</span>`
-      : nothing;
-    const amenityKey = (key: RetroHeaderIconKey) =>
-      renderRetroHeaderIcon(key, {
-        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
-      });
-    const wc = side.show_wc ? amenityKey("wc") : nothing;
-    const esc = side.show_escalator ? amenityKey("escalator") : nothing;
-    const elv = side.show_elevator ? amenityKey("elevator") : nothing;
-    const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
-      renderRetroHeaderMdiTile(icon, icon),
-    );
-    const mdiTilesLeftOrder = mdiTileNodes;
-    const mdiTilesRightOrder = [...mdiTileNodes].reverse();
-    const chipNodes = (side.chips ?? []).map(
-      (chipText) =>
-        html`<span class="retro-station-header__chip">${chipText}</span>`,
-    );
-    const chipsLeftOrder = chipNodes;
-    const chipsRightOrder = [...chipNodes].reverse();
-    const clockText = side.show_clock ? this._formatClock(serverTime) : null;
-    const clockNode = clockText
-      ? html`<span
-          class="retro-station-header__chip retro-station-header__chip--clock"
-        >
-          <ha-icon
-            class="retro-station-header__chip-icon"
-            icon="mdi:clock-outline"
-          ></ha-icon>
-          <span>${clockText}</span>
-        </span>`
-      : nothing;
-    const dateText = side.show_date
-      ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
-      : null;
-    const dateNode = dateText
-      ? html`<span
-          class="retro-station-header__chip retro-station-header__chip--date"
-          >${dateText}</span
-        >`
-      : nothing;
-    return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTilesLeftOrder}${chipsLeftOrder}${dateNode}${clockNode}`
-      : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
-  }
-
-  private _formatClock(serverTime: string | null | undefined): string | null {
-    return formatClock(serverTime);
-  }
-
-  private _formatDateChip(
-    serverTime: string | null | undefined,
-    format: string | undefined,
-  ): string | null {
-    if (!serverTime || !format) return null;
-    const ts = Date.parse(serverTime);
-    if (!Number.isFinite(ts)) return null;
-    return formatDate(new Date(ts), format, this.hass?.language);
   }
 
   private _renderBoard(

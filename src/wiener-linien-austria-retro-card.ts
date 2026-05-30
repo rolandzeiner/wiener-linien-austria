@@ -19,25 +19,15 @@ import {
 } from "./shared-render.js";
 import type {
   DepartureAttr,
-  RetroHeaderSide,
   WienerLinienAttrs,
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
-import { formatDate, formatClock } from "./utils/time.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
-import {
-  RETRO_HEADER_ICONS,
-  RETRO_HEADER_MDI_EXITS,
-  isRetroHeaderMdiExit,
-  renderRetroHeaderIcon,
-  renderRetroHeaderMdiIcon,
-  renderRetroHeaderMdiTile,
-  type RetroHeaderIconKey,
-} from "./utils/retro-station-icons.js";
+import { renderStationHeader } from "./utils/station-header.js";
 import {
   RACE_FINISH_X_FALLBACK_CQW,
   computeRaceParams,
@@ -861,7 +851,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // the per-side state in memory so toggling back on restores
     // exactly what the user had set.
     const stationHeader = cfg.show_header
-      ? this._renderStationHeader(cfg.header_left, cfg.header_right, attrs.server_time)
+      ? renderStationHeader({
+          left: cfg.header_left,
+          right: cfg.header_right,
+          serverTime: attrs.server_time,
+          t: (k) => this._t(k),
+          lang: this.hass?.language,
+        })
       : nothing;
 
     const raceCountdown = cfg.wheelchair_race && this._raceState === "countdown";
@@ -1007,28 +1003,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     `;
   }
 
-  /** Format an ISO timestamp as HH:MM in the user's locale. Returns
-   *  `null` on missing / unparseable input so the caller can omit the
-   *  rendering entirely instead of painting "NaN:NaN". Shared by the
-   *  optional left- and right-side header clock chips. */
-  private _formatClock(serverTime: string | null | undefined): string | null {
-    return formatClock(serverTime);
-  }
-
-  /** Format an ISO timestamp as a PHP-style date string for the
-   *  optional header date chip. Returns `null` when server_time is
-   *  missing/unparseable or the format string is empty — caller
-   *  omits the chip rather than painting an obvious placeholder. */
-  private _formatDateChip(
-    serverTime: string | null | undefined,
-    format: string | undefined,
-  ): string | null {
-    if (!serverTime || !format) return null;
-    const ts = Date.parse(serverTime);
-    if (!Number.isFinite(ts)) return null;
-    return formatDate(new Date(ts), format, this.hass?.language);
-  }
-
   private _renderRow(d: DepartureAttr, rowIndex: number, lineColors: LineColorsMap): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
@@ -1127,145 +1101,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         <div class="retro-gleis-number">${platform}</div>
       </div>
     `;
-  }
-
-  /** Render the black header strip above the orange station band —
-   *  a homage to the real Wiener Linien U-Bahn station signage.
-   *  Returns `nothing` when neither side is configured, so existing
-   *  retro cards (no `header_left`/`header_right` in YAML) are
-   *  byte-identical to pre-change behaviour.
-   *
-   *  Per-side render order — amenity order is mirrored so the same
-   *  glyph always sits the same distance from the station name on
-   *  both sides: elevator nearest the text, then escalator, then WC:
-   *   - LEFT:  [exit] [text] [Elevator] [Escalator] [WC]
-   *   - RIGHT: [WC] [Escalator] [Elevator] [text] [exit]
-   *
-   *  Exit-icon auto-flip: `exit` glyph natively points LEFT; on the
-   *  right side it's flipped so the arrow points right. `exit-access`
-   *  is the mirror case — natively points RIGHT, flipped on left.
-   *  Users pick "regular" / "accessible" per side and the renderer
-   *  derives orientation; no separate config knob. */
-  private _renderStationHeader(
-    left: RetroHeaderSide | undefined,
-    right: RetroHeaderSide | undefined,
-    serverTime: string | null | undefined,
-  ): TemplateResult | typeof nothing {
-    if (!left && !right) return nothing;
-    return html`
-      <div class="retro-station-header" role="group">
-        <div class="retro-station-header__side retro-station-header__side--left">
-          ${left ? this._renderHeaderSide(left, "left", serverTime) : nothing}
-        </div>
-        <div class="retro-station-header__side retro-station-header__side--right">
-          ${right ? this._renderHeaderSide(right, "right", serverTime) : nothing}
-        </div>
-      </div>
-    `;
-  }
-
-  private _renderHeaderSide(
-    side: RetroHeaderSide,
-    pos: "left" | "right",
-    serverTime: string | null | undefined,
-  ): TemplateResult {
-    // Resolve the exit corner to a render node. Three paths:
-    //   "regular" / "accessible" → WL traced SVG glyph (auto-flips
-    //                              per side via glyphPointsTo).
-    //   "mdi:…"                  → curated MDI icon inside the same
-    //                              tile (auto-flip only for icons
-    //                              whose registry entry declares a
-    //                              `glyphPointsTo`).
-    //   anything else            → no icon.
-    let exitNode: TemplateResult | typeof nothing = nothing;
-    if (side.exit === "regular" || side.exit === "accessible") {
-      const key: "exit" | "exit-access" =
-        side.exit === "regular" ? "exit" : "exit-access";
-      exitNode = renderRetroHeaderIcon(key, {
-        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
-        // Glyph's native direction is `pointsTo`. Flip when the side
-        // it sits on doesn't match — e.g. `exit` (points left) on the
-        // right side flips to point right.
-        flipX: RETRO_HEADER_ICONS[key].glyphPointsTo !== pos,
-      });
-    } else if (side.exit && isRetroHeaderMdiExit(side.exit)) {
-      const meta = RETRO_HEADER_MDI_EXITS[side.exit];
-      exitNode = renderRetroHeaderMdiIcon(side.exit, {
-        ariaLabel: this._t(`header.${meta.labelKey}`),
-        // Only directional MDI icons (exit-run / exit-to-app) declare
-        // glyphPointsTo. Vehicle / amenity glyphs don't flip.
-        flipX: meta.glyphPointsTo !== undefined && meta.glyphPointsTo !== pos,
-      });
-    }
-    const textNode = side.text
-      ? html`<span class="retro-station-header__text">${side.text}</span>`
-      : nothing;
-    const amenityKey = (key: RetroHeaderIconKey) =>
-      renderRetroHeaderIcon(key, {
-        ariaLabel: this._t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
-      });
-    const wc = side.show_wc ? amenityKey("wc") : nothing;
-    const esc = side.show_escalator ? amenityKey("escalator") : nothing;
-    const elv = side.show_elevator ? amenityKey("elevator") : nothing;
-    // Free-form MDI tiles — same-tile styling as the curated MDI exit
-    // variants (white square, --mdi padding modifier). Sit between
-    // the WC tile and the text chips. Aria-label is the MDI key
-    // itself, the closest semantic label we have without an
-    // explicit per-row label field.
-    const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
-      renderRetroHeaderMdiTile(icon, icon),
-    );
-    const mdiTilesRightOrder = [...mdiTileNodes].reverse();
-    // Text chips — same-height white boxes with dynamic width. Sit
-    // beyond the MDI tiles (further from the sign text than any
-    // amenity icon or extra icon) so they read as the outer-edge
-    // content on each side. Mirrored across sides so chip[0] is
-    // always the closest-to-extra-icons entry regardless of which
-    // side it lives on.
-    const chipNodes = (side.chips ?? []).map(
-      (chipText) => html`<span class="retro-station-header__chip">${chipText}</span>`,
-    );
-    const chipsRightOrder = [...chipNodes].reverse();
-    // Optional clock + date chips — `show_clock` / `show_date` per
-    // side. Both sit beyond the chips at the innermost edge of their
-    // side (rightmost on `left`, leftmost on `right`). Order from
-    // outermost to innermost: chips → date → clock. So when a side
-    // enables both, the time is closest to the centre of the strip
-    // (the primary station-board info), with the supporting date
-    // one slot further out. Suppressed if server_time hasn't arrived
-    // yet (no "NaN:NaN" while the integration warms up) or if the
-    // user's format string evaluates empty.
-    const clockText = side.show_clock ? this._formatClock(serverTime) : null;
-    const clockNode = clockText
-      ? html`<span class="retro-station-header__chip retro-station-header__chip--clock">
-          <ha-icon class="retro-station-header__chip-icon" icon="mdi:clock-outline"></ha-icon>
-          <span>${clockText}</span>
-        </span>`
-      : nothing;
-    const dateText = side.show_date
-      ? this._formatDateChip(serverTime, side.date_format ?? "d.m.Y")
-      : null;
-    // Date chip — text-only, no leading icon. The calendar glyph fought
-    // the chip's signage-label voice (it read more like a UI element
-    // than part of the sign); plain text matches the user-provided
-    // chips in the same lane. The clock chip keeps its icon because
-    // the icon there reads as the station-clock symbol, not a UI
-    // affordance.
-    const dateNode = dateText
-      ? html`<span class="retro-station-header__chip retro-station-header__chip--date">${dateText}</span>`
-      : nothing;
-    // Canonical render order mirrors the original signage. Right side
-    // mirrors the left: exit always at the outer edge of the card,
-    // amenities ordered so the *same* glyph (elevator) is always
-    // closest to the text on both sides — wheelchair-relevant info
-    // gets the same visual prominence regardless of header side.
-    // Mirror invariant for extra_icons + chips: index 0 of either
-    // array sits closest to the WC tile on both sides. Date and
-    // clock chips sit at the innermost edge: date one slot out,
-    // clock at the very edge so time stays closest to the centre.
-    return pos === "left"
-      ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTileNodes}${chipNodes}${dateNode}${clockNode}`
-      : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
   }
 
   private _renderStationName(
