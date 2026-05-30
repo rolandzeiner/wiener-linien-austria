@@ -25,7 +25,12 @@ import type {
   WalkTimes,
   WienerLinienFlapCardConfig,
 } from "../types.js";
-import { filterPassthrough, normaliseRetroHeaderSide } from "./config.js";
+import {
+  filterPassthrough,
+  normaliseRetroHeaderSide,
+  normaliseWalkTimes,
+  normaliseLineDirections,
+} from "./config.js";
 
 const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
   "small",
@@ -59,39 +64,6 @@ function normaliseStationBg(raw: unknown): FlapStationBg {
 
 function asBool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
-}
-
-function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const out: WalkTimes = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    const n =
-      typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
-    if (!Number.isFinite(n)) continue;
-    if (n < 0 || n > 120) continue;
-    // Same key collapse as the retro card normaliser — legacy triples
-    // ("U1|R|Oberlaa") become pairs ("U1|R"); on collision keep the
-    // larger (more conservative) value.
-    const parts = k.split("|");
-    const key = parts.length >= 3 ? `${parts[0]}|${parts[1]}` : k;
-    const rounded = Math.round(n);
-    const prev = out[key];
-    out[key] = prev === undefined ? rounded : Math.max(prev, rounded);
-  }
-  return Object.keys(out).length ? out : undefined;
-}
-
-function normaliseLineDirections(
-  raw: unknown,
-): Record<string, "H" | "R"> | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const out: Record<string, "H" | "R"> = {};
-  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof k !== "string" || !k.length) continue;
-    if (v === "H" || v === "R") out[k] = v;
-    // Any other value ("Both" / "" / undefined) = no override = absence.
-  }
-  return Object.keys(out).length ? out : undefined;
 }
 
 /** A stop after normalisation. Optional fields use plain `?:` (no

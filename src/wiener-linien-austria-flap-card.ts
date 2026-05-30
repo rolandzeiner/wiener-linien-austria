@@ -47,7 +47,7 @@ import {
   type NormalisedFlapConfig,
   type NormalisedFlapStop,
 } from "./utils/flap-config.js";
-import { formatDate } from "./utils/time.js";
+import { formatDate, formatClock } from "./utils/time.js";
 import {
   RETRO_HEADER_ICONS,
   RETRO_HEADER_MDI_EXITS,
@@ -305,7 +305,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       if (!row) continue;
       this._diffFlipField(
         flipKey(i, "line"),
-        (row.line ?? "").toUpperCase().padStart(maxLineLen, " "),
+        // "?" fallback matches the render + width-measure paths (_renderTile
+        // / _maxLineLen) so the flip target and painted glyph agree for a
+        // line-less row instead of marching toward a blank tile.
+        (row.line ?? "?").toUpperCase().padStart(maxLineLen, " "),
       );
       this._diffFlipField(
         flipKey(i, "dest"),
@@ -782,11 +785,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   private _formatClock(serverTime: string | null | undefined): string | null {
-    if (!serverTime) return null;
-    const ts = Date.parse(serverTime);
-    if (!Number.isFinite(ts)) return null;
-    const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    return formatClock(serverTime);
   }
 
   private _formatDateChip(

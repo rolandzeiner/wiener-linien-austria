@@ -538,7 +538,13 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             _LOGGER.warning("Static catalogue load failed on reconfigure: %s", err)
             return self.async_abort(reason="catalogue_unavailable")
 
-        diva = int(data[CONF_DIVA])
+        # A corrupt / hand-edited / fork-migrated entry may carry a missing
+        # or non-numeric DIVA. Abort cleanly with the same "stop_gone" reason
+        # used below rather than throwing an unknown-error stack trace.
+        try:
+            diva = int(data[CONF_DIVA])
+        except (KeyError, TypeError, ValueError):
+            return self.async_abort(reason="stop_gone")
         station = catalogue.stations_by_diva.get(diva)
         if station is None:
             return self.async_abort(reason="stop_gone")

@@ -26,7 +26,7 @@ import type {
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
-import { formatDate } from "./utils/time.js";
+import { formatDate, formatClock } from "./utils/time.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
 import {
@@ -126,6 +126,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // disconnect and re-armed on reconnect.
   @state() private _viaPhase: "towards" | "via" = "towards";
   private _viaTimer: ReturnType<typeof setInterval> | null = null;
+  // Whether the last render saw any row carrying `via`. Written in
+  // render() (a plain field — no reactive trigger) and consumed in
+  // updated() to arm/clear the via timer as a post-render side effect.
+  private _anyViaInRows = false;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back" console
@@ -313,6 +317,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const eid = this._resolveEntity();
     if (!eid) return false;
     return prev.states[eid] !== this.hass.states[eid];
+  }
+
+  protected override updated(changed: PropertyValues): void {
+    super.updated(changed);
+    // Arm/clear the via-tick timer as a post-render side effect. This must
+    // NOT happen in render(): _clearViaTimer writes the reactive @state
+    // `_viaPhase`, and mutating reactive state mid-render is forbidden by
+    // Lit (dev warning + a redundant extra update cycle).
+    if (this._anyViaInRows) this._armViaTimer();
+    else if (this._viaTimer !== null) this._clearViaTimer();
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -544,17 +558,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._viaTimer = setInterval(() => {
       this._viaPhase = this._viaPhase === "towards" ? "via" : "towards";
     }, VIA_TICK_MS);
-  }
-
-  /** Arm or clear the via timer based on whether any visible row
-   *  currently carries via routing. Called on every render. */
-  private _evaluateViaTimer(rows: DepartureAttr[]): void {
-    const anyVia = rows.some((d) => !!d.via);
-    if (anyVia) {
-      this._armViaTimer();
-    } else if (this._viaTimer !== null) {
-      this._clearViaTimer();
-    }
   }
 
   private _clearViaTimer(): void {
@@ -872,7 +875,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       (cfg.wheelchair_race && this._raceState === "idle") || this._tickerActive;
     const winnerLane: 1 | 2 | null =
       this._raceWinner === "A" ? 1 : this._raceWinner === "B" ? 2 : null;
-    this._evaluateViaTimer(rows);
+    this._anyViaInRows = rows.some((d) => !!d.via);
     const retroClasses = {
       retro: true,
       "retro--gleis-left": !!platform && gleisLeft,
@@ -1009,13 +1012,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
    *  rendering entirely instead of painting "NaN:NaN". Shared by the
    *  optional left- and right-side header clock chips. */
   private _formatClock(serverTime: string | null | undefined): string | null {
-    if (!serverTime) return null;
-    const ts = Date.parse(serverTime);
-    if (!Number.isFinite(ts)) return null;
-    const d = new Date(ts);
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
+    return formatClock(serverTime);
   }
 
   /** Format an ISO timestamp as a PHP-style date string for the

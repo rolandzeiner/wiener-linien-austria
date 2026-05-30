@@ -143,7 +143,7 @@ export function filterPassthrough(
   return out;
 }
 
-function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
+export function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const out: WalkTimes = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -178,7 +178,7 @@ export interface NormalisedModernStop {
   walk_times?: WalkTimes;
 }
 
-function normaliseLineDirections(
+export function normaliseLineDirections(
   raw: unknown,
 ): Record<string, "H" | "R"> | undefined {
   if (!raw || typeof raw !== "object") return undefined;

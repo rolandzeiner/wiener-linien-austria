@@ -1379,15 +1379,19 @@ def _trip_patterns_from_store(
             )
             for k, v in (raw.get("lines_at_diva") or {}).items()
         }
+        # Validate with `_HEX6_RE`, not `len() == 6` — the latter accepts
+        # garbage like "ZZZZZZ" that the card would render as the CSS-invalid
+        # `#ZZZZZZ`. Mirrors the parse path in `_parse_route_colors` so the
+        # store-reload path can't admit colours the parse path would reject.
         colors_by_line = {
             str(k): str(v).upper()
             for k, v in (raw.get("colors_by_line") or {}).items()
-            if isinstance(v, str) and len(v) == 6
+            if isinstance(v, str) and _HEX6_RE.match(v.upper())
         }
         text_colors_by_line = {
             str(k): str(v).upper()
             for k, v in (raw.get("text_colors_by_line") or {}).items()
-            if isinstance(v, str) and len(v) == 6
+            if isinstance(v, str) and _HEX6_RE.match(v.upper())
         }
         patterns_by_line: dict[int, list[TripPattern]] = {}
         for entry in raw.get("patterns") or []:

@@ -28,10 +28,10 @@ const basePlugins = () =>
     !dev && terser({ format: { comments: /Wiener Linien Austria/ } }),
   ].filter(Boolean);
 
-// Two cards, two entrypoints, two bundles — mirrors the two JS files the
-// integration has served since v0.1.0. Each card has an independent
-// CARD_VERSION in src/const.ts so they can rev without spurious reload
-// banners on the other.
+// Three cards, three entrypoints, three bundles (modern + retro + flap).
+// Each card has an independent CARD_VERSION / RETRO_CARD_VERSION /
+// FLAP_CARD_VERSION in src/const.ts so they can rev without spurious
+// reload banners on the others.
 export default [
   {
     input: "src/wiener-linien-austria-card.ts",
