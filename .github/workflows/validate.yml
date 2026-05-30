@@ -62,15 +62,17 @@ jobs:
           # PHACC 0.13.329 dep tree). Bump again when HA core jumps
           # to 3.15.
           python-version: "3.14"
-      - name: Upgrade pip
-        # pip 26.1 ships the resolver fix for hard-pinned transitive
-        # constraints in pytest-homeassistant-custom-component. Older
-        # pip versions surface ResolutionImpossible on conflicts that
-        # 26.1 backtracks past. Pin so a future pip behaviour change
-        # doesn't quietly break the lockstep with the test floors.
-        run: python -m pip install --upgrade "pip==26.1"
+      - name: Install uv
+        # uv replaces pip for resolution + install: faster, cached, and
+        # consistent with the local dev workflow (uv-built venvs). Its
+        # resolver surfaces hard PHACC transitive pins (e.g.
+        # pytest-asyncio==1.3.0) just as clearly as pip 26.1 did, so the
+        # lockstep with the test floors is preserved.
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
       - name: Install dependencies
-        run: pip install -r requirements_test.txt
+        run: uv pip install --system -r requirements_test.txt
       - name: Run Linter (Ruff)
         run: ruff check .
       - name: Run mypy (strict)
