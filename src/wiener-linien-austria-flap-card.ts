@@ -144,6 +144,20 @@ function padCountdown(countdown: number | undefined | null): string {
       name: "Wiener Linien Austria — Flap Board",
       description: "Solari-style split-flap departure board",
       preview: true,
+      // HA 2026.6 entity-first picker: only suggest this card for
+      // sensors owned by this integration. Older HA ignores the key.
+      getEntitySuggestion: (hass: HomeAssistant, entityId: string) => {
+        if (!entityId.startsWith("sensor.")) return null;
+        if (hass?.entities?.[entityId]?.platform !== "wiener_linien_austria") {
+          return null;
+        }
+        return {
+          config: {
+            type: "custom:wiener-linien-austria-flap-card",
+            entities: [entityId],
+          },
+        };
+      },
     });
   }
 }

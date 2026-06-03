@@ -86,6 +86,20 @@ const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
       name: "Wiener Linien Austria — Retro",
       description: "LED-Anzeige im Stil der Wiener-Linien-Stationen",
       preview: true,
+      // HA 2026.6 entity-first picker: only suggest this card for
+      // sensors owned by this integration. Older HA ignores the key.
+      getEntitySuggestion: (hass: HomeAssistant, entityId: string) => {
+        if (!entityId.startsWith("sensor.")) return null;
+        if (hass?.entities?.[entityId]?.platform !== "wiener_linien_austria") {
+          return null;
+        }
+        return {
+          config: {
+            type: "custom:wiener-linien-austria-retro-card",
+            entity: entityId,
+          },
+        };
+      },
     });
   }
 }
