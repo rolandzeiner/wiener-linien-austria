@@ -346,7 +346,12 @@ async def _rollback_setup_failure(
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> None:
-    """Reload the config entry when options are updated."""
+    """Reload the config entry when its options or data change.
+
+    Fires for options-flow updates AND for reconfigure-flow data changes
+    (the config flow now calls ``async_update_and_abort`` without a
+    built-in reload), making this the single reload owner.
+    """
     await hass.config_entries.async_reload(entry.entry_id)
 
 

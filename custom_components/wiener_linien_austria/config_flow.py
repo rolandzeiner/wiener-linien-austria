@@ -454,12 +454,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 if self._reconfigure_entry is not None:
                     await self.async_set_unique_id(f"diva_{station.diva}")
                     self._abort_if_unique_id_mismatch()
-                    return self.async_update_reload_and_abort(
+                    return self.async_update_and_abort(
                         self._reconfigure_entry,
                         data=data,
                     )
                 await self.async_set_unique_id(f"diva_{station.diva}")
-                self._abort_if_unique_id_configured()
+                self._abort_if_unique_id_configured(reload_on_update=False)
                 return self.async_create_entry(title=station.name, data=data)
 
         line_options: list[SelectOptionDict] = [
