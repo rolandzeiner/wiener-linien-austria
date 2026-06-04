@@ -68,7 +68,7 @@ jobs:
         # resolver surfaces hard PHACC transitive pins (e.g.
         # pytest-asyncio==1.3.0) just as clearly as pip 26.1 did, so the
         # lockstep with the test floors is preserved.
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - name: Install dependencies
