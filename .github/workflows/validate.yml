@@ -20,7 +20,7 @@ jobs:
     # fast, first job.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Verify _dev_fixture.py is not committed
         run: |
           if [ -f custom_components/wiener_linien_austria/_dev_fixture.py ]; then
@@ -31,7 +31,7 @@ jobs:
   validate-hacs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hacs/action@main
         with:
           category: integration
@@ -39,7 +39,7 @@ jobs:
   validate-hassfest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Login to ghcr.io
         uses: docker/login-action@v4
         with:
@@ -51,7 +51,7 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           # Pinned to 3.14 — HA core 2026.5.0 requires Python ≥3.14.2
@@ -86,7 +86,7 @@ jobs:
     # advisories before they reach the served www/*.js files.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Guard against backticks inside Lit css/html templates
         # The `css\`...\`` and `html\`...\`` tagged templates are
         # backtick-delimited; a stray backtick inside a comment or a
