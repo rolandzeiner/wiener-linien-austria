@@ -1,12 +1,13 @@
 name: Dependabot auto-merge
 
 # Auto-merges grouped MINOR/PATCH Dependabot PRs once every CI check on the PR
-# head is green. Majors are split out of the version groups (see dependabot.yml)
-# and arrive as individual PRs for manual review — never auto-merged. Security
-# updates use separate group names and are also left for manual review.
-# Runs daily (and on demand); merges within a day of CI passing. Works without
-# branch protection or native auto-merge, so it behaves identically on public
-# and private (free) repositories.
+# head is green. Grouped version updates use branch names of the form
+# dependabot/<eco>/<dir>/<group-name>-<hash>; majors are split out of the groups
+# (see dependabot.yml update-types) into individual PRs, and security updates use
+# separate *-security groups — neither matches, so both get manual review.
+# Runs daily (and on demand); merges within a day of CI passing. Script-based (no
+# branch protection / native auto-merge) so it behaves identically on public and
+# private (free) repositories.
 
 on:
   schedule:
@@ -32,15 +33,19 @@ jobs:
         run: |
           set -uo pipefail
           gh pr list --repo "$REPO" --author "app/dependabot" --state open \
-            --json number,title,mergeable > prs.json
+            --json number,title,mergeable,headRefName > prs.json
           total=$(jq length prs.json)
           echo "Open Dependabot PRs: $total"
           for i in $(seq 0 $((total - 1))); do
             num=$(jq -r ".[$i].number" prs.json)
             title=$(jq -r ".[$i].title" prs.json)
+            branch=$(jq -r ".[$i].headRefName" prs.json)
             mergeable=$(jq -r ".[$i].mergeable" prs.json)
-            if ! printf '%s' "$title" | grep -qiE 'bump the (python-dev|card-deps|actions) group'; then
-              echo "- skip #$num (not an auto-merge group): $title"; continue
+            # Only version-update GROUP branches (python-dev / card-deps / actions),
+            # which by config carry minor/patch only. Majors (individual PRs) and
+            # security updates (*-security groups) don't match -> manual review.
+            if ! printf '%s' "$branch" | grep -qE 'dependabot/.+/(python-dev|card-deps|actions)-[0-9a-f]{6,}$'; then
+              echo "- skip #$num (not a version-group branch): $branch"; continue
             fi
             if [ "$mergeable" != "MERGEABLE" ]; then
               echo "- skip #$num (mergeable=$mergeable)"; continue
