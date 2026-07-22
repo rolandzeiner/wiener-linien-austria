@@ -4,7 +4,7 @@ updates:
     directory: /
     target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     groups:
       actions:
@@ -14,15 +14,23 @@ updates:
     directory: /
     target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
+    groups:
+      python-dev:
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: /
     target-branch: dev
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     groups:
       card-deps:
         patterns: ["*"]
+    ignore:
+      # TypeScript 7 (tsgo/native compiler) — hold until the strict-mode
+      # toolchain is deliberately migrated. Revisit; don't auto-bump.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
