@@ -14,13 +14,15 @@ on:
     - cron: "30 5 * * *"
   workflow_dispatch: {}
 
-# Declaring permissions restricts the token to exactly these scopes, so the
-# checks/statuses read scopes MUST be listed or `gh pr checks` sees nothing.
+# Declaring permissions restricts the token to exactly these scopes. gh pr checks
+# reads statusCheckRollup, whose checkSuite.workflowRun field needs actions:read —
+# without it the query 403s and every PR is skipped as "no CI checks".
 permissions:
   contents: write
   pull-requests: write
   checks: read
   statuses: read
+  actions: read
 
 concurrency:
   group: dependabot-auto-merge
