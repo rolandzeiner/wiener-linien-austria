@@ -1,0 +1,57 @@
+name: Dependabot auto-merge
+
+# Auto-merges grouped MINOR/PATCH Dependabot PRs once every CI check on the PR
+# head is green. Majors are split out of the version groups (see dependabot.yml)
+# and arrive as individual PRs for manual review — never auto-merged. Security
+# updates use separate group names and are also left for manual review.
+# Runs daily (and on demand); merges within a day of CI passing. Works without
+# branch protection or native auto-merge, so it behaves identically on public
+# and private (free) repositories.
+
+on:
+  schedule:
+    - cron: "30 5 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge green grouped Dependabot PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          gh pr list --repo "$REPO" --author "app/dependabot" --state open \
+            --json number,title,mergeable > prs.json
+          total=$(jq length prs.json)
+          echo "Open Dependabot PRs: $total"
+          for i in $(seq 0 $((total - 1))); do
+            num=$(jq -r ".[$i].number" prs.json)
+            title=$(jq -r ".[$i].title" prs.json)
+            mergeable=$(jq -r ".[$i].mergeable" prs.json)
+            if ! printf '%s' "$title" | grep -qiE 'bump the (python-dev|card-deps|actions) group'; then
+              echo "- skip #$num (not an auto-merge group): $title"; continue
+            fi
+            if [ "$mergeable" != "MERGEABLE" ]; then
+              echo "- skip #$num (mergeable=$mergeable)"; continue
+            fi
+            buckets=$(gh pr checks "$num" --repo "$REPO" --json bucket --jq '.[].bucket' 2>/dev/null || true)
+            if [ -z "$buckets" ]; then
+              echo "- skip #$num (no CI checks reported)"; continue
+            fi
+            if printf '%s\n' "$buckets" | grep -qvE '^(pass|skipping)$'; then
+              echo "- skip #$num (CI not all green: $(printf '%s' "$buckets" | tr '\n' ',' ))"; continue
+            fi
+            echo "merging #$num: $title"
+            gh pr merge "$num" --repo "$REPO" --squash --delete-branch || echo "  ! merge failed for #$num"
+          done
