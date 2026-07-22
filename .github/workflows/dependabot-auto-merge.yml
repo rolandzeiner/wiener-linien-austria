@@ -14,9 +14,13 @@ on:
     - cron: "30 5 * * *"
   workflow_dispatch: {}
 
+# Declaring permissions restricts the token to exactly these scopes, so the
+# checks/statuses read scopes MUST be listed or `gh pr checks` sees nothing.
 permissions:
   contents: write
   pull-requests: write
+  checks: read
+  statuses: read
 
 concurrency:
   group: dependabot-auto-merge
