@@ -17,8 +17,8 @@
         4111,
         4118,
       ]),
+      'scan_interval': '0:01:00',
       'server_time': None,
-      'update_interval': '0:01:00',
     }),
     'entry': dict({
       'data': dict({

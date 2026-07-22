@@ -554,11 +554,13 @@ async def test_extra_state_attributes_rebuilt_when_alerts_seq_bumps(
     assert mock_alerts.call_count == 2
 
 
-async def test_async_update_data_clears_attrs_cache(
+async def test_batch_apply_clears_attrs_cache(
     hass: HomeAssistant,
 ) -> None:
-    """Coordinator update wipes the attrs cache so the next read rebuilds."""
-    from unittest.mock import AsyncMock, patch
+    """A batch push wipes the attrs cache so the next read rebuilds."""
+    from unittest.mock import patch
+
+    from custom_components.wiener_linien_austria.batch import BatchResult
 
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -574,17 +576,16 @@ async def test_async_update_data_clears_attrs_cache(
     ) as mock_alerts:
         sensor.extra_state_attributes
         sensor.extra_state_attributes
-        # Drive a successful coordinator tick — the cache must drop even
-        # though departures + alerts didn't change, because the recorder
-        # writes the attrs dict per state and a stale cache would freeze
-        # whatever was captured at the previous tick.
-        new_data = MonitorData(departures=[], server_time="2026-04-20T14:41:00+0200")
-        with patch.object(
-            coordinator,
-            "_fetch_monitor_data",
-            new=AsyncMock(return_value=new_data),
-        ):
-            await coordinator._async_update_data()
+        # Drive a successful batch fan-out — the cache must drop even though
+        # departures + alerts didn't change, because the recorder writes the
+        # attrs dict per state and a stale cache would freeze whatever was
+        # captured at the previous tick.
+        coordinator.batch_apply(
+            BatchResult(
+                body={"data": {"monitors": []}, "message": {"messageCode": 1}},
+                server_time="2026-04-20T14:41:00+0200",
+            )
+        )
         sensor.extra_state_attributes
 
     assert mock_alerts.call_count == 2

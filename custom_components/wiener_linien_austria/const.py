@@ -92,6 +92,12 @@ ALERT_CACHE_VALIDATORS_KEY: Final = "alert_cache_validators"
 # cleanup (cancelling the alerts + static refresh timers, dropping the
 # in-memory caches) when the *last* entry is removed.
 ENTRY_COUNT_KEY: Final = "entry_count"
+# Registry of shared monitor batch groups, keyed by scan-interval seconds.
+# Each group collapses every config entry that shares a polling cadence
+# into ONE combined /monitor request per tick (repeated `stopId` params),
+# then fans the response out to each member coordinator's own slice. See
+# batch.py. Popped by `_teardown_domain_state` on last-entry removal.
+BATCH_REGISTRY_KEY: Final = "monitor_batch_registry"
 # Sentinel that the Lovelace resources have been registered for the
 # current "run" (first entry → last entry → … → first entry again).
 # Popped by `_teardown_domain_state` so the next first-entry boot

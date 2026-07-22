@@ -4,7 +4,7 @@ A malformed User-Agent is silent failure (the integration still works, only
 upstream log parsers break). This test guards three independent call sites
 because each one builds its own headers via base_request_headers():
 
-- the coordinator's `/monitor` fetch (per-tick),
+- the shared batch group's `/monitor` fetch (per-tick),
 - `alerts._fetch_info_list` (5-min refresh of trafficInfoList),
 - `config_flow._probe_monitor_lines` (live probe during entry creation).
 
@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.alerts import _fetch_info_list
+from custom_components.wiener_linien_austria.batch import MonitorBatchGroup
 from custom_components.wiener_linien_austria.config_flow import _probe_monitor_lines
 from custom_components.wiener_linien_austria.const import USER_AGENT
 from custom_components.wiener_linien_austria.coordinator import (
@@ -37,21 +38,22 @@ def _ok_response(body: object, status: int = 200) -> MagicMock:
     return resp
 
 
-async def test_coordinator_monitor_fetch_sends_user_agent(
-    hass: HomeAssistant,
-) -> None:
-    """Coordinator's /monitor fetch carries the canonical User-Agent + gzip."""
+async def test_monitor_fetch_sends_user_agent(hass: HomeAssistant) -> None:
+    """The batch group's /monitor fetch carries the canonical User-Agent + gzip."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    group = MonitorBatchGroup(hass, 60)
+    group.add_member(coordinator)
+    coordinator.attach_batch(group)
 
     mock_get = MagicMock(
         return_value=make_response_cm(
             _ok_response({"data": {"monitors": []}, "message": {"messageCode": 1}})
         )
     )
-    with patch.object(coordinator._session, "get", new=mock_get):
-        await coordinator._async_update_data()
+    with patch.object(group._session, "get", new=mock_get):
+        await group.async_fetch()
 
     sent = mock_get.call_args.kwargs["headers"]
     assert sent["User-Agent"] == USER_AGENT
