@@ -1,24 +1,26 @@
 """Config flow for Wiener Linien Austria.
 
-Two-step flow:
-  1. `user`           — one searchable dropdown carrying every trackable stop
-                        in the static catalogue. The stops nearest the Home
-                        Assistant home location are pinned to the top with
-                        their distance; the rest follow alphabetically. HA
-                        renders this as a combo box, so typing filters the
-                        whole catalogue client-side.
-  2. `select_lines`   — live `/monitor` call with the station's RBLs; each
+Flow:
+  1. `user`           — a combo box (`custom_value=True`) over every trackable
+                        stop. Typing filters the catalogue live, so the user
+                        gets autocomplete instead of a blind search; the stops
+                        nearest the Home Assistant home location are pinned to
+                        the top with their distance. Picking a suggestion goes
+                        straight to `select_lines`.
+  2. `select_stop`    — only reached when the submitted text matched no stop
+                        exactly (a partial name, a typo). Runs the catalogue
+                        search over what was typed and offers the hits as a
+                        shortlist, plus a "search again" escape hatch.
+  3. `select_lines`   — live `/monitor` call with the station's RBLs; each
                         returned line × direction is presented as a pre-checked
                         option. Submitting saves the entry.
 `async_step_reconfigure` re-enters `select_lines` for an existing entry,
 preserving unique_id. Options flow tweaks the scan interval only.
 
-Superseded design (pre-1.6): a free-text `search_query` step feeding a
-`select_stop` shortlist. It forced the user to know and correctly spell a
-stop name before seeing anything, and the distance-sorted suggestion list
-that replaced it only helped installs sitting inside the network — a home
-location 37 km out got no suggestions at all. The searchable dropdown
-serves both cases from one control.
+The combo box is what makes step 1 usable at both extremes: a plain
+free-text box gave no feedback until submit, and a plain dropdown of ~1800
+stops is unscannable. `custom_value=True` gets both — autocomplete while
+typing, and free text that step 2 can still resolve.
 """
 from __future__ import annotations
 
@@ -70,6 +72,14 @@ from .static import StaticCatalogue, Station, async_get_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
+# SelectOptionDict labels bypass HA's selector translation system, so we
+# pick the right locale at runtime. English is the fallback for anything
+# not explicitly listed.
+_SEARCH_AGAIN_LABELS: dict[str, str] = {
+    "en": "↩ Search again",
+    "de": "↩ Erneut suchen",
+}
+
 
 def _nearest_stations(
     catalogue: StaticCatalogue,
@@ -82,10 +92,9 @@ def _nearest_stations(
     """Return the closest stations to (latitude, longitude), nearest first.
 
     Each tuple is `(station, metres)`. Stations further away than
-    `max_meters` are dropped entirely — an empty result is the signal
-    that nearby suggestions aren't useful here (home location outside
-    the Wiener Linien network) and the caller should fall back to the
-    free-text search alone.
+    `max_meters` are dropped entirely — an empty result means the home
+    location is outside the network and the picker simply opens on the
+    alphabetical list instead of a nearby block.
 
     Stations with no RBLs are skipped: `/monitor` is queried per RBL, so
     a platform-less DIVA can only ever produce a `cannot_connect` dead
@@ -116,9 +125,9 @@ def _format_distance(meters: float, language: str) -> str:
 
     Rounded to 10 m because the underlying coordinates are stop-centre
     points, not the platform the user actually walks to — more precision
-    would be false precision. German locales get the decimal comma;
-    SelectOptionDict labels bypass HA's translation system (same reason
-    `_SEARCH_AGAIN_LABELS` exists), so the formatting happens here.
+    would be false precision. German locales get the decimal comma:
+    SelectOptionDict labels bypass HA's translation system entirely, so
+    any locale-dependent formatting has to happen here.
     """
     if meters < 1000:
         return f"{round(meters / 10) * 10} m"
@@ -128,12 +137,64 @@ def _format_distance(meters: float, language: str) -> str:
     return text
 
 
-def _nearby_label(station: Station, meters: float, language: str) -> str:
-    """Render a nearby-stop option: 'Stephansplatz (Wien) — 450 m'."""
-    return (
-        f"{station.name} ({station.municipality}) "
-        f"— {_format_distance(meters, language)}"
-    )
+def _nearby_label(label: str, meters: float, language: str) -> str:
+    """Append a distance to a stop label: 'Stephansplatz (Wien) — 450 m'."""
+    return f"{label} — {_format_distance(meters, language)}"
+
+
+def _line_suffix(
+    catalogue: StaticCatalogue, station: Station, limit: int = 4
+) -> str:
+    """The lines serving a stop, for telling same-named stops apart.
+
+    Truncated because a hub like Schottenring is served by 14 lines and a
+    label that long is unreadable in a dropdown. Empty when the cache
+    predates the trip-pattern index or the stop has no scheduled lines —
+    callers fall back to the DIVA.
+    """
+    tpi = catalogue.trip_patterns
+    labels = tpi.lines_at_diva.get(station.diva, ()) if tpi is not None else ()
+    if not labels:
+        return ""
+    shown = list(labels[:limit])
+    if len(labels) > limit:
+        shown.append("…")
+    return ", ".join(shown)
+
+
+def _unique_stop_labels(catalogue: StaticCatalogue) -> dict[int, str]:
+    """Map every trackable DIVA to a label no other stop shares.
+
+    Vienna has a dozen stop names that repeat across two DIVAs inside the
+    same municipality — "Schottenring (Wien)" is both the U2/U4 hub and a
+    nightline-only stop. Rendering both as the same string leaves the user
+    picking blind, so colliding names get the lines that serve them
+    appended ("Schottenring (Wien) · U2, U4, 1, 2, …").
+
+    A handful of collisions are served by an identical line set
+    (Lafitegasse, both 54A). Those get the DIVA appended as well — ugly,
+    but a label that can't be told apart is worse than an ugly one.
+    """
+    groups: dict[str, list[Station]] = {}
+    for station in catalogue.stations_by_diva.values():
+        if station.rbls:
+            groups.setdefault(_stop_label(station), []).append(station)
+
+    labels: dict[int, str] = {}
+    for base, group in groups.items():
+        if len(group) == 1:
+            labels[group[0].diva] = base
+            continue
+        resolved = {}
+        for station in group:
+            suffix = _line_suffix(catalogue, station)
+            resolved[station.diva] = f"{base} · {suffix}" if suffix else base
+        if len(set(resolved.values())) < len(group):
+            resolved = {
+                diva: f"{label} · #{diva}" for diva, label in resolved.items()
+            }
+        labels.update(resolved)
+    return labels
 
 
 def _station_for_value(
@@ -192,6 +253,8 @@ def _stop_options(
     unset or nothing is in range; the dropdown is equally usable either
     way, the nearby block is only a shortcut.
     """
+    labels = _unique_stop_labels(catalogue)
+
     nearby: list[tuple[Station, float]] = []
     if latitude or longitude:
         nearby = _nearest_stations(catalogue, latitude, longitude)
@@ -199,7 +262,7 @@ def _stop_options(
     options = [
         SelectOptionDict(
             value=str(station.diva),
-            label=_nearby_label(station, meters, language),
+            label=_nearby_label(labels[station.diva], meters, language),
         )
         for station, meters in nearby
     ]
@@ -215,7 +278,7 @@ def _stop_options(
         key=lambda station: (station.name.casefold(), station.municipality.casefold()),
     )
     options.extend(
-        SelectOptionDict(value=str(station.diva), label=_stop_label(station))
+        SelectOptionDict(value=str(station.diva), label=labels[station.diva])
         for station in remainder
     )
     return options
@@ -411,8 +474,11 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Init in-flight selections."""
         self._selected_station: Station | None = None
-        # None = not built yet. Built once per flow; ~2 000 options.
+        # None = not built yet. Built once per flow; ~1 800 options.
         self._stop_options: list[SelectOptionDict] | None = None
+        # Free-text fallback state: what was typed, and what it matched.
+        self._query: str = ""
+        self._matches: list[Station] = []
         self._lines: list[dict[str, str]] = []
         self._reconfigure_entry: ConfigEntry | None = None
 
@@ -463,12 +529,36 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            station = _station_for_value(catalogue, user_input.get(CONF_DIVA))
-            if station is None:
-                errors[CONF_DIVA] = "invalid_stop"
-            else:
+            raw = str(user_input.get(CONF_DIVA) or "").strip()
+            station = _station_for_value(catalogue, raw)
+            if station is not None:
+                # A suggestion was picked — its value is the DIVA.
                 self._selected_station = station
                 return await self.async_step_select_lines()
+
+            # Anything else is free text the combo box let through: a
+            # partial name, a typo, or a name typed out without opening
+            # the suggestion list. Resolve it the same way the old search
+            # step did and offer the hits as a shortlist.
+            self._query = raw
+            # Clamp pathologically long queries — `catalogue.search` does
+            # an O(stations × len(query)) `casefold` substring scan per
+            # call, so a misclick paste of, say, a 10 MB clipboard would
+            # otherwise spin the event loop. 100 chars is comfortably
+            # past any real Vienna stop name.
+            if len(raw) < 2 or len(raw) > 100:
+                errors[CONF_DIVA] = "query_too_short"
+            else:
+                self._matches = catalogue.search(raw)
+                if not self._matches:
+                    errors[CONF_DIVA] = "no_matches"
+                elif len(self._matches) == 1:
+                    # Unambiguous — the shortlist would be a one-item form
+                    # asking the user to confirm what they already typed.
+                    self._selected_station = self._matches[0]
+                    return await self.async_step_select_lines()
+                else:
+                    return await self.async_step_select_stop()
 
         return self.async_show_form(
             step_id="user",
@@ -478,6 +568,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                         SelectSelectorConfig(
                             options=options,
                             mode=SelectSelectorMode.DROPDOWN,
+                            # The whole point: the field accepts typed text
+                            # as well as a pick, so the user gets filtered
+                            # suggestions while typing and the free-text
+                            # fallback below can still resolve a partial
+                            # name that matched nothing exactly.
+                            custom_value=True,
                             # Keep the nearest-first ordering built above;
                             # HA would otherwise re-sort alphabetically and
                             # bury the nearby block.
@@ -487,6 +583,74 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+    # ------------------------------------------------------------------
+    # Step 2 — select_stop: shortlist for text that matched no stop exactly
+    # ------------------------------------------------------------------
+
+    async def async_step_select_stop(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Let the user pick one station from the search hits.
+
+        Only reached from the free-text branch of `async_step_user` — a
+        picked suggestion already carries its DIVA and skips straight to
+        line selection.
+        """
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            diva_str = user_input.get(CONF_DIVA)
+            if diva_str == "__search_again__":
+                return await self.async_step_user()
+            try:
+                diva = int(diva_str) if diva_str is not None else None
+            except ValueError as err:
+                # Selector should only ever feed us numeric strings — a
+                # non-numeric value here means the selector contract
+                # changed (HA upgrade) or someone hand-edited the flow
+                # state. DEBUG only since the user-visible behaviour
+                # (invalid_stop error) is already correct.
+                _LOGGER.debug("Failed to parse diva %r: %s", diva_str, err)
+                diva = None
+            station = next(
+                (s for s in self._matches if s.diva == diva), None
+            )
+            if station is None:
+                errors[CONF_DIVA] = "invalid_stop"
+            else:
+                self._selected_station = station
+                return await self.async_step_select_lines()
+
+        options: list[SelectOptionDict] = [
+            SelectOptionDict(
+                value=str(s.diva),
+                label=f"{s.name} ({s.municipality})",
+            )
+            for s in self._matches
+        ]
+        lang = self.hass.config.language
+        search_again_label = _SEARCH_AGAIN_LABELS.get(
+            lang, _SEARCH_AGAIN_LABELS["en"]
+        )
+        options.append(
+            SelectOptionDict(value="__search_again__", label=search_again_label)
+        )
+
+        return self.async_show_form(
+            step_id="select_stop",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_DIVA): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options,
+                            mode=SelectSelectorMode.LIST,
+                        )
+                    )
+                }
+            ),
+            errors=errors,
+            description_placeholders={"query": self._query},
         )
 
     # ------------------------------------------------------------------

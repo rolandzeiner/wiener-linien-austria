@@ -4,16 +4,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
-import pytest
 
 from tests.conftest import make_response_cm
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType, InvalidData
+from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.wiener_linien_austria.config_flow import (
-    WienerLinienAustriaConfigFlow,
     _format_distance,
     _nearest_stations,
     _stop_options,
@@ -714,48 +712,95 @@ async def test_picking_a_stop_goes_straight_to_lines(
     assert result["result"].unique_id == "diva_60201012"
 
 
-async def test_unknown_diva_rejected_by_selector(hass: HomeAssistant) -> None:
-    """The SelectSelector is the first line of defence for an unlisted DIVA."""
-    _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
-
+async def test_typed_text_with_several_matches_shows_the_shortlist(
+    hass: HomeAssistant,
+) -> None:
+    """Ambiguous free text falls through to the match list, as before."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    with pytest.raises(InvalidData):
-        await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_DIVA: "99999999"}
-        )
+    # "gasse" hits Taubstummengasse, Lafitegasse-style names — several stops.
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "select_stop"
+    assert result["description_placeholders"]["query"] == "gasse"
+
+    options = _options(result)
+    values = [o["value"] for o in options]
+    # Every hit plus the escape hatch back to step 1.
+    assert "__search_again__" in values
+    assert "60201468" in values  # Taubstummengasse
 
 
-async def test_unknown_diva_rejected_by_handler(hass: HomeAssistant) -> None:
-    """And the handler refuses it too, driven past the selector directly.
+async def test_typed_text_with_one_match_skips_the_shortlist(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Unambiguous free text is clear enough — go straight to the lines."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "Stephans"}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "select_lines"
 
-    Guards the case where the selector contract changes under us, or the
-    catalogue is refreshed between rendering the form and submitting it.
-    """
-    _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
-    flow = WienerLinienAustriaConfigFlow()
-    flow.hass = hass
-    flow.flow_id = "test"
-    flow.handler = DOMAIN
-
-    result = await flow.async_step_user({CONF_DIVA: "99999999"})
+async def test_search_again_returns_to_step_one(hass: HomeAssistant) -> None:
+    """The shortlist keeps its escape hatch back to the picker."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    assert result["step_id"] == "select_stop"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "__search_again__"}
+    )
+    assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "user"
-    assert result["errors"][CONF_DIVA] == "invalid_stop"
 
 
-async def test_non_numeric_diva_rejected(hass: HomeAssistant) -> None:
-    """A non-numeric value is refused rather than raising."""
-    _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
+async def test_typed_text_matching_nothing_reports_no_matches(
+    hass: HomeAssistant,
+) -> None:
+    """Free text that matches no stop stays on step 1 with a clear error."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "XYZ-nope"}
+    )
+    assert result["step_id"] == "user"
+    assert result["errors"][CONF_DIVA] == "no_matches"
 
-    flow = WienerLinienAustriaConfigFlow()
-    flow.hass = hass
-    flow.flow_id = "test"
-    flow.handler = DOMAIN
 
-    result = await flow.async_step_user({CONF_DIVA: "not-a-diva"})
-    assert result["errors"][CONF_DIVA] == "invalid_stop"
+async def test_typed_text_too_short_is_rejected(hass: HomeAssistant) -> None:
+    """A single character is not a search — say so rather than scanning."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "a"}
+    )
+    assert result["errors"][CONF_DIVA] == "query_too_short"
+
+
+async def test_custom_value_is_enabled_on_the_picker(hass: HomeAssistant) -> None:
+    """The picker must accept typed text, not just a pick from the list."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    for key, validator in result["data_schema"].schema.items():
+        if str(key) == CONF_DIVA:
+            assert validator.config["custom_value"] is True
+            assert validator.config["mode"] == "dropdown"
+            break
+    else:
+        raise AssertionError("stop picker not in schema")
 
 
 def test_platformless_stops_are_never_offered() -> None:
@@ -805,3 +850,83 @@ def test_format_distance_localises_the_decimal_separator() -> None:
     assert _format_distance(846.0, "de") == "850 m"
     assert _format_distance(1412.0, "en") == "1.4 km"
     assert _format_distance(1412.0, "de") == "1,4 km"
+
+
+def test_same_named_stops_are_disambiguated() -> None:
+    """Two DIVAs sharing a name get the lines that serve them appended.
+
+    Vienna really does this — "Schottenring (Wien)" is both the U2/U4 hub
+    and a nightline-only stop — and identical labels leave the user
+    picking blind.
+    """
+    catalogue = StaticCatalogue(
+        stations_by_diva={
+            1: Station(
+                diva=1, name="Schottenring", municipality="Wien",
+                longitude=16.3720, latitude=48.2080, rbls=[11],
+            ),
+            2: Station(
+                diva=2, name="Schottenring", municipality="Wien",
+                longitude=16.3730, latitude=48.2090, rbls=[22],
+            ),
+            3: Station(
+                diva=3, name="Unique", municipality="Wien",
+                longitude=16.3740, latitude=48.2100, rbls=[33],
+            ),
+        },
+        last_fetched="2026-04-20T12:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            lines_at_diva={1: ("U2", "U4", "1", "2", "31"), 2: ("N31",)},
+        ),
+    )
+    labels = {o["value"]: o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en")}
+    # Truncated at 4 lines — a 14-line hub would be unreadable otherwise.
+    assert labels["1"] == "Schottenring (Wien) · U2, U4, 1, 2, …"
+    assert labels["2"] == "Schottenring (Wien) · N31"
+    # A name nobody shares is left alone.
+    assert labels["3"] == "Unique (Wien)"
+
+
+def test_identical_line_sets_fall_back_to_the_diva() -> None:
+    """When the lines match too (Lafitegasse, both 54A), the DIVA breaks the tie."""
+    catalogue = StaticCatalogue(
+        stations_by_diva={
+            1: Station(
+                diva=1, name="Lafitegasse", municipality="Wien",
+                longitude=16.3720, latitude=48.2080, rbls=[11],
+            ),
+            2: Station(
+                diva=2, name="Lafitegasse", municipality="Wien",
+                longitude=16.3730, latitude=48.2090, rbls=[22],
+            ),
+        },
+        last_fetched="2026-04-20T12:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            lines_at_diva={1: ("54A",), 2: ("54A",)},
+        ),
+    )
+    labels = sorted(o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en"))
+    assert labels == [
+        "Lafitegasse (Wien) · 54A · #1",
+        "Lafitegasse (Wien) · 54A · #2",
+    ]
+    assert len(set(labels)) == 2
+
+
+def test_collision_without_line_data_still_resolves() -> None:
+    """A cache with no trip-pattern index falls straight through to DIVAs."""
+    catalogue = StaticCatalogue(
+        stations_by_diva={
+            1: Station(
+                diva=1, name="Kirchengasse", municipality="Wien",
+                longitude=16.3720, latitude=48.2080, rbls=[11],
+            ),
+            2: Station(
+                diva=2, name="Kirchengasse", municipality="Wien",
+                longitude=16.3730, latitude=48.2090, rbls=[22],
+            ),
+        },
+        last_fetched="2026-04-20T12:00:00+00:00",
+    )
+    labels = sorted(o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en"))
+    assert labels == ["Kirchengasse (Wien) · #1", "Kirchengasse (Wien) · #2"]

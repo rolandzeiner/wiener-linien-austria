@@ -8,7 +8,14 @@
           "diva": "Haltestelle"
         },
         "data_description": {
-          "diva": "Alle Wiener-Linien-Haltestellen. Zum Filtern tippen; die dem Home-Assistant-Standort nächstgelegenen stehen oben."
+          "diva": "Zum Filtern der Haltestellenliste tippen — die dem Home-Assistant-Standort nächstgelegenen stehen oben. Teilnamen genügen: bestätigen und aus den Treffern wählen."
+        }
+      },
+      "select_stop": {
+        "title": "Haltestelle wählen",
+        "description": "Treffer für „{query}“:",
+        "data": {
+          "diva": "Haltestelle"
         }
       },
       "select_lines": {
@@ -32,6 +39,8 @@
       }
     },
     "error": {
+      "query_too_short": "Mindestens 2 Zeichen eingeben oder eine Haltestelle aus der Liste wählen.",
+      "no_matches": "Keine Haltestelle dazu gefunden. Schreibweise prüfen oder aus der Liste wählen.",
       "invalid_stop": "Diese Haltestelle steht nicht mehr im Katalog. Eine andere wählen.",
       "no_lines": "Mindestens eine Linie auswählen.",
       "cannot_connect": "Die Wiener-Linien-Echtzeit-API ist nicht erreichbar. Gleich nochmal versuchen."

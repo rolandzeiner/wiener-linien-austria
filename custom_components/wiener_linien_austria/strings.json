@@ -8,7 +8,14 @@
           "diva": "Stop"
         },
         "data_description": {
-          "diva": "Every Wiener Linien stop. Start typing to filter; the ones nearest your Home Assistant location are listed first."
+          "diva": "Start typing to filter the full stop list — the ones nearest your Home Assistant location are shown first. Partial names work: submit and pick from the matches."
+        }
+      },
+      "select_stop": {
+        "title": "Pick a stop",
+        "description": "Matches for “{query}”:",
+        "data": {
+          "diva": "Stop"
         }
       },
       "select_lines": {
@@ -32,6 +39,8 @@
       }
     },
     "error": {
+      "query_too_short": "Enter at least 2 characters, or pick a stop from the list.",
+      "no_matches": "No stop matches that. Check the spelling, or pick from the list.",
       "invalid_stop": "That stop is no longer in the catalogue. Pick another one.",
       "no_lines": "Select at least one line.",
       "cannot_connect": "Cannot reach the Wiener Linien real-time API. Try again in a minute."
