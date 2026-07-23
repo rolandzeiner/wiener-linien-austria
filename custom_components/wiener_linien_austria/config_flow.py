@@ -1,15 +1,24 @@
 """Config flow for Wiener Linien Austria.
 
-Three-step flow:
-  1. `user`           — pick one of the stops nearest the Home Assistant home
-                        location, or type a stop-name fragment to search.
-                        Picking a suggestion skips step 2.
-  2. `select_stop`    — dropdown of matching stations from the static catalogue.
-  3. `select_lines`   — live `/monitor` call with the station's RBLs; each
+Two-step flow:
+  1. `user`           — one searchable dropdown carrying every trackable stop
+                        in the static catalogue. The stops nearest the Home
+                        Assistant home location are pinned to the top with
+                        their distance; the rest follow alphabetically. HA
+                        renders this as a combo box, so typing filters the
+                        whole catalogue client-side.
+  2. `select_lines`   — live `/monitor` call with the station's RBLs; each
                         returned line × direction is presented as a pre-checked
                         option. Submitting saves the entry.
 `async_step_reconfigure` re-enters `select_lines` for an existing entry,
 preserving unique_id. Options flow tweaks the scan interval only.
+
+Superseded design (pre-1.6): a free-text `search_query` step feeding a
+`select_stop` shortlist. It forced the user to know and correctly spell a
+stop name before seeing anything, and the distance-sorted suggestion list
+that replaced it only helped installs sitting inside the network — a home
+location 37 km out got no suggestions at all. The searchable dropdown
+serves both cases from one control.
 """
 from __future__ import annotations
 
@@ -38,7 +47,6 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TextSelector,
 )
 from homeassistant.util.location import distance
 
@@ -46,9 +54,7 @@ from .const import (
     API_BASE_URL,
     CONF_DIVA,
     CONF_LINES,
-    CONF_NEARBY_STOP,
     CONF_RBLS,
-    CONF_SEARCH_QUERY,
     CONF_STOP_NAME,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -63,14 +69,6 @@ from .http import base_request_headers
 from .static import StaticCatalogue, Station, async_get_catalogue
 
 _LOGGER = logging.getLogger(__name__)
-
-# SelectOptionDict labels bypass HA's selector translation system, so we
-# pick the right locale at runtime. English is the fallback for anything
-# not explicitly listed.
-_SEARCH_AGAIN_LABELS: dict[str, str] = {
-    "en": "↩ Search again",
-    "de": "↩ Erneut suchen",
-}
 
 
 def _nearest_stations(
@@ -136,6 +134,91 @@ def _nearby_label(station: Station, meters: float, language: str) -> str:
         f"{station.name} ({station.municipality}) "
         f"— {_format_distance(meters, language)}"
     )
+
+
+def _station_for_value(
+    catalogue: StaticCatalogue, value: Any
+) -> Station | None:
+    """Resolve a picker value back to a trackable Station, or None.
+
+    The SelectSelector already constrains submissions to values we
+    offered, so this is the second line of defence — it also re-checks
+    `rbls`, which keeps the resolution honest if the catalogue was
+    refreshed between rendering the form and submitting it.
+    """
+    try:
+        diva = int(value)
+    except (TypeError, ValueError):
+        # Only reachable if the selector contract changes under us or the
+        # flow state is hand-edited; the user-visible `invalid_stop` is
+        # already the right answer, so this stays at DEBUG.
+        _LOGGER.debug("Failed to parse diva %r", value)
+        return None
+    station = catalogue.stations_by_diva.get(diva)
+    if station is None or not station.rbls:
+        return None
+    return station
+
+
+def _stop_label(station: Station) -> str:
+    """Render a plain stop option: 'Stephansplatz (Wien)'."""
+    return f"{station.name} ({station.municipality})"
+
+
+def _stop_options(
+    catalogue: StaticCatalogue,
+    latitude: float,
+    longitude: float,
+    language: str,
+) -> list[SelectOptionDict]:
+    """Every trackable stop as one picker option, nearest to home first.
+
+    HA renders a DROPDOWN SelectSelector as a combo box that filters on
+    the option labels client-side, so shipping the whole catalogue in one
+    control gives type-to-filter over every stop without a round trip —
+    the user never has to know a stop's exact spelling, and there is no
+    second shortlist step.
+
+    Ordering carries the useful default: the stops closest to the home
+    location head the list with their distance shown, so the unfiltered
+    dropdown opens on "probably one of these". Everything else follows
+    alphabetically. `sort=False` on the selector preserves this order.
+
+    Stops the nearby block already pinned are dropped from the
+    alphabetical remainder — a duplicate `value` in a select is
+    ambiguous, and the pinned row is the more informative of the two.
+
+    Falls back to a purely alphabetical list when the home location is
+    unset or nothing is in range; the dropdown is equally usable either
+    way, the nearby block is only a shortcut.
+    """
+    nearby: list[tuple[Station, float]] = []
+    if latitude or longitude:
+        nearby = _nearest_stations(catalogue, latitude, longitude)
+
+    options = [
+        SelectOptionDict(
+            value=str(station.diva),
+            label=_nearby_label(station, meters, language),
+        )
+        for station, meters in nearby
+    ]
+    pinned = {station.diva for station, _ in nearby}
+    remainder = sorted(
+        (
+            station
+            for station in catalogue.stations_by_diva.values()
+            # Same exclusion as `_nearest_stations`: /monitor is queried
+            # per RBL, so a platform-less DIVA can only dead-end.
+            if station.rbls and station.diva not in pinned
+        ),
+        key=lambda station: (station.name.casefold(), station.municipality.casefold()),
+    )
+    options.extend(
+        SelectOptionDict(value=str(station.diva), label=_stop_label(station))
+        for station in remainder
+    )
+    return options
 
 
 def _line_key(line: str, direction: str) -> str:
@@ -327,11 +410,9 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Init in-flight selections."""
-        self._query: str = ""
-        self._matches: list[Station] = []
-        # None = not computed yet; [] = computed and genuinely empty.
-        self._nearby: list[tuple[Station, float]] | None = None
         self._selected_station: Station | None = None
+        # None = not built yet. Built once per flow; ~2 000 options.
+        self._stop_options: list[SelectOptionDict] | None = None
         self._lines: list[dict[str, str]] = []
         self._reconfigure_entry: ConfigEntry | None = None
 
@@ -344,183 +425,68 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         return WienerLinienAustriaOptionsFlow()
 
     # ------------------------------------------------------------------
-    # Step 1 — user: nearby suggestions + search query
+    # ------------------------------------------------------------------
+    # Step 1 — user: searchable dropdown over the whole catalogue
     # ------------------------------------------------------------------
 
-    async def _async_nearby_stations(self) -> list[tuple[Station, float]]:
-        """Stations closest to the Home Assistant home location, nearest first.
+    async def _async_stop_options(
+        self, catalogue: StaticCatalogue
+    ) -> list[SelectOptionDict]:
+        """Build (and memoise) the stop picker options for this flow.
 
-        Memoised for the lifetime of the flow so re-rendering the form
-        after a validation error doesn't repeat the catalogue sweep.
-
-        Returns an empty list — meaning "offer search only" — when the
-        home location is unset or the install sits outside the Wiener
-        Linien network. `hass.config` initialises latitude/longitude to
-        `0.0` and onboarding overwrites them, so falsy-both is the
-        "never configured" test; a genuine Null Island install has no
-        Vienna stop within the radius anyway, so the two collapse to the
-        same (correct) outcome.
+        Memoised so re-rendering the form after a validation error does
+        not repeat the distance sweep and the ~2 000-entry sort.
         """
-        if self._nearby is not None:
-            return self._nearby
-        latitude = self.hass.config.latitude
-        longitude = self.hass.config.longitude
-        if not latitude and not longitude:
-            self._nearby = []
-            return self._nearby
-        try:
-            catalogue = await async_get_catalogue(self.hass)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-            # Deliberately not memoised and not surfaced as a form error:
-            # suggestions are an optional convenience, and the search
-            # path below reports `catalogue_unavailable` properly if the
-            # user actually needs the catalogue this attempt.
-            _LOGGER.debug("Nearby-stop suggestions unavailable: %s", err)
-            return []
-        self._nearby = _nearest_stations(catalogue, latitude, longitude)
-        return self._nearby
+        if self._stop_options is None:
+            self._stop_options = _stop_options(
+                catalogue,
+                self.hass.config.latitude,
+                self.hass.config.longitude,
+                self.hass.config.language,
+            )
+        return self._stop_options
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Offer the nearest stops, or take a stop-name fragment to search."""
+        """Pick a stop from the full catalogue, nearest to home first."""
+        try:
+            catalogue = await async_get_catalogue(self.hass)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            # Without the catalogue there is no picker to render and no
+            # free-text fallback left to offer, so end the flow cleanly
+            # rather than showing an empty dropdown the user can't use.
+            _LOGGER.warning("Static catalogue load failed: %s", err)
+            return self.async_abort(reason="catalogue_unavailable")
+
+        options = await self._async_stop_options(catalogue)
         errors: dict[str, str] = {}
-        nearby = await self._async_nearby_stations()
 
         if user_input is not None:
-            picked = str(user_input.get(CONF_NEARBY_STOP) or "").strip()
-            self._query = str(user_input.get(CONF_SEARCH_QUERY) or "").strip()
-            if picked:
-                # A suggestion carries its own Station, so the search and
-                # select_stop steps are both skipped.
-                station = next(
-                    (s for s, _ in nearby if str(s.diva) == picked), None
-                )
-                if station is None:
-                    errors[CONF_NEARBY_STOP] = "invalid_stop"
-                else:
-                    self._selected_station = station
-                    return await self.async_step_select_lines()
-            elif not self._query and nearby:
-                # Only reachable when suggestions are on screen — without
-                # them the search box is Required and an empty submit
-                # falls through to `query_too_short` below, as before.
-                errors["base"] = "no_selection"
-            # Clamp pathologically long queries — `catalogue.search` does
-            # an O(stations × len(query)) `casefold` substring scan per
-            # call, so a misclick paste of, say, a 10 MB clipboard would
-            # otherwise spin the event loop. 100 chars is comfortably
-            # past any real Vienna stop name.
-            elif len(self._query) < 2 or len(self._query) > 100:
-                errors[CONF_SEARCH_QUERY] = "query_too_short"
-            else:
-                try:
-                    catalogue = await async_get_catalogue(self.hass)
-                except (aiohttp.ClientError, asyncio.TimeoutError) as err:
-                    _LOGGER.warning("Static catalogue load failed: %s", err)
-                    errors["base"] = "catalogue_unavailable"
-                else:
-                    self._matches = catalogue.search(self._query)
-                    if not self._matches:
-                        errors[CONF_SEARCH_QUERY] = "no_matches"
-                    else:
-                        return await self.async_step_select_stop()
-
-        schema: dict[Any, Any] = {}
-        if nearby:
-            language = self.hass.config.language
-            schema[vol.Optional(CONF_NEARBY_STOP)] = SelectSelector(
-                SelectSelectorConfig(
-                    options=[
-                        SelectOptionDict(
-                            value=str(station.diva),
-                            label=_nearby_label(station, meters, language),
-                        )
-                        for station, meters in nearby
-                    ],
-                    mode=SelectSelectorMode.DROPDOWN,
-                )
-            )
-            # Optional alongside the suggestions: either field can be the
-            # one the user fills in. Without suggestions it stays Required
-            # so the form is byte-identical to the pre-suggestion flow.
-            schema[vol.Optional(CONF_SEARCH_QUERY, default=self._query)] = (
-                TextSelector()
-            )
-        else:
-            schema[vol.Required(CONF_SEARCH_QUERY, default=self._query)] = (
-                TextSelector()
-            )
-
-        return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(schema),
-            errors=errors,
-        )
-
-    # ------------------------------------------------------------------
-    # Step 2 — select_stop: dropdown of matches
-    # ------------------------------------------------------------------
-
-    async def async_step_select_stop(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Let the user pick one station from the search hits."""
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            diva_str = user_input.get(CONF_DIVA)
-            if diva_str == "__search_again__":
-                return await self.async_step_user()
-            try:
-                diva = int(diva_str) if diva_str is not None else None
-            except ValueError as err:
-                # Selector should only ever feed us numeric strings — a
-                # non-numeric value here means the selector contract
-                # changed (HA upgrade) or someone hand-edited the flow
-                # state. DEBUG only since the user-visible behaviour
-                # (invalid_stop error) is already correct.
-                _LOGGER.debug(
-                    "Failed to parse diva %r: %s", diva_str, err
-                )
-                diva = None
-            station = next(
-                (s for s in self._matches if s.diva == diva), None
-            )
+            station = _station_for_value(catalogue, user_input.get(CONF_DIVA))
             if station is None:
                 errors[CONF_DIVA] = "invalid_stop"
             else:
                 self._selected_station = station
                 return await self.async_step_select_lines()
 
-        options: list[SelectOptionDict] = [
-            SelectOptionDict(
-                value=str(s.diva),
-                label=f"{s.name} ({s.municipality})",
-            )
-            for s in self._matches
-        ]
-        lang = self.hass.config.language
-        search_again_label = _SEARCH_AGAIN_LABELS.get(
-            lang, _SEARCH_AGAIN_LABELS["en"]
-        )
-        options.append(
-            SelectOptionDict(value="__search_again__", label=search_again_label)
-        )
-
         return self.async_show_form(
-            step_id="select_stop",
+            step_id="user",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_DIVA): SelectSelector(
                         SelectSelectorConfig(
                             options=options,
-                            mode=SelectSelectorMode.LIST,
+                            mode=SelectSelectorMode.DROPDOWN,
+                            # Keep the nearest-first ordering built above;
+                            # HA would otherwise re-sort alphabetically and
+                            # bury the nearby block.
+                            sort=False,
                         )
                     )
                 }
             ),
             errors=errors,
-            description_placeholders={"query": self._query},
         )
 
     # ------------------------------------------------------------------

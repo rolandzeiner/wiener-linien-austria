@@ -34,16 +34,13 @@ CONF_DIVA: Final = "diva"
 CONF_STOP_NAME: Final = "stop_name"
 CONF_RBLS: Final = "rbls"
 CONF_LINES: Final = "lines"  # selected "{line}|{direction}" keys (see _line_key)
-CONF_SEARCH_QUERY: Final = "search_query"
-CONF_NEARBY_STOP: Final = "nearby_stop"
-
-# Nearby-stop suggestions on the first config-flow step.
-# The catalogue carries lat/lon for every DIVA, so the flow can offer the
-# stations closest to `hass.config.latitude/longitude` instead of making
-# the user guess a spelling. 2 km is roughly "still walkable, definitely
-# your stop" in Vienna, where the median gap between stops is ~350 m; past
-# that radius the list stops being a shortcut and the free-text search is
-# the better tool. 10 entries keeps the dropdown scannable.
+# Nearby-stop block pinned to the top of the stop picker.
+# The catalogue carries lat/lon for every DIVA, so the picker can lead with
+# the stations closest to `hass.config.latitude/longitude`. 2 km is roughly
+# "still walkable, definitely your stop" in Vienna, where the median gap
+# between stops is ~350 m; past that a distance-sorted row stops being a
+# shortcut and the alphabetical remainder serves better. 10 entries keeps
+# the pinned block from crowding out the rest of the list.
 NEARBY_STOP_LIMIT: Final = 10
 NEARBY_STOP_MAX_METERS: Final = 2000
 

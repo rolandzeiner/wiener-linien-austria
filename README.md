@@ -7,7 +7,7 @@
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
 [![Live demo](https://img.shields.io/badge/live-demo-2196F3.svg)](https://demo.rolandzeiner.at/#wien)
 
-Vienna public transport departures for Home Assistant. Pick a stop near you, choose the lines you care about — done. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data): no API key, no YAML, no RBL lookups.
+Vienna public transport departures for Home Assistant. Pick your stop from the list, choose the lines you care about — done. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data): no API key, no YAML, no RBL lookups.
 
 ## Supported Functions
 
@@ -15,7 +15,7 @@ Vienna public transport departures for Home Assistant. Pick a stop near you, cho
 - **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap. See [Lovelace Cards](#lovelace-cards).
 - **Service + elevator alerts** filtered to your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` attributes and rendered inline by every card.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail showing every upcoming stop on that trip with transfer-line chips.
-- **Nearby stops first** — setup opens with the stops closest to your Home Assistant location, nearest first, so most installs never type a name. Search by name covers everything else. The line picker merges the live `/monitor` window with the static schedule catalogue, so day-only and nightline services both stay selectable regardless of when you configure.
+- **One-step stop picking** — every Wiener Linien stop sits in a single dropdown you filter by typing, so no spelling has to be exact and no blind search comes back empty. Stops nearest your Home Assistant location head the list with their distance. The line picker merges the live `/monitor` window with the static schedule catalogue, so day-only and nightline services both stay selectable regardless of when you configure.
 - **Reconfigure** to add or remove lines without losing the entry; **Configure** to change the polling interval.
 
 ## Screenshots
@@ -65,10 +65,9 @@ Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_comp
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=wiener_linien_austria)
 
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
-2. Pick a stop from **Nearby stop** — the stops closest to your Home Assistant location, nearest first, with distances shown.
-3. No home location set, or nothing within 2 km? Type part of a stop name instead (e.g. `Stephans`), then pick it from the matches. Search is case-insensitive; umlauts matter.
-4. Pick the lines to track. Off-service lines (nightlines during the day, day-only lines after midnight) stay selectable — the picker merges live `/monitor` data with the static catalogue.
-5. Set a polling interval (default 60 s, range 30–600 s) and save.
+2. Open **Stop** and pick your stop. The list opens on the stops nearest your Home Assistant location, with distances shown; type any part of a name (e.g. `Stephans`) to filter the full catalogue.
+3. Pick the lines to track. Off-service lines (nightlines during the day, day-only lines after midnight) stay selectable — the picker merges live `/monitor` data with the static catalogue.
+4. Set a polling interval (default 60 s, range 30–600 s) and save.
 
 Tracked lines change via **Reconfigure**; polling interval via **Configure**.
 

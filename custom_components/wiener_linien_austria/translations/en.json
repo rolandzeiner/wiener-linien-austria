@@ -5,19 +5,10 @@
         "title": "Wiener Linien Austria",
         "description": "Pick the stop you want to track.",
         "data": {
-          "nearby_stop": "Nearby stop",
-          "search_query": "Stop name"
+          "diva": "Stop"
         },
         "data_description": {
-          "nearby_stop": "Stops closest to your Home Assistant location, nearest first.",
-          "search_query": "Type part of the name and submit. Example: Stephansplatz"
-        }
-      },
-      "select_stop": {
-        "title": "Pick a stop",
-        "description": "Matches for \"{query}\":",
-        "data": {
-          "diva": "Stop"
+          "diva": "Every Wiener Linien stop. Start typing to filter; the ones nearest your Home Assistant location are listed first."
         }
       },
       "select_lines": {
@@ -41,11 +32,7 @@
       }
     },
     "error": {
-      "no_selection": "Pick a nearby stop, or enter a stop name.",
-      "query_too_short": "Enter at least 2 characters.",
-      "no_matches": "No stops match this search.",
-      "catalogue_unavailable": "Cannot load the Wiener Linien stop catalogue. Check your internet connection and retry.",
-      "invalid_stop": "The selected stop is no longer available — search again.",
+      "invalid_stop": "That stop is no longer in the catalogue. Pick another one.",
       "no_lines": "Select at least one line.",
       "cannot_connect": "Cannot reach the Wiener Linien real-time API. Try again in a minute."
     },
@@ -69,7 +56,9 @@
   },
   "entity": {
     "sensor": {
-      "stop": { "name": "Departures" }
+      "stop": {
+        "name": "Departures"
+      }
     }
   },
   "exceptions": {

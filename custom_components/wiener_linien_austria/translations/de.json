@@ -5,19 +5,10 @@
         "title": "Wiener Linien Austria",
         "description": "Die gewünschte Haltestelle wählen.",
         "data": {
-          "nearby_stop": "Haltestelle in der Nähe",
-          "search_query": "Haltestellenname"
+          "diva": "Haltestelle"
         },
         "data_description": {
-          "nearby_stop": "Haltestellen in der Nähe des Home-Assistant-Standorts, nächstgelegene zuerst.",
-          "search_query": "Namensteil eingeben und bestätigen. Beispiel: Stephansplatz"
-        }
-      },
-      "select_stop": {
-        "title": "Haltestelle auswählen",
-        "description": "Treffer für „{query}“:",
-        "data": {
-          "diva": "Haltestelle"
+          "diva": "Alle Wiener-Linien-Haltestellen. Zum Filtern tippen; die dem Home-Assistant-Standort nächstgelegenen stehen oben."
         }
       },
       "select_lines": {
@@ -41,11 +32,7 @@
       }
     },
     "error": {
-      "no_selection": "Eine Haltestelle in der Nähe wählen oder einen Namen eingeben.",
-      "query_too_short": "Mindestens 2 Zeichen eingeben.",
-      "no_matches": "Keine Haltestelle zur Suche gefunden.",
-      "catalogue_unavailable": "Der Wiener-Linien-Haltestellenkatalog kann nicht geladen werden. Internetverbindung prüfen und erneut versuchen.",
-      "invalid_stop": "Die gewählte Haltestelle ist nicht mehr verfügbar — erneut suchen.",
+      "invalid_stop": "Diese Haltestelle steht nicht mehr im Katalog. Eine andere wählen.",
       "no_lines": "Mindestens eine Linie auswählen.",
       "cannot_connect": "Die Wiener-Linien-Echtzeit-API ist nicht erreichbar. Gleich nochmal versuchen."
     },
@@ -69,7 +56,9 @@
   },
   "entity": {
     "sensor": {
-      "stop": { "name": "Abfahrten" }
+      "stop": {
+        "name": "Abfahrten"
+      }
     }
   },
   "exceptions": {

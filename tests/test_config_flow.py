@@ -16,6 +16,7 @@ from custom_components.wiener_linien_austria.config_flow import (
     WienerLinienAustriaConfigFlow,
     _format_distance,
     _nearest_stations,
+    _stop_options,
     _probe_monitor_lines,
     _resolve_lines_for_picker,
     _static_lines_for_station,
@@ -29,9 +30,7 @@ from custom_components.wiener_linien_austria.static import (
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
-    CONF_NEARBY_STOP,
     CONF_RBLS,
-    CONF_SEARCH_QUERY,
     CONF_STOP_NAME,
     DOMAIN,
 )
@@ -42,12 +41,11 @@ DEFAULT_LINES = ["U1|H", "U1|R"]
 async def _complete_flow(
     hass: HomeAssistant,
     *,
-    query: str = "Stephans",
     diva: str = "60201012",
     lines: list[str] | None = None,
     scan_interval: int = 60,
 ) -> dict:
-    """Walk the 3-step flow end-to-end and return the final result.
+    """Walk the 2-step flow end-to-end and return the final result.
 
     Used by tests that only care about the *outcome* of a successful flow;
     tests that assert intermediate step transitions (step_id/type checks)
@@ -55,9 +53,6 @@ async def _complete_flow(
     """
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: query}
     )
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: diva}
@@ -71,49 +66,22 @@ async def _complete_flow(
     )
 
 
-async def test_search_too_short_shows_error(hass: HomeAssistant) -> None:
-    """A query shorter than 2 characters is rejected client-side."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "a"}
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"][CONF_SEARCH_QUERY] == "query_too_short"
-
-
-async def test_search_no_matches(hass: HomeAssistant) -> None:
-    """Queries that match no known station show `no_matches`."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "XYZ-nope"}
-    )
-    assert result["errors"][CONF_SEARCH_QUERY] == "no_matches"
 
 
 async def test_full_flow_creates_entry(hass: HomeAssistant, mock_fetch) -> None:
-    """Search → pick stop → pick lines → entry created with correct data."""
-    # Step 1: search
+    """Pick stop → pick lines → entry created with correct data."""
+    # Step 1: pick Stephansplatz straight out of the catalogue dropdown
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "select_stop"
-
-    # Step 2: pick Stephansplatz
+    assert result["step_id"] == "user"
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "select_lines"
 
-    # Step 3: accept defaults — config flow now writes (line, direction)
+    # Step 2: accept defaults — config flow now writes (line, direction)
     # pair keys, not (line, direction, towards) triples.
     lines_default = ["U1|H", "U1|R"]
     result = await hass.config_entries.flow.async_configure(
@@ -143,9 +111,6 @@ async def test_empty_line_selection_rejected(hass: HomeAssistant, mock_fetch) ->
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
     result = await hass.config_entries.flow.async_configure(
@@ -159,9 +124,6 @@ async def test_cannot_connect_during_probe(hass: HomeAssistant) -> None:
     """Live /monitor probe failure surfaces cannot_connect."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
     )
     with patch(
         "custom_components.wiener_linien_austria.config_flow._probe_monitor_lines",
@@ -217,38 +179,24 @@ async def test_options_flow_updates_interval(hass: HomeAssistant, mock_fetch) ->
     assert entry.options[CONF_SCAN_INTERVAL] == 180
 
 
-async def test_catalogue_unavailable_during_search(hass: HomeAssistant) -> None:
-    """If the static catalogue can't be loaded, user step surfaces an error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+async def test_catalogue_unavailable_aborts_user_step(hass: HomeAssistant) -> None:
+    """Without the catalogue there is no picker to render, so the flow aborts.
+
+    There is no free-text fallback left to degrade to — an empty dropdown
+    would be a dead end, so ending the flow with a reason the user can act
+    on is the honest outcome.
+    """
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
         side_effect=aiohttp.ClientError("upstream down"),
     ):
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
-    assert result["type"] == FlowResultType.FORM
-    assert result["errors"]["base"] == "catalogue_unavailable"
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "catalogue_unavailable"
 
-
-async def test_search_again_returns_to_user_step(hass: HomeAssistant) -> None:
-    """Picking the `__search_again__` sentinel on select_stop reopens search."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    assert result["step_id"] == "select_stop"
-
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_DIVA: "__search_again__"}
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "user"
 
 
 async def test_reconfigure_aborts_when_catalogue_unavailable(
@@ -549,7 +497,7 @@ def test_static_catalogue_index_by_rbl_caches() -> None:
 
 
 async def test_select_lines_raises_repairs_issue_when_catalogue_fails(
-    hass: HomeAssistant, mock_fetch
+    hass: HomeAssistant, mock_fetch, mock_static_catalogue
 ) -> None:
     """Catalogue failure during select_lines must create a Repairs issue."""
     from homeassistant.helpers import issue_registry as ir
@@ -557,16 +505,17 @@ async def test_select_lines_raises_repairs_issue_when_catalogue_fails(
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    assert result["step_id"] == "select_stop"
 
-    # Override the autouse-success patch for the select_lines call only.
+    # The step-1 picker needs the catalogue to render at all, so let the
+    # first load succeed and fail only the second — the one select_lines
+    # makes when it merges the static line list into the live probe.
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("OGD endpoint down"),
+        side_effect=[
+            mock_static_catalogue,
+            aiohttp.ClientError("OGD endpoint down"),
+        ],
     ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {CONF_DIVA: "60201012"}
@@ -608,9 +557,6 @@ async def test_select_lines_clears_repairs_issue_on_recovery(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-    )
-    result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
     assert result["step_id"] == "select_lines"
@@ -623,14 +569,14 @@ async def test_select_lines_clears_repairs_issue_on_recovery(
 
 
 # ----------------------------------------------------------------------
-# Nearby-stop suggestions on the `user` step
+# Step 1 — the searchable all-stops dropdown
 # ----------------------------------------------------------------------
 
 # Right on top of the fixture's Stephansplatz (48.2085/16.3726). At this
-# origin the sample catalogue yields exactly three stops inside the 2 km
+# origin the sample catalogue puts exactly three stops inside the 2 km
 # radius — Stephansplatz (~70 m), Schwarzenbergplatz (~850 m) and
 # Taubstummengasse (~1.4 km) — while Leopoldau / Oberlaa / Alaudagasse
-# sit several kilometres out and must be filtered away.
+# sit several kilometres out and fall into the alphabetical remainder.
 HOME_LATITUDE = 48.2080
 HOME_LONGITUDE = 16.3720
 
@@ -646,50 +592,115 @@ def _schema_keys(result: dict) -> list[str]:
     return [str(key) for key in result["data_schema"].schema]
 
 
-def _nearby_options(result: dict) -> list[dict]:
-    """The SelectOptionDicts offered by the nearby-stop field."""
+def _options(result: dict) -> list[dict]:
+    """The SelectOptionDicts offered by the stop picker."""
     for key, validator in result["data_schema"].schema.items():
-        if str(key) == CONF_NEARBY_STOP:
+        if str(key) == CONF_DIVA:
             options = validator.config["options"]
             assert isinstance(options, list)
             return options
-    raise AssertionError(f"{CONF_NEARBY_STOP} not in schema: {_schema_keys(result)}")
+    raise AssertionError(f"{CONF_DIVA} not in schema: {_schema_keys(result)}")
 
 
-async def test_nearby_suggestions_sorted_by_distance(hass: HomeAssistant) -> None:
-    """With a home location inside Vienna, the user step offers nearby stops."""
+async def test_picker_holds_every_trackable_stop(hass: HomeAssistant) -> None:
+    """One field, one option per trackable stop — no separate search step."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     assert result["step_id"] == "user"
-    # Suggestions come first, search box stays available underneath.
-    assert _schema_keys(result) == [CONF_NEARBY_STOP, CONF_SEARCH_QUERY]
+    assert _schema_keys(result) == [CONF_DIVA]
 
-    options = _nearby_options(result)
-    assert [o["value"] for o in options] == ["60201012", "60200123", "60201468"]
-    # Distance is part of the label so the list is scannable without a map.
+    options = _options(result)
+    # All six fixture stations carry RBLs, so all six are offered exactly once.
+    assert len(options) == 6
+    values = [o["value"] for o in options]
+    assert len(set(values)) == len(values)
+    assert set(values) == {
+        "60201012", "60200123", "60201468", "60201470", "60201471", "60201472",
+    }
+
+
+async def test_nearby_stops_pinned_first_with_distance(
+    hass: HomeAssistant,
+) -> None:
+    """The nearest stops head the list, carrying their distance."""
+    _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    options = _options(result)
+
+    # First three: nearest-first, distance in the label.
+    assert [o["value"] for o in options[:3]] == [
+        "60201012", "60200123", "60201468",
+    ]
     assert options[0]["label"].startswith("Stephansplatz (Wien) — ")
     assert options[0]["label"].endswith(" m")
     assert options[2]["label"].endswith(" km")
-    # Stops beyond the 2 km radius are dropped entirely.
-    assert "60201470" not in [o["value"] for o in options]
+
+    # Remainder: alphabetical, no distance, no repeat of the pinned three.
+    rest = options[3:]
+    assert [o["label"] for o in rest] == [
+        "Alaudagasse (Wien)", "Leopoldau (Wien)", "Oberlaa (Wien)",
+    ]
+    assert all("—" not in o["label"] for o in rest)
 
 
-async def test_nearby_pick_skips_the_search_steps(
+async def test_picker_is_alphabetical_without_a_home_location(
+    hass: HomeAssistant,
+) -> None:
+    """A never-onboarded 0/0 home location just drops the pinned block."""
+    _set_home(hass, 0.0, 0.0)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    options = _options(result)
+    assert [o["label"] for o in options] == [
+        "Alaudagasse (Wien)",
+        "Leopoldau (Wien)",
+        "Oberlaa (Wien)",
+        "Schwarzenbergplatz (Wien)",
+        "Stephansplatz (Wien)",
+        "Taubstummengasse (Wien)",
+    ]
+
+
+async def test_picker_is_alphabetical_when_home_is_far_away(
+    hass: HomeAssistant,
+) -> None:
+    """A home location outside the network still gets the full catalogue.
+
+    This is the case that motivated the design: an install 37 km from the
+    nearest stop got nothing from a radius-gated suggestion list, but the
+    dropdown is equally usable at any distance.
+    """
+    _set_home(hass, 47.0707, 15.4395)  # Graz — 145 km out
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    options = _options(result)
+    assert len(options) == 6
+    assert options[0]["label"] == "Alaudagasse (Wien)"
+    assert all("—" not in o["label"] for o in options)
+
+
+async def test_picking_a_stop_goes_straight_to_lines(
     hass: HomeAssistant, mock_fetch
 ) -> None:
-    """Picking a suggestion jumps straight to line selection and saves."""
+    """One pick is enough to reach line selection and save the entry."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_NEARBY_STOP: "60201012"}
+        result["flow_id"], {CONF_DIVA: "60201012"}
     )
-    # No `select_stop` in between — the suggestion already is the station.
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "select_lines"
 
@@ -699,46 +710,11 @@ async def test_nearby_pick_skips_the_search_steps(
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["title"] == "Stephansplatz"
-    assert result["data"][CONF_DIVA] == 60201012
     assert result["data"][CONF_RBLS] == [4111, 4118]
     assert result["result"].unique_id == "diva_60201012"
 
 
-async def test_search_still_works_when_suggestions_are_shown(
-    hass: HomeAssistant,
-) -> None:
-    """Leaving the dropdown empty and typing a name keeps the old path."""
-    _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_SEARCH_QUERY: "Leopoldau"}
-    )
-    assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "select_stop"
-
-
-async def test_submitting_nothing_with_suggestions_shown(
-    hass: HomeAssistant,
-) -> None:
-    """Neither field filled is a distinct error, not `query_too_short`."""
-    _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
-    assert result["step_id"] == "user"
-    assert result["errors"]["base"] == "no_selection"
-    # The form still offers the suggestions after the error.
-    assert _schema_keys(result) == [CONF_NEARBY_STOP, CONF_SEARCH_QUERY]
-
-
-async def test_unknown_nearby_diva_rejected_by_selector(
-    hass: HomeAssistant,
-) -> None:
+async def test_unknown_diva_rejected_by_selector(hass: HomeAssistant) -> None:
     """The SelectSelector is the first line of defence for an unlisted DIVA."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
@@ -747,19 +723,15 @@ async def test_unknown_nearby_diva_rejected_by_selector(
     )
     with pytest.raises(InvalidData):
         await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_NEARBY_STOP: "60201470"}  # 5 km away
+            result["flow_id"], {CONF_DIVA: "99999999"}
         )
 
 
-async def test_unknown_nearby_diva_rejected_by_handler(
-    hass: HomeAssistant,
-) -> None:
+async def test_unknown_diva_rejected_by_handler(hass: HomeAssistant) -> None:
     """And the handler refuses it too, driven past the selector directly.
 
-    Guards the case where the selector contract changes under us (an HA
-    upgrade, or a future non-dropdown rendering of the same step) — the
-    step must still refuse a DIVA it never offered rather than reaching
-    into the catalogue for an arbitrary stop.
+    Guards the case where the selector contract changes under us, or the
+    catalogue is refreshed between rendering the form and submitting it.
     """
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
@@ -768,93 +740,52 @@ async def test_unknown_nearby_diva_rejected_by_handler(
     flow.flow_id = "test"
     flow.handler = DOMAIN
 
-    result = await flow.async_step_user({CONF_NEARBY_STOP: "60201470"})
+    result = await flow.async_step_user({CONF_DIVA: "99999999"})
     assert result["step_id"] == "user"
-    assert result["errors"][CONF_NEARBY_STOP] == "invalid_stop"
+    assert result["errors"][CONF_DIVA] == "invalid_stop"
 
 
-async def test_no_suggestions_when_home_location_unset(hass: HomeAssistant) -> None:
-    """A never-onboarded 0/0 home location falls back to search-only."""
-    _set_home(hass, 0.0, 0.0)
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    assert _schema_keys(result) == [CONF_SEARCH_QUERY]
-
-    # And the search box is still Required, so an empty submit reports the
-    # pre-existing error rather than the new `no_selection` one.
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
-    assert result["errors"][CONF_SEARCH_QUERY] == "query_too_short"
-
-
-async def test_no_suggestions_when_home_is_outside_vienna(
-    hass: HomeAssistant,
-) -> None:
-    """No stop within the radius means the form is the old search-only one."""
-    _set_home(hass, 47.0707, 15.4395)  # Graz — 145 km from any sample stop
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    assert _schema_keys(result) == [CONF_SEARCH_QUERY]
-
-
-async def test_suggestions_survive_catalogue_outage(hass: HomeAssistant) -> None:
-    """A catalogue failure degrades to search-only instead of blocking the form."""
+async def test_non_numeric_diva_rejected(hass: HomeAssistant) -> None:
+    """A non-numeric value is refused rather than raising."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
-    with patch(
-        "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
-        new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("boom"),
-    ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
-        assert _schema_keys(result) == [CONF_SEARCH_QUERY]
-        # The search path is the one that reports the outage to the user.
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_SEARCH_QUERY: "Stephans"}
-        )
-        assert result["errors"]["base"] == "catalogue_unavailable"
+    flow = WienerLinienAustriaConfigFlow()
+    flow.hass = hass
+    flow.flow_id = "test"
+    flow.handler = DOMAIN
+
+    result = await flow.async_step_user({CONF_DIVA: "not-a-diva"})
+    assert result["errors"][CONF_DIVA] == "invalid_stop"
 
 
-def test_nearest_stations_skips_platformless_stops() -> None:
-    """A DIVA with no RBLs can't be polled, so it is never suggested."""
+def test_platformless_stops_are_never_offered() -> None:
+    """A DIVA with no RBLs can't be polled, so it is left out of the picker."""
     catalogue = StaticCatalogue(
         stations_by_diva={
             1: Station(
-                diva=1,
-                name="Trackable",
-                municipality="Wien",
-                longitude=16.3720,
-                latitude=48.2080,
-                rbls=[4111],
+                diva=1, name="Trackable", municipality="Wien",
+                longitude=16.3720, latitude=48.2080, rbls=[4111],
             ),
             2: Station(
-                diva=2,
-                name="No platforms",
-                municipality="Wien",
-                longitude=16.3721,
-                latitude=48.2081,
-                rbls=[],
+                diva=2, name="No platforms", municipality="Wien",
+                longitude=16.3721, latitude=48.2081, rbls=[],
             ),
         },
         last_fetched="2026-04-20T12:00:00+00:00",
     )
-    nearest = _nearest_stations(catalogue, HOME_LATITUDE, HOME_LONGITUDE)
-    assert [station.diva for station, _ in nearest] == [1]
+    # Nearby block and alphabetical remainder must both exclude it.
+    assert [s.diva for s, _ in _nearest_stations(
+        catalogue, HOME_LATITUDE, HOME_LONGITUDE)] == [1]
+    assert [o["value"] for o in _stop_options(
+        catalogue, HOME_LATITUDE, HOME_LONGITUDE, "en")] == ["1"]
 
 
 def test_nearest_stations_honours_limit() -> None:
-    """The suggestion list is capped even when many stops are in range."""
+    """The pinned block is capped even when many stops are in range."""
     catalogue = StaticCatalogue(
         stations_by_diva={
             diva: Station(
-                diva=diva,
-                name=f"Stop {diva}",
-                municipality="Wien",
+                diva=diva, name=f"Stop {diva}", municipality="Wien",
                 longitude=16.3720,
                 # ~11 m apart, so all 5 sit well inside the radius.
                 latitude=48.2080 + diva * 0.0001,
