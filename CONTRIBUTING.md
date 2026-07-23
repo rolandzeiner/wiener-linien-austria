@@ -5,18 +5,19 @@ Thanks for taking the time to look. This file is the single answer to "how do I 
 ## Dev setup
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements_test.txt pre-commit
+uv venv --python 3.14 && source .venv/bin/activate
+uv pip install -r requirements_test.txt pre-commit
 pre-commit install      # runs ruff + mypy + checks on every commit
 
 npm ci                  # Lovelace card deps
-npm run build           # Rollup builds two bundles into
+npm run build           # Rollup builds three bundles into
                         # custom_components/wiener_linien_austria/www/:
                         #   wiener-linien-austria-card.js
                         #   wiener-linien-austria-retro-card.js
+                        #   wiener-linien-austria-flap-card.js
 ```
 
-`npm run dev` watches `src/` and rebuilds both bundles on save.
+`npm run dev` watches `src/` and rebuilds all three bundles on save.
 
 ## Branching & releases
 
