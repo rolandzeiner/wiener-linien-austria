@@ -4,16 +4,14 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
-import pytest
 
 from tests.conftest import make_response_cm
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResultType, InvalidData
+from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.wiener_linien_austria.config_flow import (
-    WienerLinienAustriaConfigFlow,
     _format_distance,
     _nearest_stations,
     _stop_options,
@@ -714,103 +712,95 @@ async def test_picking_a_stop_goes_straight_to_lines(
     assert result["result"].unique_id == "diva_60201012"
 
 
-def _handler(hass: HomeAssistant) -> WienerLinienAustriaConfigFlow:
-    """A config-flow handler wired up outside the flow manager.
-
-    The free-text branch of `async_step_user` is no longer reachable
-    through the UI — `custom_value=False` means the combo box refuses to
-    commit a value that matches no option, so the selector rejects it
-    before the handler runs. These tests drive the handler directly to
-    keep that server-side contract covered for any other caller.
-    """
-    flow = WienerLinienAustriaConfigFlow()
-    flow.hass = hass
-    flow.flow_id = "test"
-    flow.handler = DOMAIN
-    return flow
-
-
-async def test_picker_does_not_offer_a_custom_value(hass: HomeAssistant) -> None:
-    """No "add custom item" row — it would offer to save a nonexistent stop.
-
-    Filtering while typing is the combo box's own behaviour and does not
-    depend on this flag, so autocomplete survives it being off.
-    """
+async def test_typed_text_with_several_matches_shows_the_shortlist(
+    hass: HomeAssistant,
+) -> None:
+    """Ambiguous free text falls through to the match list, as before."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
-    for key, validator in result["data_schema"].schema.items():
-        if str(key) == CONF_DIVA:
-            assert validator.config["custom_value"] is False
-            assert validator.config["mode"] == "dropdown"
-            break
-    else:
-        raise AssertionError("stop picker not in schema")
-
-
-async def test_selector_rejects_text_that_matches_no_option(
-    hass: HomeAssistant,
-) -> None:
-    """With custom_value off, free text never reaches the handler."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    # "gasse" hits Taubstummengasse, Lafitegasse-style names — several stops.
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
     )
-    with pytest.raises(InvalidData):
-        await hass.config_entries.flow.async_configure(
-            result["flow_id"], {CONF_DIVA: "Stephans"}
-        )
-
-
-async def test_free_text_with_several_matches_shows_the_shortlist(
-    hass: HomeAssistant,
-) -> None:
-    """Ambiguous text still resolves to the match list, server-side."""
-    flow = _handler(hass)
-    # "gasse" hits Taubstummengasse and Alaudagasse in the fixture.
-    result = await flow.async_step_user({CONF_DIVA: "gasse"})
+    assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "select_stop"
     assert result["description_placeholders"]["query"] == "gasse"
 
-    values = [
-        o["value"]
-        for o in result["data_schema"].schema[CONF_DIVA].config["options"]
-    ]
-    assert "60201468" in values  # Taubstummengasse
+    options = _options(result)
+    values = [o["value"] for o in options]
+    # Every hit plus the escape hatch back to step 1.
     assert "__search_again__" in values
+    assert "60201468" in values  # Taubstummengasse
 
 
-async def test_free_text_with_one_match_skips_the_shortlist(
+async def test_typed_text_with_one_match_skips_the_shortlist(
     hass: HomeAssistant, mock_fetch
 ) -> None:
-    """Unambiguous text is clear enough — go straight to the lines."""
-    flow = _handler(hass)
-    result = await flow.async_step_user({CONF_DIVA: "Stephans"})
+    """Unambiguous free text is clear enough — go straight to the lines."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "Stephans"}
+    )
+    assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "select_lines"
 
 
 async def test_search_again_returns_to_step_one(hass: HomeAssistant) -> None:
     """The shortlist keeps its escape hatch back to the picker."""
-    flow = _handler(hass)
-    await flow.async_step_user({CONF_DIVA: "gasse"})
-    result = await flow.async_step_select_stop({CONF_DIVA: "__search_again__"})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    assert result["step_id"] == "select_stop"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "__search_again__"}
+    )
+    assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "user"
 
 
-async def test_free_text_matching_nothing_reports_no_matches(
+async def test_typed_text_matching_nothing_reports_no_matches(
     hass: HomeAssistant,
 ) -> None:
-    """Text that matches no stop stays on step 1 with a clear error."""
-    flow = _handler(hass)
-    result = await flow.async_step_user({CONF_DIVA: "XYZ-nope"})
+    """Free text that matches no stop stays on step 1 with a clear error."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "XYZ-nope"}
+    )
     assert result["step_id"] == "user"
     assert result["errors"][CONF_DIVA] == "no_matches"
 
 
-async def test_free_text_too_short_is_rejected(hass: HomeAssistant) -> None:
+async def test_typed_text_too_short_is_rejected(hass: HomeAssistant) -> None:
     """A single character is not a search — say so rather than scanning."""
-    flow = _handler(hass)
-    result = await flow.async_step_user({CONF_DIVA: "a"})
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "a"}
+    )
     assert result["errors"][CONF_DIVA] == "query_too_short"
+
+
+async def test_custom_value_is_enabled_on_the_picker(hass: HomeAssistant) -> None:
+    """The picker must accept typed text, not just a pick from the list."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    for key, validator in result["data_schema"].schema.items():
+        if str(key) == CONF_DIVA:
+            assert validator.config["custom_value"] is True
+            assert validator.config["mode"] == "dropdown"
+            break
+    else:
+        raise AssertionError("stop picker not in schema")
 
 
 def test_platformless_stops_are_never_offered() -> None:

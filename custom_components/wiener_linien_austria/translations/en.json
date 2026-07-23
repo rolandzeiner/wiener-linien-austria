@@ -8,7 +8,7 @@
           "diva": "Stop"
         },
         "data_description": {
-          "diva": "Start typing to filter the full stop list — the ones nearest your Home Assistant location are shown first."
+          "diva": "Start typing to filter the full stop list — the ones nearest your Home Assistant location are shown first. Partial names work: submit and pick from the matches."
         }
       },
       "select_stop": {

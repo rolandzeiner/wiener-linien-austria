@@ -1,16 +1,16 @@
 """Config flow for Wiener Linien Austria.
 
 Flow:
-  1. `user`           — a combo box over every trackable stop. Typing filters
-                        the catalogue live, so the user gets autocomplete
-                        instead of a blind search; the stops nearest the Home
-                        Assistant home location are pinned to the top with
-                        their distance. Picking a suggestion goes straight to
-                        `select_lines`.
-  2. `select_stop`    — shortlist for text that matched no stop exactly. Not
-                        reachable from the UI (`custom_value=False` stops the
-                        combo box committing a non-matching value); kept as
-                        the server-side contract for any other caller.
+  1. `user`           — a combo box (`custom_value=True`) over every trackable
+                        stop. Typing filters the catalogue live, so the user
+                        gets autocomplete instead of a blind search; the stops
+                        nearest the Home Assistant home location are pinned to
+                        the top with their distance. Picking a suggestion goes
+                        straight to `select_lines`.
+  2. `select_stop`    — only reached when the submitted text matched no stop
+                        exactly (a partial name, a typo). Runs the catalogue
+                        search over what was typed and offers the hits as a
+                        shortlist, plus a "search again" escape hatch.
   3. `select_lines`   — live `/monitor` call with the station's RBLs; each
                         returned line × direction is presented as a pre-checked
                         option. Submitting saves the entry.
@@ -19,10 +19,8 @@ preserving unique_id. Options flow tweaks the scan interval only.
 
 The combo box is what makes step 1 usable at both extremes: a plain
 free-text box gave no feedback until submit, and a plain dropdown of ~1800
-stops is unscannable. Filtering comes from the combo box itself, so
-`custom_value` stays off — it only controls whether non-matching text can
-be committed, and its "add custom item" row offers to save a stop that
-does not exist.
+stops is unscannable. `custom_value=True` gets both — autocomplete while
+typing, and free text that step 2 can still resolve.
 """
 from __future__ import annotations
 
@@ -538,12 +536,10 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._selected_station = station
                 return await self.async_step_select_lines()
 
-            # Anything else is free text. With `custom_value=False` the
-            # combo box no longer lets a non-matching value through, so
-            # this is not reachable from the UI — it is kept as the
-            # server-side contract for any other caller (a script, a
-            # future frontend that does pass text) and resolves a partial
-            # name the same way the old search step did.
+            # Anything else is free text the combo box let through: a
+            # partial name, a typo, or a name typed out without opening
+            # the suggestion list. Resolve it the same way the old search
+            # step did and offer the hits as a shortlist.
             self._query = raw
             # Clamp pathologically long queries — `catalogue.search` does
             # an O(stations × len(query)) `casefold` substring scan per
@@ -572,14 +568,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                         SelectSelectorConfig(
                             options=options,
                             mode=SelectSelectorMode.DROPDOWN,
-                            # Filtering while typing comes from the combo
-                            # box itself (`searchFn`), NOT from this flag —
-                            # `custom_value` only governs whether text that
-                            # matches no option can be committed, and it is
-                            # what renders HA's "add custom item" row. That
-                            # row offers to save a stop that doesn't exist,
-                            # so it stays off; autocomplete is unaffected.
-                            custom_value=False,
+                            # The whole point: the field accepts typed text
+                            # as well as a pick, so the user gets filtered
+                            # suggestions while typing and the free-text
+                            # fallback below can still resolve a partial
+                            # name that matched nothing exactly.
+                            custom_value=True,
                             # Keep the nearest-first ordering built above;
                             # HA would otherwise re-sort alphabetically and
                             # bury the nearby block.
