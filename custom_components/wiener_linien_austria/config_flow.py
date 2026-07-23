@@ -1,7 +1,9 @@
 """Config flow for Wiener Linien Austria.
 
 Three-step flow:
-  1. `user`           — user types a stop-name fragment.
+  1. `user`           — pick one of the stops nearest the Home Assistant home
+                        location, or type a stop-name fragment to search.
+                        Picking a suggestion skips step 2.
   2. `select_stop`    — dropdown of matching stations from the static catalogue.
   3. `select_lines`   — live `/monitor` call with the station's RBLs; each
                         returned line × direction is presented as a pre-checked
@@ -38,11 +40,13 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
     TextSelector,
 )
+from homeassistant.util.location import distance
 
 from .const import (
     API_BASE_URL,
     CONF_DIVA,
     CONF_LINES,
+    CONF_NEARBY_STOP,
     CONF_RBLS,
     CONF_SEARCH_QUERY,
     CONF_STOP_NAME,
@@ -51,6 +55,8 @@ from .const import (
     MAX_POLL_SECONDS,
     MIN_POLL_SECONDS,
     MONITOR_ENDPOINT,
+    NEARBY_STOP_LIMIT,
+    NEARBY_STOP_MAX_METERS,
     USER_AGENT,
 )
 from .http import base_request_headers
@@ -65,6 +71,71 @@ _SEARCH_AGAIN_LABELS: dict[str, str] = {
     "en": "↩ Search again",
     "de": "↩ Erneut suchen",
 }
+
+
+def _nearest_stations(
+    catalogue: StaticCatalogue,
+    latitude: float,
+    longitude: float,
+    *,
+    limit: int = NEARBY_STOP_LIMIT,
+    max_meters: float = NEARBY_STOP_MAX_METERS,
+) -> list[tuple[Station, float]]:
+    """Return the closest stations to (latitude, longitude), nearest first.
+
+    Each tuple is `(station, metres)`. Stations further away than
+    `max_meters` are dropped entirely — an empty result is the signal
+    that nearby suggestions aren't useful here (home location outside
+    the Wiener Linien network) and the caller should fall back to the
+    free-text search alone.
+
+    Stations with no RBLs are skipped: `/monitor` is queried per RBL, so
+    a platform-less DIVA can only ever produce a `cannot_connect` dead
+    end in `select_lines`. Never suggest a stop that can't be tracked.
+
+    Uses HA's own Vincenty implementation rather than a hand-rolled
+    haversine. Measured at ~17 ms for a full 4 500-station sweep, which
+    is well inside what a config-flow step can absorb, so there is no
+    bounding-box pre-filter to keep correct.
+    """
+    scored: list[tuple[Station, float]] = []
+    for station in catalogue.stations_by_diva.values():
+        if not station.rbls:
+            continue
+        meters = distance(latitude, longitude, station.latitude, station.longitude)
+        if meters is None or meters > max_meters:
+            continue
+        scored.append((station, meters))
+    # Name is the tie-breaker so the ordering is stable across renders —
+    # dict iteration order is stable too, but co-located stops would
+    # otherwise shuffle if the catalogue is refreshed mid-flow.
+    scored.sort(key=lambda row: (row[1], row[0].name))
+    return scored[:limit]
+
+
+def _format_distance(meters: float, language: str) -> str:
+    """Render a distance for a picker label: '450 m' / '1.2 km' / '1,2 km'.
+
+    Rounded to 10 m because the underlying coordinates are stop-centre
+    points, not the platform the user actually walks to — more precision
+    would be false precision. German locales get the decimal comma;
+    SelectOptionDict labels bypass HA's translation system (same reason
+    `_SEARCH_AGAIN_LABELS` exists), so the formatting happens here.
+    """
+    if meters < 1000:
+        return f"{round(meters / 10) * 10} m"
+    text = f"{meters / 1000:.1f} km"
+    if language.startswith("de"):
+        text = text.replace(".", ",")
+    return text
+
+
+def _nearby_label(station: Station, meters: float, language: str) -> str:
+    """Render a nearby-stop option: 'Stephansplatz (Wien) — 450 m'."""
+    return (
+        f"{station.name} ({station.municipality}) "
+        f"— {_format_distance(meters, language)}"
+    )
 
 
 def _line_key(line: str, direction: str) -> str:
@@ -258,6 +329,8 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Init in-flight selections."""
         self._query: str = ""
         self._matches: list[Station] = []
+        # None = not computed yet; [] = computed and genuinely empty.
+        self._nearby: list[tuple[Station, float]] | None = None
         self._selected_station: Station | None = None
         self._lines: list[dict[str, str]] = []
         self._reconfigure_entry: ConfigEntry | None = None
@@ -271,22 +344,74 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         return WienerLinienAustriaOptionsFlow()
 
     # ------------------------------------------------------------------
-    # Step 1 — user: search query
+    # Step 1 — user: nearby suggestions + search query
     # ------------------------------------------------------------------
+
+    async def _async_nearby_stations(self) -> list[tuple[Station, float]]:
+        """Stations closest to the Home Assistant home location, nearest first.
+
+        Memoised for the lifetime of the flow so re-rendering the form
+        after a validation error doesn't repeat the catalogue sweep.
+
+        Returns an empty list — meaning "offer search only" — when the
+        home location is unset or the install sits outside the Wiener
+        Linien network. `hass.config` initialises latitude/longitude to
+        `0.0` and onboarding overwrites them, so falsy-both is the
+        "never configured" test; a genuine Null Island install has no
+        Vienna stop within the radius anyway, so the two collapse to the
+        same (correct) outcome.
+        """
+        if self._nearby is not None:
+            return self._nearby
+        latitude = self.hass.config.latitude
+        longitude = self.hass.config.longitude
+        if not latitude and not longitude:
+            self._nearby = []
+            return self._nearby
+        try:
+            catalogue = await async_get_catalogue(self.hass)
+        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            # Deliberately not memoised and not surfaced as a form error:
+            # suggestions are an optional convenience, and the search
+            # path below reports `catalogue_unavailable` properly if the
+            # user actually needs the catalogue this attempt.
+            _LOGGER.debug("Nearby-stop suggestions unavailable: %s", err)
+            return []
+        self._nearby = _nearest_stations(catalogue, latitude, longitude)
+        return self._nearby
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Prompt for a stop-name fragment."""
+        """Offer the nearest stops, or take a stop-name fragment to search."""
         errors: dict[str, str] = {}
+        nearby = await self._async_nearby_stations()
+
         if user_input is not None:
-            self._query = str(user_input.get(CONF_SEARCH_QUERY, "")).strip()
+            picked = str(user_input.get(CONF_NEARBY_STOP) or "").strip()
+            self._query = str(user_input.get(CONF_SEARCH_QUERY) or "").strip()
+            if picked:
+                # A suggestion carries its own Station, so the search and
+                # select_stop steps are both skipped.
+                station = next(
+                    (s for s, _ in nearby if str(s.diva) == picked), None
+                )
+                if station is None:
+                    errors[CONF_NEARBY_STOP] = "invalid_stop"
+                else:
+                    self._selected_station = station
+                    return await self.async_step_select_lines()
+            elif not self._query and nearby:
+                # Only reachable when suggestions are on screen — without
+                # them the search box is Required and an empty submit
+                # falls through to `query_too_short` below, as before.
+                errors["base"] = "no_selection"
             # Clamp pathologically long queries — `catalogue.search` does
             # an O(stations × len(query)) `casefold` substring scan per
             # call, so a misclick paste of, say, a 10 MB clipboard would
             # otherwise spin the event loop. 100 chars is comfortably
             # past any real Vienna stop name.
-            if len(self._query) < 2 or len(self._query) > 100:
+            elif len(self._query) < 2 or len(self._query) > 100:
                 errors[CONF_SEARCH_QUERY] = "query_too_short"
             else:
                 try:
@@ -301,13 +426,35 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     else:
                         return await self.async_step_select_stop()
 
+        schema: dict[Any, Any] = {}
+        if nearby:
+            language = self.hass.config.language
+            schema[vol.Optional(CONF_NEARBY_STOP)] = SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        SelectOptionDict(
+                            value=str(station.diva),
+                            label=_nearby_label(station, meters, language),
+                        )
+                        for station, meters in nearby
+                    ],
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
+            )
+            # Optional alongside the suggestions: either field can be the
+            # one the user fills in. Without suggestions it stays Required
+            # so the form is byte-identical to the pre-suggestion flow.
+            schema[vol.Optional(CONF_SEARCH_QUERY, default=self._query)] = (
+                TextSelector()
+            )
+        else:
+            schema[vol.Required(CONF_SEARCH_QUERY, default=self._query)] = (
+                TextSelector()
+            )
+
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_SEARCH_QUERY, default=self._query): TextSelector()
-                }
-            ),
+            data_schema=vol.Schema(schema),
             errors=errors,
         )
 

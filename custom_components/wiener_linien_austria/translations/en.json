@@ -3,12 +3,14 @@
     "step": {
       "user": {
         "title": "Wiener Linien Austria",
-        "description": "Search for a stop by name.",
+        "description": "Pick the stop you want to track.",
         "data": {
+          "nearby_stop": "Nearby stop",
           "search_query": "Stop name"
         },
         "data_description": {
-          "search_query": "Start typing and hit submit. Example: Stephansplatz"
+          "nearby_stop": "Stops closest to your Home Assistant location, nearest first.",
+          "search_query": "Type part of the name and submit. Example: Stephansplatz"
         }
       },
       "select_stop": {
@@ -39,6 +41,7 @@
       }
     },
     "error": {
+      "no_selection": "Pick a nearby stop, or enter a stop name.",
       "query_too_short": "Enter at least 2 characters.",
       "no_matches": "No stops match this search.",
       "catalogue_unavailable": "Cannot load the Wiener Linien stop catalogue. Check your internet connection and retry.",
