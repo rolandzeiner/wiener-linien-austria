@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 from datetime import timedelta
 from typing import Any
@@ -21,11 +22,13 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_interval
 
 from .alerts import async_refresh_alerts
+from .batch import MonitorBatchGroup
 from .card_registration import JSModuleRegistration
 from .const import (
     ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_SECONDS,
     ALERTS_REFRESH_UNSUB_KEY,
+    BATCH_REGISTRY_KEY,
     CARD_VERSION,
     CONF_LINES,
     DOMAIN,
@@ -212,9 +215,68 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
         )
 
 
+def _register_in_batch(
+    hass: HomeAssistant, coordinator: WienerLinienAustriaCoordinator
+) -> None:
+    """Add a coordinator to the shared batch group for its scan interval.
+
+    Groups are keyed by interval seconds so every entry sharing a cadence
+    fetches through ONE combined /monitor request. The group timer is created
+    and started on first membership. Idempotent per entry (the group keys
+    members by entry_id), so a ConfigEntryNotReady retry re-adds cleanly.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    registry: dict[int, MonitorBatchGroup] = domain_data.setdefault(
+        BATCH_REGISTRY_KEY, {}
+    )
+    seconds = int(coordinator.scan_interval.total_seconds())
+    group = registry.get(seconds)
+    if group is None:
+        group = MonitorBatchGroup(hass, seconds)
+        registry[seconds] = group
+        group.start()
+    group.add_member(coordinator)
+    coordinator.attach_batch(group)
+
+
+def _deregister_from_batch(
+    hass: HomeAssistant, coordinator: WienerLinienAustriaCoordinator
+) -> None:
+    """Remove a coordinator from its batch group; stop the group if now empty.
+
+    Read-only on the registry when there's nothing to do, so it never
+    re-creates domain state that `_teardown_domain_state` has already popped.
+    """
+    domain_data = hass.data.get(DOMAIN)
+    if not domain_data:
+        return
+    registry: dict[int, MonitorBatchGroup] | None = domain_data.get(
+        BATCH_REGISTRY_KEY
+    )
+    if not registry:
+        return
+    seconds = int(coordinator.scan_interval.total_seconds())
+    group = registry.get(seconds)
+    if group is None:
+        return
+    if group.remove_member(coordinator.entry_id):
+        group.stop()
+        registry.pop(seconds, None)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    # Register into the shared batch group for this entry's scan interval
+    # BEFORE the first refresh, so the combined /monitor request already
+    # carries this entry's RBLs. Wire the dereg via `async_on_unload` so it
+    # fires on normal unload AND on a setup that never completes (first-refresh
+    # ConfigEntryNotReady, or a later platform-forward failure) — HA runs the
+    # registered on_unload callbacks in both cases.
+    _register_in_batch(hass, coordinator)
+    entry.async_on_unload(
+        functools.partial(_deregister_from_batch, hass, coordinator)
+    )
     # `_async_setup` is auto-called by `async_config_entry_first_refresh`
     # (HA core contract) — do NOT invoke it explicitly here.
     await coordinator.async_config_entry_first_refresh()
@@ -306,6 +368,14 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
     if isinstance(bg_task, asyncio.Task) and not bg_task.done():
         bg_task.cancel()
+    # Stop every remaining batch-group timer. Groups normally self-stop as
+    # their last member deregisters, but the LAST entry's `async_on_unload`
+    # dereg fires AFTER this teardown runs (HA runs on_unload callbacks after
+    # `async_unload_entry` returns), so its group is still live here.
+    registry = domain_data.pop(BATCH_REGISTRY_KEY, None)
+    if isinstance(registry, dict):
+        for group in registry.values():
+            group.stop()
     # Drop the rest of the domain-wide state — caches and validators
     # are stale by definition once no entry is around to consume them.
     # RESOURCES_REGISTERED_KEY pops too so the next first-entry boot
@@ -346,7 +416,12 @@ async def _rollback_setup_failure(
 
 
 async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> None:
-    """Reload the config entry when options are updated."""
+    """Reload the config entry when its options or data change.
+
+    Fires for options-flow updates AND for reconfigure-flow data changes
+    (the config flow now calls ``async_update_and_abort`` without a
+    built-in reload), making this the single reload owner.
+    """
     await hass.config_entries.async_reload(entry.entry_id)
 
 

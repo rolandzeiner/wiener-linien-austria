@@ -33,7 +33,7 @@ import { live } from "lit/directives/live.js";
 import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
-import { resolveEditorHelper, resolveEditorLabel, swallowEditorKeys } from "./editor-shared.js";
+import { coerceWalkTime, resolveEditorHelper, resolveEditorLabel, swallowEditorKeys } from "./editor-shared.js";
 import { fireEvent } from "./utils.js";
 import { translate } from "./localize/localize.js";
 import type {
@@ -661,18 +661,7 @@ export class WienerLinienAustriaRetroCardEditor
 
   private _setWalkTime(key: string, raw: string): void {
     if (!this._config) return;
-    const trimmed = raw.trim();
-    const n = trimmed === "" ? NaN : Number(trimmed);
-    // Distinguish "" (intentional clear) from typed garbage. Without
-    // the warning a typo like "5min" silently clears the value and the
-    // user has no signal that their input was rejected.
-    if (trimmed !== "" && !Number.isFinite(n)) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[wiener-linien-austria-retro-card-editor] walk-time "${raw}" for ${key} is not a number — clearing`,
-      );
-    }
-    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
+    const clean = coerceWalkTime(raw, key);
     const cur = { ...(this._config.walk_times ?? {}) };
     if (clean === null) delete cur[key];
     else cur[key] = clean;

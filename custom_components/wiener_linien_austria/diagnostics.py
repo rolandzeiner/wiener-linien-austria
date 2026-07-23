@@ -89,7 +89,10 @@ async def async_get_config_entry_diagnostics(
             # last_update_success is False.
             "last_exception": repr(coordinator.last_exception),
             "last_error_code": coordinator.last_error_code,
-            "update_interval": str(coordinator.update_interval),
+            # The coordinator no longer self-polls (a shared batch group drives
+            # fetches), so `update_interval` is None. Report the configured
+            # scan interval instead — the cadence the batch group is keyed on.
+            "scan_interval": str(coordinator.scan_interval),
             "server_time": coordinator.server_time,
             "rbls": list(coordinator.rbls),
             "departure_count": len(data.departures) if data is not None else 0,

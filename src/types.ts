@@ -16,14 +16,26 @@ export interface HassEntity {
   entity_id?: string;
 }
 
+/** Slim mirror of an `hass.entities` registry entry. The 2026.6 card
+ *  picker's `getEntitySuggestion` reads `platform` to decide whether an
+ *  entity belongs to this integration; the rest of the registry record
+ *  is open-ended and untyped here. */
+export interface HassEntityRegistryEntry {
+  platform?: string;
+  [key: string]: unknown;
+}
+
 /** Minimal HA shape — only the fields these cards touch. `language` is
  *  the user-profile locale; `localize` is HA's own UI translation
  *  lookup the editors reuse for built-in field names; `callWS` powers
  *  the card-version probe; `themes.darkMode` is reserved for future
- *  adaptive-logo work. Anything beyond these lives untyped and is read
- *  with a cast at the call site. */
+ *  adaptive-logo work; `entities` is the registry map the 2026.6 card
+ *  picker's `getEntitySuggestion` hook consults for platform gating.
+ *  Anything beyond these lives untyped and is read with a cast at the
+ *  call site. */
 export interface HomeAssistant {
   states: Record<string, HassEntity>;
+  entities?: Record<string, HassEntityRegistryEntry>;
   language?: string;
   themes?: { darkMode?: boolean } & Record<string, unknown>;
   config?: { time_zone?: string } & Record<string, unknown>;
@@ -59,13 +71,26 @@ declare global {
   }
 }
 
-/** Window shape for the HA `customCards` registry. Both card entrypoints
- *  push their picker descriptor into `window.customCards` at module
- *  load — this interface is the canonical cast target so the two
+/** One descriptor in `window.customCards`. The base picker fields are
+ *  open-ended (`type`, `name`, `description`, `preview`, …); HA 2026.6
+ *  adds the optional `getEntitySuggestion` hook that lets a card opt into
+ *  the entity-first picker by returning a card-config stub (or an array of
+ *  them, or `null`) for a given entity. Older HA simply ignores the key,
+ *  so it is fully backward-compatible. */
+export interface CustomCardEntry extends Record<string, unknown> {
+  getEntitySuggestion?: (
+    hass: HomeAssistant,
+    entityId: string,
+  ) => Record<string, unknown> | Array<Record<string, unknown>> | null;
+}
+
+/** Window shape for the HA `customCards` registry. All three card
+ *  entrypoints push their picker descriptor into `window.customCards` at
+ *  module load — this interface is the canonical cast target so the
  *  registration blocks read identically and a future maintainer can't
  *  drift the field name (`customCards` vs `customCardsRegistry`). */
 export interface WindowWithCustomCards extends Window {
-  customCards?: Array<Record<string, unknown>>;
+  customCards?: CustomCardEntry[];
 }
 
 // ---------------------------------------------------------------------------

@@ -3,10 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 
@@ -15,24 +14,16 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    API_BASE_URL,
-    BACKOFF_CAP_SECONDS,
     CONF_DIVA,
     CONF_LINES,
     CONF_RBLS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
-    ERR_RATE_LIMIT,
-    MONITOR_ENDPOINT,
-    USER_AGENT,
 )
-from .http import CacheValidators, base_request_headers
-from .rate_limit import async_enforce_domain_cooldown
 # Eager import — `stops_ahead_for_match` runs in the /monitor parser's
 # hot loop, so the other names from `static` are already in sys.modules
 # anyway. No import-time saving from lazy imports here.
@@ -42,6 +33,9 @@ from .static import (
     async_get_catalogue,
     stops_ahead_for_match,
 )
+
+if TYPE_CHECKING:
+    from .batch import BatchResult, MonitorBatchGroup
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -129,7 +123,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._selected_lines: set[str] | None = _normalise_lines(
             config.get(CONF_LINES)
         )
-        self._session = async_get_clientsession(hass)
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
@@ -156,31 +149,30 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # genuine schema change surfaces once at WARNING (loud enough to
         # be noticed) without spamming the logbook every poll.
         self._stops_ahead_warned_lines: set[str] = set()
-        # Conditional-GET validators captured from the previous /monitor
-        # response. The CDN sets ETag + Last-Modified on every reply; we
-        # echo them back as If-None-Match / If-Modified-Since so unchanged
-        # ticks come back as 304 (no body) and cost only headers.
-        self._monitor_cache = CacheValidators()
-        # Exponential-backoff bookkeeping for sustained API outages. We
-        # leave self._normal_interval immutable as the user-configured
-        # cadence; self.update_interval is what HA actually reads, and we
-        # bump it temporarily after consecutive UpdateFailed.
-        self._consecutive_failures = 0
         scan_secs = _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_SCAN_INTERVAL
-        self._normal_interval = timedelta(seconds=scan_secs)
+        self._scan_interval = timedelta(seconds=scan_secs)
+        # The shared batch group that owns this entry's fetching. Assigned by
+        # `attach_batch` during entry setup, before the first refresh.
+        self._batch: MonitorBatchGroup | None = None
 
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=self._normal_interval,
+            # No self-scheduled polling: the shared MonitorBatchGroup timer
+            # (keyed on this entry's scan interval) drives every fetch and
+            # pushes results via `batch_apply` → `async_set_updated_data`. A
+            # non-None interval here would double-poll, because the sensor is
+            # a CoordinatorEntity and therefore a listener that would arm the
+            # coordinator's own timer.
+            update_interval=None,
             # Absorb request storms (options-flow save, manual reload,
-            # dashboard edit-mode flip) so /monitor isn't hit 3-4× back
-            # to back. Cooldown matches the 15s domain-wide floor.
-            # `immediate=False` makes the FIRST call wait too — matters
-            # during config-flow setup where test-before-configure and
-            # first-refresh land back-to-back.
+            # dashboard edit-mode flip) on the first-refresh / manual-refresh
+            # path so /monitor isn't hit back-to-back. Cooldown matches the
+            # 15s domain-wide floor. `immediate=False` makes the FIRST call
+            # wait too — matters during config-flow setup where
+            # test-before-configure and first-refresh land back-to-back.
             request_refresh_debouncer=Debouncer(
                 hass,
                 _LOGGER,
@@ -235,6 +227,16 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         return list(self._rbls)
 
     @property
+    def entry_id(self) -> str:
+        """The config entry id this coordinator serves (batch member key)."""
+        return self._entry.entry_id
+
+    @property
+    def scan_interval(self) -> timedelta:
+        """User-configured polling cadence; the batch group is keyed on this."""
+        return self._scan_interval
+
+    @property
     def latitude(self) -> float | None:
         """Stop latitude from the static catalogue (None if lookup failed)."""
         return self._latitude
@@ -248,8 +250,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
     # Repair-issue helpers
     # ------------------------------------------------------------------
 
-    def _raise_rate_limit_issue(self) -> None:
-        """Raise a Repairs issue the first time Wiener Linien rate-limits us."""
+    def note_rate_limited(self) -> None:
+        """Raise a per-entry Repairs issue the first time we're rate-limited.
+
+        Called by the shared batch group when the combined request comes back
+        rate-limited — the issue stays per-entry so its title names this stop.
+        """
         if self._rate_limited:
             return
         self._rate_limited = True
@@ -263,8 +269,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             translation_placeholders={"entry_title": self._entry.title},
         )
 
-    def _clear_rate_limit_issue(self) -> None:
-        """Clear the rate-limit Repairs issue once the API recovers."""
+    def note_not_rate_limited(self) -> None:
+        """Clear this entry's rate-limit Repairs issue once the API recovers."""
         if not self._rate_limited:
             return
         self._rate_limited = False
@@ -273,155 +279,82 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         )
 
     # ------------------------------------------------------------------
-    # Fetch
+    # Fetch (delegated to the shared MonitorBatchGroup)
     # ------------------------------------------------------------------
 
     async def _async_update_data(self) -> MonitorData:
-        """Fetch departures and return a sorted MonitorData."""
-        # Drop the attrs cache before the fetch, not after — failures
-        # also produce a state change (CoordinatorEntity flips to
-        # unavailable per its own logic), and a stale cached attrs
-        # dict would survive that transition.
-        self._attrs_cache = None
-        self._attrs_cache_alerts_seq = None
-        try:
-            data = await self._fetch_monitor_data()
-        except UpdateFailed:
-            self._note_failure()
-            raise
-        self._note_success()
-        return data
+        """Fetch via the shared batch group and return this entry's slice.
 
-    async def _fetch_monitor_data(self) -> MonitorData:
-        """Inner fetch — separated so backoff bookkeeping can wrap it."""
-        await async_enforce_domain_cooldown(self.hass)
-
-        url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
-        params: list[tuple[str, str]] = [
-            ("stopId", str(rbl)) for rbl in self._rbls
-        ]
-        headers = base_request_headers(USER_AGENT)
-        headers.update(self._monitor_cache.to_request_headers())
-        timeout = aiohttp.ClientTimeout(total=30)
-
-        # Single `async with` block keeps the response scoped tightly so
-        # aiohttp returns the connection to the pool the moment we're
-        # done — even on early `raise UpdateFailed(...)` paths. The
-        # body read AND the validator capture both need `resp`, so the
-        # whole parse/validate flow lives inside the context manager.
-        try:
-            async with self._session.get(
-                url, params=params, headers=headers, timeout=timeout
-            ) as resp:
-                status = resp.status
-                # 304 = our cached data is still fresh. Return the previous
-                # MonitorData unchanged; HA's coordinator handles "same value"
-                # by not re-emitting state changes to entities.
-                if status == 304:
-                    if self.data is not None:
-                        self._monitor_cache.update_from_response(resp)
-                        return self.data
-                    # First tick after restart with no `self.data` yet — a 304
-                    # has an empty body, so falling through to `resp.json()`
-                    # would surface as a misleading "invalid response". Treat
-                    # it as a transient and retry. Practically unreachable
-                    # today (validators reset on init), but defends against a
-                    # future change that persists them across restarts.
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_invalid_response",
-                        translation_placeholders={
-                            "status": "304",
-                            "error": "no cached data to revalidate",
-                        },
-                    )
-                resp.raise_for_status()
-
-                try:
-                    body = await resp.json()
-                except (aiohttp.ContentTypeError, ValueError) as err:
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_invalid_response",
-                        translation_placeholders={
-                            "status": str(status),
-                            "error": str(err),
-                        },
-                    ) from err
-
-                if not isinstance(body, dict):
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_invalid_response",
-                        translation_placeholders={
-                            "status": str(status),
-                            "error": f"expected object, got {type(body).__name__}",
-                        },
-                    )
-
-                message = body.get("message") or {}
-                code = _safe_int(message.get("messageCode"))
-                self._last_error_code = code
-                self._server_time = message.get("serverTime")
-
-                if code == ERR_RATE_LIMIT:
-                    self._raise_rate_limit_issue()
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_rate_limited",
-                    )
-
-                if code is not None and code != 1:
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_upstream_error",
-                        translation_placeholders={
-                            "code": str(code),
-                            "value": str(message.get("value") or ""),
-                        },
-                    )
-
-                self._clear_rate_limit_issue()
-                # Capture validators only on a fully-validated 200 response —
-                # never store them for an error reply, else next tick would
-                # send If-None-Match against a payload we never accepted.
-                self._monitor_cache.update_from_response(resp)
-        except asyncio.TimeoutError as err:
+        Only the manual paths reach here: `async_config_entry_first_refresh()`
+        at setup and any explicit `async_request_refresh()`. Steady-state
+        ticks arrive through `batch_apply` instead — the group timer fans one
+        combined response out to every member, bypassing this method.
+        """
+        # Drop the attrs cache before the fetch, not after — failures also
+        # produce a state change (CoordinatorEntity flips to unavailable per
+        # its own logic), and a stale cached attrs dict would survive that.
+        self._invalidate_attrs_cache()
+        if self._batch is None:
+            # Unreachable in normal operation: setup attaches the group before
+            # the first refresh. Guard so a misuse fails loudly-but-cleanly.
             raise UpdateFailed(
                 translation_domain=DOMAIN,
-                translation_key="api_timeout",
-                translation_placeholders={"seconds": "30"},
-            ) from err
-        except aiohttp.ClientResponseError as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_http_error",
+                translation_key="api_invalid_response",
                 translation_placeholders={
-                    "status": str(err.status),
-                    "reason": err.message or "",
+                    "status": "0",
+                    "error": "batch group not attached",
                 },
-            ) from err
-        except aiohttp.ClientError as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_connection_error",
-                translation_placeholders={
-                    "error_type": type(err).__name__,
-                    "error": str(err),
-                },
-            ) from err
-        # Read the shared catalogue ref live so a background trip-pattern
-        # refresh that lands after this coordinator's setup is picked up
-        # on the very next parse — no restart needed.
+            )
+        result = await self._batch.async_fetch()
+        return self._parse_slice(result)
+
+    def attach_batch(self, group: MonitorBatchGroup) -> None:
+        """Bind the shared batch group that owns this entry's fetching."""
+        self._batch = group
+
+    def batch_apply(self, result: BatchResult) -> None:
+        """Apply a fanned-out batch result: parse this entry's slice and push.
+
+        Called by the group timer (not via `_async_update_data`), so it drives
+        the entity update directly through `async_set_updated_data`.
+        """
+        self._invalidate_attrs_cache()
+        self.async_set_updated_data(self._parse_slice(result))
+
+    def batch_set_error(self, err: UpdateFailed) -> None:
+        """Propagate a batch fetch failure to this entry's coordinator state."""
+        self._invalidate_attrs_cache()
+        self.async_set_update_error(err)
+
+    def apply_upstream_meta(self, server_time: str | None, code: int | None) -> None:
+        """Record the latest server time and API message code from a fetch.
+
+        Called by the batch group for every member on each fetch — including
+        error ticks — so diagnostics reflect the last observed upstream state.
+        """
+        self._server_time = server_time
+        self._last_error_code = code
+
+    def _parse_slice(self, result: BatchResult) -> MonitorData:
+        """Parse this entry's departures out of a shared combined response.
+
+        Reads the live catalogue ref so a background trip-pattern refresh that
+        lands after setup is picked up on the next parse — no restart needed.
+        """
         catalogue = self._current_catalogue()
         return _parse_monitor_body(
-            body,
+            result.body,
             self._selected_lines,
-            self._server_time,
+            result.server_time,
             catalogue=catalogue,
             entry_rbls=self._rbls,
             warned_lines=self._stops_ahead_warned_lines,
         )
+
+    def _invalidate_attrs_cache(self) -> None:
+        """Drop the memoised extra_state_attributes payload before a state change."""
+        self._attrs_cache = None
+        self._attrs_cache_alerts_seq = None
 
     def _current_catalogue(self) -> StaticCatalogue | None:
         """Fetch the live catalogue ref from hass.data, or None.
@@ -437,39 +370,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         if isinstance(cached, StaticCatalogue):
             return cached
         return None
-
-    def _note_success(self) -> None:
-        """Reset the consecutive-failure counter and restore normal cadence."""
-        if self._consecutive_failures == 0:
-            return
-        self._consecutive_failures = 0
-        if self.update_interval != self._normal_interval:
-            self.update_interval = self._normal_interval
-
-    def _note_failure(self) -> None:
-        """Bump the consecutive-failure counter and apply exponential backoff.
-
-        First failure stays at the user-configured cadence (transient hiccups
-        shouldn't slow down the loop). From the second failure onwards, the
-        update interval doubles each time, capped at BACKOFF_CAP_SECONDS so
-        a sustained outage settles into a slow poll instead of hammering
-        the API every minute. The next successful tick resets it.
-
-        Jitter (±10 %) prevents thundering-herd retries when the API
-        recovers — without it, every entry across every HA instance
-        configured against this integration would line up on identical
-        backoff intervals.
-        """
-        self._consecutive_failures += 1
-        if self._consecutive_failures < 2:
-            return
-        normal_secs = self._normal_interval.total_seconds()
-        backoff_secs = min(
-            normal_secs * (2 ** (self._consecutive_failures - 1)),
-            BACKOFF_CAP_SECONDS,
-        )
-        jittered = backoff_secs * random.uniform(0.9, 1.1)
-        self.update_interval = timedelta(seconds=jittered)
 
 
 def _normalise_lines(raw: Any) -> set[str] | None:
@@ -527,7 +427,26 @@ def _parse_monitor_body(
         else {(parts[0], parts[1]) for k in selected if len((parts := k.split("|", 2))) >= 2}
     )
 
+    # Restrict to this entry's own stops. A shared batch /monitor response
+    # carries the monitors of EVERY member entry (one combined request), so
+    # each member must keep only the monitors at its own RBLs — identified by
+    # `locationStop.properties.attributes.rbl`. Applied only when `entry_rbls`
+    # is given AND the monitor actually carries an rbl: a monitor with no rbl
+    # (older payloads, hand-built test fixtures) falls through to
+    # include-all, matching the pre-batch single-request behaviour where the
+    # request already scoped the response.
+    rbl_filter: set[int] | None = set(entry_rbls) if entry_rbls else None
+
     for monitor in monitors:
+        if rbl_filter is not None:
+            monitor_rbl = _safe_int(
+                (monitor.get("locationStop") or {})
+                .get("properties", {})
+                .get("attributes", {})
+                .get("rbl")
+            )
+            if monitor_rbl is not None and monitor_rbl not in rbl_filter:
+                continue
         for line in (monitor.get("lines") or []):
             line_name = str(line.get("name") or "").strip()
             if not line_name:

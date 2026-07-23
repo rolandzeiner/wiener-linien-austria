@@ -23,6 +23,7 @@ import { live } from "lit/directives/live.js";
 
 import { editorBaseStyles } from "./editor-shared-styles.js";
 import {
+  coerceWalkTime,
   resolveEditorHelper,
   resolveEditorLabel,
   swallowEditorKeys,
@@ -454,18 +455,7 @@ export class WienerLinienAustriaFlapCardEditor
 
   private _setWalkTime(eid: string, key: string, raw: string): void {
     if (!this._config) return;
-    const trimmed = raw.trim();
-    const n = trimmed === "" ? NaN : Number(trimmed);
-    // Distinguish "empty input = clear" from "typed garbage = warn but
-    // still clear". Without the warning a typo silently clears the
-    // value and the user has no signal that their input was rejected.
-    if (trimmed !== "" && !Number.isFinite(n)) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[wiener-linien-austria-flap-card-editor] walk-time "${raw}" for ${eid}/${key} is not a number — clearing`,
-      );
-    }
-    const clean = Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
+    const clean = coerceWalkTime(raw, `${eid}/${key}`);
     this._updateStop(eid, (s) => {
       const cur = { ...(s.walk_times ?? {}) };
       if (clean === null) delete cur[key];

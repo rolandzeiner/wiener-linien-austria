@@ -250,9 +250,14 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 
 @pytest.fixture(autouse=True)
 def mock_aiohttp_session():
-    """Stub the aiohttp session to prevent pycares DNS thread leaks."""
+    """Stub the aiohttp session to prevent pycares DNS thread leaks.
+
+    The batch group owns the /monitor session; the coordinator no longer
+    creates one. Patch the batch binding so a group timer firing during a
+    time-advancing test can't reach the real network.
+    """
     with patch(
-        "custom_components.wiener_linien_austria.coordinator.async_get_clientsession",
+        "custom_components.wiener_linien_austria.batch.async_get_clientsession",
     ):
         yield
 

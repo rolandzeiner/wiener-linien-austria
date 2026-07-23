@@ -31,6 +31,19 @@ export function formatTime(iso: string | null | undefined, lang = "de"): string 
   }
 }
 
+// Station-signage clock chip: HH:MM in the viewer's local time. Returns
+// null on missing/unparseable input so the caller can omit the chip
+// instead of painting "NaN:NaN". Shared by the retro + flap header clocks.
+export function formatClock(
+  serverTime: string | null | undefined,
+): string | null {
+  if (!serverTime) return null;
+  const ts = Date.parse(serverTime);
+  if (!Number.isFinite(ts)) return null;
+  const d = new Date(ts);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 // PHP-style date formatter — supports the subset of date() tokens the
 // retro card header chip exposes. Locale-aware weekday / month names
 // route through Intl so a user picking `l` ("Monday" in English /

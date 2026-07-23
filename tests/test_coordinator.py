@@ -1,25 +1,20 @@
 """Tests for the Wiener Linien Austria coordinator."""
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-import aiohttp
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
-from homeassistant.util import dt as dt_util
+from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
+    CONF_LINES,
     DOMAIN,
-    DOMAIN_COOLDOWN_SECONDS,
-    DOMAIN_LAST_CALL_KEY,
-    ERR_RATE_LIMIT,
 )
-from tests.conftest import make_response_cm
 from custom_components.wiener_linien_austria.coordinator import (
     MonitorData,
     WienerLinienAustriaCoordinator,
@@ -280,168 +275,8 @@ def test_parse_monitor_body_failsoft_on_match_exception() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Fetch behaviour
+# Parser edge cases + first-refresh / setup behaviour
 # ---------------------------------------------------------------------------
-
-
-def _ok_response(body: dict) -> MagicMock:
-    """Build a MagicMock aiohttp response that returns `body` from .json()."""
-    resp = MagicMock()
-    resp.raise_for_status = MagicMock()
-    resp.json = AsyncMock(return_value=body)
-    resp.status = 200
-    return resp
-
-
-async def test_fetch_success_real_chain(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """Drive the *real* _async_update_data through a patched session.get.
-
-    This replaces the earlier tautological test that only checked the mocked
-    return value. Here we verify: URL built correctly (one stopId per RBL),
-    raise_for_status called, JSON parsed into MonitorData, server_time and
-    last_error_code stored on the coordinator.
-    """
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    mock_resp = _ok_response(monitor_fixture)
-    mock_get = MagicMock(return_value=make_response_cm(mock_resp))
-    with patch.object(coordinator._session, "get", new=mock_get):
-        data = await coordinator._async_update_data()
-
-    # URL + params
-    args, kwargs = mock_get.call_args
-    assert args[0].endswith("/monitor")
-    assert kwargs["params"] == [("stopId", "4111"), ("stopId", "4118")]
-    # Response consumed
-    mock_resp.raise_for_status.assert_called_once()
-    mock_resp.json.assert_awaited_once()
-    # Parsed correctly
-    assert isinstance(data, MonitorData)
-    assert len(data.departures) > 0
-    assert data.departures == sorted(
-        data.departures, key=lambda d: (d.countdown, d.line, d.towards)
-    )
-    # Side-effects on coordinator state
-    assert coordinator.last_error_code == 1
-    assert coordinator.server_time == monitor_fixture["message"]["serverTime"]
-
-
-async def test_http_error_raises_update_failed(
-    hass: HomeAssistant,
-) -> None:
-    """aiohttp.ClientResponseError → UpdateFailed(api_http_error)."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    req_info = MagicMock()
-    req_info.real_url = "https://example/monitor"
-    err = aiohttp.ClientResponseError(
-        request_info=req_info, history=(), status=503, message="boom"
-    )
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock(side_effect=err)
-    mock_resp.json = AsyncMock()
-    mock_resp.status = 503
-
-    with (
-        patch.object(
-            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
-        ),
-        pytest.raises(UpdateFailed) as exc,
-    ):
-        await coordinator._async_update_data()
-    assert exc.value.translation_key == "api_http_error"
-    assert exc.value.translation_placeholders["status"] == "503"
-
-
-async def test_connection_error_raises_update_failed(hass: HomeAssistant) -> None:
-    """aiohttp.ClientError → UpdateFailed(api_connection_error)."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    with (
-        patch.object(
-            coordinator._session,
-            "get",
-            new=MagicMock(side_effect=aiohttp.ClientConnectionError("unreachable")),
-        ),
-        pytest.raises(UpdateFailed) as exc,
-    ):
-        await coordinator._async_update_data()
-    assert exc.value.translation_key == "api_connection_error"
-    assert exc.value.translation_placeholders["error_type"] == "ClientConnectionError"
-
-
-async def test_invalid_json_raises_update_failed(hass: HomeAssistant) -> None:
-    """Body that is not valid JSON → UpdateFailed(api_invalid_response)."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.json = AsyncMock(side_effect=ValueError("bad json"))
-    mock_resp.status = 200
-
-    with (
-        patch.object(
-            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
-        ),
-        pytest.raises(UpdateFailed) as exc,
-    ):
-        await coordinator._async_update_data()
-    assert exc.value.translation_key == "api_invalid_response"
-
-
-async def test_non_dict_body_raises_update_failed(hass: HomeAssistant) -> None:
-    """JSON that decodes to something other than an object → UpdateFailed."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    mock_resp = _ok_response(body={})  # placeholder, overridden below
-    mock_resp.json = AsyncMock(return_value=["not", "a", "dict"])
-
-    with (
-        patch.object(
-            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
-        ),
-        pytest.raises(UpdateFailed) as exc,
-    ):
-        await coordinator._async_update_data()
-    assert exc.value.translation_key == "api_invalid_response"
-    assert "list" in exc.value.translation_placeholders["error"]
-
-
-async def test_upstream_error_code_raises_update_failed(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """messageCode != 1 AND != 316 → UpdateFailed(api_upstream_error)."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    bad = dict(monitor_fixture)
-    bad["message"] = {"value": "Something else", "messageCode": 500}
-    mock_resp = _ok_response(bad)
-
-    with (
-        patch.object(
-            coordinator._session, "get", new=MagicMock(return_value=make_response_cm(mock_resp))
-        ),
-        pytest.raises(UpdateFailed) as exc,
-    ):
-        await coordinator._async_update_data()
-    assert exc.value.translation_key == "api_upstream_error"
-    assert exc.value.translation_placeholders["code"] == "500"
-    # A non-rate-limit upstream error must NOT raise the rate-limit Repairs issue.
-    assert coordinator._rate_limited is False
 
 
 async def test_parser_skips_departures_without_countdown() -> None:
@@ -501,184 +336,6 @@ async def test_config_entry_not_ready_on_first_refresh_failure(
         await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.SETUP_RETRY
-
-
-async def test_rate_limit_raises_update_failed_and_issue(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """Error code 316 raises UpdateFailed and creates a Repairs issue."""
-    from homeassistant.helpers import issue_registry as ir
-
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    rate_limited = dict(monitor_fixture)
-    rate_limited["message"] = {"value": "Rate limit", "messageCode": ERR_RATE_LIMIT}
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.json = AsyncMock(return_value=rate_limited)
-    mock_resp.status = 200
-
-    with (
-        patch.object(
-            coordinator._session,
-            "get",
-            new=MagicMock(return_value=make_response_cm(mock_resp)),
-        ),
-        pytest.raises(UpdateFailed),
-    ):
-        await coordinator._async_update_data()
-
-    registry = ir.async_get(hass)
-    issue = registry.async_get_issue(
-        DOMAIN, f"rate_limited_{entry.entry_id}"
-    )
-    assert issue is not None
-    assert coordinator._rate_limited is True
-    assert coordinator.last_error_code == ERR_RATE_LIMIT
-
-
-async def test_recovery_clears_rate_limit_issue(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """Successful fetch after a rate-limit clears the Repairs issue."""
-    from homeassistant.helpers import issue_registry as ir
-
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    coordinator._raise_rate_limit_issue()
-    registry = ir.async_get(hass)
-    assert registry.async_get_issue(
-        DOMAIN, f"rate_limited_{entry.entry_id}"
-    ) is not None
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.json = AsyncMock(return_value=monitor_fixture)
-    mock_resp.status = 200
-    with patch.object(
-        coordinator._session,
-        "get",
-        new=MagicMock(return_value=make_response_cm(mock_resp)),
-    ):
-        await coordinator._async_update_data()
-
-    assert registry.async_get_issue(
-        DOMAIN, f"rate_limited_{entry.entry_id}"
-    ) is None
-    assert coordinator._rate_limited is False
-
-
-async def test_timeout_raises_update_failed(hass: HomeAssistant) -> None:
-    """Request timeout → UpdateFailed with api_timeout translation key."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    with (
-        patch.object(
-            coordinator._session,
-            "get",
-            new=MagicMock(side_effect=asyncio.TimeoutError()),
-        ),
-        pytest.raises(UpdateFailed) as exc,
-    ):
-        await coordinator._async_update_data()
-    assert exc.value.translation_key == "api_timeout"
-
-
-async def test_domain_cooldown_serialises_calls(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """Back-to-back entries from the same domain respect the 15s cooldown.
-
-    Tightened: assert the sleep duration is in the right neighbourhood, not
-    just `> 0`. A bug that always slept for 0.001s would otherwise pass.
-    """
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    # Prime domain-wide timestamp to "just now" so the cooldown must fire.
-    # Push it back a tiny known amount so we can predict the remaining sleep.
-    elapsed = 1.0
-    hass.data.setdefault(DOMAIN, {})[DOMAIN_LAST_CALL_KEY] = (
-        dt_util.utcnow() - timedelta(seconds=elapsed)
-    )
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.json = AsyncMock(return_value=monitor_fixture)
-    mock_resp.status = 200
-
-    with (
-        patch.object(
-            coordinator._session,
-            "get",
-            new=MagicMock(return_value=make_response_cm(mock_resp)),
-        ),
-        patch(
-            "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
-            new_callable=AsyncMock,
-        ) as mock_sleep,
-    ):
-        await coordinator._async_update_data()
-    mock_sleep.assert_awaited_once()
-    # Sleep must close the gap to DOMAIN_COOLDOWN_SECONDS — give a generous
-    # margin for the small wall-clock cost of getting from prime → check.
-    expected = DOMAIN_COOLDOWN_SECONDS - elapsed
-    actual = mock_sleep.call_args.args[0]
-    assert abs(actual - expected) < 0.5, (
-        f"expected sleep ≈{expected}s, got {actual}s"
-    )
-
-
-async def test_domain_cooldown_no_sleep_when_elapsed(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """When the last call is older than the cooldown, no sleep is issued.
-
-    Guards against a regression where `_enforce_domain_cooldown` always sleeps
-    — every test would still pass if we forgot the "elapsed ≥ cooldown" branch.
-    """
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    # Last call was long ago (well past DOMAIN_COOLDOWN_SECONDS).
-    hass.data.setdefault(DOMAIN, {})[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow() - timedelta(
-        seconds=DOMAIN_COOLDOWN_SECONDS + 10
-    )
-
-    mock_resp = MagicMock()
-    mock_resp.raise_for_status = MagicMock()
-    mock_resp.json = AsyncMock(return_value=monitor_fixture)
-    mock_resp.status = 200
-
-    with (
-        patch.object(
-            coordinator._session,
-            "get",
-            new=MagicMock(return_value=make_response_cm(mock_resp)),
-        ),
-        patch(
-            "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
-            new_callable=AsyncMock,
-        ) as mock_sleep,
-    ):
-        await coordinator._async_update_data()
-    mock_sleep.assert_not_called()
-
-
-async def test_scan_interval_honours_config(hass: HomeAssistant) -> None:
-    """The configured scan interval lands on the DataUpdateCoordinator."""
-    entry = _make_entry({CONF_SCAN_INTERVAL: 120})
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    assert coordinator.update_interval == timedelta(seconds=120)
 
 
 # ---------------------------------------------------------------------------
@@ -751,158 +408,182 @@ def test_parse_monitor_body_handles_bus_fixture(tram_fixture) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Conditional GET — 304 Not Modified
+# Batch delegation — the coordinator no longer fetches; it parses its slice
+# out of a shared batch result. The HTTP / 304 / backoff / rate-limit / domain
+# cooldown behaviour lives in test_batch.py against MonitorBatchGroup.
 # ---------------------------------------------------------------------------
 
 
-async def test_304_returns_prior_data_unchanged(
+class _FakeBatch:
+    """Minimal stand-in for a MonitorBatchGroup with a scripted async_fetch."""
+
+    def __init__(self, result: BatchResult | Exception) -> None:
+        self._result = result
+
+    async def async_fetch(self) -> BatchResult:
+        if isinstance(self._result, Exception):
+            raise self._result
+        return self._result
+
+
+def _batch_result(body: dict, server_time: str | None = None) -> BatchResult:
+    return BatchResult(body=body, server_time=server_time)
+
+
+async def test_async_update_data_parses_slice_from_batch(
     hass: HomeAssistant, monitor_fixture
 ) -> None:
-    """A 304 response reuses the previous MonitorData without re-parsing.
-
-    The conditional-GET cache is the integration's main bandwidth saver. If
-    a regression made 304 fall through to `resp.json()`, we'd crash on every
-    cache hit because 304 has no body. This test feeds a 200 first to seed
-    coordinator.data, then a 304 and verifies the cached object is returned.
-    """
+    """_async_update_data returns this entry's parsed slice of the batch body."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-
-    # First pass — 200, with ETag/Last-Modified for the validators to capture.
-    resp_200 = MagicMock()
-    resp_200.status = 200
-    resp_200.headers = {"ETag": '"abc"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
-    resp_200.raise_for_status = MagicMock()
-    resp_200.json = AsyncMock(return_value=monitor_fixture)
-
-    # Second pass — 304, no body. resp.json() would raise if accidentally
-    # called, surfacing the regression we want to guard against.
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = {"ETag": '"abc"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
-
-    mock_get = MagicMock(
-        side_effect=[make_response_cm(resp_200), make_response_cm(resp_304)]
+    server_time = monitor_fixture["message"]["serverTime"]
+    coordinator.attach_batch(
+        _FakeBatch(_batch_result(monitor_fixture, server_time))  # type: ignore[arg-type]
     )
-    with patch.object(coordinator._session, "get", new=mock_get):
-        first = await coordinator._async_update_data()
-        coordinator.data = first  # mimic DataUpdateCoordinator caching
-        second = await coordinator._async_update_data()
 
-    assert second is first  # same object, no re-parse
-    # Conditional headers were sent on the second call.
-    second_headers = mock_get.call_args_list[1].kwargs["headers"]
-    assert second_headers.get("If-None-Match") == '"abc"'
+    data = await coordinator._async_update_data()
 
-
-# ---------------------------------------------------------------------------
-# Exponential backoff on consecutive failures
-# ---------------------------------------------------------------------------
+    assert isinstance(data, MonitorData)
+    assert len(data.departures) > 0
+    assert data.departures == sorted(
+        data.departures, key=lambda d: (d.countdown, d.line, d.towards)
+    )
+    assert data.server_time == server_time
 
 
-async def test_backoff_does_not_kick_in_on_single_failure(
+async def test_async_update_data_raises_without_batch(hass: HomeAssistant) -> None:
+    """Reaching _async_update_data before a batch is attached fails cleanly."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    with pytest.raises(UpdateFailed) as exc:
+        await coordinator._async_update_data()
+    assert exc.value.translation_key == "api_invalid_response"
+
+
+async def test_async_update_data_propagates_batch_failure(
     hass: HomeAssistant,
 ) -> None:
-    """A one-off failure leaves the user-configured cadence intact.
-
-    Transient hiccups are common (single timeout, brief 5xx). Doubling the
-    interval after every single failure would make a user's 60s cadence
-    creep up to 120s after one bad poll, which is surprising. Backoff only
-    starts at the *second* consecutive failure.
-    """
+    """An UpdateFailed from the batch fetch surfaces unchanged."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    original = coordinator.update_interval
+    coordinator.attach_batch(
+        _FakeBatch(
+            UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="api_timeout",
+                translation_placeholders={"seconds": "30"},
+            )
+        )  # type: ignore[arg-type]
+    )
 
-    coordinator._note_failure()
-    assert coordinator.update_interval == original
-
-
-async def test_backoff_doubles_on_consecutive_failures(
-    hass: HomeAssistant,
-) -> None:
-    """Each failure past the first doubles the interval, up to BACKOFF_CAP_SECONDS.
-
-    `_note_failure` adds ±10 % jitter on top of the doubling to prevent
-    thundering-herd retries when the API recovers, so assert each
-    interval is within that envelope rather than equal to it.
-    """
-    from custom_components.wiener_linien_austria.const import BACKOFF_CAP_SECONDS
-
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    base_secs = coordinator.update_interval.total_seconds()
-
-    def _within_jitter(actual: timedelta, expected_secs: float) -> bool:
-        return (
-            expected_secs * 0.9
-            <= actual.total_seconds()
-            <= expected_secs * 1.1
-        )
-
-    # 1st failure: still at base. 2nd: 2x ± 10 %. 3rd: 4x ± 10 %. … capped.
-    coordinator._note_failure()
-    coordinator._note_failure()
-    assert _within_jitter(coordinator.update_interval, base_secs * 2)
-
-    coordinator._note_failure()
-    assert _within_jitter(coordinator.update_interval, base_secs * 4)
-
-    # Drive past the cap by piling on failures. Once the un-jittered value
-    # would hit BACKOFF_CAP_SECONDS, every subsequent failure stays
-    # within ±10 % of the cap (the jitter applies after the cap clamp).
-    for _ in range(20):
-        coordinator._note_failure()
-    assert _within_jitter(coordinator.update_interval, BACKOFF_CAP_SECONDS)
+    with pytest.raises(UpdateFailed) as exc:
+        await coordinator._async_update_data()
+    assert exc.value.translation_key == "api_timeout"
 
 
-async def test_backoff_resets_on_success(hass: HomeAssistant) -> None:
-    """A successful tick after a backoff cycle restores the user-configured interval."""
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    original = coordinator.update_interval
-
-    # Build up backoff.
-    for _ in range(4):
-        coordinator._note_failure()
-    assert coordinator.update_interval != original
-
-    coordinator._note_success()
-    assert coordinator.update_interval == original
-    assert coordinator._consecutive_failures == 0
-
-
-async def test_304_with_no_prior_data_falls_through(
+async def test_batch_apply_pushes_parsed_data(
     hass: HomeAssistant, monitor_fixture
 ) -> None:
-    """If we somehow get a 304 before any 200 (e.g. stale validator from
-    persistence), we fall through to raise_for_status which won't error on
-    304 but the coordinator must NOT return None — that would crash sensors.
-
-    Here we simulate the sequence: validator pre-seeded → 304 with no prior
-    data → coordinator should treat 304 as success-but-empty by raising for
-    status (304 < 400, so it doesn't raise) and then attempting to parse,
-    which will fail on the empty body — surfaced as UpdateFailed. This is
-    the safer behaviour than silently returning None.
-    """
+    """batch_apply parses the slice and pushes it as a successful update."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
-    # No prior data — coordinator.data is None.
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = {}
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(side_effect=ValueError("304 has no body"))
 
-    with (
-        patch.object(coordinator._session, "get", new=MagicMock(return_value=make_response_cm(resp_304))),
-        pytest.raises(UpdateFailed),
-    ):
-        await coordinator._async_update_data()
+    coordinator.batch_apply(_batch_result(monitor_fixture, "2026-04-20T14:00:00+0200"))
+
+    assert coordinator.last_update_success is True
+    assert coordinator.data is not None
+    assert len(coordinator.data.departures) > 0
+
+
+async def test_batch_apply_only_includes_own_lines(hass: HomeAssistant) -> None:
+    """Two entries sharing a body each keep only their own selected lines."""
+    body = {
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U1", "towards": "Leopoldau", "direction": "H",
+                            "type": "ptMetro", "barrierFree": True,
+                            "realtimeSupported": True, "trafficjam": False,
+                            "departures": {"departure": [
+                                {"departureTime": {"countdown": 2}},
+                            ]},
+                        },
+                        {
+                            "name": "U3", "towards": "Simmering", "direction": "H",
+                            "type": "ptMetro", "barrierFree": True,
+                            "realtimeSupported": True, "trafficjam": False,
+                            "departures": {"departure": [
+                                {"departureTime": {"countdown": 5}},
+                            ]},
+                        },
+                    ]
+                }
+            ]
+        },
+        "message": {"messageCode": 1},
+    }
+    entry_u1 = _make_entry({CONF_LINES: ["U1|H"]}, unique_id="diva_u1")
+    entry_u3 = _make_entry({CONF_LINES: ["U3|H"]}, unique_id="diva_u3")
+    entry_u1.add_to_hass(hass)
+    entry_u3.add_to_hass(hass)
+    coord_u1 = WienerLinienAustriaCoordinator(hass, entry_u1)
+    coord_u3 = WienerLinienAustriaCoordinator(hass, entry_u3)
+
+    coord_u1.batch_apply(_batch_result(body))
+    coord_u3.batch_apply(_batch_result(body))
+
+    assert coord_u1.data is not None and coord_u3.data is not None
+    assert {d.line for d in coord_u1.data.departures} == {"U1"}
+    assert {d.line for d in coord_u3.data.departures} == {"U3"}
+
+
+async def test_batch_set_error_marks_unsuccessful(hass: HomeAssistant) -> None:
+    """batch_set_error flips the coordinator to an unsuccessful update."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    coordinator.batch_apply(_batch_result({"message": {"messageCode": 1}}))
+    assert coordinator.last_update_success is True
+
+    coordinator.batch_set_error(
+        UpdateFailed(
+            translation_domain=DOMAIN,
+            translation_key="api_timeout",
+            translation_placeholders={"seconds": "30"},
+        )
+    )
+    assert coordinator.last_update_success is False
+
+
+async def test_apply_upstream_meta_records_server_time_and_code(
+    hass: HomeAssistant,
+) -> None:
+    """apply_upstream_meta records the last server time and message code."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    coordinator.apply_upstream_meta("2026-04-20T14:00:00+0200", 1)
+    assert coordinator.server_time == "2026-04-20T14:00:00+0200"
+    assert coordinator.last_error_code == 1
+
+
+async def test_scan_interval_reflects_config(hass: HomeAssistant) -> None:
+    """The configured scan interval is exposed and drives batch grouping.
+
+    The coordinator no longer self-polls (update_interval is None); the shared
+    batch group is keyed on this value instead.
+    """
+    entry = _make_entry({CONF_SCAN_INTERVAL: 120})
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    assert coordinator.scan_interval == timedelta(seconds=120)
+    assert coordinator.update_interval is None
+
