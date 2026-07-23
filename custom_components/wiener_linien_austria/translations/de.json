@@ -8,7 +8,7 @@
           "diva": "Haltestelle"
         },
         "data_description": {
-          "diva": "Zum Filtern der Haltestellenliste tippen — die dem Home-Assistant-Standort nächstgelegenen stehen oben. Teilnamen genügen: bestätigen und aus den Treffern wählen."
+          "diva": "Zum Filtern der Haltestellenliste tippen — die dem Home-Assistant-Standort nächstgelegenen stehen oben."
         }
       },
       "select_stop": {

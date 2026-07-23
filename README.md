@@ -65,7 +65,7 @@ Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_comp
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=wiener_linien_austria)
 
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
-2. Start typing in **Stop** (e.g. `Stephans`) and pick a suggestion. The list opens on the stops nearest your Home Assistant location, with distances shown. Submitting a partial name instead brings up every stop that matches it.
+2. Start typing in **Stop** (e.g. `Stephans`) and pick a suggestion. The list opens on the stops nearest your Home Assistant location, with distances shown.
 3. Pick the lines to track. Off-service lines (nightlines during the day, day-only lines after midnight) stay selectable — the picker merges live `/monitor` data with the static catalogue.
 4. Set a polling interval (default 60 s, range 30–600 s) and save.
 
