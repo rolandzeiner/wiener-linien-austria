@@ -25,13 +25,11 @@ typing, and free text that step 2 can still resolve.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
 import aiohttp
 import voluptuous as vol
-
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -310,7 +308,7 @@ async def _probe_monitor_lines(
         ) as resp:
             resp.raise_for_status()
             body = await resp.json()
-    except (asyncio.TimeoutError, aiohttp.ClientError, ValueError) as err:
+    except (TimeoutError, aiohttp.ClientError, ValueError) as err:
         _LOGGER.warning("Line-probe failed for RBLs %s: %s", rbls, err)
         return []
 
@@ -511,7 +509,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick a stop from the full catalogue, nearest to home first."""
         try:
             catalogue = await async_get_catalogue(self.hass)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        except (TimeoutError, aiohttp.ClientError) as err:
             # Without the catalogue there is no picker to render and no
             # free-text fallback left to offer, so end the flow cleanly
             # rather than showing an empty dropdown the user can't use.
@@ -657,7 +655,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         if not self._lines:
             try:
                 catalogue = await async_get_catalogue(self.hass)
-            except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+            except (TimeoutError, aiohttp.ClientError) as err:
                 _LOGGER.warning("Static catalogue load failed: %s", err)
                 catalogue = None
             if catalogue is not None:
@@ -796,7 +794,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             catalogue = await async_get_catalogue(self.hass)
-        except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        except (TimeoutError, aiohttp.ClientError) as err:
             _LOGGER.warning("Static catalogue load failed on reconfigure: %s", err)
             return self.async_abort(reason="catalogue_unavailable")
 

@@ -218,7 +218,7 @@ class JSModuleRegistration:
 
     async def _async_upsert_resource(
         self,
-        resources: "ResourceStorageCollection",
+        resources: ResourceStorageCollection,
         url: str,
         version: str,
     ) -> None:

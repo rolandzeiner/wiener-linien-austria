@@ -5,8 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
-
-from tests.conftest import make_response_cm
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -15,16 +13,10 @@ from homeassistant.data_entry_flow import FlowResultType
 from custom_components.wiener_linien_austria.config_flow import (
     _format_distance,
     _nearest_stations,
-    _stop_options,
     _probe_monitor_lines,
     _resolve_lines_for_picker,
     _static_lines_for_station,
-)
-from custom_components.wiener_linien_austria.static import (
-    Station,
-    StaticCatalogue,
-    TripPattern,
-    TripPatternIndex,
+    _stop_options,
 )
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
@@ -33,6 +25,13 @@ from custom_components.wiener_linien_austria.const import (
     CONF_STOP_NAME,
     DOMAIN,
 )
+from custom_components.wiener_linien_austria.static import (
+    StaticCatalogue,
+    Station,
+    TripPattern,
+    TripPatternIndex,
+)
+from tests.conftest import make_response_cm
 
 DEFAULT_LINES = ["U1|H", "U1|R"]
 

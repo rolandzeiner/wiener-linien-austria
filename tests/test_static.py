@@ -5,8 +5,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
-
-from tests.conftest import make_response_cm
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -14,8 +12,8 @@ from homeassistant.helpers.storage import Store
 from custom_components.wiener_linien_austria.static import (
     STORE_KEY,
     STORE_VERSION,
-    Station,
     StaticCatalogue,
+    Station,
     TripPattern,
     TripPatternIndex,
     _catalogue_from_store,
@@ -28,6 +26,7 @@ from custom_components.wiener_linien_austria.static import (
     async_refresh_catalogue,
     stops_ahead_for_match,
 )
+from tests.conftest import make_response_cm
 
 
 @pytest.fixture(autouse=True)
@@ -820,13 +819,13 @@ def test_stops_ahead_capped_at_max_stops_ahead() -> None:
     # Build a pattern longer than MAX_STOPS_AHEAD.
     n = MAX_STOPS_AHEAD + 5
     stations = {
-        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i]) for i in range(0, n + 1)
+        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i]) for i in range(n + 1)
     }
     long_pattern = TripPattern(
         line_id=999,
         pattern_id=1,
         direction=1,
-        stops=tuple(range(0, n + 1)),
+        stops=tuple(range(n + 1)),
     )
     catalogue = StaticCatalogue(
         stations_by_diva=stations,

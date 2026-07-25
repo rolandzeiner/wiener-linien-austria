@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
+
 from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
@@ -23,7 +24,6 @@ from custom_components.wiener_linien_austria.coordinator import (
 )
 
 from .conftest import make_entry as _make_entry
-
 
 # ---------------------------------------------------------------------------
 # Parsing
@@ -158,8 +158,8 @@ def test_parse_monitor_body_falls_back_to_line_towards_when_vehicle_missing() ->
 def _u1_catalogue_for_coord():
     """Catalogue + trip-pattern index covering U1 H + R for enrichment tests."""
     from custom_components.wiener_linien_austria.static import (
-        Station,
         StaticCatalogue,
+        Station,
         TripPattern,
         TripPatternIndex,
     )

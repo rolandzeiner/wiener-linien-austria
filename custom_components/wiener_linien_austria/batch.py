@@ -29,7 +29,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
-
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
@@ -285,7 +284,7 @@ class MonitorBatchGroup:
                 # against a payload we never accepted.
                 self._cache.update_from_response(resp)
                 self._last_body = body
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="api_timeout",

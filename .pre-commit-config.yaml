@@ -7,7 +7,7 @@
 # one that decides green-on-main. Bump both in the same commit.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.22 # keep in sync with ruff== in requirements_test.txt
+    rev: v0.16.0 # keep in sync with ruff== in requirements_test.txt
     hooks:
       - id: ruff
         args: [--fix]

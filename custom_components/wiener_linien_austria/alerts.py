@@ -219,12 +219,7 @@ async def _fetch_info_list(
         # propagates cleanly and we don't pollute the log with a noisy
         # warning that the user can do nothing about.
         raise
-    except (
-        aiohttp.ClientError,
-        aiohttp.ContentTypeError,
-        asyncio.TimeoutError,
-        ValueError,
-    ):
+    except TimeoutError, aiohttp.ClientError, aiohttp.ContentTypeError, ValueError:
         _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
         return _FETCH_FAILED
 
@@ -368,7 +363,7 @@ def _as_str_list(val: Any) -> list[str]:
     if isinstance(val, list):
         return [str(x).strip() for x in val if isinstance(x, str) and x.strip()]
     if isinstance(val, dict):
-        return [str(k).strip() for k in val.keys() if isinstance(k, str) and k.strip()]
+        return [str(k).strip() for k in val if isinstance(k, str) and k.strip()]
     return []
 
 

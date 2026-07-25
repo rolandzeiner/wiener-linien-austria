@@ -27,7 +27,8 @@ from custom_components.wiener_linien_austria.coordinator import (
     WienerLinienAustriaCoordinator,
 )
 
-from .conftest import make_entry as _make_entry, make_response_cm
+from .conftest import make_entry as _make_entry
+from .conftest import make_response_cm
 
 
 def _ok_response(body: object, status: int = 200) -> MagicMock:

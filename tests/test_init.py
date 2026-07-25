@@ -8,9 +8,9 @@ covered by the `test_card_version` invariants and live-HA smoke tests.
 
 from __future__ import annotations
 
-from homeassistant.core import HomeAssistant
-
 from unittest.mock import AsyncMock, patch
+
+from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.const import (
     ALERT_CACHE_VALIDATORS_KEY,

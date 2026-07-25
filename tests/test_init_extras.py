@@ -35,7 +35,6 @@ from custom_components.wiener_linien_austria.const import (
 
 from .conftest import make_entry as _make_entry
 
-
 # ---------------------------------------------------------------------------
 # WebSocket card-version handlers
 # ---------------------------------------------------------------------------

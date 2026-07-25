@@ -308,7 +308,7 @@ async def async_setup_entry(
     # state that other live entries still need.
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    except Exception:  # noqa: BLE001
+    except Exception:
         # Catch broad: HA core may surface platform-setup failures from
         # third-party libraries as anything from `ImportError` to
         # `ValueError`; we don't want to enumerate them here. Reraise

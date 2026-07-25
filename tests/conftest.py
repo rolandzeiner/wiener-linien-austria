@@ -21,8 +21,8 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
 )
 from custom_components.wiener_linien_austria.static import (
-    Station,
     StaticCatalogue,
+    Station,
     TripPattern,
     TripPatternIndex,
 )

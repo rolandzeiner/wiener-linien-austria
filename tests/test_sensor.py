@@ -590,11 +590,11 @@ async def test_extra_state_attributes_rebuilt_when_alerts_seq_bumps(
         "custom_components.wiener_linien_austria.sensor.get_alerts_for",
         return_value=([], []),
     ) as mock_alerts:
-        sensor.extra_state_attributes  # build + cache at seq=1
-        sensor.extra_state_attributes  # served from cache
+        _ = sensor.extra_state_attributes  # build + cache at seq=1
+        _ = sensor.extra_state_attributes  # served from cache
         hass.data[DOMAIN][ALERTS_SEQ_KEY] = 2  # alerts refresh tick
-        sensor.extra_state_attributes  # rebuild at seq=2
-        sensor.extra_state_attributes  # served from cache at seq=2
+        _ = sensor.extra_state_attributes  # rebuild at seq=2
+        _ = sensor.extra_state_attributes  # served from cache at seq=2
 
     assert mock_alerts.call_count == 2
 
@@ -619,8 +619,8 @@ async def test_batch_apply_clears_attrs_cache(
         "custom_components.wiener_linien_austria.sensor.get_alerts_for",
         return_value=([], []),
     ) as mock_alerts:
-        sensor.extra_state_attributes
-        sensor.extra_state_attributes
+        _ = sensor.extra_state_attributes
+        _ = sensor.extra_state_attributes
         # Drive a successful batch fan-out — the cache must drop even though
         # departures + alerts didn't change, because the recorder writes the
         # attrs dict per state and a stale cache would freeze whatever was
@@ -631,6 +631,6 @@ async def test_batch_apply_clears_attrs_cache(
                 server_time="2026-04-20T14:41:00+0200",
             )
         )
-        sensor.extra_state_attributes
+        _ = sensor.extra_state_attributes
 
     assert mock_alerts.call_count == 2

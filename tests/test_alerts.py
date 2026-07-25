@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
-
-from tests.conftest import make_response_cm
 
 import aiohttp
 import pytest
@@ -15,8 +12,8 @@ from homeassistant.core import HomeAssistant
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
     TrafficInfo,
-    _FetchFailed,
     _fetch_info_list,
+    _FetchFailed,
     _parse_elevator,
     _parse_traffic,
     async_refresh_alerts,
@@ -28,6 +25,7 @@ from custom_components.wiener_linien_austria.const import (
     ENTRY_COUNT_KEY,
     TRAFFIC_INFO_KEY,
 )
+from tests.conftest import make_response_cm
 
 
 @pytest.fixture(autouse=True)
@@ -321,7 +319,7 @@ async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None
 async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None:
     """Fetch failures must not raise — alerts are advisory."""
     fake_session = MagicMock()
-    fake_session.get = MagicMock(side_effect=asyncio.TimeoutError())
+    fake_session.get = MagicMock(side_effect=TimeoutError())
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -349,12 +347,14 @@ async def test_fetch_info_list_propagates_unexpected_errors(
     fake_session = MagicMock()
     fake_session.get = MagicMock(side_effect=RuntimeError("unexpected"))
 
-    with patch(
-        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
-        return_value=fake_session,
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+            return_value=fake_session,
+        ),
+        pytest.raises(RuntimeError),
     ):
-        with pytest.raises(RuntimeError):
-            await _fetch_info_list(hass, "stoerunglang")
+        await _fetch_info_list(hass, "stoerunglang")
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,6 @@ stops, a missing RBL yields empty-not-error).
 
 from __future__ import annotations
 
-import asyncio
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -37,7 +36,6 @@ from custom_components.wiener_linien_austria.coordinator import (
 )
 
 from .conftest import make_entry, make_response_cm
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -165,9 +163,11 @@ async def test_fetch_http_error(hass: HomeAssistant) -> None:
     resp = MagicMock()
     resp.status = 503
     resp.raise_for_status = MagicMock(side_effect=err)
-    with _patch_get(group, MagicMock(return_value=make_response_cm(resp))):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(resp))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
     assert exc.value.translation_key == "api_http_error"
     assert exc.value.translation_placeholders["status"] == "503"
 
@@ -175,11 +175,13 @@ async def test_fetch_http_error(hass: HomeAssistant) -> None:
 async def test_fetch_connection_error(hass: HomeAssistant) -> None:
     """aiohttp.ClientError → UpdateFailed(api_connection_error)."""
     group, _ = _group_with_member(hass)
-    with _patch_get(
-        group, MagicMock(side_effect=aiohttp.ClientConnectionError("unreachable"))
+    with (
+        _patch_get(
+            group, MagicMock(side_effect=aiohttp.ClientConnectionError("unreachable"))
+        ),
+        pytest.raises(UpdateFailed) as exc,
     ):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+        await group.async_fetch()
     assert exc.value.translation_key == "api_connection_error"
     assert exc.value.translation_placeholders["error_type"] == "ClientConnectionError"
 
@@ -187,9 +189,11 @@ async def test_fetch_connection_error(hass: HomeAssistant) -> None:
 async def test_fetch_timeout(hass: HomeAssistant) -> None:
     """Request timeout → UpdateFailed(api_timeout)."""
     group, _ = _group_with_member(hass)
-    with _patch_get(group, MagicMock(side_effect=asyncio.TimeoutError())):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+    with (
+        _patch_get(group, MagicMock(side_effect=TimeoutError())),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
     assert exc.value.translation_key == "api_timeout"
 
 
@@ -200,9 +204,11 @@ async def test_fetch_invalid_json(hass: HomeAssistant) -> None:
     resp.status = 200
     resp.raise_for_status = MagicMock()
     resp.json = AsyncMock(side_effect=ValueError("bad json"))
-    with _patch_get(group, MagicMock(return_value=make_response_cm(resp))):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(resp))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
     assert exc.value.translation_key == "api_invalid_response"
 
 
@@ -211,9 +217,11 @@ async def test_fetch_non_dict_body(hass: HomeAssistant) -> None:
     group, _ = _group_with_member(hass)
     resp = _ok_response({})
     resp.json = AsyncMock(return_value=["not", "a", "dict"])
-    with _patch_get(group, MagicMock(return_value=make_response_cm(resp))):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(resp))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
     assert exc.value.translation_key == "api_invalid_response"
     assert "list" in exc.value.translation_placeholders["error"]
 
@@ -223,9 +231,11 @@ async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -
     group, coordinator = _group_with_member(hass)
     bad = dict(monitor_fixture)
     bad["message"] = {"value": "Something else", "messageCode": 500}
-    with _patch_get(group, MagicMock(return_value=make_response_cm(_ok_response(bad)))):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(_ok_response(bad)))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
     assert exc.value.translation_key == "api_upstream_error"
     assert exc.value.translation_placeholders["code"] == "500"
     # A non-rate-limit upstream error must NOT raise the rate-limit issue.
@@ -246,11 +256,13 @@ async def test_rate_limit_raises_issue_per_member(
     group, coordinator = _group_with_member(hass)
     limited = dict(monitor_fixture)
     limited["message"] = {"value": "Rate limit", "messageCode": ERR_RATE_LIMIT}
-    with _patch_get(
-        group, MagicMock(return_value=make_response_cm(_ok_response(limited)))
+    with (
+        _patch_get(
+            group, MagicMock(return_value=make_response_cm(_ok_response(limited)))
+        ),
+        pytest.raises(UpdateFailed) as exc,
     ):
-        with pytest.raises(UpdateFailed) as exc:
-            await group.async_fetch()
+        await group.async_fetch()
     assert exc.value.translation_key == "api_rate_limited"
 
     registry = ir.async_get(hass)
@@ -372,9 +384,11 @@ async def test_304_without_cached_body_raises(hass: HomeAssistant) -> None:
     resp_304.headers = {}
     resp_304.raise_for_status = MagicMock()
     resp_304.json = AsyncMock(side_effect=ValueError("304 has no body"))
-    with _patch_get(group, MagicMock(return_value=make_response_cm(resp_304))):
-        with pytest.raises(UpdateFailed):
-            await group.async_fetch()
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(resp_304))),
+        pytest.raises(UpdateFailed),
+    ):
+        await group.async_fetch()
 
 
 # ---------------------------------------------------------------------------

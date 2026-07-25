@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -194,8 +192,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         try:
             catalogue = await async_get_catalogue(self.hass)
         except (
+            TimeoutError,
             aiohttp.ClientError,
-            asyncio.TimeoutError,
             KeyError,
             TypeError,
             ValueError,
@@ -425,9 +423,7 @@ def _parse_monitor_body(
         None
         if selected is None
         else {
-            (parts[0], parts[1])
-            for k in selected
-            if len((parts := k.split("|", 2))) >= 2
+            (parts[0], parts[1]) for k in selected if len(parts := k.split("|", 2)) >= 2
         }
     )
 
@@ -487,7 +483,7 @@ def _parse_monitor_body(
                             resolved_towards,
                             live_direction=direction,
                         )
-                    except Exception:  # noqa: BLE001
+                    except Exception:
                         # Fail-soft: a single matcher hiccup must not poison
                         # the rest of the parse. `except Exception` (not
                         # `BaseException`) is deliberate — it lets

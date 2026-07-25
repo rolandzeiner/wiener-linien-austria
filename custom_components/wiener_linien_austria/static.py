@@ -30,7 +30,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
@@ -580,7 +579,7 @@ async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None
 
     try:
         catalogue = await _fetch_and_build(hass, prior=prior)
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+    except (TimeoutError, aiohttp.ClientError, ValueError) as err:
         _LOGGER.warning("Static catalogue refresh failed, keeping cache: %s", err)
         return None
 
@@ -849,7 +848,7 @@ async def _download_or_fail_soft(
     """
     try:
         body, new_validators = await _download_text(session, url, timeout, validators)
-    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+    except (TimeoutError, aiohttp.ClientError) as err:
         _LOGGER.warning("Optional static CSV fetch failed (%s): %s", url, err)
         return (None, validators, True)
     return (body, new_validators, False)
