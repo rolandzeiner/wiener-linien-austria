@@ -6,6 +6,7 @@ group, PLUS the batching-specific behaviour: RBL union/dedupe, one combined
 request for N members, and per-member fan-out (each member keeps only its own
 stops, a missing RBL yields empty-not-error).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -217,9 +218,7 @@ async def test_fetch_non_dict_body(hass: HomeAssistant) -> None:
     assert "list" in exc.value.translation_placeholders["error"]
 
 
-async def test_fetch_upstream_error_code(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
+async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -> None:
     """messageCode not in {1, 316} → UpdateFailed(api_upstream_error)."""
     group, coordinator = _group_with_member(hass)
     bad = dict(monitor_fixture)
@@ -255,9 +254,10 @@ async def test_rate_limit_raises_issue_per_member(
     assert exc.value.translation_key == "api_rate_limited"
 
     registry = ir.async_get(hass)
-    assert registry.async_get_issue(
-        DOMAIN, f"rate_limited_{coordinator.entry_id}"
-    ) is not None
+    assert (
+        registry.async_get_issue(DOMAIN, f"rate_limited_{coordinator.entry_id}")
+        is not None
+    )
     assert coordinator._rate_limited is True
     assert coordinator.last_error_code == ERR_RATE_LIMIT
 
@@ -269,18 +269,19 @@ async def test_recovery_clears_rate_limit_issue(
     group, coordinator = _group_with_member(hass)
     coordinator.note_rate_limited()
     registry = ir.async_get(hass)
-    assert registry.async_get_issue(
-        DOMAIN, f"rate_limited_{coordinator.entry_id}"
-    ) is not None
+    assert (
+        registry.async_get_issue(DOMAIN, f"rate_limited_{coordinator.entry_id}")
+        is not None
+    )
 
     with _patch_get(
         group, MagicMock(return_value=make_response_cm(_ok_response(monitor_fixture)))
     ):
         await group.async_fetch()
 
-    assert registry.async_get_issue(
-        DOMAIN, f"rate_limited_{coordinator.entry_id}"
-    ) is None
+    assert (
+        registry.async_get_issue(DOMAIN, f"rate_limited_{coordinator.entry_id}") is None
+    )
     assert coordinator._rate_limited is False
 
 
@@ -289,9 +290,7 @@ async def test_recovery_clears_rate_limit_issue(
 # ---------------------------------------------------------------------------
 
 
-async def test_domain_cooldown_serialises(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
+async def test_domain_cooldown_serialises(hass: HomeAssistant, monitor_fixture) -> None:
     """A recent domain call forces the group to wait out the remaining slice."""
     group, _ = _group_with_member(hass)
     elapsed = 1.0
@@ -338,9 +337,7 @@ async def test_domain_cooldown_no_sleep_when_elapsed(
 # ---------------------------------------------------------------------------
 
 
-async def test_304_returns_cached_body(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
+async def test_304_returns_cached_body(hass: HomeAssistant, monitor_fixture) -> None:
     """A 304 revalidation returns the cached body with not_modified=True."""
     group, _ = _group_with_member(hass)
     headers = {"ETag": '"abc"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
@@ -349,7 +346,9 @@ async def test_304_returns_cached_body(
     resp_304.status = 304
     resp_304.headers = headers
     resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
+    resp_304.json = AsyncMock(
+        side_effect=AssertionError("must not call .json() on 304")
+    )
 
     mock_get = MagicMock(
         side_effect=[make_response_cm(resp_200), make_response_cm(resp_304)]

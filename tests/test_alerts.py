@@ -1,4 +1,5 @@
 """Tests for the alerts module (traffic info + elevator info)."""
+
 from __future__ import annotations
 
 import asyncio
@@ -488,8 +489,13 @@ async def test_async_refresh_alerts_304_keeps_existing_cache(
     """
     # Pre-seed the cache so we can assert it survives.
     pre_existing_traffic = TrafficInfo(
-        name="PRE", title="U1: prior", description="x",
-        related_lines=["U1"], time_start=None, time_end=None, status="active",
+        name="PRE",
+        title="U1: prior",
+        description="x",
+        related_lines=["U1"],
+        time_start=None,
+        time_end=None,
+        status="active",
     )
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [pre_existing_traffic]
@@ -499,7 +505,9 @@ async def test_async_refresh_alerts_304_keeps_existing_cache(
     resp_304.status = 304
     resp_304.headers = {"ETag": '"abc"'}
     resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(side_effect=AssertionError("must not call .json() on 304"))
+    resp_304.json = AsyncMock(
+        side_effect=AssertionError("must not call .json() on 304")
+    )
 
     fake_session = MagicMock()
     fake_session.get = MagicMock(return_value=make_response_cm(resp_304))
@@ -520,11 +528,24 @@ async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
     """After a 200 captures ETag/Last-Modified, the next call sends them back."""
     body = {
         "message": {"messageCode": 1},
-        "data": {"trafficInfos": [{"name": "T1", "title": "U1: x", "relatedLines": ["U1"], "status": "active", "time": {}}]},
+        "data": {
+            "trafficInfos": [
+                {
+                    "name": "T1",
+                    "title": "U1: x",
+                    "relatedLines": ["U1"],
+                    "status": "active",
+                    "time": {},
+                }
+            ]
+        },
     }
     resp_first = MagicMock()
     resp_first.status = 200
-    resp_first.headers = {"ETag": '"v1"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
+    resp_first.headers = {
+        "ETag": '"v1"',
+        "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT",
+    }
     resp_first.raise_for_status = MagicMock()
     resp_first.json = AsyncMock(return_value=body)
 
@@ -554,8 +575,7 @@ async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
     # Find the third call (start of the second refresh, stoerunglang again).
     second_pass_calls = fake_session.get.call_args_list[2:]
     assert any(
-        c.kwargs["headers"].get("If-None-Match") == '"v1"'
-        for c in second_pass_calls
+        c.kwargs["headers"].get("If-None-Match") == '"v1"' for c in second_pass_calls
     ), "second refresh must echo the ETag captured on first response"
 
 

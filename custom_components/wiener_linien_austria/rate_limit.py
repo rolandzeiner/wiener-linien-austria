@@ -6,6 +6,7 @@ circulated for the OGD real-time endpoint, *in aggregate*. An asyncio.Lock
 serialises the check-then-update, so concurrent callers can't both observe
 the same `last_call_ts` and skip the sleep.
 """
+
 from __future__ import annotations
 
 import asyncio

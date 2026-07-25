@@ -22,6 +22,7 @@ free-text box gave no feedback until submit, and a plain dropdown of ~1800
 stops is unscannable. `custom_value=True` gets both — autocomplete while
 typing, and free text that step 2 can still resolve.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -142,9 +143,7 @@ def _nearby_label(label: str, meters: float, language: str) -> str:
     return f"{label} — {_format_distance(meters, language)}"
 
 
-def _line_suffix(
-    catalogue: StaticCatalogue, station: Station, limit: int = 4
-) -> str:
+def _line_suffix(catalogue: StaticCatalogue, station: Station, limit: int = 4) -> str:
     """The lines serving a stop, for telling same-named stops apart.
 
     Truncated because a hub like Schottenring is served by 14 lines and a
@@ -190,16 +189,12 @@ def _unique_stop_labels(catalogue: StaticCatalogue) -> dict[int, str]:
             suffix = _line_suffix(catalogue, station)
             resolved[station.diva] = f"{base} · {suffix}" if suffix else base
         if len(set(resolved.values())) < len(group):
-            resolved = {
-                diva: f"{label} · #{diva}" for diva, label in resolved.items()
-            }
+            resolved = {diva: f"{label} · #{diva}" for diva, label in resolved.items()}
         labels.update(resolved)
     return labels
 
 
-def _station_for_value(
-    catalogue: StaticCatalogue, value: Any
-) -> Station | None:
+def _station_for_value(catalogue: StaticCatalogue, value: Any) -> Station | None:
     """Resolve a picker value back to a trackable Station, or None.
 
     The SelectSelector already constrains submissions to values we
@@ -209,7 +204,7 @@ def _station_for_value(
     """
     try:
         diva = int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         # Only reachable if the selector contract changes under us or the
         # flow state is hand-edited; the user-visible `invalid_stop` is
         # already the right answer, so this stays at DEBUG.
@@ -416,9 +411,7 @@ def _static_lines_for_station(
             key = _line_key(label, direction_str)
             if key in seen:
                 continue
-            terminus_entry = (
-                rbl_index.get(terminus_rbl) if terminus_rbl else None
-            )
+            terminus_entry = rbl_index.get(terminus_rbl) if terminus_rbl else None
             towards = terminus_entry[1] if terminus_entry is not None else ""
             if not towards:
                 continue
@@ -613,9 +606,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 # (invalid_stop error) is already correct.
                 _LOGGER.debug("Failed to parse diva %r: %s", diva_str, err)
                 diva = None
-            station = next(
-                (s for s in self._matches if s.diva == diva), None
-            )
+            station = next((s for s in self._matches if s.diva == diva), None)
             if station is None:
                 errors[CONF_DIVA] = "invalid_stop"
             else:
@@ -630,9 +621,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             for s in self._matches
         ]
         lang = self.hass.config.language
-        search_again_label = _SEARCH_AGAIN_LABELS.get(
-            lang, _SEARCH_AGAIN_LABELS["en"]
-        )
+        search_again_label = _SEARCH_AGAIN_LABELS.get(lang, _SEARCH_AGAIN_LABELS["en"])
         options.append(
             SelectOptionDict(value="__search_again__", label=search_again_label)
         )
@@ -678,9 +667,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Catalogue is healthy again — drop any prior Repairs
                 # issue from a previous failed attempt so the user's
                 # dashboard doesn't carry stale warnings forever.
-                ir.async_delete_issue(
-                    self.hass, DOMAIN, "catalogue_unavailable"
-                )
+                ir.async_delete_issue(self.hass, DOMAIN, "catalogue_unavailable")
             else:
                 # Catalogue unavailable — fall back to the live-only
                 # path so the user can still proceed if the OGD data
@@ -697,9 +684,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     severity=ir.IssueSeverity.WARNING,
                     translation_key="catalogue_unavailable",
                 )
-                self._lines = await _probe_monitor_lines(
-                    self.hass, station.rbls
-                )
+                self._lines = await _probe_monitor_lines(self.hass, station.rbls)
             if not self._lines:
                 return self.async_show_form(
                     step_id="select_lines",
@@ -712,9 +697,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                 )
 
         if user_input is not None:
-            picked: list[str] = [
-                str(x) for x in user_input.get(CONF_LINES, [])
-            ]
+            picked: list[str] = [str(x) for x in user_input.get(CONF_LINES, [])]
             if not picked:
                 errors[CONF_LINES] = "no_lines"
             else:
@@ -750,9 +733,11 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         # otherwise the system default.
         existing = self._reconfigure_entry
         default_interval = (
-            int({**existing.data, **existing.options}.get(
-                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
-            ))
+            int(
+                {**existing.data, **existing.options}.get(
+                    CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                )
+            )
             if existing is not None
             else DEFAULT_SCAN_INTERVAL
         )
@@ -820,7 +805,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         # used below rather than throwing an unknown-error stack trace.
         try:
             diva = int(data[CONF_DIVA])
-        except (KeyError, TypeError, ValueError):
+        except KeyError, TypeError, ValueError:
             return self.async_abort(reason="stop_gone")
         station = catalogue.stations_by_diva.get(diva)
         if station is None:
@@ -842,16 +827,10 @@ class WienerLinienAustriaOptionsFlow(OptionsFlow):
         """Handle options."""
         config = {**self.config_entry.data, **self.config_entry.options}
         if user_input is not None:
-            interval = int(
-                user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-            )
-            return self.async_create_entry(
-                data={CONF_SCAN_INTERVAL: interval}
-            )
+            interval = int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+            return self.async_create_entry(data={CONF_SCAN_INTERVAL: interval})
 
-        default_interval = int(
-            config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-        )
+        default_interval = int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(

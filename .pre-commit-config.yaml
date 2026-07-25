@@ -1,21 +1,26 @@
 # Run the same lint + type checks as CI before each commit.
 # Install once per clone: `pre-commit install`.
+#
+# The ruff and mypy `rev:` pins below MUST match the `==` pins in
+# `requirements_test.txt`. CI installs those exact versions; a drifting
+# hook rev means the local gate lints with a different ruleset than the
+# one that decides green-on-main. Bump both in the same commit.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.15.22 # keep in sync with ruff== in requirements_test.txt
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.0.0
+    rev: v2.3.0 # keep in sync with mypy== in requirements_test.txt
     hooks:
       - id: mypy
         additional_dependencies: [homeassistant, voluptuous]
         args: [--strict, --ignore-missing-imports]
         files: ^custom_components/wiener_linien_austria/.*\.py$
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer

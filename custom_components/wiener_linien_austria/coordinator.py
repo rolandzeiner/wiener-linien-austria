@@ -1,4 +1,5 @@
 """DataUpdateCoordinator for Wiener Linien Austria."""
+
 from __future__ import annotations
 
 import asyncio
@@ -24,6 +25,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
+
 # Eager import — `stops_ahead_for_match` runs in the /monitor parser's
 # hot loop, so the other names from `static` are already in sys.modules
 # anyway. No import-time saving from lazy imports here.
@@ -120,9 +122,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             raise ConfigEntryError(
                 f"Entry has no valid integer RBLs (received {raw_rbls!r})"
             )
-        self._selected_lines: set[str] | None = _normalise_lines(
-            config.get(CONF_LINES)
-        )
+        self._selected_lines: set[str] | None = _normalise_lines(config.get(CONF_LINES))
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
@@ -274,9 +274,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         if not self._rate_limited:
             return
         self._rate_limited = False
-        ir.async_delete_issue(
-            self.hass, DOMAIN, f"rate_limited_{self._entry.entry_id}"
-        )
+        ir.async_delete_issue(self.hass, DOMAIN, f"rate_limited_{self._entry.entry_id}")
 
     # ------------------------------------------------------------------
     # Fetch (delegated to the shared MonitorBatchGroup)
@@ -410,7 +408,9 @@ def _parse_monitor_body(
     # narrowing across the closure boundary if we hand it through a
     # local alias that's either the catalogue or None.
     pattern_catalogue: StaticCatalogue | None = (
-        catalogue if catalogue is not None and catalogue.trip_patterns is not None else None
+        catalogue
+        if catalogue is not None and catalogue.trip_patterns is not None
+        else None
     )
 
     # Match the user's selection on (line, direction) only — `line.towards`
@@ -424,7 +424,11 @@ def _parse_monitor_body(
     selected_pairs: set[tuple[str, str]] | None = (
         None
         if selected is None
-        else {(parts[0], parts[1]) for k in selected if len((parts := k.split("|", 2))) >= 2}
+        else {
+            (parts[0], parts[1])
+            for k in selected
+            if len((parts := k.split("|", 2))) >= 2
+        }
     )
 
     # Restrict to this entry's own stops. A shared batch /monitor response
@@ -447,7 +451,7 @@ def _parse_monitor_body(
             )
             if monitor_rbl is not None and monitor_rbl not in rbl_filter:
                 continue
-        for line in (monitor.get("lines") or []):
+        for line in monitor.get("lines") or []:
             line_name = str(line.get("name") or "").strip()
             if not line_name:
                 continue
@@ -459,7 +463,10 @@ def _parse_monitor_body(
             traffic_jam = bool(line.get("trafficjam"))
             platform = str(line.get("platform") or "").strip() or None
 
-            if selected_pairs is not None and (line_name, direction) not in selected_pairs:
+            if (
+                selected_pairs is not None
+                and (line_name, direction) not in selected_pairs
+            ):
                 continue
 
             for entry in (line.get("departures") or {}).get("departure") or []:
@@ -535,5 +542,5 @@ def _safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

@@ -1,4 +1,5 @@
 """Tests for the Wiener Linien Austria diagnostics module."""
+
 from __future__ import annotations
 
 from homeassistant.core import HomeAssistant
@@ -30,10 +31,10 @@ async def test_diagnostics_includes_attribution_and_state(
     """Diagnostics expose attribution, RBL list, error code, and exact count."""
     # Derive the expected departure count from the fixture itself so the test
     # stays honest if the captured fixture is ever refreshed.
-    expected_count = len(
-        _parse_monitor_body(monitor_fixture, None, None).departures
+    expected_count = len(_parse_monitor_body(monitor_fixture, None, None).departures)
+    assert expected_count > 0, (
+        "fixture must have departures for the test to mean anything"
     )
-    assert expected_count > 0, "fixture must have departures for the test to mean anything"
 
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -128,20 +129,35 @@ async def test_diagnostics_includes_matched_alerts(
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [
         TrafficInfo(
-            name="T1", title="U1: Störung", description="x",
-            related_lines=["U1"], time_start=None, time_end=None, status="active",
+            name="T1",
+            title="U1: Störung",
+            description="x",
+            related_lines=["U1"],
+            time_start=None,
+            time_end=None,
+            status="active",
         ),
         TrafficInfo(
-            name="T2", title="49A: unrelated", description="y",
-            related_lines=["49A"], time_start=None, time_end=None, status="active",
+            name="T2",
+            title="49A: unrelated",
+            description="y",
+            related_lines=["49A"],
+            time_start=None,
+            time_end=None,
+            status="active",
         ),
     ]
     hass.data[DOMAIN][ELEVATOR_INFO_KEY] = [
         ElevatorInfo(
-            name="E1", station="Stephansplatz", description="U1 exit",
-            reason="", status="außer Betrieb",
-            related_lines=["U1"], related_stops=[4111],
-            time_start=None, time_end=None,
+            name="E1",
+            station="Stephansplatz",
+            description="U1 exit",
+            reason="",
+            status="außer Betrieb",
+            related_lines=["U1"],
+            related_stops=[4111],
+            time_start=None,
+            time_end=None,
         ),
     ]
 

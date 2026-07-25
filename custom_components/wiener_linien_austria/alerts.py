@@ -11,6 +11,7 @@ than a few times an hour and aggregating across all entries keeps the
 integration's outbound request rate trivial. Each sensor filters the cached
 lists by its own (lines, RBLs) at attribute-read time.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -304,7 +305,11 @@ def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
     attrs = raw.get("attributes") or {}
     line_types_raw = attrs.get("relatedLineTypes") or {}
     line_types: dict[str, str] = (
-        {k: v for k, v in line_types_raw.items() if isinstance(k, str) and isinstance(v, str)}
+        {
+            k: v
+            for k, v in line_types_raw.items()
+            if isinstance(k, str) and isinstance(v, str)
+        }
         if isinstance(line_types_raw, dict)
         else {}
     )
@@ -340,12 +345,8 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
         attrs.get("relatedStops")
     )
 
-    station = str(
-        attrs.get("station") or raw.get("title") or ""
-    ).strip()
-    description = str(
-        raw.get("description") or attrs.get("location") or ""
-    ).strip()
+    station = str(attrs.get("station") or raw.get("title") or "").strip()
+    description = str(raw.get("description") or attrs.get("location") or "").strip()
     reason = str(attrs.get("reason") or "").strip()
     status = str(attrs.get("status") or "").strip()
 
@@ -379,7 +380,7 @@ def _as_int_list(val: Any) -> list[int]:
     for item in val:
         try:
             out.append(int(item))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
     return out
 

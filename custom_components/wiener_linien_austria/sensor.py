@@ -1,4 +1,5 @@
 """Sensor platform for Wiener Linien Austria."""
+
 from __future__ import annotations
 
 import logging
@@ -189,9 +190,7 @@ class WienerLinienStopSensor(
         # day-only lines after midnight). Empty when nothing's tracked,
         # in which case the editors fall through to `lines_at_stop`.
         tracked_keys = [
-            str(k)
-            for k in (selected_line_keys or [])
-            if isinstance(k, str) and k
+            str(k) for k in (selected_line_keys or []) if isinstance(k, str) and k
         ]
         tracked_lines = sorted({k.split("|", 1)[0] for k in tracked_keys})
 

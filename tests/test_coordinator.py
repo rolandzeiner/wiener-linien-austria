@@ -1,4 +1,5 @@
 """Tests for the Wiener Linien Austria coordinator."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -43,7 +44,9 @@ def test_parse_monitor_body_surfaces_platform(monitor_fixture) -> None:
     # At least one departure in the fixture has a platform — capture it and
     # confirm it also appears in the dict form surfaced to sensor attributes.
     with_platform = [d for d in result.departures if d.platform]
-    assert with_platform, "fixture should contain at least one departure with a platform"
+    assert with_platform, (
+        "fixture should contain at least one departure with a platform"
+    )
     d = with_platform[0]
     assert isinstance(d.platform, str)
     assert d.to_dict()["platform"] == d.platform
@@ -163,7 +166,9 @@ def _u1_catalogue_for_coord():
 
     stations = {
         62000001: Station(62000001, "Reumannplatz", "Wien", 16.37, 48.18, [4001]),
-        60201012: Station(60201012, "Stephansplatz", "Wien", 16.37, 48.21, [4111, 4118]),
+        60201012: Station(
+            60201012, "Stephansplatz", "Wien", 16.37, 48.21, [4111, 4118]
+        ),
         62000002: Station(62000002, "Praterstern", "Wien", 16.39, 48.22, [4222]),
         62000003: Station(62000003, "Leopoldau", "Wien", 16.47, 48.27, [4333]),
     }
@@ -295,7 +300,11 @@ async def test_parser_skips_departures_without_countdown() -> None:
                             "departures": {
                                 "departure": [
                                     # Missing countdown — should be skipped
-                                    {"departureTime": {"timePlanned": "2026-01-01T00:00:00+0000"}},
+                                    {
+                                        "departureTime": {
+                                            "timePlanned": "2026-01-01T00:00:00+0000"
+                                        }
+                                    },
                                     # Well-formed — should survive
                                     {"departureTime": {"countdown": 3}},
                                 ]
@@ -508,20 +517,32 @@ async def test_batch_apply_only_includes_own_lines(hass: HomeAssistant) -> None:
                 {
                     "lines": [
                         {
-                            "name": "U1", "towards": "Leopoldau", "direction": "H",
-                            "type": "ptMetro", "barrierFree": True,
-                            "realtimeSupported": True, "trafficjam": False,
-                            "departures": {"departure": [
-                                {"departureTime": {"countdown": 2}},
-                            ]},
+                            "name": "U1",
+                            "towards": "Leopoldau",
+                            "direction": "H",
+                            "type": "ptMetro",
+                            "barrierFree": True,
+                            "realtimeSupported": True,
+                            "trafficjam": False,
+                            "departures": {
+                                "departure": [
+                                    {"departureTime": {"countdown": 2}},
+                                ]
+                            },
                         },
                         {
-                            "name": "U3", "towards": "Simmering", "direction": "H",
-                            "type": "ptMetro", "barrierFree": True,
-                            "realtimeSupported": True, "trafficjam": False,
-                            "departures": {"departure": [
-                                {"departureTime": {"countdown": 5}},
-                            ]},
+                            "name": "U3",
+                            "towards": "Simmering",
+                            "direction": "H",
+                            "type": "ptMetro",
+                            "barrierFree": True,
+                            "realtimeSupported": True,
+                            "trafficjam": False,
+                            "departures": {
+                                "departure": [
+                                    {"departureTime": {"countdown": 5}},
+                                ]
+                            },
                         },
                     ]
                 }
@@ -586,4 +607,3 @@ async def test_scan_interval_reflects_config(hass: HomeAssistant) -> None:
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     assert coordinator.scan_interval == timedelta(seconds=120)
     assert coordinator.update_interval is None
-

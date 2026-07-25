@@ -1,4 +1,5 @@
 """Wiener Linien Austria integration."""
+
 from __future__ import annotations
 
 import asyncio
@@ -58,9 +59,7 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 STATIC_REFRESH_UNSUB_KEY = "static_refresh_unsub"
 
 
-@websocket_command(
-    {vol.Required("type"): "wiener_linien_austria/card_version"}
-)
+@websocket_command({vol.Required("type"): "wiener_linien_austria/card_version"})
 @async_response
 async def _websocket_card_version(
     hass: HomeAssistant,
@@ -71,9 +70,7 @@ async def _websocket_card_version(
     connection.send_result(msg["id"], {"version": CARD_VERSION})
 
 
-@websocket_command(
-    {vol.Required("type"): "wiener_linien_austria/retro_card_version"}
-)
+@websocket_command({vol.Required("type"): "wiener_linien_austria/retro_card_version"})
 @async_response
 async def _websocket_retro_card_version(
     hass: HomeAssistant,
@@ -84,9 +81,7 @@ async def _websocket_retro_card_version(
     connection.send_result(msg["id"], {"version": RETRO_CARD_VERSION})
 
 
-@websocket_command(
-    {vol.Required("type"): "wiener_linien_austria/flap_card_version"}
-)
+@websocket_command({vol.Required("type"): "wiener_linien_austria/flap_card_version"})
 @async_response
 async def _websocket_flap_card_version(
     hass: HomeAssistant,
@@ -160,6 +155,7 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
         )
 
     if STATIC_REFRESH_UNSUB_KEY not in domain_data:
+
         async def _periodic_refresh(_now: Any) -> None:
             # Belt-and-braces: async_refresh_catalogue catches the known
             # network / parse errors, but Store I/O can still raise
@@ -170,9 +166,7 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
             try:
                 refreshed = await async_refresh_catalogue(hass)
             except Exception as err:  # noqa: BLE001 — periodic callback safety net
-                _LOGGER.warning(
-                    "Static-catalogue periodic refresh failed: %s", err
-                )
+                _LOGGER.warning("Static-catalogue periodic refresh failed: %s", err)
                 return
             if refreshed is not None:
                 # Surface the new catalogue to future config-flow / entry-load
@@ -189,6 +183,7 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
         )
 
     if ALERTS_REFRESH_UNSUB_KEY not in domain_data:
+
         async def _periodic_alerts(_now: Any) -> None:
             # Same safety-net rationale as _periodic_refresh above —
             # exceptions inside an async_track_time_interval callback
@@ -197,9 +192,7 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
             try:
                 await async_refresh_alerts(hass)
             except Exception as err:  # noqa: BLE001 — periodic callback safety net
-                _LOGGER.warning(
-                    "Alerts periodic refresh failed: %s", err
-                )
+                _LOGGER.warning("Alerts periodic refresh failed: %s", err)
 
         # No eager first fetch — the periodic timer populates the cache after
         # ALERTS_REFRESH_SECONDS. During the warm-up window (up to 5 min after
@@ -250,9 +243,7 @@ def _deregister_from_batch(
     domain_data = hass.data.get(DOMAIN)
     if not domain_data:
         return
-    registry: dict[int, MonitorBatchGroup] | None = domain_data.get(
-        BATCH_REGISTRY_KEY
-    )
+    registry: dict[int, MonitorBatchGroup] | None = domain_data.get(BATCH_REGISTRY_KEY)
     if not registry:
         return
     seconds = int(coordinator.scan_interval.total_seconds())
@@ -264,7 +255,9 @@ def _deregister_from_batch(
         registry.pop(seconds, None)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: WienerLinienConfigEntry
+) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     # Register into the shared batch group for this entry's scan interval
@@ -274,9 +267,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry)
     # ConfigEntryNotReady, or a later platform-forward failure) — HA runs the
     # registered on_unload callbacks in both cases.
     _register_in_batch(hass, coordinator)
-    entry.async_on_unload(
-        functools.partial(_deregister_from_batch, hass, coordinator)
-    )
+    entry.async_on_unload(functools.partial(_deregister_from_batch, hass, coordinator))
     # `_async_setup` is auto-called by `async_config_entry_first_refresh`
     # (HA core contract) — do NOT invoke it explicitly here.
     await coordinator.async_config_entry_first_refresh()
@@ -415,7 +406,9 @@ async def _rollback_setup_failure(
         _teardown_domain_state(domain_data)
 
 
-async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> None:
+async def _async_reload_entry(
+    hass: HomeAssistant, entry: WienerLinienConfigEntry
+) -> None:
     """Reload the config entry when its options or data change.
 
     Fires for options-flow updates AND for reconfigure-flow data changes
@@ -425,7 +418,9 @@ async def _async_reload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntr
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, entry: WienerLinienConfigEntry
+) -> bool:
     """Unload a config entry.
 
     When the *last* entry is removed, also tear down the domain-wide
@@ -474,7 +469,9 @@ async def async_remove_entry(
     await registration.async_unregister()
 
 
-async def async_migrate_entry(hass: HomeAssistant, entry: WienerLinienConfigEntry) -> bool:
+async def async_migrate_entry(
+    hass: HomeAssistant, entry: WienerLinienConfigEntry
+) -> bool:
     """Migrate legacy entry data to the current schema.
 
     v1 → v2: collapse `CONF_LINES` triples (`line|direction|towards`) to

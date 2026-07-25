@@ -1,4 +1,5 @@
 """Tests for the Wiener Linien Austria config flow."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -62,8 +63,6 @@ async def _complete_flow(
             CONF_SCAN_INTERVAL: scan_interval,
         },
     )
-
-
 
 
 async def test_full_flow_creates_entry(hass: HomeAssistant, mock_fetch) -> None:
@@ -196,7 +195,6 @@ async def test_catalogue_unavailable_aborts_user_step(hass: HomeAssistant) -> No
     assert result["reason"] == "catalogue_unavailable"
 
 
-
 async def test_reconfigure_aborts_when_catalogue_unavailable(
     hass: HomeAssistant, mock_fetch
 ) -> None:
@@ -236,17 +234,42 @@ async def test_probe_monitor_lines_dedupes_and_sorts(hass: HomeAssistant) -> Non
             "monitors": [
                 {
                     "lines": [
-                        {"name": "U1", "direction": "H", "towards": "Leopoldau", "type": "ptMetro"},
-                        {"name": "U1", "direction": "H", "towards": "Leopoldau", "type": "ptMetro"},  # dup
+                        {
+                            "name": "U1",
+                            "direction": "H",
+                            "towards": "Leopoldau",
+                            "type": "ptMetro",
+                        },
+                        {
+                            "name": "U1",
+                            "direction": "H",
+                            "towards": "Leopoldau",
+                            "type": "ptMetro",
+                        },  # dup
                     ]
                 },
                 {
                     "lines": [
-                        {"name": "U1", "direction": "R", "towards": "Alaudagasse", "type": "ptMetro"},
+                        {
+                            "name": "U1",
+                            "direction": "R",
+                            "towards": "Alaudagasse",
+                            "type": "ptMetro",
+                        },
                         # Empty towards must be dropped, not crash.
-                        {"name": "U1", "direction": "H", "towards": "", "type": "ptMetro"},
+                        {
+                            "name": "U1",
+                            "direction": "H",
+                            "towards": "",
+                            "type": "ptMetro",
+                        },
                         # Empty name must be dropped.
-                        {"name": "", "direction": "H", "towards": "X", "type": "ptMetro"},
+                        {
+                            "name": "",
+                            "direction": "H",
+                            "towards": "X",
+                            "type": "ptMetro",
+                        },
                     ]
                 },
             ]
@@ -335,8 +358,12 @@ def _u1_catalogue() -> tuple[StaticCatalogue, Station]:
     trip_patterns = TripPatternIndex(
         patterns_by_line={
             1: [
-                TripPattern(line_id=1, pattern_id=101, direction=1, stops=(90011, 90015)),
-                TripPattern(line_id=1, pattern_id=102, direction=2, stops=(90012, 90016)),
+                TripPattern(
+                    line_id=1, pattern_id=101, direction=1, stops=(90011, 90015)
+                ),
+                TripPattern(
+                    line_id=1, pattern_id=102, direction=2, stops=(90012, 90016)
+                ),
             ],
         },
         lines_by_label={"U1": 1},
@@ -545,8 +572,7 @@ async def test_select_lines_clears_repairs_issue_on_recovery(
         translation_key="catalogue_unavailable",
     )
     assert (
-        ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable")
-        is not None
+        ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable") is not None
     )
 
     # Run the flow normally — the autouse mock_static_catalogue fixture
@@ -559,11 +585,7 @@ async def test_select_lines_clears_repairs_issue_on_recovery(
     )
     assert result["step_id"] == "select_lines"
 
-    assert (
-        ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable")
-        is None
-    )
-
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "catalogue_unavailable") is None
 
 
 # ----------------------------------------------------------------------
@@ -616,7 +638,12 @@ async def test_picker_holds_every_trackable_stop(hass: HomeAssistant) -> None:
     values = [o["value"] for o in options]
     assert len(set(values)) == len(values)
     assert set(values) == {
-        "60201012", "60200123", "60201468", "60201470", "60201471", "60201472",
+        "60201012",
+        "60200123",
+        "60201468",
+        "60201470",
+        "60201471",
+        "60201472",
     }
 
 
@@ -633,7 +660,9 @@ async def test_nearby_stops_pinned_first_with_distance(
 
     # First three: nearest-first, distance in the label.
     assert [o["value"] for o in options[:3]] == [
-        "60201012", "60200123", "60201468",
+        "60201012",
+        "60200123",
+        "60201468",
     ]
     assert options[0]["label"].startswith("Stephansplatz (Wien) — ")
     assert options[0]["label"].endswith(" m")
@@ -642,7 +671,9 @@ async def test_nearby_stops_pinned_first_with_distance(
     # Remainder: alphabetical, no distance, no repeat of the pinned three.
     rest = options[3:]
     assert [o["label"] for o in rest] == [
-        "Alaudagasse (Wien)", "Leopoldau (Wien)", "Oberlaa (Wien)",
+        "Alaudagasse (Wien)",
+        "Leopoldau (Wien)",
+        "Oberlaa (Wien)",
     ]
     assert all("—" not in o["label"] for o in rest)
 
@@ -808,21 +839,32 @@ def test_platformless_stops_are_never_offered() -> None:
     catalogue = StaticCatalogue(
         stations_by_diva={
             1: Station(
-                diva=1, name="Trackable", municipality="Wien",
-                longitude=16.3720, latitude=48.2080, rbls=[4111],
+                diva=1,
+                name="Trackable",
+                municipality="Wien",
+                longitude=16.3720,
+                latitude=48.2080,
+                rbls=[4111],
             ),
             2: Station(
-                diva=2, name="No platforms", municipality="Wien",
-                longitude=16.3721, latitude=48.2081, rbls=[],
+                diva=2,
+                name="No platforms",
+                municipality="Wien",
+                longitude=16.3721,
+                latitude=48.2081,
+                rbls=[],
             ),
         },
         last_fetched="2026-04-20T12:00:00+00:00",
     )
     # Nearby block and alphabetical remainder must both exclude it.
-    assert [s.diva for s, _ in _nearest_stations(
-        catalogue, HOME_LATITUDE, HOME_LONGITUDE)] == [1]
-    assert [o["value"] for o in _stop_options(
-        catalogue, HOME_LATITUDE, HOME_LONGITUDE, "en")] == ["1"]
+    assert [
+        s.diva for s, _ in _nearest_stations(catalogue, HOME_LATITUDE, HOME_LONGITUDE)
+    ] == [1]
+    assert [
+        o["value"]
+        for o in _stop_options(catalogue, HOME_LATITUDE, HOME_LONGITUDE, "en")
+    ] == ["1"]
 
 
 def test_nearest_stations_honours_limit() -> None:
@@ -830,7 +872,9 @@ def test_nearest_stations_honours_limit() -> None:
     catalogue = StaticCatalogue(
         stations_by_diva={
             diva: Station(
-                diva=diva, name=f"Stop {diva}", municipality="Wien",
+                diva=diva,
+                name=f"Stop {diva}",
+                municipality="Wien",
                 longitude=16.3720,
                 # ~11 m apart, so all 5 sit well inside the radius.
                 latitude=48.2080 + diva * 0.0001,
@@ -862,16 +906,28 @@ def test_same_named_stops_are_disambiguated() -> None:
     catalogue = StaticCatalogue(
         stations_by_diva={
             1: Station(
-                diva=1, name="Schottenring", municipality="Wien",
-                longitude=16.3720, latitude=48.2080, rbls=[11],
+                diva=1,
+                name="Schottenring",
+                municipality="Wien",
+                longitude=16.3720,
+                latitude=48.2080,
+                rbls=[11],
             ),
             2: Station(
-                diva=2, name="Schottenring", municipality="Wien",
-                longitude=16.3730, latitude=48.2090, rbls=[22],
+                diva=2,
+                name="Schottenring",
+                municipality="Wien",
+                longitude=16.3730,
+                latitude=48.2090,
+                rbls=[22],
             ),
             3: Station(
-                diva=3, name="Unique", municipality="Wien",
-                longitude=16.3740, latitude=48.2100, rbls=[33],
+                diva=3,
+                name="Unique",
+                municipality="Wien",
+                longitude=16.3740,
+                latitude=48.2100,
+                rbls=[33],
             ),
         },
         last_fetched="2026-04-20T12:00:00+00:00",
@@ -892,12 +948,20 @@ def test_identical_line_sets_fall_back_to_the_diva() -> None:
     catalogue = StaticCatalogue(
         stations_by_diva={
             1: Station(
-                diva=1, name="Lafitegasse", municipality="Wien",
-                longitude=16.3720, latitude=48.2080, rbls=[11],
+                diva=1,
+                name="Lafitegasse",
+                municipality="Wien",
+                longitude=16.3720,
+                latitude=48.2080,
+                rbls=[11],
             ),
             2: Station(
-                diva=2, name="Lafitegasse", municipality="Wien",
-                longitude=16.3730, latitude=48.2090, rbls=[22],
+                diva=2,
+                name="Lafitegasse",
+                municipality="Wien",
+                longitude=16.3730,
+                latitude=48.2090,
+                rbls=[22],
             ),
         },
         last_fetched="2026-04-20T12:00:00+00:00",
@@ -918,12 +982,20 @@ def test_collision_without_line_data_still_resolves() -> None:
     catalogue = StaticCatalogue(
         stations_by_diva={
             1: Station(
-                diva=1, name="Kirchengasse", municipality="Wien",
-                longitude=16.3720, latitude=48.2080, rbls=[11],
+                diva=1,
+                name="Kirchengasse",
+                municipality="Wien",
+                longitude=16.3720,
+                latitude=48.2080,
+                rbls=[11],
             ),
             2: Station(
-                diva=2, name="Kirchengasse", municipality="Wien",
-                longitude=16.3730, latitude=48.2090, rbls=[22],
+                diva=2,
+                name="Kirchengasse",
+                municipality="Wien",
+                longitude=16.3730,
+                latitude=48.2090,
+                rbls=[22],
             ),
         },
         last_fetched="2026-04-20T12:00:00+00:00",

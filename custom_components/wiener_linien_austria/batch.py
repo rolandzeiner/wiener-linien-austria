@@ -18,6 +18,7 @@ The upstream API omits unknown/decommissioned ``stopId``s from an otherwise
 single stale RBL never fails the batch — the affected member simply parses
 zero departures for that stop, exactly as a per-entry fetch would today.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -348,5 +349,5 @@ def _safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

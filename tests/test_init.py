@@ -5,6 +5,7 @@ behaviour with no other test home. The card-registration paths in
 `__init__.py` are version-fragile and not exercised here; they're
 covered by the `test_card_version` invariants and live-HA smoke tests.
 """
+
 from __future__ import annotations
 
 from homeassistant.core import HomeAssistant

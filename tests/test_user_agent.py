@@ -12,6 +12,7 @@ Each site is exercised separately so a refactor that drops the header in
 one place can't slip past the other two. Also asserts the gzip
 Accept-Encoding header — same fan-out, same silent-failure mode.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
