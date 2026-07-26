@@ -92,3 +92,11 @@ updates:
       # these two by hand, in the same commit as the pin.
       - dependency-name: "https://github.com/astral-sh/ruff-pre-commit"
       - dependency-name: "https://github.com/pre-commit/mirrors-mypy"
+      # The mypy hook's `additional_dependencies` are parsed by
+      # Dependabot as dependencies in their own right (verified against
+      # dependabot-core's pre_commit file_parser). They are deliberately
+      # unpinned -- the hook only needs the type stubs importable, and
+      # the real HA version is governed by PHACC in requirements_test.
+      # Ignore them so Dependabot can't introduce a pin here.
+      - dependency-name: "homeassistant"
+      - dependency-name: "voluptuous"
