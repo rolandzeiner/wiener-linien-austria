@@ -75,6 +75,12 @@ jobs:
         run: uv pip install --system -r requirements_test.txt
       - name: Run Linter (Ruff)
         run: ruff check .
+      - name: Check formatting (Ruff)
+        # Separate from `ruff check`, which never inspects formatting.
+        # Without this the formatter drifts silently until someone runs
+        # it, and the catch-up lands as one unreviewable tree-wide diff
+        # (2026-07: ~18 months of drift, 15-28 files per repo).
+        run: ruff format --check .
       - name: Run mypy (strict)
         run: mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
       - name: Run tests
