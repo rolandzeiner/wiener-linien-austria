@@ -64,3 +64,39 @@ updates:
     ignore:
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: pre-commit
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"          # no prefix-development — unsupported here
+      include: "scope"
+    cooldown:
+      default-days: 5
+    groups:
+      pre-commit:
+        applies-to: version-updates
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      pre-commit-security:
+        applies-to: security-updates
+        patterns: ["*"]
+    ignore:
+      # The ruff and mypy hook revs are manually kept equal to the `==`
+      # pins in requirements_test.txt (see .pre-commit-config.yaml).
+      # Letting Dependabot float them here would desync the local gate
+      # from CI — precisely what the exact pins exist to prevent. Bump
+      # these two by hand, in the same commit as the pin.
+      - dependency-name: "https://github.com/astral-sh/ruff-pre-commit"
+      - dependency-name: "https://github.com/pre-commit/mirrors-mypy"
+      # The mypy hook's `additional_dependencies` are parsed by
+      # Dependabot as dependencies in their own right (verified against
+      # dependabot-core's pre_commit file_parser). They are deliberately
+      # unpinned -- the hook only needs the type stubs importable, and
+      # the real HA version is governed by PHACC in requirements_test.
+      # Ignore them so Dependabot can't introduce a pin here.
+      - dependency-name: "homeassistant"
+      - dependency-name: "voluptuous"
