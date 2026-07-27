@@ -574,7 +574,7 @@ async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None
     if cached_payload:
         try:
             prior = _catalogue_from_store(cached_payload)
-        except KeyError, ValueError, TypeError:
+        except (KeyError, ValueError, TypeError):
             prior = None
 
     try:
@@ -868,7 +868,7 @@ def _parse_haltestellen(csv_text: str) -> dict[int, Station]:
             diva = int(row["DIVA"])
             lon = float(row["Longitude"])
             lat = float(row["Latitude"])
-        except KeyError, ValueError, TypeError:
+        except (KeyError, ValueError, TypeError):
             continue
         stations[diva] = Station(
             diva=diva,
@@ -891,7 +891,7 @@ def _merge_haltepunkte(stations: dict[int, Station], csv_text: str) -> None:
         try:
             rbl = int(row["StopID"])
             diva = int(row["DIVA"])
-        except KeyError, ValueError, TypeError:
+        except (KeyError, ValueError, TypeError):
             continue
         station = stations.get(diva)
         if station is not None:
@@ -923,7 +923,7 @@ def _parse_trip_patterns(
     for row in line_reader:
         try:
             line_id = int(row["LineID"])
-        except KeyError, ValueError, TypeError:
+        except (KeyError, ValueError, TypeError):
             continue
         label = (row.get("LineText") or "").strip()
         if label:
@@ -956,7 +956,7 @@ def _parse_trip_patterns(
             seq = int(row["StopSeqCount"])
             rbl = int(row["StopID"])
             direction = int(row["Direction"])
-        except KeyError, ValueError, TypeError:
+        except (KeyError, ValueError, TypeError):
             continue
         grouped.setdefault((line_id, pattern_id), []).append((seq, rbl, direction))
         if rbl_to_diva:
