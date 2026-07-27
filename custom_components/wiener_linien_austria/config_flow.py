@@ -202,7 +202,7 @@ def _station_for_value(catalogue: StaticCatalogue, value: Any) -> Station | None
     """
     try:
         diva = int(value)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         # Only reachable if the selector contract changes under us or the
         # flow state is hand-edited; the user-visible `invalid_stop` is
         # already the right answer, so this stays at DEBUG.
@@ -803,7 +803,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         # used below rather than throwing an unknown-error stack trace.
         try:
             diva = int(data[CONF_DIVA])
-        except KeyError, TypeError, ValueError:
+        except (KeyError, TypeError, ValueError):
             return self.async_abort(reason="stop_gone")
         station = catalogue.stations_by_diva.get(diva)
         if station is None:

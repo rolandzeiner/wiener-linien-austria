@@ -28,6 +28,28 @@ jobs:
             exit 1
           fi
 
+  compile-floor-python:
+    # Every other job runs the CI interpreter (3.14). `hacs.json` promises
+    # Home Assistant >= 2025.1.0, which runs on Python 3.12 — so the whole
+    # gate was structurally blind to syntax that parses on 3.14 and not on
+    # the floor. v1.7.1 shipped PEP 758 `except A, B:` (ruff's
+    # target-version was set to the CI interpreter, not the support floor)
+    # and failed to import for every user below 3.14 — issue #91.
+    #
+    # `ruff check` now catches this too, since target-version is pinned to
+    # the floor in pyproject.toml. This job is the independent backstop: it
+    # asks the real interpreter, so it also covers syntax no linter rule
+    # models. Bump `python-version` only together with the `homeassistant`
+    # floor in `hacs.json` and `target-version` in `pyproject.toml`.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Byte-compile the shipped package on the oldest supported Python
+        run: python -m compileall -q custom_components/wiener_linien_austria
+
   validate-hacs:
     runs-on: ubuntu-latest
     steps:
