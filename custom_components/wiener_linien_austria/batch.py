@@ -18,6 +18,7 @@ The upstream API omits unknown/decommissioned ``stopId``s from an otherwise
 single stale RBL never fails the batch — the affected member simply parses
 zero departures for that stop, exactly as a per-entry fetch would today.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +29,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
-
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
@@ -284,7 +284,7 @@ class MonitorBatchGroup:
                 # against a payload we never accepted.
                 self._cache.update_from_response(resp)
                 self._last_body = body
-        except asyncio.TimeoutError as err:
+        except TimeoutError as err:
             raise UpdateFailed(
                 translation_domain=DOMAIN,
                 translation_key="api_timeout",
@@ -348,5 +348,5 @@ def _safe_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None

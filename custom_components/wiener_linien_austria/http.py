@@ -11,6 +11,7 @@ Centralises two cross-cutting concerns we want on every outbound call:
   refresh, the weekly static catalogue refresh, and the per-tick monitor
   poll when nothing has changed upstream.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

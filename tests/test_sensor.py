@@ -1,4 +1,5 @@
 """Tests for the Wiener Linien Austria sensor platform."""
+
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorDeviceClass
@@ -69,7 +70,9 @@ def _make_departures() -> list[Departure]:
 # ---------------------------------------------------------------------------
 
 
-def _make_coordinator(hass: HomeAssistant, entry: MockConfigEntry, data: MonitorData | None) -> WienerLinienAustriaCoordinator:
+def _make_coordinator(
+    hass: HomeAssistant, entry: MockConfigEntry, data: MonitorData | None
+) -> WienerLinienAustriaCoordinator:
     """Instantiate a coordinator with pre-set data — no network."""
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     coordinator.data = data
@@ -99,7 +102,9 @@ async def test_native_value_none_when_no_departures(hass: HomeAssistant) -> None
     assert sensor.native_value is None
 
 
-async def test_native_value_none_when_coordinator_has_no_data(hass: HomeAssistant) -> None:
+async def test_native_value_none_when_coordinator_has_no_data(
+    hass: HomeAssistant,
+) -> None:
     """State is None before the first successful fetch."""
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -137,7 +142,9 @@ async def test_unit_and_device_class(hass: HomeAssistant) -> None:
     """Unit = minutes, device_class = duration."""
     entry = _make_entry()
     entry.add_to_hass(hass)
-    coordinator = _make_coordinator(hass, entry, MonitorData(departures=[], server_time=None))
+    coordinator = _make_coordinator(
+        hass, entry, MonitorData(departures=[], server_time=None)
+    )
     sensor = WienerLinienStopSensor(coordinator, entry)
     assert sensor.native_unit_of_measurement == UnitOfTime.MINUTES
     assert sensor.device_class == SensorDeviceClass.DURATION
@@ -147,7 +154,9 @@ async def test_unique_id_format_is_frozen(hass: HomeAssistant) -> None:
     """unique_id MUST be f'{entry_id}_stop' — changes would wipe registries."""
     entry = _make_entry()
     entry.add_to_hass(hass)
-    coordinator = _make_coordinator(hass, entry, MonitorData(departures=[], server_time=None))
+    coordinator = _make_coordinator(
+        hass, entry, MonitorData(departures=[], server_time=None)
+    )
     sensor = WienerLinienStopSensor(coordinator, entry)
     assert sensor.unique_id == f"{entry.entry_id}_stop"
 
@@ -156,7 +165,9 @@ async def test_device_info_fields(hass: HomeAssistant) -> None:
     """DeviceInfo carries name/manufacturer/model/configuration_url + identifier."""
     entry = _make_entry()
     entry.add_to_hass(hass)
-    coordinator = _make_coordinator(hass, entry, MonitorData(departures=[], server_time=None))
+    coordinator = _make_coordinator(
+        hass, entry, MonitorData(departures=[], server_time=None)
+    )
     sensor = WienerLinienStopSensor(coordinator, entry)
     info = sensor.device_info
     assert info is not None
@@ -215,7 +226,9 @@ async def test_attributes_full_departure_list(hass: HomeAssistant) -> None:
     assert first["traffic_jam"] is False
 
 
-async def test_attributes_next_by_line_and_no_grouped_duplicate(hass: HomeAssistant) -> None:
+async def test_attributes_next_by_line_and_no_grouped_duplicate(
+    hass: HomeAssistant,
+) -> None:
     """next_by_line gives cheap per-line access; we deliberately do NOT publish
     a full `departures_by_line` grouping because it duplicates every departure
     dict under `departures` and blows past the recorder's 16 KB attribute cap
@@ -243,19 +256,40 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     data = MonitorData(
         departures=[
             Departure(
-                line="U1", towards="Leopoldau", direction="H", type="ptMetro",
-                countdown=2, time_planned=None, time_real=None,
-                realtime=True, barrier_free=True, traffic_jam=False,
+                line="U1",
+                towards="Leopoldau",
+                direction="H",
+                type="ptMetro",
+                countdown=2,
+                time_planned=None,
+                time_real=None,
+                realtime=True,
+                barrier_free=True,
+                traffic_jam=False,
             ),
             Departure(
-                line="71", towards="Schottentor", direction="H", type="ptTram",
-                countdown=4, time_planned=None, time_real=None,
-                realtime=True, barrier_free=False, traffic_jam=False,
+                line="71",
+                towards="Schottentor",
+                direction="H",
+                type="ptTram",
+                countdown=4,
+                time_planned=None,
+                time_real=None,
+                realtime=True,
+                barrier_free=False,
+                traffic_jam=False,
             ),
             Departure(
-                line="U1", towards="Leopoldau", direction="H", type="ptMetro",
-                countdown=7, time_planned=None, time_real=None,
-                realtime=False, barrier_free=True, traffic_jam=False,
+                line="U1",
+                towards="Leopoldau",
+                direction="H",
+                type="ptMetro",
+                countdown=7,
+                time_planned=None,
+                time_real=None,
+                realtime=False,
+                barrier_free=True,
+                traffic_jam=False,
             ),
         ],
         server_time=None,
@@ -266,7 +300,9 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     assert next_by_line == {"U1": 2, "71": 4}
 
 
-async def test_attributes_line_colors_publishes_full_catalogue(hass: HomeAssistant) -> None:
+async def test_attributes_line_colors_publishes_full_catalogue(
+    hass: HomeAssistant,
+) -> None:
     """`line_colors` carries every line in the GTFS catalogue.
 
     Published unscoped (not "only lines at this stop") because the card's
@@ -286,9 +322,16 @@ async def test_attributes_line_colors_publishes_full_catalogue(hass: HomeAssista
     data = MonitorData(
         departures=[
             Departure(
-                line="U1", towards="Leopoldau", direction="H", type="ptMetro",
-                countdown=2, time_planned=None, time_real=None,
-                realtime=True, barrier_free=True, traffic_jam=False,
+                line="U1",
+                towards="Leopoldau",
+                direction="H",
+                type="ptMetro",
+                countdown=2,
+                time_planned=None,
+                time_real=None,
+                realtime=True,
+                barrier_free=True,
+                traffic_jam=False,
             ),
         ],
         server_time=None,
@@ -322,7 +365,9 @@ async def test_attributes_line_colors_publishes_full_catalogue(hass: HomeAssista
     assert line_colors["71"] == {"bg": "C00808"}
 
 
-async def test_attributes_line_colors_empty_when_catalogue_missing(hass: HomeAssistant) -> None:
+async def test_attributes_line_colors_empty_when_catalogue_missing(
+    hass: HomeAssistant,
+) -> None:
     """Without a loaded catalogue, the attribute is `{}` — card uses fallbacks."""
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -545,11 +590,11 @@ async def test_extra_state_attributes_rebuilt_when_alerts_seq_bumps(
         "custom_components.wiener_linien_austria.sensor.get_alerts_for",
         return_value=([], []),
     ) as mock_alerts:
-        sensor.extra_state_attributes  # build + cache at seq=1
-        sensor.extra_state_attributes  # served from cache
+        _ = sensor.extra_state_attributes  # build + cache at seq=1
+        _ = sensor.extra_state_attributes  # served from cache
         hass.data[DOMAIN][ALERTS_SEQ_KEY] = 2  # alerts refresh tick
-        sensor.extra_state_attributes  # rebuild at seq=2
-        sensor.extra_state_attributes  # served from cache at seq=2
+        _ = sensor.extra_state_attributes  # rebuild at seq=2
+        _ = sensor.extra_state_attributes  # served from cache at seq=2
 
     assert mock_alerts.call_count == 2
 
@@ -574,8 +619,8 @@ async def test_batch_apply_clears_attrs_cache(
         "custom_components.wiener_linien_austria.sensor.get_alerts_for",
         return_value=([], []),
     ) as mock_alerts:
-        sensor.extra_state_attributes
-        sensor.extra_state_attributes
+        _ = sensor.extra_state_attributes
+        _ = sensor.extra_state_attributes
         # Drive a successful batch fan-out — the cache must drop even though
         # departures + alerts didn't change, because the recorder writes the
         # attrs dict per state and a stale cache would freeze whatever was
@@ -586,6 +631,6 @@ async def test_batch_apply_clears_attrs_cache(
                 server_time="2026-04-20T14:41:00+0200",
             )
         )
-        sensor.extra_state_attributes
+        _ = sensor.extra_state_attributes
 
     assert mock_alerts.call_count == 2

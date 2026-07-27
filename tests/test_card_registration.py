@@ -8,6 +8,7 @@ three-card setup (modern + retro + flap). Covers:
 - async_unregister removes all
 - the http-unavailable short-circuit (pytest env without `http` component)
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -140,8 +141,16 @@ async def test_register_skips_when_all_already_current(hass: HomeAssistant) -> N
     _stub_static(hass)
     items = [
         {"id": "a", "url": f"{CARD_URL}?v={CARD_VERSION}", "res_type": "module"},
-        {"id": "b", "url": f"{RETRO_CARD_URL}?v={RETRO_CARD_VERSION}", "res_type": "module"},
-        {"id": "c", "url": f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}", "res_type": "module"},
+        {
+            "id": "b",
+            "url": f"{RETRO_CARD_URL}?v={RETRO_CARD_VERSION}",
+            "res_type": "module",
+        },
+        {
+            "id": "c",
+            "url": f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}",
+            "res_type": "module",
+        },
     ]
     lovelace = _build_lovelace(items)
     hass.data["lovelace"] = lovelace
@@ -203,17 +212,15 @@ async def test_register_warns_when_card_missing(
     with patch(
         "custom_components.wiener_linien_austria.card_registration.Path"
     ) as path_cls:
-        path_cls.return_value.parent.__truediv__.return_value.__truediv__.return_value = (
-            bad_path
-        )
+        path_cls.return_value.parent.__truediv__.return_value.__truediv__.return_value = bad_path
         caplog.clear()
         with caplog.at_level("WARNING"):
             reg = JSModuleRegistration(hass)
             await reg.async_register()
 
-    assert any(
-        "Card JS not found" in rec.message for rec in caplog.records
-    ), "expected warning when card JS file is missing"
+    assert any("Card JS not found" in rec.message for rec in caplog.records), (
+        "expected warning when card JS file is missing"
+    )
 
 
 async def test_register_skips_when_http_unavailable(hass: HomeAssistant) -> None:
@@ -228,8 +235,16 @@ async def test_unregister_removes_all_resources(hass: HomeAssistant) -> None:
     """async_unregister deletes every card resource in storage mode."""
     existing = [
         {"id": "abc", "url": f"{CARD_URL}?v={CARD_VERSION}", "res_type": "module"},
-        {"id": "xyz", "url": f"{RETRO_CARD_URL}?v={RETRO_CARD_VERSION}", "res_type": "module"},
-        {"id": "flp", "url": f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}", "res_type": "module"},
+        {
+            "id": "xyz",
+            "url": f"{RETRO_CARD_URL}?v={RETRO_CARD_VERSION}",
+            "res_type": "module",
+        },
+        {
+            "id": "flp",
+            "url": f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}",
+            "res_type": "module",
+        },
     ]
     lovelace = _build_lovelace(existing)
     hass.data["lovelace"] = lovelace
@@ -239,8 +254,7 @@ async def test_unregister_removes_all_resources(hass: HomeAssistant) -> None:
 
     assert lovelace.resources.async_delete_item.await_count == 3
     deleted_ids = {
-        call.args[0]
-        for call in lovelace.resources.async_delete_item.await_args_list
+        call.args[0] for call in lovelace.resources.async_delete_item.await_args_list
     }
     assert deleted_ids == {"abc", "xyz", "flp"}
 

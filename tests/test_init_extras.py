@@ -10,6 +10,7 @@ This file fills in:
 - async_migrate_entry placeholder
 - async_unload_entry's "platform unload failed" early return
 """
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -34,7 +35,6 @@ from custom_components.wiener_linien_austria.const import (
 
 from .conftest import make_entry as _make_entry
 
-
 # ---------------------------------------------------------------------------
 # WebSocket card-version handlers
 # ---------------------------------------------------------------------------
@@ -56,18 +56,14 @@ async def test_websocket_modern_card_version(hass: HomeAssistant) -> None:
 async def test_websocket_retro_card_version(hass: HomeAssistant) -> None:
     """The undecorated handler returns the retro card version."""
     conn = _make_connection()
-    await _websocket_retro_card_version.__wrapped__(
-        hass, conn, {"id": 18, "type": "x"}
-    )
+    await _websocket_retro_card_version.__wrapped__(hass, conn, {"id": 18, "type": "x"})
     conn.send_result.assert_called_once_with(18, {"version": RETRO_CARD_VERSION})
 
 
 async def test_websocket_flap_card_version(hass: HomeAssistant) -> None:
     """The undecorated handler returns the flap card version."""
     conn = _make_connection()
-    await _websocket_flap_card_version.__wrapped__(
-        hass, conn, {"id": 19, "type": "x"}
-    )
+    await _websocket_flap_card_version.__wrapped__(hass, conn, {"id": 19, "type": "x"})
     conn.send_result.assert_called_once_with(19, {"version": FLAP_CARD_VERSION})
 
 
@@ -193,9 +189,7 @@ async def test_migrate_entry_collapses_v1_triples_to_pairs(
     from .conftest import make_v1_entry
 
     # Two triples for the same (line, direction) — must dedupe to one.
-    entry = make_v1_entry(
-        lines=["U1|R|Oberlaa", "U1|R|Alaudagasse", "U1|H|Leopoldau"]
-    )
+    entry = make_v1_entry(lines=["U1|R|Oberlaa", "U1|R|Alaudagasse", "U1|H|Leopoldau"])
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry) is True

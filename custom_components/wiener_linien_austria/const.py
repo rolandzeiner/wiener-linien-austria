@@ -1,4 +1,5 @@
 """Constants for Wiener Linien Austria."""
+
 from __future__ import annotations
 
 import json
@@ -127,9 +128,7 @@ STATIC_FILES: Final = {
 }
 
 # Response attribution (CC-BY mandated)
-ATTRIBUTION: Final = (
-    "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
-)
+ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 
 # Error code 316 = rate limit exceeded — observed empirically from the
 # OGD real-time endpoint when the conventional 15-second minimum
@@ -161,14 +160,10 @@ CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
 CARD_FILENAME: Final = "wiener-linien-austria-card.js"
 RETRO_CARD_VERSION: Final = INTEGRATION_VERSION
-RETRO_CARD_URL: Final = (
-    "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
-)
+RETRO_CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-retro-card.js"
 RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
 FLAP_CARD_VERSION: Final = INTEGRATION_VERSION
-FLAP_CARD_URL: Final = (
-    "/wiener-linien-austria/wiener-linien-austria-flap-card.js"
-)
+FLAP_CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-flap-card.js"
 FLAP_CARD_FILENAME: Final = "wiener-linien-austria-flap-card.js"
 
 # Webfonts directory — subsetted woff2 derivatives of TeX Gyre Heros +

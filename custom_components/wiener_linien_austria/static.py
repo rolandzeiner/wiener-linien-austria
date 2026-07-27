@@ -16,6 +16,7 @@ API. We use four of them:
 The catalogue is stable for days/weeks at a time so we fetch it once, cache it
 on disk via `homeassistant.helpers.storage.Store`, and refresh weekly.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -29,7 +30,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import aiohttp
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
@@ -156,6 +156,7 @@ def _sort_line_labels(
             )
         )
     return tuple(sorted(labels, key=lambda label: _line_sort_key(label)))
+
 
 STORE_VERSION = 1
 STORE_KEY = f"{DOMAIN}_static"
@@ -299,13 +300,10 @@ class StaticCatalogue:
         if not needle:
             return []
         results = [
-            s for s in self.stations_by_diva.values()
-            if needle in s.name.casefold()
+            s for s in self.stations_by_diva.values() if needle in s.name.casefold()
         ]
         # Prefer name-starts-with matches, then lexicographic.
-        results.sort(
-            key=lambda s: (not s.name.casefold().startswith(needle), s.name)
-        )
+        results.sort(key=lambda s: (not s.name.casefold().startswith(needle), s.name))
         return results[:limit]
 
     def index_by_rbl(self) -> dict[int, tuple[int, str]]:
@@ -358,9 +356,7 @@ async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     return catalogue
 
 
-def async_set_cached_catalogue(
-    hass: HomeAssistant, catalogue: StaticCatalogue
-) -> None:
+def async_set_cached_catalogue(hass: HomeAssistant, catalogue: StaticCatalogue) -> None:
     """Replace the shared catalogue ref (called by the periodic refresher).
 
     Existing coordinators continue to hold their captured ref from setup
@@ -429,7 +425,10 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 (tp is None, "predates trip_patterns"),
                 # Older cache wrote trip_patterns without the
                 # lines_at_diva index.
-                (tp is not None and not tp.lines_at_diva, "missing lines_at_diva index"),
+                (
+                    tp is not None and not tp.lines_at_diva,
+                    "missing lines_at_diva index",
+                ),
                 # Cache predates GTFS routes.txt — refresh so the card
                 # isn't stuck on the fallback palette until the next
                 # weekly tick.
@@ -575,12 +574,12 @@ async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None
     if cached_payload:
         try:
             prior = _catalogue_from_store(cached_payload)
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             prior = None
 
     try:
         catalogue = await _fetch_and_build(hass, prior=prior)
-    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+    except (TimeoutError, aiohttp.ClientError, ValueError) as err:
         _LOGGER.warning("Static catalogue refresh failed, keeping cache: %s", err)
         return None
 
@@ -849,7 +848,7 @@ async def _download_or_fail_soft(
     """
     try:
         body, new_validators = await _download_text(session, url, timeout, validators)
-    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+    except (TimeoutError, aiohttp.ClientError) as err:
         _LOGGER.warning("Optional static CSV fetch failed (%s): %s", url, err)
         return (None, validators, True)
     return (body, new_validators, False)
@@ -869,7 +868,7 @@ def _parse_haltestellen(csv_text: str) -> dict[int, Station]:
             diva = int(row["DIVA"])
             lon = float(row["Longitude"])
             lat = float(row["Latitude"])
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             continue
         stations[diva] = Station(
             diva=diva,
@@ -881,9 +880,7 @@ def _parse_haltestellen(csv_text: str) -> dict[int, Station]:
     return stations
 
 
-def _merge_haltepunkte(
-    stations: dict[int, Station], csv_text: str
-) -> None:
+def _merge_haltepunkte(stations: dict[int, Station], csv_text: str) -> None:
     """Populate station.rbls from haltepunkte.csv.
 
     Columns: StopID;DIVA;StopText;Municipality;MunicipalityID;Longitude;Latitude
@@ -894,7 +891,7 @@ def _merge_haltepunkte(
         try:
             rbl = int(row["StopID"])
             diva = int(row["DIVA"])
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             continue
         station = stations.get(diva)
         if station is not None:
@@ -926,7 +923,7 @@ def _parse_trip_patterns(
     for row in line_reader:
         try:
             line_id = int(row["LineID"])
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             continue
         label = (row.get("LineText") or "").strip()
         if label:
@@ -959,11 +956,9 @@ def _parse_trip_patterns(
             seq = int(row["StopSeqCount"])
             rbl = int(row["StopID"])
             direction = int(row["Direction"])
-        except (KeyError, ValueError, TypeError):
+        except KeyError, ValueError, TypeError:
             continue
-        grouped.setdefault((line_id, pattern_id), []).append(
-            (seq, rbl, direction)
-        )
+        grouped.setdefault((line_id, pattern_id), []).append((seq, rbl, direction))
         if rbl_to_diva:
             label = label_for_line.get(line_id)
             stop_diva = rbl_to_diva.get(rbl)
@@ -1131,10 +1126,7 @@ def stops_ahead_for_match(
             terminus_name = _station_name_for_rbl(catalogue, terminus_rbl)
             if not terminus_name:
                 continue
-            if (
-                needle in terminus_name.casefold()
-                or terminus_name.casefold() in needle
-            ):
+            if needle in terminus_name.casefold() or terminus_name.casefold() in needle:
                 # Among matching-by-terminus patterns, prefer the one with
                 # the longest remaining tail from our RBL — handles cases
                 # where one branch's pattern is a prefix of another.
@@ -1244,9 +1236,7 @@ def stops_ahead_for_match(
     return full
 
 
-def _first_index_in_pattern(
-    pattern: TripPattern, rbl_set: set[int]
-) -> int:
+def _first_index_in_pattern(pattern: TripPattern, rbl_set: set[int]) -> int:
     """Index of the first matching RBL in `pattern.stops`, or -1."""
     return next(
         (i for i, rbl in enumerate(pattern.stops) if rbl in rbl_set),
@@ -1284,9 +1274,7 @@ def _pick_validators(
     return prior.validators.get(key) or CacheValidators()
 
 
-def _station_name_for_rbl(
-    catalogue: StaticCatalogue, rbl: int
-) -> str | None:
+def _station_name_for_rbl(catalogue: StaticCatalogue, rbl: int) -> str | None:
     """Look up the station name for a given RBL (None if unknown).
 
     Backed by the catalogue's cached RBL index — O(1) per call after

@@ -476,6 +476,28 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
     line-height: 1.4;
   }
+  /* Upstream descriptionHTML ships one <p> per statement (what / detour /
+     duration / reason). Sanitised in utils/html.ts — p, br, lists and
+     text-level emphasis only. */
+  .alert-desc p {
+    margin: 0 0 8px;
+  }
+  .alert-desc p:last-child {
+    margin-bottom: 0;
+  }
+  .alert-desc ul,
+  .alert-desc ol {
+    margin: 0 0 8px;
+    padding-inline-start: 18px;
+  }
+  .alert-desc li {
+    margin: 2px 0;
+  }
+  .alert-desc strong,
+  .alert-desc b {
+    color: var(--primary-text-color);
+    font-weight: 600;
+  }
   .alert-meta {
     display: inline-flex;
     flex-wrap: wrap;

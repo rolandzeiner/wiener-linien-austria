@@ -1,11 +1,10 @@
 """Tests for the Wiener Linien Austria static catalogue layer."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
-
-from tests.conftest import make_response_cm
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -13,8 +12,8 @@ from homeassistant.helpers.storage import Store
 from custom_components.wiener_linien_austria.static import (
     STORE_KEY,
     STORE_VERSION,
-    Station,
     StaticCatalogue,
+    Station,
     TripPattern,
     TripPatternIndex,
     _catalogue_from_store,
@@ -27,6 +26,7 @@ from custom_components.wiener_linien_austria.static import (
     async_refresh_catalogue,
     stops_ahead_for_match,
 )
+from tests.conftest import make_response_cm
 
 
 @pytest.fixture(autouse=True)
@@ -39,6 +39,7 @@ def mock_static_catalogue():
     unnecessary; we just disable the global stub here.
     """
     yield
+
 
 HALTESTELLEN_CSV = (
     "DIVA;PlatformText;Municipality;MunicipalityID;Longitude;Latitude\n"
@@ -137,10 +138,16 @@ def test_search_is_case_insensitive_and_prefers_prefix() -> None:
     # second station only matches via substring, so the *first* must rank
     # higher even though it sorts later by name.
     stations = {
-        1: Station(diva=1, name="ZZZ Westbahnhof Areal", municipality="Wien",
-                   longitude=0, latitude=0),
-        2: Station(diva=2, name="Westbahnhof", municipality="Wien",
-                   longitude=0, latitude=0),
+        1: Station(
+            diva=1,
+            name="ZZZ Westbahnhof Areal",
+            municipality="Wien",
+            longitude=0,
+            latitude=0,
+        ),
+        2: Station(
+            diva=2, name="Westbahnhof", municipality="Wien", longitude=0, latitude=0
+        ),
     }
     catalogue = StaticCatalogue(stations_by_diva=stations, last_fetched="t")
 
@@ -431,9 +438,7 @@ async def test_fetch_and_build_all_304_returns_prior_unchanged(
         nm.status = 304
         nm.headers = {}
         nm.raise_for_status = MagicMock()
-        nm.text = AsyncMock(
-            side_effect=AssertionError("must not call .text() on 304")
-        )
+        nm.text = AsyncMock(side_effect=AssertionError("must not call .text() on 304"))
         return nm
 
     fake_session = MagicMock()
@@ -556,7 +561,9 @@ def _u1_catalogue() -> StaticCatalogue:
     """
     stations: dict[int, Station] = {
         62000001: Station(62000001, "Reumannplatz", "Wien", 16.37, 48.18, [4001]),
-        60201012: Station(60201012, "Stephansplatz", "Wien", 16.37, 48.21, [4111, 4118]),
+        60201012: Station(
+            60201012, "Stephansplatz", "Wien", 16.37, 48.21, [4111, 4118]
+        ),
         62000002: Station(62000002, "Praterstern", "Wien", 16.39, 48.22, [4222]),
         62000003: Station(62000003, "Leopoldau", "Wien", 16.47, 48.27, [4333]),
     }
@@ -578,9 +585,7 @@ def test_parse_trip_patterns_builds_line_label_lookup() -> None:
 def test_parse_trip_patterns_orders_stops_by_seq_count() -> None:
     """Sequence gaps are tolerated; sort is by StopSeqCount value."""
     index = _parse_trip_patterns(LINIEN_CSV, FAHR_CSV)
-    h_pattern = next(
-        p for p in index.patterns_by_line[301] if p.pattern_id == 1
-    )
+    h_pattern = next(p for p in index.patterns_by_line[301] if p.pattern_id == 1)
     # H pattern: Reumannplatz(0) → Stephansplatz(1) → Praterstern(3) → Leopoldau(4)
     assert h_pattern.stops == (4001, 4111, 4222, 4333)
     assert h_pattern.direction == 1
@@ -686,9 +691,7 @@ def test_stops_ahead_for_match_returns_tail_after_current_rbl() -> None:
 def test_stops_ahead_for_match_excludes_current_stop() -> None:
     """The current stop is never in the returned tail."""
     catalogue = _u1_catalogue()
-    result = stops_ahead_for_match(
-        catalogue, "U1", [4111, 4118], "Leopoldau"
-    )
+    result = stops_ahead_for_match(catalogue, "U1", [4111, 4118], "Leopoldau")
     assert result is not None
     assert all(s["name"] != "Stephansplatz" for s in result)
 
@@ -696,9 +699,7 @@ def test_stops_ahead_for_match_excludes_current_stop() -> None:
 def test_stops_ahead_for_match_unknown_line_returns_none() -> None:
     """Replacement service / unmatched line → None (card hides chevron)."""
     catalogue = _u1_catalogue()
-    assert (
-        stops_ahead_for_match(catalogue, "U99", [4111], "Wherever") is None
-    )
+    assert stops_ahead_for_match(catalogue, "U99", [4111], "Wherever") is None
 
 
 def test_stops_ahead_for_match_no_trip_patterns_returns_none() -> None:
@@ -718,9 +719,7 @@ def test_stops_ahead_for_match_terminus_substring_picks_branch() -> None:
     rather than the R pattern (which terminates at Reumannplatz).
     """
     catalogue = _u1_catalogue()
-    result = stops_ahead_for_match(
-        catalogue, "U1", [4111, 4118], "Leopoldau S+U"
-    )
+    result = stops_ahead_for_match(catalogue, "U1", [4111, 4118], "Leopoldau S+U")
     assert result is not None
     assert result[-1]["name"] == "Leopoldau"
 
@@ -789,8 +788,7 @@ def test_stops_ahead_for_match_returns_empty_at_terminus() -> None:
 def test_stops_ahead_full_route_no_truncation() -> None:
     """Full path is returned (no head+ellipsis+terminus truncation)."""
     stations = {
-        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i])
-        for i in range(1, 11)
+        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i]) for i in range(1, 11)
     }
     long_pattern = TripPattern(
         line_id=999,
@@ -821,14 +819,13 @@ def test_stops_ahead_capped_at_max_stops_ahead() -> None:
     # Build a pattern longer than MAX_STOPS_AHEAD.
     n = MAX_STOPS_AHEAD + 5
     stations = {
-        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i])
-        for i in range(0, n + 1)
+        i: Station(i, f"Stop{i}", "Wien", 16.0, 48.0, [i]) for i in range(n + 1)
     }
     long_pattern = TripPattern(
         line_id=999,
         pattern_id=1,
         direction=1,
-        stops=tuple(range(0, n + 1)),
+        stops=tuple(range(n + 1)),
     )
     catalogue = StaticCatalogue(
         stations_by_diva=stations,

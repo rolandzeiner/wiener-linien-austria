@@ -14,6 +14,7 @@ Wiener Linien ships *three* card variants (modern + retro + flap), each
 with its own constant. The test asserts all three separately so a
 failure points at exactly which constant drifted.
 """
+
 from __future__ import annotations
 
 import json

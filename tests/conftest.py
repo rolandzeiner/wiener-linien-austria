@@ -1,4 +1,5 @@
 """Shared pytest fixtures for Wiener Linien Austria tests."""
+
 from __future__ import annotations
 
 import json
@@ -20,8 +21,8 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
 )
 from custom_components.wiener_linien_austria.static import (
-    Station,
     StaticCatalogue,
+    Station,
     TripPattern,
     TripPatternIndex,
 )
@@ -51,6 +52,7 @@ def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
     Stored under tests/snapshots/ next to the test module.
     """
     return snapshot.use_extension(HomeAssistantSnapshotExtension)
+
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
