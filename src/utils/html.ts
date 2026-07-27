@@ -101,7 +101,16 @@ const DROP_CONTENT = /<\s*(script|style|template|iframe|svg)\b[^>]*>[\s\S]*?<\s*
 export function safeTrafficHtml(raw: unknown): string {
   const src = String(raw)
     .replace(DROP_CONTENT, " ")
-    .replace(/<!--[\s\S]*?-->/g, "");
+    // Comments end at `-->` OR the legacy `--!>`, and an unterminated one
+    // runs to the end of the input. Matching only `-->` (CodeQL
+    // js/incomplete-multi-character-sanitization) left `<!--` sitting in the
+    // text — harmless here, since leftovers are escaped and any tag inside
+    // the comment still has to survive the allowlist, but the user saw the
+    // stray marker rendered as literal text.
+    .replace(/<!--[\s\S]*?(?:--!?>|$)/g, "")
+    // Doctypes and bogus comments (`<!foo>`): never meaningful in a traffic
+    // notice, and escaping them would show `<!doctype html>` as body text.
+    .replace(/<![^>]*>/g, "");
 
   const out: string[] = [];
   const open: string[] = [];
