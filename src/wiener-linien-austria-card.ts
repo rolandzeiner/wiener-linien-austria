@@ -1,6 +1,5 @@
 import { LitElement, html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import QrCreator from "qr-creator";
@@ -51,7 +50,13 @@ import {
   lineColorsFor,
 } from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
-import { safeDomId, safeTrafficHtml, toggleInSet } from "./utils/html.js";
+import { safeDomId, toggleInSet } from "./utils/html.js";
+import {
+  iconForElevatorReason,
+  parseTrafficNotice,
+  splitLocationPath,
+  type TrafficNotice,
+} from "./utils/traffic-notice.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
 
 // Eager import — a dynamic `await import("./editor.js")` would race
@@ -796,10 +801,24 @@ export class WienerLinienAustriaCard extends LitElement {
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
 
+    // Scheme polarity for --wl-accent-text (see card-styles.ts). Follows
+    // HA's own theme rather than light-dark() / prefers-color-scheme,
+    // both of which read the OS and would pick the wrong branch for a
+    // dark HA theme on a light-mode desktop — same call the flap card
+    // makes for .flap--light. Tri-state on purpose: `undefined` before
+    // themes have loaded leaves both classes off, so the hueless :host
+    // fallback stands instead of us guessing a polarity.
+    const scheme =
+      this.hass?.themes?.darkMode === true
+        ? "dark"
+        : this.hass?.themes?.darkMode === false
+          ? "light"
+          : undefined;
+
     const isPanel = tabIndex !== undefined;
     return html`
       <section
-        class="station"
+        class=${classMap({ station: true, [`scheme-${scheme}`]: scheme !== undefined })}
         style="--wl-accent: ${accent};"
         id=${isPanel ? `wl-tabpanel-${tabIndex}` : nothing}
         role=${isPanel ? "tabpanel" : nothing}
@@ -855,7 +874,12 @@ export class WienerLinienAustriaCard extends LitElement {
 
   private _renderElevatorDetail(e: ElevatorInfoAttr): TemplateResult {
     const location = e.description || e.station || "";
+    // The feed writes the location as a path through the station; showing
+    // the segments separately makes "which lift is this" answerable at a
+    // glance. Falls back to a single segment when there's no separator.
+    const path = splitLocationPath(location);
     const reason = e.reason || "";
+    const reasonIcon = iconForElevatorReason(reason);
     const until = formatTime(e.time_end, this._lang());
     const hasDetail = Boolean(reason || until);
     const expanded = this._expandedElevator.has(e.name);
@@ -880,12 +904,26 @@ export class WienerLinienAustriaCard extends LitElement {
         <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
-            <div class="alert-title">${deText(location)}</div>
+            <div class="alert-title">
+              <span lang="de" class="lift-path"
+                >${path.map(
+                  (seg, i) =>
+                    html`${i
+                      ? html`<span class="lift-path-sep" aria-hidden="true">›</span>`
+                      : nothing}<span>${seg}</span>`,
+                )}</span
+              >
+            </div>
           </div>
           ${hasDetail
             ? html`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${reason ? html`<div class="alert-desc">${deText(reason)}</div>` : nothing}
+                  ${reason
+                    ? html`<div class="alert-desc lift-reason">
+                        <ha-icon icon=${reasonIcon} aria-hidden="true"></ha-icon>
+                        <span lang="de">${reason}</span>
+                      </div>`
+                    : nothing}
                   ${until
                     ? html`<div class="alert-meta">
                         <span>${this._t("elevator_until")} ${until}</span>
@@ -952,6 +990,49 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
+  /** Lay out a parsed disruption notice: per-line headings, prose, then the
+   *  labelled facts as a definition list.
+   *
+   *  Everything here is a plain Lit text binding — upstream text is escaped
+   *  by the template, never interpreted as markup. `lang="de"` because the
+   *  ÖDV publishes German only, whatever locale the card is running in;
+   *  without it a screen reader in an English UI reads street names with
+   *  English phonetics. */
+  private _renderTrafficNotice(notice: TrafficNotice): TemplateResult {
+    // A lone heading segments nothing — it just restates the line the
+    // alert title already names ("U1: Verspätungen" followed by "LINIE
+    // U1"). Headings earn their keep only from two upwards, where they
+    // separate the per-line blocks of a notice covering several lines.
+    const headings = notice.blocks.reduce(
+      (n, b) => (b.kind === "heading" ? n + 1 : n),
+      0,
+    );
+    const blocks =
+      headings > 1 ? notice.blocks : notice.blocks.filter((b) => b.kind !== "heading");
+
+    return html`
+      <div class="alert-desc" lang="de">
+        ${blocks.map((b) =>
+          b.kind === "heading"
+            ? html`<p class="alert-desc-heading">${b.text}</p>`
+            : html`<p>${b.text}</p>`,
+        )}
+        ${notice.facts.length
+          ? html`<dl class="alert-facts">
+              ${notice.facts.map(
+                (f) => html`<div class="alert-fact">
+                  <dt>
+                    <ha-icon icon=${f.icon} aria-hidden="true"></ha-icon>${f.label}
+                  </dt>
+                  <dd>${f.value}</dd>
+                </div>`,
+              )}
+            </dl>`
+          : nothing}
+      </div>
+    `;
+  }
+
   private _renderTrafficItem(
     t: TrafficInfoAttr,
     lineColors: LineColorsMap,
@@ -959,13 +1040,14 @@ export class WienerLinienAustriaCard extends LitElement {
     const overrides = this._config!.line_colors;
     const lines = Array.isArray(t.related_lines) ? t.related_lines : [];
     const descSource = t.description_html || t.description || "";
-    const descHtml = descSource ? safeTrafficHtml(descSource) : "";
+    const notice = parseTrafficNotice(descSource);
+    const hasNotice = notice.blocks.length > 0 || notice.facts.length > 0;
     const until = formatTime(t.time_end, this._lang());
     const updatedRaw = formatTime(t.time_last_update, this._lang());
     const created = formatTime(t.time_created, this._lang());
     const updated = updatedRaw && updatedRaw !== created ? updatedRaw : "";
     const hasMeta = Boolean(t.location || until || updated);
-    const hasDetail = Boolean(descHtml || hasMeta);
+    const hasDetail = Boolean(hasNotice || hasMeta);
     const expanded = this._expandedTraffic.has(t.name);
     const classes = {
       alert: true,
@@ -1004,7 +1086,7 @@ export class WienerLinienAustriaCard extends LitElement {
           ${hasDetail
             ? html`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${descHtml ? html`<div class="alert-desc">${unsafeHTML(descHtml)}</div>` : nothing}
+                  ${hasNotice ? this._renderTrafficNotice(notice) : nothing}
                   ${hasMeta
                     ? html`<div class="alert-meta">
                         ${t.location
@@ -1724,6 +1806,73 @@ export class WienerLinienAustriaCard extends LitElement {
     return arr[idx] as T;
   }
 
+  // Successive clicks walk through the payload SHAPES the notice renderer
+  // has to survive, rather than injecting the same entry repeatedly. Each
+  // variant is modelled on a real trafficInfoList entry — including the
+  // malformed ones, which are the whole point: 4 of the 10 live entries
+  // carrying HTML glue their facts onto the preceding sentence with no
+  // separator, and that path is otherwise unreachable in dev.
+  private _devTrafficVariant = 0;
+  private _devElevatorVariant = 0;
+
+  /** `descriptionHTML` fixtures, keyed to what each one exercises. */
+  private static readonly DEV_TRAFFIC_SHAPES: ReadonlyArray<{
+    readonly label: string;
+    readonly html: (line: string, towards: string) => string;
+  }> = [
+    {
+      // Well-formed multi-paragraph notice — the U3 Bauarbeiten shape.
+      // Date duration (calendar icon) + construction reason (excavator).
+      label: "Bauarbeiten",
+      html: (line, towards) =>
+        `<p>Die Linie ${line} fährt derzeit nicht Richtung ${towards}.</p><p><br></p>` +
+        `<p>Weichen Sie ersatzweise auf die Linien E3, 46 und 49 aus.</p><p><br></p>` +
+        `<p>Voraussichtliche Dauer: 31. August.</p><p><br></p>` +
+        `<p>Grund: Bauarbeiten im Bereich zwischen Westbahnhof U und Hütteldorfer Straße U.</p>`,
+    },
+    {
+      // Everything glued into one paragraph, no space after the colon or
+      // the periods — the 43/31/U4 shape. Exercises heading detach AND
+      // fact splitting in a single line.
+      label: "Run-on (ungetrennt)",
+      html: (line) =>
+        `<p>Linie ${line}:Betrieb nur zwischen Schottentor U und Dornbach. ` +
+        `Weichen Sie ersatzweise auf die Linie 43A aus.Voraussichtliche Dauer: ` +
+        `31.07.2026.Grund: Gleisbauarbeiten im Bereich Dornbacher Straße.</p>`,
+    },
+    {
+      // Several per-line sections — the 5/12/37/38/40/41/42 shape, the
+      // case the headings exist for.
+      label: "Mehrere Linien",
+      html: (line) =>
+        `<p>Linie ${line}:</p>` +
+        `<p>Kein Betrieb zwischen Lerchenfelder Straße und Franz-Josefs-Bahnhof S.</p>` +
+        `<p>Betrieb zwischen Westbahnhof S U und Lerchenfelder Straße.</p>` +
+        `<p>Linie 12:</p>` +
+        `<p>Betrieb nur zwischen Hillerstraße und Franz-Josefs-Bahnhof S.</p>` +
+        `<p>Linien 40, 41, 42:</p>` +
+        `<p>Kein Betrieb. Die Außenäste werden von den Linien 37 und 38 übernommen.</p>` +
+        `<p>Die Störung dauert voraussichtlich bis Ende August.</p>`,
+    },
+    {
+      // Clock-only duration (clock icon, not calendar) + accident reason.
+      label: "Unfall, Uhrzeit",
+      html: (line) =>
+        `<p>Linie ${line}:</p><p>Unregelmäßige Intervalle in beiden Richtungen.</p>` +
+        `<p>Voraussichtliche Dauer: 11:30 Uhr.</p>` +
+        `<p>Grund: Verkehrsunfall im Bereich Gersthofer Straße 140.</p>`,
+    },
+    {
+      // Reason matching no category — must fall back to the neutral
+      // circled "i" rather than guessing a pictogram.
+      label: "Unbekannter Grund",
+      html: (line) =>
+        `<p>Linie ${line}:</p><p>Es kommt zu Verzögerungen im Betrieb.</p>` +
+        `<p>Voraussichtliche Dauer: Ende August.</p>` +
+        `<p>Grund: Vorübergehend nicht näher bekannte Ursache.</p>`,
+    },
+  ];
+
   private _devTestTraffic = (): void => {
     const stops = this._resolveStops();
     const pool: DepartureAttr[] = [];
@@ -1736,13 +1885,19 @@ export class WienerLinienAustriaCard extends LitElement {
     const line = pick?.line || "U?";
     const towards = pick?.towards || "Unbekannt";
     const now = new Date();
+    const shapes = WienerLinienAustriaCard.DEV_TRAFFIC_SHAPES;
+    const shape = shapes[this._devTrafficVariant % shapes.length]!;
+    this._devTrafficVariant += 1;
+    const html = shape.html(line, towards);
     this._debugTraffic = [
       ...this._debugTraffic,
       {
         name: `DEBUG-T-${Date.now()}`,
-        title: `${line}: Testmeldung`,
-        description: `Debug-Eintrag für Linie ${line} Richtung ${towards}.`,
-        description_html: `Debug-Eintrag für Linie ${line} Richtung ${towards}.<br><br>Grund: Dev-Mode-Test.`,
+        title: `${line}: ${shape.label}`,
+        // Plain-text twin of the HTML, mirroring the feed: `description`
+        // is the same prose with the tags removed.
+        description: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
+        description_html: html,
         location: "Debug-Stelle",
         related_lines: [line],
         time_start: new Date(now.getTime() - 30 * 60_000).toISOString(),
@@ -1768,14 +1923,36 @@ export class WienerLinienAustriaCard extends LitElement {
     const anyLine = sample?.line || "";
     const towards = sample?.towards || "Unbekannt";
     const now = new Date();
+    // Location strings use " - " between path segments in every live
+    // entry; the variants cover three, two and — the case with no
+    // separator at all — one segment, alongside the three reason
+    // categories the pictogram has to distinguish.
+    const shapes: ReadonlyArray<{ description: string; reason: string }> = [
+      {
+        description: `${anyLine || "U3"} Mittelbahnsteig - Zwischengeschoss Zugang ${station} - Ausgang ${station}`,
+        reason: "Aufzug ist wegen Bauarbeiten bis 03.08.2026 außer Betrieb!",
+      },
+      {
+        description: `${anyLine || "U6"} Bahnsteig Richtung ${towards} - Ausgang ${station}`,
+        reason: "An der Instandsetzung wird bereits gearbeitet.",
+      },
+      {
+        // No " - " anywhere: the single-segment path, plus a reason that
+        // matches no category and must land on the neutral fallback icon.
+        description: `Ausgang ${station}`,
+        reason: "Der Aufzug steht aus nicht näher bekannter Ursache still.",
+      },
+    ];
+    const shape = shapes[this._devElevatorVariant % shapes.length]!;
+    this._devElevatorVariant += 1;
     this._debugElevator = [
       ...this._debugElevator,
       {
         __debug_entity: pick.entity,
         name: `DEBUG-E-${Date.now()}`,
         station,
-        description: `${anyLine || "Station"} Bahnsteig Richtung ${towards} — Ausgang ${station}`,
-        reason: "AUFZUGSERNEUERUNG Voraussichtlich bis Ende Mai außer Betrieb! (Dev-Mode-Test)",
+        description: shape.description,
+        reason: shape.reason,
         status: "außer Betrieb",
         related_lines: anyLine ? [anyLine] : [],
         time_start: new Date(now.getTime() - 45 * 60_000).toISOString(),
