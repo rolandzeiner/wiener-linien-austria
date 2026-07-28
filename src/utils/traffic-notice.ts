@@ -31,6 +31,13 @@
 // dropped, which costs nothing today (zero occurrences) and is the reason
 // this can be escaped rather than sanitised.
 //
+// Extraction goes through `DOMParser`, not regex tag-stripping. Regex is the
+// obvious first reach and the wrong tool: removing a tag can reassemble the
+// tag it was removing (`<scr<script>ipt src=x>`), so it needs iterating to a
+// fixpoint, and it still mis-reads `>` inside an attribute value. The
+// browser's parser has neither problem and decodes entities on the way, so
+// there is no entity table to maintain either.
+//
 // The module also carries two helpers for the LIFT feed —
 // `iconForElevatorReason` and `splitLocationPath`. They live here rather
 // than in their own module because the reason vocabulary is shared: the
@@ -177,130 +184,100 @@ export interface TrafficNotice {
   facts: TrafficFact[];
 }
 
-/** The named entities the operator's CMS actually emits: German umlauts and
- *  ß, typographic quotes and dashes, and the handful of XML basics. Not a
- *  complete HTML5 table — an unknown entity is left verbatim rather than
- *  guessed at, so a miss shows up as visible `&foo;` in the card instead of
- *  silently becoming the wrong glyph.
- *
- *  `shy` maps to the empty string deliberately: a soft hyphen is a *break
- *  opportunity*, not a character. Once the prose is re-wrapped into the
- *  card's own layout the operator's break points are meaningless, and
- *  keeping U+00AD leaves stray hyphens mid-word on some renderers. */
-const NAMED_ENTITIES: Record<string, string> = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  shy: "",
-  ndash: "–",
-  mdash: "—",
-  hellip: "…",
-  laquo: "«",
-  raquo: "»",
-  bdquo: "„",
-  ldquo: "“",
-  rdquo: "”",
-  sbquo: "‚",
-  euro: "€",
-  deg: "°",
-  auml: "ä",
-  ouml: "ö",
-  uuml: "ü",
-  Auml: "Ä",
-  Ouml: "Ö",
-  Uuml: "Ü",
-  szlig: "ß",
-};
+/** Elements whose END tag is a line break in the rendered prose. */
+const BLOCK_TAGS: ReadonlySet<string> = new Set([
+  "P",
+  "DIV",
+  "LI",
+  "UL",
+  "OL",
+  "TR",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+]);
 
-/** Resolve numeric (`&#8211;` / `&#x2013;`) and named entities. Out-of-range
- *  or unparseable code points are left as the original text — the input is
- *  a display string, so a visible `&#99999999;` beats throwing or emitting
- *  U+FFFD. */
-function decodeEntities(s: string): string {
-  return s.replace(
-    /&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi,
-    (match, ref: string) => {
-      if (ref[0] === "#") {
-        const code =
-          ref[1] === "x" || ref[1] === "X"
-            ? Number.parseInt(ref.slice(2), 16)
-            : Number.parseInt(ref.slice(1), 10);
-        if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return match;
-        return String.fromCodePoint(code);
-      }
-      const named = NAMED_ENTITIES[ref];
-      return named === undefined ? match : named;
-    },
-  );
-}
-
-/** Hard stop on the fixpoint loop below. Eight passes strips any nesting
- *  depth the operator's CMS could plausibly produce; a crafted payload that
- *  is still changing after that is pathological and gets returned as-is
- *  rather than spun on. */
-const MAX_STRIP_PASSES = 8;
-
-/** Remove tags repeatedly until the string stops changing.
- *
- *  A single pass is not enough, because removing a sequence can reassemble
- *  the very sequence it was removing: `<scr<script>ipt src=x></scr</script>ipt>`
- *  loses the inner pair and the remainder closes back up into a live
- *  `<script src=x>` (CodeQL js/incomplete-multi-character-sanitization).
- *
- *  The replacements are written inline in the loop body on purpose. Factoring
- *  them into a `stripMarkupOnce` helper reads better but hides the loop from
- *  static analysis — the helper then looks like an unguarded single-pass
- *  sanitizer and the query fires on it (alert #7) even though every caller
- *  iterates to a fixpoint.
- *
- *  This is not an injection boundary — the parsed text is rendered through
- *  ordinary Lit bindings and is escaped on the way to the DOM, which is the
- *  whole reason the `unsafeHTML` path was dropped. The fixpoint is about the
- *  text the reader actually sees, and about not leaving a sanitizer that can
- *  be walked backwards for the next person who wires up a different sink. */
-function stripMarkup(input: string): string {
-  let out = input;
-  let previous: string;
-  let passes = 0;
-  do {
-    previous = out;
-    out = out
-      // Elements whose content is markup, not prose.
-      .replace(
-        /<\s*(script|style|template|iframe|svg)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
-        " ",
-      )
-      // Comments terminate at --> or the legacy --!>; an unterminated one
-      // runs to the end of input.
-      .replace(/<!--[\s\S]*?(?:--!?>|$)/g, "")
-      .replace(/<![^>]*>/g, "")
-      // Block boundaries become line breaks; every other tag is dropped.
-      .replace(/<\s*br\s*\/?\s*>/gi, "\n")
-      .replace(/<\s*\/\s*(?:p|div|li|ul|ol|tr|h[1-6])\s*>/gi, "\n")
-      .replace(/<\/?[a-z][^>]*>/gi, "");
-  } while (out !== previous && ++passes < MAX_STRIP_PASSES);
-  return out;
-}
+/** Elements whose content is markup or styling, never prose — dropped
+ *  wholesale rather than descended into. */
+const SKIP_TAGS: ReadonlySet<string> = new Set([
+  "SCRIPT",
+  "STYLE",
+  "TEMPLATE",
+  "IFRAME",
+  "SVG",
+  "NOSCRIPT",
+]);
 
 /** Reduce the payload to plain-text lines. Accepts either `descriptionHTML`
- *  or the plain `description` — the tag handling is simply inert on the
- *  latter, and the run-on repair below is what makes the plain variant
+ *  or the plain `description`; markup handling is simply inert on the latter,
+ *  and the run-on repair in `splitRunOns` is what makes the plain variant
  *  readable at all.
  *
- *  Entities are decoded AFTER the tags are stripped, never before: decoding
- *  first would turn `&lt;script&gt;` into a live-looking tag for the
- *  stripper to chew on, and the operator writing that entity meant it to be
- *  read as text. */
+ *  Uses the browser's own HTML parser rather than regex tag-stripping. The
+ *  regex version had to be iterated to a fixpoint because removing a tag
+ *  could reassemble the tag it was removing — `<scr<script>ipt src=x>` — and
+ *  it still mis-read attribute values containing ">" (`<p title="a>b">`).
+ *  Both are whole classes of bug that a real parser doesn't have, and it
+ *  decodes entities for free, so there is no named-entity table to keep in
+ *  sync with whatever the operator's CMS emits.
+ *
+ *  `parseFromString` is inert by construction: it neither executes scripts
+ *  nor fetches resources, and the document it returns is detached — never
+ *  adopted into the live tree. Nothing here is an injection boundary anyway,
+ *  since the extracted text reaches the DOM through ordinary escaped Lit
+ *  bindings; that is why the `unsafeHTML` path was dropped. */
 function toLines(raw: string): string[] {
-  const text = decodeEntities(stripMarkup(raw));
+  const doc = new DOMParser().parseFromString(raw, "text/html");
 
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
+  const lines: string[] = [];
+  let buffer = "";
+
+  const flush = (): void => {
+    const line = buffer.replace(/\s+/g, " ").trim();
+    if (line) lines.push(line);
+    buffer = "";
+  };
+
+  // A newline inside a text node is a break too — the plain `description`
+  // variant separates its per-line sections that way, with no markup at all.
+  const addText = (value: string): void => {
+    const parts = value.split(/\r?\n/);
+    buffer += parts[0] ?? "";
+    for (let i = 1; i < parts.length; i += 1) {
+      flush();
+      buffer += parts[i] ?? "";
+    }
+  };
+
+  const walk = (node: Node): void => {
+    const children = node.childNodes;
+    for (let i = 0; i < children.length; i += 1) {
+      const child = children[i];
+      if (!child) continue;
+      if (child.nodeType === Node.TEXT_NODE) {
+        addText(child.nodeValue ?? "");
+        continue;
+      }
+      // Comments, doctypes and processing instructions carry no prose.
+      if (child.nodeType !== Node.ELEMENT_NODE) continue;
+
+      const tag = (child as Element).tagName.toUpperCase();
+      if (SKIP_TAGS.has(tag)) continue;
+      if (tag === "BR") {
+        flush();
+        continue;
+      }
+      walk(child);
+      if (BLOCK_TAGS.has(tag)) flush();
+    }
+  };
+
+  walk(doc.body);
+  flush();
+  return lines;
 }
 
 /** Detach a heading that upstream glued to its first statement
