@@ -243,32 +243,18 @@ function decodeEntities(s: string): string {
  *  rather than spun on. */
 const MAX_STRIP_PASSES = 8;
 
-/** One pass of tag removal. Not safe on its own — see `stripMarkup`. */
-function stripMarkupOnce(input: string): string {
-  return (
-    input
-      // Elements whose content is markup, not prose.
-      .replace(
-        /<\s*(script|style|template|iframe|svg)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
-        " ",
-      )
-      // Comments terminate at --> or the legacy --!>; an unterminated one
-      // runs to the end of input.
-      .replace(/<!--[\s\S]*?(?:--!?>|$)/g, "")
-      .replace(/<![^>]*>/g, "")
-      // Block boundaries become line breaks; every other tag is dropped.
-      .replace(/<\s*br\s*\/?\s*>/gi, "\n")
-      .replace(/<\s*\/\s*(?:p|div|li|ul|ol|tr|h[1-6])\s*>/gi, "\n")
-      .replace(/<\/?[a-z][^>]*>/gi, "")
-  );
-}
-
 /** Remove tags repeatedly until the string stops changing.
  *
  *  A single pass is not enough, because removing a sequence can reassemble
- *  the very sequence it was removing: `<scr<script>ipt>` loses the inner
- *  `<script>` and the remainder closes back up into `<script>`
- *  (CodeQL js/incomplete-multi-character-sanitization).
+ *  the very sequence it was removing: `<scr<script>ipt src=x></scr</script>ipt>`
+ *  loses the inner pair and the remainder closes back up into a live
+ *  `<script src=x>` (CodeQL js/incomplete-multi-character-sanitization).
+ *
+ *  The replacements are written inline in the loop body on purpose. Factoring
+ *  them into a `stripMarkupOnce` helper reads better but hides the loop from
+ *  static analysis — the helper then looks like an unguarded single-pass
+ *  sanitizer and the query fires on it (alert #7) even though every caller
+ *  iterates to a fixpoint.
  *
  *  This is not an injection boundary — the parsed text is rendered through
  *  ordinary Lit bindings and is escaped on the way to the DOM, which is the
@@ -281,7 +267,20 @@ function stripMarkup(input: string): string {
   let passes = 0;
   do {
     previous = out;
-    out = stripMarkupOnce(out);
+    out = out
+      // Elements whose content is markup, not prose.
+      .replace(
+        /<\s*(script|style|template|iframe|svg)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
+        " ",
+      )
+      // Comments terminate at --> or the legacy --!>; an unterminated one
+      // runs to the end of input.
+      .replace(/<!--[\s\S]*?(?:--!?>|$)/g, "")
+      .replace(/<![^>]*>/g, "")
+      // Block boundaries become line breaks; every other tag is dropped.
+      .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+      .replace(/<\s*\/\s*(?:p|div|li|ul|ol|tr|h[1-6])\s*>/gi, "\n")
+      .replace(/<\/?[a-z][^>]*>/gi, "");
   } while (out !== previous && ++passes < MAX_STRIP_PASSES);
   return out;
 }
