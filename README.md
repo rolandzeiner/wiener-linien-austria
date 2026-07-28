@@ -13,7 +13,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 - **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; state is the next-departure countdown, attributes carry the full board.
 - **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap. See [Lovelace Cards](#lovelace-cards).
-- **Service + elevator alerts** filtered to your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` attributes and rendered inline by every card.
+- **Service + elevator alerts** filtered to your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` attributes and rendered inline by every card. Disruption notices break out into per-line headings, the reason, and how long it's expected to last — each with its own pictogram — so you can find your line without reading the whole notice *(1.7.3)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail showing every upcoming stop on that trip with transfer-line chips.
 - **Autocomplete stop entry** — type a stop name and the full catalogue filters as you go, with the stops nearest your Home Assistant location offered first and their distance shown. Submit a partial name and you get the matching stops to choose from. The line picker merges the live `/monitor` window with the static schedule catalogue, so day-only and nightline services both stay selectable regardless of when you configure.
 - **Batched polling** — stops sharing a polling interval are fetched in one request per tick instead of one each, so adding stops no longer multiplies API load or your odds of hitting the rate limit.

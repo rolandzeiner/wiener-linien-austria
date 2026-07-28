@@ -2,8 +2,17 @@ import { css } from "lit";
 
 // Tile-card visual language. Token-driven, container-query-paced.
 // Per-station accent is piped in via inline `style="--wl-accent: …;"` on
-// `.station`, so every accented surface (icon-tile, line badge, alert
-// surface, focus ring) reads from one prop.
+// `.station`, so every accented SURFACE (icon-tile tint, line badge, alert
+// surface, the radial wash) reads from one prop.
+//
+// Accented TEXT reads from `--wl-accent-text` instead — the GTFS palette is
+// a set of background colours and several of them are illegible as glyphs.
+// See the clamp below the `.station` rule. Two props, split by role: if a
+// declaration sets `color`, it wants the text token.
+//
+// The focus ring is deliberately NOT on either — it uses `--primary-color`
+// so it stays a consistent, theme-owned affordance rather than shifting hue
+// per station.
 //
 // Webfonts (WL Sans / WL Sans Condensed / WL Mono) are NOT declared
 // here: `@font-face` inside Shadow DOM is unreliable on older engines
@@ -24,6 +33,14 @@ export const cardStyles = css`
     /* Brand accent inherits HA's primary. Per-station accent override
        lands inline on .station via style="--wl-accent: …;". */
     --wl-accent: var(--primary-color);
+
+    /* Text-safe companion to --wl-accent. GTFS route_color is a
+       *background* colour — Wiener Linien ships 0A295D for city buses
+       and 000000 for the Badner Bahn, both fine behind white badge text
+       and both around 1.19:1 when painted *as* text on a dark card.
+       Anything colouring glyphs reads from this token; backgrounds keep
+       using --wl-accent directly. Resolved per scheme on .station. */
+    --wl-accent-text: var(--primary-text-color);
 
     /* Semantic state tokens layered over HA's official semantic palette
        so theme authors can recolour the whole portfolio in one place;
@@ -130,6 +147,33 @@ export const cardStyles = css`
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
   }
 
+  /* Clamp the accent's lightness into a legible band while leaving hue
+     and chroma untouched, so the countdown still reads as *that line's*
+     colour rather than going flat white. A floor on dark, a ceiling on
+     light — being a clamp rather than a blend, it only moves the lines
+     that actually need it (U3 orange passes through nearly unchanged;
+     13A navy is lifted to ~#80A5E3). Worst case across the published
+     palette is 5.06:1, so AA for normal text, not just large.
+
+     Must live on .station, not :host — this is the element carrying the
+     inline --wl-accent, and a custom property resolves against its own
+     element. Polarity comes from hass.themes.darkMode via .scheme-*:
+     light-dark() and prefers-color-scheme both follow the OS, which
+     would take the wrong branch for a dark HA theme on a light-mode
+     desktop. Same reasoning as the flap card's .flap--light.
+
+     No .scheme-* class (themes not loaded yet) or no oklch support and
+     the :host declaration stands — legible but hueless, never
+     invisible. Issue #93. */
+  @supports (color: oklch(from red l c h)) {
+    .station.scheme-dark {
+      --wl-accent-text: oklch(from var(--wl-accent) clamp(0.72, l, 1) c h);
+    }
+    .station.scheme-light {
+      --wl-accent-text: oklch(from var(--wl-accent) clamp(0, l, 0.45) c h);
+    }
+  }
+
   /* Header: square accent tile (left), title block (centre), circular
      icon-action (right). Mirrors HA's hui-tile-card composition. */
   .head {
@@ -142,7 +186,7 @@ export const cardStyles = css`
     height: var(--wl-tile-size);
     border-radius: var(--wl-radius-md);
     background: color-mix(in srgb, var(--wl-accent) 18%, transparent);
-    color: var(--wl-accent);
+    color: var(--wl-accent-text);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -244,7 +288,7 @@ export const cardStyles = css`
     display: flex;
     align-items: baseline;
     gap: 4px;
-    color: var(--wl-accent);
+    color: var(--wl-accent-text);
   }
   .hero-min {
     font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
@@ -440,6 +484,32 @@ export const cardStyles = css`
     font-weight: 600;
     color: var(--primary-text-color);
   }
+
+  /* Lift location rendered as the path it is — "U3 Mittelbahnsteig ›
+     Ausgang Schlachthausgasse › Ausgang Hainburger Weg". The separator is
+     decorative and aria-hidden; the row's aria-label still carries the
+     original unsegmented string, so the accessible name is unchanged. */
+  .lift-path {
+    display: inline;
+  }
+  .lift-path-sep {
+    margin: 0 5px;
+    color: var(--secondary-text-color);
+    font-weight: 400;
+  }
+  /* Reason line with its category pictogram. flex-start keeps the icon on
+     the first line when the reason wraps to several. */
+  .lift-reason {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .lift-reason ha-icon {
+    --mdc-icon-size: 16px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--wl-accent-text);
+  }
   .alert-lines {
     display: inline-flex;
     flex-wrap: wrap;
@@ -472,31 +542,102 @@ export const cardStyles = css`
   .alert.expanded .alert-detail {
     grid-template-rows: 1fr;
   }
+  /* Disruption body. utils/traffic-notice.ts recovers the structure the
+     operator writes in prose but never marks up — per-line headings,
+     statements, and the trailing labelled facts — so the layout can do
+     what the <p> soup can't: let someone scan for their own line, or for
+     the reason, without reading the whole notice. */
   .alert-desc {
     color: var(--secondary-text-color);
-    line-height: 1.4;
+    line-height: 1.45;
   }
-  /* Upstream descriptionHTML ships one <p> per statement (what / detour /
-     duration / reason). Sanitised in utils/html.ts — p, br, lists and
-     text-level emphasis only. */
   .alert-desc p {
     margin: 0 0 8px;
   }
   .alert-desc p:last-child {
     margin-bottom: 0;
   }
-  .alert-desc ul,
-  .alert-desc ol {
-    margin: 0 0 8px;
-    padding-inline-start: 18px;
-  }
-  .alert-desc li {
-    margin: 2px 0;
-  }
-  .alert-desc strong,
-  .alert-desc b {
+
+  /* "Linie 43:" / "Linien 40, 41, 42:" — the section header of a per-line
+     block. Signage-style: accent rule, uppercase, tracked out. A notice
+     covering seven tram lines is unreadable without these.
+
+     Only rendered when a notice has two or more — a lone heading segments
+     nothing and merely restates the line already in the alert title, so
+     _renderTrafficNotice drops it. */
+  .alert-desc-heading {
+    margin: 14px 0 6px;
+    padding-left: 8px;
+    border-left: 3px solid var(--wl-accent);
     color: var(--primary-text-color);
-    font-weight: 600;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.3;
+  }
+  /* No leading gap when the notice opens with a heading. */
+  .alert-desc-heading:first-child {
+    margin-top: 0;
+  }
+
+  /* Labelled facts (Grund / Voraussichtliche Dauer). Pulled out of the
+     prose flow and set as label→value pairs above the timing meta row, so
+     the two most-asked questions — why, and until when — are findable at
+     a glance instead of buried in the last sentence. */
+  .alert-facts {
+    display: grid;
+    gap: 4px 10px;
+    margin: 10px 0 0;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+  }
+  /* Label column sizes to its own text — no minimum. A floor here padded
+     the short label ("Grund") out to a width set by nothing in particular,
+     which reads as a stray gap rather than as alignment. Rows size
+     independently on purpose: with two facts of very different label
+     lengths, a shared column would push every value out to the width of
+     "Voraussichtliche Dauer". */
+  .alert-fact {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    align-items: baseline;
+  }
+  .alert-fact dt {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--secondary-text-color);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.5;
+    white-space: nowrap;
+  }
+  /* Pictogram for the reason category (excavator, ambulance, …) and the
+     date/time distinction. Decorative — the label text beside it already
+     names the field, so it carries aria-hidden and adds nothing for a
+     screen reader. Sized off the label rather than the body text so it
+     stays subordinate to the value. */
+  .alert-fact dt ha-icon {
+    --mdc-icon-size: 14px;
+    flex-shrink: 0;
+    color: var(--wl-accent-text);
+  }
+  .alert-fact dd {
+    margin: 0;
+    color: var(--primary-text-color);
+  }
+  /* Narrow cards can't hold a label column beside "Voraussichtliche
+     Dauer" — stack instead of letting the value squeeze to two words a
+     line. Matches the 360px breakpoint the rest of the card uses. */
+  @container wlcard (inline-size < 360px) {
+    .alert-fact {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
   }
   .alert-meta {
     display: inline-flex;
@@ -856,7 +997,7 @@ export const cardStyles = css`
      not expose a realtime-vs-scheduled distinction, so the live-pulse
      dot Linz uses isn't applicable here — countdowns are coloured
      purely by their delay state. */
-  .countdown.now   { color: var(--wl-accent); }
+  .countdown.now   { color: var(--wl-accent-text); }
   .countdown.late  { color: var(--wl-error); }
   .countdown.early { color: var(--wl-rt); }
 
