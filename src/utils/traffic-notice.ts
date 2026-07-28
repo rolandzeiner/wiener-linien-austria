@@ -237,13 +237,16 @@ function decodeEntities(s: string): string {
   );
 }
 
-/** Reduce the payload to plain-text lines. Accepts either `descriptionHTML`
- *  or the plain `description` — the tag handling is simply inert on the
- *  latter, and the run-on repair below is what makes the plain variant
- *  readable at all. */
-function toLines(raw: string): string[] {
-  const text = decodeEntities(
-    raw
+/** Hard stop on the fixpoint loop below. Eight passes strips any nesting
+ *  depth the operator's CMS could plausibly produce; a crafted payload that
+ *  is still changing after that is pathological and gets returned as-is
+ *  rather than spun on. */
+const MAX_STRIP_PASSES = 8;
+
+/** One pass of tag removal. Not safe on its own — see `stripMarkup`. */
+function stripMarkupOnce(input: string): string {
+  return (
+    input
       // Elements whose content is markup, not prose.
       .replace(
         /<\s*(script|style|template|iframe|svg)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi,
@@ -256,8 +259,44 @@ function toLines(raw: string): string[] {
       // Block boundaries become line breaks; every other tag is dropped.
       .replace(/<\s*br\s*\/?\s*>/gi, "\n")
       .replace(/<\s*\/\s*(?:p|div|li|ul|ol|tr|h[1-6])\s*>/gi, "\n")
-      .replace(/<\/?[a-z][^>]*>/gi, ""),
+      .replace(/<\/?[a-z][^>]*>/gi, "")
   );
+}
+
+/** Remove tags repeatedly until the string stops changing.
+ *
+ *  A single pass is not enough, because removing a sequence can reassemble
+ *  the very sequence it was removing: `<scr<script>ipt>` loses the inner
+ *  `<script>` and the remainder closes back up into `<script>`
+ *  (CodeQL js/incomplete-multi-character-sanitization).
+ *
+ *  This is not an injection boundary — the parsed text is rendered through
+ *  ordinary Lit bindings and is escaped on the way to the DOM, which is the
+ *  whole reason the `unsafeHTML` path was dropped. The fixpoint is about the
+ *  text the reader actually sees, and about not leaving a sanitizer that can
+ *  be walked backwards for the next person who wires up a different sink. */
+function stripMarkup(input: string): string {
+  let out = input;
+  let previous: string;
+  let passes = 0;
+  do {
+    previous = out;
+    out = stripMarkupOnce(out);
+  } while (out !== previous && ++passes < MAX_STRIP_PASSES);
+  return out;
+}
+
+/** Reduce the payload to plain-text lines. Accepts either `descriptionHTML`
+ *  or the plain `description` — the tag handling is simply inert on the
+ *  latter, and the run-on repair below is what makes the plain variant
+ *  readable at all.
+ *
+ *  Entities are decoded AFTER the tags are stripped, never before: decoding
+ *  first would turn `&lt;script&gt;` into a live-looking tag for the
+ *  stripper to chew on, and the operator writing that entity meant it to be
+ *  read as text. */
+function toLines(raw: string): string[] {
+  const text = decodeEntities(stripMarkup(raw));
 
   return text
     .split(/\r?\n/)
