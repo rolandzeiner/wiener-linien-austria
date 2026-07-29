@@ -58,6 +58,7 @@ import {
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
+import { accentTextColor } from "./utils/color.js";
 
 // Eager import — a dynamic `await import("./editor.js")` would race
 // HA's synchronous `document.createElement('…-editor')` call when the
@@ -801,25 +802,28 @@ export class WienerLinienAustriaCard extends LitElement {
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
 
-    // Scheme polarity for --wl-accent-text (see card-styles.ts). Follows
+    // Scheme polarity for --wl-accent-text (see utils/color.ts). Follows
     // HA's own theme rather than light-dark() / prefers-color-scheme,
     // both of which read the OS and would pick the wrong branch for a
     // dark HA theme on a light-mode desktop — same call the flap card
     // makes for .flap--light. Tri-state on purpose: `undefined` before
-    // themes have loaded leaves both classes off, so the hueless :host
-    // fallback stands instead of us guessing a polarity.
+    // themes have loaded yields no token, so the hueless :host fallback
+    // stands instead of us guessing a polarity.
     const scheme =
       this.hass?.themes?.darkMode === true
         ? "dark"
         : this.hass?.themes?.darkMode === false
           ? "light"
           : undefined;
+    const accentText = accentTextColor(accent, scheme);
 
     const isPanel = tabIndex !== undefined;
     return html`
       <section
-        class=${classMap({ station: true, [`scheme-${scheme}`]: scheme !== undefined })}
-        style="--wl-accent: ${accent};"
+        class="station"
+        style="--wl-accent: ${accent};${accentText
+          ? ` --wl-accent-text: ${accentText};`
+          : ""}"
         id=${isPanel ? `wl-tabpanel-${tabIndex}` : nothing}
         role=${isPanel ? "tabpanel" : nothing}
         aria-labelledby=${isPanel ? `wl-tab-${tabIndex}` : nothing}

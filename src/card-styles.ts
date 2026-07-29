@@ -7,8 +7,8 @@ import { css } from "lit";
 //
 // Accented TEXT reads from `--wl-accent-text` instead — the GTFS palette is
 // a set of background colours and several of them are illegible as glyphs.
-// See the clamp below the `.station` rule. Two props, split by role: if a
-// declaration sets `color`, it wants the text token.
+// See `accentTextColor()` in utils/color.ts, which computes it. Two props,
+// split by role: if a declaration sets `color`, it wants the text token.
 //
 // The focus ring is deliberately NOT on either — it uses `--primary-color`
 // so it stays a consistent, theme-owned affordance rather than shifting hue
@@ -39,7 +39,16 @@ export const cardStyles = css`
        and 000000 for the Badner Bahn, both fine behind white badge text
        and both around 1.19:1 when painted *as* text on a dark card.
        Anything colouring glyphs reads from this token; backgrounds keep
-       using --wl-accent directly. Resolved per scheme on .station. */
+       using --wl-accent directly.
+
+       The lightness-clamped value lands inline on .station alongside
+       --wl-accent, computed in accentTextColor() (utils/color.ts) —
+       not in CSS, because the relative-colour declaration that did the
+       clamp until v1.7.3 mis-resolved on older embedded WebViews and
+       @supports cannot probe it (issue #95). This declaration is the
+       fallback for the cases the helper declines: no theme polarity
+       yet, or an accent it can't resolve (the neutral
+       var(--primary-color)). Legible but hueless, never invisible. */
     --wl-accent-text: var(--primary-text-color);
 
     /* Semantic state tokens layered over HA's official semantic palette
@@ -145,33 +154,6 @@ export const cardStyles = css`
     margin-top: var(--wl-row-gap);
     padding-top: var(--wl-row-gap);
     border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
-  }
-
-  /* Clamp the accent's lightness into a legible band while leaving hue
-     and chroma untouched, so the countdown still reads as *that line's*
-     colour rather than going flat white. A floor on dark, a ceiling on
-     light — being a clamp rather than a blend, it only moves the lines
-     that actually need it (U3 orange passes through nearly unchanged;
-     13A navy is lifted to ~#80A5E3). Worst case across the published
-     palette is 5.06:1, so AA for normal text, not just large.
-
-     Must live on .station, not :host — this is the element carrying the
-     inline --wl-accent, and a custom property resolves against its own
-     element. Polarity comes from hass.themes.darkMode via .scheme-*:
-     light-dark() and prefers-color-scheme both follow the OS, which
-     would take the wrong branch for a dark HA theme on a light-mode
-     desktop. Same reasoning as the flap card's .flap--light.
-
-     No .scheme-* class (themes not loaded yet) or no oklch support and
-     the :host declaration stands — legible but hueless, never
-     invisible. Issue #93. */
-  @supports (color: oklch(from red l c h)) {
-    .station.scheme-dark {
-      --wl-accent-text: oklch(from var(--wl-accent) clamp(0.72, l, 1) c h);
-    }
-    .station.scheme-light {
-      --wl-accent-text: oklch(from var(--wl-accent) clamp(0, l, 0.45) c h);
-    }
   }
 
   /* Header: square accent tile (left), title block (centre), circular
