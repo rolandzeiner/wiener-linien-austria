@@ -95,7 +95,7 @@ function linearToOklab([r, g, b]: Rgb): Rgb {
   ];
 }
 
-/** OKLab → linear sRGB. May land outside the gamut; see `gamutMap`. */
+/** OKLab → linear sRGB. May land outside the gamut; the caller clips. */
 function oklabToLinear([lightness, a, b]: Rgb): Rgb {
   const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
   const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
@@ -105,47 +105,6 @@ function oklabToLinear([lightness, a, b]: Rgb): Rgb {
     -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
     -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
   ];
-}
-
-const inGamut = ([r, g, b]: Rgb): boolean =>
-  [r, g, b].every((v) => v >= -1e-5 && v <= 1 + 1e-5);
-
-/**
- * CSS Color 4 §13.2 gamut mapping: lifting lightness can push a saturated
- * accent outside sRGB, so reduce chroma (binary search) until the clipped
- * result is within a just-noticeable difference of the unclipped colour.
- * Naive clipping instead of this would shift hue on the vivid lines.
- */
-function gamutMap(lightness: number, chroma: number, hue: number): Rgb {
-  if (lightness >= 1) return [1, 1, 1];
-  if (lightness <= 0) return [0, 0, 0];
-  const rad = (hue * Math.PI) / 180;
-  const at = (c: number): Rgb =>
-    oklabToLinear([lightness, c * Math.cos(rad), c * Math.sin(rad)]);
-
-  if (inGamut(at(chroma))) return at(chroma);
-
-  let lo = 0;
-  let hi = chroma;
-  while (hi - lo > 1e-4) {
-    const mid = (lo + hi) / 2;
-    const candidate = at(mid);
-    if (inGamut(candidate)) {
-      lo = mid;
-      continue;
-    }
-    const clipped: Rgb = [
-      clamp01(candidate[0]),
-      clamp01(candidate[1]),
-      clamp01(candidate[2]),
-    ];
-    const a = linearToOklab(clipped);
-    const b = linearToOklab(candidate);
-    if (Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) < 0.02) return clipped;
-    hi = mid;
-  }
-  const final = at(lo);
-  return [clamp01(final[0]), clamp01(final[1]), clamp01(final[2])];
 }
 
 const toHex = ([r, g, b]: Rgb): string =>
@@ -165,9 +124,19 @@ const toHex = ([r, g, b]: Rgb): string =>
  * the theme's own text colour stands (legible but hueless, never invisible).
  *
  * Being a clamp rather than a blend, it only moves the lines that need it:
- * U3 orange passes through nearly unchanged, bus navy is lifted to #80a5e3.
- * Worst case across the published palette is 6.28:1 on HA's dark card and
- * 7.00:1 on its light card — AA for normal text, not just large.
+ * U3 orange passes through nearly unchanged, bus navy is lifted to #80A5E3.
+ * Lifting lightness can push a saturated accent outside sRGB; the channels are
+ * then clipped, which is what browsers do for `oklch()` in practice — so these
+ * values are byte-identical to what v1.7.3's relative-colour CSS painted
+ * wherever it worked (verified against a canvas read-back of Chrome's own
+ * output for all eight published lines, both schemes). Deliberately NOT the
+ * CSS Color 4 §13.2 chroma-reduction gamut map: that is the more correct
+ * algorithm, but it lands U1 on #FF7163 where the browser paints #FF5347, and
+ * matching the shipped colour matters more than matching the spec.
+ *
+ * Worst case across the published palette, measured against the 12%
+ * accent-tinted row the countdown actually sits on (not the flat card):
+ * 5.06:1 dark, 5.70:1 light — AA for normal text, not just large.
  */
 export function accentTextColor(
   accent: string,
@@ -185,6 +154,11 @@ export function accentTextColor(
   if (clamped === lightness) return toHex(linear);
 
   const chroma = Math.hypot(a, b);
-  const hue = (Math.atan2(b, a) * 180) / Math.PI;
-  return toHex(gamutMap(clamped, chroma, hue));
+  const hue = Math.atan2(b, a);
+  const lifted = oklabToLinear([
+    clamped,
+    chroma * Math.cos(hue),
+    chroma * Math.sin(hue),
+  ]);
+  return toHex([clamp01(lifted[0]), clamp01(lifted[1]), clamp01(lifted[2])]);
 }
