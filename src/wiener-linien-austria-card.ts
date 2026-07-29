@@ -17,7 +17,7 @@ import type {
 
 import { cardStyles } from "./card-styles.js";
 import { registerWlFonts } from "./font-face.js";
-import { CARD_VERSION } from "./const.js";
+import { CARD_VERSION, NIGHTLINE_BG } from "./const.js";
 import { translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
@@ -58,7 +58,7 @@ import {
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
-import { accentTextColor } from "./utils/color.js";
+import { accentTextColor, contrastRatio, mixOver } from "./utils/color.js";
 
 // Eager import — a dynamic `await import("./editor.js")` would race
 // HA's synchronous `document.createElement('…-editor')` call when the
@@ -152,6 +152,7 @@ export class WienerLinienAustriaCard extends LitElement {
   // QR dialog open state, keyed by stop entity_id. null = closed.
   // Per-stop so that in `tabs` layout each tab keeps its own dialog.
   @state() private _qrOpenFor: string | null = null;
+  @state() private _devPaletteOpen = false;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back to first WL
@@ -1793,12 +1794,140 @@ export class WienerLinienAustriaCard extends LitElement {
         <span class="dev-strip-label">${this._t("devmode_title")}</span>
         <button type="button" @click=${this._devTestTraffic}>${this._t("devmode_traffic_btn")}</button>
         <button type="button" @click=${this._devTestElevator}>${this._t("devmode_elevator_btn")}</button>
+        <button
+          type="button"
+          aria-expanded=${this._devPaletteOpen ? "true" : "false"}
+          @click=${this._devTogglePalette}
+        >
+          ${this._t("devmode_colors_btn")}
+        </button>
         <button type="button" class="dev-strip-clear" @click=${this._devClear}>
           ${this._t("devmode_clear_btn")}
         </button>
       </div>
+      ${this._devPaletteOpen ? this._renderDevPalette() : nothing}
     `;
   }
+
+  // ------------------------------------------------------------------
+  // Dev-mode palette panel — every accent the card can be handed, run
+  // through accentTextColor() for BOTH schemes at once, on BOTH accented
+  // surfaces the countdown actually lands on: the hero block's 12% plate
+  // and the station's 6% radial wash. Rendered against HA's stock card
+  // backgrounds rather than the live theme, so one screenshot covers
+  // both themes without toggling anything.
+  // ------------------------------------------------------------------
+
+  /** HA stock card backgrounds — the reference grounds the panel measures against. */
+  private static readonly DEV_GROUNDS = { dark: "#1c1c1c", light: "#ffffff" } as const;
+
+  /** Accent surfaces defined in card-styles.ts, as (label, accent share). */
+  private static readonly DEV_SURFACES = [
+    { label: "hero", ratio: 0.12 },
+    { label: "row", ratio: 0.06 },
+  ] as const;
+
+  /**
+   * The distinct published palette plus the two edge cases that motivated
+   * the clamp — pure black (Badner Bahn) and pure white. Live GTFS colours
+   * not in this list are appended at render time, so a new line shows up
+   * here the day it appears in the feed.
+   */
+  private static readonly DEV_PALETTE: ReadonlyArray<{
+    readonly label: string;
+    readonly hex: string;
+  }> = [
+    { label: "U1", hex: "#E3000F" },
+    { label: "U2", hex: "#A862A4" },
+    { label: "U3", hex: "#EF7C00" },
+    { label: "U4", hex: "#319F49" },
+    { label: "U6", hex: "#9D6830" },
+    { label: "Tram", hex: "#C00808" },
+    { label: "Bus", hex: "#0A295D" },
+    { label: "Nightline", hex: NIGHTLINE_BG },
+    { label: "Badner Bahn", hex: "#000000" },
+    { label: "Weiß", hex: "#FFFFFF" },
+  ];
+
+  /** Fixture first, then any live GTFS colour the fixture doesn't already cover. */
+  private _devPaletteEntries(): ReadonlyArray<{
+    label: string;
+    hex: string;
+    live: boolean;
+  }> {
+    const entries = WienerLinienAustriaCard.DEV_PALETTE.map((e) => ({
+      ...e,
+      live: false,
+    }));
+    const seen = new Set(entries.map((e) => e.hex.toUpperCase()));
+    const live = firstLineColorsMap(
+      this.hass,
+      (this._config?.entities ?? []).map((s) => s.entity),
+    );
+    for (const [line, colors] of Object.entries(live)) {
+      if (!colors?.bg) continue;
+      const hex = `#${colors.bg}`.toUpperCase();
+      if (seen.has(hex)) continue;
+      seen.add(hex);
+      entries.push({ label: line, hex, live: true });
+    }
+    return entries;
+  }
+
+  private _renderDevPalette(): TemplateResult {
+    return html`
+      <div class="dev-palette">
+        ${this._devPaletteEntries().map((entry) => this._renderDevPaletteRow(entry))}
+      </div>
+    `;
+  }
+
+  private _renderDevPaletteRow(entry: {
+    label: string;
+    hex: string;
+    live: boolean;
+  }): TemplateResult {
+    return html`
+      <div class="dev-pal-row">
+        <div class="dev-pal-id">
+          <span class="dev-pal-badge" style="background: ${entry.hex};">${entry.label}</span>
+          <code>${entry.hex.toUpperCase()}${entry.live ? " ·live" : ""}</code>
+        </div>
+        ${(["dark", "light"] as const).map((scheme) => {
+          const text = accentTextColor(entry.hex, scheme);
+          const ground = WienerLinienAustriaCard.DEV_GROUNDS[scheme];
+          return html`
+            <div class="dev-pal-scheme" style="background: ${ground};">
+              <span class="dev-pal-scheme-label">${scheme}</span>
+              ${WienerLinienAustriaCard.DEV_SURFACES.map((surface) => {
+                const plate = mixOver(entry.hex, ground, surface.ratio) ?? ground;
+                const ratio = text ? contrastRatio(text, plate) : null;
+                const pass = ratio !== null && ratio >= 4.5;
+                return html`
+                  <div class="dev-pal-chip" style="background: ${plate};">
+                    <span
+                      class="dev-pal-word"
+                      style=${text ? `color: ${text};` : nothing}
+                      >${this._t("now")}</span
+                    >
+                    <span class="dev-pal-ratio ${pass ? "pass" : "fail"}">
+                      ${ratio === null ? "—" : ratio.toFixed(2)}
+                    </span>
+                    <span class="dev-pal-surface">${surface.label}</span>
+                  </div>
+                `;
+              })}
+              <code class="dev-pal-out">${(text ?? "—").toUpperCase()}</code>
+            </div>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  private _devTogglePalette = (): void => {
+    this._devPaletteOpen = !this._devPaletteOpen;
+  };
 
   private _randomFrom<T>(arr: readonly T[]): T | null {
     if (arr.length === 0) return null;
@@ -1968,6 +2097,7 @@ export class WienerLinienAustriaCard extends LitElement {
   private _devClear = (): void => {
     this._debugTraffic = [];
     this._debugElevator = [];
+    this._devPaletteOpen = false;
   };
 
 

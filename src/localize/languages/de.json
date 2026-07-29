@@ -40,6 +40,7 @@
     "devmode_title": "DEV",
     "devmode_traffic_btn": "Störung testen",
     "devmode_elevator_btn": "Aufzug testen",
+    "devmode_colors_btn": "Linienfarben",
     "devmode_clear_btn": "Löschen",
     "editor": {
       "lines_label": "Linien",

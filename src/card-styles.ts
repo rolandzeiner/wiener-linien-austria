@@ -1051,6 +1051,98 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
   }
 
+  /* Dev-mode palette panel. Every row shows one accent resolved for both
+     schemes at once, on both accented surfaces the countdown lands on —
+     so it deliberately does NOT follow the active theme: the two scheme
+     blocks carry HA's stock card backgrounds inline. */
+  .dev-palette {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+    padding: 8px;
+    border: 1px dashed var(--secondary-text-color, rgba(0, 0, 0, 0.3));
+    border-radius: var(--wl-radius-sm);
+    overflow-x: auto;
+  }
+  .dev-pal-row {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr 1fr;
+    align-items: stretch;
+    gap: 6px;
+    min-width: 30rem;
+  }
+  .dev-pal-id {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    min-width: 0;
+  }
+  .dev-pal-id code {
+    font-size: 0.62rem;
+    color: var(--secondary-text-color);
+  }
+  .dev-pal-badge {
+    align-self: flex-start;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #fff;
+    forced-color-adjust: none;
+  }
+  .dev-pal-scheme {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 6px;
+    border-radius: var(--wl-radius-sm);
+    border: 1px solid rgba(128, 128, 128, 0.35);
+  }
+  /* Deliberately a plain horizontal label: writing-mode + rotate would
+     save a few px but this panel exists to be read on the old WebViews
+     that motivated the fix in the first place. */
+  .dev-pal-scheme-label {
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8a8a8a;
+    flex-shrink: 0;
+  }
+  .dev-pal-chip {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    min-width: 0;
+  }
+  .dev-pal-word {
+    font-weight: 700;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .dev-pal-ratio {
+    font-size: 0.62rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .dev-pal-ratio.pass {
+    color: #4caf50;
+  }
+  .dev-pal-ratio.fail {
+    color: #ff5252;
+  }
+  .dev-pal-surface {
+    font-size: 0.55rem;
+    color: #8a8a8a;
+  }
+  .dev-pal-out {
+    margin-left: auto;
+    font-size: 0.6rem;
+    color: #8a8a8a;
+  }
+
   /* QR icon button — gentle accent tint while the panel is expanded
      so the toggle state reads at a glance, mirroring how dep-row's
      row-chevron flips on expand. */

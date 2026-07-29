@@ -117,6 +117,52 @@ const toHex = ([r, g, b]: Rgb): string =>
     )
     .join("");
 
+/** WCAG 2.x relative luminance, from linear-light sRGB. */
+const relativeLuminance = ([r, g, b]: Rgb): number =>
+  0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+/**
+ * WCAG contrast ratio between two colours, or null if either won't parse.
+ * Used by the dev-mode palette panel to label each combination pass/fail.
+ */
+export function contrastRatio(a: string, b: string): number | null {
+  const first = parseColor(a);
+  const second = parseColor(b);
+  if (!first || !second) return null;
+  const one = relativeLuminance(first);
+  const two = relativeLuminance(second);
+  return (Math.max(one, two) + 0.05) / (Math.min(one, two) + 0.05);
+}
+
+/**
+ * `accent` at `ratio` over `ground`, mixed in sRGB — the JS equivalent of the
+ * `color-mix(in srgb, var(--wl-accent) N%, transparent)` surfaces the card
+ * paints its accented blocks with, composited onto the card background.
+ * Returns null if either colour won't parse.
+ */
+export function mixOver(
+  accent: string,
+  ground: string,
+  ratio: number,
+): string | null {
+  const top = parseColor(accent);
+  const base = parseColor(ground);
+  if (!top || !base) return null;
+  const channels = ([0, 1, 2] as const).map((i) =>
+    clamp01(linearToSrgb(top[i]) * ratio + linearToSrgb(base[i]) * (1 - ratio)),
+  );
+  return (
+    "#" +
+    channels
+      .map((v) =>
+        Math.round(v * 255)
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")
+  );
+}
+
 /**
  * Return `accent` with its OKLCh lightness clamped into the legible band for
  * `scheme`, as `#rrggbb` — or null when the accent isn't resolvable or the
