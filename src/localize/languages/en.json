@@ -40,6 +40,7 @@
     "devmode_title": "DEV",
     "devmode_traffic_btn": "Test disruption",
     "devmode_elevator_btn": "Test elevator",
+    "devmode_colors_btn": "Line colours",
     "devmode_clear_btn": "Clear",
     "editor": {
       "lines_label": "Lines",

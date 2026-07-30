@@ -17,7 +17,7 @@ import type {
 
 import { cardStyles } from "./card-styles.js";
 import { registerWlFonts } from "./font-face.js";
-import { CARD_VERSION } from "./const.js";
+import { CARD_VERSION, NIGHTLINE_BG } from "./const.js";
 import { translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
@@ -58,6 +58,12 @@ import {
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
+import {
+  accentTextColor,
+  contrastRatio,
+  mixOver,
+  NEUTRAL_ACCENT_TEXT,
+} from "./utils/color.js";
 
 // Eager import — a dynamic `await import("./editor.js")` would race
 // HA's synchronous `document.createElement('…-editor')` call when the
@@ -151,6 +157,7 @@ export class WienerLinienAustriaCard extends LitElement {
   // QR dialog open state, keyed by stop entity_id. null = closed.
   // Per-stop so that in `tabs` layout each tab keeps its own dialog.
   @state() private _qrOpenFor: string | null = null;
+  @state() private _devPaletteOpen = false;
 
   private _versionCheckDone = false;
   // One-shot flag so the "configured entity missing → fell back to first WL
@@ -801,25 +808,15 @@ export class WienerLinienAustriaCard extends LitElement {
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
 
-    // Scheme polarity for --wl-accent-text (see card-styles.ts). Follows
-    // HA's own theme rather than light-dark() / prefers-color-scheme,
-    // both of which read the OS and would pick the wrong branch for a
-    // dark HA theme on a light-mode desktop — same call the flap card
-    // makes for .flap--light. Tri-state on purpose: `undefined` before
-    // themes have loaded leaves both classes off, so the hueless :host
-    // fallback stands instead of us guessing a polarity.
-    const scheme =
-      this.hass?.themes?.darkMode === true
-        ? "dark"
-        : this.hass?.themes?.darkMode === false
-          ? "light"
-          : undefined;
+    const accentText = accentTextColor(accent, this._colorScheme());
 
     const isPanel = tabIndex !== undefined;
     return html`
       <section
-        class=${classMap({ station: true, [`scheme-${scheme}`]: scheme !== undefined })}
-        style="--wl-accent: ${accent};"
+        class="station"
+        style="--wl-accent: ${accent};${accentText
+          ? ` --wl-accent-text: ${accentText};`
+          : ""}"
         id=${isPanel ? `wl-tabpanel-${tabIndex}` : nothing}
         role=${isPanel ? "tabpanel" : nothing}
         aria-labelledby=${isPanel ? `wl-tab-${tabIndex}` : nothing}
@@ -1317,6 +1314,41 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
+  /**
+   * Scheme polarity for `--wl-accent-text` (see utils/color.ts). Follows
+   * HA's own theme rather than light-dark() / prefers-color-scheme, both
+   * of which read the OS and would pick the wrong branch for a dark HA
+   * theme on a light-mode desktop — same call the flap card makes for
+   * .flap--light. Tri-state on purpose: `undefined` before themes have
+   * loaded yields no token, so the hueless `:host` fallback stands
+   * instead of us guessing a polarity.
+   */
+  private _colorScheme(): "dark" | "light" | undefined {
+    if (this.hass?.themes?.darkMode === true) return "dark";
+    if (this.hass?.themes?.darkMode === false) return "light";
+    return undefined;
+  }
+
+  /**
+   * Accent-as-text colour for one departure row's OWN line.
+   *
+   * `.station` sets `--wl-accent-text` from the hero lead, and every row
+   * inherits it — so a row at Jetzt painted the hero line's colour rather
+   * than its own. Invisible until two lines are at Jetzt at once, where
+   * both countdowns came out the same hue.
+   *
+   * Returns null when the polarity isn't known yet — there the station
+   * leaves the token unset too, so the hueless `:host` default already
+   * stands for every row. An accent the clamp can't resolve (the neutral
+   * `var(--primary-color)`) falls back to that same default explicitly:
+   * "unset" would mean inheriting the hero's hue, which is the bug.
+   */
+  private _rowAccentText(accent: string): string | null {
+    const scheme = this._colorScheme();
+    if (scheme === undefined) return null;
+    return accentTextColor(accent, scheme) ?? NEUTRAL_ACCENT_TEXT;
+  }
+
   private _renderRow(
     d: DepartureAttr,
     entityId: string,
@@ -1348,6 +1380,13 @@ export class WienerLinienAustriaCard extends LitElement {
     else if (signedDelay !== null && signedDelay >= 1) cdState = "late";
     else if (signedDelay !== null && signedDelay <= -1) cdState = "early";
 
+    // Only `now` reads --wl-accent-text inside a row, so only `now` needs
+    // the override — late/early carry their own semantic tokens. Same
+    // ladder as the badge beside it, so the countdown and the badge can
+    // never disagree about which line this row is.
+    const nowColor =
+      cdState === "now" ? this._rowAccentText(badgeStyle.background) : null;
+
     const showA11y = this._config!.show_accessibility;
     const hasFlags = Boolean(d.traffic_jam || (showA11y && d.barrier_free));
     const rowPlatform =
@@ -1371,7 +1410,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const rowTpl = html`
       <li
         class=${classMap(rowClasses)}
-        style=${`--row-i: ${rowIndex}`}
+        style=${`--row-i: ${rowIndex};${nowColor ? ` --wl-accent-text: ${nowColor};` : ""}`}
         role=${hasStopsAhead ? "button" : nothing}
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
@@ -1789,12 +1828,140 @@ export class WienerLinienAustriaCard extends LitElement {
         <span class="dev-strip-label">${this._t("devmode_title")}</span>
         <button type="button" @click=${this._devTestTraffic}>${this._t("devmode_traffic_btn")}</button>
         <button type="button" @click=${this._devTestElevator}>${this._t("devmode_elevator_btn")}</button>
+        <button
+          type="button"
+          aria-expanded=${this._devPaletteOpen ? "true" : "false"}
+          @click=${this._devTogglePalette}
+        >
+          ${this._t("devmode_colors_btn")}
+        </button>
         <button type="button" class="dev-strip-clear" @click=${this._devClear}>
           ${this._t("devmode_clear_btn")}
         </button>
       </div>
+      ${this._devPaletteOpen ? this._renderDevPalette() : nothing}
     `;
   }
+
+  // ------------------------------------------------------------------
+  // Dev-mode palette panel — every accent the card can be handed, run
+  // through accentTextColor() for BOTH schemes at once, on BOTH accented
+  // surfaces the countdown actually lands on: the hero block's 12% plate
+  // and the station's 6% radial wash. Rendered against HA's stock card
+  // backgrounds rather than the live theme, so one screenshot covers
+  // both themes without toggling anything.
+  // ------------------------------------------------------------------
+
+  /** HA stock card backgrounds — the reference grounds the panel measures against. */
+  private static readonly DEV_GROUNDS = { dark: "#1c1c1c", light: "#ffffff" } as const;
+
+  /** Accent surfaces defined in card-styles.ts, as (label, accent share). */
+  private static readonly DEV_SURFACES = [
+    { label: "hero", ratio: 0.12 },
+    { label: "row", ratio: 0.06 },
+  ] as const;
+
+  /**
+   * The distinct published palette plus the two edge cases that motivated
+   * the clamp — pure black (Badner Bahn) and pure white. Live GTFS colours
+   * not in this list are appended at render time, so a new line shows up
+   * here the day it appears in the feed.
+   */
+  private static readonly DEV_PALETTE: ReadonlyArray<{
+    readonly label: string;
+    readonly hex: string;
+  }> = [
+    { label: "U1", hex: "#E3000F" },
+    { label: "U2", hex: "#A862A4" },
+    { label: "U3", hex: "#EF7C00" },
+    { label: "U4", hex: "#319F49" },
+    { label: "U6", hex: "#9D6830" },
+    { label: "Tram", hex: "#C00808" },
+    { label: "Bus", hex: "#0A295D" },
+    { label: "Nightline", hex: NIGHTLINE_BG },
+    { label: "Badner Bahn", hex: "#000000" },
+    { label: "Weiß", hex: "#FFFFFF" },
+  ];
+
+  /** Fixture first, then any live GTFS colour the fixture doesn't already cover. */
+  private _devPaletteEntries(): ReadonlyArray<{
+    label: string;
+    hex: string;
+    live: boolean;
+  }> {
+    const entries = WienerLinienAustriaCard.DEV_PALETTE.map((e) => ({
+      ...e,
+      live: false,
+    }));
+    const seen = new Set(entries.map((e) => e.hex.toUpperCase()));
+    const live = firstLineColorsMap(
+      this.hass,
+      (this._config?.entities ?? []).map((s) => s.entity),
+    );
+    for (const [line, colors] of Object.entries(live)) {
+      if (!colors?.bg) continue;
+      const hex = `#${colors.bg}`.toUpperCase();
+      if (seen.has(hex)) continue;
+      seen.add(hex);
+      entries.push({ label: line, hex, live: true });
+    }
+    return entries;
+  }
+
+  private _renderDevPalette(): TemplateResult {
+    return html`
+      <div class="dev-palette">
+        ${this._devPaletteEntries().map((entry) => this._renderDevPaletteRow(entry))}
+      </div>
+    `;
+  }
+
+  private _renderDevPaletteRow(entry: {
+    label: string;
+    hex: string;
+    live: boolean;
+  }): TemplateResult {
+    return html`
+      <div class="dev-pal-row">
+        <div class="dev-pal-id">
+          <span class="dev-pal-badge" style="background: ${entry.hex};">${entry.label}</span>
+          <code>${entry.hex.toUpperCase()}${entry.live ? " ·live" : ""}</code>
+        </div>
+        ${(["dark", "light"] as const).map((scheme) => {
+          const text = accentTextColor(entry.hex, scheme);
+          const ground = WienerLinienAustriaCard.DEV_GROUNDS[scheme];
+          return html`
+            <div class="dev-pal-scheme" style="background: ${ground};">
+              <span class="dev-pal-scheme-label">${scheme}</span>
+              ${WienerLinienAustriaCard.DEV_SURFACES.map((surface) => {
+                const plate = mixOver(entry.hex, ground, surface.ratio) ?? ground;
+                const ratio = text ? contrastRatio(text, plate) : null;
+                const pass = ratio !== null && ratio >= 4.5;
+                return html`
+                  <div class="dev-pal-chip" style="background: ${plate};">
+                    <span
+                      class="dev-pal-word"
+                      style=${text ? `color: ${text};` : nothing}
+                      >${this._t("now")}</span
+                    >
+                    <span class="dev-pal-ratio ${pass ? "pass" : "fail"}">
+                      ${ratio === null ? "—" : ratio.toFixed(2)}
+                    </span>
+                    <span class="dev-pal-surface">${surface.label}</span>
+                  </div>
+                `;
+              })}
+              <code class="dev-pal-out">${(text ?? "—").toUpperCase()}</code>
+            </div>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  private _devTogglePalette = (): void => {
+    this._devPaletteOpen = !this._devPaletteOpen;
+  };
 
   private _randomFrom<T>(arr: readonly T[]): T | null {
     if (arr.length === 0) return null;
@@ -1964,6 +2131,7 @@ export class WienerLinienAustriaCard extends LitElement {
   private _devClear = (): void => {
     this._debugTraffic = [];
     this._debugElevator = [];
+    this._devPaletteOpen = false;
   };
 
 

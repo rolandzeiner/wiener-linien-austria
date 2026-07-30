@@ -4,7 +4,15 @@
 # Local dev tracks the floor or higher; CI installs the floor's minor
 # resolved by pip. PHACC's `==` pins govern syrupy + pytest-cov etc.,
 # so the floors below stay non-conflicting with whatever PHACC pulls in.
-pytest-homeassistant-custom-component>=0.13.348,<0.14
+# Pinned exact, not a floor: PHACC tracks HA's beta channel, so a floor
+# silently moves CI onto an HA beta mid-release. 0.13.349 pulled HA
+# 2026.8.0b0, which split `components/http/__init__.py` and now re-imports
+# StaticPathConfig from `.server` with `# noqa: F401` and no `__all__` —
+# mypy --strict rejects the non-explicit re-export and the `tests` job goes
+# red on a commit that didn't touch Python. Runtime is unaffected (the
+# public import still resolves), so this is lint-only. Same reasoning as
+# the exact mypy/ruff pins below. Unpin deliberately when adopting 2026.8.
+pytest-homeassistant-custom-component==0.13.348
 pytest-asyncio>=1.4.0,<2
 pytest-cov>=7.1.0,<8
 # syrupy floor intentionally omitted: PHACC pins syrupy with `==`, so any
