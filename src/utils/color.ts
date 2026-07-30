@@ -21,6 +21,14 @@
 const DARK_FLOOR = 0.72;
 const LIGHT_CEILING = 0.45;
 
+/**
+ * The hueless fallback — legible but carrying no line identity. Mirrors the
+ * `--wl-accent-text` default on `:host` in card-styles.ts, for the callers
+ * that have to state it rather than leave the token unset (a nested element
+ * would otherwise inherit an ancestor's line colour).
+ */
+export const NEUTRAL_ACCENT_TEXT = "var(--primary-text-color)";
+
 type Rgb = readonly [number, number, number];
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));

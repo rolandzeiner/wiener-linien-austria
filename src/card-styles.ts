@@ -979,6 +979,11 @@ export const cardStyles = css`
      not expose a realtime-vs-scheduled distinction, so the live-pulse
      dot Linz uses isn't applicable here — countdowns are coloured
      purely by their delay state. */
+  /* .now is per-ROW, not per-station: the row re-declares
+     --wl-accent-text from its own line (see _rowAccentText), because the
+     value inherited from .station is the hero lead's colour — two lines
+     both at Jetzt otherwise paint the same hue. Only this list surface
+     resolves per row; the hero and header keep the station accent. */
   .countdown.now   { color: var(--wl-accent-text); }
   .countdown.late  { color: var(--wl-error); }
   .countdown.early { color: var(--wl-rt); }

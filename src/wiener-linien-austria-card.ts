@@ -58,7 +58,12 @@ import {
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
 import { delayMinutes, formatTime } from "./utils/time.js";
-import { accentTextColor, contrastRatio, mixOver } from "./utils/color.js";
+import {
+  accentTextColor,
+  contrastRatio,
+  mixOver,
+  NEUTRAL_ACCENT_TEXT,
+} from "./utils/color.js";
 
 // Eager import — a dynamic `await import("./editor.js")` would race
 // HA's synchronous `document.createElement('…-editor')` call when the
@@ -803,20 +808,7 @@ export class WienerLinienAustriaCard extends LitElement {
       cd === null ? "—" : cd <= 0 ? this._t("now") : String(cd);
     const heroUnit = cd !== null && cd > 0 ? this._t("min") : "";
 
-    // Scheme polarity for --wl-accent-text (see utils/color.ts). Follows
-    // HA's own theme rather than light-dark() / prefers-color-scheme,
-    // both of which read the OS and would pick the wrong branch for a
-    // dark HA theme on a light-mode desktop — same call the flap card
-    // makes for .flap--light. Tri-state on purpose: `undefined` before
-    // themes have loaded yields no token, so the hueless :host fallback
-    // stands instead of us guessing a polarity.
-    const scheme =
-      this.hass?.themes?.darkMode === true
-        ? "dark"
-        : this.hass?.themes?.darkMode === false
-          ? "light"
-          : undefined;
-    const accentText = accentTextColor(accent, scheme);
+    const accentText = accentTextColor(accent, this._colorScheme());
 
     const isPanel = tabIndex !== undefined;
     return html`
@@ -1322,6 +1314,41 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
+  /**
+   * Scheme polarity for `--wl-accent-text` (see utils/color.ts). Follows
+   * HA's own theme rather than light-dark() / prefers-color-scheme, both
+   * of which read the OS and would pick the wrong branch for a dark HA
+   * theme on a light-mode desktop — same call the flap card makes for
+   * .flap--light. Tri-state on purpose: `undefined` before themes have
+   * loaded yields no token, so the hueless `:host` fallback stands
+   * instead of us guessing a polarity.
+   */
+  private _colorScheme(): "dark" | "light" | undefined {
+    if (this.hass?.themes?.darkMode === true) return "dark";
+    if (this.hass?.themes?.darkMode === false) return "light";
+    return undefined;
+  }
+
+  /**
+   * Accent-as-text colour for one departure row's OWN line.
+   *
+   * `.station` sets `--wl-accent-text` from the hero lead, and every row
+   * inherits it — so a row at Jetzt painted the hero line's colour rather
+   * than its own. Invisible until two lines are at Jetzt at once, where
+   * both countdowns came out the same hue.
+   *
+   * Returns null when the polarity isn't known yet — there the station
+   * leaves the token unset too, so the hueless `:host` default already
+   * stands for every row. An accent the clamp can't resolve (the neutral
+   * `var(--primary-color)`) falls back to that same default explicitly:
+   * "unset" would mean inheriting the hero's hue, which is the bug.
+   */
+  private _rowAccentText(accent: string): string | null {
+    const scheme = this._colorScheme();
+    if (scheme === undefined) return null;
+    return accentTextColor(accent, scheme) ?? NEUTRAL_ACCENT_TEXT;
+  }
+
   private _renderRow(
     d: DepartureAttr,
     entityId: string,
@@ -1353,6 +1380,13 @@ export class WienerLinienAustriaCard extends LitElement {
     else if (signedDelay !== null && signedDelay >= 1) cdState = "late";
     else if (signedDelay !== null && signedDelay <= -1) cdState = "early";
 
+    // Only `now` reads --wl-accent-text inside a row, so only `now` needs
+    // the override — late/early carry their own semantic tokens. Same
+    // ladder as the badge beside it, so the countdown and the badge can
+    // never disagree about which line this row is.
+    const nowColor =
+      cdState === "now" ? this._rowAccentText(badgeStyle.background) : null;
+
     const showA11y = this._config!.show_accessibility;
     const hasFlags = Boolean(d.traffic_jam || (showA11y && d.barrier_free));
     const rowPlatform =
@@ -1376,7 +1410,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const rowTpl = html`
       <li
         class=${classMap(rowClasses)}
-        style=${`--row-i: ${rowIndex}`}
+        style=${`--row-i: ${rowIndex};${nowColor ? ` --wl-accent-text: ${nowColor};` : ""}`}
         role=${hasStopsAhead ? "button" : nothing}
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}

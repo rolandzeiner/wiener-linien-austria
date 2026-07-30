@@ -958,6 +958,11 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
      not expose a realtime-vs-scheduled distinction, so the live-pulse
      dot Linz uses isn't applicable here — countdowns are coloured
      purely by their delay state. */
+  /* .now is per-ROW, not per-station: the row re-declares
+     --wl-accent-text from its own line (see _rowAccentText), because the
+     value inherited from .station is the hero lead's colour — two lines
+     both at Jetzt otherwise paint the same hue. Only this list surface
+     resolves per row; the hero and header keep the station accent. */
   .countdown.now   { color: var(--wl-accent-text); }
   .countdown.late  { color: var(--wl-error); }
   .countdown.early { color: var(--wl-rt); }
@@ -1794,7 +1799,7 @@ let qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         </div>
         ${t.flatMap(t=>[this._renderHeroEntry(t,e.entity),this._renderHeroPanelForEntry(t,e.entity)])}
       </div>
-    </div>`}_renderStop(e,t){const i=this._attrs(e.entity),n=i.stop_name||i.friendly_name,r=n||e.entity,a=function(e,t){const{lines:i,direction:n,line_directions:r,walk_times:a,accessibility_only:o}=t,s=i&&i.length?new Set(i):null;return e.filter(e=>{if(s&&!s.has(e.line))return!1;const t=r?.[e.line]??n;if(t&&e.direction!==t)return!1;if(a){const t=a[ft(e.line,String(e.direction??""))];if("number"==typeof t&&e.countdown<t)return!1}return!(o&&!e.barrier_free)})}(Array.isArray(i.departures)?i.departures:[],{...e,accessibility_only:this._config.accessibility_only}),o=Array.isArray(i.elevator_info)?i.elevator_info:[],s=this._debugElevator.filter(t=>t.__debug_entity===e.entity),l=[...o,...s],d=this._config.show_elevator_info&&l.length>0,c=this._stopMapUrl(r,i.latitude,i.longitude),h=this._stopGeoUri(r,i.latitude,i.longitude),p=!1!==this._config.show_qr_button&&null!==h,u=this._computeHeroGroup(a),f=u[0],_=this._config.show_hero_metric?new Set(u):new Set,m=a.filter(e=>!_.has(e)),g=m.slice(0,this._config.max_departures),b=pt(this.hass,e.entity),w=f?ct(f.line||"",this._config.line_colors,b):"var(--primary-color)",v=(y=f?.type,Ve(y)??"mdi:bus-stop");var y;const x=f&&Number.isFinite(f.countdown)?f.countdown:null,$=null===x?"—":x<=0?this._t("now"):String(x),k=null!==x&&x>0?this._t("min"):"",S=Bt(w,!0===this.hass?.themes?.darkMode?"dark":!1===this.hass?.themes?.darkMode?"light":void 0),A=void 0!==t;return j`
+    </div>`}_renderStop(e,t){const i=this._attrs(e.entity),n=i.stop_name||i.friendly_name,r=n||e.entity,a=function(e,t){const{lines:i,direction:n,line_directions:r,walk_times:a,accessibility_only:o}=t,s=i&&i.length?new Set(i):null;return e.filter(e=>{if(s&&!s.has(e.line))return!1;const t=r?.[e.line]??n;if(t&&e.direction!==t)return!1;if(a){const t=a[ft(e.line,String(e.direction??""))];if("number"==typeof t&&e.countdown<t)return!1}return!(o&&!e.barrier_free)})}(Array.isArray(i.departures)?i.departures:[],{...e,accessibility_only:this._config.accessibility_only}),o=Array.isArray(i.elevator_info)?i.elevator_info:[],s=this._debugElevator.filter(t=>t.__debug_entity===e.entity),l=[...o,...s],d=this._config.show_elevator_info&&l.length>0,c=this._stopMapUrl(r,i.latitude,i.longitude),h=this._stopGeoUri(r,i.latitude,i.longitude),p=!1!==this._config.show_qr_button&&null!==h,u=this._computeHeroGroup(a),f=u[0],_=this._config.show_hero_metric?new Set(u):new Set,m=a.filter(e=>!_.has(e)),g=m.slice(0,this._config.max_departures),b=pt(this.hass,e.entity),w=f?ct(f.line||"",this._config.line_colors,b):"var(--primary-color)",v=(y=f?.type,Ve(y)??"mdi:bus-stop");var y;const x=f&&Number.isFinite(f.countdown)?f.countdown:null,$=null===x?"—":x<=0?this._t("now"):String(x),k=null!==x&&x>0?this._t("min"):"",S=Bt(w,this._colorScheme()),A=void 0!==t;return j`
       <section
         class="station"
         style="--wl-accent: ${w};${S?` --wl-accent-text: ${S};`:""}"
@@ -1958,30 +1963,30 @@ let qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
           ${this._renderStopsAheadInner(e,n,r,a)}
         </div>
       </div>
-    `}_renderRow(e,t,i=0){const n=this._config.line_colors,r=pt(this.hass,t),a=e.line||"?",o=dt(a,n,r),s=Number.isFinite(e.countdown)?e.countdown:null,l=null===s?"—":s<=0?this._t("now"):`${s} ${this._t("min")}`,d=function(e,t){if(!e||!t)return null;const i=Date.parse(e),n=Date.parse(t);return Number.isFinite(i)&&Number.isFinite(n)?Math.round((n-i)/6e4):null}(e.time_planned,e.time_real),c=this._config.show_delay&&null!==d&&d>=1?1===d?this._t("delay_singular"):this._t("delay_plural",{n:d}):"";let h="";null!==s&&s<=0?h="now":null!==d&&d>=1?h="late":null!==d&&d<=-1&&(h="early");const p=this._config.show_accessibility,u=Boolean(e.traffic_jam||p&&e.barrier_free),f=this._config.show_platform&&e.platform?String(e.platform):null,_=this._config.show_type_icon?Ve(e.type):null,{hasStopsAhead:m,rowKey:g,expanded:b,panelId:w,ariaLabel:v}=this._expandState(e,t,"row"),y=j`
+    `}_colorScheme(){return!0===this.hass?.themes?.darkMode?"dark":!1===this.hass?.themes?.darkMode?"light":void 0}_rowAccentText(e){const t=this._colorScheme();return void 0===t?null:Bt(e,t)??"var(--primary-text-color)"}_renderRow(e,t,i=0){const n=this._config.line_colors,r=pt(this.hass,t),a=e.line||"?",o=dt(a,n,r),s=Number.isFinite(e.countdown)?e.countdown:null,l=null===s?"—":s<=0?this._t("now"):`${s} ${this._t("min")}`,d=function(e,t){if(!e||!t)return null;const i=Date.parse(e),n=Date.parse(t);return Number.isFinite(i)&&Number.isFinite(n)?Math.round((n-i)/6e4):null}(e.time_planned,e.time_real),c=this._config.show_delay&&null!==d&&d>=1?1===d?this._t("delay_singular"):this._t("delay_plural",{n:d}):"";let h="";null!==s&&s<=0?h="now":null!==d&&d>=1?h="late":null!==d&&d<=-1&&(h="early");const p="now"===h?this._rowAccentText(o.background):null,u=this._config.show_accessibility,f=Boolean(e.traffic_jam||u&&e.barrier_free),_=this._config.show_platform&&e.platform?String(e.platform):null,m=this._config.show_type_icon?Ve(e.type):null,{hasStopsAhead:g,rowKey:b,expanded:w,panelId:v,ariaLabel:y}=this._expandState(e,t,"row"),x=j`
       <li
-        class=${we({"dep-row":!0,expandable:m,expanded:b})}
-        style=${`--row-i: ${i}`}
-        role=${m?"button":q}
-        tabindex=${m?"0":q}
-        aria-expanded=${m?b?"true":"false":q}
-        aria-controls=${m?w:q}
-        aria-label=${m?v:q}
-        @click=${()=>m&&this._toggleRow(g)}
-        @keydown=${e=>this._onExpanderKeydown(e,m,()=>this._toggleRow(g))}
+        class=${we({"dep-row":!0,expandable:g,expanded:w})}
+        style=${`--row-i: ${i};${p?` --wl-accent-text: ${p};`:""}`}
+        role=${g?"button":q}
+        tabindex=${g?"0":q}
+        aria-expanded=${g?w?"true":"false":q}
+        aria-controls=${g?v:q}
+        aria-label=${g?y:q}
+        @click=${()=>g&&this._toggleRow(b)}
+        @keydown=${e=>this._onExpanderKeydown(e,g,()=>this._toggleRow(b))}
       >
         <div class="line-badge" style=${xe(o)}>${a}</div>
         <div class="towards">
-          ${_?j`<ha-icon class="type-icon" icon=${_} aria-hidden="true"></ha-icon>`:q}
+          ${m?j`<ha-icon class="type-icon" icon=${m} aria-hidden="true"></ha-icon>`:q}
           <div class="towards-rows">
             <span class="towards-name">${We(e.towards)}</span>${c?j`<span class="delay">${c}</span>`:q}
           </div>
         </div>
-        ${f||u?j`<span class="row-end">
-              ${f?j`<span class="row-platform"
-                    >${this._t(Gt(e.type))} ${f}</span
+        ${_||f?j`<span class="row-end">
+              ${_?j`<span class="row-platform"
+                    >${this._t(Gt(e.type))} ${_}</span
                   >`:q}
-              ${u?j`<span class="row-flags">
+              ${f?j`<span class="row-flags">
                     ${e.traffic_jam?j`<ha-icon
                           class="disturbance"
                           icon="mdi:alert-circle"
@@ -1989,7 +1994,7 @@ let qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
                           aria-label=${this._t("disturbance_title")}
                           title=${this._t("disturbance_title")}
                         ></ha-icon>`:q}
-                    ${p&&e.barrier_free?j`<ha-icon
+                    ${u&&e.barrier_free?j`<ha-icon
                           class="a11y"
                           icon="mdi:wheelchair-accessibility"
                           role="img"
@@ -2000,13 +2005,13 @@ let qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
             </span>`:j`<span></span>`}
         <!-- Conditional spread avoids classMap({ "": true }) when cdState is "". -->
         <div class=${we({countdown:!0,...h?{[h]:!0}:{}})}>${l}</div>
-        ${m?j`<ha-icon
+        ${g?j`<ha-icon
               class="row-chevron"
               icon="mdi:chevron-down"
               aria-hidden="true"
             ></ha-icon>`:q}
       </li>
-    `;return m?[y,this._renderStopsAheadPanel(e.stops_ahead,w,b,a,g,t)]:y}_renderStopsAheadPanel(e,t,i,n,r,a){return j`
+    `;return g?[x,this._renderStopsAheadPanel(e.stops_ahead,v,w,a,b,t)]:x}_renderStopsAheadPanel(e,t,i,n,r,a){return j`
       <li
         class=${we({"dep-row-detail":!0,expanded:i})}
         id=${t}
