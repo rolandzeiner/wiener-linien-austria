@@ -588,7 +588,8 @@ export class WienerLinienAustriaCard extends LitElement {
 
   private _renderTabs(stops: NormalisedModernStop[], activeIndex: number): TemplateResult {
     return html`
-      <div class="tabs" role="tablist">
+      <div class="tabbar">
+        <div class="tabs" role="tablist">
         ${stops.map((s, i) => {
           const attrs = this._attrs(s.entity);
           const label = attrs.stop_name || attrs.friendly_name || s.entity;
@@ -607,8 +608,48 @@ export class WienerLinienAustriaCard extends LitElement {
               this._onTabKeydown(ev, i, stops.length)}
           >${label}</button>`;
         })}
+        </div>
+        ${this._renderTabActions(stops, activeIndex)}
       </div>
     `;
+  }
+
+  /** Tab-strip home for the QR + map actions.
+   *
+   *  Only used when `hide_header` is set — otherwise the header owns
+   *  them and rendering here too would duplicate the pair. The strip is
+   *  a card-level sibling of the body, so unlike the header path the
+   *  active stop's geo data has to be resolved here rather than
+   *  inherited from `_renderStop`. Both helpers are pure functions of
+   *  (title, lat, lon), so this stays a derivation, not a second source
+   *  of truth.
+   *
+   *  The slot keeps a fixed width whenever the config asks for a QR
+   *  button: a stop with no coordinates yields `geoUri === null` and
+   *  drops the button, and without the reservation the tabs
+   *  (`flex: 1 0 auto`) would visibly re-flow as you switch between a
+   *  stop that has coordinates and one that doesn't. */
+  private _renderTabActions(
+    stops: NormalisedModernStop[],
+    activeIndex: number,
+  ): TemplateResult | typeof nothing {
+    if (!this._config!.hide_header) return nothing;
+    const active = stops[activeIndex] ?? stops[0];
+    if (!active) return nothing;
+
+    const attrs = this._attrs(active.entity);
+    const title = attrs.stop_name || attrs.friendly_name || active.entity;
+    const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
+    const geoUri = this._stopGeoUri(title, attrs.latitude, attrs.longitude);
+    const qrConfigured = this._config!.show_qr_button !== false;
+    const showQrButton = qrConfigured && geoUri !== null;
+    if (!mapUrl && !showQrButton) return nothing;
+
+    return html`<div
+      class=${classMap({ "tab-actions": true, reserved: qrConfigured })}
+    >
+      ${this._renderStopActions(active.entity, title, mapUrl, showQrButton)}
+    </div>`;
   }
 
   private _setActiveTab(i: number): void {
@@ -683,8 +724,6 @@ export class WienerLinienAustriaCard extends LitElement {
     mapUrl: string | null,
     showQrButton: boolean,
   ): TemplateResult {
-    const openInMaps = this._t("open_in_maps");
-    const qrOpenLabel = this._t("qr_open");
     return html`<header class="head">
       <span class="icon-tile" aria-hidden="true">
         <ha-icon icon=${headerIcon}></ha-icon>
@@ -697,34 +736,51 @@ export class WienerLinienAustriaCard extends LitElement {
       </div>
       ${mapUrl || showQrButton
         ? html`<div class="head-actions">
-            ${showQrButton
-              ? html`<button
-                  type="button"
-                  class=${classMap({
-                    "icon-action": true,
-                    "qr-toggle": true,
-                    expanded: this._qrOpenFor === stopCfg.entity,
-                  })}
-                  title=${qrOpenLabel}
-                  aria-label="${qrOpenLabel}: ${title}"
-                  aria-expanded=${this._qrOpenFor === stopCfg.entity ? "true" : "false"}
-                  aria-controls="wl-qr-${safeDomId(stopCfg.entity)}"
-                  @click=${() => this._toggleQrFor(stopCfg.entity)}
-                ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
-              : nothing}
-            ${mapUrl
-              ? html`<a
-                  class="icon-action"
-                  href=${mapUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title=${openInMaps}
-                  aria-label="${openInMaps}: ${title}"
-                ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`
-              : nothing}
+            ${this._renderStopActions(stopCfg.entity, title, mapUrl, showQrButton)}
           </div>`
         : nothing}
     </header>`;
+  }
+
+  /** The QR toggle + open-in-maps pair, without a container — the two
+   *  call sites bring their own. Normally they sit in `<header>`; when
+   *  `hide_header` is set they move to the tab strip instead, which is
+   *  why this takes a bare entity id rather than the stop config. */
+  private _renderStopActions(
+    entity: string,
+    title: string,
+    mapUrl: string | null,
+    showQrButton: boolean,
+  ): TemplateResult {
+    const openInMaps = this._t("open_in_maps");
+    const qrOpenLabel = this._t("qr_open");
+    return html`
+      ${showQrButton
+        ? html`<button
+            type="button"
+            class=${classMap({
+              "icon-action": true,
+              "qr-toggle": true,
+              expanded: this._qrOpenFor === entity,
+            })}
+            title=${qrOpenLabel}
+            aria-label="${qrOpenLabel}: ${title}"
+            aria-expanded=${this._qrOpenFor === entity ? "true" : "false"}
+            aria-controls="wl-qr-${safeDomId(entity)}"
+            @click=${() => this._toggleQrFor(entity)}
+          ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`
+        : nothing}
+      ${mapUrl
+        ? html`<a
+            class="icon-action"
+            href=${mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            title=${openInMaps}
+            aria-label="${openInMaps}: ${title}"
+          ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`
+        : nothing}
+    `;
   }
 
   /** The hero block: big countdown number + per-entry chip rows. The
@@ -784,6 +840,12 @@ export class WienerLinienAustriaCard extends LitElement {
     // regardless of which app rendered the QR.
     const showQrButton =
       this._config!.show_qr_button !== false && geoUri !== null;
+    // Where the toggle lives: the header normally, the tab strip when
+    // the header is hidden. `tabIndex` is only passed in tabs mode, so
+    // it doubles as "a tab strip exists". With neither, nothing can
+    // expand the panel — render no panel rather than leaving an
+    // unreachable one in the DOM.
+    const hasQrToggle = !this._config!.hide_header || tabIndex !== undefined;
 
     const heroGroup = this._computeHeroGroup(filtered);
     const heroLead = heroGroup[0];
@@ -834,7 +896,7 @@ export class WienerLinienAustriaCard extends LitElement {
               mapUrl,
               showQrButton,
             )}
-        ${showQrButton && geoUri
+        ${showQrButton && geoUri && hasQrToggle
           ? this._renderQrPanel(
               stopCfg.entity,
               title,

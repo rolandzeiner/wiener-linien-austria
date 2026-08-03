@@ -95,16 +95,46 @@ export const cardStyles = css`
   /* Tabs sit flush with the card edge — direct child of <ha-card>, not
      inside .wrap. Three active cues (colour + weight + inset underline)
      so the active tab reads without colour vision. */
-  .tabs {
+  /* The strip is split in two: .tabs scrolls horizontally on its own,
+     .tab-actions stays pinned outside that scroller so the buttons
+     don't drift off-screen with a long tab list. */
+  .tabbar {
     display: flex;
+    align-items: stretch;
     height: 44px;
     padding: 0 14px;
     border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+  }
+  .tabs {
+    display: flex;
+    flex: 1;
+    min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
   }
   .tabs::-webkit-scrollbar {
     display: none;
+  }
+  .tab-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    flex: 0 0 auto;
+    padding-left: 8px;
+  }
+  /* Two 32px buttons + the 2px gap. Held even when the active stop has
+     no coordinates and the QR button drops out, so switching tabs never
+     re-flows the tab widths. */
+  .tab-actions.reserved {
+    min-width: 66px;
+  }
+  .tab-actions .icon-action {
+    width: 32px;
+    height: 32px;
+  }
+  .tab-actions .icon-action ha-icon {
+    --mdc-icon-size: 18px;
   }
   .tab {
     flex: 1 0 auto;
