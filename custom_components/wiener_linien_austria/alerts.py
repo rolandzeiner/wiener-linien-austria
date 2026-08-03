@@ -219,8 +219,21 @@ async def _fetch_info_list(
         # propagates cleanly and we don't pollute the log with a noisy
         # warning that the user can do nothing about.
         raise
-    except (TimeoutError, aiohttp.ClientError, aiohttp.ContentTypeError, ValueError):
+    except (aiohttp.ContentTypeError, ValueError):
+        # The endpoint answered, but not with the JSON object we expect —
+        # a contract break upstream, or a proxy error page served with the
+        # wrong content type. Rare and actionable, so keep the traceback.
+        # Must be caught before ClientError below: ContentTypeError is a
+        # subclass of ClientResponseError, which is a subclass of ClientError.
         _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
+        return _FETCH_FAILED
+    except (TimeoutError, aiohttp.ClientError) as err:
+        # Transient upstream trouble — the ÖDV endpoint sheds load with
+        # 502/503 and times out sporadically. Alerts are advisory and the
+        # previous cache survives, so there is nothing for the user to act
+        # on. Debug, not warning: a traceback per occurrence buried real
+        # faults (29 of them in one week on an otherwise healthy install).
+        _LOGGER.debug("Failed to refresh %s alerts: %s", name, err)
         return _FETCH_FAILED
 
 
