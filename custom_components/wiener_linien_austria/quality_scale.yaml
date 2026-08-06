@@ -19,12 +19,18 @@ rules:
   docs-actions:
     status: exempt
     comment: No service actions.
+  docs-conditions:
+    status: exempt
+    comment: This integration does not have any conditions.
   docs-high-level-description:
     status: done
   docs-installation-instructions:
     status: done
   docs-removal-instructions:
     status: done
+  docs-triggers:
+    status: exempt
+    comment: This integration does not have any triggers.
   entity-event-setup:
     status: exempt
     comment: Coordinator pattern; entities don't subscribe to events directly.
