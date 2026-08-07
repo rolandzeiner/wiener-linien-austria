@@ -4,15 +4,16 @@
 # Local dev tracks the floor or higher; CI installs the floor's minor
 # resolved by pip. PHACC's `==` pins govern syrupy + pytest-cov etc.,
 # so the floors below stay non-conflicting with whatever PHACC pulls in.
-# Pinned exact, not a floor: PHACC tracks HA's beta channel, so a floor
-# silently moves CI onto an HA beta mid-release. 0.13.349 pulled HA
-# 2026.8.0b0, which split `components/http/__init__.py` and now re-imports
-# StaticPathConfig from `.server` with `# noqa: F401` and no `__all__` —
-# mypy --strict rejects the non-explicit re-export and the `tests` job goes
-# red on a commit that didn't touch Python. Runtime is unaffected (the
-# public import still resolves), so this is lint-only. Same reasoning as
-# the exact mypy/ruff pins below. Unpin deliberately when adopting 2026.8.
-pytest-homeassistant-custom-component==0.13.348
+# Unpinned again 2026-08-07. This was `==0.13.348` for a fortnight to
+# dodge a mypy --strict failure in 0.13.349: HA 2026.8.0b0 split
+# `components/http/__init__.py` and re-imported StaticPathConfig from
+# `.server` with `# noqa: F401` and no `__all__`, which mypy rejects as a
+# non-explicit re-export. Lint-only — the public import always resolved
+# at runtime. The condition has passed: 0.13.354 is current, the five
+# sibling repos float on this same range and are green on it, and this
+# repo imports StaticPathConfig identically to all of them. Holding the
+# pin was making this the only repo NOT tested against current HA core.
+pytest-homeassistant-custom-component>=0.13.348,<0.14
 pytest-asyncio>=1.4.0,<2
 pytest-cov>=7.1.0,<8
 # Backs `timeout = 60` in pytest.ini — a hung async fixture must fail the
