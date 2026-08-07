@@ -30,6 +30,32 @@ from custom_components.wiener_linien_austria.static import (
 pytest_plugins = "pytest_homeassistant_custom_component"
 
 
+@pytest.fixture(autouse=True)
+def _collapse_domain_cooldown_sleep() -> Any:
+    """Make the 15-second domain cooldown instant for every test.
+
+    `rate_limit.async_enforce_domain_cooldown` sleeps for real —
+    `DOMAIN_COOLDOWN_SECONDS` is 15 — so any test that fetches twice paid
+    that in wall-clock. Before this fixture the suite took 137s, of which
+    135s was seven tests sitting in that sleep (one of them 45s, being
+    three sequential fetches). Every push and every nightly cron paid it.
+
+    Autouse rather than per-test because the cost is invisible at the call
+    site: a test looks fast, and only shows up in `--durations`.
+
+    Tests that assert the cooldown MATHS (the sleep duration passed to
+    `asyncio.sleep`) patch the same target themselves inside a `with`
+    block; that patch nests inside this one and wins, so their assertions
+    still exercise the real calculation. See test_batch.py's
+    `test_domain_cooldown_*`.
+    """
+    with patch(
+        "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 def make_response_cm(resp: Any) -> MagicMock:
     """Wrap a mock response as an async context manager.
 

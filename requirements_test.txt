@@ -15,6 +15,9 @@
 pytest-homeassistant-custom-component==0.13.348
 pytest-asyncio>=1.4.0,<2
 pytest-cov>=7.1.0,<8
+# Backs `timeout = 60` in pytest.ini — a hung async fixture must fail the
+# job, not idle until the runner's 6-hour cap.
+pytest-timeout>=2.4,<3
 # syrupy floor intentionally omitted: PHACC pins syrupy with `==`, so any
 # floor here either matches PHACC (redundant) or contradicts it (unresolvable).
 # Let PHACC's transitive pin govern; dependabot bumps of syrupy can't apply.
