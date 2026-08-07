@@ -88,6 +88,12 @@
     },
     "api_upstream_error": {
       "message": "Wiener-Linien-API meldete Fehlercode {code}: {value}"
+    },
+    "invalid_rbls": {
+      "message": "Der Konfigurationseintrag enthält keine gültigen RBL-Haltestellen-IDs (erhalten: {received}). Bitte die Integration entfernen und neu hinzufügen."
+    },
+    "invalid_diva": {
+      "message": "Der Konfigurationseintrag enthält keine gültige DIVA-Haltestellennummer (erhalten: {received}). Bitte die Integration entfernen und neu hinzufügen."
     }
   },
   "issues": {
