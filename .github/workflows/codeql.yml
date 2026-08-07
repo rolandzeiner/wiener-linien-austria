@@ -4,6 +4,16 @@ name: CodeQL
 # Runs on every push to main/dev, every PR targeting main, and once a
 # week on Tuesday at 04:23 UTC to catch newly-published advisories
 # against code that hasn't been touched since the last scan.
+#
+# workflow_dispatch exists to re-run a scan that GitHub's own
+# infrastructure killed. During the 2026-08-06 Actions outage the
+# CodeQL jobs were cancelled before they got a runner, and with only
+# push/PR/weekly triggers the sole recovery options were an empty
+# commit or a four-day wait for the Tuesday cron.
+#
+# NOTE: GitHub reads dispatchability from the DEFAULT branch, not the
+# ref you target. This trigger does nothing until it lands on main —
+# `gh workflow run CodeQL --ref dev` returns HTTP 422 until then.
 
 on:
   push:
@@ -12,6 +22,7 @@ on:
     branches: [main]
   schedule:
     - cron: "23 4 * * 2"
+  workflow_dispatch:
 
 jobs:
   analyze:
