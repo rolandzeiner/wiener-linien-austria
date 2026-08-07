@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
 from syrupy.assertion import SnapshotAssertion
 
+from custom_components.wiener_linien_austria import rate_limit
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
@@ -31,28 +33,28 @@ pytest_plugins = "pytest_homeassistant_custom_component"
 
 
 @pytest.fixture(autouse=True)
-def _collapse_domain_cooldown_sleep() -> Any:
-    """Make the 15-second domain cooldown instant for every test.
+def _collapse_domain_cooldown(request: pytest.FixtureRequest) -> Generator[None]:
+    """Zero the domain cooldown so tests don't pay it in wall clock.
 
-    `rate_limit.async_enforce_domain_cooldown` sleeps for real —
-    `DOMAIN_COOLDOWN_SECONDS` is 15 — so any test that fetches twice paid
-    that in wall-clock. Before this fixture the suite took 137s, of which
-    135s was seven tests sitting in that sleep (one of them 45s, being
-    three sequential fetches). Every push and every nightly cron paid it.
+    `rate_limit.async_enforce_domain_cooldown` sleeps for real, so any
+    test that fetches twice would sit out `DOMAIN_COOLDOWN_SECONDS`.
+    Autouse rather than per-test because the cost is invisible at the
+    call site: a test looks fast and only shows up in `--durations`.
 
-    Autouse rather than per-test because the cost is invisible at the call
-    site: a test looks fast, and only shows up in `--durations`.
+    Patches the constant, not `asyncio.sleep`: patching
+    `rate_limit.asyncio.sleep` resolves the singleton asyncio module and
+    silences every sleep in the process, HA core's included.
 
-    Tests that assert the cooldown MATHS (the sleep duration passed to
-    `asyncio.sleep`) patch the same target themselves inside a `with`
-    block; that patch nests inside this one and wins, so their assertions
-    still exercise the real calculation. See test_batch.py's
-    `test_domain_cooldown_*`.
+    Zeroing it makes `elapsed < DOMAIN_COOLDOWN_SECONDS` false for any
+    non-negative elapsed, so the sleep branch is never entered.
+
+    Opt out with `@pytest.mark.real_domain_cooldown` when asserting the
+    cooldown arithmetic.
     """
-    with patch(
-        "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
-        new_callable=AsyncMock,
-    ):
+    if "real_domain_cooldown" in request.keywords:
+        yield
+        return
+    with patch.object(rate_limit, "DOMAIN_COOLDOWN_SECONDS", 0):
         yield
 
 

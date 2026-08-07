@@ -4,20 +4,17 @@
 # Local dev tracks the floor or higher; CI installs the floor's minor
 # resolved by pip. PHACC's `==` pins govern syrupy + pytest-cov etc.,
 # so the floors below stay non-conflicting with whatever PHACC pulls in.
-# Unpinned again 2026-08-07. This was `==0.13.348` for a fortnight to
-# dodge a mypy --strict failure in 0.13.349: HA 2026.8.0b0 split
-# `components/http/__init__.py` and re-imported StaticPathConfig from
-# `.server` with `# noqa: F401` and no `__all__`, which mypy rejects as a
-# non-explicit re-export. Lint-only — the public import always resolved
-# at runtime. The condition has passed: 0.13.354 is current, the five
-# sibling repos float on this same range and are green on it, and this
-# repo imports StaticPathConfig identically to all of them. Holding the
-# pin was making this the only repo NOT tested against current HA core.
+# Kept floating deliberately, and identical across all five repos.
+# PHACC tracks HA core including betas, so a patch bump can land on a
+# beta and break lint (mypy --strict is the usual casualty) with no
+# runtime fault. The fix is a temporary exact `==` pin carrying the
+# reason and the condition for removing it — not widening the range.
+# Drop the pin once the siblings are green on a later release.
 pytest-homeassistant-custom-component>=0.13.348,<0.14
 pytest-asyncio>=1.4.0,<2
 pytest-cov>=7.1.0,<8
-# Backs `timeout = 60` in pytest.ini — a hung async fixture must fail the
-# job, not idle until the runner's 6-hour cap.
+# Backs the `timeout` setting in pytest.ini — a hung async fixture must
+# fail the job, not idle until the runner's 6-hour cap.
 pytest-timeout>=2.4,<3
 # syrupy floor intentionally omitted: PHACC pins syrupy with `==`, so any
 # floor here either matches PHACC (redundant) or contradicts it (unresolvable).

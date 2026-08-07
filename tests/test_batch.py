@@ -302,6 +302,7 @@ async def test_recovery_clears_rate_limit_issue(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.real_domain_cooldown
 async def test_domain_cooldown_serialises(hass: HomeAssistant, monitor_fixture) -> None:
     """A recent domain call forces the group to wait out the remaining slice."""
     group, _ = _group_with_member(hass)
@@ -324,6 +325,7 @@ async def test_domain_cooldown_serialises(hass: HomeAssistant, monitor_fixture) 
     assert abs(actual - expected) < 0.5
 
 
+@pytest.mark.real_domain_cooldown
 async def test_domain_cooldown_no_sleep_when_elapsed(
     hass: HomeAssistant, monitor_fixture
 ) -> None:

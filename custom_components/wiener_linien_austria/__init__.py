@@ -346,7 +346,8 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     `async_on_unload` is per-entry — which is the wrong granularity
     for "fire when the LAST entry removes." Keep this pattern for
     domain-wide state; for new per-entry cleanup, prefer
-    `entry.async_on_unload`. See PORTFOLIO_LIFTABLES.md item 6.
+    `entry.async_on_unload`. See the portfolio-liftables reference,
+    item 6 (maintainer note; the file is not in this repo).
     """
     for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
         unsub = domain_data.pop(unsub_key, None)
@@ -450,8 +451,8 @@ async def async_remove_entry(
 ) -> None:
     """Drop the Lovelace resources when the LAST config entry is removed.
 
-    Both card resources are registered once globally per integration, so
-    reloading or removing a single entry must not remove them. Only when
+    All three card resources are registered once globally per integration,
+    so reloading or removing a single entry must not remove them. Only when
     no other entries of this domain remain do we unregister.
     """
     # Always clear this entry's per-entry Repairs issue. If the user is

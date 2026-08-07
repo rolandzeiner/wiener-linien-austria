@@ -183,7 +183,7 @@ class WienerLinienStopSensor(
 
         # User-tracked subset of `lines_at_stop` — the lines selected in
         # the integration's config flow (`CONF_LINES` is a list of
-        # `{line}|{direction}` keys). Both card editors prefer this
+        # `{line}|{direction}` keys). All three card editors prefer this
         # filtered list so the per-stop pickers don't surface lines the
         # user has explicitly opted out of, while still including ones
         # that aren't currently driving (nightlines during the day,
@@ -292,9 +292,9 @@ class WienerLinienStopSensor(
         DO NOT lift this pattern naively to other integrations
         without the same UX-vs-contract trade-off being made
         deliberately. Especially not for entities driving
-        automations more than dashboards. See
-        `~/.claude/skills/austria-portfolio-workflow/PORTFOLIO_LIFTABLES.md`
-        item 13 for the cleaner alternative (separate
-        `binary_sensor.<...>_stale` entity).
+        automations more than dashboards. The cleaner alternative is a
+        separate `binary_sensor.<...>_stale` entity — see the
+        portfolio-liftables reference, item 13 (maintainer note; the
+        file is not in this repo).
         """
         return self.coordinator.data is not None
