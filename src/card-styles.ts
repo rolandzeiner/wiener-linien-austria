@@ -721,6 +721,11 @@ export const cardStyles = css`
   .dep-row.expandable {
     cursor: pointer;
     user-select: none;
+    /* Divider moves to the trailing .dep-row-detail (which an expandable
+       row always emits, expanded or not) so the rule falls BELOW the
+       stops-ahead trail: the trail reads as part of this departure and
+       the line separates it from the next one. */
+    border-bottom: none;
   }
   .row-chevron {
     --mdc-icon-size: 18px;
@@ -743,6 +748,15 @@ export const cardStyles = css`
     grid-template-rows: 0fr;
     transition: grid-template-rows 0.24s ease;
     list-style: none;
+    /* Carries the divider on behalf of its .dep-row (see above). Applied
+       in both states rather than only on .expanded: collapsed the panel
+       is zero-height, so the rule lands exactly where the row's own
+       border used to sit, and it then travels smoothly with the panel
+       instead of snapping between two positions mid-animation. */
+    border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+  }
+  .dep-row-detail:last-child {
+    border-bottom: none;
   }
   .dep-row-detail-inner {
     overflow: hidden;
