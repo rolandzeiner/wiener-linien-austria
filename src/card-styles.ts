@@ -44,6 +44,11 @@ export const cardStyles = css`
     --wl-badge-pad-x: 8px;
     --wl-badge-width: calc(0.85rem * 2.4 + var(--wl-badge-pad-x) * 2);
 
+    /* Gap between a trail dot and its station name. On :host because the
+       departure row reads it too, to line its direction text up with the
+       stop names below. */
+    --stops-ahead-name-gap: 10px;
+
     /* Text-safe companion to --wl-accent. GTFS route_color is a
        *background* colour — Wiener Linien ships 0A295D for city buses
        and 000000 for the Badner Bahn, both fine behind white badge text
@@ -744,6 +749,9 @@ export const cardStyles = css`
        descendant's own font-size. */
     --stops-ahead-dot-size: 10px;
     --stops-ahead-line-width: 2px;
+    /* The .dep-row grid's column gap, named so the direction cell can
+       subtract it when aligning itself to the stop names. */
+    --wl-dep-col-gap: 8px;
     /* A row's left padding, and so where the badge's left border falls.
        Derived rather than picked: the trail can't sit further left than
        half a dot without .stops-ahead needing negative padding, which
@@ -760,7 +768,7 @@ export const cardStyles = css`
     display: grid;
     grid-template-columns: max-content 1fr auto auto auto;
     align-items: center;
-    gap: 8px;
+    gap: var(--wl-dep-col-gap);
     padding: 6px 2px 6px var(--wl-row-pad-left);
     border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     transition: background-color
@@ -942,7 +950,9 @@ export const cardStyles = css`
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding-left: calc(var(--stops-ahead-dot-size) + 10px);
+    padding-left: calc(
+      var(--stops-ahead-dot-size) + var(--stops-ahead-name-gap)
+    );
     min-height: var(--stops-ahead-dot-size);
   }
   .stops-ahead-row {
@@ -1446,6 +1456,20 @@ export const cardStyles = css`
       --wl-trail-x: calc(
         var(--wl-row-pad-left) + var(--wl-badge-width) -
           var(--stops-ahead-line-width) / 2
+      );
+    }
+    /* Nudge the direction text onto the same axis as the stop names
+       below it. The grid puts this cell at badge + column-gap; a stop
+       name sits at the dot column + its name gap, and the dot column is
+       inset from the badge's right border by half a dot less half the
+       stroke. The difference is what's added back here — 6px at the
+       default tokens. Wide cards only: on narrow ones the trail runs
+       flush left, so the stop names are far to the LEFT of the direction
+       and closing the gap would drag this text under the badge. */
+    .towards {
+      margin-left: calc(
+        var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2 +
+          var(--stops-ahead-name-gap) - var(--wl-dep-col-gap)
       );
     }
     /* Trail is indented out here, so it leaves the badge's trailing
