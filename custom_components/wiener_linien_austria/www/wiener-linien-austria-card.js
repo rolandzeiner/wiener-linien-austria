@@ -26,7 +26,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     /* Gap between a trail dot and its station name. On :host because the
        departure row reads it too, to line its direction text up with the
        stop names below. */
-    --stops-ahead-name-gap: 10px;
+    --stops-ahead-name-gap: var(--ha-space-2, 8px);
 
     /* Text-safe companion to --wl-accent. GTFS route_color is a
        *background* colour — Wiener Linien ships 0A295D for city buses
@@ -62,14 +62,33 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
        so the card moves with HA when tokens evolve. Values match
        linz-linien-austria so a stacked dashboard reads as one
        family. */
-    --wl-radius-sm: var(--ha-radius-sm, 6px);
-    --wl-radius-md: var(--ha-radius-md, 10px);
-    --wl-radius-lg: var(--ha-card-border-radius, var(--ha-radius-lg, 12px));
-    --wl-pad-x:     var(--ha-spacing-4, 16px);
-    --wl-pad-y:     var(--ha-spacing-3, 14px);
-    --wl-row-gap:   var(--ha-spacing-3, 12px);
+    --wl-radius-sm: var(--ha-border-radius-sm, 4px);
+    --wl-radius-md: var(--ha-border-radius-md, 8px);
+    --wl-radius-lg: var(--ha-card-border-radius, var(--ha-border-radius-lg, 12px));
+    /* These names were wrong until v1.7.6 and nothing complained: var()
+       on a token HA does not define is not an error, it just resolves to
+       the fallback. So the card ran entirely on its own literals while
+       looking theme-aware — which is how --ha-spacing-3 came to mean
+       14px on one line and 12px on the next.
+
+       Verified against the frontend's src/resources/theme/core.globals.ts:
+         --ha-space-N          4px grid, 1…14   (was --ha-spacing-N)
+         --ha-border-radius-*  sm 4 / md 8 / lg 12 / xl 16 / pill / circle
+                                                (was --ha-radius-*)
+         --ha-animation-duration-*  none 1 / instant 75 / fast 150 /
+                                    normal 250 / slow 350ms
+                                                (was --ha-transition-duration-*)
+       There is no easing token — --ha-transition-easing-standard never
+       existed either, so easings are now named directly.
+
+       Fallbacks are kept and now match the token they stand in for.
+       Adopting a new --ha-* token means checking core.globals.ts first;
+       a typo here is invisible. */
+    --wl-pad-x:     var(--ha-space-4, 16px);
+    --wl-pad-y:     var(--ha-space-3, 12px);
+    --wl-row-gap:   var(--ha-space-3, 12px);
     --wl-tile-size: 40px;
-    --wl-slot-radius: var(--ha-radius-md, 10px);
+    --wl-slot-radius: var(--ha-border-radius-md, 8px);
     --wl-slot-gap: 6px;
     --wl-slot-min-h: 44px;
     --wl-metric-size: 2.25rem;
@@ -144,7 +163,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), box-shadow var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+    transition: color var(--ha-animation-duration-fast, 150ms) ease, box-shadow var(--ha-animation-duration-fast, 150ms) ease;
   }
   .tab:hover {
     color: var(--primary-text-color);
@@ -245,7 +264,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     text-decoration: none;
     border: none;
     cursor: pointer;
-    transition: background-color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+    transition: background-color var(--ha-animation-duration-fast, 150ms) ease, color var(--ha-animation-duration-fast, 150ms) ease;
   }
   .icon-action:hover {
     background: color-mix(in srgb, var(--primary-color) 12%, transparent);
@@ -265,7 +284,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
   .hero {
     display: grid;
     grid-template-columns: auto 1fr;
-    column-gap: var(--ha-spacing-3, 12px);
+    column-gap: var(--ha-space-3, 12px);
     row-gap: 6px;
     align-items: center;
     /* Cosmetics (background, padding, radius) live on .hero-host so
@@ -316,7 +335,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: var(--ha-spacing-3, 12px) var(--wl-pad-x);
+    padding: var(--ha-space-3, 12px) var(--wl-pad-x);
     background: color-mix(in srgb, var(--wl-accent) 12%, transparent);
     border-radius: var(--wl-radius-lg);
   }
@@ -342,8 +361,8 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
        pass that nudges flex siblings during the transition. */
     will-change: transform;
     transition: transform
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .hero-entry.expanded .hero-chevron {
     transform: rotate(180deg);
@@ -435,7 +454,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     font-weight: 600;
     cursor: pointer;
     box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
-    transition: filter var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), transform 0.06s ease;
+    transition: filter var(--ha-animation-duration-fast, 150ms) ease, transform 0.06s ease;
     forced-color-adjust: none;
   }
   .banner > button:hover {
@@ -667,7 +686,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     margin-left: auto;
     --mdc-icon-size: 20px;
     color: var(--secondary-text-color);
-    transition: transform var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+    transition: transform var(--ha-animation-duration-fast, 150ms) ease;
     flex-shrink: 0;
   }
   .alert.expanded .alert-chevron {
@@ -730,7 +749,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     --stops-ahead-line-width: 2px;
     /* The .dep-row grid's column gap, named so the direction cell can
        subtract it when aligning itself to the stop names. */
-    --wl-dep-col-gap: 8px;
+    --wl-dep-col-gap: var(--ha-space-2, 8px);
     /* A row's left padding, and so where the badge's left border falls.
        Derived rather than picked: the trail can't sit further left than
        half a dot without .stops-ahead needing negative padding, which
@@ -748,11 +767,13 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     grid-template-columns: max-content 1fr auto auto auto;
     align-items: center;
     gap: var(--wl-dep-col-gap);
-    padding: 6px 2px 6px var(--wl-row-pad-left);
+    /* Symmetric: the old right-hand 2px matched nothing and left every
+       row sitting 2px left of centre in its container. */
+    padding: var(--ha-space-2, 8px) var(--wl-row-pad-left);
     border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     transition: background-color
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .dep-row:last-child {
     border-bottom: none;
@@ -787,8 +808,8 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     color: var(--secondary-text-color);
     flex-shrink: 0;
     transition: transform
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .dep-row.expanded .row-chevron {
     transform: rotate(180deg);
@@ -858,10 +879,14 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     --stops-ahead-line-width: 2px;
     /* Doubles as the gap between stops and the panel's top padding, so
        a stop's connector segment can bridge either with one offset. */
-    --stops-ahead-gap: 8px;
+    --stops-ahead-gap: var(--ha-space-2, 8px);
     list-style: none;
     margin: 0;
-    padding: var(--stops-ahead-gap) 10px 10px 0;
+    /* Symmetric top and bottom. The old 10px bottom existed to feed the
+       removed single stroke's end calculation (bottom: 10px + half a
+       dot); with the line drawn per stop it described nothing. */
+    padding: var(--stops-ahead-gap) var(--ha-space-2, 8px)
+      var(--stops-ahead-gap) 0;
     position: relative;
     display: flex;
     flex-direction: column;
@@ -928,7 +953,10 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    /* Owns the space under the name row on its own — .stops-ahead-others
+       used to add a further 2px margin-top, so the real gap was 6px and
+       you had to find both declarations to know it. */
+    gap: var(--ha-space-1, 4px);
     padding-left: calc(
       var(--stops-ahead-dot-size) + var(--stops-ahead-name-gap)
     );
@@ -937,7 +965,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
   .stops-ahead-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--ha-space-2, 8px);
     min-height: var(--stops-ahead-dot-size);
   }
   /* Pointer cursor on intermediate stops the user can actually click —
@@ -985,7 +1013,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
   .stops-ahead-metros {
     display: inline-flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--ha-space-1, 4px);
     flex-shrink: 0;
   }
   .stops-ahead-line-chip {
@@ -1025,8 +1053,8 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
   .stops-ahead-other-toggle ha-icon {
     --mdc-icon-size: 14px;
     transition: transform
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .stops-ahead-stop.transfers-expanded .stops-ahead-other-toggle ha-icon {
     transform: rotate(180deg);
@@ -1036,8 +1064,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
   .stops-ahead-others {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 2px;
+    gap: var(--ha-space-1, 4px);
   }
   /* Non-metro chips render slightly lighter so the inline U-Bahn chips
      stay the dominant signal. */
@@ -1053,8 +1080,8 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
        eases back on collapse too. The reduced-motion block at the foot
        of this stylesheet neutralises it for users who opt out. */
     transition: border-radius
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
     text-align: center;
     font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     font-weight: 700;
@@ -1842,8 +1869,8 @@ let Vt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
       font-variant-numeric: tabular-nums;
       cursor: pointer;
       transition:
-        background-color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease),
-        color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+        background-color var(--ha-animation-duration-fast, 150ms) ease,
+        color var(--ha-animation-duration-fast, 150ms) ease;
       border: 1.5px solid var(--chip-color);
       background: transparent;
       color: var(--primary-text-color);
@@ -1853,7 +1880,7 @@ let Vt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
       --mdc-icon-size: 16px;
       color: var(--chip-color);
       flex-shrink: 0;
-      transition: color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+      transition: color var(--ha-animation-duration-fast, 150ms) ease;
     }
     .chip:hover {
       background: color-mix(in srgb, var(--chip-color) 16%, transparent);

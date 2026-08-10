@@ -730,8 +730,8 @@ export class WienerLinienAustriaCardEditor
       font-variant-numeric: tabular-nums;
       cursor: pointer;
       transition:
-        background-color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease),
-        color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+        background-color var(--ha-animation-duration-fast, 150ms) ease,
+        color var(--ha-animation-duration-fast, 150ms) ease;
       border: 1.5px solid var(--chip-color);
       background: transparent;
       color: var(--primary-text-color);
@@ -741,7 +741,7 @@ export class WienerLinienAustriaCardEditor
       --mdc-icon-size: 16px;
       color: var(--chip-color);
       flex-shrink: 0;
-      transition: color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+      transition: color var(--ha-animation-duration-fast, 150ms) ease;
     }
     .chip:hover {
       background: color-mix(in srgb, var(--chip-color) 16%, transparent);
