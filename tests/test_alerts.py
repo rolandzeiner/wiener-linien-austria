@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -26,6 +27,8 @@ from custom_components.wiener_linien_austria.const import (
     TRAFFIC_INFO_KEY,
 )
 from tests.conftest import make_response_cm
+
+ALERTS_LOGGER = "custom_components.wiener_linien_austria.alerts"
 
 
 @pytest.fixture(autouse=True)
@@ -376,9 +379,15 @@ def _mock_session(resp: MagicMock) -> MagicMock:
 
 async def test_fetch_info_list_http_error_returns_failed(
     hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A 5xx from upstream yields _FETCH_FAILED so the caller leaves the
-    cache untouched (vs an empty `[]`, which would now overwrite it)."""
+    cache untouched (vs an empty `[]`, which would now overwrite it).
+
+    It is logged at debug, not warning: the ÖDV endpoint sheds load with
+    502/503 routinely, alerts are advisory, and a warning-level traceback
+    per occurrence drowns out real faults.
+    """
     req_info = MagicMock()
     req_info.real_url = "https://example/trafficInfoList"
     err = aiohttp.ClientResponseError(
@@ -389,12 +398,52 @@ async def test_fetch_info_list_http_error_returns_failed(
     resp.json = AsyncMock()
     fake_session = _mock_session(resp)
 
-    with patch(
-        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
-        return_value=fake_session,
+    with (
+        caplog.at_level(logging.DEBUG, logger=ALERTS_LOGGER),
+        patch(
+            "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+            return_value=fake_session,
+        ),
     ):
         result = await _fetch_info_list(hass, "stoerunglang")
     assert isinstance(result, _FetchFailed)
+
+    records = [r for r in caplog.records if r.name == ALERTS_LOGGER]
+    assert [r.levelno for r in records] == [logging.DEBUG]
+    assert "stoerunglang" in records[0].getMessage()
+    # No traceback attached — that is the whole point of the downgrade.
+    assert records[0].exc_info is None
+
+
+async def test_fetch_info_list_bad_content_type_still_warns(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A non-JSON body is a contract break, not routine load-shedding, so
+    it keeps its warning-level traceback while 5xx is demoted to debug."""
+    req_info = MagicMock()
+    req_info.real_url = "https://example/trafficInfoList"
+    err = aiohttp.ContentTypeError(
+        request_info=req_info, history=(), message="not json"
+    )
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(side_effect=err)
+    fake_session = _mock_session(resp)
+
+    with (
+        caplog.at_level(logging.DEBUG, logger=ALERTS_LOGGER),
+        patch(
+            "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+            return_value=fake_session,
+        ),
+    ):
+        result = await _fetch_info_list(hass, "stoerunglang")
+    assert isinstance(result, _FetchFailed)
+
+    records = [r for r in caplog.records if r.name == ALERTS_LOGGER]
+    assert [r.levelno for r in records] == [logging.WARNING]
+    assert records[0].exc_info is not None
 
 
 async def test_fetch_info_list_non_ok_message_code_returns_failed(

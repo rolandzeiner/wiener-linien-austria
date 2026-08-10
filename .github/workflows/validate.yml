@@ -63,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Login to ghcr.io
-        uses: docker/login-action@v4.4.0
+        uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -171,6 +171,26 @@ jobs:
         run: npx tsc --noEmit
       - name: Build card bundles
         run: npm run build
+      - name: Assert the committed bundles match a fresh build
+        # The build above regenerates www/ from src/. Any diff means a
+        # committed bundle is stale — someone changed src/ and didn't
+        # rebuild. This repo ships THREE bundles (modern, retro, flap),
+        # so the whole www/ directory is checked rather than one file;
+        # www/fonts/ is not generated and will never diff.
+        #
+        # Nothing else in the gate catches this:
+        # tests/test_card_version.py compares manifest.json against
+        # src/const.ts, i.e. source vs source, never the built artefact.
+        # Shipping a stale bundle is the infinite-reload-banner bug: the
+        # card's WebSocket version check sees the old CARD_VERSION, shows
+        # the reload banner, the reload re-serves the same stale JS, and
+        # the banner comes straight back — for every HACS user.
+        run: |
+          if ! git diff --exit-code -- custom_components/wiener_linien_austria/www/; then
+            echo "::error::A committed card bundle differs from a fresh build."
+            echo "::error::Run 'npm run build' and commit custom_components/wiener_linien_austria/www/."
+            exit 1
+          fi
       - name: Syntax-check modern bundle
         run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-card.js
       - name: Syntax-check retro bundle

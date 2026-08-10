@@ -140,7 +140,7 @@ Every `sensor.{stop}_abfahrten` entity carries:
 | `traffic_info` | list[dict] | Service disruptions matching tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
-The 20-departure cap keeps busy multi-line stops under HA's 16 KB recorder attribute limit even when each row carries the full `stops_ahead` trail. The card's `max_departures` slider tops out at 20, so nothing displayed is clipped.
+The 20-departure cap bounds the attribute payload sent on every update, even when each row carries the full `stops_ahead` trail. The card's `max_departures` slider tops out at 20, so nothing displayed is clipped.
 
 ### Departure shape
 

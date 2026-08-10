@@ -8,8 +8,10 @@ covered by the `test_card_version` invariants and live-HA smoke tests.
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.const import (
@@ -150,3 +152,25 @@ async def test_delete_then_readd_re_registers_resources(
     # And the sentinel is re-flagged for the duration of this run so a
     # second entry add doesn't double-register.
     assert hass.data[DOMAIN].get(RESOURCES_REGISTERED_KEY) is True
+
+
+async def test_setup_uses_no_deprecated_ha_api(
+    hass: HomeAssistant, mock_fetch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """HA reports deprecated API use to the logger, not via warnings.
+
+    `frame.report_usage` logs through `_LOGGER.warning`
+    (homeassistant/helpers/frame.py:393) and never calls `warnings.warn`,
+    so pytest.ini's `error::DeprecationWarning` cannot see it. This is the
+    check that covers that channel.
+    """
+    caplog.set_level(logging.WARNING)
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+
+    assert "Detected that custom integration" not in caplog.text

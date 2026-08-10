@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
 from syrupy.assertion import SnapshotAssertion
 
+from custom_components.wiener_linien_austria import rate_limit
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
@@ -28,6 +30,32 @@ from custom_components.wiener_linien_austria.static import (
 )
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+@pytest.fixture(autouse=True)
+def _collapse_domain_cooldown(request: pytest.FixtureRequest) -> Generator[None]:
+    """Zero the domain cooldown so tests don't pay it in wall clock.
+
+    `rate_limit.async_enforce_domain_cooldown` sleeps for real, so any
+    test that fetches twice would sit out `DOMAIN_COOLDOWN_SECONDS`.
+    Autouse rather than per-test because the cost is invisible at the
+    call site: a test looks fast and only shows up in `--durations`.
+
+    Patches the constant, not `asyncio.sleep`: patching
+    `rate_limit.asyncio.sleep` resolves the singleton asyncio module and
+    silences every sleep in the process, HA core's included.
+
+    Zeroing it makes `elapsed < DOMAIN_COOLDOWN_SECONDS` false for any
+    non-negative elapsed, so the sleep branch is never entered.
+
+    Opt out with `@pytest.mark.real_domain_cooldown` when asserting the
+    cooldown arithmetic.
+    """
+    if "real_domain_cooldown" in request.keywords:
+        yield
+        return
+    with patch.object(rate_limit, "DOMAIN_COOLDOWN_SECONDS", 0):
+        yield
 
 
 def make_response_cm(resp: Any) -> MagicMock:

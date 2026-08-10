@@ -151,7 +151,7 @@ class JSModuleRegistration:
             configs.append(StaticPathConfig(FONTS_URL, str(fonts_dir), False))
         if not configs:
             # No card JS at all on disk — the integration's user-visible
-            # surface (both modern and retro Lovelace cards) is broken.
+            # surface (all three Lovelace cards) is broken.
             # Promote from the per-file warning to a single error so the
             # condition is loud in the integration log instead of silent.
             if JSMODULES:

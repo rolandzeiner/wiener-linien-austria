@@ -2093,8 +2093,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       justify-content: space-between;
       background: #000;
       color: #fff;
-      padding: var(--ha-spacing-2, 8px) var(--ha-spacing-3, 12px);
-      gap: var(--ha-spacing-2, 8px);
+      padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
+      gap: var(--ha-space-2, 8px);
       /* WL Sans Condensed is the subsetted TeX Gyre Heros Cn face —
          the condensed proportion matches real Wiener Linien station
          signage. Ships only at weight 700 (the only weight the
@@ -2275,11 +2275,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     /* Size-token alignment — match the .retro--size-* scale. */
     .retro--size-medium .retro-station-header {
       font-size: 0.9em;
-      padding: 6px var(--ha-spacing-2, 10px);
+      padding: 6px var(--ha-space-2, 8px);
     }
     .retro--size-small .retro-station-header {
       font-size: 0.8em;
-      padding: 5px var(--ha-spacing-2, 8px);
+      padding: 5px var(--ha-space-2, 8px);
     }
     /* Narrow-width reflow (WCAG 1.4.10 AA) — drop the destination
        label so the icons stay visible at a 320 px section-view

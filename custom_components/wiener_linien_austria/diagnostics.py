@@ -17,6 +17,14 @@ from .static import CATALOGUE_KEY, StaticCatalogue
 # defends future generically-named credential / coord fields against a
 # silent leak. Today: no credentials, but coords leak the user's chosen
 # stop location; the credential keys are defensive future-proofing.
+#
+# `entry.title` is deliberately NOT redacted, even though the stop name it
+# carries is coarse location data of the same kind as the coordinates
+# below. The two are not inconsistent: coordinates pin a household to a
+# few metres, whereas the title is a user-chosen label that is what makes
+# a shared dump readable at all — "which entry is this?" is the first
+# question every triage starts with. Redacting it buys little and costs
+# the dump most of its usefulness. Ratified 2026-08-07.
 TO_REDACT: set[str] = {
     "lat",
     "lon",

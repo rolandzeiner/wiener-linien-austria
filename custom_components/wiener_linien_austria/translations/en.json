@@ -88,6 +88,12 @@
     },
     "api_upstream_error": {
       "message": "Wiener Linien API reported error code {code}: {value}"
+    },
+    "invalid_rbls": {
+      "message": "Config entry contains no valid RBL stop IDs (received {received}). Remove and re-add the integration."
+    },
+    "invalid_diva": {
+      "message": "Config entry contains no valid DIVA stop number (received {received}). Remove and re-add the integration."
     }
   },
   "issues": {

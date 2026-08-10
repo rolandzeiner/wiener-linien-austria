@@ -34,6 +34,21 @@ export const cardStyles = css`
        lands inline on .station via style="--wl-accent: …;". */
     --wl-accent: var(--primary-color);
 
+    /* The .line-badge box, as one authoritative pair. The badge derives
+       its min-width from these rather than declaring its own, so the
+       token can never disagree with the element it describes — the
+       departure trail aligns its stroke to the badge's right border and
+       any drift between the two shows up as a misaligned connector.
+       No line label is wide enough to beat the 2.4em min-width, so
+       every badge is exactly --wl-badge-width across. */
+    --wl-badge-pad-x: 8px;
+    --wl-badge-width: calc(0.85rem * 2.4 + var(--wl-badge-pad-x) * 2);
+
+    /* Gap between a trail dot and its station name. On :host because the
+       departure row reads it too, to line its direction text up with the
+       stop names below. */
+    --stops-ahead-name-gap: var(--ha-space-2, 8px);
+
     /* Text-safe companion to --wl-accent. GTFS route_color is a
        *background* colour — Wiener Linien ships 0A295D for city buses
        and 000000 for the Badner Bahn, both fine behind white badge text
@@ -68,14 +83,33 @@ export const cardStyles = css`
        so the card moves with HA when tokens evolve. Values match
        linz-linien-austria so a stacked dashboard reads as one
        family. */
-    --wl-radius-sm: var(--ha-radius-sm, 6px);
-    --wl-radius-md: var(--ha-radius-md, 10px);
-    --wl-radius-lg: var(--ha-card-border-radius, var(--ha-radius-lg, 12px));
-    --wl-pad-x:     var(--ha-spacing-4, 16px);
-    --wl-pad-y:     var(--ha-spacing-3, 14px);
-    --wl-row-gap:   var(--ha-spacing-3, 12px);
+    --wl-radius-sm: var(--ha-border-radius-sm, 4px);
+    --wl-radius-md: var(--ha-border-radius-md, 8px);
+    --wl-radius-lg: var(--ha-card-border-radius, var(--ha-border-radius-lg, 12px));
+    /* These names were wrong until v1.7.6 and nothing complained: var()
+       on a token HA does not define is not an error, it just resolves to
+       the fallback. So the card ran entirely on its own literals while
+       looking theme-aware — which is how --ha-spacing-3 came to mean
+       14px on one line and 12px on the next.
+
+       Verified against the frontend's src/resources/theme/core.globals.ts:
+         --ha-space-N          4px grid, 1…14   (was --ha-spacing-N)
+         --ha-border-radius-*  sm 4 / md 8 / lg 12 / xl 16 / pill / circle
+                                                (was --ha-radius-*)
+         --ha-animation-duration-*  none 1 / instant 75 / fast 150 /
+                                    normal 250 / slow 350ms
+                                                (was --ha-transition-duration-*)
+       There is no easing token — --ha-transition-easing-standard never
+       existed either, so easings are now named directly.
+
+       Fallbacks are kept and now match the token they stand in for.
+       Adopting a new --ha-* token means checking core.globals.ts first;
+       a typo here is invisible. */
+    --wl-pad-x:     var(--ha-space-4, 16px);
+    --wl-pad-y:     var(--ha-space-3, 12px);
+    --wl-row-gap:   var(--ha-space-3, 12px);
     --wl-tile-size: 40px;
-    --wl-slot-radius: var(--ha-radius-md, 10px);
+    --wl-slot-radius: var(--ha-border-radius-md, 8px);
     --wl-slot-gap: 6px;
     --wl-slot-min-h: 44px;
     --wl-metric-size: 2.25rem;
@@ -95,16 +129,46 @@ export const cardStyles = css`
   /* Tabs sit flush with the card edge — direct child of <ha-card>, not
      inside .wrap. Three active cues (colour + weight + inset underline)
      so the active tab reads without colour vision. */
-  .tabs {
+  /* The strip is split in two: .tabs scrolls horizontally on its own,
+     .tab-actions stays pinned outside that scroller so the buttons
+     don't drift off-screen with a long tab list. */
+  .tabbar {
     display: flex;
+    align-items: stretch;
     height: 44px;
     padding: 0 14px;
     border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
+  }
+  .tabs {
+    display: flex;
+    flex: 1;
+    min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
   }
   .tabs::-webkit-scrollbar {
     display: none;
+  }
+  .tab-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+    flex: 0 0 auto;
+    padding-left: 8px;
+  }
+  /* Two 32px buttons + the 2px gap. Held even when the active stop has
+     no coordinates and the QR button drops out, so switching tabs never
+     re-flows the tab widths. */
+  .tab-actions.reserved {
+    min-width: 66px;
+  }
+  .tab-actions .icon-action {
+    width: 32px;
+    height: 32px;
+  }
+  .tab-actions .icon-action ha-icon {
+    --mdc-icon-size: 18px;
   }
   .tab {
     flex: 1 0 auto;
@@ -120,7 +184,7 @@ export const cardStyles = css`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), box-shadow var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+    transition: color var(--ha-animation-duration-fast, 150ms) ease, box-shadow var(--ha-animation-duration-fast, 150ms) ease;
   }
   .tab:hover {
     color: var(--primary-text-color);
@@ -221,7 +285,7 @@ export const cardStyles = css`
     text-decoration: none;
     border: none;
     cursor: pointer;
-    transition: background-color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), color var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+    transition: background-color var(--ha-animation-duration-fast, 150ms) ease, color var(--ha-animation-duration-fast, 150ms) ease;
   }
   .icon-action:hover {
     background: color-mix(in srgb, var(--primary-color) 12%, transparent);
@@ -241,7 +305,7 @@ export const cardStyles = css`
   .hero {
     display: grid;
     grid-template-columns: auto 1fr;
-    column-gap: var(--ha-spacing-3, 12px);
+    column-gap: var(--ha-space-3, 12px);
     row-gap: 6px;
     align-items: center;
     /* Cosmetics (background, padding, radius) live on .hero-host so
@@ -292,7 +356,7 @@ export const cardStyles = css`
     display: flex;
     flex-direction: column;
     min-width: 0;
-    padding: var(--ha-spacing-3, 12px) var(--wl-pad-x);
+    padding: var(--ha-space-3, 12px) var(--wl-pad-x);
     background: color-mix(in srgb, var(--wl-accent) 12%, transparent);
     border-radius: var(--wl-radius-lg);
   }
@@ -318,8 +382,8 @@ export const cardStyles = css`
        pass that nudges flex siblings during the transition. */
     will-change: transform;
     transition: transform
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .hero-entry.expanded .hero-chevron {
     transform: rotate(180deg);
@@ -411,7 +475,7 @@ export const cardStyles = css`
     font-weight: 600;
     cursor: pointer;
     box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
-    transition: filter var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease), transform 0.06s ease;
+    transition: filter var(--ha-animation-duration-fast, 150ms) ease, transform 0.06s ease;
     forced-color-adjust: none;
   }
   .banner > button:hover {
@@ -643,7 +707,7 @@ export const cardStyles = css`
     margin-left: auto;
     --mdc-icon-size: 20px;
     color: var(--secondary-text-color);
-    transition: transform var(--ha-transition-duration-fast, 160ms) var(--ha-transition-easing-standard, ease);
+    transition: transform var(--ha-animation-duration-fast, 150ms) ease;
     flex-shrink: 0;
   }
   .alert.expanded .alert-chevron {
@@ -653,23 +717,84 @@ export const cardStyles = css`
   /* Departure rows: rack-style repeated unit. Soft accent surface so the
      section reads as a single coherent block rather than a row of
      dividers. */
+  /* Snap the badge box to whole pixels. Unrounded it is 48.64px
+     (0.85rem × 2.4 + 16px at a 16px root), which leaves both the badge's
+     right border and the trail aligned to it on a fractional x. The
+     row's connector stub and the panel's segments resolve to the same
+     coordinate but sit in different containing blocks, so the browser
+     rounds their edges independently and the stub paints a device pixel
+     wider than the line it continues.
+
+     Rounding the token alone is not enough — that moves the trail off a
+     badge which is still 48.64px, which is the misalignment this
+     replaced. Because .line-badge derives its min-width from the same
+     token, snapping here moves the badge and the trail together: badge
+     48px, right border and stroke both landing on 52px.
+
+     Guarded because a failing round() would make the token invalid at
+     computed-value time, cascading into both the badge's min-width and
+     --wl-trail-x. */
+  @supports (width: round(down, 1px, 1px)) {
+    :host {
+      --wl-badge-width: round(
+        down,
+        calc(0.85rem * 2.4 + var(--wl-badge-pad-x) * 2),
+        1px
+      );
+    }
+  }
   .dep-list {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
+    /* x of the trail's stroke centre, measured from a row's left edge.
+       The open row's connector stub, the trail's line and its dots all
+       derive from this one value, which is what guarantees they meet.
+
+       The stroke sits flush inside one of the badge's vertical borders,
+       so it reads as that border carrying on downwards: the left one on
+       narrow cards, where the trail stays at the card's edge and long
+       station names keep their full width, and the right one once the
+       container-query override further down has room to indent it.
+       Either way the stroke is inside the badge's footprint, which is
+       what lets the stub emerge from under the badge.
+
+       --wl-badge-width (on :host) is exact rather than approximate:
+       nothing resets box-sizing in this shadow root, so .line-badge is
+       content-box, and it derives its min-width from that same token.
+       Kept in rem, not em, so nothing re-resolves against a
+       descendant's own font-size. */
+    --stops-ahead-dot-size: 10px;
+    --stops-ahead-line-width: 2px;
+    /* The .dep-row grid's column gap, named so the direction cell can
+       subtract it when aligning itself to the stop names. */
+    --wl-dep-col-gap: var(--ha-space-2, 8px);
+    /* A row's left padding, and so where the badge's left border falls.
+       Derived rather than picked: the trail can't sit further left than
+       half a dot without .stops-ahead needing negative padding, which
+       would slide the dots off the line. So the badge moves to the
+       trail instead of the other way round — the 2px this adds over the
+       old flush-2px padding is imperceptible, and it costs the stop
+       names none of their width on narrow cards. */
+    --wl-row-pad-left: calc(
+      var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2
+    );
+    --wl-trail-x: calc(var(--stops-ahead-dot-size) / 2);
   }
   .dep-row {
     display: grid;
     grid-template-columns: max-content 1fr auto auto auto;
     align-items: center;
-    gap: 8px;
-    padding: 6px 2px;
+    gap: var(--wl-dep-col-gap);
+    /* Symmetric: the old right-hand 2px matched nothing and left every
+       row sitting 2px left of centre in its container. */
+    padding: var(--ha-space-2, 8px) var(--wl-row-pad-left);
     border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
     transition: background-color
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .dep-row:last-child {
     border-bottom: none;
@@ -691,17 +816,49 @@ export const cardStyles = css`
   .dep-row.expandable {
     cursor: pointer;
     user-select: none;
+    /* Containing block for the open row's connector stub below. */
+    position: relative;
+    /* Divider moves to the trailing .dep-row-detail (which an expandable
+       row always emits, expanded or not) so the rule falls BELOW the
+       stops-ahead trail: the trail reads as part of this departure and
+       the line separates it from the next one. */
+    border-bottom: none;
   }
   .row-chevron {
     --mdc-icon-size: 18px;
     color: var(--secondary-text-color);
     flex-shrink: 0;
     transition: transform
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .dep-row.expanded .row-chevron {
     transform: rotate(180deg);
+  }
+  /* Connector stub: bridges the gap between the line-badge and the trail
+     in the panel below, so the trail reads as growing out of the badge
+     rather than floating under it. It spans from the row's vertical
+     centre to the row's bottom edge, and .line-badge (z-index 1) paints
+     over the upper half — that way the stub appears to start exactly at
+     the badge's bottom edge without hard-coding the badge's height. The
+     panel's own line starts at its top edge, which is flush against the
+     row's bottom, so the two form one continuous stroke. */
+  .dep-row.expanded::after {
+    content: "";
+    position: absolute;
+    left: calc(var(--wl-trail-x) - var(--stops-ahead-line-width) / 2);
+    top: 50%;
+    bottom: 0;
+    width: var(--stops-ahead-line-width);
+    background: var(--stops-ahead-line, var(--primary-color));
+  }
+  /* Square off the badge corner the trail leaves from, so the stroke
+     reads as continuing out of the badge rather than sliding past a
+     rounded edge. Which corner that is follows --wl-trail-x: a
+     flush-left trail leaves from the badge's leading edge, an indented
+     one from its trailing edge (flipped in the wide-card override). */
+  .dep-row.expanded .line-badge {
+    border-bottom-left-radius: 0;
   }
   /* Detail panel: sibling <li> rendered immediately below an expandable
      .dep-row. The 0fr ↔ 1fr trick mirrors .alert-detail and animates to
@@ -713,6 +870,15 @@ export const cardStyles = css`
     grid-template-rows: 0fr;
     transition: grid-template-rows 0.24s ease;
     list-style: none;
+    /* Carries the divider on behalf of its .dep-row (see above). Applied
+       in both states rather than only on .expanded: collapsed the panel
+       is zero-height, so the rule lands exactly where the row's own
+       border used to sit, and it then travels smoothly with the panel
+       instead of snapping between two positions mid-animation. */
+    border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.08));
+  }
+  .dep-row-detail:last-child {
+    border-bottom: none;
   }
   .dep-row-detail-inner {
     overflow: hidden;
@@ -732,44 +898,95 @@ export const cardStyles = css`
     --stops-ahead-line: var(--primary-color);
     --stops-ahead-dot-size: 10px;
     --stops-ahead-line-width: 2px;
+    /* Doubles as the gap between stops and the panel's top padding, so
+       a stop's connector segment can bridge either with one offset. */
+    --stops-ahead-gap: var(--ha-space-2, 8px);
     list-style: none;
     margin: 0;
-    padding: 8px 10px 10px 0;
+    /* Symmetric top and bottom. The old 10px bottom existed to feed the
+       removed single stroke's end calculation (bottom: 10px + half a
+       dot); with the line drawn per stop it described nothing. */
+    padding: var(--stops-ahead-gap) var(--ha-space-2, 8px)
+      var(--stops-ahead-gap) 0;
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--stops-ahead-gap);
     color: var(--secondary-text-color);
     font-size: 0.85rem;
     line-height: 1.3;
   }
-  /* The vertical line. Sits behind the dots (they have higher z-index)
-     and stops at the centre of the first/last dot via a clip on the
-     containing list — easiest done by pinning top/bottom to half the
-     dot size. The dot column hugs the panel's left edge so long
-     station names get the maximum readable width on narrow cards. */
-  .stops-ahead::before {
+  /* The vertical line, drawn per stop rather than as one stroke down the
+     whole list. Each stop carries an upper segment (from the gap above
+     down to its own dot) and a lower one (from its dot to its bottom
+     edge); the first stop has no upper segment and the last no lower
+     one, so the line begins and ends exactly on a dot.
+
+     A single stroke pinned to the list's top and bottom was simpler but
+     assumed every stop is one row tall. Expanding the terminus's
+     transfer chips makes that entry taller while its dot stays centred
+     in it, so the stroke overshot the ring. Segments are measured
+     against each stop's own box, so any stop can grow without the ends
+     drifting. They sit behind the dots, which carry z-index 1. */
+  .stops-ahead-stop:not(:first-child)::before,
+  .dep-row-detail .stops-ahead-stop::before,
+  .stops-ahead-stop:not(:last-child)::after {
     content: "";
     position: absolute;
     left: calc(var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
-    top: calc(8px + var(--stops-ahead-dot-size) / 2);
-    bottom: calc(10px + var(--stops-ahead-dot-size) / 2);
     width: var(--stops-ahead-line-width);
     background: var(--stops-ahead-line);
-    border-radius: 2px;
+    /* Square ends, deliberately. The single stroke this replaced carried
+       border-radius: 2px, which only ever rounded the two far ends of a
+       list-long bar. On segments a fraction of that length, a 2px radius
+       on a 2px-wide bar curves away enough of both ends to read as a
+       thinner line than the row's connector stub, and to pinch every
+       join into an apparent gap. Butt joins are what make the segments
+       read as one stroke. */
+  }
+  /* Upper segment. In a departure panel the first stop gets one too, so
+     the line reaches the panel's top edge and meets the row's connector
+     stub — the panel's top padding equals the inter-stop gap, so the
+     same offset covers both cases. The hero panel has no stub, so its
+     first stop keeps the line starting at the dot. */
+  .stops-ahead-stop:not(:first-child)::before,
+  .dep-row-detail .stops-ahead-stop::before {
+    top: calc(-1 * var(--stops-ahead-gap));
+    height: calc(50% + var(--stops-ahead-gap));
+  }
+  /* Lower segment: runs to the stop's bottom edge, where the next stop's
+     upper segment picks it up across the gap. */
+  .stops-ahead-stop:not(:last-child)::after {
+    top: 50%;
+    bottom: 0;
+  }
+  /* Departure-row trail: driven by --wl-trail-x so it always shares an
+     axis with its row's connector stub. Indenting the list is enough —
+     the dots and their segments are positioned inside each stop, so they
+     follow. Two classes of specificity, so this wins over the wide-card
+     override further down without being repeated inside that container
+     query. The hero's copy of .stops-ahead is unaffected — it has no
+     badge to grow from. */
+  .dep-row-detail .stops-ahead {
+    padding-left: calc(var(--wl-trail-x) - var(--stops-ahead-dot-size) / 2);
   }
   .stops-ahead-stop {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding-left: calc(var(--stops-ahead-dot-size) + 10px);
+    /* Owns the space under the name row on its own — .stops-ahead-others
+       used to add a further 2px margin-top, so the real gap was 6px and
+       you had to find both declarations to know it. */
+    gap: var(--ha-space-1, 4px);
+    padding-left: calc(
+      var(--stops-ahead-dot-size) + var(--stops-ahead-name-gap)
+    );
     min-height: var(--stops-ahead-dot-size);
   }
   .stops-ahead-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--ha-space-2, 8px);
     min-height: var(--stops-ahead-dot-size);
   }
   /* Pointer cursor on intermediate stops the user can actually click —
@@ -817,7 +1034,7 @@ export const cardStyles = css`
   .stops-ahead-metros {
     display: inline-flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--ha-space-1, 4px);
     flex-shrink: 0;
   }
   .stops-ahead-line-chip {
@@ -857,8 +1074,8 @@ export const cardStyles = css`
   .stops-ahead-other-toggle ha-icon {
     --mdc-icon-size: 14px;
     transition: transform
-      var(--ha-transition-duration-fast, 160ms)
-      var(--ha-transition-easing-standard, ease);
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
   }
   .stops-ahead-stop.transfers-expanded .stops-ahead-other-toggle ha-icon {
     transform: rotate(180deg);
@@ -868,8 +1085,7 @@ export const cardStyles = css`
   .stops-ahead-others {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 2px;
+    gap: var(--ha-space-1, 4px);
   }
   /* Non-metro chips render slightly lighter so the inline U-Bahn chips
      stay the dominant signal. */
@@ -877,16 +1093,25 @@ export const cardStyles = css`
     opacity: 0.92;
   }
   .line-badge {
+    /* Paints over the upper half of an open row's connector stub, so the
+       stub emerges from the badge's bottom edge. */
+    position: relative;
+    z-index: 1;
+    /* Declared here rather than on the .expanded rule so the corner
+       eases back on collapse too. The reduced-motion block at the foot
+       of this stylesheet neutralises it for users who opt out. */
+    transition: border-radius
+      var(--ha-animation-duration-fast, 150ms)
+ ease;
     text-align: center;
     font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     font-weight: 700;
     color: #fff;
     border-radius: 6px;
-    padding: 3px 8px;
-    min-width: 2.4em;
+    padding: 3px var(--wl-badge-pad-x);
+    min-width: calc(var(--wl-badge-width) - var(--wl-badge-pad-x) * 2);
     font-size: 0.85rem;
     background: var(--primary-color);
-    box-shadow: inset 0 -2px 0 color-mix(in srgb, #000 18%, transparent);
     forced-color-adjust: none;
   }
   /* Towards cell: type-icon sits as a sibling of .towards-rows so when
@@ -1247,15 +1472,43 @@ export const cardStyles = css`
     .icon-tile ha-icon {
       --mdc-icon-size: 24px;
     }
-    /* Wide enough to afford the metro-map alignment: dots + connecting
-       line indent under the line-badge column so the trail descends
-       visually from under the badge. Narrow cards keep the flush-left
-       layout above for readability of long station names. */
-    .stops-ahead {
-      padding-left: calc(2.4em + 8px);
+    /* Wide enough to afford the metro-map indent. The stroke's right
+       edge sits flush with the badge's right border (hence the half
+       line-width back-off), so with that corner squared off the line
+       reads as the border itself continuing downwards rather than as a
+       separate stroke starting near it. Narrow cards keep the
+       flush-left layout for readability of long station names. Moving
+       the token moves the stub, the line and the dots together. */
+    .dep-list {
+      --wl-trail-x: calc(
+        var(--wl-row-pad-left) + var(--wl-badge-width) -
+          var(--stops-ahead-line-width) / 2
+      );
     }
-    .stops-ahead::before {
-      left: calc(2.4em + 8px + var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2);
+    /* Nudge the direction text onto the same axis as the stop names
+       below it. The grid puts this cell at badge + column-gap; a stop
+       name sits at the dot column + its name gap, and the dot column is
+       inset from the badge's right border by half a dot less half the
+       stroke. The difference is what's added back here — 6px at the
+       default tokens. Wide cards only: on narrow ones the trail runs
+       flush left, so the stop names are far to the LEFT of the direction
+       and closing the gap would drag this text under the badge. */
+    .towards {
+      margin-left: calc(
+        var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2 +
+          var(--stops-ahead-name-gap) - var(--wl-dep-col-gap)
+      );
+    }
+    /* Trail is indented out here, so it leaves the badge's trailing
+       edge — square that corner instead of the leading one. */
+    .dep-row.expanded .line-badge {
+      border-bottom-left-radius: 6px;
+      border-bottom-right-radius: 0;
+    }
+    /* The hero panel has no badge to grow from, so it keeps the plain
+       indent rather than following --wl-trail-x. */
+    .hero-detail .stops-ahead {
+      padding-left: calc(2.4em + 8px);
     }
     .hero > .hero-detail {
       grid-column: 2;

@@ -150,12 +150,13 @@ LineType = Literal["ptMetro", "ptTram", "ptBusCity", "ptBusNight"]
 # "R" = Rückfahrt (return). Used as keys in CONF_LINES ("U1|H").
 Direction = Literal["H", "R"]
 
-# Lovelace cards — each JS file carries a `const CARD_VERSION` that must
-# match the corresponding Python constant below byte-for-byte, else the
-# reload banner loops. Both cards version in lockstep with the integration
+# Lovelace cards — this integration ships THREE (modern, retro, flap).
+# Each JS file carries a `const CARD_VERSION` that must match the
+# corresponding Python constant below byte-for-byte, else the reload
+# banner loops. All three version in lockstep with the integration
 # (mirrored in src/const.ts; tests/test_card_version.py asserts both
-# directions). The two cards still ship independent WS probes so a
-# mismatch on one bundle doesn't show a banner on the other.
+# directions). Each card still ships an independent WS probe so a
+# mismatch on one bundle doesn't show a banner on the others.
 CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
 CARD_FILENAME: Final = "wiener-linien-austria-card.js"
@@ -173,10 +174,16 @@ FLAP_CARD_FILENAME: Final = "wiener-linien-austria-flap-card.js"
 FONTS_URL: Final = "/wiener-linien-austria/fonts"
 FONTS_DIRNAME: Final = "fonts"
 
-# Cap on how many departures we surface in sensor attributes. The card maxes
-# out at 20 per stop; matching that here keeps the per-departure stops_ahead
-# trail (now full route, not truncated) within HA's 16 KB recorder attribute
-# cap at busy multi-line stops (Stephansplatz tracks U1/U3/U4).
+# Cap on how many departures we surface in sensor attributes, matching the
+# card's own 20-per-stop maximum — surfacing more than the card can render
+# costs payload for nothing.
+#
+# Not a recorder budget: `departures` is in sensor.py's
+# `_unrecorded_attributes`, so the 16 KB attribute cap does not apply. (It
+# used to, and is why the attribute was excluded.) What this bounds now is
+# the live payload pushed to the frontend, WebSocket subscribers, and
+# `/api/states` on every state write — which at busy multi-line stops
+# (Stephansplatz tracks U1/U3/U4) is the cost that actually matters.
 MAX_DEPARTURES_IN_ATTRS: Final = 20
 
 # Hard safety cap on `stops_ahead` length per departure. The longest Wiener

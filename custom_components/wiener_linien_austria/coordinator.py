@@ -118,7 +118,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         ]
         if not self._rbls:
             raise ConfigEntryError(
-                f"Entry has no valid integer RBLs (received {raw_rbls!r})"
+                translation_domain=DOMAIN,
+                translation_key="invalid_rbls",
+                translation_placeholders={"received": repr(raw_rbls)},
             )
         self._selected_lines: set[str] | None = _normalise_lines(config.get(CONF_LINES))
         self._rate_limited: bool = False
@@ -138,7 +140,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         diva_int = _safe_int(config.get(CONF_DIVA))
         if diva_int is None:
             raise ConfigEntryError(
-                f"Entry has no valid DIVA (received {config.get(CONF_DIVA)!r})"
+                translation_domain=DOMAIN,
+                translation_key="invalid_diva",
+                translation_placeholders={"received": repr(config.get(CONF_DIVA))},
             )
         self._diva: int = diva_int
         self._latitude: float | None = None
