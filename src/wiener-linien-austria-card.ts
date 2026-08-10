@@ -1472,7 +1472,12 @@ export class WienerLinienAustriaCard extends LitElement {
     const rowTpl = html`
       <li
         class=${classMap(rowClasses)}
-        style=${`--row-i: ${rowIndex};${nowColor ? ` --wl-accent-text: ${nowColor};` : ""}`}
+        style=${`--row-i: ${rowIndex};${nowColor ? ` --wl-accent-text: ${nowColor};` : ""}${
+          // Colours the connector stub that joins the badge to the trail
+          // below. colorForLine() is chipPalette().background, so this is
+          // the same value the panel resolves for the trail itself.
+          hasStopsAhead ? ` --stops-ahead-line: ${badgeStyle.background};` : ""
+        }`}
         role=${hasStopsAhead ? "button" : nothing}
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
