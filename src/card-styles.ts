@@ -44,10 +44,28 @@ export const cardStyles = css`
     --wl-badge-pad-x: 8px;
     --wl-badge-width: calc(0.85rem * 2.4 + var(--wl-badge-pad-x) * 2);
 
-    /* Gap between a trail dot and its station name. On :host because the
-       departure row reads it too, to line its direction text up with the
-       stop names below. */
+    /* Trail geometry. All of it lives on :host rather than on .dep-list,
+       because BOTH trails read it: the departure list and the hero. That
+       is not cosmetic tidying — a token declared on .dep-list is simply
+       absent inside .hero, so any calc() referencing it there is invalid
+       at computed-value time and the whole declaration is dropped. That
+       silently cost the hero its connector once already: the trail fell
+       back to flush-left while the corner-squaring rule, which contains
+       no var(), still applied to the opposite corner.
+
+       --stops-ahead-name-gap is the dot-to-station-name gap; the
+       departure row reads it to line its direction text up with the stop
+       names below. --wl-row-pad-left is where a badge's left border
+       falls, derived rather than picked: the trail can't sit further
+       left than half a dot without .stops-ahead needing negative
+       padding, which would slide the dots off the line, so the badge
+       moves to the trail instead of the reverse. */
+    --stops-ahead-dot-size: 10px;
+    --stops-ahead-line-width: 2px;
     --stops-ahead-name-gap: var(--ha-space-2, 8px);
+    --wl-row-pad-left: calc(
+      var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2
+    );
 
     /* Text-safe companion to --wl-accent. GTFS route_color is a
        *background* colour — Wiener Linien ships 0A295D for city buses
@@ -93,7 +111,11 @@ export const cardStyles = css`
        14px on one line and 12px on the next.
 
        Verified against the frontend's src/resources/theme/core.globals.ts:
-         --ha-space-N          4px grid, 1…14   (was --ha-spacing-N)
+         --ha-space-N          4px grid, 1…20   (was --ha-spacing-N)
+         --ha-font-size-*      xs 10 / s 12 / m 14 / l 16 / xl 20px.
+                               typography.globals.ts sets the root to
+                               font-size:14px, so -m is 1rem, NOT 0.875 —
+                               do the rem maths at 14px or just write px.
          --ha-border-radius-*  sm 4 / md 8 / lg 12 / xl 16 / pill / circle
                                                 (was --ha-radius-*)
          --ha-animation-duration-*  none 1 / instant 75 / fast 150 /
@@ -191,7 +213,7 @@ export const cardStyles = css`
   }
   .tab.active {
     color: var(--primary-color);
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     box-shadow: inset 0 -2px 0 var(--primary-color);
   }
 
@@ -250,7 +272,7 @@ export const cardStyles = css`
   }
   .title {
     margin: 0;
-    font-size: var(--ha-font-size-m, 0.9375rem);
+    font-size: var(--ha-font-size-m, 14px);
     font-weight: 600;
     color: var(--primary-text-color);
     line-height: 1.2;
@@ -306,7 +328,9 @@ export const cardStyles = css`
     display: grid;
     grid-template-columns: auto 1fr;
     column-gap: var(--ha-space-3, 12px);
-    row-gap: 6px;
+    /* Named so the hero connector stub can bridge it. */
+    --wl-hero-row-gap: 6px;
+    row-gap: var(--wl-hero-row-gap);
     align-items: center;
     /* Cosmetics (background, padding, radius) live on .hero-host so
        the tinted surface visually contains both the grid and any
@@ -371,6 +395,14 @@ export const cardStyles = css`
     cursor: pointer;
     user-select: none;
     border-radius: 6px;
+    /* Containing block for the connector stub (wide cards only). */
+    position: relative;
+  }
+  /* The dep-row version leans on .type-icon's own margin-right for its
+     spacing; .hero-entry is a flex row with its own gap, so the margin
+     would double up. */
+  .hero-entry .type-icon {
+    margin-right: 0;
   }
   .hero-chevron {
     --mdc-icon-size: 18px;
@@ -417,7 +449,7 @@ export const cardStyles = css`
     text-overflow: ellipsis;
   }
   .hero-platform {
-    font-size: var(--ha-font-size-xs, 0.75rem);
+    font-size: var(--ha-font-size-xs, 10px);
     font-weight: 500;
     color: var(--primary-text-color);
     font-variant-numeric: tabular-nums;
@@ -566,7 +598,7 @@ export const cardStyles = css`
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 0.78rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     color: #fff;
     background: var(--primary-color);
     forced-color-adjust: none;
@@ -766,21 +798,9 @@ export const cardStyles = css`
        content-box, and it derives its min-width from that same token.
        Kept in rem, not em, so nothing re-resolves against a
        descendant's own font-size. */
-    --stops-ahead-dot-size: 10px;
-    --stops-ahead-line-width: 2px;
     /* The .dep-row grid's column gap, named so the direction cell can
        subtract it when aligning itself to the stop names. */
     --wl-dep-col-gap: var(--ha-space-2, 8px);
-    /* A row's left padding, and so where the badge's left border falls.
-       Derived rather than picked: the trail can't sit further left than
-       half a dot without .stops-ahead needing negative padding, which
-       would slide the dots off the line. So the badge moves to the
-       trail instead of the other way round — the 2px this adds over the
-       old flush-2px padding is imperceptible, and it costs the stop
-       names none of their width on narrow cards. */
-    --wl-row-pad-left: calc(
-      var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2
-    );
     --wl-trail-x: calc(var(--stops-ahead-dot-size) / 2);
   }
   .dep-row {
@@ -896,8 +916,6 @@ export const cardStyles = css`
      name to anchor the destination. */
   .stops-ahead {
     --stops-ahead-line: var(--primary-color);
-    --stops-ahead-dot-size: 10px;
-    --stops-ahead-line-width: 2px;
     /* Doubles as the gap between stops and the panel's top padding, so
        a stop's connector segment can bridge either with one offset. */
     --stops-ahead-gap: var(--ha-space-2, 8px);
@@ -1042,7 +1060,7 @@ export const cardStyles = css`
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 0.7rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     color: #fff;
     background: var(--primary-color);
     line-height: 1.4;
@@ -1066,7 +1084,7 @@ export const cardStyles = css`
     );
     color: var(--secondary-text-color);
     font-size: 0.7rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     cursor: pointer;
     flex-shrink: 0;
     line-height: 1.4;
@@ -1165,7 +1183,7 @@ export const cardStyles = css`
      "Gleis 12" line up visually across rows. Same shape as Linz's
      .row-platform with the wiener-namespace tokens. */
   .row-platform {
-    font-size: var(--ha-font-size-xs, 0.7rem);
+    font-size: var(--ha-font-size-xs, 10px);
     color: var(--secondary-text-color);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -1505,10 +1523,80 @@ export const cardStyles = css`
       border-bottom-left-radius: 6px;
       border-bottom-right-radius: 0;
     }
-    /* The hero panel has no badge to grow from, so it keeps the plain
-       indent rather than following --wl-trail-x. */
+    /* Hero trail gets the same badge connector as a departure row, but
+       only at this width: .hero-detail moves into grid column 2 here
+       (below), so it finally shares a left edge with .hero-entry and
+       therefore with the badge that starts it. Narrow cards span the
+       panel across both columns for station-name width, which puts its
+       left edge left of the badge entirely — nothing to connect to, and
+       the narrow hero is deliberately left exactly as it was before the
+       connector existed. */
+    .hero {
+      /* Leading edge, not trailing. A departure row can afford to indent
+         its trail out to the badge's right border because the row is a
+         grid and the stop names get the whole 1fr column back. The hero
+         panel is a single column under a much larger metric, so pushing
+         the trail a badge-width right just eats station-name space for
+         symmetry nobody asked for. Flush left it is — same value the
+         narrow departure list uses. */
+      --wl-hero-trail-x: calc(var(--stops-ahead-dot-size) / 2);
+    }
+    /* Shifts the badge's left border onto the stroke, rather than the
+       stroke onto the border — the trail can't go further left without
+       negative padding. Same trick, and same 4px, as .dep-row. */
+    .hero-entry {
+      padding-left: var(--wl-row-pad-left);
+      /* The first entry shares its grid row with .hero-time, which is far
+         taller than a badge. Under the grid's align-items: center that
+         entry's own box is only badge-height, floating mid-row — so a
+         stub measured from its bottom edge stopped short of the panel by
+         half the height difference, and only ever on the first entry.
+         Stretching the box to fill the row puts its bottom edge where the
+         row actually ends; the flex content inside stays centred, so the
+         badge does not move and top: 50% is still its centre.
+
+         This also closes the slack that made the first line look like it
+         had more space beneath it than the others — the trail now starts
+         directly under it either way. */
+      align-self: stretch;
+    }
     .hero-detail .stops-ahead {
-      padding-left: calc(2.4em + 8px);
+      padding-left: calc(
+        var(--wl-hero-trail-x) - var(--stops-ahead-dot-size) / 2
+      );
+    }
+    /* First stop gets an upper segment so the line reaches the panel's
+       top edge and meets the stub. Outside this query the hero's first
+       stop deliberately has none. */
+    .hero-detail .stops-ahead-stop::before {
+      content: "";
+      position: absolute;
+      left: calc(
+        var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2
+      );
+      width: var(--stops-ahead-line-width);
+      background: var(--stops-ahead-line);
+      top: calc(-1 * var(--stops-ahead-gap));
+      height: calc(50% + var(--stops-ahead-gap));
+    }
+    /* Runs from the badge's centre — .line-badge paints over the upper
+       half — down past the grid's row gap to the panel below. Assumes
+       .hero-entry has not wrapped; at this width it is a single line. */
+    .hero-entry.expanded::after {
+      content: "";
+      position: absolute;
+      left: calc(
+        var(--wl-hero-trail-x) - var(--stops-ahead-line-width) / 2
+      );
+      top: 50%;
+      bottom: calc(-1 * var(--wl-hero-row-gap));
+      width: var(--stops-ahead-line-width);
+      background: var(--stops-ahead-line, var(--primary-color));
+    }
+    /* Left corner: the hero trail leaves the badge's leading edge, not
+       its trailing one. */
+    .hero-entry.expanded .line-badge {
+      border-bottom-left-radius: 0;
     }
     .hero > .hero-detail {
       grid-column: 2;
