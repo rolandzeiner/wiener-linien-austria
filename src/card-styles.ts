@@ -93,7 +93,11 @@ export const cardStyles = css`
        14px on one line and 12px on the next.
 
        Verified against the frontend's src/resources/theme/core.globals.ts:
-         --ha-space-N          4px grid, 1…14   (was --ha-spacing-N)
+         --ha-space-N          4px grid, 1…20   (was --ha-spacing-N)
+         --ha-font-size-*      xs 10 / s 12 / m 14 / l 16 / xl 20px.
+                               typography.globals.ts sets the root to
+                               font-size:14px, so -m is 1rem, NOT 0.875 —
+                               do the rem maths at 14px or just write px.
          --ha-border-radius-*  sm 4 / md 8 / lg 12 / xl 16 / pill / circle
                                                 (was --ha-radius-*)
          --ha-animation-duration-*  none 1 / instant 75 / fast 150 /
@@ -250,7 +254,7 @@ export const cardStyles = css`
   }
   .title {
     margin: 0;
-    font-size: var(--ha-font-size-m, 0.9375rem);
+    font-size: var(--ha-font-size-m, 14px);
     font-weight: 600;
     color: var(--primary-text-color);
     line-height: 1.2;
@@ -417,7 +421,7 @@ export const cardStyles = css`
     text-overflow: ellipsis;
   }
   .hero-platform {
-    font-size: var(--ha-font-size-xs, 0.75rem);
+    font-size: var(--ha-font-size-xs, 10px);
     font-weight: 500;
     color: var(--primary-text-color);
     font-variant-numeric: tabular-nums;
@@ -1165,7 +1169,7 @@ export const cardStyles = css`
      "Gleis 12" line up visually across rows. Same shape as Linz's
      .row-platform with the wiener-namespace tokens. */
   .row-platform {
-    font-size: var(--ha-font-size-xs, 0.7rem);
+    font-size: var(--ha-font-size-xs, 10px);
     color: var(--secondary-text-color);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
