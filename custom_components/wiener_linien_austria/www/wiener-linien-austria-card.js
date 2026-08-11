@@ -170,7 +170,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
   }
   .tab.active {
     color: var(--primary-color);
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     box-shadow: inset 0 -2px 0 var(--primary-color);
   }
 
@@ -545,7 +545,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 0.78rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     color: #fff;
     background: var(--primary-color);
     forced-color-adjust: none;
@@ -1021,7 +1021,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     padding: 1px 6px;
     border-radius: 4px;
     font-size: 0.7rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     color: #fff;
     background: var(--primary-color);
     line-height: 1.4;
@@ -1045,7 +1045,7 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     );
     color: var(--secondary-text-color);
     font-size: 0.7rem;
-    font-weight: var(--ha-font-weight-bold, 600);
+    font-weight: var(--ha-font-weight-bold, 700);
     cursor: pointer;
     flex-shrink: 0;
     line-height: 1.4;
