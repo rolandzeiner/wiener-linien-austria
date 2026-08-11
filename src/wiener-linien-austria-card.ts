@@ -1277,6 +1277,7 @@ export class WienerLinienAustriaCard extends LitElement {
       this._config!.show_platform && d.platform ? String(d.platform) : null;
     const isBarrierFree =
       !!d.barrier_free && this._config!.show_accessibility;
+    const typeIcon = this._config!.show_type_icon ? lineTypeIcon(d.type) : null;
 
     const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
       this._expandState(d, entityId, "hero");
@@ -1291,6 +1292,10 @@ export class WienerLinienAustriaCard extends LitElement {
     return html`
       <div
         class=${classMap(entryClasses)}
+        style=${hasStopsAhead
+          ? // Colours the connector stub joining the badge to the trail.
+            `--stops-ahead-line: ${accentStyle.background};`
+          : nothing}
         role=${hasStopsAhead ? "button" : nothing}
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
@@ -1304,6 +1309,13 @@ export class WienerLinienAustriaCard extends LitElement {
           class="line-badge"
           style=${styleMap(accentStyle)}
         >${line}</span>
+        ${typeIcon
+          ? html`<ha-icon
+              class="type-icon"
+              icon=${typeIcon}
+              aria-hidden="true"
+            ></ha-icon>`
+          : nothing}
         <span class="hero-direction">${deText(d.towards)}</span>
         ${platform
           ? html`<span class="hero-platform"
