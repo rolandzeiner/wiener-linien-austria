@@ -634,3 +634,58 @@ async def test_batch_apply_clears_attrs_cache(
         _ = sensor.extra_state_attributes
 
     assert mock_alerts.call_count == 2
+
+
+async def test_stale_feed_yields_unknown_state_and_signals(
+    hass: HomeAssistant, stale_metro_fixture
+) -> None:
+    """A frozen upstream feed reports no countdown at all — not a stuck 0.
+
+    This is the half of issue #103 the reporter didn't see. The card's
+    four-digit delay was cosmetic; the sensor state was worse. Every
+    U-Bahn stop's countdown sat at 0 for 60 hours because the ghost
+    record's `countdown` never moved, so any "next train in ≤ N minutes"
+    automation fired continuously for two and a half days.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from custom_components.wiener_linien_austria.coordinator import (
+        _parse_monitor_body,
+    )
+
+    # Parse the U1 monitors only, so the stop is entirely stale — the
+    # healthy 48A in the same capture belongs to a different RBL.
+    metro_only = {
+        "data": {
+            "monitors": [
+                m
+                for m in stale_metro_fixture["data"]["monitors"]
+                if m["locationStop"]["properties"]["attributes"]["rbl"] != 1401
+            ]
+        },
+        "message": stale_metro_fixture["message"],
+    }
+    parsed = _parse_monitor_body(metro_only, None, metro_only["message"]["serverTime"])
+    assert parsed.stale_dropped == 2
+    assert parsed.departures == []
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.wiener_linien_austria.coordinator"
+        ".WienerLinienAustriaCoordinator._async_update_data",
+        new_callable=AsyncMock,
+        return_value=parsed,
+    ):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    registry = er.async_get(hass)
+    entities = er.async_entries_for_config_entry(registry, entry.entry_id)
+    state = hass.states.get(entities[0].entity_id)
+    assert state is not None
+    assert state.state == "unknown"
+    assert state.attributes["departures"] == []
+    # The signals the cards read to explain the empty board.
+    assert state.attributes["stale_departures"] == 2
+    assert state.attributes["stale_since"] == "2026-08-27T06:42:00+02:00"

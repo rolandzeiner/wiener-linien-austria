@@ -346,6 +346,20 @@ def tram_fixture() -> dict:
 
 
 @pytest.fixture
+def stale_metro_fixture() -> dict:
+    """Live capture of the 2026-08-27 ptMetro freeze (issue #103).
+
+    One combined response holding both halves of the bug: two U1 monitors
+    (rbl 4109 / 4111) whose `timePlanned` had been frozen at 06:4x on
+    2026-08-27 for 60+ hours while `timeReal` tracked `serverTime` and
+    `countdown` stayed 0, plus a healthy 48A bus monitor (rbl 1401) from
+    the same request. Captured 2026-08-29T19:11:47+0200 — not reproducible
+    once Wiener Linien restored the feed, which is why it is checked in.
+    """
+    return _load_fixture("monitor_stale_metro.json")
+
+
+@pytest.fixture
 def mock_fetch(monitor_fixture):
     """Stub the coordinator's fetch + the config-flow live probe."""
     # Mirror _probe_monitor_lines: dedupe on (line, direction) pair and

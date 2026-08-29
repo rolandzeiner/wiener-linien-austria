@@ -857,6 +857,11 @@ export class WienerLinienAustriaCard extends LitElement {
       : new Set<DepartureAttr>();
     const remaining = filtered.filter((d) => !heroDedupe.has(d));
     const rows = remaining.slice(0, this._config!.max_departures);
+    // Records the coordinator dropped this poll because upstream stopped
+    // advancing them. Drives both the "some lines are missing" note above
+    // a partially-filled list and the empty-state copy below it.
+    const staleDropped =
+      typeof attrs.stale_departures === "number" ? attrs.stale_departures : 0;
 
     const lineColors = lineColorsFor(this.hass, stopCfg.entity);
     const accent = heroLead
@@ -912,15 +917,52 @@ export class WienerLinienAustriaCard extends LitElement {
         ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
         ${this._config!.show_departures && this._config!.max_departures > 0
           ? rows.length
-            ? html`<ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
-                ${rows.map((d, i) => this._renderRow(d, stopCfg.entity, i))}
-              </ul>`
-            : html`<div class="empty" role="status" aria-live="polite">
-                ${this._t(attrs.server_time ? "betriebsschluss" : "no_data")}
-              </div>`
+            ? html`${staleDropped > 0
+                  ? html`<div class="stale-note" role="status" aria-live="polite">
+                      ${this._t("stale_feed_partial")}
+                    </div>`
+                  : nothing}
+                <ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
+                  ${rows.map((d, i) => this._renderRow(d, stopCfg.entity, i))}
+                </ul>`
+            : this._renderEmptyState(attrs, staleDropped)
           : nothing}
       </section>
     `;
+  }
+
+  /** Empty departure board, with the reason. Three distinct causes, and
+   *  conflating them is what made a frozen upstream feed read as a normal
+   *  end-of-service board for two and a half days (issue #103):
+   *
+   *  - stale feed — the coordinator dropped every record because upstream
+   *    stopped advancing their planned times. Named explicitly, because
+   *    the user's first instinct is otherwise that the card is broken.
+   *  - end of service — the API answered (server_time present) and the
+   *    stop genuinely has nothing left tonight.
+   *  - no data — no successful poll yet.
+   */
+  private _renderEmptyState(
+    attrs: WienerLinienAttrs,
+    staleDropped: number,
+  ): TemplateResult {
+    if (staleDropped > 0) {
+      const frozenAt = attrs.stale_since
+        ? formatTime(attrs.stale_since, this._lang())
+        : "";
+      return html`<div class="empty stale" role="status" aria-live="polite">
+        <div class="empty-title">${this._t("stale_feed")}</div>
+        <div class="empty-detail">${this._t("stale_feed_detail")}</div>
+        ${frozenAt
+          ? html`<div class="empty-meta">
+              ${this._t("stale_feed_since", { time: frozenAt })}
+            </div>`
+          : nothing}
+      </div>`;
+    }
+    return html`<div class="empty" role="status" aria-live="polite">
+      ${this._t(attrs.server_time ? "betriebsschluss" : "no_data")}
+    </div>`;
   }
 
   private _renderElevatorDetails(infos: ElevatorInfoAttr[]): TemplateResult {

@@ -203,6 +203,13 @@ class WienerLinienStopSensor(
             "latitude": self.coordinator.latitude,
             "longitude": self.coordinator.longitude,
             "server_time": data.server_time if data is not None else None,
+            # Upstream plausibility signal. `stale_departures` counts the
+            # records this poll dropped because the feed stopped advancing
+            # them; `stale_since` is the newest planned time among those,
+            # i.e. roughly when it froze. The cards read both to explain an
+            # empty board instead of mislabelling it "Betriebsschluss".
+            "stale_departures": data.stale_dropped if data is not None else 0,
+            "stale_since": data.stale_since if data is not None else None,
             "departures": capped,
             "next_by_line": next_by_line,
             "lines_at_stop": lines_at_stop,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from pathlib import Path
 from typing import Final, Literal
 
@@ -185,6 +186,23 @@ FONTS_DIRNAME: Final = "fonts"
 # `/api/states` on every state write — which at busy multi-line stops
 # (Stephansplatz tracks U1/U3/U4) is the cost that actually matters.
 MAX_DEPARTURES_IN_ATTRS: Final = 20
+
+# How far into the past a departure's `timePlanned` may sit before we treat
+# the record as stale upstream data and drop it. Wiener Linien's /monitor
+# endpoint can keep answering 200 OK with a well-formed but frozen payload:
+# on 2026-08-27 the entire ptMetro feed stopped advancing and every U-Bahn
+# stop served a single record whose `timePlanned` stayed put while
+# `timeReal` tracked `serverTime` and `countdown` sat at 0 — rendering as a
+# four-digit delay next to a permanent "Jetzt" for two and a half days.
+#
+# 3 h is deliberately generous. A survey of 1283 departures across every
+# transport mode during that outage put the widest *legitimate* record at
+# ~1.1 h ahead of serverTime, and a genuinely delayed vehicle runs minutes
+# — not hours — behind its planned time, so the real-traffic margin is
+# large. The ghost records sat 60 h out. Anything we cannot prove stale
+# (no `timePlanned`, unparseable timestamp) is kept: fail open, never
+# hide a departure on a guess.
+STALE_DEPARTURE_MAX_AGE: Final = timedelta(hours=3)
 
 # Hard safety cap on `stops_ahead` length per departure. The longest Wiener
 # Linien lines are ~25 stops end-to-end; 30 gives generous headroom while

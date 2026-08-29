@@ -31,7 +31,11 @@ async def test_diagnostics_includes_attribution_and_state(
     """Diagnostics expose attribution, RBL list, error code, and exact count."""
     # Derive the expected departure count from the fixture itself so the test
     # stays honest if the captured fixture is ever refreshed.
-    expected_count = len(_parse_monitor_body(monitor_fixture, None, None).departures)
+    expected_count = len(
+        _parse_monitor_body(
+            monitor_fixture, None, monitor_fixture["message"]["serverTime"]
+        ).departures
+    )
     assert expected_count > 0, (
         "fixture must have departures for the test to mean anything"
     )

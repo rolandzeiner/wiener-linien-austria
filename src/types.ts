@@ -285,6 +285,13 @@ export interface WienerLinienAttrs {
   latitude?: number | null;
   longitude?: number | null;
   server_time?: string | null;
+  // Upstream plausibility signals from the coordinator. `stale_departures`
+  // is how many records the last poll dropped because their planned times
+  // had stopped advancing; `stale_since` is the newest planned time among
+  // them — roughly when the feed froze. Absent on integration versions
+  // older than 1.7.8, which is why every read treats them as optional.
+  stale_departures?: number;
+  stale_since?: string | null;
   departures?: DepartureAttr[];
   next_by_line?: Record<string, number>;
   // Static-catalogue line list for this stop — every line serving the
