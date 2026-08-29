@@ -161,8 +161,16 @@ async def test_setup_uses_no_deprecated_ha_api(
 
     `frame.report_usage` logs through `_LOGGER.warning`
     (homeassistant/helpers/frame.py:393) and never calls `warnings.warn`,
-    so pytest.ini's `error::DeprecationWarning` cannot see it. This is the
-    check that covers that channel.
+    so pytest.ini's `error::DeprecationWarning` cannot see it.
+
+    Superseded as a *net* on 2026-08-29 by the `no_deprecated_ha_api`
+    autouse fixture in conftest.py, which makes this assertion after every
+    test and matches both of HA's message shapes — where this one sees only
+    "Detected that custom integration ...", the lenient tier that misses any
+    deprecated call made from a test file. Kept deliberately: it exercises a
+    full entry setup, and a named test states the intent where an autouse
+    fixture is easy to miss. The fixture is the real coverage; this is a
+    readable anchor for it.
     """
     caplog.set_level(logging.WARNING)
     entry = _make_entry()
