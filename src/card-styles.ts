@@ -1239,6 +1239,41 @@ export const cardStyles = css`
     font-size: 0.85rem;
   }
 
+  /* Stale-feed empty state: a headline in the same voice as the other
+     empty states, then the explanation. Horizontal padding (absent on the
+     plain .empty, which is a single short line) keeps the detail sentence
+     off the card edge on narrow dashboards. */
+  .empty.stale {
+    padding: 18px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .empty .empty-title {
+    font-weight: 500;
+    color: var(--primary-text-color);
+  }
+  .empty .empty-detail {
+    /* 34em keeps the sentence near the 45-75 character measure that
+       reads comfortably, without forcing a width on narrow cards. */
+    max-width: 34em;
+    margin: 0 auto;
+    line-height: 1.4;
+  }
+  .empty .empty-meta {
+    font-size: 0.78rem;
+    opacity: 0.75;
+  }
+
+  /* Partial staleness: some lines at this stop still report, so the board
+     renders normally and this note explains the gap rather than replacing
+     the list. Deliberately quiet — the departures are the content. */
+  .stale-note {
+    padding: 4px 0 8px;
+    color: var(--secondary-text-color);
+    font-size: 0.78rem;
+  }
+
   /* Footer: attribution timestamp / etc. Right-pin via margin-left:auto.
      Lives inside .wrap (which already pads horizontally), so padding
      stays vertical-only. */

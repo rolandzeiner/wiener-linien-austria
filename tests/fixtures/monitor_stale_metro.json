@@ -1,0 +1,332 @@
+{
+  "data": {
+    "monitors": [
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.3570367,
+              48.2055835
+            ]
+          },
+          "properties": {
+            "name": "60201430",
+            "title": "Volkstheater U",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "attributes": {
+              "rbl": 1401
+            }
+          }
+        },
+        "lines": [
+          {
+            "name": "48A",
+            "towards": "Klinik Penzing",
+            "direction": "H",
+            "platform": "1",
+            "richtungsId": "1",
+            "barrierFree": true,
+            "realtimeSupported": true,
+            "trafficjam": false,
+            "departures": {
+              "departure": [
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T19:16:00.000+0200",
+                    "timeReal": "2026-08-29T19:16:10.000+0200",
+                    "countdown": 4
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T19:26:00.000+0200",
+                    "timeReal": "2026-08-29T19:26:00.000+0200",
+                    "countdown": 14
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T19:36:00.000+0200",
+                    "timeReal": "2026-08-29T19:36:00.000+0200",
+                    "countdown": 24
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T19:46:00.000+0200",
+                    "timeReal": "2026-08-29T19:46:00.000+0200",
+                    "countdown": 34
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T19:56:00.000+0200",
+                    "timeReal": "2026-08-29T19:56:00.000+0200",
+                    "countdown": 44
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T20:06:00.000+0200",
+                    "timeReal": "2026-08-29T20:06:00.000+0200",
+                    "countdown": 54
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                },
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-29T20:16:00.000+0200",
+                    "timeReal": "2026-08-29T20:16:00.000+0200",
+                    "countdown": 64
+                  },
+                  "vehicle": {
+                    "name": "48A",
+                    "towards": "Klinik Penzing",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "cooling": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptBusCity",
+                    "attributes": {},
+                    "linienId": 448
+                  }
+                }
+              ]
+            },
+            "type": "ptBusCity",
+            "lineId": 448
+          }
+        ],
+        "attributes": {}
+      },
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.3689035,
+              48.2012488
+            ]
+          },
+          "properties": {
+            "name": "60200657",
+            "title": "Karlsplatz",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "gate": "1",
+            "attributes": {
+              "rbl": 4109
+            }
+          }
+        },
+        "lines": [
+          {
+            "name": "U1",
+            "towards": "Leopoldau",
+            "direction": "H",
+            "platform": "1",
+            "richtungsId": "1",
+            "barrierFree": true,
+            "realtimeSupported": true,
+            "trafficjam": false,
+            "departures": {
+              "departure": [
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-27T06:42:00.000+0200",
+                    "timeReal": "2026-08-29T19:11:52.000+0200",
+                    "countdown": 0
+                  },
+                  "vehicle": {
+                    "name": "U1",
+                    "towards": "Leopoldau",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "foldingRamp": false,
+                    "cooling": false,
+                    "onStop": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptMetro",
+                    "attributes": {},
+                    "linienId": 301
+                  }
+                }
+              ]
+            },
+            "type": "ptMetro",
+            "lineId": 301
+          }
+        ],
+        "attributes": {}
+      },
+      {
+        "locationStop": {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [
+              16.3716613,
+              48.208062
+            ]
+          },
+          "properties": {
+            "name": "60201320",
+            "title": "Stephansplatz",
+            "municipality": "Wien",
+            "municipalityId": 49000001,
+            "type": "stop",
+            "coordName": "WGS84",
+            "gate": "1",
+            "attributes": {
+              "rbl": 4111
+            }
+          }
+        },
+        "lines": [
+          {
+            "name": "U1",
+            "towards": "Leopoldau",
+            "direction": "H",
+            "platform": "1",
+            "richtungsId": "1",
+            "barrierFree": true,
+            "realtimeSupported": true,
+            "trafficjam": false,
+            "departures": {
+              "departure": [
+                {
+                  "departureTime": {
+                    "timePlanned": "2026-08-27T06:40:15.000+0200",
+                    "timeReal": "2026-08-29T19:11:52.000+0200",
+                    "countdown": 0
+                  },
+                  "vehicle": {
+                    "name": "U1",
+                    "towards": "Leopoldau",
+                    "direction": "H",
+                    "platform": "1",
+                    "richtungsId": "1",
+                    "barrierFree": true,
+                    "foldingRamp": true,
+                    "cooling": true,
+                    "onStop": true,
+                    "realtimeSupported": true,
+                    "trafficjam": false,
+                    "type": "ptMetro",
+                    "attributes": {},
+                    "linienId": 301
+                  }
+                }
+              ]
+            },
+            "type": "ptMetro",
+            "lineId": 301
+          }
+        ],
+        "attributes": {}
+      }
+    ]
+  },
+  "message": {
+    "value": "OK",
+    "messageCode": 1,
+    "serverTime": "2026-08-29T19:11:47.000+0200"
+  }
+}

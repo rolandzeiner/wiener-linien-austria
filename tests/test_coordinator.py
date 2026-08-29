@@ -40,7 +40,9 @@ def test_parse_monitor_body_sorts_by_countdown(monitor_fixture) -> None:
 
 def test_parse_monitor_body_surfaces_platform(monitor_fixture) -> None:
     """The `platform` field (Gleis, e.g. "1" / "2") round-trips through Departure."""
-    result = _parse_monitor_body(monitor_fixture, None, None)
+    result = _parse_monitor_body(
+        monitor_fixture, None, monitor_fixture["message"]["serverTime"]
+    )
     # At least one departure in the fixture has a platform — capture it and
     # confirm it also appears in the dict form surfaced to sensor attributes.
     with_platform = [d for d in result.departures if d.platform]
@@ -55,7 +57,9 @@ def test_parse_monitor_body_surfaces_platform(monitor_fixture) -> None:
 def test_parse_monitor_body_filters_by_selected_lines(monitor_fixture) -> None:
     """Only selected line keys are included when `selected` is provided."""
     selected = {"U1|H|Leopoldau"}
-    result = _parse_monitor_body(monitor_fixture, selected, None)
+    result = _parse_monitor_body(
+        monitor_fixture, selected, monitor_fixture["message"]["serverTime"]
+    )
     assert all(
         d.line == "U1" and d.direction == "H" and d.towards == "Leopoldau"
         for d in result.departures
@@ -405,7 +409,9 @@ async def test_async_setup_no_coords_when_diva_not_in_catalogue(
 
 def test_parse_monitor_body_handles_bus_fixture(tram_fixture) -> None:
     """Line 4A (ptBusCity) round-trips type + platform + barrier_free."""
-    result = _parse_monitor_body(tram_fixture, None, None)
+    result = _parse_monitor_body(
+        tram_fixture, None, tram_fixture["message"]["serverTime"]
+    )
     assert result.departures, "tram fixture should yield at least one departure"
     first = result.departures[0]
     assert first.line == "4A"
@@ -607,3 +613,165 @@ async def test_scan_interval_reflects_config(hass: HomeAssistant) -> None:
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     assert coordinator.scan_interval == timedelta(seconds=120)
     assert coordinator.update_interval is None
+
+
+# ---------------------------------------------------------------------------
+# Upstream staleness (issue #103)
+# ---------------------------------------------------------------------------
+
+# `serverTime` from the captured fixture. Every staleness assertion is
+# anchored on it rather than on wall-clock now, so these tests keep meaning
+# the same thing in 2027 as they did the evening the outage was captured.
+STALE_FIXTURE_SERVER_TIME = "2026-08-29T19:11:47.000+0200"
+
+
+def test_stale_records_dropped_healthy_kept(stale_metro_fixture) -> None:
+    """The frozen U1 ghosts go; the 48A bus from the same response stays.
+
+    This is the whole bug in one payload: without the filter the two U1
+    records render as a ~3600-minute delay beside a permanent "Jetzt".
+    """
+    result = _parse_monitor_body(stale_metro_fixture, None, STALE_FIXTURE_SERVER_TIME)
+
+    assert result.stale_dropped == 2
+    assert {d.line for d in result.departures} == {"48A"}
+    assert all(d.type == "ptBusCity" for d in result.departures)
+    # Newest planned time among the dropped records — when the feed froze.
+    assert result.stale_since == "2026-08-27T06:42:00+02:00"
+
+
+def test_stale_filter_leaves_healthy_response_untouched(monitor_fixture) -> None:
+    """A normal response loses nothing and reports no staleness."""
+    server_time = monitor_fixture["message"]["serverTime"]
+    result = _parse_monitor_body(monitor_fixture, None, server_time)
+
+    assert result.stale_dropped == 0
+    assert result.stale_since is None
+    assert len(result.departures) > 0
+
+
+def test_late_departure_survives_the_filter() -> None:
+    """A vehicle running badly late is a real departure, not a ghost.
+
+    The single most important negative case: `timePlanned` sitting in the
+    past is normal for any delayed vehicle. Only hours-deep records are
+    ghosts, so a 45-minute delay must pass straight through.
+    """
+    body = {
+        "data": {
+            "monitors": [
+                {
+                    "locationStop": {"properties": {"attributes": {"rbl": 1401}}},
+                    "lines": [
+                        {
+                            "name": "48A",
+                            "towards": "Klinik Penzing",
+                            "direction": "H",
+                            "type": "ptBusCity",
+                            "departures": {
+                                "departure": [
+                                    {
+                                        "departureTime": {
+                                            "timePlanned": "2026-08-29T18:26:00.000+0200",
+                                            "timeReal": "2026-08-29T19:12:00.000+0200",
+                                            "countdown": 0,
+                                        }
+                                    }
+                                ]
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+    result = _parse_monitor_body(body, None, STALE_FIXTURE_SERVER_TIME)
+
+    assert result.stale_dropped == 0
+    assert len(result.departures) == 1
+
+
+@pytest.mark.parametrize(
+    "planned",
+    [None, "", "not-a-timestamp", 1756486320],
+    ids=["missing", "empty", "unparseable", "epoch-int"],
+)
+def test_unjudgeable_timestamp_keeps_the_departure(planned) -> None:
+    """Fail open: a record we can't date is never dropped on a guess."""
+    body = {
+        "data": {
+            "monitors": [
+                {
+                    "locationStop": {"properties": {"attributes": {"rbl": 1401}}},
+                    "lines": [
+                        {
+                            "name": "48A",
+                            "towards": "Klinik Penzing",
+                            "direction": "H",
+                            "type": "ptBusCity",
+                            "departures": {
+                                "departure": [
+                                    {
+                                        "departureTime": {
+                                            "timePlanned": planned,
+                                            "countdown": 5,
+                                        }
+                                    }
+                                ]
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+    result = _parse_monitor_body(body, None, STALE_FIXTURE_SERVER_TIME)
+
+    assert result.stale_dropped == 0
+    assert len(result.departures) == 1
+
+
+def test_missing_server_time_falls_back_to_local_clock(stale_metro_fixture) -> None:
+    """No serverTime in the payload still catches a 60-hour-old record.
+
+    The fallback matters because `serverTime` lives in the envelope, not the
+    monitor block — a batch slice or a truncated response can arrive without
+    it, and that must not disable the plausibility check entirely.
+    """
+    result = _parse_monitor_body(stale_metro_fixture, None, None)
+
+    assert result.stale_dropped == 2
+    assert {d.line for d in result.departures} == {"48A"}
+
+
+def test_stale_warning_latches_until_recovery(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Warn once per freeze episode, not once per poll.
+
+    A frozen feed persists for days; at a 60-second cadence an unlatched
+    warning would emit thousands of identical lines.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    stale = MonitorData(
+        departures=[],
+        server_time=STALE_FIXTURE_SERVER_TIME,
+        stale_dropped=2,
+        stale_since="2026-08-27T06:42:00+02:00",
+    )
+
+    with caplog.at_level("WARNING"):
+        coordinator._note_stale_departures(stale)
+        coordinator._note_stale_departures(stale)
+    assert sum("Dropped 2 stale" in r.message for r in caplog.records) == 1
+
+    # Feed recovers, then freezes again — the second episode warns afresh.
+    caplog.clear()
+    coordinator._note_stale_departures(
+        MonitorData(departures=[], server_time=STALE_FIXTURE_SERVER_TIME)
+    )
+    with caplog.at_level("WARNING"):
+        coordinator._note_stale_departures(stale)
+    assert sum("Dropped 2 stale" in r.message for r in caplog.records) == 1

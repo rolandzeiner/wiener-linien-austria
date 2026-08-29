@@ -266,8 +266,7 @@ export class WienerLinienAustriaRetroCardEditor
         required: true,
         selector: {
           entity: {
-            domain: "sensor",
-            integration: "wiener_linien_austria",
+            filter: { domain: "sensor", integration: "wiener_linien_austria" },
           },
         },
       },

@@ -105,6 +105,11 @@ async def async_get_config_entry_diagnostics(
             "server_time": coordinator.server_time,
             "rbls": list(coordinator.rbls),
             "departure_count": len(data.departures) if data is not None else 0,
+            # Non-zero means the last poll carried records whose planned
+            # times had stopped advancing — an upstream freeze, not a
+            # config problem. First triage question for "my stop is empty".
+            "stale_dropped": data.stale_dropped if data is not None else 0,
+            "stale_since": data.stale_since if data is not None else None,
         },
         "trip_patterns": trip_pattern_summary,
         "alerts": {

@@ -718,7 +718,19 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
         return Array.isArray(attrs.departures) && attrs.departures.length > 0;
       });
-      const key = anyDepartures ? "no_data" : "betriebsschluss";
+      // Upstream froze at every stop on the board: records arrived but had
+      // stopped advancing, so the coordinator dropped them. Takes priority
+      // over the end-of-service reading — a frozen feed labelled
+      // "Betriebsschluss" is exactly the confusion issue #103 reported.
+      const anyStale = eids.some((eid) => {
+        const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
+        return typeof attrs.stale_departures === "number" && attrs.stale_departures > 0;
+      });
+      const key = anyDepartures
+        ? "no_data"
+        : anyStale
+          ? "stale_feed"
+          : "betriebsschluss";
       return html`<div class="flap-empty">${this._t(key)}</div>`;
     }
     // Thin column-header caption above the rows — gives every column

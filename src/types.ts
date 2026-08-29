@@ -102,14 +102,39 @@ export interface WindowWithCustomCards extends Window {
 // expandable that quietly nests its values.
 // ---------------------------------------------------------------------------
 
+export interface DeviceSelectorFilter {
+  integration?: string;
+  manufacturer?: string;
+  model?: string;
+  model_id?: string;
+}
+
+// Entity picker filter. Keys inside one object are ANDed; a list of objects
+// is ORed. Matching is exact, case-sensitive string equality. `device` needs
+// HA 2026.8+ — older frontends ignore the key, so the picker simply narrows
+// less rather than erroring, which is safe under this repo's HA floor.
+export interface EntitySelectorFilter {
+  integration?: string;
+  domain?: string | string[];
+  device_class?: string | string[];
+  supported_features?: string[];
+  unit_of_measurement?: string | string[];
+  device?: DeviceSelectorFilter;
+}
+
+// Filters belong under `filter`. The flat `domain` / `integration` /
+// `device_class` keys are deprecated upstream (LegacyEntitySelector) and are
+// dropped without warning when a `filter` key is present, so never mix them.
+export interface EntitySelectorConfig {
+  filter?: EntitySelectorFilter | ReadonlyArray<EntitySelectorFilter>;
+  multiple?: boolean;
+  reorder?: boolean;
+  include_entities?: string[];
+  exclude_entities?: string[];
+}
+
 export type HASelector =
-  | {
-      entity: {
-        domain?: string | string[];
-        integration?: string;
-        multiple?: boolean;
-      };
-    }
+  | { entity: EntitySelectorConfig }
   | { boolean: Record<string, never> }
   | { icon: Record<string, never> }
   | { text: { type?: "text" | "password" | "url" | "email"; multiline?: boolean } }
@@ -260,6 +285,13 @@ export interface WienerLinienAttrs {
   latitude?: number | null;
   longitude?: number | null;
   server_time?: string | null;
+  // Upstream plausibility signals from the coordinator. `stale_departures`
+  // is how many records the last poll dropped because their planned times
+  // had stopped advancing; `stale_since` is the newest planned time among
+  // them — roughly when the feed froze. Absent on integration versions
+  // older than 1.7.8, which is why every read treats them as optional.
+  stale_departures?: number;
+  stale_since?: string | null;
   departures?: DepartureAttr[];
   next_by_line?: Record<string, number>;
   // Static-catalogue line list for this stop — every line serving the

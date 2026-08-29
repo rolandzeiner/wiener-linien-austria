@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import aiohttp
@@ -15,6 +15,7 @@ from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_DIVA,
@@ -22,6 +23,7 @@ from .const import (
     CONF_RBLS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    STALE_DEPARTURE_MAX_AGE,
 )
 
 # Eager import — `stops_ahead_for_match` runs in the /monitor parser's
@@ -99,6 +101,12 @@ class MonitorData:
 
     departures: list[Departure]
     server_time: str | None
+    # How many records this poll dropped as stale upstream data, and the
+    # newest `timePlanned` among them — i.e. roughly when the feed froze.
+    # Both are surfaced in sensor attributes so the cards can say why a
+    # stop is empty instead of mislabelling a frozen feed "Betriebsschluss".
+    stale_dropped: int = 0
+    stale_since: str | None = None
 
 
 class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
@@ -151,6 +159,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # genuine schema change surfaces once at WARNING (loud enough to
         # be noticed) without spamming the logbook every poll.
         self._stops_ahead_warned_lines: set[str] = set()
+        # Latch for the stale-feed warning; see _note_stale_departures.
+        self._stale_warned: bool = False
         scan_secs = _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_SCAN_INTERVAL
         self._scan_interval = timedelta(seconds=scan_secs)
         # The shared batch group that owns this entry's fetching. Assigned by
@@ -342,13 +352,44 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         lands after setup is picked up on the next parse — no restart needed.
         """
         catalogue = self._current_catalogue()
-        return _parse_monitor_body(
+        data = _parse_monitor_body(
             result.body,
             self._selected_lines,
             result.server_time,
             catalogue=catalogue,
             entry_rbls=self._rbls,
             warned_lines=self._stops_ahead_warned_lines,
+        )
+        self._note_stale_departures(data)
+        return data
+
+    def _note_stale_departures(self, data: MonitorData) -> None:
+        """Log an upstream freeze once per episode, not once per poll.
+
+        A frozen feed persists for days (the 2026-08-27 ptMetro outage ran
+        60+ hours), so an unconditional warning here would emit thousands
+        of identical lines. Latch on the first tick that drops records and
+        clear it once the feed recovers, so a *later* freeze warns again.
+        """
+        if data.stale_dropped == 0:
+            if self._stale_warned:
+                _LOGGER.info(
+                    "Upstream departure data is current again for RBLs %s",
+                    self._rbls,
+                )
+                self._stale_warned = False
+            return
+        if self._stale_warned:
+            return
+        self._stale_warned = True
+        _LOGGER.warning(
+            "Dropped %d stale departure(s) for RBLs %s: upstream stopped "
+            "advancing them (newest planned time %s, server time %s). "
+            "Further occurrences stay silent until the feed recovers.",
+            data.stale_dropped,
+            self._rbls,
+            data.stale_since,
+            data.server_time,
         )
 
     def _invalidate_attrs_cache(self) -> None:
@@ -405,6 +446,15 @@ def _parse_monitor_body(
     rather than spamming on every poll.
     """
     departures: list[Departure] = []
+    stale_dropped = 0
+    stale_since: datetime | None = None
+    # Plausibility floor for `timePlanned`. Anchored on the payload's own
+    # `serverTime` rather than the local clock: the upstream timestamp is
+    # what the records are consistent with, so a skewed HA clock can't
+    # start hiding real departures. Falls back to our clock only when the
+    # response carried no usable serverTime.
+    reference_time = _parse_iso(server_time) or dt_util.utcnow()
+    stale_cutoff = reference_time - STALE_DEPARTURE_MAX_AGE
     monitors = (body.get("data") or {}).get("monitors") or []
     # Narrow `catalogue` once for the loop below — mypy carries the
     # narrowing across the closure boundary if we hand it through a
@@ -474,6 +524,17 @@ def _parse_monitor_body(
                 countdown = _safe_int(dep_time.get("countdown"))
                 if countdown is None:
                     continue
+                # Drop records the upstream feed has stopped advancing.
+                # Checked before the stops_ahead enrichment below so a
+                # frozen feed costs no matcher work. A row whose
+                # `timePlanned` is missing or unparseable is kept — we
+                # only drop what we can prove is stale.
+                planned_at = _parse_iso(dep_time.get("timePlanned"))
+                if planned_at is not None and planned_at < stale_cutoff:
+                    stale_dropped += 1
+                    if stale_since is None or planned_at > stale_since:
+                        stale_since = planned_at
+                    continue
                 vehicle = entry.get("vehicle") or {}
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
                 resolved_towards = vehicle_towards or line_towards
@@ -533,7 +594,28 @@ def _parse_monitor_body(
                 )
 
     departures.sort(key=lambda d: (d.countdown, d.line, d.towards))
-    return MonitorData(departures=departures, server_time=server_time)
+    return MonitorData(
+        departures=departures,
+        server_time=server_time,
+        stale_dropped=stale_dropped,
+        stale_since=stale_since.isoformat() if stale_since is not None else None,
+    )
+
+
+def _parse_iso(value: Any) -> datetime | None:
+    """Best-effort ISO-8601 parse of an upstream timestamp.
+
+    The /monitor feed emits `2026-08-27T06:55:30.000+0200`, which
+    `datetime.fromisoformat` handles natively on every Python this
+    integration supports. Returns None on anything else so callers can
+    fail open rather than act on a timestamp they couldn't read.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
 
 
 def _safe_int(value: Any) -> int | None:

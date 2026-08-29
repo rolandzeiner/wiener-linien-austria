@@ -19,6 +19,8 @@
       ]),
       'scan_interval': '0:01:00',
       'server_time': None,
+      'stale_dropped': 0,
+      'stale_since': None,
     }),
     'entry': dict({
       'data': dict({

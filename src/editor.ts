@@ -101,9 +101,8 @@ export class WienerLinienAustriaCardEditor
         required: true,
         selector: {
           entity: {
-            domain: "sensor",
-            integration: "wiener_linien_austria",
             multiple: true,
+            filter: { domain: "sensor", integration: "wiener_linien_austria" },
           },
         },
       },

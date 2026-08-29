@@ -931,7 +931,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
-            ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time, attrs.line_colors ?? {})}
+            ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time, attrs.line_colors ?? {}, typeof attrs.stale_departures === "number" ? attrs.stale_departures : 0)}
             ${this._tickerActive && cfg.message_text
               ? html`<div class="retro-ticker" role="status" aria-live="polite">
                   <div
@@ -989,6 +989,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     platformLabel: string,
     serverTime: string | null | undefined,
     lineColors: LineColorsMap,
+    staleDropped: number,
   ): TemplateResult {
     if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
@@ -1000,7 +1001,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       const lineFilter = this._config!.line;
       const inDirection = allDepartures.filter((d) => d.direction === dir);
       let key = "no_data";
-      if (allDepartures.length === 0 && serverTime) {
+      if (allDepartures.length === 0 && staleDropped > 0) {
+        // Upstream froze: records arrived but had stopped advancing, so
+        // the coordinator dropped them. Checked before the end-of-service
+        // branch — both look like "nothing left at this stop" from here,
+        // and calling a frozen feed Betriebsschluss is the bug in #103.
+        key = "stale_feed";
+      } else if (allDepartures.length === 0 && serverTime) {
         key = "betriebsschluss";
       } else if (allDepartures.length > 0 && inDirection.length === 0) {
         key = "no_data_wrong_direction";
