@@ -7,13 +7,13 @@
 # one that decides green-on-main. Bump both in the same commit.
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.0 # keep in sync with ruff== in requirements_test.txt
+    rev: v0.16.5 # keep in sync with ruff== in requirements_test.txt
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.0 # keep in sync with mypy== in requirements_test.txt
+    rev: v2.3.1 # keep in sync with mypy== in requirements_test.txt
     hooks:
       - id: mypy
         additional_dependencies: [homeassistant, voluptuous]
