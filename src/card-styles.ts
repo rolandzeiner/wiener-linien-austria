@@ -96,21 +96,22 @@ export const cardStyles = css`
        always renders in the standards-correct colour, while themes can
        still override if they need to. */
     --wl-a11y:    #0072CE;
-    /* Air conditioning. Deliberately NOT --wl-info or --wl-a11y: comfort
-       is not a standards-defined accessibility guarantee and must not
-       borrow the ISO pictogram blue.
-       Two earlier attempts bracket this value and explain it. Full-chroma
-       teal (#00838F, 100% sat at 28% light) read muddy — saturation that
-       high at that little lightness always does. Cyan-400 (#22D3EE) read
-       neon, and needed a dark glyph to pass contrast at all. The middle
-       is moderate saturation at mid lightness, hue nudged off green
-       toward blue: 193deg / 58% / 35%. That keeps a white glyph at
-       5.0:1 — past the 4.5:1 AA text bar, and well past the 3:1 in SC
-       1.4.11 that actually governs an icon — so it matches the a11y
-       pill's treatment instead of fighting it. The two flags stay
-       tellable apart by glyph shape, which is what WCAG 1.4.1 asks for;
-       colour is not carrying the distinction on its own. */
-    --wl-cooling: #26788F;
+    /* Air conditioning. Deliberately NOT --wl-info: comfort is not a
+       standards-defined accessibility guarantee.
+       Three attempts bracket this value. Full-chroma teal (#00838F,
+       100% sat / 28% light) read muddy — that combination always does.
+       Cyan-400 (#22D3EE) read neon. #00B8CC was considered and rejected
+       on measurement, not taste: 2.41:1 behind a white glyph fails even
+       the 3:1 of SC 1.4.11, let alone AA text.
+       This is 207deg / 55% / 44% at 4.84:1, past the 4.5:1 AA text bar.
+       Note it shares its HUE with --wl-a11y (also 207deg) and differs
+       only in saturation and lightness, so the two hero flags read as a
+       matched pair of blues rather than as contrasting colours. That is
+       fine for WCAG — 1.4.1 is satisfied by the glyph shapes, which
+       carry the meaning — but it is a deliberate look, not an accident.
+       Swap to #26788F (193deg, 5.04:1) if they should read as clearly
+       different colours. */
+    --wl-cooling: #3276AE;
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
@@ -505,9 +506,19 @@ export const cardStyles = css`
   .hero-cooling {
     background: var(--wl-cooling);
   }
+  /* ha-icon is inline-level by default, so the ha-svg-icon inside it sits
+     on a text baseline and reserves descender space underneath. Inside a
+     24px circle that lifts the glyph a couple of pixels above true centre
+     — visible on a shape this small. Making ha-icon a flex box of exactly
+     the glyph's size removes the line box, and with it the offset. */
   .hero-a11y ha-icon,
   .hero-cooling ha-icon {
     --mdc-icon-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
   }
 
   /* Version banner — accent surface that uses warning tokens. The
