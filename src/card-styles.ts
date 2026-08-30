@@ -99,18 +99,18 @@ export const cardStyles = css`
     /* Air conditioning. Deliberately NOT --wl-info or --wl-a11y: comfort
        is not a standards-defined accessibility guarantee and must not
        borrow the ISO pictogram blue.
-       Inverted against the a11y pill on purpose. A white glyph forces
-       the background dark, and every teal dark enough to carry one
-       reads muddy next to the vivid a11y blue; going bright and putting
-       a deep teal-ink glyph on top is what makes it read as "cold"
-       rather than "dark". It also separates the two flags by treatment
-       and not merely by hue, which survives a colour-vision deficiency
-       that collapses blue and cyan. Both are fixed hex: the pill is a
-       filled chip, so its internal contrast is independent of theme.
-       Glyph on pill = 7.6:1, comfortably past the 4.5:1 AA text bar and
-       well past the 3:1 SC 1.4.11 bar that actually governs an icon. */
-    --wl-cooling:     #22D3EE;
-    --wl-cooling-ink: #06323F;
+       Two earlier attempts bracket this value and explain it. Full-chroma
+       teal (#00838F, 100% sat at 28% light) read muddy — saturation that
+       high at that little lightness always does. Cyan-400 (#22D3EE) read
+       neon, and needed a dark glyph to pass contrast at all. The middle
+       is moderate saturation at mid lightness, hue nudged off green
+       toward blue: 193deg / 58% / 35%. That keeps a white glyph at
+       5.0:1 — past the 4.5:1 AA text bar, and well past the 3:1 in SC
+       1.4.11 that actually governs an icon — so it matches the a11y
+       pill's treatment instead of fighting it. The two flags stay
+       tellable apart by glyph shape, which is what WCAG 1.4.1 asks for;
+       colour is not carrying the distinction on its own. */
+    --wl-cooling: #26788F;
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
@@ -479,29 +479,31 @@ export const cardStyles = css`
   /* Hero accessibility flag — small icon-only pill, only rendered
      when the next departure is barrier-free AND the user has
      show_accessibility enabled. */
+  /* Hero status flags. Fixed 24px box with a 16px glyph, so these are
+     true circles rather than the wider-than-tall lozenge that padding
+     plus border-radius:999px produced — 2px/6px padding plus a 16px icon
+     resolves to 20x28. Sizing the box instead of padding it keeps the
+     two flags identical whatever glyph sits inside. */
   .hero-a11y,
   .hero-cooling {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 2px 6px;
-    border-radius: 999px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     flex-shrink: 0;
     forced-color-adjust: none;
+    color: #fff;
   }
   .hero-a11y {
     background: var(--wl-a11y);
-    color: #fff;
   }
-  /* Comfort flag, rendered only with show_cooling on. Same pill geometry
-     as .hero-a11y so a row carrying both reads as one set; the colour
-     pairing inverts (see --wl-cooling). The hairline ring is carried by
-     this pill alone: a bright fill needs an edge to stay crisp on a
-     white card, where the dark a11y blue already has one for free. */
+  /* Comfort flag, rendered only with show_cooling on. Same circle and
+     the same white glyph as .hero-a11y so a row carrying both reads as
+     one set; only the fill differs. */
   .hero-cooling {
     background: var(--wl-cooling);
-    color: var(--wl-cooling-ink);
-    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
   }
   .hero-a11y ha-icon,
   .hero-cooling ha-icon {
