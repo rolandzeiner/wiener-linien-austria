@@ -125,6 +125,63 @@ def test_parse_monitor_body_preserves_vehicle_towards_on_branching_lines() -> No
     assert all(d.line == "U1" and d.direction == "R" for d in result.departures)
 
 
+def _cooling_body(vehicle: dict | None) -> dict:
+    """One U3 departure whose `vehicle` block is the test's variable."""
+    departure: dict = {"departureTime": {"countdown": 4}}
+    if vehicle is not None:
+        departure["vehicle"] = vehicle
+    return {
+        "data": {
+            "monitors": [
+                {
+                    "locationStop": {"properties": {"attributes": {"rbl": 4921}}},
+                    "lines": [
+                        {
+                            "name": "U3",
+                            "towards": "Simmering",
+                            "direction": "H",
+                            "type": "ptMetro",
+                            "departures": {"departure": [departure]},
+                        }
+                    ],
+                }
+            ]
+        }
+    }
+
+
+@pytest.mark.parametrize(
+    ("vehicle", "expected"),
+    [
+        ({"cooling": True}, True),
+        ({"cooling": False}, False),
+        ({"towards": "Simmering"}, False),
+        (None, False),
+    ],
+    ids=["cooled", "not-cooled", "key-absent", "no-vehicle-block"],
+)
+def test_parse_monitor_body_reads_cooling_from_the_vehicle(vehicle, expected) -> None:
+    """`cooling` lives on the vehicle, not the line, and is optional.
+
+    The monitor endpoint only populates `departure.vehicle` "wenn
+    abweichend von der Linie", so a row can legitimately arrive with no
+    vehicle block at all. Absent must read as False rather than raising —
+    the card renders only the positive case, so an unreported vehicle
+    simply shows no snowflake.
+    """
+    result = _parse_monitor_body(_cooling_body(vehicle), None, None)
+
+    assert len(result.departures) == 1
+    assert result.departures[0].cooling is expected
+
+
+def test_departure_to_dict_carries_cooling() -> None:
+    """The attribute payload exposes `cooling` so the card can read it."""
+    result = _parse_monitor_body(_cooling_body({"cooling": True}), None, None)
+
+    assert result.departures[0].to_dict()["cooling"] is True
+
+
 def test_parse_monitor_body_falls_back_to_line_towards_when_vehicle_missing() -> None:
     """If `vehicle.towards` is absent, fall back to `line.towards`."""
     body = {

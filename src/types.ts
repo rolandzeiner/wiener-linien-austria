@@ -228,6 +228,9 @@ export interface DepartureAttr {
   barrier_free?: boolean;
   traffic_jam?: boolean;
   platform?: string | null;
+  /** Vehicle is air conditioned. Reported per vehicle, not per line, and
+   *  omitted entirely by older feeds — absent reads as "not reported". */
+  cooling?: boolean;
   // Via / over routing — when present, the retro card alternates the
   // destination text with `ÜBER {via}` / `VIA {via}` every few seconds.
   // Absent on every departure today; reserved for a future sensor
@@ -348,6 +351,8 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 
   show_accessibility?: boolean | undefined;
   accessibility_only?: boolean | undefined;
+  /** Show a snowflake beside departures whose vehicle is air conditioned. */
+  show_cooling?: boolean | undefined;
   show_traffic_info?: boolean | undefined;
   show_elevator_info?: boolean | undefined;
   show_delay?: boolean | undefined;

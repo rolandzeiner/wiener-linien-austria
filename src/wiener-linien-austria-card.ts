@@ -1319,6 +1319,7 @@ export class WienerLinienAustriaCard extends LitElement {
       this._config!.show_platform && d.platform ? String(d.platform) : null;
     const isBarrierFree =
       !!d.barrier_free && this._config!.show_accessibility;
+    const isCooled = !!d.cooling && this._config!.show_cooling;
     const typeIcon = this._config!.show_type_icon ? lineTypeIcon(d.type) : null;
 
     const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
@@ -1375,6 +1376,16 @@ export class WienerLinienAustriaCard extends LitElement {
                 icon="mdi:wheelchair-accessibility"
                 aria-hidden="true"
               ></ha-icon>
+            </span>`
+          : nothing}
+        ${isCooled
+          ? html`<span
+              class="hero-cooling"
+              role="img"
+              aria-label=${this._t("cooling_title")}
+              title=${this._t("cooling_title")}
+            >
+              <ha-icon icon="mdi:snowflake" aria-hidden="true"></ha-icon>
             </span>`
           : nothing}
         ${hasStopsAhead
@@ -1504,7 +1515,12 @@ export class WienerLinienAustriaCard extends LitElement {
       cdState === "now" ? this._rowAccentText(badgeStyle.background) : null;
 
     const showA11y = this._config!.show_accessibility;
-    const hasFlags = Boolean(d.traffic_jam || (showA11y && d.barrier_free));
+    const showCooling = this._config!.show_cooling;
+    const hasFlags = Boolean(
+      d.traffic_jam ||
+        (showA11y && d.barrier_free) ||
+        (showCooling && d.cooling),
+    );
     const rowPlatform =
       this._config!.show_platform && d.platform ? String(d.platform) : null;
 
@@ -1577,6 +1593,15 @@ export class WienerLinienAustriaCard extends LitElement {
                           role="img"
                           aria-label=${this._t("barrier_free_title")}
                           title=${this._t("barrier_free_title")}
+                        ></ha-icon>`
+                      : nothing}
+                    ${showCooling && d.cooling
+                      ? html`<ha-icon
+                          class="cooling"
+                          icon="mdi:snowflake"
+                          role="img"
+                          aria-label=${this._t("cooling_title")}
+                          title=${this._t("cooling_title")}
                         ></ha-icon>`
                       : nothing}
                   </span>`
