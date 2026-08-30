@@ -69,6 +69,13 @@ class Departure:
     barrier_free: bool
     traffic_jam: bool
     platform: str | None = None  # "1" / "2" / "A" / "B" — Gleis as published
+    # Air conditioning, per VEHICLE rather than per line: the monitor
+    # endpoint only carries `cooling` inside `departure.vehicle`, which the
+    # API docs (V1.5, 21.05.2026) mark optional and populate "nur wenn
+    # abweichend von der Linie". A missing key therefore means "not
+    # reported", not "not cooled" — we render only the positive case, so
+    # collapsing both to False costs nothing.
+    cooling: bool = False
     # Ordered list of upcoming stops on the trip the vehicle is running.
     # None when the static trip-pattern index hasn't loaded or no pattern
     # matches the row (replacement service, short-turn variant, etc.). The
@@ -89,6 +96,7 @@ class Departure:
             "barrier_free": self.barrier_free,
             "traffic_jam": self.traffic_jam,
             "platform": self.platform,
+            "cooling": self.cooling,
         }
         if self.stops_ahead is not None:
             out["stops_ahead"] = self.stops_ahead
@@ -536,6 +544,7 @@ def _parse_monitor_body(
                         stale_since = planned_at
                     continue
                 vehicle = entry.get("vehicle") or {}
+                cooling = bool(vehicle.get("cooling"))
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
                 resolved_towards = vehicle_towards or line_towards
                 stops_ahead: list[dict[str, Any]] | None = None
@@ -589,6 +598,7 @@ def _parse_monitor_body(
                         barrier_free=barrier_free,
                         traffic_jam=traffic_jam,
                         platform=platform,
+                        cooling=cooling,
                         stops_ahead=stops_ahead,
                     )
                 )

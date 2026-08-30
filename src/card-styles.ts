@@ -96,6 +96,17 @@ export const cardStyles = css`
        always renders in the standards-correct colour, while themes can
        still override if they need to. */
     --wl-a11y:    #0072CE;
+    /* Air conditioning. Deliberately NOT --wl-info: comfort is not a
+       standards-defined accessibility guarantee.
+       4.84:1 behind the white glyph, past the 4.5:1 AA text bar and well
+       past the 3:1 of SC 1.4.11 that governs an icon. Brighter cyans
+       look fresher and fail it — #00B8CC is 2.41:1 — so raising the
+       lightness here means giving up the white glyph.
+       It shares its hue with --wl-a11y (both 207deg), differing only in
+       saturation and lightness, so the two badges deliberately read as a
+       matched pair rather than as contrasting colours. WCAG 1.4.1 is
+       satisfied by the glyph shapes, not by the fills. */
+    --wl-cooling: #3276AE;
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
@@ -461,22 +472,47 @@ export const cardStyles = css`
       transparent
     );
   }
-  /* Hero accessibility flag — small icon-only pill, only rendered
-     when the next departure is barrier-free AND the user has
-     show_accessibility enabled. */
-  .hero-a11y {
+  /* Hero status flags — icon-only badges on the next departure, each
+     rendered only when its condition holds AND the user enabled it
+     (show_accessibility / show_cooling).
+     Sized rather than padded: 2px/6px padding around a 16px glyph
+     resolves to 20x28, so the previous border-radius:999px produced a
+     lozenge, not the circle it reads as at a glance. A fixed 24px box
+     keeps both badges identical whatever glyph sits inside. */
+  .hero-a11y,
+  .hero-cooling {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    background: var(--wl-a11y);
-    padding: 2px 6px;
-    border-radius: 999px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     flex-shrink: 0;
     forced-color-adjust: none;
+    color: #fff;
   }
-  .hero-a11y ha-icon {
+  .hero-a11y {
+    background: var(--wl-a11y);
+  }
+  /* Comfort flag, rendered only with show_cooling on. Same circle and
+     the same white glyph as .hero-a11y so a row carrying both reads as
+     one set; only the fill differs. */
+  .hero-cooling {
+    background: var(--wl-cooling);
+  }
+  /* ha-icon is inline-level by default, so the ha-svg-icon inside it sits
+     on a text baseline and reserves descender space underneath. Inside a
+     24px circle that lifts the glyph a couple of pixels above true centre
+     — visible on a shape this small. Making ha-icon a flex box of exactly
+     the glyph's size removes the line box, and with it the offset. */
+  .hero-a11y ha-icon,
+  .hero-cooling ha-icon {
     --mdc-icon-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
   }
 
   /* Version banner — accent surface that uses warning tokens. The

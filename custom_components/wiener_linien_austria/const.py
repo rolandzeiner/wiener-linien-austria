@@ -137,6 +137,35 @@ ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 # publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
+# The remaining documented `messageCode` values (Schnittstellendokumentation
+# V1.5, 21.05.2026, §3.1.4). Each gets its own translated message, because
+# they ask different things of whoever reads the log: 311 clears itself,
+# 322 is an empty answer, 320/321 mean the integration built a bad request,
+# and 312 means the stop is gone.
+#
+# 312 is included for completeness but is not reachable through this
+# integration today: it is raised for the `diva` request parameter, and both
+# request sites send `stopId`. Measured against the live API — an unknown
+# `stopId` comes back `messageCode: 1` with zero monitors, and in a batch the
+# other stops still return their data. Kept mapped so the day a `diva` call
+# is added (or the API starts applying 312 to `stopId`) the message is
+# already right rather than a bare code.
+ERR_DB_UNAVAILABLE: Final = 311
+ERR_STOP_UNKNOWN: Final = 312
+ERR_PARAM_INVALID: Final = 320
+ERR_PARAM_MISSING: Final = 321
+ERR_NO_DATA: Final = 322
+
+# messageCode -> `exceptions.<key>` in strings.json. Codes absent here fall
+# back to `api_upstream_error`, which prints the raw code and value.
+UPSTREAM_ERROR_KEYS: Final[dict[int, str]] = {
+    ERR_DB_UNAVAILABLE: "api_db_unavailable",
+    ERR_STOP_UNKNOWN: "api_stop_unknown",
+    ERR_PARAM_INVALID: "api_request_rejected",
+    ERR_PARAM_MISSING: "api_request_rejected",
+    ERR_NO_DATA: "api_no_data",
+}
+
 # MeansOfTransport values → rough categorisation for UI icons. Mirrored
 # in src/utils/mot.ts; tests/test_card_version.py:test_line_type_constants
 # asserts byte-identity. `LineType` carries the same set as a Literal so

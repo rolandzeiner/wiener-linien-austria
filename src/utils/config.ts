@@ -258,6 +258,7 @@ export interface NormalisedModernConfigValidated {
   line_colors: Record<string, string>;
   show_accessibility: boolean;
   accessibility_only: boolean;
+  show_cooling: boolean;
   show_traffic_info: boolean;
   show_elevator_info: boolean;
   show_delay: boolean;
@@ -300,6 +301,7 @@ const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "line_colors",
   "show_accessibility",
   "accessibility_only",
+  "show_cooling",
   "show_traffic_info",
   "show_elevator_info",
   "show_delay",
@@ -318,6 +320,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   max_departures: 6,
   show_accessibility: false,
   accessibility_only: false,
+  show_cooling: false,
   show_traffic_info: true,
   show_elevator_info: true,
   show_delay: true,
@@ -402,6 +405,7 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     line_colors: lineColors,
     show_accessibility: asBool(raw.show_accessibility, MODERN_DEFAULTS.show_accessibility),
     accessibility_only: asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
+    show_cooling: asBool(raw.show_cooling, MODERN_DEFAULTS.show_cooling),
     show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
     show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
     show_delay: asBool(raw.show_delay, MODERN_DEFAULTS.show_delay),
