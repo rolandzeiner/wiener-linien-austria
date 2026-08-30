@@ -138,9 +138,10 @@ ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 ERR_RATE_LIMIT: Final = 316
 
 # The remaining documented `messageCode` values (Schnittstellendokumentation
-# V1.5, 21.05.2026, §3.1.4). Each gets its own translated message so a user
-# reading the log can tell an upstream outage from a stop that no longer
-# exists from a request the integration built wrong.
+# V1.5, 21.05.2026, §3.1.4). Each gets its own translated message, because
+# they ask different things of whoever reads the log: 311 clears itself,
+# 322 is an empty answer, 320/321 mean the integration built a bad request,
+# and 312 means the stop is gone.
 #
 # 312 is included for completeness but is not reachable through this
 # integration today: it is raised for the `diva` request parameter, and both

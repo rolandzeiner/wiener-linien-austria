@@ -229,7 +229,8 @@ export interface DepartureAttr {
   traffic_jam?: boolean;
   platform?: string | null;
   /** Vehicle is air conditioned. Reported per vehicle, not per line, and
-   *  omitted entirely by older feeds — absent reads as "not reported". */
+   *  absent whenever the response carries no vehicle block for the row,
+   *  so a missing value reads as "not reported" rather than "not cooled". */
   cooling?: boolean;
   // Via / over routing — when present, the retro card alternates the
   // destination text with `ÜBER {via}` / `VIA {via}` every few seconds.

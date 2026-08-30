@@ -98,19 +98,14 @@ export const cardStyles = css`
     --wl-a11y:    #0072CE;
     /* Air conditioning. Deliberately NOT --wl-info: comfort is not a
        standards-defined accessibility guarantee.
-       Three attempts bracket this value. Full-chroma teal (#00838F,
-       100% sat / 28% light) read muddy — that combination always does.
-       Cyan-400 (#22D3EE) read neon. #00B8CC was considered and rejected
-       on measurement, not taste: 2.41:1 behind a white glyph fails even
-       the 3:1 of SC 1.4.11, let alone AA text.
-       This is 207deg / 55% / 44% at 4.84:1, past the 4.5:1 AA text bar.
-       Note it shares its HUE with --wl-a11y (also 207deg) and differs
-       only in saturation and lightness, so the two hero flags read as a
-       matched pair of blues rather than as contrasting colours. That is
-       fine for WCAG — 1.4.1 is satisfied by the glyph shapes, which
-       carry the meaning — but it is a deliberate look, not an accident.
-       Swap to #26788F (193deg, 5.04:1) if they should read as clearly
-       different colours. */
+       4.84:1 behind the white glyph, past the 4.5:1 AA text bar and well
+       past the 3:1 of SC 1.4.11 that governs an icon. Brighter cyans
+       look fresher and fail it — #00B8CC is 2.41:1 — so raising the
+       lightness here means giving up the white glyph.
+       It shares its hue with --wl-a11y (both 207deg), differing only in
+       saturation and lightness, so the two badges deliberately read as a
+       matched pair rather than as contrasting colours. WCAG 1.4.1 is
+       satisfied by the glyph shapes, not by the fills. */
     --wl-cooling: #3276AE;
 
     /* Spacing / radius / sizing — layered over the HA Design System
@@ -477,14 +472,13 @@ export const cardStyles = css`
       transparent
     );
   }
-  /* Hero accessibility flag — small icon-only pill, only rendered
-     when the next departure is barrier-free AND the user has
-     show_accessibility enabled. */
-  /* Hero status flags. Fixed 24px box with a 16px glyph, so these are
-     true circles rather than the wider-than-tall lozenge that padding
-     plus border-radius:999px produced — 2px/6px padding plus a 16px icon
-     resolves to 20x28. Sizing the box instead of padding it keeps the
-     two flags identical whatever glyph sits inside. */
+  /* Hero status flags — icon-only badges on the next departure, each
+     rendered only when its condition holds AND the user enabled it
+     (show_accessibility / show_cooling).
+     Sized rather than padded: 2px/6px padding around a 16px glyph
+     resolves to 20x28, so the previous border-radius:999px produced a
+     lozenge, not the circle it reads as at a glance. A fixed 24px box
+     keeps both badges identical whatever glyph sits inside. */
   .hero-a11y,
   .hero-cooling {
     display: inline-flex;
