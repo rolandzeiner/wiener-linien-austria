@@ -98,11 +98,19 @@ export const cardStyles = css`
     --wl-a11y:    #0072CE;
     /* Air conditioning. Deliberately NOT --wl-info or --wl-a11y: comfort
        is not a standards-defined accessibility guarantee and must not
-       borrow the ISO pictogram blue. A cooler, darker teal reads as
-       "cold" while sitting a step below the a11y pill in the hierarchy,
-       and — like --wl-a11y — it is a fixed hex because the pill pairs it
-       with a white glyph, which keeps it legible in either theme. */
-    --wl-cooling: #00838F;
+       borrow the ISO pictogram blue.
+       Inverted against the a11y pill on purpose. A white glyph forces
+       the background dark, and every teal dark enough to carry one
+       reads muddy next to the vivid a11y blue; going bright and putting
+       a deep teal-ink glyph on top is what makes it read as "cold"
+       rather than "dark". It also separates the two flags by treatment
+       and not merely by hue, which survives a colour-vision deficiency
+       that collapses blue and cyan. Both are fixed hex: the pill is a
+       filled chip, so its internal contrast is independent of theme.
+       Glyph on pill = 7.6:1, comfortably past the 4.5:1 AA text bar and
+       well past the 3:1 SC 1.4.11 bar that actually governs an icon. */
+    --wl-cooling:     #22D3EE;
+    --wl-cooling-ink: #06323F;
 
     /* Spacing / radius / sizing — layered over the HA Design System
        so the card moves with HA when tokens evolve. Values match
@@ -476,7 +484,6 @@ export const cardStyles = css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
     padding: 2px 6px;
     border-radius: 999px;
     flex-shrink: 0;
@@ -484,11 +491,17 @@ export const cardStyles = css`
   }
   .hero-a11y {
     background: var(--wl-a11y);
+    color: #fff;
   }
   /* Comfort flag, rendered only with show_cooling on. Same pill geometry
-     as .hero-a11y so a row carrying both reads as one set. */
+     as .hero-a11y so a row carrying both reads as one set; the colour
+     pairing inverts (see --wl-cooling). The hairline ring is carried by
+     this pill alone: a bright fill needs an edge to stay crisp on a
+     white card, where the dark a11y blue already has one for free. */
   .hero-cooling {
     background: var(--wl-cooling);
+    color: var(--wl-cooling-ink);
+    box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
   }
   .hero-a11y ha-icon,
   .hero-cooling ha-icon {
