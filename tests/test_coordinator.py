@@ -6,6 +6,7 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -622,6 +623,9 @@ async def test_scan_interval_reflects_config(hass: HomeAssistant) -> None:
 # `serverTime` from the captured fixture. Every staleness assertion is
 # anchored on it rather than on wall-clock now, so these tests keep meaning
 # the same thing in 2027 as they did the evening the outage was captured.
+# The one test that exercises the `dt_util.utcnow()` fallback can't take the
+# anchor as an argument, so it pins the clock here instead — same invariant,
+# applied through `freezer` rather than through the parameter.
 STALE_FIXTURE_SERVER_TIME = "2026-08-29T19:11:47.000+0200"
 
 
@@ -731,13 +735,24 @@ def test_unjudgeable_timestamp_keeps_the_departure(planned) -> None:
     assert len(result.departures) == 1
 
 
-def test_missing_server_time_falls_back_to_local_clock(stale_metro_fixture) -> None:
+def test_missing_server_time_falls_back_to_local_clock(
+    stale_metro_fixture, freezer: FrozenDateTimeFactory
+) -> None:
     """No serverTime in the payload still catches a 60-hour-old record.
 
     The fallback matters because `serverTime` lives in the envelope, not the
     monitor block — a batch slice or a truncated response can arrive without
     it, and that must not disable the plausibility check entirely.
+
+    Pinning the clock to the capture instant is what the assertion means:
+    in production the response was just fetched, so our clock stands in for
+    the `serverTime` the envelope didn't carry. On the real clock the test
+    quietly changes subject as the fixture ages — once every row is past the
+    three-hour floor it stops distinguishing the frozen U1 rows from the
+    healthy 48A ones and starts asserting that everything is dropped.
     """
+    freezer.move_to(STALE_FIXTURE_SERVER_TIME)
+
     result = _parse_monitor_body(stale_metro_fixture, None, None)
 
     assert result.stale_dropped == 2
