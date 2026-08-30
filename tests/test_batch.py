@@ -244,6 +244,52 @@ async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -
     assert coordinator.last_error_code == 500
 
 
+@pytest.mark.parametrize(
+    ("code", "expected_key"),
+    [
+        (311, "api_db_unavailable"),
+        (312, "api_stop_unknown"),
+        (320, "api_request_rejected"),
+        (321, "api_request_rejected"),
+        (322, "api_no_data"),
+        (500, "api_upstream_error"),
+    ],
+    ids=[
+        "db-down",
+        "stop-unknown",
+        "param-invalid",
+        "param-missing",
+        "no-data",
+        "unmapped",
+    ],
+)
+async def test_documented_error_codes_get_their_own_message(
+    hass: HomeAssistant, monitor_fixture, code, expected_key
+) -> None:
+    """Each documented `messageCode` raises its own translated message.
+
+    An unmapped code still falls back to `api_upstream_error`, which prints
+    the raw code and the upstream text, so a future code the docs gain is
+    reported rather than swallowed.
+    """
+    group, coordinator = _group_with_member(hass)
+    bad = dict(monitor_fixture)
+    bad["message"] = {"value": "upstream text", "messageCode": code}
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(_ok_response(bad)))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
+
+    assert exc.value.translation_key == expected_key
+    # Every message carries both placeholders, mapped or not.
+    assert exc.value.translation_placeholders["code"] == str(code)
+    assert exc.value.translation_placeholders["value"] == "upstream text"
+    assert coordinator.last_error_code == code
+    # None of these is the rate limit, so none may trip that flag.
+    assert coordinator._rate_limited is False
+
+
 # ---------------------------------------------------------------------------
 # Rate-limit Repairs issue (stays per-member)
 # ---------------------------------------------------------------------------

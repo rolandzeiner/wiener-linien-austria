@@ -40,6 +40,7 @@ from .const import (
     DOMAIN,
     ERR_RATE_LIMIT,
     MONITOR_ENDPOINT,
+    UPSTREAM_ERROR_KEYS,
     USER_AGENT,
 )
 from .http import CacheValidators, base_request_headers
@@ -268,9 +269,15 @@ class MonitorBatchGroup:
                     )
 
                 if code is not None and code != 1:
+                    # Named message where the code is documented, raw code
+                    # and value otherwise. Both shapes carry `code` and
+                    # `value` so an unrecognised code still says something
+                    # useful rather than swallowing the upstream text.
                     raise UpdateFailed(
                         translation_domain=DOMAIN,
-                        translation_key="api_upstream_error",
+                        translation_key=UPSTREAM_ERROR_KEYS.get(
+                            code, "api_upstream_error"
+                        ),
                         translation_placeholders={
                             "code": str(code),
                             "value": str(message.get("value") or ""),

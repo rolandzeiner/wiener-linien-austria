@@ -94,6 +94,18 @@
     },
     "invalid_diva": {
       "message": "Config entry contains no valid DIVA stop number (received {received}). Remove and re-add the integration."
+    },
+    "api_db_unavailable": {
+      "message": "Wiener Linien API reports its database is unavailable (error {code}): {value}. Upstream outage — it clears on its own."
+    },
+    "api_stop_unknown": {
+      "message": "Wiener Linien API does not know this stop (error {code}): {value}. It may have been retired — remove and re-add the integration to pick the stop again."
+    },
+    "api_request_rejected": {
+      "message": "Wiener Linien API rejected the request (error {code}): {value}. This is an integration bug, not a configuration problem — please report it."
+    },
+    "api_no_data": {
+      "message": "Wiener Linien API has no data for this stop right now (error {code}): {value}."
     }
   },
   "issues": {

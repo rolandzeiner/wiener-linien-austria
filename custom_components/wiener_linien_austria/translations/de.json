@@ -94,6 +94,18 @@
     },
     "invalid_diva": {
       "message": "Der Konfigurationseintrag enthält keine gültige DIVA-Haltestellennummer (erhalten: {received}). Bitte die Integration entfernen und neu hinzufügen."
+    },
+    "api_db_unavailable": {
+      "message": "Wiener-Linien-API meldet ihre Datenbank als nicht verfügbar (Fehler {code}): {value}. Eine Störung auf Seite der Wiener Linien — sie behebt sich von selbst."
+    },
+    "api_stop_unknown": {
+      "message": "Wiener-Linien-API kennt diese Haltestelle nicht (Fehler {code}): {value}. Möglicherweise wurde sie aufgelassen — bitte die Integration entfernen und die Haltestelle neu auswählen."
+    },
+    "api_request_rejected": {
+      "message": "Wiener-Linien-API hat die Anfrage abgelehnt (Fehler {code}): {value}. Das ist ein Fehler der Integration, kein Konfigurationsproblem — bitte melde ihn."
+    },
+    "api_no_data": {
+      "message": "Wiener-Linien-API hat derzeit keine Daten für diese Haltestelle (Fehler {code}): {value}."
     }
   },
   "issues": {
