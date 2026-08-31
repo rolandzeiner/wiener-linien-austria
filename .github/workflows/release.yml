@@ -100,11 +100,17 @@ jobs:
               exit 1
             fi
 
-            ( cd "custom_components/$domain" \
-                && zip -q -r -X "$GITHUB_WORKSPACE/$filename" . \
-                     -x '*.pyc' '*__pycache__*' '*.DS_Store' )
+            # `git archive` over the subtree gives a flat archive of exactly
+            # the tracked files at this tag — no __pycache__, no .DS_Store, no
+            # dependence on the runner's working directory being pristine.
+            git archive --format=zip -o "$filename" "HEAD:custom_components/$domain"
 
-            if ! unzip -l "$filename" | grep -qE ' manifest\.json$'; then
+            # Capture the listing first: under `set -o pipefail`, piping it
+            # into `grep -q` makes grep exit on the match, unzip die of
+            # SIGPIPE, and the whole step fail at random depending on where
+            # the entry lands in the archive.
+            listing="$(unzip -Z1 "$filename")"
+            if ! grep -qxF 'manifest.json' <<<"$listing"; then
               echo "::error::manifest.json is not at the root of $filename — HACS would extract a broken tree."
               exit 1
             fi
