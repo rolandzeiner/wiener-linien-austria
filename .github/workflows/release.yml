@@ -1,0 +1,154 @@
+name: Release
+
+# Attaches the file HACS downloads to every published release.
+#
+# Why this exists: HACS reads its download counter off the release *asset*
+# (`data.downloads = target_asset.download_count` in hacs/repositories/base.py).
+# A repository whose releases carry no asset is installed by pulling the tag's
+# individual files through the GitHub API — no asset is touched, so HACS has
+# nothing to count and shows nothing. Shipping one archive per release also
+# turns an N-file download into a single request, which is faster for users and
+# far cheaper against GitHub's rate limit.
+#
+# The job is deliberately repo-agnostic: everything it needs is read out of
+# `hacs.json` and the repository layout, so this file is byte-identical across
+# the portfolio. Integrations (a `custom_components/` tree) get a flat zip;
+# the dashboard-card repo (a `dist/` bundle) gets its .js.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to (re)attach the HACS asset to, e.g. v1.9.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-asset-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  asset:
+    name: Attach HACS download asset
+    runs-on: ubuntu-latest
+    permissions:
+      # Only this job may write, and only to upload the asset.
+      contents: write
+    steps:
+      - name: Resolve tag
+        id: ctx
+        env:
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag to work on."
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          # Build the asset from the tagged tree, never from the branch head —
+          # a workflow_dispatch backfill runs the workflow from the default
+          # branch but must package the code the user actually installs.
+          ref: ${{ steps.ctx.outputs.tag }}
+          persist-credentials: false
+
+      - name: Build the asset HACS downloads
+        id: asset
+        env:
+          TAG: ${{ steps.ctx.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+
+          # hacs.json is read from the *tagged* tree, so on a backfill of a
+          # release cut before this workflow existed the zip_release keys are
+          # simply not there yet. The archive name is therefore derived from
+          # the layout, which is the rule hacs.json has to follow anyway, and
+          # the file is only consulted to assert the two agree.
+          declared_filename="$(jq -r '.filename // empty' hacs.json)"
+          declared_zip_release="$(jq -r '.zip_release // empty' hacs.json)"
+
+          if [ -d custom_components ]; then
+            # --- Integration ------------------------------------------------
+            # HACS extracts the archive with `zip_file.extractall(<config>/
+            # custom_components/<domain>/)`, so the zip must be flat:
+            # manifest.json at the archive root, not one directory down.
+            mapfile -t domains < <(find custom_components -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+            if [ "${#domains[@]}" -ne 1 ]; then
+              echo "::error::Expected exactly one directory under custom_components/, found ${#domains[@]}."
+              exit 1
+            fi
+            domain="${domains[0]}"
+            filename="$domain.zip"
+
+            if [ -z "$declared_zip_release" ]; then
+              echo "::warning::$TAG predates \"zip_release\" in hacs.json. Attaching $filename anyway so the version stays installable."
+            elif [ "$declared_zip_release" != "true" ]; then
+              echo '::error::hacs.json sets "zip_release" to something other than true — HACS would ignore the asset.'
+              exit 1
+            elif [ "$declared_filename" != "$filename" ]; then
+              echo "::error::hacs.json filename is '$declared_filename' but must be '$filename'."
+              exit 1
+            fi
+
+            # A tag whose manifest still carries the previous version ships an
+            # integration that reports the wrong version to HA and to the card's
+            # WebSocket version check. Cheapest possible place to catch it.
+            manifest_version="$(jq -er '.version' "custom_components/$domain/manifest.json")"
+            if [ "$manifest_version" != "$version" ]; then
+              echo "::error::manifest.json version is '$manifest_version' but the tag is '$TAG'."
+              exit 1
+            fi
+
+            # `git archive` over the subtree gives a flat archive of exactly
+            # the tracked files at this tag — no __pycache__, no .DS_Store, no
+            # dependence on the runner's working directory being pristine.
+            git archive --format=zip -o "$filename" "HEAD:custom_components/$domain"
+
+            # Capture the listing first: under `set -o pipefail`, piping it
+            # into `grep -q` makes grep exit on the match, unzip die of
+            # SIGPIPE, and the whole step fail at random depending on where
+            # the entry lands in the archive.
+            listing="$(unzip -Z1 "$filename")"
+            if ! grep -qxF 'manifest.json' <<<"$listing"; then
+              echo "::error::manifest.json is not at the root of $filename — HACS would extract a broken tree."
+              exit 1
+            fi
+          else
+            # --- Dashboard card ---------------------------------------------
+            # zip_release is integration-only. For a plugin, HACS matches an
+            # asset named exactly hacs.json's `filename` and — per
+            # plugin.py:update_filenames — prefers it over dist/, so shipping
+            # the built bundle as an asset is all that is needed.
+            filename="${declared_filename:-${GITHUB_REPOSITORY##*/}.js}"
+            if [ ! -f "dist/$filename" ]; then
+              echo "::error::dist/$filename not found — nothing to attach."
+              exit 1
+            fi
+
+            package_version="$(jq -er '.version' package.json)"
+            if [ "$package_version" != "$version" ]; then
+              echo "::error::package.json version is '$package_version' but the tag is '$TAG'."
+              exit 1
+            fi
+
+            cp "dist/$filename" "$filename"
+          fi
+
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+          echo "Attaching $filename ($(wc -c <"$filename") bytes) to $TAG"
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ctx.outputs.tag }}
+          ASSET: ${{ steps.asset.outputs.filename }}
+        run: gh release upload "$TAG" "$ASSET" --clobber --repo "$GITHUB_REPOSITORY"
