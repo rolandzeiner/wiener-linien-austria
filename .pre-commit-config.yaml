@@ -5,6 +5,11 @@
 # `requirements_test.txt`. CI installs those exact versions; a drifting
 # hook rev means the local gate lints with a different ruleset than the
 # one that decides green-on-main. Bump both in the same commit.
+#
+# The vendored font licence is third-party text kept verbatim. A
+# `--all-files` run would otherwise reformat it, so it is excluded here
+# rather than rewritten.
+exclude: ^custom_components/wiener_linien_austria/www/fonts/
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.16.5 # keep in sync with ruff== in requirements_test.txt
