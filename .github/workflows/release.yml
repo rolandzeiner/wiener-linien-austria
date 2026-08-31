@@ -66,28 +66,36 @@ jobs:
           TAG: ${{ steps.ctx.outputs.tag }}
         run: |
           set -euo pipefail
-          filename="$(jq -er '.filename' hacs.json)"
           version="${TAG#v}"
+
+          # hacs.json is read from the *tagged* tree, so on a backfill of a
+          # release cut before this workflow existed the zip_release keys are
+          # simply not there yet. The archive name is therefore derived from
+          # the layout, which is the rule hacs.json has to follow anyway, and
+          # the file is only consulted to assert the two agree.
+          declared_filename="$(jq -r '.filename // empty' hacs.json)"
+          declared_zip_release="$(jq -r '.zip_release // empty' hacs.json)"
 
           if [ -d custom_components ]; then
             # --- Integration ------------------------------------------------
             # HACS extracts the archive with `zip_file.extractall(<config>/
             # custom_components/<domain>/)`, so the zip must be flat:
             # manifest.json at the archive root, not one directory down.
-            if [ "$(jq -r '.zip_release' hacs.json)" != "true" ]; then
-              echo '::error::hacs.json is missing "zip_release": true — HACS would ignore the asset.'
-              exit 1
-            fi
-
             mapfile -t domains < <(find custom_components -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
             if [ "${#domains[@]}" -ne 1 ]; then
               echo "::error::Expected exactly one directory under custom_components/, found ${#domains[@]}."
               exit 1
             fi
             domain="${domains[0]}"
+            filename="$domain.zip"
 
-            if [ "$filename" != "$domain.zip" ]; then
-              echo "::error::hacs.json filename is '$filename' but must be '$domain.zip'."
+            if [ -z "$declared_zip_release" ]; then
+              echo "::warning::$TAG predates \"zip_release\" in hacs.json. Attaching $filename anyway so the version stays installable."
+            elif [ "$declared_zip_release" != "true" ]; then
+              echo '::error::hacs.json sets "zip_release" to something other than true — HACS would ignore the asset.'
+              exit 1
+            elif [ "$declared_filename" != "$filename" ]; then
+              echo "::error::hacs.json filename is '$declared_filename' but must be '$filename'."
               exit 1
             fi
 
@@ -120,6 +128,7 @@ jobs:
             # asset named exactly hacs.json's `filename` and — per
             # plugin.py:update_filenames — prefers it over dist/, so shipping
             # the built bundle as an asset is all that is needed.
+            filename="${declared_filename:-${GITHUB_REPOSITORY##*/}.js}"
             if [ ! -f "dist/$filename" ]; then
               echo "::error::dist/$filename not found — nothing to attach."
               exit 1
@@ -135,7 +144,7 @@ jobs:
           fi
 
           echo "filename=$filename" >> "$GITHUB_OUTPUT"
-          ls -l "$filename"
+          echo "Attaching $filename ($(wc -c <"$filename") bytes) to $TAG"
 
       - name: Attach to the release
         env:
