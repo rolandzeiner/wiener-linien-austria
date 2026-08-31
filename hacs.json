@@ -3,5 +3,7 @@
   "country": ["AT"],
   "homeassistant": "2025.1.0",
   "hacs": "2.0.0",
-  "render_readme": true
+  "render_readme": true,
+  "filename": "wiener_linien_austria.zip",
+  "zip_release": true
 }
