@@ -357,16 +357,23 @@ export const cardStyles = css`
     grid-row: 1;
     /* The metric (2.5rem on wide cards) is taller than an entry, so it
        sized grid row 1 and left the first entry reading ~7px further
-       from the second than every other pair in the trail. Zero height
-       takes it out of the row's sizing without shrinking the glyphs:
-       they overflow up into hero-host's padding and down into column 1,
-       which is empty on every row below. align-self keeps the 0-height
-       box centred on the first entry, so the number still sits level
-       with it and all entry gaps are --wl-hero-row-gap. Nothing clips
-       the overflow — ha-card is the only overflow: hidden ancestor and
-       it wraps the whole card. */
+       from the second than every other pair in the trail. Symmetric
+       negative margins cancel its own height, so it contributes nothing
+       to the row while the glyphs stay put: they overflow equally up
+       into hero-host's padding and down into column 1, which is empty
+       on every row below. Nothing clips them — ha-card is the only
+       overflow: hidden ancestor and it wraps the whole card.
+
+       Not height: 0 — this is a baseline flex line, and collapsing the
+       box makes its content hang below the box rather than stay centred
+       on it — which dropped the countdown well under the badge on a
+       one-entry hero, where there was no second row to disguise it.
+       Margins shrink the box's footprint without moving its content.
+       Halving --wl-metric-size slightly over-shrinks (the line box can
+       exceed the font size), and over-shrinking is the safe direction:
+       the row falls back to entry height and the box stays centred. */
     align-self: center;
-    height: 0;
+    margin-block: calc(var(--wl-metric-size) / -2);
   }
   .hero > .hero-entry {
     grid-column: 2;
@@ -449,7 +456,21 @@ export const cardStyles = css`
   .hero-detail {
     display: grid;
     grid-template-rows: 0fr;
-    transition: grid-template-rows 0.24s ease;
+    transition:
+      grid-template-rows 0.24s ease,
+      margin-top 0.24s ease;
+    /* An expandable entry always emits this panel, open or not, and a
+       collapsed one is zero-height but still occupies a grid row — so
+       --wl-hero-row-gap applies both above and below it, and the two
+       entries it sits between end up two gaps apart. An entry with no
+       stops_ahead emits no panel at all and gets one gap, which is why
+       the same hero measures differently depending on whether its stop
+       has trail data. Pull the collapsed panel up by one gap so both
+       read identically; .expanded releases it, and the transition lets
+       it travel with the opening animation instead of snapping at frame
+       one. The departure list below has no equivalent bug — .dep-list
+       spaces its rows with padding and borders, not a gap. */
+    margin-top: calc(-1 * var(--wl-hero-row-gap));
   }
   .hero-detail-inner {
     overflow: hidden;
@@ -457,6 +478,7 @@ export const cardStyles = css`
   }
   .hero-detail.expanded {
     grid-template-rows: 1fr;
+    margin-top: 0;
   }
   .hero-direction {
     font-weight: 500;
@@ -1561,14 +1583,15 @@ export const cardStyles = css`
       align-items: stretch;
       gap: 6px;
     }
-    /* The zero-height metric above is a grid-row-sizing fix. Here the
+    /* The negative margins above are a grid-row-sizing fix. Here the
        hero is a flex column, the countdown is its own stacked line, and
-       it must take its natural height and full width back. Selector is
+       it must take its natural footprint and full width back — left as
+       is, the margins would pull the entry below up into it. Selector is
        kept at .hero > .hero-time: a container query adds no specificity,
        so a bare .hero-time would lose to the base rule. */
     .hero > .hero-time {
       align-self: stretch;
-      height: auto;
+      margin-block: 0;
     }
   }
 
@@ -1647,10 +1670,10 @@ export const cardStyles = css`
          row actually ends; the flex content inside stays centred, so the
          badge does not move and top: 50% is still its centre.
 
-         Since .hero-time went zero-height this is a no-op in practice —
-         row 1 is now entry-height like the rest. Kept as a guard so the
-         stub still lands correctly if anything ever makes row 1 taller
-         than its entry again. */
+         Since .hero-time's negative margins cancel its footprint this
+         is a no-op in practice — row 1 is now entry-height like the
+         rest. Kept as a guard so the stub still lands correctly if
+         anything ever makes row 1 taller than its entry again. */
       align-self: stretch;
     }
     .hero-detail .stops-ahead {
