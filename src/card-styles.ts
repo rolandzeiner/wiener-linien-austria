@@ -355,6 +355,18 @@ export const cardStyles = css`
   .hero > .hero-time {
     grid-column: 1;
     grid-row: 1;
+    /* The metric (2.5rem on wide cards) is taller than an entry, so it
+       sized grid row 1 and left the first entry reading ~7px further
+       from the second than every other pair in the trail. Zero height
+       takes it out of the row's sizing without shrinking the glyphs:
+       they overflow up into hero-host's padding and down into column 1,
+       which is empty on every row below. align-self keeps the 0-height
+       box centred on the first entry, so the number still sits level
+       with it and all entry gaps are --wl-hero-row-gap. Nothing clips
+       the overflow — ha-card is the only overflow: hidden ancestor and
+       it wraps the whole card. */
+    align-self: center;
+    height: 0;
   }
   .hero > .hero-entry {
     grid-column: 2;
@@ -1549,6 +1561,15 @@ export const cardStyles = css`
       align-items: stretch;
       gap: 6px;
     }
+    /* The zero-height metric above is a grid-row-sizing fix. Here the
+       hero is a flex column, the countdown is its own stacked line, and
+       it must take its natural height and full width back. Selector is
+       kept at .hero > .hero-time: a container query adds no specificity,
+       so a bare .hero-time would lose to the base rule. */
+    .hero > .hero-time {
+      align-self: stretch;
+      height: auto;
+    }
   }
 
   @container wlcard (inline-size > 480px) {
@@ -1626,9 +1647,10 @@ export const cardStyles = css`
          row actually ends; the flex content inside stays centred, so the
          badge does not move and top: 50% is still its centre.
 
-         This also closes the slack that made the first line look like it
-         had more space beneath it than the others — the trail now starts
-         directly under it either way. */
+         Since .hero-time went zero-height this is a no-op in practice —
+         row 1 is now entry-height like the rest. Kept as a guard so the
+         stub still lands correctly if anything ever makes row 1 taller
+         than its entry again. */
       align-self: stretch;
     }
     .hero-detail .stops-ahead {
