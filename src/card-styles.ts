@@ -339,9 +339,22 @@ export const cardStyles = css`
     display: grid;
     grid-template-columns: auto 1fr;
     column-gap: var(--ha-space-3, 12px);
-    /* Named so the hero connector stub can bridge it. */
+    /* Named so the hero connector stub can bridge it, and so the item
+       margins below can reuse the one value. */
     --wl-hero-row-gap: 6px;
-    row-gap: var(--wl-hero-row-gap);
+    /* Spacing lives on the items, NOT on the track gap. An expandable
+       entry always emits a .hero-detail panel; collapsed, that panel is
+       a zero-height grid row, so a row-gap would apply above AND below
+       it and leave two gaps between the entries it separates, while an
+       entry without stops_ahead emits no panel and got one. Two heroes
+       on the same dashboard then measured differently.
+
+       A negative margin on the panel does NOT fix this: a margin changes
+       an item's contribution to its own track, never the fixed space
+       the grid inserts between tracks. Only removing the gap does. This
+       is the same reason .dep-list spaces its rows with padding and
+       borders rather than a gap. */
+    row-gap: 0;
     align-items: center;
     /* Cosmetics (background, padding, radius) live on .hero-host so
        the tinted surface visually contains both the grid and any
@@ -374,9 +387,26 @@ export const cardStyles = css`
        the row falls back to entry height and the box stays centred. */
     align-self: center;
     margin-block: calc(var(--wl-metric-size) / -2);
+    /* Optical correction. Centring the BOX is not centring the INK:
+       wl-sans-bold (TeX Gyre Heros, 1000 upm) declares hhea ascent 1125
+       / descent -307 and leaves USE_TYPO_METRICS off, so browsers use
+       those. Under line-height: 1 that puts the baseline 0.909em below
+       the line-box top, and the ink of "Jetzt" (yMax 729, yMin -12)
+       centres 0.0505em BELOW the box centre — about 2px low at 2.5rem,
+       which is what a one-entry hero shows plainly. Digits measure
+       0.047em to 0.0545em, so one constant covers every value the
+       metric renders. A transform rather than a margin: it must not
+       feed back into row sizing. */
+    translate: 0 calc(var(--wl-metric-size) * -0.05);
   }
   .hero > .hero-entry {
     grid-column: 2;
+  }
+  /* Every entry but the first carries the gap above it. A closed panel
+     between two entries adds nothing, so the spacing is identical
+     whether or not the stop has trail data. */
+  .hero > .hero-entry ~ .hero-entry {
+    margin-top: var(--wl-hero-row-gap);
   }
   /* Detail panel spans both columns so its dot column starts at the
      hero-host's left padding — long station names get the full inner
@@ -459,18 +489,13 @@ export const cardStyles = css`
     transition:
       grid-template-rows 0.24s ease,
       margin-top 0.24s ease;
-    /* An expandable entry always emits this panel, open or not, and a
-       collapsed one is zero-height but still occupies a grid row — so
-       --wl-hero-row-gap applies both above and below it, and the two
-       entries it sits between end up two gaps apart. An entry with no
-       stops_ahead emits no panel at all and gets one gap, which is why
-       the same hero measures differently depending on whether its stop
-       has trail data. Pull the collapsed panel up by one gap so both
-       read identically; .expanded releases it, and the transition lets
-       it travel with the opening animation instead of snapping at frame
-       one. The departure list below has no equivalent bug — .dep-list
-       spaces its rows with padding and borders, not a gap. */
-    margin-top: calc(-1 * var(--wl-hero-row-gap));
+    /* Closed, this panel is a zero-height row that must cost nothing —
+       .hero carries no row-gap (see there), so it doesn't. Open, it
+       buys its own gap below the entry it belongs to; the entry after
+       it already carries one. Transitioned with grid-template-rows so
+       the gap grows with the panel instead of snapping at frame one,
+       and so the connector stub (which reaches exactly one gap past the
+       entry's bottom edge) always meets the trail's top. */
   }
   .hero-detail-inner {
     overflow: hidden;
@@ -478,7 +503,7 @@ export const cardStyles = css`
   }
   .hero-detail.expanded {
     grid-template-rows: 1fr;
-    margin-top: 0;
+    margin-top: var(--wl-hero-row-gap);
   }
   .hero-direction {
     font-weight: 500;
@@ -1581,7 +1606,8 @@ export const cardStyles = css`
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      gap: 6px;
+      /* No gap here either — flex spaces a zero-height closed panel
+         exactly the way grid does. The item margins carry it. */
     }
     /* The negative margins above are a grid-row-sizing fix. Here the
        hero is a flex column, the countdown is its own stacked line, and
@@ -1591,7 +1617,9 @@ export const cardStyles = css`
        so a bare .hero-time would lose to the base rule. */
     .hero > .hero-time {
       align-self: stretch;
-      margin-block: 0;
+      /* Stacked above the first entry, so it buys the gap the entry's
+         own ~ rule doesn't give it (that rule skips the first entry). */
+      margin-block: 0 var(--wl-hero-row-gap);
     }
   }
 
