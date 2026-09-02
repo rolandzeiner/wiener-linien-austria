@@ -289,6 +289,13 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    /* The QR toggle is a <button>, the maps link an <a>: without this
+       reset the button keeps its UA padding and the two boxes disagree,
+       so the round hover surface stops being a circle centred on the
+       glyph. */
+    padding: 0;
     width: 40px;
     height: 40px;
     border-radius: 50%;
@@ -303,8 +310,19 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     background: color-mix(in srgb, var(--primary-color) 12%, transparent);
     color: var(--primary-text-color);
   }
+  /* Same inline-baseline correction as .hero-a11y: ha-icon is
+     inline-level, so the ha-svg-icon inside it sits on a text baseline
+     and reserves descender space below the glyph. Inside a round
+     button that lifts the icon above true centre and the hover circle
+     reads as misaligned. Sizing ha-icon as a flex box of exactly the
+     glyph's size removes the line box, and with it the offset. */
   .icon-action ha-icon {
     --mdc-icon-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: var(--mdc-icon-size);
+    height: var(--mdc-icon-size);
   }
 
   /* Hero block — Linz-Linien-aligned layout: tinted background, big
@@ -1738,6 +1756,11 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
     border-radius: 6px;
+  }
+  /* …except the round icon buttons, which would otherwise take a
+     rounded-rect ring around a circular surface. */
+  .icon-action:focus-visible {
+    border-radius: 50%;
   }
   @media (forced-colors: active) {
     .icon-tile,
