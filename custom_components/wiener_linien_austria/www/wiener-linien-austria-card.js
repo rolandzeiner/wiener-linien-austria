@@ -2474,7 +2474,7 @@ let It=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
               title=${this._t("barrier_free_title")}
             >
               <ha-icon
-                icon="mdi:wheelchair-accessibility"
+                icon="mdi:wheelchair"
                 aria-hidden="true"
               ></ha-icon>
             </span>`:V}
@@ -2536,7 +2536,7 @@ let It=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
                         ></ha-icon>`:V}
                     ${u&&e.barrier_free?j`<ha-icon
                           class="a11y"
-                          icon="mdi:wheelchair-accessibility"
+                          icon="mdi:wheelchair"
                           role="img"
                           aria-label=${this._t("barrier_free_title")}
                           title=${this._t("barrier_free_title")}

@@ -1373,7 +1373,7 @@ export class WienerLinienAustriaCard extends LitElement {
               title=${this._t("barrier_free_title")}
             >
               <ha-icon
-                icon="mdi:wheelchair-accessibility"
+                icon="mdi:wheelchair"
                 aria-hidden="true"
               ></ha-icon>
             </span>`
@@ -1589,7 +1589,7 @@ export class WienerLinienAustriaCard extends LitElement {
                     ${showA11y && d.barrier_free
                       ? html`<ha-icon
                           class="a11y"
-                          icon="mdi:wheelchair-accessibility"
+                          icon="mdi:wheelchair"
                           role="img"
                           aria-label=${this._t("barrier_free_title")}
                           title=${this._t("barrier_free_title")}
