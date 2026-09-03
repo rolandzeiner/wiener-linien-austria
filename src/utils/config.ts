@@ -262,6 +262,7 @@ export interface NormalisedModernConfigValidated {
   show_traffic_info: boolean;
   show_elevator_info: boolean;
   show_delay: boolean;
+  show_delay_colors: boolean;
   show_type_icon: boolean;
   show_platform: boolean;
   show_hero_metric: boolean;
@@ -305,6 +306,7 @@ const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_traffic_info",
   "show_elevator_info",
   "show_delay",
+  "show_delay_colors",
   "show_type_icon",
   "show_platform",
   "show_hero_metric",
@@ -324,6 +326,7 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   show_traffic_info: true,
   show_elevator_info: true,
   show_delay: true,
+  show_delay_colors: true,
   show_type_icon: false,
   show_platform: true,
   show_hero_metric: true,
@@ -409,6 +412,7 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
     show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
     show_delay: asBool(raw.show_delay, MODERN_DEFAULTS.show_delay),
+    show_delay_colors: asBool(raw.show_delay_colors, MODERN_DEFAULTS.show_delay_colors),
     show_type_icon: asBool(raw.show_type_icon, MODERN_DEFAULTS.show_type_icon),
     show_platform: asBool(raw.show_platform, MODERN_DEFAULTS.show_platform),
     show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),

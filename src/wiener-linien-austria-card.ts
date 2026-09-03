@@ -1502,10 +1502,14 @@ export class WienerLinienAustriaCard extends LitElement {
 
     // Row state — `now` overrides late/early when cd<=0. Empty string
     // when none apply; the classMap below skips falsy entries.
+    // `show_delay_colors` gates late/early only: `now` is the line's own
+    // accent, not a schedule-deviation signal, so it stays either way.
+    const showDelayColors = this._config!.show_delay_colors;
     let cdState: "now" | "late" | "early" | "" = "";
     if (cd !== null && cd <= 0) cdState = "now";
-    else if (signedDelay !== null && signedDelay >= 1) cdState = "late";
-    else if (signedDelay !== null && signedDelay <= -1) cdState = "early";
+    else if (!showDelayColors || signedDelay === null) cdState = "";
+    else if (signedDelay >= 1) cdState = "late";
+    else if (signedDelay <= -1) cdState = "early";
 
     // Only `now` reads --wl-accent-text inside a row, so only `now` needs
     // the override — late/early carry their own semantic tokens. Same

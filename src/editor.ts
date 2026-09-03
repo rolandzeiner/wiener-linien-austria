@@ -146,6 +146,7 @@ export class WienerLinienAustriaCardEditor
           { name: "show_traffic_info", selector: { boolean: {} } },
           { name: "show_elevator_info", selector: { boolean: {} } },
           { name: "show_delay", selector: { boolean: {} } },
+          { name: "show_delay_colors", selector: { boolean: {} } },
           { name: "hide_attribution", selector: { boolean: {} } },
         ],
       },

@@ -74,6 +74,8 @@
       "show_traffic_info": "Störungen anzeigen",
       "show_elevator_info": "Aufzugsausfälle anzeigen",
       "show_delay": "Verspätungen anzeigen",
+      "show_delay_colors": "Verspätungen farblich hervorheben",
+      "show_delay_colors_helper": "Färbt die Minutenzahl rot, wenn eine Abfahrt verspätet ist, und grün, wenn sie zu früh kommt.",
       "show_hero_metric": "Hauptbereich anzeigen",
       "show_departures": "Abfahrtsliste anzeigen",
       "show_stops_ahead": "Zwischenstopps anzeigen",

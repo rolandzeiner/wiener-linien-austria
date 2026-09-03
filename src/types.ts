@@ -357,6 +357,8 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_traffic_info?: boolean | undefined;
   show_elevator_info?: boolean | undefined;
   show_delay?: boolean | undefined;
+  /** Colour the countdown red when late / green when early. */
+  show_delay_colors?: boolean | undefined;
   show_type_icon?: boolean | undefined;
   show_platform?: boolean | undefined;
   show_hero_metric?: boolean | undefined;

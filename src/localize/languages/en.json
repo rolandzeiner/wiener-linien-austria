@@ -74,6 +74,8 @@
       "show_traffic_info": "Show disruption alerts",
       "show_elevator_info": "Show elevator outages",
       "show_delay": "Show delays",
+      "show_delay_colors": "Colour-code delays",
+      "show_delay_colors_helper": "Turns the countdown number red when a departure runs late and green when it runs early.",
       "show_hero_metric": "Show featured departure",
       "show_departures": "Show departure list",
       "show_stops_ahead": "Show intermediate stops",
