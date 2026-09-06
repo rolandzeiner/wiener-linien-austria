@@ -40,10 +40,14 @@ import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
  *  the call site. */
 export interface StopView {
   entity: string;
-  lines?: string[];
-  direction?: "H" | "R";
-  line_directions?: Record<string, "H" | "R">;
-  walk_times?: Record<string, number>;
+  // `?: T | undefined` is the dual form used across this codebase: it lets a
+  // caller either omit the key or assign an explicit `undefined` (retro passes
+  // `cfg.walk_times` straight through, which is `WalkTimes | undefined`). The
+  // bare `?:` form alone is rejected under `exactOptionalPropertyTypes`.
+  lines?: string[] | undefined;
+  direction?: "H" | "R" | undefined;
+  line_directions?: Record<string, "H" | "R"> | undefined;
+  walk_times?: Record<string, number> | undefined;
 }
 
 export interface StopBlockCallbacks {

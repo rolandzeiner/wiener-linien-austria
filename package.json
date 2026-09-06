@@ -5,9 +5,8 @@
   "description": "Lovelace custom cards for the Wiener Linien Austria HA integration",
   "type": "module",
   "scripts": {
-    "gen-mdi-names": "node scripts/build-mdi-icon-names.mjs",
-    "build": "npm run gen-mdi-names && rollup -c",
-    "dev": "npm run gen-mdi-names && rollup -c -w",
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
     "build:push": "./scripts/dev-push.sh --quiet"
   },
   "devDependencies": {
