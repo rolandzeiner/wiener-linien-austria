@@ -68,6 +68,7 @@ declare global {
     "wiener-linien-austria-retro-card-editor": LovelaceCardEditor;
     "hui-error-card": LovelaceCard;
     "ha-form": HaFormElement;
+    "ha-icon-picker": HaIconPickerElement;
   }
 }
 
@@ -187,6 +188,18 @@ export type HaFormSchema =
   | HaFormSelectorSchema
   | HaFormGridSchema
   | HaFormExpandableSchema;
+
+/** `<ha-icon-picker>` element shape. The v2 header-strip editor is the
+ *  first place in this codebase that can use it: the picker's popover does
+ *  not round-trip its click commit when nested inside a `flatten: false`
+ *  expandable, which is why v1's editors fell back to a `select` carrying
+ *  the whole MDI catalogue. Outside `ha-form` we own the event plumbing and
+ *  the real picker works. */
+interface HaIconPickerElement extends HTMLElement {
+  value?: string;
+  label?: string;
+  disabled?: boolean;
+}
 
 // `<ha-form>` element shape — mirror the props the editor sets so
 // `tsc --noEmit` validates the template at compile time.
