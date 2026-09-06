@@ -899,7 +899,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       "retro--race-freeze": raceFreeze,
       "retro--race-victory": raceVictory,
       "retro--clickable": clickable,
-      "retro--line-pill": cfg.line_pill,
+      "retro--line-pill": cfg.show_line_pill,
       "retro--line-stripe": cfg.line_stripe,
       "retro--housing": cfg.housing,
     };

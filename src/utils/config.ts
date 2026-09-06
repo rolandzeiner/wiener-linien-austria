@@ -451,7 +451,10 @@ export interface NormalisedRetroConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
-  line_pill: boolean;
+  /** v2.0.0 rename of `line_pill`. Same polarity — only the name changed, so
+   *  that flap's opposite-meaning key of the same name could be split off.
+   *  See the migration in `normaliseRetroConfig`. */
+  show_line_pill: boolean;
   line_stripe: boolean;
   housing: boolean;
   show_unit: boolean;
@@ -484,7 +487,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_header",
   "header_left",
   "header_right",
-  "line_pill",
+  "show_line_pill",
   "line_stripe",
   "housing",
   "show_unit",
@@ -538,7 +541,14 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
-    line_pill: raw.line_pill === true,
+    // v2.0.0 migration: `line_pill` kept its meaning here but gave up its name,
+    // because flap used the same key for the opposite effect (hiding a whole
+    // column). Polarity is unchanged, so old YAML renders identically; the new
+    // key wins when both are present.
+    show_line_pill:
+      raw.show_line_pill !== undefined
+        ? raw.show_line_pill === true
+        : raw.line_pill === true,
     line_stripe: raw.line_stripe === true,
     housing: raw.housing === true,
     show_unit: raw.show_unit === true,

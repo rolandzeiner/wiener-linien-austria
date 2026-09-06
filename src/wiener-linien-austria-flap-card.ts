@@ -564,12 +564,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       [`flap--size-${cfg.size}`]: cfg.size !== "regular",
       "flap--has-platform": hasAnyPlatform,
       "flap--light": isLightTheme,
-      // line_pill — flap-card semantics: hide the entire line column.
-      // Mirrors retro's `line_pill` tweak NAME but not its effect
+      // show_line_column — flap-card semantics: the line column is a whole
+      // column of the board, not a per-row pill. v1 called this `line_pill`,
+      // which was retro's key for an unrelated effect
       // (retro renders the line as a pill; flap has no LED voice to
       // pill against, so the equivalent presentation tweak is column
       // suppression — useful on single-line setups).
-      "flap--no-line": cfg.line_pill,
+      "flap--no-line": !cfg.show_line_column,
       // housing — when off, drop the cabinet surround so the panel
       // sits flush. Default on, so existing dashboards keep the
       // cabinet look.
@@ -629,7 +630,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               hasAnyPlatform,
               platformLabel,
               cfg.show_accessibility,
-              cfg.line_pill,
+              !cfg.show_line_column,
               lineColors,
             )}
             ${attribution
@@ -1249,7 +1250,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap-board--has-platform {
       grid-template-columns: auto 1fr auto auto;
     }
-    /* line_pill (flap-card semantics: hide line column) — the line
+    /* show_line_column off — the line
        cell + line colheader span are skipped in the template, so the
        grid loses its first auto track and shifts dest into column 1.
        Subgrids on .flap-colheader / .flap-row pick up the new track

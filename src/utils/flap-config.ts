@@ -122,7 +122,12 @@ export interface NormalisedFlapConfigValidated {
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
   hide_attribution: boolean;
-  line_pill: boolean;
+  /** v2.0.0 rename of `line_pill`, with the polarity flipped so the label can
+   *  read positively. The old key hid the line column when true and shared a
+   *  name with retro's `line_pill`, which *showed* a pill — the same key
+   *  meaning opposite things on two cards of one integration. Migrated in
+   *  `normaliseFlapConfig`; old YAML keeps working. */
+  show_line_column: boolean;
   housing: boolean;
 }
 
@@ -161,7 +166,7 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "header_left",
   "header_right",
   "hide_attribution",
-  "line_pill",
+  "show_line_column",
   "housing",
 ]);
 
@@ -274,9 +279,18 @@ export function normaliseFlapConfig(
     // it. Mirrors the modern card's default.
     hide_attribution: raw.hide_attribution === true,
     // Tweaks — default values preserve the pre-tweak look:
-    //   line_pill = false → line column visible
-    //   housing  = true  → cream cabinet wraps the board
-    line_pill: raw.line_pill === true,
+    //   show_line_column = true → line column visible
+    //   housing          = true → cream cabinet wraps the board
+    //
+    // v2.0.0 migration: `line_pill` (true = HIDE the column) became
+    // `show_line_column` (true = show it). A config carrying only the old key
+    // is read through the inversion, so an existing card renders identically
+    // after the upgrade. The new key wins when both are present, which is what
+    // a user who has re-saved in the v2 editor expects.
+    show_line_column:
+      raw.show_line_column !== undefined
+        ? raw.show_line_column === true
+        : raw.line_pill !== true,
     housing: asBool(raw.housing, true),
   };
 }

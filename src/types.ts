@@ -498,11 +498,17 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Superseded by `show_line_pill` in v2.0.0 — same meaning, new name. The
+   *  flap card used this same key for the opposite effect (hiding an entire
+   *  column), so it was split rather than left to mislead. Still read by
+   *  `normaliseRetroConfig` so existing YAML keeps working.
+   *  @deprecated Use `show_line_pill`. */
+  line_pill?: boolean | undefined;
   /** Tweak — render the line code as a filled rounded pill in the
    *  line's resolved colour (GTFS routes.txt → nightline rule →
    *  amber fallback) with a soft outer glow. Off by default; the LED
    *  panel's canonical voice is monochrome amber. */
-  line_pill?: boolean | undefined;
+  show_line_pill?: boolean | undefined;
   /** Tweak — paint a 4 px vertical bar at each row's left edge in the
    *  line's resolved colour with a faint matching glow. Off by default
    *  so pre-feature retro cards stay byte-identical. */
@@ -615,13 +621,18 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  and complies with the Wiener Linien OGD licence requirement
    *  unless the user explicitly opts out. */
   hide_attribution?: boolean | undefined;
-  /** Tweak — hide the line column entirely. Useful for single-line
-   *  setups where the line is implicit (e.g. a card scoped to one
-   *  metro line via per-stop `lines` filter). Default `false`. The
-   *  name mirrors the retro card's `line_pill` toggle by convention,
-   *  even though the flap-card effect is different (column hide vs
-   *  pill render); both are presentation tweaks on the line slot. */
+  /** Superseded by `show_line_column` in v2.0.0, which inverts the polarity so
+   *  the editor label can read positively. The name was borrowed from the
+   *  retro card's `line_pill` "by convention", but the effect was different —
+   *  hiding a whole column versus rendering a pill — so one key meant opposite
+   *  things on two cards of the same integration. Still read by
+   *  `normaliseFlapConfig` so existing YAML keeps working.
+   *  @deprecated Use `show_line_column` (inverted). */
   line_pill?: boolean | undefined;
+  /** Show the line column. Default `true`. Turn it off for single-line setups
+   *  where the line is implicit (e.g. a card scoped to one metro line via the
+   *  per-stop `lines` filter). */
+  show_line_column?: boolean | undefined;
   /** Tweak — wrap the board in the cream-cabinet housing (bevel +
    *  drop shadow). Default `true` (preserves the original flap-card
    *  look). When `false`, the board sits flush against the dashboard
