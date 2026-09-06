@@ -160,6 +160,17 @@ export type HASelector =
 export interface HaFormBaseSchema {
   name: string;
   required?: boolean;
+  /** Render the field greyed out and non-interactive. Present on HA core's own
+   *  `HaFormBaseSchema` and long supported; mirrored here because the v2
+   *  editors use it for dependent options.
+   *
+   *  We disable rather than hide, and put the reason in `computeHelper`. HA
+   *  2026.8 added a declarative `visible:` condition which would be the
+   *  cleaner tool, but it drops a hidden field's value and needs a frontend
+   *  floor this repo does not have (`hacs.json` declares HA 2025.1.0). On an
+   *  older frontend an unknown `visible` key is ignored and the field renders
+   *  unconditionally — so it is not safe to ship here yet. */
+  disabled?: boolean;
 }
 
 export interface HaFormSelectorSchema extends HaFormBaseSchema {
