@@ -1,5 +1,5 @@
 // Wiener Linien Austria — bundled by Rollup. Edit sources in src/, then `npm run build`.
-function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPropertyDescriptor(t,i):n;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)o=Reflect.decorate(e,t,i,n);else for(var s=e.length-1;s>=0;s--)(r=e[s])&&(o=(a<3?r(o):a>3?r(t,i,o):r(t,i))||o);return a>3&&o&&Object.defineProperty(t,i,o),o}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,i=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,n=Symbol(),r=new WeakMap;let a=class{constructor(e,t,i){if(this._$cssResult$=!0,i!==n)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(i&&void 0===e){const i=void 0!==t&&1===t.length;i&&(e=r.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),i&&r.set(t,e))}return e}toString(){return this.cssText}};const o=(e,...t)=>{const i=1===e.length?e[0]:t.reduce((t,i,n)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+e[n+1],e[0]);return new a(i,e,n)},s=i?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const i of e.cssRules)t+=i.cssText;return(e=>new a("string"==typeof e?e:e+"",void 0,n))(t)})(e):e,{is:l,defineProperty:d,getOwnPropertyDescriptor:h,getOwnPropertyNames:c,getOwnPropertySymbols:p,getPrototypeOf:u}=Object,f=globalThis,_=f.trustedTypes,g=_?_.emptyScript:"",m=f.reactiveElementPolyfillSupport,w=(e,t)=>e,b={toAttribute(e,t){switch(t){case Boolean:e=e?g:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let i=e;switch(t){case Boolean:i=null!==e;break;case Number:i=null===e?null:Number(e);break;case Object:case Array:try{i=JSON.parse(e)}catch(e){i=null}}return i}},v=(e,t)=>!l(e,t),y={attribute:!0,type:String,converter:b,reflect:!1,useDefault:!1,hasChanged:v};Symbol.metadata??=Symbol("metadata"),f.litPropertyMetadata??=new WeakMap;let x=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=y){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const i=Symbol(),n=this.getPropertyDescriptor(e,i,t);void 0!==n&&d(this.prototype,e,n)}}static getPropertyDescriptor(e,t,i){const{get:n,set:r}=h(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:n,set(t){const a=n?.call(this);r?.call(this,t),this.requestUpdate(e,a,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??y}static _$Ei(){if(this.hasOwnProperty(w("elementProperties")))return;const e=u(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(w("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(w("properties"))){const e=this.properties,t=[...c(e),...p(e)];for(const i of t)this.createProperty(i,e[i])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,i]of t)this.elementProperties.set(e,i)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const i=this._$Eu(e,t);void 0!==i&&this._$Eh.set(i,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const i=new Set(e.flat(1/0).reverse());for(const e of i)t.unshift(s(e))}else void 0!==e&&t.push(s(e));return t}static _$Eu(e,t){const i=t.attribute;return!1===i?void 0:"string"==typeof i?i:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const i of t.keys())this.hasOwnProperty(i)&&(e.set(i,this[i]),delete this[i]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,n)=>{if(i)e.adoptedStyleSheets=n.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const i of n){const n=document.createElement("style"),r=t.litNonce;void 0!==r&&n.setAttribute("nonce",r),n.textContent=i.cssText,e.appendChild(n)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,i){this._$AK(e,i)}_$ET(e,t){const i=this.constructor.elementProperties.get(e),n=this.constructor._$Eu(e,i);if(void 0!==n&&!0===i.reflect){const r=(void 0!==i.converter?.toAttribute?i.converter:b).toAttribute(t,i.type);this._$Em=e,null==r?this.removeAttribute(n):this.setAttribute(n,r),this._$Em=null}}_$AK(e,t){const i=this.constructor,n=i._$Eh.get(e);if(void 0!==n&&this._$Em!==n){const e=i.getPropertyOptions(n),r="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:b;this._$Em=n;const a=r.fromAttribute(t,e.type);this[n]=a??this._$Ej?.get(n)??a,this._$Em=null}}requestUpdate(e,t,i,n=!1,r){if(void 0!==e){const a=this.constructor;if(!1===n&&(r=this[e]),i??=a.getPropertyOptions(e),!((i.hasChanged??v)(r,t)||i.useDefault&&i.reflect&&r===this._$Ej?.get(e)&&!this.hasAttribute(a._$Eu(e,i))))return;this.C(e,t,i)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:i,reflect:n,wrapped:r},a){i&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,a??t??this[e]),!0!==r||void 0!==a)||(this._$AL.has(e)||(this.hasUpdated||i||(t=void 0),this._$AL.set(e,t)),!0===n&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,i]of e){const{wrapped:e}=i,n=this[t];!0!==e||this._$AL.has(t)||void 0===n||this.C(t,void 0,i,n)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};x.elementStyles=[],x.shadowRootOptions={mode:"open"},x[w("elementProperties")]=new Map,x[w("finalized")]=new Map,m?.({ReactiveElement:x}),(f.reactiveElementVersions??=[]).push("2.1.2");const $=globalThis,k=e=>e,S=$.trustedTypes,A=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,z="$lit$",E=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+E,C=`<${T}>`,L=document,M=()=>L.createComment(""),R=e=>null===e||"object"!=typeof e&&"function"!=typeof e,D=Array.isArray,H="[ \t\n\f\r]",N=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,P=/-->/g,O=/>/g,U=RegExp(`>|${H}(?:([^\\s"'>=/]+)(${H}*=${H}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),B=/'/g,F=/"/g,W=/^(?:script|style|textarea|title)$/i,q=(e=>(t,...i)=>({_$litType$:e,strings:t,values:i}))(1),j=Symbol.for("lit-noChange"),I=Symbol.for("lit-nothing"),V=new WeakMap,G=L.createTreeWalker(L,129);function K(e,t){if(!D(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==A?A.createHTML(t):t}const Q=(e,t)=>{const i=e.length-1,n=[];let r,a=2===t?"<svg>":3===t?"<math>":"",o=N;for(let t=0;t<i;t++){const i=e[t];let s,l,d=-1,h=0;for(;h<i.length&&(o.lastIndex=h,l=o.exec(i),null!==l);)h=o.lastIndex,o===N?"!--"===l[1]?o=P:void 0!==l[1]?o=O:void 0!==l[2]?(W.test(l[2])&&(r=RegExp("</"+l[2],"g")),o=U):void 0!==l[3]&&(o=U):o===U?">"===l[0]?(o=r??N,d=-1):void 0===l[1]?d=-2:(d=o.lastIndex-l[2].length,s=l[1],o=void 0===l[3]?U:'"'===l[3]?F:B):o===F||o===B?o=U:o===P||o===O?o=N:(o=U,r=void 0);const c=o===U&&e[t+1].startsWith("/>")?" ":"";a+=o===N?i+C:d>=0?(n.push(s),i.slice(0,d)+z+i.slice(d)+E+c):i+E+(-2===d?t:c)}return[K(e,a+(e[i]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),n]};class Z{constructor({strings:e,_$litType$:t},i){let n;this.parts=[];let r=0,a=0;const o=e.length-1,s=this.parts,[l,d]=Q(e,t);if(this.el=Z.createElement(l,i),G.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(n=G.nextNode())&&s.length<o;){if(1===n.nodeType){if(n.hasAttributes())for(const e of n.getAttributeNames())if(e.endsWith(z)){const t=d[a++],i=n.getAttribute(e).split(E),o=/([.?@])?(.*)/.exec(t);s.push({type:1,index:r,name:o[2],strings:i,ctor:"."===o[1]?te:"?"===o[1]?ie:"@"===o[1]?ne:ee}),n.removeAttribute(e)}else e.startsWith(E)&&(s.push({type:6,index:r}),n.removeAttribute(e));if(W.test(n.tagName)){const e=n.textContent.split(E),t=e.length-1;if(t>0){n.textContent=S?S.emptyScript:"";for(let i=0;i<t;i++)n.append(e[i],M()),G.nextNode(),s.push({type:2,index:++r});n.append(e[t],M())}}}else if(8===n.nodeType)if(n.data===T)s.push({type:2,index:r});else{let e=-1;for(;-1!==(e=n.data.indexOf(E,e+1));)s.push({type:7,index:r}),e+=E.length-1}r++}}static createElement(e,t){const i=L.createElement("template");return i.innerHTML=e,i}}function Y(e,t,i=e,n){if(t===j)return t;let r=void 0!==n?i._$Co?.[n]:i._$Cl;const a=R(t)?void 0:t._$litDirective$;return r?.constructor!==a&&(r?._$AO?.(!1),void 0===a?r=void 0:(r=new a(e),r._$AT(e,i,n)),void 0!==n?(i._$Co??=[])[n]=r:i._$Cl=r),void 0!==r&&(t=Y(e,r._$AS(e,t.values),r,n)),t}class J{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:i}=this._$AD,n=(e?.creationScope??L).importNode(t,!0);G.currentNode=n;let r=G.nextNode(),a=0,o=0,s=i[0];for(;void 0!==s;){if(a===s.index){let t;2===s.type?t=new X(r,r.nextSibling,this,e):1===s.type?t=new s.ctor(r,s.name,s.strings,this,e):6===s.type&&(t=new re(r,this,e)),this._$AV.push(t),s=i[++o]}a!==s?.index&&(r=G.nextNode(),a++)}return G.currentNode=L,n}p(e){let t=0;for(const i of this._$AV)void 0!==i&&(void 0!==i.strings?(i._$AI(e,i,t),t+=i.strings.length-2):i._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,i,n){this.type=2,this._$AH=I,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=i,this.options=n,this._$Cv=n?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=Y(this,e,t),R(e)?e===I||null==e||""===e?(this._$AH!==I&&this._$AR(),this._$AH=I):e!==this._$AH&&e!==j&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>D(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==I&&R(this._$AH)?this._$AA.nextSibling.data=e:this.T(L.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:i}=e,n="number"==typeof i?this._$AC(e):(void 0===i.el&&(i.el=Z.createElement(K(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===n)this._$AH.p(t);else{const e=new J(n,this),i=e.u(this.options);e.p(t),this.T(i),this._$AH=e}}_$AC(e){let t=V.get(e.strings);return void 0===t&&V.set(e.strings,t=new Z(e)),t}k(e){D(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let i,n=0;for(const r of e)n===t.length?t.push(i=new X(this.O(M()),this.O(M()),this,this.options)):i=t[n],i._$AI(r),n++;n<t.length&&(this._$AR(i&&i._$AB.nextSibling,n),t.length=n)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=k(e).nextSibling;k(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}let ee=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,i,n,r){this.type=1,this._$AH=I,this._$AN=void 0,this.element=e,this.name=t,this._$AM=n,this.options=r,i.length>2||""!==i[0]||""!==i[1]?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=I}_$AI(e,t=this,i,n){const r=this.strings;let a=!1;if(void 0===r)e=Y(this,e,t,0),a=!R(e)||e!==this._$AH&&e!==j,a&&(this._$AH=e);else{const n=e;let o,s;for(e=r[0],o=0;o<r.length-1;o++)s=Y(this,n[i+o],t,o),s===j&&(s=this._$AH[o]),a||=!R(s)||s!==this._$AH[o],s===I?e=I:e!==I&&(e+=(s??"")+r[o+1]),this._$AH[o]=s}a&&!n&&this.j(e)}j(e){e===I?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}};class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===I?void 0:e}}class ie extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==I)}}class ne extends ee{constructor(e,t,i,n,r){super(e,t,i,n,r),this.type=5}_$AI(e,t=this){if((e=Y(this,e,t,0)??I)===j)return;const i=this._$AH,n=e===I&&i!==I||e.capture!==i.capture||e.once!==i.once||e.passive!==i.passive,r=e!==I&&(i===I||n);n&&this.element.removeEventListener(this.name,this,i),r&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class re{constructor(e,t,i){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(e){Y(this,e)}}const ae=$.litHtmlPolyfillSupport;ae?.(Z,X),($.litHtmlVersions??=[]).push("3.3.2");const oe=globalThis;let se=class extends x{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,i)=>{const n=i?.renderBefore??t;let r=n._$litPart$;if(void 0===r){const e=i?.renderBefore??null;n._$litPart$=r=new X(t.insertBefore(M(),e),e,void 0,i??{})}return r._$AI(e),r})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return j}};se._$litElement$=!0,se.finalized=!0,oe.litElementHydrateSupport?.({LitElement:se});const le=oe.litElementPolyfillSupport;le?.({LitElement:se}),(oe.litElementVersions??=[]).push("4.2.2");const de=e=>(t,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(e,t)}):customElements.define(e,t)},he={attribute:!0,type:String,converter:b,reflect:!1,hasChanged:v},ce=(e=he,t,i)=>{const{kind:n,metadata:r}=i;let a=globalThis.litPropertyMetadata.get(r);if(void 0===a&&globalThis.litPropertyMetadata.set(r,a=new Map),"setter"===n&&((e=Object.create(e)).wrapped=!0),a.set(i.name,e),"accessor"===n){const{name:n}=i;return{set(i){const r=t.get.call(this);t.set.call(this,i),this.requestUpdate(n,r,e,!0,i)},init(t){return void 0!==t&&this.C(n,void 0,e,t),t}}}if("setter"===n){const{name:n}=i;return function(i){const r=this[n];t.call(this,i),this.requestUpdate(n,r,e,!0,i)}}throw Error("Unsupported decorator location: "+n)};function pe(e){return(t,i)=>"object"==typeof i?ce(e,t,i):((e,t,i)=>{const n=t.hasOwnProperty(i);return t.constructor.createProperty(i,e),n?Object.getOwnPropertyDescriptor(t,i):void 0})(e,t,i)}function ue(e){return pe({...e,state:!0,attribute:!1})}const fe=1,_e=3,ge=4,me=e=>(...t)=>({_$litDirective$:e,values:t});let we=class{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,t,i){this._$Ct=e,this._$AM=t,this._$Ci=i}_$AS(e,t){return this.update(e,t)}update(e,t){return this.render(...t)}};const be=me(class extends we{constructor(e){if(super(e),e.type!==fe||"class"!==e.name||e.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(e){return" "+Object.keys(e).filter(t=>e[t]).join(" ")+" "}update(e,[t]){if(void 0===this.st){this.st=new Set,void 0!==e.strings&&(this.nt=new Set(e.strings.join(" ").split(/\s/).filter(e=>""!==e)));for(const e in t)t[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(t)}const i=e.element.classList;for(const e of this.st)e in t||(i.remove(e),this.st.delete(e));for(const e in t){const n=!!t[e];n===this.st.has(e)||this.nt?.has(e)||(n?(i.add(e),this.st.add(e)):(i.remove(e),this.st.delete(e)))}return j}}),ve="important",ye=" !"+ve,xe=me(class extends we{constructor(e){if(super(e),e.type!==fe||"style"!==e.name||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((t,i)=>{const n=e[i];return null==n?t:t+`${i=i.includes("-")?i:i.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${n};`},"")}update(e,[t]){const{style:i}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(t)),this.render(t);for(const e of this.ft)null==t[e]&&(this.ft.delete(e),e.includes("-")?i.removeProperty(e):i[e]=null);for(const e in t){const n=t[e];if(null!=n){this.ft.add(e);const t="string"==typeof n&&n.endsWith(ye);e.includes("-")||t?i.setProperty(e,t?n.slice(0,-11):n,t?ve:""):i[e]=n}}return j}});let $e=null;class ke{}ke.render=function(e,t){$e(e,t)},self.QrCreator=ke,function(e){function t(t,i,n,r){var a={},o=e(n,i);o.u(t),o.J(),r=r||0;var s=o.h(),l=o.h()+2*r;return a.text=t,a.level=i,a.version=n,a.O=l,a.a=function(e,t){return t-=r,!(0>(e-=r)||e>=s||0>t||t>=s)&&o.a(e,t)},a}function i(e,t,i,n,r,a,o,s,l,d){function h(t,i,n,r,o,s,l){t?(e.lineTo(i+s,n+l),e.arcTo(i,n,r,o,a)):e.lineTo(i,n)}o?e.moveTo(t+a,i):e.moveTo(t,i),h(s,n,i,n,r,-a,0),h(l,n,r,t,r,0,-a),h(d,t,r,t,i,a,0),h(o,t,i,n,i,0,a)}function n(e,t,i,n,r,a,o,s,l,d){function h(t,i,n,r){e.moveTo(t+n,i),e.lineTo(t,i),e.lineTo(t,i+r),e.arcTo(t,i,t+n,i,a)}o&&h(t,i,a,a),s&&h(n,i,-a,a),l&&h(n,r,-a,-a),d&&h(t,r,a,-a)}function r(e,r){e:{var a=r.text,o=r.v,s=r.N,l=r.K,d=r.P;for(s=Math.max(1,s||1),l=Math.min(40,l||40);s<=l;s+=1)try{var h=t(a,o,s,d);break e}catch(e){}h=void 0}if(!h)return null;for(a=e.getContext("2d"),r.background&&(a.fillStyle=r.background,a.fillRect(r.left,r.top,r.size,r.size)),o=h.O,l=r.size/o,a.beginPath(),d=0;d<o;d+=1)for(s=0;s<o;s+=1){var c=a,p=r.left+s*l,u=r.top+d*l,f=d,_=s,g=h.a,m=p+l,w=u+l,b=f-1,v=f+1,y=_-1,x=_+1,$=Math.floor(Math.min(.5,Math.max(0,r.R))*l),k=g(f,_),S=g(b,y),A=g(b,_);b=g(b,x);var z=g(f,x);x=g(v,x),_=g(v,_),v=g(v,y),f=g(f,y),p=Math.round(p),u=Math.round(u),m=Math.round(m),w=Math.round(w),k?i(c,p,u,m,w,$,!A&&!f,!A&&!z,!_&&!z,!_&&!f):n(c,p,u,m,w,$,A&&f&&S,A&&z&&b,_&&z&&x,_&&f&&v)}return function(e,t){var i=t.fill;if("string"==typeof i)e.fillStyle=i;else{var n=i.type,r=i.colorStops;if(i=i.position.map(e=>Math.round(e*t.size)),"linear-gradient"===n)var a=e.createLinearGradient.apply(e,i);else{if("radial-gradient"!==n)throw Error("Unsupported fill");a=e.createRadialGradient.apply(e,i)}r.forEach(([e,t])=>{a.addColorStop(e,t)}),e.fillStyle=a}}(a,r),a.fill(),e}var a={minVersion:1,maxVersion:40,ecLevel:"L",left:0,top:0,size:200,fill:"#000",background:null,text:"no text",radius:.5,quiet:0};$e=function(e,t){var i={};Object.assign(i,a,e),i.N=i.minVersion,i.K=i.maxVersion,i.v=i.ecLevel,i.left=i.left,i.top=i.top,i.size=i.size,i.fill=i.fill,i.background=i.background,i.text=i.text,i.R=i.radius,i.P=i.quiet,t instanceof HTMLCanvasElement?(t.width===i.size&&t.height===i.size||(t.width=i.size,t.height=i.size),t.getContext("2d").clearRect(0,0,t.width,t.height),r(t,i)):((e=document.createElement("canvas")).width=i.size,e.height=i.size,i=r(e,i),t.appendChild(i))}}(function(){function e(r,o){function s(e,t){for(var i=-1;7>=i;i+=1)if(!(-1>=e+i||c<=e+i))for(var n=-1;7>=n;n+=1)-1>=t+n||c<=t+n||(h[e+i][t+n]=0<=i&&6>=i&&(0==n||6==n)||0<=n&&6>=n&&(0==i||6==i)||2<=i&&4>=i&&2<=n&&4>=n)}function l(e,i){for(var o=c=4*r+17,l=Array(o),f=0;f<o;f+=1){l[f]=Array(o);for(var _=0;_<o;_+=1)l[f][_]=null}for(h=l,s(0,0),s(c-7,0),s(0,c-7),o=n.G(r),l=0;l<o.length;l+=1)for(f=0;f<o.length;f+=1){_=o[l];var g=o[f];if(null==h[_][g])for(var m=-2;2>=m;m+=1)for(var w=-2;2>=w;w+=1)h[_+m][g+w]=-2==m||2==m||-2==w||2==w||0==m&&0==w}for(o=8;o<c-8;o+=1)null==h[o][6]&&(h[o][6]=0==o%2);for(o=8;o<c-8;o+=1)null==h[6][o]&&(h[6][o]=0==o%2);for(o=n.w(d<<3|i),l=0;15>l;l+=1)f=!e&&1==(o>>l&1),h[6>l?l:8>l?l+1:c-15+l][8]=f,h[8][8>l?c-l-1:9>l?15-l:14-l]=f;if(h[c-8][8]=!e,7<=r){for(o=n.A(r),l=0;18>l;l+=1)f=!e&&1==(o>>l&1),h[Math.floor(l/3)][l%3+c-8-3]=f;for(l=0;18>l;l+=1)f=!e&&1==(o>>l&1),h[l%3+c-8-3][Math.floor(l/3)]=f}if(null==p){for(e=a.I(r,d),o=function(){var e=[],t=0,i={B:function(){return e},c:function(t){return 1==(e[Math.floor(t/8)]>>>7-t%8&1)},put:function(e,t){for(var n=0;n<t;n+=1)i.m(1==(e>>>t-n-1&1))},f:function(){return t},m:function(i){var n=Math.floor(t/8);e.length<=n&&e.push(0),i&&(e[n]|=128>>>t%8),t+=1}};return i}(),l=0;l<u.length;l+=1)f=u[l],o.put(4,4),o.put(f.b(),n.f(4,r)),f.write(o);for(l=f=0;l<e.length;l+=1)f+=e[l].j;if(o.f()>8*f)throw Error("code length overflow. ("+o.f()+">"+8*f+")");for(o.f()+4<=8*f&&o.put(0,4);0!=o.f()%8;)o.m(!1);for(;!(o.f()>=8*f)&&(o.put(236,8),!(o.f()>=8*f));)o.put(17,8);var b=0;for(f=l=0,_=Array(e.length),g=Array(e.length),m=0;m<e.length;m+=1){var v=e[m].j,y=e[m].o-v;for(l=Math.max(l,v),f=Math.max(f,y),_[m]=Array(v),w=0;w<_[m].length;w+=1)_[m][w]=255&o.B()[w+b];for(b+=v,w=n.C(y),v=t(_[m],w.b()-1).l(w),g[m]=Array(w.b()-1),w=0;w<g[m].length;w+=1)y=w+v.b()-g[m].length,g[m][w]=0<=y?v.c(y):0}for(w=o=0;w<e.length;w+=1)o+=e[w].o;for(o=Array(o),w=b=0;w<l;w+=1)for(m=0;m<e.length;m+=1)w<_[m].length&&(o[b]=_[m][w],b+=1);for(w=0;w<f;w+=1)for(m=0;m<e.length;m+=1)w<g[m].length&&(o[b]=g[m][w],b+=1);p=o}for(e=p,o=-1,l=c-1,f=7,_=0,i=n.F(i),g=c-1;0<g;g-=2)for(6==g&&--g;;){for(m=0;2>m;m+=1)null==h[l][g-m]&&(w=!1,_<e.length&&(w=1==(e[_]>>>f&1)),i(l,g-m)&&(w=!w),h[l][g-m]=w,-1==--f&&(_+=1,f=7));if(0>(l+=o)||c<=l){l-=o,o=-o;break}}}var d=i[o],h=null,c=0,p=null,u=[],f={u:function(t){t=function(t){var i=e.s(t);return{S:function(){return 4},b:function(){return i.length},write:function(e){for(var t=0;t<i.length;t+=1)e.put(i[t],8)}}}(t),u.push(t),p=null},a:function(e,t){if(0>e||c<=e||0>t||c<=t)throw Error(e+","+t);return h[e][t]},h:function(){return c},J:function(){for(var e=0,t=0,i=0;8>i;i+=1){l(!0,i);var r=n.D(f);(0==i||e>r)&&(e=r,t=i)}l(!1,t)}};return f}function t(e,i){if(void 0===e.length)throw Error(e.length+"/"+i);var n=function(){for(var t=0;t<e.length&&0==e[t];)t+=1;for(var n=Array(e.length-t+i),r=0;r<e.length-t;r+=1)n[r]=e[r+t];return n}(),a={c:function(e){return n[e]},b:function(){return n.length},multiply:function(e){for(var i=Array(a.b()+e.b()-1),n=0;n<a.b();n+=1)for(var o=0;o<e.b();o+=1)i[n+o]^=r.i(r.g(a.c(n))+r.g(e.c(o)));return t(i,0)},l:function(e){if(0>a.b()-e.b())return a;for(var i=r.g(a.c(0))-r.g(e.c(0)),n=Array(a.b()),o=0;o<a.b();o+=1)n[o]=a.c(o);for(o=0;o<e.b();o+=1)n[o]^=r.i(r.g(e.c(o))+i);return t(n,0).l(e)}};return a}e.s=function(e){for(var t=[],i=0;i<e.length;i++){var n=e.charCodeAt(i);128>n?t.push(n):2048>n?t.push(192|n>>6,128|63&n):55296>n||57344<=n?t.push(224|n>>12,128|n>>6&63,128|63&n):(i++,n=65536+((1023&n)<<10|1023&e.charCodeAt(i)),t.push(240|n>>18,128|n>>12&63,128|n>>6&63,128|63&n))}return t};var i={L:1,M:0,Q:3,H:2},n=function(){function e(e){for(var t=0;0!=e;)t+=1,e>>>=1;return t}var i=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],n={w:function(t){for(var i=t<<10;0<=e(i)-e(1335);)i^=1335<<e(i)-e(1335);return 21522^(t<<10|i)},A:function(t){for(var i=t<<12;0<=e(i)-e(7973);)i^=7973<<e(i)-e(7973);return t<<12|i},G:function(e){return i[e-1]},F:function(e){switch(e){case 0:return function(e,t){return 0==(e+t)%2};case 1:return function(e){return 0==e%2};case 2:return function(e,t){return 0==t%3};case 3:return function(e,t){return 0==(e+t)%3};case 4:return function(e,t){return 0==(Math.floor(e/2)+Math.floor(t/3))%2};case 5:return function(e,t){return 0==e*t%2+e*t%3};case 6:return function(e,t){return 0==(e*t%2+e*t%3)%2};case 7:return function(e,t){return 0==(e*t%3+(e+t)%2)%2};default:throw Error("bad maskPattern:"+e)}},C:function(e){for(var i=t([1],0),n=0;n<e;n+=1)i=i.multiply(t([1,r.i(n)],0));return i},f:function(e,t){if(4!=e||1>t||40<t)throw Error("mode: "+e+"; type: "+t);return 10>t?8:16},D:function(e){for(var t=e.h(),i=0,n=0;n<t;n+=1)for(var r=0;r<t;r+=1){for(var a=0,o=e.a(n,r),s=-1;1>=s;s+=1)if(!(0>n+s||t<=n+s))for(var l=-1;1>=l;l+=1)0>r+l||t<=r+l||(0!=s||0!=l)&&o==e.a(n+s,r+l)&&(a+=1);5<a&&(i+=3+a-5)}for(n=0;n<t-1;n+=1)for(r=0;r<t-1;r+=1)a=0,e.a(n,r)&&(a+=1),e.a(n+1,r)&&(a+=1),e.a(n,r+1)&&(a+=1),e.a(n+1,r+1)&&(a+=1),(0==a||4==a)&&(i+=3);for(n=0;n<t;n+=1)for(r=0;r<t-6;r+=1)e.a(n,r)&&!e.a(n,r+1)&&e.a(n,r+2)&&e.a(n,r+3)&&e.a(n,r+4)&&!e.a(n,r+5)&&e.a(n,r+6)&&(i+=40);for(r=0;r<t;r+=1)for(n=0;n<t-6;n+=1)e.a(n,r)&&!e.a(n+1,r)&&e.a(n+2,r)&&e.a(n+3,r)&&e.a(n+4,r)&&!e.a(n+5,r)&&e.a(n+6,r)&&(i+=40);for(r=a=0;r<t;r+=1)for(n=0;n<t;n+=1)e.a(n,r)&&(a+=1);return i+Math.abs(100*a/t/t-50)/5*10}};return n}(),r=function(){for(var e=Array(256),t=Array(256),i=0;8>i;i+=1)e[i]=1<<i;for(i=8;256>i;i+=1)e[i]=e[i-4]^e[i-5]^e[i-6]^e[i-8];for(i=0;255>i;i+=1)t[e[i]]=i;return{g:function(e){if(1>e)throw Error("glog("+e+")");return t[e]},i:function(t){for(;0>t;)t+=255;for(;256<=t;)t-=255;return e[t]}}}(),a=function(){function e(e,n){switch(n){case i.L:return t[4*(e-1)];case i.M:return t[4*(e-1)+1];case i.Q:return t[4*(e-1)+2];case i.H:return t[4*(e-1)+3]}}var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],n={I:function(t,i){var n=e(t,i);if(void 0===n)throw Error("bad rs block @ typeNumber:"+t+"/errorCorrectLevel:"+i);t=n.length/3,i=[];for(var r=0;r<t;r+=1)for(var a=n[3*r],o=n[3*r+1],s=n[3*r+2],l=0;l<a;l+=1){var d=s,h={};h.o=o,h.j=d,i.push(h)}return i}};return n}();return e}());var Se=QrCreator;const Ae=o`
+function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPropertyDescriptor(t,i):r;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)o=Reflect.decorate(e,t,i,r);else for(var s=e.length-1;s>=0;s--)(n=e[s])&&(o=(a<3?n(o):a>3?n(t,i,o):n(t,i))||o);return a>3&&o&&Object.defineProperty(t,i,o),o}"function"==typeof SuppressedError&&SuppressedError;const t=globalThis,i=t.ShadowRoot&&(void 0===t.ShadyCSS||t.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,r=Symbol(),n=new WeakMap;let a=class{constructor(e,t,i){if(this._$cssResult$=!0,i!==r)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o;const t=this.t;if(i&&void 0===e){const i=void 0!==t&&1===t.length;i&&(e=n.get(t)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),i&&n.set(t,e))}return e}toString(){return this.cssText}};const o=(e,...t)=>{const i=1===e.length?e[0]:t.reduce((t,i,r)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(i)+e[r+1],e[0]);return new a(i,e,r)},s=i?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t="";for(const i of e.cssRules)t+=i.cssText;return(e=>new a("string"==typeof e?e:e+"",void 0,r))(t)})(e):e,{is:l,defineProperty:d,getOwnPropertyDescriptor:h,getOwnPropertyNames:c,getOwnPropertySymbols:p,getPrototypeOf:u}=Object,f=globalThis,g=f.trustedTypes,_=g?g.emptyScript:"",m=f.reactiveElementPolyfillSupport,w=(e,t)=>e,b={toAttribute(e,t){switch(t){case Boolean:e=e?_:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,t){let i=e;switch(t){case Boolean:i=null!==e;break;case Number:i=null===e?null:Number(e);break;case Object:case Array:try{i=JSON.parse(e)}catch(e){i=null}}return i}},v=(e,t)=>!l(e,t),y={attribute:!0,type:String,converter:b,reflect:!1,useDefault:!1,hasChanged:v};Symbol.metadata??=Symbol("metadata"),f.litPropertyMetadata??=new WeakMap;let x=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=y){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){const i=Symbol(),r=this.getPropertyDescriptor(e,i,t);void 0!==r&&d(this.prototype,e,r)}}static getPropertyDescriptor(e,t,i){const{get:r,set:n}=h(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:r,set(t){const a=r?.call(this);n?.call(this,t),this.requestUpdate(e,a,i)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??y}static _$Ei(){if(this.hasOwnProperty(w("elementProperties")))return;const e=u(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(w("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(w("properties"))){const e=this.properties,t=[...c(e),...p(e)];for(const i of t)this.createProperty(i,e[i])}const e=this[Symbol.metadata];if(null!==e){const t=litPropertyMetadata.get(e);if(void 0!==t)for(const[e,i]of t)this.elementProperties.set(e,i)}this._$Eh=new Map;for(const[e,t]of this.elementProperties){const i=this._$Eu(e,t);void 0!==i&&this._$Eh.set(i,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const t=[];if(Array.isArray(e)){const i=new Set(e.flat(1/0).reverse());for(const e of i)t.unshift(s(e))}else void 0!==e&&t.push(s(e));return t}static _$Eu(e,t){const i=t.attribute;return!1===i?void 0:"string"==typeof i?i:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,t=this.constructor.elementProperties;for(const i of t.keys())this.hasOwnProperty(i)&&(e.set(i,this[i]),delete this[i]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,r)=>{if(i)e.adoptedStyleSheets=r.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const i of r){const r=document.createElement("style"),n=t.litNonce;void 0!==n&&r.setAttribute("nonce",n),r.textContent=i.cssText,e.appendChild(r)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,i){this._$AK(e,i)}_$ET(e,t){const i=this.constructor.elementProperties.get(e),r=this.constructor._$Eu(e,i);if(void 0!==r&&!0===i.reflect){const n=(void 0!==i.converter?.toAttribute?i.converter:b).toAttribute(t,i.type);this._$Em=e,null==n?this.removeAttribute(r):this.setAttribute(r,n),this._$Em=null}}_$AK(e,t){const i=this.constructor,r=i._$Eh.get(e);if(void 0!==r&&this._$Em!==r){const e=i.getPropertyOptions(r),n="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:b;this._$Em=r;const a=n.fromAttribute(t,e.type);this[r]=a??this._$Ej?.get(r)??a,this._$Em=null}}requestUpdate(e,t,i,r=!1,n){if(void 0!==e){const a=this.constructor;if(!1===r&&(n=this[e]),i??=a.getPropertyOptions(e),!((i.hasChanged??v)(n,t)||i.useDefault&&i.reflect&&n===this._$Ej?.get(e)&&!this.hasAttribute(a._$Eu(e,i))))return;this.C(e,t,i)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:i,reflect:r,wrapped:n},a){i&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,a??t??this[e]),!0!==n||void 0!==a)||(this._$AL.has(e)||(this.hasUpdated||i||(t=void 0),this._$AL.set(e,t)),!0===r&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[t,i]of e){const{wrapped:e}=i,r=this[t];!0!==e||this._$AL.has(t)||void 0===r||this.C(t,void 0,i,r)}}let e=!1;const t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};x.elementStyles=[],x.shadowRootOptions={mode:"open"},x[w("elementProperties")]=new Map,x[w("finalized")]=new Map,m?.({ReactiveElement:x}),(f.reactiveElementVersions??=[]).push("2.1.2");const $=globalThis,k=e=>e,S=$.trustedTypes,A=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,z="$lit$",E=`lit$${Math.random().toFixed(9).slice(2)}$`,T="?"+E,C=`<${T}>`,L=document,M=()=>L.createComment(""),R=e=>null===e||"object"!=typeof e&&"function"!=typeof e,H=Array.isArray,D="[ \t\n\f\r]",O=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,P=/-->/g,N=/>/g,U=RegExp(`>|${D}(?:([^\\s"'>=/]+)(${D}*=${D}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),B=/'/g,q=/"/g,W=/^(?:script|style|textarea|title)$/i,j=(e=>(t,...i)=>({_$litType$:e,strings:t,values:i}))(1),F=Symbol.for("lit-noChange"),I=Symbol.for("lit-nothing"),V=new WeakMap,G=L.createTreeWalker(L,129);function K(e,t){if(!H(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==A?A.createHTML(t):t}const Q=(e,t)=>{const i=e.length-1,r=[];let n,a=2===t?"<svg>":3===t?"<math>":"",o=O;for(let t=0;t<i;t++){const i=e[t];let s,l,d=-1,h=0;for(;h<i.length&&(o.lastIndex=h,l=o.exec(i),null!==l);)h=o.lastIndex,o===O?"!--"===l[1]?o=P:void 0!==l[1]?o=N:void 0!==l[2]?(W.test(l[2])&&(n=RegExp("</"+l[2],"g")),o=U):void 0!==l[3]&&(o=U):o===U?">"===l[0]?(o=n??O,d=-1):void 0===l[1]?d=-2:(d=o.lastIndex-l[2].length,s=l[1],o=void 0===l[3]?U:'"'===l[3]?q:B):o===q||o===B?o=U:o===P||o===N?o=O:(o=U,n=void 0);const c=o===U&&e[t+1].startsWith("/>")?" ":"";a+=o===O?i+C:d>=0?(r.push(s),i.slice(0,d)+z+i.slice(d)+E+c):i+E+(-2===d?t:c)}return[K(e,a+(e[i]||"<?>")+(2===t?"</svg>":3===t?"</math>":"")),r]};class Z{constructor({strings:e,_$litType$:t},i){let r;this.parts=[];let n=0,a=0;const o=e.length-1,s=this.parts,[l,d]=Q(e,t);if(this.el=Z.createElement(l,i),G.currentNode=this.el.content,2===t||3===t){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(r=G.nextNode())&&s.length<o;){if(1===r.nodeType){if(r.hasAttributes())for(const e of r.getAttributeNames())if(e.endsWith(z)){const t=d[a++],i=r.getAttribute(e).split(E),o=/([.?@])?(.*)/.exec(t);s.push({type:1,index:n,name:o[2],strings:i,ctor:"."===o[1]?te:"?"===o[1]?ie:"@"===o[1]?re:ee}),r.removeAttribute(e)}else e.startsWith(E)&&(s.push({type:6,index:n}),r.removeAttribute(e));if(W.test(r.tagName)){const e=r.textContent.split(E),t=e.length-1;if(t>0){r.textContent=S?S.emptyScript:"";for(let i=0;i<t;i++)r.append(e[i],M()),G.nextNode(),s.push({type:2,index:++n});r.append(e[t],M())}}}else if(8===r.nodeType)if(r.data===T)s.push({type:2,index:n});else{let e=-1;for(;-1!==(e=r.data.indexOf(E,e+1));)s.push({type:7,index:n}),e+=E.length-1}n++}}static createElement(e,t){const i=L.createElement("template");return i.innerHTML=e,i}}function Y(e,t,i=e,r){if(t===F)return t;let n=void 0!==r?i._$Co?.[r]:i._$Cl;const a=R(t)?void 0:t._$litDirective$;return n?.constructor!==a&&(n?._$AO?.(!1),void 0===a?n=void 0:(n=new a(e),n._$AT(e,i,r)),void 0!==r?(i._$Co??=[])[r]=n:i._$Cl=n),void 0!==n&&(t=Y(e,n._$AS(e,t.values),n,r)),t}class J{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:t},parts:i}=this._$AD,r=(e?.creationScope??L).importNode(t,!0);G.currentNode=r;let n=G.nextNode(),a=0,o=0,s=i[0];for(;void 0!==s;){if(a===s.index){let t;2===s.type?t=new X(n,n.nextSibling,this,e):1===s.type?t=new s.ctor(n,s.name,s.strings,this,e):6===s.type&&(t=new ne(n,this,e)),this._$AV.push(t),s=i[++o]}a!==s?.index&&(n=G.nextNode(),a++)}return G.currentNode=L,r}p(e){let t=0;for(const i of this._$AV)void 0!==i&&(void 0!==i.strings?(i._$AI(e,i,t),t+=i.strings.length-2):i._$AI(e[t])),t++}}class X{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,i,r){this.type=2,this._$AH=I,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=i,this.options=r,this._$Cv=r?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const t=this._$AM;return void 0!==t&&11===e?.nodeType&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=Y(this,e,t),R(e)?e===I||null==e||""===e?(this._$AH!==I&&this._$AR(),this._$AH=I):e!==this._$AH&&e!==F&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>H(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==I&&R(this._$AH)?this._$AA.nextSibling.data=e:this.T(L.createTextNode(e)),this._$AH=e}$(e){const{values:t,_$litType$:i}=e,r="number"==typeof i?this._$AC(e):(void 0===i.el&&(i.el=Z.createElement(K(i.h,i.h[0]),this.options)),i);if(this._$AH?._$AD===r)this._$AH.p(t);else{const e=new J(r,this),i=e.u(this.options);e.p(t),this.T(i),this._$AH=e}}_$AC(e){let t=V.get(e.strings);return void 0===t&&V.set(e.strings,t=new Z(e)),t}k(e){H(this._$AH)||(this._$AH=[],this._$AR());const t=this._$AH;let i,r=0;for(const n of e)r===t.length?t.push(i=new X(this.O(M()),this.O(M()),this,this.options)):i=t[r],i._$AI(n),r++;r<t.length&&(this._$AR(i&&i._$AB.nextSibling,r),t.length=r)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){const t=k(e).nextSibling;k(e).remove(),e=t}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}let ee=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,i,r,n){this.type=1,this._$AH=I,this._$AN=void 0,this.element=e,this.name=t,this._$AM=r,this.options=n,i.length>2||""!==i[0]||""!==i[1]?(this._$AH=Array(i.length-1).fill(new String),this.strings=i):this._$AH=I}_$AI(e,t=this,i,r){const n=this.strings;let a=!1;if(void 0===n)e=Y(this,e,t,0),a=!R(e)||e!==this._$AH&&e!==F,a&&(this._$AH=e);else{const r=e;let o,s;for(e=n[0],o=0;o<n.length-1;o++)s=Y(this,r[i+o],t,o),s===F&&(s=this._$AH[o]),a||=!R(s)||s!==this._$AH[o],s===I?e=I:e!==I&&(e+=(s??"")+n[o+1]),this._$AH[o]=s}a&&!r&&this.j(e)}j(e){e===I?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}};class te extends ee{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===I?void 0:e}}class ie extends ee{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==I)}}class re extends ee{constructor(e,t,i,r,n){super(e,t,i,r,n),this.type=5}_$AI(e,t=this){if((e=Y(this,e,t,0)??I)===F)return;const i=this._$AH,r=e===I&&i!==I||e.capture!==i.capture||e.once!==i.once||e.passive!==i.passive,n=e!==I&&(i===I||r);r&&this.element.removeEventListener(this.name,this,i),n&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class ne{constructor(e,t,i){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=i}get _$AU(){return this._$AM._$AU}_$AI(e){Y(this,e)}}const ae=$.litHtmlPolyfillSupport;ae?.(Z,X),($.litHtmlVersions??=[]).push("3.3.2");const oe=globalThis;let se=class extends x{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,t,i)=>{const r=i?.renderBefore??t;let n=r._$litPart$;if(void 0===n){const e=i?.renderBefore??null;r._$litPart$=n=new X(t.insertBefore(M(),e),e,void 0,i??{})}return n._$AI(e),n})(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return F}};se._$litElement$=!0,se.finalized=!0,oe.litElementHydrateSupport?.({LitElement:se});const le=oe.litElementPolyfillSupport;le?.({LitElement:se}),(oe.litElementVersions??=[]).push("4.2.2");const de=e=>(t,i)=>{void 0!==i?i.addInitializer(()=>{customElements.define(e,t)}):customElements.define(e,t)},he={attribute:!0,type:String,converter:b,reflect:!1,hasChanged:v},ce=(e=he,t,i)=>{const{kind:r,metadata:n}=i;let a=globalThis.litPropertyMetadata.get(n);if(void 0===a&&globalThis.litPropertyMetadata.set(n,a=new Map),"setter"===r&&((e=Object.create(e)).wrapped=!0),a.set(i.name,e),"accessor"===r){const{name:r}=i;return{set(i){const n=t.get.call(this);t.set.call(this,i),this.requestUpdate(r,n,e,!0,i)},init(t){return void 0!==t&&this.C(r,void 0,e,t),t}}}if("setter"===r){const{name:r}=i;return function(i){const n=this[r];t.call(this,i),this.requestUpdate(r,n,e,!0,i)}}throw Error("Unsupported decorator location: "+r)};function pe(e){return(t,i)=>"object"==typeof i?ce(e,t,i):((e,t,i)=>{const r=t.hasOwnProperty(i);return t.constructor.createProperty(i,e),r?Object.getOwnPropertyDescriptor(t,i):void 0})(e,t,i)}function ue(e){return pe({...e,state:!0,attribute:!1})}const fe=1,ge=3,_e=4,me=e=>(...t)=>({_$litDirective$:e,values:t});let we=class{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,t,i){this._$Ct=e,this._$AM=t,this._$Ci=i}_$AS(e,t){return this.update(e,t)}update(e,t){return this.render(...t)}};const be=me(class extends we{constructor(e){if(super(e),e.type!==fe||"class"!==e.name||e.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(e){return" "+Object.keys(e).filter(t=>e[t]).join(" ")+" "}update(e,[t]){if(void 0===this.st){this.st=new Set,void 0!==e.strings&&(this.nt=new Set(e.strings.join(" ").split(/\s/).filter(e=>""!==e)));for(const e in t)t[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(t)}const i=e.element.classList;for(const e of this.st)e in t||(i.remove(e),this.st.delete(e));for(const e in t){const r=!!t[e];r===this.st.has(e)||this.nt?.has(e)||(r?(i.add(e),this.st.add(e)):(i.remove(e),this.st.delete(e)))}return F}}),ve="important",ye=" !"+ve,xe=me(class extends we{constructor(e){if(super(e),e.type!==fe||"style"!==e.name||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((t,i)=>{const r=e[i];return null==r?t:t+`${i=i.includes("-")?i:i.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${r};`},"")}update(e,[t]){const{style:i}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(t)),this.render(t);for(const e of this.ft)null==t[e]&&(this.ft.delete(e),e.includes("-")?i.removeProperty(e):i[e]=null);for(const e in t){const r=t[e];if(null!=r){this.ft.add(e);const t="string"==typeof r&&r.endsWith(ye);e.includes("-")||t?i.setProperty(e,t?r.slice(0,-11):r,t?ve:""):i[e]=r}}return F}});let $e=null;class ke{}ke.render=function(e,t){$e(e,t)},self.QrCreator=ke,function(e){function t(t,i,r,n){var a={},o=e(r,i);o.u(t),o.J(),n=n||0;var s=o.h(),l=o.h()+2*n;return a.text=t,a.level=i,a.version=r,a.O=l,a.a=function(e,t){return t-=n,!(0>(e-=n)||e>=s||0>t||t>=s)&&o.a(e,t)},a}function i(e,t,i,r,n,a,o,s,l,d){function h(t,i,r,n,o,s,l){t?(e.lineTo(i+s,r+l),e.arcTo(i,r,n,o,a)):e.lineTo(i,r)}o?e.moveTo(t+a,i):e.moveTo(t,i),h(s,r,i,r,n,-a,0),h(l,r,n,t,n,0,-a),h(d,t,n,t,i,a,0),h(o,t,i,r,i,0,a)}function r(e,t,i,r,n,a,o,s,l,d){function h(t,i,r,n){e.moveTo(t+r,i),e.lineTo(t,i),e.lineTo(t,i+n),e.arcTo(t,i,t+r,i,a)}o&&h(t,i,a,a),s&&h(r,i,-a,a),l&&h(r,n,-a,-a),d&&h(t,n,a,-a)}function n(e,n){e:{var a=n.text,o=n.v,s=n.N,l=n.K,d=n.P;for(s=Math.max(1,s||1),l=Math.min(40,l||40);s<=l;s+=1)try{var h=t(a,o,s,d);break e}catch(e){}h=void 0}if(!h)return null;for(a=e.getContext("2d"),n.background&&(a.fillStyle=n.background,a.fillRect(n.left,n.top,n.size,n.size)),o=h.O,l=n.size/o,a.beginPath(),d=0;d<o;d+=1)for(s=0;s<o;s+=1){var c=a,p=n.left+s*l,u=n.top+d*l,f=d,g=s,_=h.a,m=p+l,w=u+l,b=f-1,v=f+1,y=g-1,x=g+1,$=Math.floor(Math.min(.5,Math.max(0,n.R))*l),k=_(f,g),S=_(b,y),A=_(b,g);b=_(b,x);var z=_(f,x);x=_(v,x),g=_(v,g),v=_(v,y),f=_(f,y),p=Math.round(p),u=Math.round(u),m=Math.round(m),w=Math.round(w),k?i(c,p,u,m,w,$,!A&&!f,!A&&!z,!g&&!z,!g&&!f):r(c,p,u,m,w,$,A&&f&&S,A&&z&&b,g&&z&&x,g&&f&&v)}return function(e,t){var i=t.fill;if("string"==typeof i)e.fillStyle=i;else{var r=i.type,n=i.colorStops;if(i=i.position.map(e=>Math.round(e*t.size)),"linear-gradient"===r)var a=e.createLinearGradient.apply(e,i);else{if("radial-gradient"!==r)throw Error("Unsupported fill");a=e.createRadialGradient.apply(e,i)}n.forEach(([e,t])=>{a.addColorStop(e,t)}),e.fillStyle=a}}(a,n),a.fill(),e}var a={minVersion:1,maxVersion:40,ecLevel:"L",left:0,top:0,size:200,fill:"#000",background:null,text:"no text",radius:.5,quiet:0};$e=function(e,t){var i={};Object.assign(i,a,e),i.N=i.minVersion,i.K=i.maxVersion,i.v=i.ecLevel,i.left=i.left,i.top=i.top,i.size=i.size,i.fill=i.fill,i.background=i.background,i.text=i.text,i.R=i.radius,i.P=i.quiet,t instanceof HTMLCanvasElement?(t.width===i.size&&t.height===i.size||(t.width=i.size,t.height=i.size),t.getContext("2d").clearRect(0,0,t.width,t.height),n(t,i)):((e=document.createElement("canvas")).width=i.size,e.height=i.size,i=n(e,i),t.appendChild(i))}}(function(){function e(n,o){function s(e,t){for(var i=-1;7>=i;i+=1)if(!(-1>=e+i||c<=e+i))for(var r=-1;7>=r;r+=1)-1>=t+r||c<=t+r||(h[e+i][t+r]=0<=i&&6>=i&&(0==r||6==r)||0<=r&&6>=r&&(0==i||6==i)||2<=i&&4>=i&&2<=r&&4>=r)}function l(e,i){for(var o=c=4*n+17,l=Array(o),f=0;f<o;f+=1){l[f]=Array(o);for(var g=0;g<o;g+=1)l[f][g]=null}for(h=l,s(0,0),s(c-7,0),s(0,c-7),o=r.G(n),l=0;l<o.length;l+=1)for(f=0;f<o.length;f+=1){g=o[l];var _=o[f];if(null==h[g][_])for(var m=-2;2>=m;m+=1)for(var w=-2;2>=w;w+=1)h[g+m][_+w]=-2==m||2==m||-2==w||2==w||0==m&&0==w}for(o=8;o<c-8;o+=1)null==h[o][6]&&(h[o][6]=0==o%2);for(o=8;o<c-8;o+=1)null==h[6][o]&&(h[6][o]=0==o%2);for(o=r.w(d<<3|i),l=0;15>l;l+=1)f=!e&&1==(o>>l&1),h[6>l?l:8>l?l+1:c-15+l][8]=f,h[8][8>l?c-l-1:9>l?15-l:14-l]=f;if(h[c-8][8]=!e,7<=n){for(o=r.A(n),l=0;18>l;l+=1)f=!e&&1==(o>>l&1),h[Math.floor(l/3)][l%3+c-8-3]=f;for(l=0;18>l;l+=1)f=!e&&1==(o>>l&1),h[l%3+c-8-3][Math.floor(l/3)]=f}if(null==p){for(e=a.I(n,d),o=function(){var e=[],t=0,i={B:function(){return e},c:function(t){return 1==(e[Math.floor(t/8)]>>>7-t%8&1)},put:function(e,t){for(var r=0;r<t;r+=1)i.m(1==(e>>>t-r-1&1))},f:function(){return t},m:function(i){var r=Math.floor(t/8);e.length<=r&&e.push(0),i&&(e[r]|=128>>>t%8),t+=1}};return i}(),l=0;l<u.length;l+=1)f=u[l],o.put(4,4),o.put(f.b(),r.f(4,n)),f.write(o);for(l=f=0;l<e.length;l+=1)f+=e[l].j;if(o.f()>8*f)throw Error("code length overflow. ("+o.f()+">"+8*f+")");for(o.f()+4<=8*f&&o.put(0,4);0!=o.f()%8;)o.m(!1);for(;!(o.f()>=8*f)&&(o.put(236,8),!(o.f()>=8*f));)o.put(17,8);var b=0;for(f=l=0,g=Array(e.length),_=Array(e.length),m=0;m<e.length;m+=1){var v=e[m].j,y=e[m].o-v;for(l=Math.max(l,v),f=Math.max(f,y),g[m]=Array(v),w=0;w<g[m].length;w+=1)g[m][w]=255&o.B()[w+b];for(b+=v,w=r.C(y),v=t(g[m],w.b()-1).l(w),_[m]=Array(w.b()-1),w=0;w<_[m].length;w+=1)y=w+v.b()-_[m].length,_[m][w]=0<=y?v.c(y):0}for(w=o=0;w<e.length;w+=1)o+=e[w].o;for(o=Array(o),w=b=0;w<l;w+=1)for(m=0;m<e.length;m+=1)w<g[m].length&&(o[b]=g[m][w],b+=1);for(w=0;w<f;w+=1)for(m=0;m<e.length;m+=1)w<_[m].length&&(o[b]=_[m][w],b+=1);p=o}for(e=p,o=-1,l=c-1,f=7,g=0,i=r.F(i),_=c-1;0<_;_-=2)for(6==_&&--_;;){for(m=0;2>m;m+=1)null==h[l][_-m]&&(w=!1,g<e.length&&(w=1==(e[g]>>>f&1)),i(l,_-m)&&(w=!w),h[l][_-m]=w,-1==--f&&(g+=1,f=7));if(0>(l+=o)||c<=l){l-=o,o=-o;break}}}var d=i[o],h=null,c=0,p=null,u=[],f={u:function(t){t=function(t){var i=e.s(t);return{S:function(){return 4},b:function(){return i.length},write:function(e){for(var t=0;t<i.length;t+=1)e.put(i[t],8)}}}(t),u.push(t),p=null},a:function(e,t){if(0>e||c<=e||0>t||c<=t)throw Error(e+","+t);return h[e][t]},h:function(){return c},J:function(){for(var e=0,t=0,i=0;8>i;i+=1){l(!0,i);var n=r.D(f);(0==i||e>n)&&(e=n,t=i)}l(!1,t)}};return f}function t(e,i){if(void 0===e.length)throw Error(e.length+"/"+i);var r=function(){for(var t=0;t<e.length&&0==e[t];)t+=1;for(var r=Array(e.length-t+i),n=0;n<e.length-t;n+=1)r[n]=e[n+t];return r}(),a={c:function(e){return r[e]},b:function(){return r.length},multiply:function(e){for(var i=Array(a.b()+e.b()-1),r=0;r<a.b();r+=1)for(var o=0;o<e.b();o+=1)i[r+o]^=n.i(n.g(a.c(r))+n.g(e.c(o)));return t(i,0)},l:function(e){if(0>a.b()-e.b())return a;for(var i=n.g(a.c(0))-n.g(e.c(0)),r=Array(a.b()),o=0;o<a.b();o+=1)r[o]=a.c(o);for(o=0;o<e.b();o+=1)r[o]^=n.i(n.g(e.c(o))+i);return t(r,0).l(e)}};return a}e.s=function(e){for(var t=[],i=0;i<e.length;i++){var r=e.charCodeAt(i);128>r?t.push(r):2048>r?t.push(192|r>>6,128|63&r):55296>r||57344<=r?t.push(224|r>>12,128|r>>6&63,128|63&r):(i++,r=65536+((1023&r)<<10|1023&e.charCodeAt(i)),t.push(240|r>>18,128|r>>12&63,128|r>>6&63,128|63&r))}return t};var i={L:1,M:0,Q:3,H:2},r=function(){function e(e){for(var t=0;0!=e;)t+=1,e>>>=1;return t}var i=[[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50],[6,30,54],[6,32,58],[6,34,62],[6,26,46,66],[6,26,48,70],[6,26,50,74],[6,30,54,78],[6,30,56,82],[6,30,58,86],[6,34,62,90],[6,28,50,72,94],[6,26,50,74,98],[6,30,54,78,102],[6,28,54,80,106],[6,32,58,84,110],[6,30,58,86,114],[6,34,62,90,118],[6,26,50,74,98,122],[6,30,54,78,102,126],[6,26,52,78,104,130],[6,30,56,82,108,134],[6,34,60,86,112,138],[6,30,58,86,114,142],[6,34,62,90,118,146],[6,30,54,78,102,126,150],[6,24,50,76,102,128,154],[6,28,54,80,106,132,158],[6,32,58,84,110,136,162],[6,26,54,82,110,138,166],[6,30,58,86,114,142,170]],r={w:function(t){for(var i=t<<10;0<=e(i)-e(1335);)i^=1335<<e(i)-e(1335);return 21522^(t<<10|i)},A:function(t){for(var i=t<<12;0<=e(i)-e(7973);)i^=7973<<e(i)-e(7973);return t<<12|i},G:function(e){return i[e-1]},F:function(e){switch(e){case 0:return function(e,t){return 0==(e+t)%2};case 1:return function(e){return 0==e%2};case 2:return function(e,t){return 0==t%3};case 3:return function(e,t){return 0==(e+t)%3};case 4:return function(e,t){return 0==(Math.floor(e/2)+Math.floor(t/3))%2};case 5:return function(e,t){return 0==e*t%2+e*t%3};case 6:return function(e,t){return 0==(e*t%2+e*t%3)%2};case 7:return function(e,t){return 0==(e*t%3+(e+t)%2)%2};default:throw Error("bad maskPattern:"+e)}},C:function(e){for(var i=t([1],0),r=0;r<e;r+=1)i=i.multiply(t([1,n.i(r)],0));return i},f:function(e,t){if(4!=e||1>t||40<t)throw Error("mode: "+e+"; type: "+t);return 10>t?8:16},D:function(e){for(var t=e.h(),i=0,r=0;r<t;r+=1)for(var n=0;n<t;n+=1){for(var a=0,o=e.a(r,n),s=-1;1>=s;s+=1)if(!(0>r+s||t<=r+s))for(var l=-1;1>=l;l+=1)0>n+l||t<=n+l||(0!=s||0!=l)&&o==e.a(r+s,n+l)&&(a+=1);5<a&&(i+=3+a-5)}for(r=0;r<t-1;r+=1)for(n=0;n<t-1;n+=1)a=0,e.a(r,n)&&(a+=1),e.a(r+1,n)&&(a+=1),e.a(r,n+1)&&(a+=1),e.a(r+1,n+1)&&(a+=1),(0==a||4==a)&&(i+=3);for(r=0;r<t;r+=1)for(n=0;n<t-6;n+=1)e.a(r,n)&&!e.a(r,n+1)&&e.a(r,n+2)&&e.a(r,n+3)&&e.a(r,n+4)&&!e.a(r,n+5)&&e.a(r,n+6)&&(i+=40);for(n=0;n<t;n+=1)for(r=0;r<t-6;r+=1)e.a(r,n)&&!e.a(r+1,n)&&e.a(r+2,n)&&e.a(r+3,n)&&e.a(r+4,n)&&!e.a(r+5,n)&&e.a(r+6,n)&&(i+=40);for(n=a=0;n<t;n+=1)for(r=0;r<t;r+=1)e.a(r,n)&&(a+=1);return i+Math.abs(100*a/t/t-50)/5*10}};return r}(),n=function(){for(var e=Array(256),t=Array(256),i=0;8>i;i+=1)e[i]=1<<i;for(i=8;256>i;i+=1)e[i]=e[i-4]^e[i-5]^e[i-6]^e[i-8];for(i=0;255>i;i+=1)t[e[i]]=i;return{g:function(e){if(1>e)throw Error("glog("+e+")");return t[e]},i:function(t){for(;0>t;)t+=255;for(;256<=t;)t-=255;return e[t]}}}(),a=function(){function e(e,r){switch(r){case i.L:return t[4*(e-1)];case i.M:return t[4*(e-1)+1];case i.Q:return t[4*(e-1)+2];case i.H:return t[4*(e-1)+3]}}var t=[[1,26,19],[1,26,16],[1,26,13],[1,26,9],[1,44,34],[1,44,28],[1,44,22],[1,44,16],[1,70,55],[1,70,44],[2,35,17],[2,35,13],[1,100,80],[2,50,32],[2,50,24],[4,25,9],[1,134,108],[2,67,43],[2,33,15,2,34,16],[2,33,11,2,34,12],[2,86,68],[4,43,27],[4,43,19],[4,43,15],[2,98,78],[4,49,31],[2,32,14,4,33,15],[4,39,13,1,40,14],[2,121,97],[2,60,38,2,61,39],[4,40,18,2,41,19],[4,40,14,2,41,15],[2,146,116],[3,58,36,2,59,37],[4,36,16,4,37,17],[4,36,12,4,37,13],[2,86,68,2,87,69],[4,69,43,1,70,44],[6,43,19,2,44,20],[6,43,15,2,44,16],[4,101,81],[1,80,50,4,81,51],[4,50,22,4,51,23],[3,36,12,8,37,13],[2,116,92,2,117,93],[6,58,36,2,59,37],[4,46,20,6,47,21],[7,42,14,4,43,15],[4,133,107],[8,59,37,1,60,38],[8,44,20,4,45,21],[12,33,11,4,34,12],[3,145,115,1,146,116],[4,64,40,5,65,41],[11,36,16,5,37,17],[11,36,12,5,37,13],[5,109,87,1,110,88],[5,65,41,5,66,42],[5,54,24,7,55,25],[11,36,12,7,37,13],[5,122,98,1,123,99],[7,73,45,3,74,46],[15,43,19,2,44,20],[3,45,15,13,46,16],[1,135,107,5,136,108],[10,74,46,1,75,47],[1,50,22,15,51,23],[2,42,14,17,43,15],[5,150,120,1,151,121],[9,69,43,4,70,44],[17,50,22,1,51,23],[2,42,14,19,43,15],[3,141,113,4,142,114],[3,70,44,11,71,45],[17,47,21,4,48,22],[9,39,13,16,40,14],[3,135,107,5,136,108],[3,67,41,13,68,42],[15,54,24,5,55,25],[15,43,15,10,44,16],[4,144,116,4,145,117],[17,68,42],[17,50,22,6,51,23],[19,46,16,6,47,17],[2,139,111,7,140,112],[17,74,46],[7,54,24,16,55,25],[34,37,13],[4,151,121,5,152,122],[4,75,47,14,76,48],[11,54,24,14,55,25],[16,45,15,14,46,16],[6,147,117,4,148,118],[6,73,45,14,74,46],[11,54,24,16,55,25],[30,46,16,2,47,17],[8,132,106,4,133,107],[8,75,47,13,76,48],[7,54,24,22,55,25],[22,45,15,13,46,16],[10,142,114,2,143,115],[19,74,46,4,75,47],[28,50,22,6,51,23],[33,46,16,4,47,17],[8,152,122,4,153,123],[22,73,45,3,74,46],[8,53,23,26,54,24],[12,45,15,28,46,16],[3,147,117,10,148,118],[3,73,45,23,74,46],[4,54,24,31,55,25],[11,45,15,31,46,16],[7,146,116,7,147,117],[21,73,45,7,74,46],[1,53,23,37,54,24],[19,45,15,26,46,16],[5,145,115,10,146,116],[19,75,47,10,76,48],[15,54,24,25,55,25],[23,45,15,25,46,16],[13,145,115,3,146,116],[2,74,46,29,75,47],[42,54,24,1,55,25],[23,45,15,28,46,16],[17,145,115],[10,74,46,23,75,47],[10,54,24,35,55,25],[19,45,15,35,46,16],[17,145,115,1,146,116],[14,74,46,21,75,47],[29,54,24,19,55,25],[11,45,15,46,46,16],[13,145,115,6,146,116],[14,74,46,23,75,47],[44,54,24,7,55,25],[59,46,16,1,47,17],[12,151,121,7,152,122],[12,75,47,26,76,48],[39,54,24,14,55,25],[22,45,15,41,46,16],[6,151,121,14,152,122],[6,75,47,34,76,48],[46,54,24,10,55,25],[2,45,15,64,46,16],[17,152,122,4,153,123],[29,74,46,14,75,47],[49,54,24,10,55,25],[24,45,15,46,46,16],[4,152,122,18,153,123],[13,74,46,32,75,47],[48,54,24,14,55,25],[42,45,15,32,46,16],[20,147,117,4,148,118],[40,75,47,7,76,48],[43,54,24,22,55,25],[10,45,15,67,46,16],[19,148,118,6,149,119],[18,75,47,31,76,48],[34,54,24,34,55,25],[20,45,15,61,46,16]],r={I:function(t,i){var r=e(t,i);if(void 0===r)throw Error("bad rs block @ typeNumber:"+t+"/errorCorrectLevel:"+i);t=r.length/3,i=[];for(var n=0;n<t;n+=1)for(var a=r[3*n],o=r[3*n+1],s=r[3*n+2],l=0;l<a;l+=1){var d=s,h={};h.o=o,h.j=d,i.push(h)}return i}};return r}();return e}());var Se=QrCreator;const Ae=o`
   :host {
     /* color-scheme enables light-dark() and steers forced-colors
        palette selection (WCAG 1.4.11). HA's active theme drives the
@@ -1806,492 +1806,1159 @@ function e(e,t,i,n){var r,a=arguments.length,o=a<3?t:null===n?n=Object.getOwnPro
       scroll-behavior: auto !important;
     }
   }
-`,ze="wl-austria-fonts";const Ee="#1b1464";var Te={editor:{add_chip:"Chip hinzufügen",add_icon:"Symbol hinzufügen",add_stop:"Haltestelle hinzufügen",date_format_placeholder:"d.m.Y",direction_label:"Fahrtrichtung",direction_not_served:"nicht bedient",direction_note_one_way:"Rückfahrt deaktiviert: {line} endet hier.",direction_unavailable:"Keine Abfahrten in dieser Richtung",header_amenities:"Symbole in diesem Slot",header_bar_aria:"Stationsanzeige — Seite wählen",header_chips_and_icons:"Textchips (max. {chips}) und Extra-Symbole (max. {icons})",header_left:"Linke Seite",header_pick_side_hint:"Seite antippen, dann unten füllen",header_right:"Rechte Seite",header_side_aria:"Seite der Stationsanzeige",header_slot_empty:"leer",line_active_aria:"Linie {line} aktiv",line_inactive_aria:"Linie {line} inaktiv",lines_empty_means_all:"leer = alle Linien",lines_label:"Linien an dieser Haltestelle",lines_selected:"{n} von {total}",no_lines_hint:"Wähle zuerst eine Haltestelle — die Linien kommen live aus der API.",no_lines_title:"Noch keine Linien verfügbar",per_line_direction_aria:"Linie {line}: {direction}",per_line_direction_hint:"Ohne eigene Wahl folgt eine Linie der Richtung oben.",per_line_direction_label:"Richtung je Linie (überschreibt oben)",remove_chip_aria:"Chip {chip} entfernen",remove_icon_aria:"Symbol {icon} entfernen",remove_stop:"Haltestelle entfernen",section_header:"Stationsanzeige",section_header_hint:"Direkt am Balken",section_station:"Stationsband",section_tweaks:"Feinheiten",section_tweaks_hint:"optional",section_walk_time:"Gehzeit zur Haltestelle",show_clock_short:"Uhr",show_date_short:"Datum",show_elevator_short:"Lift",show_escalator_short:"Rolltreppe",show_wc_short:"WC",size_medium:"Mittel",size_regular:"Standard",size_small:"Klein",tab_display:"Anzeige",tab_stop:"Stop",tab_stops:"Stops",tab_tweaks:"Feinheiten",text_placeholder:"z. B. Name der nächsten Station",walk_time_aria:"Gehzeit in Minuten für Linie {line} Richtung {towards}",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_hint:"Blendet Abfahrten aus, die ohne dich abfahren würden. Leer = kein Filter.",walk_time_less_aria:"Gehzeit für Linie {line} verringern",walk_time_more_aria:"Gehzeit für Linie {line} erhöhen",walk_time_placeholder:"–",walk_time_unit:"Minuten"}},Ce={no_data:"Keine Abfahrten verfügbar",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",stale_feed_detail:"Die Wiener Linien melden für diese Haltestelle veraltete Abfahrtszeiten. Sobald wieder Echtzeitdaten kommen, füllt sich die Anzeige automatisch.",stale_feed_since:"Letzte gemeldete Abfahrt: {time}",stale_feed_partial:"Einzelne Linien melden keine aktuellen Zeiten.",min:"Min",now:"Jetzt",platform_short_rail:"Gleis",platform_short_bus:"Steig",version_update:"Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie einen anderen Sensor oder entfernen Sie ihn aus den Haltestellen dieser Karte.",no_entities_picked:"Keine Haltestelle ausgewählt",no_entities_available:"Keine Wiener-Linien-Sensoren gefunden",departures_list:"Kommende Abfahrten",barrier_free_title:"Barrierefrei zugänglich",cooling_title:"Klimatisiert",disturbance_title:"Verkehrsbehinderung gemeldet",stops_ahead_aria_show:"Streckenverlauf für {line} Richtung {towards} anzeigen",stops_ahead_aria_hide:"Streckenverlauf für {line} Richtung {towards} ausblenden",stops_ahead_transfer_aria:"Umsteigen auf {lines}",stops_ahead_other_show:"{count} weitere Linien bei {stop} anzeigen",stops_ahead_other_hide:"Weitere Linien bei {stop} ausblenden",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",dir_both:"Beide",traffic_label:"Störung",traffic_until:"Bis",traffic_updated:"aktualisiert",elevator_label:"Aufzug außer Betrieb",elevator_until:"Bis",open_in_maps:"In Karte öffnen",qr_open:"QR-Code anzeigen",qr_dialog_title:"QR-Code für Haltestelle",qr_dialog_hint:"Mit dem Smartphone scannen — öffnet die Haltestelle in der Karten-App.",qr_dialog_close:"QR-Code schließen",delay_singular:"1 Min. verspätet",delay_plural:"{n} Min. verspätet",devmode_title:"DEV",devmode_traffic_btn:"Störung testen",devmode_elevator_btn:"Aufzug testen",devmode_colors_btn:"Linienfarben",devmode_clear_btn:"Löschen",editor:{lines_label:"Linien",direction_label:"Richtung",per_line_direction_label:"Richtung pro Linie",per_line_direction_hint:"Optional: Richtung pro Linie festlegen. Beide = dem Feld Richtung folgen.",per_line_direction_aria:"Richtung für Linie {line}",direction_unavailable:"Keine Abfahrten in dieser Richtung",walk_time_label:"Fußweg (min)",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis Sie dort sind. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",section_colors:"Linienfarben",colors_hint:"Optional: Farben überschreiben. U-Bahn-Standardwerte sind gesetzt.",reset_color:"Zurücksetzen",pick_color_for_line:"Farbe für Linie {line} wählen",section_display:"Anzeige",max_departures:"Anzahl Abfahrten pro Haltestelle",show_accessibility:"Barrierefrei-Symbol anzeigen",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",show_cooling:"Klimaanlagen-Symbol anzeigen",show_cooling_helper:"Zeigt eine Schneeflocke neben Abfahrten mit klimatisiertem Fahrzeug. Wiener Linien melden das pro Fahrzeug — ältere Garnituren liefern die Angabe nicht.",show_type_icon:"Verkehrsmittel-Symbol anzeigen",show_platform:"Gleis/Steig anzeigen",show_traffic_info:"Störungen anzeigen",show_elevator_info:"Aufzugsausfälle anzeigen",show_delay:"Verspätungen anzeigen",show_delay_colors:"Verspätungen farblich hervorheben",show_delay_colors_helper:"Färbt die Minutenzahl rot, wenn eine Abfahrt verspätet ist, und grün, wenn sie zu früh kommt.",show_hero_metric:"Hauptbereich anzeigen",show_departures:"Abfahrtsliste anzeigen",show_stops_ahead:"Zwischenstopps anzeigen",show_qr_button:"QR-Code-Schaltfläche anzeigen",hide_header:"Kopfzeile ausblenden",hide_header_helper:"Wenn aktiv, wird die Titelleiste der Karte ausgeblendet.",hide_attribution:"Datenquelle ausblenden",hide_attribution_helper:"Wenn aktiv, wird die Quellenangabe ausgeblendet.",layout:"Layout mehrerer Haltestellen",layout_stacked:"Gestapelt",layout_tabs:"Reiter",no_lines_available:"Linien erscheinen hier, sobald Haltestellen ausgewählt wurden."}},Le={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",version_update:"Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie oben einen anderen Sensor.",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",race_finished:"Barrierefreiheits-Rennen beendet",race_starting_in:"Rennen startet in {n}",race_winner_announce:"Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",barrier_free_title:"Barrierefrei zugänglich",unit_min:"min",via_prefix:"ÜBER",aria_start_race:"Barrierefreiheits-Rennen starten",aria_dismiss_message:"Lauftext schließen",header:{icon_exit:"Ausgang",icon_exit_access:"Stufenloser Ausgang",icon_wc:"WC",icon_escalator:"Rolltreppe",icon_elevator:"Aufzug",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe"},editor:{accessibility_only:"Nur barrierefreie Abfahrten anzeigen",chips:"Zusätzliche Beschriftungen",chips_helper:"Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen.",date_format:"Datumsformat",date_format_helper:"Beispiel: d.m.Y → 25.05.2026. Zeichen: d j (Tag), m n (Monat), Y y (Jahr), D l (Wochentag), M F (Monatsname). Alles andere bleibt unverändert.",exit:"Ausgangssymbol",extra_icons:"Zusätzliche Symbole",extra_icons_helper:"Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",flicker:"LED-Flackern simulieren",header_exit_accessible:"Stufenloser Ausgang",header_exit_none:"Kein",header_exit_regular:"Ausgang",housing:"LED-Gehäuserahmen anzeigen",housing_helper:"Dunkler Rahmen um die LED-Anzeige mit dezentem Glas-Reflex obenauf.",icon_mdi_door_open:"Offene Tür",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_stairs:"Treppe",line_stripe:"Seitlichen Linienstreifen anzeigen",line_stripe_helper:"4-Pixel-Balken am linken Rand jeder Zeile in der Linienfarbe.",message_text:"Nachricht",message_text_requires:"Braucht „Lauftext anzeigen“.",message_ticker:"Laufschrift",message_ticker_helper:"Zeigt alle 5 Minuten eine eigene Nachricht als Laufschrift über die Anzeige.",platform_side:"Gleis/Steig-Seite",platform_side_auto:"Automatisch (1 = rechts, 2 = links)",platform_side_helper:"Standard folgt der Wiener-Linien-Beschilderung (Gleis 2 links, sonst rechts). Manuell überschreibbar.",platform_side_left:"Immer links",platform_side_requires:"Braucht „Steig anzeigen“.",platform_side_right:"Immer rechts",section_display:"Anzeige",section_display_hint:"LED-Feld",section_header_hint:"Direkt am Balken",show_clock:"Uhr-Plakette anzeigen",show_clock_helper:"Aktuelle Uhrzeit (HH:MM) als weiße Plakette am innen liegenden Rand dieser Seite.",show_date:"Datums-Plakette anzeigen",show_date_helper:"Aktuelles Datum als weiße Plakette neben der Uhr.",show_header:"Stationsanzeige anzeigen",show_header_helper:"Hauptschalter. Einstellungen pro Seite bleiben gespeichert.",show_line_pill:"Linien-Plakette anzeigen",show_line_pill_helper:"Liniencode als gefüllte Plakette in der Linienfarbe statt als schlichter Text.",show_platform:"Steig anzeigen",show_station_name:"Stationsnamen anzeigen",show_unit:"Einheit „min“ anzeigen",show_unit_helper:"Kleines „min“ in Amber-Versalien nach jeder Minutenzahl.",size:"Größe",station_bg:"Stationsschild-Hintergrund",station_bg_black:"Schwarz",station_bg_default:"Standard",station_bg_white:"Weiß",style:"Stil",style_classic:"Klassisch",style_pixel:"Punktmatrix",style_warm:"Warm",text:"Beschriftung",text_helper:"z. B. Name der nächsten Station.",wheelchair_race:"Rollstuhl-Rennen (Easter Egg)"}},Me={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",col_line:"LINIE",col_dest:"RICHTUNG",col_step_free:"STUFENLOS",col_cd:"ANKUNFT",version_update:"Klappanzeige wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie oben einen anderen Sensor.",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",barrier_free_title:"Barrierefrei zugänglich",not_barrier_free_title:"Nicht barrierefrei",unit_min:"min",dir_both:"Beide",header:{icon_exit:"Ausgang",icon_exit_access:"Stufenloser Ausgang",icon_wc:"WC",icon_escalator:"Rolltreppe",icon_elevator:"Aufzug",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe"},editor:{accessibility_only:"Nur barrierefreie Abfahrten anzeigen",accessibility_only_requires:"Braucht „Rollstuhl-Plakette anzeigen“.",chips:"Zusätzliche Beschriftungen",chips_helper:"Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen.",date_format:"Datumsformat",date_format_helper:"Beispiel: d.m.Y → 25.05.2026. Zeichen: d j (Tag), m n (Monat), Y y (Jahr), D l (Wochentag), M F (Monatsname). Alles andere bleibt unverändert.",entities:"Haltestellen",exit:"Ausgangssymbol",extra_icons:"Zusätzliche Symbole",extra_icons_helper:"Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",header_exit_accessible:"Stufenloser Ausgang",header_exit_none:"Kein",header_exit_regular:"Ausgang",hide_attribution:"Datenquelle ausblenden",hide_attribution_helper:"Wenn aktiv, wird die CC-BY-Quellenangabe am unteren Rand der Karte ausgeblendet. Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern der Hinweis nicht an anderer Stelle im Dashboard erscheint.",housing:"Gehäuserahmen anzeigen",housing_helper:"Umrahmt die Tafel mit dem Gehäuse inkl. dezenter Innenkante und Schlagschatten. Gehäusefarbe folgt dem HA-Theme (cremefarben im Hellmodus, dunkel im Dunkelmodus). Aus = Tafel sitzt bündig auf dem Dashboard.",icon_mdi_door_open:"Offene Tür",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_stairs:"Treppe",max_rows:"Anzahl Zeilen",max_rows_helper:"Wie viele Abfahrten die Tafel zeigt (1–8). Über alle Haltestellen zusammengeführt, nach Abfahrtszeit sortiert.",section_display:"Anzeige",section_display_hint:"Fallblatt-Feld",section_station_helper:"Das farbige Band mit Stationsname und Uhrzeit am oberen Rand der Tafel.",show_accessibility:"Rollstuhl-Plakette anzeigen",show_accessibility_helper:"Zeigt eine Rollstuhl-Plakette neben barrierefreien Abfahrten.",show_clock:"Uhr-Plakette anzeigen",show_clock_helper:"Aktuelle Uhrzeit (HH:MM) als cremefarbene Plakette am innen liegenden Rand dieser Seite.",show_date:"Datums-Plakette anzeigen",show_date_helper:"Aktuelles Datum als cremefarbene Plakette neben der Uhr.",show_header:"Stationsanzeige anzeigen",show_header_helper:"Hauptschalter. Einstellungen pro Seite bleiben gespeichert.",show_line_column:"Linienspalte anzeigen",show_line_column_helper:"Zeigt die Spalte mit dem Liniencode. Ausschalten, wenn die Tafel ohnehin nur eine Linie zeigt.",show_min_unit:"Einheit „min“ anzeigen",show_min_unit_helper:"Kleines „min“ neben der Minutenzahl, wie auf echten Stationstafeln.",show_platform:"Gleis/Steig anzeigen",show_platform_helper:"Fügt jeder Zeile eine eigene Gleis-Plakette zwischen Ziel und Minutenzahl hinzu. Wird nur eingeblendet, wenn mindestens eine sichtbare Zeile einen Gleis-Wert hat.",show_station_name:"Stationsnamen anzeigen",show_station_name_helper:"Farbiges Band mit Stationsname und Uhrzeit am oberen Rand der Karte.",size:"Größe",station_bg:"Hintergrund Stationsschild",station_bg_black:"Schwarz",station_bg_helper:"Standard ist die Farbe der ersten erfassten Linie (z. B. Rot für U1, Orange für U3). Bei mehreren Linien kann eine bestimmte Linie gewählt oder auf Weiß bzw. Schwarz umgestellt werden.",station_bg_line:"Erste Linie",station_bg_white:"Weiß",text:"Beschriftung",text_helper:"z. B. Name der nächsten Station.",walk_time_no_data:"Keine passenden Abfahrten. Richtung wechseln oder warten, bis der Sensor Linien meldet."}},Re={common:Te,modern:Ce,retro:Le,flap:Me},De={editor:{add_chip:"Add chip",add_icon:"Add icon",add_stop:"Add stop",date_format_placeholder:"d.m.Y",direction_label:"Direction",direction_not_served:"not served",direction_note_one_way:"Return direction disabled: {line} terminates here.",direction_unavailable:"No departures in this direction",header_amenities:"Icons in this slot",header_bar_aria:"Station sign — choose a side",header_chips_and_icons:"Text chips (max. {chips}) and extra icons (max. {icons})",header_left:"Left side",header_pick_side_hint:"Tap a side, then fill it in below",header_right:"Right side",header_side_aria:"Station sign side",header_slot_empty:"empty",line_active_aria:"Line {line} active",line_inactive_aria:"Line {line} inactive",lines_empty_means_all:"empty = all lines",lines_label:"Lines at this stop",lines_selected:"{n} of {total}",no_lines_hint:"Pick a stop first — lines arrive live from the API.",no_lines_title:"No lines yet",per_line_direction_aria:"Line {line}: {direction}",per_line_direction_hint:"A line with no choice of its own follows the direction above.",per_line_direction_label:"Direction per line (overrides above)",remove_chip_aria:"Remove chip {chip}",remove_icon_aria:"Remove icon {icon}",remove_stop:"Remove stop",section_header:"Station sign",section_header_hint:"Edit on the bar",section_station:"Station band",section_tweaks:"Details",section_tweaks_hint:"optional",section_walk_time:"Walking time to the stop",show_clock_short:"Clock",show_date_short:"Date",show_elevator_short:"Lift",show_escalator_short:"Escalator",show_wc_short:"WC",size_medium:"Medium",size_regular:"Standard",size_small:"Small",tab_display:"Display",tab_stop:"Stop",tab_stops:"Stops",tab_tweaks:"Details",text_placeholder:"e.g. name of the next station",walk_time_aria:"Walking time in minutes for line {line} towards {towards}",walk_time_branching_hint:"Applies to every terminus in this direction",walk_time_hint:"Hides departures that would leave without you. Empty = no filter.",walk_time_less_aria:"Decrease walking time for line {line}",walk_time_more_aria:"Increase walking time for line {line}",walk_time_placeholder:"–",walk_time_unit:"minutes"}},He={no_data:"No departures available",betriebsschluss:"End of service",stale_feed:"No live data",stale_feed_detail:"Wiener Linien is sending out-of-date departure times for this stop. Departures return automatically once live data resumes.",stale_feed_since:"Last reported departure: {time}",stale_feed_partial:"Some lines aren't reporting current times.",min:"min",now:"Now",platform_short_rail:"Track",platform_short_bus:"Bay",version_update:"Wiener Linien Austria updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor, or remove it from this card's stops.",no_entities_picked:"No stop selected",no_entities_available:"No Wiener Linien sensors found",departures_list:"Upcoming departures",barrier_free_title:"Step-free access",cooling_title:"Air conditioned",disturbance_title:"Traffic disruption reported",stops_ahead_aria_show:"Show stops ahead for {line} towards {towards}",stops_ahead_aria_hide:"Hide stops ahead for {line} towards {towards}",stops_ahead_transfer_aria:"Change to {lines}",stops_ahead_other_show:"Show {count} more lines at {stop}",stops_ahead_other_hide:"Hide other lines at {stop}",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",dir_both:"Both",traffic_label:"Disruption",traffic_until:"Until",traffic_updated:"updated",elevator_label:"Elevator out of service",elevator_until:"Until",open_in_maps:"Open in maps",qr_open:"Show QR code",qr_dialog_title:"QR code for stop",qr_dialog_hint:"Scan with your phone — opens the stop in your maps app.",qr_dialog_close:"Close QR code",delay_singular:"1 min. late",delay_plural:"{n} min. late",devmode_title:"DEV",devmode_traffic_btn:"Test disruption",devmode_elevator_btn:"Test elevator",devmode_colors_btn:"Line colours",devmode_clear_btn:"Clear",editor:{lines_label:"Lines",direction_label:"Direction",per_line_direction_label:"Per-line direction",per_line_direction_hint:"Optional: pick a direction per line. Both = follow the Direction field.",per_line_direction_aria:"Direction for line {line}",direction_unavailable:"No departures in this direction",walk_time_label:"Walking time (min)",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",section_colors:"Line colours",colors_hint:"Optional overrides. Metro defaults are already set.",reset_color:"Reset",pick_color_for_line:"Pick colour for line {line}",section_display:"Display",max_departures:"Departures per stop",show_accessibility:"Show step-free icon",accessibility_only:"Only show step-free departures",show_cooling:"Show air-conditioning icon",show_cooling_helper:"Shows a snowflake beside departures with an air-conditioned vehicle. Wiener Linien report this per vehicle — older trains and trams don't send it.",show_type_icon:"Show vehicle-type icon",show_platform:"Show platform / track",show_traffic_info:"Show disruption alerts",show_elevator_info:"Show elevator outages",show_delay:"Show delays",show_delay_colors:"Colour-code delays",show_delay_colors_helper:"Turns the countdown number red when a departure runs late and green when it runs early.",show_hero_metric:"Show featured departure",show_departures:"Show departure list",show_stops_ahead:"Show intermediate stops",show_qr_button:"Show QR-code button",hide_header:"Hide header",hide_header_helper:"When on, the card title bar is hidden.",hide_attribution:"Hide data source",hide_attribution_helper:"When on, the data-source credit is hidden.",layout:"Multi-stop layout",layout_stacked:"Stacked",layout_tabs:"Tabs",no_lines_available:"Lines appear here once stops are selected."}},Ne={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",stale_feed:"No live data",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"PLATF.",steig:"BAY",version_update:"Retro card updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.",departures_list:"Upcoming departures",at_platform:"Arriving",countdown_minutes:"{n} minutes",race_finished:"Accessibility race finished",race_starting_in:"Race starting in {n}",race_winner_announce:"Wheelchair {n} wins the accessibility race",barrier_free_title:"Step-free access",unit_min:"min",via_prefix:"VIA",aria_start_race:"Start accessibility race",aria_dismiss_message:"Dismiss scrolling message",header:{icon_exit:"Exit",icon_exit_access:"Step-free exit",icon_wc:"Toilet",icon_escalator:"Escalator",icon_elevator:"Elevator",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs"},editor:{accessibility_only:"Only show step-free departures",chips:"Extra labels",chips_helper:"Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each.",date_format:"Date format",date_format_helper:"Example: d.m.Y → 25.05.2026. Tokens: d j (day), m n (month), Y y (year), D l (weekday), M F (month name). Anything else passes through unchanged.",exit:"Exit icon",extra_icons:"Extra icons",extra_icons_helper:"Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",flicker:"Simulate LED flicker",header_exit_accessible:"Step-free exit",header_exit_none:"None",header_exit_regular:"Exit",housing:"Show LED cabinet frame",housing_helper:"Dark bezel around the LED panel with a subtle glass reflection on top.",icon_mdi_door_open:"Open door",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_stairs:"Stairs",line_stripe:"Show line stripe",line_stripe_helper:"A 4 px coloured bar at the left edge of each row, matched to the line.",message_text:"Message",message_text_requires:"Requires “Show ticker”.",message_ticker:"Scrolling message",message_ticker_helper:"Runs a custom message across the display every 5 minutes.",platform_side:"Platform side",platform_side_auto:"Auto (1 = right, 2 = left)",platform_side_helper:"Default follows Wiener Linien signage (platform 2 on the left, otherwise right). Override manually if needed.",platform_side_left:"Always left",platform_side_requires:"Requires “Show platform”.",platform_side_right:"Always right",section_display:"Display",section_display_hint:"LED panel",section_header_hint:"Edit on the bar",show_clock:"Show clock chip",show_clock_helper:"Current time (HH:MM) as a white chip at the innermost edge of this side.",show_date:"Show date chip",show_date_helper:"Current date as a white chip next to the clock.",show_header:"Show station sign",show_header_helper:"Master switch. Per-side settings are kept.",show_line_pill:"Show line badge",show_line_pill_helper:"Renders the line code as a filled badge in the line colour rather than plain text.",show_platform:"Show platform",show_station_name:"Show station name",show_unit:"Show the “min” unit",show_unit_helper:'Trail each countdown number with a small amber "min" caption.',size:"Size",station_bg:"Station-name background",station_bg_black:"Black",station_bg_default:"Default",station_bg_white:"White",style:"Style",style_classic:"Classic",style_pixel:"Dot matrix",style_warm:"Warm",text:"Sign text",text_helper:"E.g. name of the next station.",wheelchair_race:"Wheelchair race (easter egg)"}},Pe={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",stale_feed:"No live data",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"BAY",col_line:"LINE",col_dest:"DIRECTION",col_step_free:"STEP-FREE",col_cd:"ARRIVAL",version_update:"Flap card updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.",departures_list:"Upcoming departures",at_platform:"Arriving",countdown_minutes:"{n} minutes",barrier_free_title:"Step-free access",not_barrier_free_title:"Step-free access not available",unit_min:"min",dir_both:"Both",header:{icon_exit:"Exit",icon_exit_access:"Step-free exit",icon_wc:"Toilet",icon_escalator:"Escalator",icon_elevator:"Elevator",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs"},editor:{accessibility_only:"Only show step-free departures",accessibility_only_requires:"Requires “Show wheelchair badge”.",chips:"Extra labels",chips_helper:"Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each.",date_format:"Date format",date_format_helper:"Example: d.m.Y → 25.05.2026. Tokens: d j (day), m n (month), Y y (year), D l (weekday), M F (month name). Anything else passes through unchanged.",entities:"Stops",exit:"Exit icon",extra_icons:"Extra icons",extra_icons_helper:"Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",header_exit_accessible:"Step-free exit",header_exit_none:"None",header_exit_regular:"Exit",hide_attribution:"Hide data source",hide_attribution_helper:"When on, the CC-BY credit at the bottom of the card is hidden. The Wiener Linien Open Government Data licence requires visible attribution unless you keep the credit elsewhere on the dashboard.",housing:"Show cabinet frame",housing_helper:"Wraps the board in the cabinet with a soft inset bevel and drop shadow. Cabinet colour follows your HA theme (cream on light, dark on dark). When off, the board sits flush against the dashboard.",icon_mdi_door_open:"Open door",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_stairs:"Stairs",max_rows:"Number of rows",max_rows_helper:"How many departures to show on the board (1–8). Merged across all stops, sorted by countdown.",section_display:"Display",section_display_hint:"Split-flap board",section_station_helper:"The coloured band with the station name + clock at the top of the board.",show_accessibility:"Show step-free tile",show_accessibility_helper:"Add a wheelchair pictogram tile next to step-free departures.",show_clock:"Show clock chip",show_clock_helper:"Current time (HH:MM) as a cream chip at the innermost edge of this side.",show_date:"Show date chip",show_date_helper:"Current date as a cream chip next to the clock.",show_header:"Show station sign",show_header_helper:"Master switch. Per-side settings are kept.",show_line_column:"Show line column",show_line_column_helper:"Shows the column carrying the line code. Turn it off when the board only ever shows one line.",show_min_unit:'Show "min" caption',show_min_unit_helper:"Small label next to the countdown number, like real station boards.",show_platform:"Show platform / track",show_platform_helper:"Adds a per-row platform tile between the destination and the countdown. Only shown when at least one visible row has a platform value.",show_station_name:"Show station name",show_station_name_helper:"Coloured band with the station name and current time at the top of the card.",size:"Size",station_bg:"Station-name background",station_bg_black:"Black",station_bg_helper:"Default is the colour of the first tracked line (e.g. red for U1, orange for U3). On multi-line boards you can pick a specific line, or override with solid white or black.",station_bg_line:"First line",station_bg_white:"White",text:"Sign text",text_helper:"E.g. name of the next station.",walk_time_no_data:"No departures matched. Pick a direction or wait until the sensor reports lines."}},Oe={common:De,modern:He,retro:Ne,flap:Pe};const Ue={de:Object.freeze({__proto__:null,common:Te,default:Re,flap:Me,modern:Ce,retro:Le}),en:Object.freeze({__proto__:null,common:De,default:Oe,flap:Pe,modern:He,retro:Ne})},Be=Ue.de??{};function Fe(e,t){const i=function(e,t){return e.split(".").reduce((e,t)=>{if(e&&"object"==typeof e&&t in e)return e[t]},t)}(e,t);return"string"==typeof i?i:void 0}function We(e,t,i){const n=function(e){return"en"===((e.configLanguage||e.hassLanguage||"de").split(/[-_]/)[0]??"de")?"en":"de"}(t);let r=Fe(e,Ue[n]??Be);if(void 0===r&&(r=Fe(e,Be)),void 0===r)return e;if(i)for(const[e,t]of Object.entries(i))r=r.replace(`{${e}}`,String(t));return r}function qe(e,t,i="banner"){if(!e)return I;if(function(e){if(!e)return!1;try{return"1"===window.sessionStorage?.getItem(`wl-reload-attempted-${e}`)}catch{return!1}}(e)){const e=t("version_reload_stuck");return q`
+`,ze="wl-austria-fonts";const Ee="#1b1464";var Te={editor:{add_chip:"Chip hinzufügen",add_icon:"Symbol hinzufügen",add_stop:"Haltestelle hinzufügen",date_format_placeholder:"d.m.Y",direction_label:"Fahrtrichtung",direction_not_served:"nicht bedient",direction_note_one_way:"Rückfahrt deaktiviert: {line} endet hier.",direction_unavailable:"Keine Abfahrten in dieser Richtung",header_amenities:"Symbole in diesem Slot",header_bar_aria:"Stationsanzeige — Seite wählen",header_chips_and_icons:"Textchips (max. {chips}) und Extra-Symbole (max. {icons})",header_left:"Linke Seite",header_pick_side_hint:"Seite antippen, dann unten füllen",header_right:"Rechte Seite",header_side_aria:"Seite der Stationsanzeige",header_slot_empty:"leer",line_active_aria:"Linie {line} aktiv",line_inactive_aria:"Linie {line} inaktiv",lines_empty_means_all:"leer = alle Linien",lines_label:"Linien an dieser Haltestelle",lines_selected:"{n} von {total}",no_lines_hint:"Wähle zuerst eine Haltestelle — die Linien kommen live aus der API.",no_lines_title:"Noch keine Linien verfügbar",per_line_direction_aria:"Linie {line}: {direction}",per_line_direction_hint:"Ohne eigene Wahl folgt eine Linie der Richtung oben.",per_line_direction_label:"Richtung je Linie (überschreibt oben)",remove_chip_aria:"Chip {chip} entfernen",remove_icon_aria:"Symbol {icon} entfernen",remove_stop:"Haltestelle entfernen",section_header:"Stationsanzeige",section_header_hint:"Direkt am Balken",section_station:"Stationsband",section_tweaks:"Feinheiten",section_tweaks_hint:"optional",section_walk_time:"Gehzeit zur Haltestelle",show_clock_short:"Uhr",show_date_short:"Datum",show_elevator_short:"Lift",show_escalator_short:"Rolltreppe",show_wc_short:"WC",size_medium:"Mittel",size_regular:"Standard",size_small:"Klein",tab_display:"Anzeige",tab_stop:"Stop",tab_stops:"Stops",tab_tweaks:"Feinheiten",text_placeholder:"z. B. Name der nächsten Station",walk_time_aria:"Gehzeit in Minuten für Linie {line} Richtung {towards}",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_hint:"Blendet Abfahrten aus, die ohne dich abfahren würden. Leer = kein Filter.",walk_time_less_aria:"Gehzeit für Linie {line} verringern",walk_time_more_aria:"Gehzeit für Linie {line} erhöhen",walk_time_placeholder:"–",walk_time_unit:"Minuten"}},Ce={no_data:"Keine Abfahrten verfügbar",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",stale_feed_detail:"Die Wiener Linien melden für diese Haltestelle veraltete Abfahrtszeiten. Sobald wieder Echtzeitdaten kommen, füllt sich die Anzeige automatisch.",stale_feed_since:"Letzte gemeldete Abfahrt: {time}",stale_feed_partial:"Einzelne Linien melden keine aktuellen Zeiten.",min:"Min",now:"Jetzt",platform_short_rail:"Gleis",platform_short_bus:"Steig",version_update:"Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie einen anderen Sensor oder entfernen Sie ihn aus den Haltestellen dieser Karte.",no_entities_picked:"Keine Haltestelle ausgewählt",no_entities_available:"Keine Wiener-Linien-Sensoren gefunden",departures_list:"Kommende Abfahrten",barrier_free_title:"Barrierefrei zugänglich",cooling_title:"Klimatisiert",disturbance_title:"Verkehrsbehinderung gemeldet",stops_ahead_aria_show:"Streckenverlauf für {line} Richtung {towards} anzeigen",stops_ahead_aria_hide:"Streckenverlauf für {line} Richtung {towards} ausblenden",stops_ahead_transfer_aria:"Umsteigen auf {lines}",stops_ahead_other_show:"{count} weitere Linien bei {stop} anzeigen",stops_ahead_other_hide:"Weitere Linien bei {stop} ausblenden",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",dir_both:"Beide",traffic_label:"Störung",traffic_until:"Bis",traffic_updated:"aktualisiert",elevator_label:"Aufzug außer Betrieb",elevator_until:"Bis",open_in_maps:"In Karte öffnen",qr_open:"QR-Code anzeigen",qr_dialog_title:"QR-Code für Haltestelle",qr_dialog_hint:"Mit dem Smartphone scannen — öffnet die Haltestelle in der Karten-App.",qr_dialog_close:"QR-Code schließen",delay_singular:"1 Min. verspätet",delay_plural:"{n} Min. verspätet",devmode_title:"DEV",devmode_traffic_btn:"Störung testen",devmode_elevator_btn:"Aufzug testen",devmode_colors_btn:"Linienfarben",devmode_clear_btn:"Löschen",editor:{accessibility_only:"Nur barrierefreie Abfahrten anzeigen",accessibility_only_requires:"Braucht „Barrierefrei-Symbol anzeigen“.",colors_empty_hint:"Wähle im Reiter Stops Haltestellen aus — die Linien erscheinen dann hier.",colors_hint:"Optional. Ohne Überschreibung gilt die offizielle Linienfarbe.",hide_attribution:"Datenquelle ausblenden",hide_attribution_helper:"Wenn aktiv, wird die Quellenangabe ausgeblendet.",hide_header:"Kopfzeile ausblenden",hide_header_helper:"Wenn aktiv, wird die Titelleiste der Karte ausgeblendet.",layout:"Layout mehrerer Haltestellen",layout_requires:"Wirkt erst ab zwei Haltestellen.",layout_stacked:"Gestapelt",layout_tabs:"Reiter",max_departures:"Anzahl Abfahrten pro Haltestelle",pick_color_for_line:"Farbe für Linie {line} wählen",reset_color:"Auf Standard zurücksetzen",reset_color_aria:"Linienfarbe {line} auf Standard zurücksetzen",section_colors:"Linienfarben",section_colors_hint:"überschreibt API-Farbe",section_departure_row:"Abfahrtszeile",section_departure_row_hint:"pro Zeile",section_display:"Anzeige",section_disruptions:"Störungen & Verspätungen",section_layout:"Aufbau",section_layout_hint:"Struktur",show_accessibility:"Barrierefrei-Symbol anzeigen",show_cooling:"Klimaanlagen-Symbol anzeigen",show_cooling_helper:"Zeigt eine Schneeflocke neben Abfahrten mit klimatisiertem Fahrzeug. Wiener Linien melden das pro Fahrzeug — ältere Garnituren liefern die Angabe nicht.",show_delay:"Verspätungen anzeigen",show_delay_colors:"Verspätungen farblich hervorheben",show_delay_colors_helper:"Färbt die Minutenzahl rot, wenn eine Abfahrt verspätet ist, und grün, wenn sie zu früh kommt.",show_delay_colors_requires:"Braucht „Verspätungen anzeigen“.",show_departures:"Abfahrtsliste anzeigen",show_elevator_info:"Aufzugsausfälle anzeigen",show_hero_metric:"Nächste Abfahrt groß anzeigen",show_platform:"Gleis/Steig anzeigen",show_qr_button:"QR-Code-Schaltfläche anzeigen",show_stops_ahead:"Zwischenstationen anzeigen",show_traffic_info:"Störungen anzeigen",show_type_icon:"Verkehrsmittel-Symbol anzeigen"}},Le={editor:{accessibility_only:"Nur barrierefreie Abfahrten anzeigen",chips:"Zusätzliche Beschriftungen",chips_helper:"Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen.",date_format:"Datumsformat",date_format_helper:"Beispiel: d.m.Y → 25.05.2026. Zeichen: d j (Tag), m n (Monat), Y y (Jahr), D l (Wochentag), M F (Monatsname). Alles andere bleibt unverändert.",exit:"Ausgangssymbol",extra_icons:"Zusätzliche Symbole",extra_icons_helper:"Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",flicker:"LED-Flackern simulieren",header_exit_accessible:"Stufenloser Ausgang",header_exit_none:"Kein",header_exit_regular:"Ausgang",housing:"LED-Gehäuserahmen anzeigen",housing_helper:"Dunkler Rahmen um die LED-Anzeige mit dezentem Glas-Reflex obenauf.",icon_mdi_door_open:"Offene Tür",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_stairs:"Treppe",line_stripe:"Seitlichen Linienstreifen anzeigen",line_stripe_helper:"4-Pixel-Balken am linken Rand jeder Zeile in der Linienfarbe.",message_text:"Nachricht",message_text_requires:"Braucht „Lauftext anzeigen“.",message_ticker:"Laufschrift",message_ticker_helper:"Zeigt alle 5 Minuten eine eigene Nachricht als Laufschrift über die Anzeige.",platform_side:"Gleis/Steig-Seite",platform_side_auto:"Automatisch (1 = rechts, 2 = links)",platform_side_helper:"Standard folgt der Wiener-Linien-Beschilderung (Gleis 2 links, sonst rechts). Manuell überschreibbar.",platform_side_left:"Immer links",platform_side_requires:"Braucht „Steig anzeigen“.",platform_side_right:"Immer rechts",section_display:"Anzeige",section_display_hint:"LED-Feld",section_header_hint:"Direkt am Balken",show_clock:"Uhr-Plakette anzeigen",show_clock_helper:"Aktuelle Uhrzeit (HH:MM) als weiße Plakette am innen liegenden Rand dieser Seite.",show_date:"Datums-Plakette anzeigen",show_date_helper:"Aktuelles Datum als weiße Plakette neben der Uhr.",show_header:"Stationsanzeige anzeigen",show_header_helper:"Hauptschalter. Einstellungen pro Seite bleiben gespeichert.",show_line_pill:"Linien-Plakette anzeigen",show_line_pill_helper:"Liniencode als gefüllte Plakette in der Linienfarbe statt als schlichter Text.",show_platform:"Steig anzeigen",show_station_name:"Stationsnamen anzeigen",show_unit:"Einheit „min“ anzeigen",show_unit_helper:"Kleines „min“ in Amber-Versalien nach jeder Minutenzahl.",size:"Größe",station_bg:"Stationsschild-Hintergrund",station_bg_black:"Schwarz",station_bg_default:"Standard",station_bg_white:"Weiß",style:"Stil",style_classic:"Klassisch",style_pixel:"Punktmatrix",style_warm:"Warm",text:"Beschriftung",text_helper:"z. B. Name der nächsten Station.",wheelchair_race:"Rollstuhl-Rennen (Easter Egg)"},aria_dismiss_message:"Lauftext schließen",aria_start_race:"Barrierefreiheits-Rennen starten",at_platform:"Einfahrt",barrier_free_title:"Barrierefrei zugänglich",betriebsschluss:"Betriebsschluss",countdown_minutes:"{n} Minuten",departures_list:"Kommende Abfahrten",dir_both:"Beide",dir_h:"Hinfahrt",dir_h_short:"H",dir_r:"Rückfahrt",dir_r_short:"R",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie oben einen anderen Sensor.",gleis:"GLEIS",header:{icon_exit:"Ausgang",icon_exit_access:"Stufenloser Ausgang",icon_wc:"WC",icon_escalator:"Rolltreppe",icon_elevator:"Aufzug",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe"},no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",no_entity:"Keine Haltestelle ausgewählt",race_finished:"Barrierefreiheits-Rennen beendet",race_starting_in:"Rennen startet in {n}",race_winner_announce:"Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",stale_feed:"Keine aktuellen Daten",steig:"STEIG",unit_min:"min",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",version_update:"Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",via_prefix:"ÜBER"},Me={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",col_line:"LINIE",col_dest:"RICHTUNG",col_step_free:"STUFENLOS",col_cd:"ANKUNFT",version_update:"Klappanzeige wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie oben einen anderen Sensor.",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",barrier_free_title:"Barrierefrei zugänglich",not_barrier_free_title:"Nicht barrierefrei",unit_min:"min",dir_both:"Beide",header:{icon_exit:"Ausgang",icon_exit_access:"Stufenloser Ausgang",icon_wc:"WC",icon_escalator:"Rolltreppe",icon_elevator:"Aufzug",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe"},editor:{accessibility_only:"Nur barrierefreie Abfahrten anzeigen",accessibility_only_requires:"Braucht „Rollstuhl-Plakette anzeigen“.",chips:"Zusätzliche Beschriftungen",chips_helper:"Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen.",date_format:"Datumsformat",date_format_helper:"Beispiel: d.m.Y → 25.05.2026. Zeichen: d j (Tag), m n (Monat), Y y (Jahr), D l (Wochentag), M F (Monatsname). Alles andere bleibt unverändert.",entities:"Haltestellen",exit:"Ausgangssymbol",extra_icons:"Zusätzliche Symbole",extra_icons_helper:"Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",header_exit_accessible:"Stufenloser Ausgang",header_exit_none:"Kein",header_exit_regular:"Ausgang",hide_attribution:"Datenquelle ausblenden",hide_attribution_helper:"Wenn aktiv, wird die CC-BY-Quellenangabe am unteren Rand der Karte ausgeblendet. Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern der Hinweis nicht an anderer Stelle im Dashboard erscheint.",housing:"Gehäuserahmen anzeigen",housing_helper:"Umrahmt die Tafel mit dem Gehäuse inkl. dezenter Innenkante und Schlagschatten. Gehäusefarbe folgt dem HA-Theme (cremefarben im Hellmodus, dunkel im Dunkelmodus). Aus = Tafel sitzt bündig auf dem Dashboard.",icon_mdi_door_open:"Offene Tür",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_stairs:"Treppe",max_rows:"Anzahl Zeilen",max_rows_helper:"Wie viele Abfahrten die Tafel zeigt (1–8). Über alle Haltestellen zusammengeführt, nach Abfahrtszeit sortiert.",section_display:"Anzeige",section_display_hint:"Fallblatt-Feld",section_station_helper:"Das farbige Band mit Stationsname und Uhrzeit am oberen Rand der Tafel.",show_accessibility:"Rollstuhl-Plakette anzeigen",show_accessibility_helper:"Zeigt eine Rollstuhl-Plakette neben barrierefreien Abfahrten.",show_clock:"Uhr-Plakette anzeigen",show_clock_helper:"Aktuelle Uhrzeit (HH:MM) als cremefarbene Plakette am innen liegenden Rand dieser Seite.",show_date:"Datums-Plakette anzeigen",show_date_helper:"Aktuelles Datum als cremefarbene Plakette neben der Uhr.",show_header:"Stationsanzeige anzeigen",show_header_helper:"Hauptschalter. Einstellungen pro Seite bleiben gespeichert.",show_line_column:"Linienspalte anzeigen",show_line_column_helper:"Zeigt die Spalte mit dem Liniencode. Ausschalten, wenn die Tafel ohnehin nur eine Linie zeigt.",show_min_unit:"Einheit „min“ anzeigen",show_min_unit_helper:"Kleines „min“ neben der Minutenzahl, wie auf echten Stationstafeln.",show_platform:"Gleis/Steig anzeigen",show_platform_helper:"Fügt jeder Zeile eine eigene Gleis-Plakette zwischen Ziel und Minutenzahl hinzu. Wird nur eingeblendet, wenn mindestens eine sichtbare Zeile einen Gleis-Wert hat.",show_station_name:"Stationsnamen anzeigen",show_station_name_helper:"Farbiges Band mit Stationsname und Uhrzeit am oberen Rand der Karte.",size:"Größe",station_bg:"Hintergrund Stationsschild",station_bg_black:"Schwarz",station_bg_helper:"Standard ist die Farbe der ersten erfassten Linie (z. B. Rot für U1, Orange für U3). Bei mehreren Linien kann eine bestimmte Linie gewählt oder auf Weiß bzw. Schwarz umgestellt werden.",station_bg_line:"Erste Linie",station_bg_white:"Weiß",text:"Beschriftung",text_helper:"z. B. Name der nächsten Station.",walk_time_no_data:"Keine passenden Abfahrten. Richtung wechseln oder warten, bis der Sensor Linien meldet."}},Re={common:Te,modern:Ce,retro:Le,flap:Me},He={editor:{add_chip:"Add chip",add_icon:"Add icon",add_stop:"Add stop",date_format_placeholder:"d.m.Y",direction_label:"Direction",direction_not_served:"not served",direction_note_one_way:"Return direction disabled: {line} terminates here.",direction_unavailable:"No departures in this direction",header_amenities:"Icons in this slot",header_bar_aria:"Station sign — choose a side",header_chips_and_icons:"Text chips (max. {chips}) and extra icons (max. {icons})",header_left:"Left side",header_pick_side_hint:"Tap a side, then fill it in below",header_right:"Right side",header_side_aria:"Station sign side",header_slot_empty:"empty",line_active_aria:"Line {line} active",line_inactive_aria:"Line {line} inactive",lines_empty_means_all:"empty = all lines",lines_label:"Lines at this stop",lines_selected:"{n} of {total}",no_lines_hint:"Pick a stop first — lines arrive live from the API.",no_lines_title:"No lines yet",per_line_direction_aria:"Line {line}: {direction}",per_line_direction_hint:"A line with no choice of its own follows the direction above.",per_line_direction_label:"Direction per line (overrides above)",remove_chip_aria:"Remove chip {chip}",remove_icon_aria:"Remove icon {icon}",remove_stop:"Remove stop",section_header:"Station sign",section_header_hint:"Edit on the bar",section_station:"Station band",section_tweaks:"Details",section_tweaks_hint:"optional",section_walk_time:"Walking time to the stop",show_clock_short:"Clock",show_date_short:"Date",show_elevator_short:"Lift",show_escalator_short:"Escalator",show_wc_short:"WC",size_medium:"Medium",size_regular:"Standard",size_small:"Small",tab_display:"Display",tab_stop:"Stop",tab_stops:"Stops",tab_tweaks:"Details",text_placeholder:"e.g. name of the next station",walk_time_aria:"Walking time in minutes for line {line} towards {towards}",walk_time_branching_hint:"Applies to every terminus in this direction",walk_time_hint:"Hides departures that would leave without you. Empty = no filter.",walk_time_less_aria:"Decrease walking time for line {line}",walk_time_more_aria:"Increase walking time for line {line}",walk_time_placeholder:"–",walk_time_unit:"minutes"}},De={no_data:"No departures available",betriebsschluss:"End of service",stale_feed:"No live data",stale_feed_detail:"Wiener Linien is sending out-of-date departure times for this stop. Departures return automatically once live data resumes.",stale_feed_since:"Last reported departure: {time}",stale_feed_partial:"Some lines aren't reporting current times.",min:"min",now:"Now",platform_short_rail:"Track",platform_short_bus:"Bay",version_update:"Wiener Linien Austria updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor, or remove it from this card's stops.",no_entities_picked:"No stop selected",no_entities_available:"No Wiener Linien sensors found",departures_list:"Upcoming departures",barrier_free_title:"Step-free access",cooling_title:"Air conditioned",disturbance_title:"Traffic disruption reported",stops_ahead_aria_show:"Show stops ahead for {line} towards {towards}",stops_ahead_aria_hide:"Hide stops ahead for {line} towards {towards}",stops_ahead_transfer_aria:"Change to {lines}",stops_ahead_other_show:"Show {count} more lines at {stop}",stops_ahead_other_hide:"Hide other lines at {stop}",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",dir_both:"Both",traffic_label:"Disruption",traffic_until:"Until",traffic_updated:"updated",elevator_label:"Elevator out of service",elevator_until:"Until",open_in_maps:"Open in maps",qr_open:"Show QR code",qr_dialog_title:"QR code for stop",qr_dialog_hint:"Scan with your phone — opens the stop in your maps app.",qr_dialog_close:"Close QR code",delay_singular:"1 min. late",delay_plural:"{n} min. late",devmode_title:"DEV",devmode_traffic_btn:"Test disruption",devmode_elevator_btn:"Test elevator",devmode_colors_btn:"Line colours",devmode_clear_btn:"Clear",editor:{accessibility_only:"Only show step-free departures",accessibility_only_requires:"Requires “Show accessibility icon”.",colors_empty_hint:"Pick stops on the Stops tab — their lines will show up here.",colors_hint:"Optional. Without an override the official line colour applies.",hide_attribution:"Hide data source",hide_attribution_helper:"When on, the data-source credit is hidden.",hide_header:"Hide header",hide_header_helper:"When on, the card title bar is hidden.",layout:"Multi-stop layout",layout_requires:"Only takes effect with two or more stops.",layout_stacked:"Stacked",layout_tabs:"Tabs",max_departures:"Departures per stop",pick_color_for_line:"Pick colour for line {line}",reset_color:"Reset to default",reset_color_aria:"Reset line colour {line} to default",section_colors:"Line colours",section_colors_hint:"overrides the API colour",section_departure_row:"Departure row",section_departure_row_hint:"per row",section_display:"Display",section_disruptions:"Disruptions & delays",section_layout:"Structure",section_layout_hint:"Layout",show_accessibility:"Show step-free icon",show_cooling:"Show air-conditioning icon",show_cooling_helper:"Shows a snowflake beside departures with an air-conditioned vehicle. Wiener Linien report this per vehicle — older trains and trams don't send it.",show_delay:"Show delays",show_delay_colors:"Colour-code delays",show_delay_colors_helper:"Turns the countdown number red when a departure runs late and green when it runs early.",show_delay_colors_requires:"Requires “Show delays”.",show_departures:"Show departure list",show_elevator_info:"Show elevator outages",show_hero_metric:"Show next departure large",show_platform:"Show platform / track",show_qr_button:"Show QR-code button",show_stops_ahead:"Show intermediate stops",show_traffic_info:"Show disruption alerts",show_type_icon:"Show vehicle-type icon"}},Oe={editor:{accessibility_only:"Only show step-free departures",chips:"Extra labels",chips_helper:"Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each.",date_format:"Date format",date_format_helper:"Example: d.m.Y → 25.05.2026. Tokens: d j (day), m n (month), Y y (year), D l (weekday), M F (month name). Anything else passes through unchanged.",exit:"Exit icon",extra_icons:"Extra icons",extra_icons_helper:"Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",flicker:"Simulate LED flicker",header_exit_accessible:"Step-free exit",header_exit_none:"None",header_exit_regular:"Exit",housing:"Show LED cabinet frame",housing_helper:"Dark bezel around the LED panel with a subtle glass reflection on top.",icon_mdi_door_open:"Open door",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_stairs:"Stairs",line_stripe:"Show line stripe",line_stripe_helper:"A 4 px coloured bar at the left edge of each row, matched to the line.",message_text:"Message",message_text_requires:"Requires “Show ticker”.",message_ticker:"Scrolling message",message_ticker_helper:"Runs a custom message across the display every 5 minutes.",platform_side:"Platform side",platform_side_auto:"Auto (1 = right, 2 = left)",platform_side_helper:"Default follows Wiener Linien signage (platform 2 on the left, otherwise right). Override manually if needed.",platform_side_left:"Always left",platform_side_requires:"Requires “Show platform”.",platform_side_right:"Always right",section_display:"Display",section_display_hint:"LED panel",section_header_hint:"Edit on the bar",show_clock:"Show clock chip",show_clock_helper:"Current time (HH:MM) as a white chip at the innermost edge of this side.",show_date:"Show date chip",show_date_helper:"Current date as a white chip next to the clock.",show_header:"Show station sign",show_header_helper:"Master switch. Per-side settings are kept.",show_line_pill:"Show line badge",show_line_pill_helper:"Renders the line code as a filled badge in the line colour rather than plain text.",show_platform:"Show platform",show_station_name:"Show station name",show_unit:"Show the “min” unit",show_unit_helper:'Trail each countdown number with a small amber "min" caption.',size:"Size",station_bg:"Station-name background",station_bg_black:"Black",station_bg_default:"Default",station_bg_white:"White",style:"Style",style_classic:"Classic",style_pixel:"Dot matrix",style_warm:"Warm",text:"Sign text",text_helper:"E.g. name of the next station.",wheelchair_race:"Wheelchair race (easter egg)"},aria_dismiss_message:"Dismiss scrolling message",aria_start_race:"Start accessibility race",at_platform:"Arriving",barrier_free_title:"Step-free access",betriebsschluss:"End of service",countdown_minutes:"{n} minutes",departures_list:"Upcoming departures",dir_both:"Both",dir_h:"Outbound",dir_h_short:"H",dir_r:"Return",dir_r_short:"R",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.",gleis:"PLATF.",header:{icon_exit:"Exit",icon_exit_access:"Step-free exit",icon_wc:"Toilet",icon_escalator:"Escalator",icon_elevator:"Elevator",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs"},no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",no_entity:"No stop selected",race_finished:"Accessibility race finished",race_starting_in:"Race starting in {n}",race_winner_announce:"Wheelchair {n} wins the accessibility race",stale_feed:"No live data",steig:"BAY",unit_min:"min",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",version_update:"Retro card updated to v{v} — please reload",via_prefix:"VIA"},Pe={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",stale_feed:"No live data",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"BAY",col_line:"LINE",col_dest:"DIRECTION",col_step_free:"STEP-FREE",col_cd:"ARRIVAL",version_update:"Flap card updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.",departures_list:"Upcoming departures",at_platform:"Arriving",countdown_minutes:"{n} minutes",barrier_free_title:"Step-free access",not_barrier_free_title:"Step-free access not available",unit_min:"min",dir_both:"Both",header:{icon_exit:"Exit",icon_exit_access:"Step-free exit",icon_wc:"Toilet",icon_escalator:"Escalator",icon_elevator:"Elevator",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs"},editor:{accessibility_only:"Only show step-free departures",accessibility_only_requires:"Requires “Show wheelchair badge”.",chips:"Extra labels",chips_helper:"Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each.",date_format:"Date format",date_format_helper:"Example: d.m.Y → 25.05.2026. Tokens: d j (day), m n (month), Y y (year), D l (weekday), M F (month name). Anything else passes through unchanged.",entities:"Stops",exit:"Exit icon",extra_icons:"Extra icons",extra_icons_helper:"Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",header_exit_accessible:"Step-free exit",header_exit_none:"None",header_exit_regular:"Exit",hide_attribution:"Hide data source",hide_attribution_helper:"When on, the CC-BY credit at the bottom of the card is hidden. The Wiener Linien Open Government Data licence requires visible attribution unless you keep the credit elsewhere on the dashboard.",housing:"Show cabinet frame",housing_helper:"Wraps the board in the cabinet with a soft inset bevel and drop shadow. Cabinet colour follows your HA theme (cream on light, dark on dark). When off, the board sits flush against the dashboard.",icon_mdi_door_open:"Open door",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_stairs:"Stairs",max_rows:"Number of rows",max_rows_helper:"How many departures to show on the board (1–8). Merged across all stops, sorted by countdown.",section_display:"Display",section_display_hint:"Split-flap board",section_station_helper:"The coloured band with the station name + clock at the top of the board.",show_accessibility:"Show step-free tile",show_accessibility_helper:"Add a wheelchair pictogram tile next to step-free departures.",show_clock:"Show clock chip",show_clock_helper:"Current time (HH:MM) as a cream chip at the innermost edge of this side.",show_date:"Show date chip",show_date_helper:"Current date as a cream chip next to the clock.",show_header:"Show station sign",show_header_helper:"Master switch. Per-side settings are kept.",show_line_column:"Show line column",show_line_column_helper:"Shows the column carrying the line code. Turn it off when the board only ever shows one line.",show_min_unit:'Show "min" caption',show_min_unit_helper:"Small label next to the countdown number, like real station boards.",show_platform:"Show platform / track",show_platform_helper:"Adds a per-row platform tile between the destination and the countdown. Only shown when at least one visible row has a platform value.",show_station_name:"Show station name",show_station_name_helper:"Coloured band with the station name and current time at the top of the card.",size:"Size",station_bg:"Station-name background",station_bg_black:"Black",station_bg_helper:"Default is the colour of the first tracked line (e.g. red for U1, orange for U3). On multi-line boards you can pick a specific line, or override with solid white or black.",station_bg_line:"First line",station_bg_white:"White",text:"Sign text",text_helper:"E.g. name of the next station.",walk_time_no_data:"No departures matched. Pick a direction or wait until the sensor reports lines."}},Ne={common:He,modern:De,retro:Oe,flap:Pe};const Ue={de:Object.freeze({__proto__:null,common:Te,default:Re,flap:Me,modern:Ce,retro:Le}),en:Object.freeze({__proto__:null,common:He,default:Ne,flap:Pe,modern:De,retro:Oe})},Be=Ue.de??{};function qe(e,t){const i=function(e,t){return e.split(".").reduce((e,t)=>{if(e&&"object"==typeof e&&t in e)return e[t]},t)}(e,t);return"string"==typeof i?i:void 0}function We(e,t,i){const r=function(e){return"en"===((e.configLanguage||e.hassLanguage||"de").split(/[-_]/)[0]??"de")?"en":"de"}(t);let n=qe(e,Ue[r]??Be);if(void 0===n&&(n=qe(e,Be)),void 0===n)return e;if(i)for(const[e,t]of Object.entries(i))n=n.replace(`{${e}}`,String(t));return n}function je(e,t,i="banner"){if(!e)return I;if(function(e){if(!e)return!1;try{return"1"===window.sessionStorage?.getItem(`wl-reload-attempted-${e}`)}catch{return!1}}(e)){const e=t("version_reload_stuck");return j`
       <div class=${i} role="alert" aria-live="assertive">
         <span>${e}</span>
       </div>
-    `}const n=t("version_update").replace("{v}",e),r=t("version_reload");return q`
+    `}const r=t("version_update").replace("{v}",e),n=t("version_reload");return j`
     <div class=${i} role="alert" aria-live="assertive">
-      <span>${n}</span>
+      <span>${r}</span>
       <button
         type="button"
-        aria-label=${r}
+        aria-label=${n}
         @click=${()=>function(e){try{window.caches?.keys?.().then(e=>{e.forEach(e=>window.caches?.delete?.(e))})}catch{}if(e)try{window.sessionStorage?.setItem(`wl-reload-attempted-${e}`,"1")}catch{}window.location.reload()}(e)}
       >
-        ${r}
+        ${n}
       </button>
     </div>
-  `}function je(e,t){return e?q`<span lang="de">${e}</span>`:t??""}const Ie="ptMetro";function Ve(e){switch(e){case Ie:return"mdi:subway-variant";case"ptTram":return"mdi:tram";case"ptBusCity":case"ptBusNight":return"mdi:bus";default:return null}}function Ge(e,t){return"boolean"==typeof e?e:t}function Ke(e){if("string"==typeof e)return e.startsWith("sensor.")?{entity:e}:(console.warn(`[wiener-linien-austria] entities[] entry ${JSON.stringify(e)} is not a sensor.* entity — dropping`),null);if(!e||"object"!=typeof e)return console.warn(`[wiener-linien-austria] entities[] entry ${JSON.stringify(e)} is not a string or object — dropping`),null;const t=e,i="string"==typeof t.entity?t.entity:null;if(!i?.startsWith("sensor."))return console.warn("[wiener-linien-austria] entities[] entry has missing or non-sensor.* entity field",e),null;const n={entity:i};if(Array.isArray(t.lines)){const e=t.lines.filter(e=>"string"==typeof e&&e.length>0);e.length&&(n.lines=e)}"H"!==t.direction&&"R"!==t.direction||(n.direction=t.direction);const r=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,n]of Object.entries(e)){if("string"!=typeof i||!i.length)continue;const e=i.toUpperCase();"H"!==n&&"R"!==n?void 0!==n&&""!==n&&"Both"!==n&&console.warn(`[wiener-linien-austria] line_directions["${i}"] = ${JSON.stringify(n)} is not "H" / "R" / "Both" — dropping`):t[e]=n}return Object.keys(t).length?t:void 0}(t.line_directions);r&&(n.line_directions=r);const a=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,n]of Object.entries(e)){const e="number"==typeof n?n:"string"==typeof n?Number(n):NaN;if(!Number.isFinite(e)||e<0||e>120){console.warn(`[wiener-linien-austria] walk_times["${i}"] = ${JSON.stringify(n)} is not a finite number in 0..120 — dropping`);continue}const r=i.split("|"),a=r.length>=3?`${r[0]}|${r[1]}`:i,o=Math.round(e),s=t[a];t[a]=void 0===s?o:Math.max(s,o)}return Object.keys(t).length?t:void 0}(t.walk_times);return a&&(n.walk_times=a),n}const Qe=new Set(["type","entities","entity","lines","direction","walk_times","max_departures","line_colors","show_accessibility","accessibility_only","show_cooling","show_traffic_info","show_elevator_info","show_delay","show_delay_colors","show_type_icon","show_platform","show_hero_metric","show_departures","show_stops_ahead","show_qr_button","hide_header","hide_attribution","layout"]),Ze=6,Ye=!1,Je=!1,Xe=!1,et=!0,tt=!0,it=!0,nt=!0,rt=!1,at=!0,ot=!0,st=!0,lt=!0,dt=!0,ht=!1,ct=!1;function pt(e){let t=[];Array.isArray(e.entities)?t=e.entities:"string"==typeof e.entity&&(t=[{entity:e.entity,lines:e.lines,direction:e.direction,walk_times:e.walk_times}]);const i=[],n=new Set;for(const e of t){const t=Ke(e);t&&(n.has(t.entity)||(n.add(t.entity),i.push(t)))}const r=Number(e.max_departures),a=Number.isFinite(r)?Math.max(0,Math.min(20,Math.round(r))):Ze,o={};if(e.line_colors&&"object"==typeof e.line_colors){const t=/^#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;for(const[i,n]of Object.entries(e.line_colors))"string"==typeof n&&t.test(n.trim())&&(o[i.toUpperCase()]=n.trim())}const s=function(e,t){const i={};if(!e||"object"!=typeof e)return i;for(const[n,r]of Object.entries(e))t.has(n)||(i[n]=r);return i}(e,Qe);return{...s,type:"string"==typeof e.type&&e.type?e.type:"custom:wiener-linien-austria-card",entities:i,max_departures:a,line_colors:o,show_accessibility:Ge(e.show_accessibility,Ye),accessibility_only:Ge(e.accessibility_only,Je),show_cooling:Ge(e.show_cooling,Xe),show_traffic_info:Ge(e.show_traffic_info,et),show_elevator_info:Ge(e.show_elevator_info,tt),show_delay:Ge(e.show_delay,it),show_delay_colors:Ge(e.show_delay_colors,nt),show_type_icon:Ge(e.show_type_icon,rt),show_platform:Ge(e.show_platform,at),show_hero_metric:Ge(e.show_hero_metric,ot),show_departures:Ge(e.show_departures,st),show_stops_ahead:Ge(e.show_stops_ahead,lt),show_qr_button:Ge(e.show_qr_button,dt),hide_header:Ge(e.hide_header,ht),hide_attribution:Ge(e.hide_attribution,ct),layout:"tabs"===e.layout?"tabs":"stacked"}}function ut(e,t,i={},n="var(--primary-color)"){const r=e.toUpperCase();if(void 0!==t[r])return{background:t[r]};if(/^N\d/.test(r))return{background:Ee,color:"#fef200"};const a=i[e]??i[r];return a?.bg?a.fg?{background:`#${a.bg}`,color:`#${a.fg}`}:{background:`#${a.bg}`}:{background:n}}function ft(e,t,i={},n="var(--primary-color)"){return ut(e,t,i,n).background}function _t(e){if(!e)return[];const t=[];for(const[i,n]of Object.entries(e.states??{})){if(!i.startsWith("sensor."))continue;const e=n?.attributes??{};"number"==typeof e.diva&&(Array.isArray(e.departures)&&e.next_by_line&&"object"==typeof e.next_by_line&&t.push(i))}return t.sort(),t}function gt(e,t){if(!e||!t)return{};const i=e.states?.[t]?.attributes;return i?.line_colors??{}}function mt(e,t){if(!e)return{};for(const i of t){const t=gt(e,i);if(Object.keys(t).length)return t}return{}}function wt(e,t){return`${e}|${t}`}function bt(e,t){if(!e.length)return t.full;const i=e.slice(0,3).join(" / "),n=e.length>3?" +"+(e.length-3):"";return`${t.short}: ${i}${n}`}function vt(e){if(e?.tracked_lines?.length)return[...e.tracked_lines].sort();const t=new Set;if(e?.lines_at_stop?.length)for(const i of e.lines_at_stop)t.add(i);for(const i of e?.departures??[])i.line&&t.add(i.line);return Array.from(t).sort()}function yt(e){return e.replace(/[^A-Za-z0-9_]/g,"_")}function xt(e,t){const i=new Set(e);return i.has(t)?i.delete(t):i.add(t),i}const $t=["Voraussichtliche Dauer","Grund"],kt=/^(Linien?\s+[^:]{1,60}):\s*/,St=new RegExp(`${kt.source}$`),At=new RegExp(`^(${$t.join("|")}):\\s*(.+)$`),zt=new RegExp(`(?<=\\S)\\s*(?=(?:${$t.join("|")}):)`,"g"),Et="mdi:information-outline",Tt=[[/bauarbeit|baustelle|gleisbau|bauma(ß|ss)nahme/i,"mdi:excavator"],[/verkehrsunfall|unfall|kollision|zusammensto(ß|ss)/i,"mdi:car-emergency"],[/rettung|sanit(ä|ae)|notarzt/i,"mdi:ambulance"],[/feuerwehr|brand/i,"mdi:fire-truck"],[/polizei/i,"mdi:police-badge"],[/demonstration|kundgebung|veranstaltung|umzug|marathon/i,"mdi:account-group"],[/schnee|eis|glatt/i,"mdi:snowflake"],[/sturm|unwetter|witterung|gewitter|hitze/i,"mdi:weather-lightning-rainy"],[/gebrechen|defekt|schaden|st(ö|oe)rung|reparatur|erneuerung|instandsetzung|ma(ß|ss)nahme|wartung/i,"mdi:wrench"]];const Ct=/^\d{1,2}[:.]\d{2}(\s*Uhr)?\.?$/i;function Lt(e){const t=e.trim();return t.endsWith(".")?/^\d+\.$/.test(t)?t:t.slice(0,-1):t}function Mt(e,t){if("Grund"===e){for(const[e,i]of Tt)if(e.test(t))return i;return Et}return"Voraussichtliche Dauer"===e?Ct.test(t.trim())?"mdi:clock-outline":"mdi:calendar-clock":Et}const Rt=new Set(["P","DIV","LI","UL","OL","TR","H1","H2","H3","H4","H5","H6"]),Dt=new Set(["SCRIPT","STYLE","TEMPLATE","IFRAME","SVG","NOSCRIPT"]);function Ht(e){const t=[];let i=e;const n=kt.exec(i);n&&(t.push(`${n[1]}:`),i=i.slice(n[0].length));for(const e of i.split(zt)){const i=e.trim();i&&t.push(i)}return t}function Nt(e){const t=[],i=[],n=new Set;for(const r of function(e){const t=(new DOMParser).parseFromString(e,"text/html"),i=[];let n="";const r=()=>{const e=n.replace(/\s+/g," ").trim();e&&i.push(e),n=""},a=e=>{const t=e.split(/\r?\n/);n+=t[0]??"";for(let e=1;e<t.length;e+=1)r(),n+=t[e]??""},o=e=>{const t=e.childNodes;for(let e=0;e<t.length;e+=1){const i=t[e];if(!i)continue;if(i.nodeType===Node.TEXT_NODE){a(i.nodeValue??"");continue}if(i.nodeType!==Node.ELEMENT_NODE)continue;const n=i.tagName.toUpperCase();Dt.has(n)||("BR"!==n?(o(i),Rt.has(n)&&r()):r())}};return o(t.body),r(),i}(String(e??"")))for(const e of Ht(r)){const r=At.exec(e);if(r?.[1]&&r[2]){if(n.has(r[1]))continue;n.add(r[1]);const e=Lt(r[2]);i.push({label:r[1],value:e,icon:Mt(r[1],e)});continue}const a=St.exec(e);a?.[1]?t.push({kind:"heading",text:a[1]}):t.push({kind:"para",text:e})}return{blocks:t,facts:i}}function Pt(e,t="de"){if(!e)return"";const i=Date.parse(e);if(!Number.isFinite(i))return e;try{return new Date(i).toLocaleString("en"===t?"en-GB":"de-AT",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch{return e}}const Ot=e=>Math.min(1,Math.max(0,e)),Ut=e=>e<=.04045?e/12.92:((e+.055)/1.055)**2.4,Bt=e=>e<=.0031308?12.92*e:1.055*e**(1/2.4)-.055;function Ft(e){const t=e.trim();if(!t||t.includes("var("))return null;let i=/^#[0-9a-f]{3,8}$/i.test(t)?t.slice(1):"";if(!i){let e="";try{const i=document.createElement("span").style;i.color=t,e=i.color.trim()}catch{return null}const i=/^rgba?\(([^)]+)\)$/.exec(e);if(!i?.[1])return null;const n=i[1].split(/[,\s/]+/).filter(Boolean).map(Number),[r,a,o]=n;return void 0===r||void 0===a||void 0===o?null:[r,a,o].every(Number.isFinite)?[Ut(r/255),Ut(a/255),Ut(o/255)]:null}if(3!==i.length&&4!==i.length||(i=[...i.slice(0,3)].map(e=>e+e).join("")),6!==i.length&&8!==i.length)return null;const n=Number.parseInt(i.slice(0,6),16);return Number.isFinite(n)?[Ut((n>>16&255)/255),Ut((n>>8&255)/255),Ut((255&n)/255)]:null}const Wt=([e,t,i])=>"#"+[e,t,i].map(e=>Math.round(255*Ot(Bt(e))).toString(16).padStart(2,"0")).join(""),qt=([e,t,i])=>.2126*e+.7152*t+.0722*i;function jt(e,t){if(void 0===t)return null;const i=Ft(e);if(!i)return null;const[n,r,a]=function([e,t,i]){const n=Math.cbrt(.4122214708*e+.5363325363*t+.0514459929*i),r=Math.cbrt(.2119034982*e+.6806995451*t+.1073969566*i),a=Math.cbrt(.0883024619*e+.2817188376*t+.6299787005*i);return[.2104542553*n+.793617785*r-.0040720468*a,1.9779984951*n-2.428592205*r+.4505937099*a,.0259040371*n+.7827717662*r-.808675766*a]}(i),o="dark"===t?Math.max(.72,n):Math.min(.45,n);if(o===n)return Wt(i);const s=Math.hypot(r,a),l=Math.atan2(a,r),d=function([e,t,i]){const n=(e+.3963377774*t+.2158037573*i)**3,r=(e-.1055613458*t-.0638541728*i)**3,a=(e-.0894841775*t-1.291485548*i)**3;return[4.0767416621*n-3.3077115913*r+.2309699292*a,-1.2684380046*n+2.6097574011*r-.3413193965*a,-.0041960863*n-.7034186147*r+1.707614701*a]}([o,s*Math.cos(l),s*Math.sin(l)]);return Wt([Ot(d[0]),Ot(d[1]),Ot(d[2])])}const It={},Vt=me(class extends we{constructor(e){if(super(e),e.type!==_e&&e.type!==fe&&e.type!==ge)throw Error("The `live` directive is not allowed on child or event bindings");if(!(e=>void 0===e.strings)(e))throw Error("`live` bindings can only contain a single expression")}render(e){return e}update(e,[t]){if(t===j||t===I)return t;const i=e.element,n=e.name;if(e.type===_e){if(t===i[n])return j}else if(e.type===ge){if(!!t===i.hasAttribute(n))return j}else if(e.type===fe&&i.getAttribute(n)===t+"")return j;return((e,t=It)=>{e._$AH=t})(e),t}}),Gt=o`
+  `}function Fe(e,t){return e?j`<span lang="de">${e}</span>`:t??""}const Ie="ptMetro";function Ve(e){switch(e){case Ie:return"mdi:subway-variant";case"ptTram":return"mdi:tram";case"ptBusCity":case"ptBusNight":return"mdi:bus";default:return null}}function Ge(e,t){return"boolean"==typeof e?e:t}function Ke(e){if("string"==typeof e)return e.startsWith("sensor.")?{entity:e}:(console.warn(`[wiener-linien-austria] entities[] entry ${JSON.stringify(e)} is not a sensor.* entity — dropping`),null);if(!e||"object"!=typeof e)return console.warn(`[wiener-linien-austria] entities[] entry ${JSON.stringify(e)} is not a string or object — dropping`),null;const t=e,i="string"==typeof t.entity?t.entity:null;if(!i?.startsWith("sensor."))return console.warn("[wiener-linien-austria] entities[] entry has missing or non-sensor.* entity field",e),null;const r={entity:i};if(Array.isArray(t.lines)){const e=t.lines.filter(e=>"string"==typeof e&&e.length>0);e.length&&(r.lines=e)}"H"!==t.direction&&"R"!==t.direction||(r.direction=t.direction);const n=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,r]of Object.entries(e)){if("string"!=typeof i||!i.length)continue;const e=i.toUpperCase();"H"!==r&&"R"!==r?void 0!==r&&""!==r&&"Both"!==r&&console.warn(`[wiener-linien-austria] line_directions["${i}"] = ${JSON.stringify(r)} is not "H" / "R" / "Both" — dropping`):t[e]=r}return Object.keys(t).length?t:void 0}(t.line_directions);n&&(r.line_directions=n);const a=function(e){if(!e||"object"!=typeof e)return;const t={};for(const[i,r]of Object.entries(e)){const e="number"==typeof r?r:"string"==typeof r?Number(r):NaN;if(!Number.isFinite(e)||e<0||e>120){console.warn(`[wiener-linien-austria] walk_times["${i}"] = ${JSON.stringify(r)} is not a finite number in 0..120 — dropping`);continue}const n=i.split("|"),a=n.length>=3?`${n[0]}|${n[1]}`:i,o=Math.round(e),s=t[a];t[a]=void 0===s?o:Math.max(s,o)}return Object.keys(t).length?t:void 0}(t.walk_times);return a&&(r.walk_times=a),r}const Qe=new Set(["type","entities","entity","lines","direction","walk_times","max_departures","line_colors","show_accessibility","accessibility_only","show_cooling","show_traffic_info","show_elevator_info","show_delay","show_delay_colors","show_type_icon","show_platform","show_hero_metric","show_departures","show_stops_ahead","show_qr_button","hide_header","hide_attribution","layout"]),Ze=6,Ye=!1,Je=!1,Xe=!1,et=!0,tt=!0,it=!0,rt=!0,nt=!1,at=!0,ot=!0,st=!0,lt=!0,dt=!0,ht=!1,ct=!1;function pt(e){let t=[];Array.isArray(e.entities)?t=e.entities:"string"==typeof e.entity&&(t=[{entity:e.entity,lines:e.lines,direction:e.direction,walk_times:e.walk_times}]);const i=[],r=new Set;for(const e of t){const t=Ke(e);t&&(r.has(t.entity)||(r.add(t.entity),i.push(t)))}const n=Number(e.max_departures),a=Number.isFinite(n)?Math.max(0,Math.min(20,Math.round(n))):Ze,o={};if(e.line_colors&&"object"==typeof e.line_colors){const t=/^#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;for(const[i,r]of Object.entries(e.line_colors))"string"==typeof r&&t.test(r.trim())&&(o[i.toUpperCase()]=r.trim())}const s=function(e,t){const i={};if(!e||"object"!=typeof e)return i;for(const[r,n]of Object.entries(e))t.has(r)||(i[r]=n);return i}(e,Qe);return{...s,type:"string"==typeof e.type&&e.type?e.type:"custom:wiener-linien-austria-card",entities:i,max_departures:a,line_colors:o,show_accessibility:Ge(e.show_accessibility,Ye),accessibility_only:Ge(e.accessibility_only,Je),show_cooling:Ge(e.show_cooling,Xe),show_traffic_info:Ge(e.show_traffic_info,et),show_elevator_info:Ge(e.show_elevator_info,tt),show_delay:Ge(e.show_delay,it),show_delay_colors:Ge(e.show_delay_colors,rt),show_type_icon:Ge(e.show_type_icon,nt),show_platform:Ge(e.show_platform,at),show_hero_metric:Ge(e.show_hero_metric,ot),show_departures:Ge(e.show_departures,st),show_stops_ahead:Ge(e.show_stops_ahead,lt),show_qr_button:Ge(e.show_qr_button,dt),hide_header:Ge(e.hide_header,ht),hide_attribution:Ge(e.hide_attribution,ct),layout:"tabs"===e.layout?"tabs":"stacked"}}function ut(e,t,i={},r="var(--primary-color)"){const n=e.toUpperCase();if(void 0!==t[n])return{background:t[n]};if(/^N\d/.test(n))return{background:Ee,color:"#fef200"};const a=i[e]??i[n];return a?.bg?a.fg?{background:`#${a.bg}`,color:`#${a.fg}`}:{background:`#${a.bg}`}:{background:r}}function ft(e,t,i={},r="var(--primary-color)"){return ut(e,t,i,r).background}function gt(e){if(!e)return[];const t=[];for(const[i,r]of Object.entries(e.states??{})){if(!i.startsWith("sensor."))continue;const e=r?.attributes??{};"number"==typeof e.diva&&(Array.isArray(e.departures)&&e.next_by_line&&"object"==typeof e.next_by_line&&t.push(i))}return t.sort(),t}function _t(e,t){if(!e||!t)return{};const i=e.states?.[t]?.attributes;return i?.line_colors??{}}function mt(e,t){if(!e)return{};for(const i of t){const t=_t(e,i);if(Object.keys(t).length)return t}return{}}function wt(e,t){return`${e}|${t}`}function bt(e,t){if(!e.length)return t.full;const i=e.slice(0,3).join(" / "),r=e.length>3?" +"+(e.length-3):"";return`${t.short}: ${i}${r}`}function vt(e){if(e?.tracked_lines?.length)return[...e.tracked_lines].sort();const t=new Set;if(e?.lines_at_stop?.length)for(const i of e.lines_at_stop)t.add(i);for(const i of e?.departures??[])i.line&&t.add(i.line);return Array.from(t).sort()}function yt(e){return e.replace(/[^A-Za-z0-9_]/g,"_")}function xt(e,t){const i=new Set(e);return i.has(t)?i.delete(t):i.add(t),i}const $t=["Voraussichtliche Dauer","Grund"],kt=/^(Linien?\s+[^:]{1,60}):\s*/,St=new RegExp(`${kt.source}$`),At=new RegExp(`^(${$t.join("|")}):\\s*(.+)$`),zt=new RegExp(`(?<=\\S)\\s*(?=(?:${$t.join("|")}):)`,"g"),Et="mdi:information-outline",Tt=[[/bauarbeit|baustelle|gleisbau|bauma(ß|ss)nahme/i,"mdi:excavator"],[/verkehrsunfall|unfall|kollision|zusammensto(ß|ss)/i,"mdi:car-emergency"],[/rettung|sanit(ä|ae)|notarzt/i,"mdi:ambulance"],[/feuerwehr|brand/i,"mdi:fire-truck"],[/polizei/i,"mdi:police-badge"],[/demonstration|kundgebung|veranstaltung|umzug|marathon/i,"mdi:account-group"],[/schnee|eis|glatt/i,"mdi:snowflake"],[/sturm|unwetter|witterung|gewitter|hitze/i,"mdi:weather-lightning-rainy"],[/gebrechen|defekt|schaden|st(ö|oe)rung|reparatur|erneuerung|instandsetzung|ma(ß|ss)nahme|wartung/i,"mdi:wrench"]];const Ct=/^\d{1,2}[:.]\d{2}(\s*Uhr)?\.?$/i;function Lt(e){const t=e.trim();return t.endsWith(".")?/^\d+\.$/.test(t)?t:t.slice(0,-1):t}function Mt(e,t){if("Grund"===e){for(const[e,i]of Tt)if(e.test(t))return i;return Et}return"Voraussichtliche Dauer"===e?Ct.test(t.trim())?"mdi:clock-outline":"mdi:calendar-clock":Et}const Rt=new Set(["P","DIV","LI","UL","OL","TR","H1","H2","H3","H4","H5","H6"]),Ht=new Set(["SCRIPT","STYLE","TEMPLATE","IFRAME","SVG","NOSCRIPT"]);function Dt(e){const t=[];let i=e;const r=kt.exec(i);r&&(t.push(`${r[1]}:`),i=i.slice(r[0].length));for(const e of i.split(zt)){const i=e.trim();i&&t.push(i)}return t}function Ot(e){const t=[],i=[],r=new Set;for(const n of function(e){const t=(new DOMParser).parseFromString(e,"text/html"),i=[];let r="";const n=()=>{const e=r.replace(/\s+/g," ").trim();e&&i.push(e),r=""},a=e=>{const t=e.split(/\r?\n/);r+=t[0]??"";for(let e=1;e<t.length;e+=1)n(),r+=t[e]??""},o=e=>{const t=e.childNodes;for(let e=0;e<t.length;e+=1){const i=t[e];if(!i)continue;if(i.nodeType===Node.TEXT_NODE){a(i.nodeValue??"");continue}if(i.nodeType!==Node.ELEMENT_NODE)continue;const r=i.tagName.toUpperCase();Ht.has(r)||("BR"!==r?(o(i),Rt.has(r)&&n()):n())}};return o(t.body),n(),i}(String(e??"")))for(const e of Dt(n)){const n=At.exec(e);if(n?.[1]&&n[2]){if(r.has(n[1]))continue;r.add(n[1]);const e=Lt(n[2]);i.push({label:n[1],value:e,icon:Mt(n[1],e)});continue}const a=St.exec(e);a?.[1]?t.push({kind:"heading",text:a[1]}):t.push({kind:"para",text:e})}return{blocks:t,facts:i}}function Pt(e,t="de"){if(!e)return"";const i=Date.parse(e);if(!Number.isFinite(i))return e;try{return new Date(i).toLocaleString("en"===t?"en-GB":"de-AT",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"})}catch{return e}}const Nt=e=>Math.min(1,Math.max(0,e)),Ut=e=>e<=.04045?e/12.92:((e+.055)/1.055)**2.4,Bt=e=>e<=.0031308?12.92*e:1.055*e**(1/2.4)-.055;function qt(e){const t=e.trim();if(!t||t.includes("var("))return null;let i=/^#[0-9a-f]{3,8}$/i.test(t)?t.slice(1):"";if(!i){let e="";try{const i=document.createElement("span").style;i.color=t,e=i.color.trim()}catch{return null}const i=/^rgba?\(([^)]+)\)$/.exec(e);if(!i?.[1])return null;const r=i[1].split(/[,\s/]+/).filter(Boolean).map(Number),[n,a,o]=r;return void 0===n||void 0===a||void 0===o?null:[n,a,o].every(Number.isFinite)?[Ut(n/255),Ut(a/255),Ut(o/255)]:null}if(3!==i.length&&4!==i.length||(i=[...i.slice(0,3)].map(e=>e+e).join("")),6!==i.length&&8!==i.length)return null;const r=Number.parseInt(i.slice(0,6),16);return Number.isFinite(r)?[Ut((r>>16&255)/255),Ut((r>>8&255)/255),Ut((255&r)/255)]:null}const Wt=([e,t,i])=>"#"+[e,t,i].map(e=>Math.round(255*Nt(Bt(e))).toString(16).padStart(2,"0")).join(""),jt=([e,t,i])=>.2126*e+.7152*t+.0722*i;function Ft(e,t){if(void 0===t)return null;const i=qt(e);if(!i)return null;const[r,n,a]=function([e,t,i]){const r=Math.cbrt(.4122214708*e+.5363325363*t+.0514459929*i),n=Math.cbrt(.2119034982*e+.6806995451*t+.1073969566*i),a=Math.cbrt(.0883024619*e+.2817188376*t+.6299787005*i);return[.2104542553*r+.793617785*n-.0040720468*a,1.9779984951*r-2.428592205*n+.4505937099*a,.0259040371*r+.7827717662*n-.808675766*a]}(i),o="dark"===t?Math.max(.72,r):Math.min(.45,r);if(o===r)return Wt(i);const s=Math.hypot(n,a),l=Math.atan2(a,n),d=function([e,t,i]){const r=(e+.3963377774*t+.2158037573*i)**3,n=(e-.1055613458*t-.0638541728*i)**3,a=(e-.0894841775*t-1.291485548*i)**3;return[4.0767416621*r-3.3077115913*n+.2309699292*a,-1.2684380046*r+2.6097574011*n-.3413193965*a,-.0041960863*r-.7034186147*n+1.707614701*a]}([o,s*Math.cos(l),s*Math.sin(l)]);return Wt([Nt(d[0]),Nt(d[1]),Nt(d[2])])}const It=o`
   :host {
     display: block;
   }
-  .editor {
-    padding: 16px;
+
+  /* ---------------------------------------------------------------- *
+   * Shell: tab bar + scrolling column
+   * ---------------------------------------------------------------- */
+
+  .wl-editor {
     display: flex;
     flex-direction: column;
-    gap: 12px;
   }
-  .editor-section {
-    background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
-    border-radius: 12px;
-    padding: 14px 16px;
+
+  /* Sticky so the tabs stay reachable while a long Anzeige tab scrolls.
+     z-index beats ha-form's own focused-field elevation. */
+  .wl-tabs {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
+    gap: 2px;
+    padding: 0 8px;
+    background: var(--card-background-color);
+    border-bottom: 1px solid var(--divider-color);
+    position: sticky;
+    top: 0;
+    z-index: 3;
   }
-  .section-header {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.6px;
+
+  .wl-tab {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 12px 14px 0;
+    font-size: 0.78125rem;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
     color: var(--secondary-text-color);
   }
-  .editor-hint {
-    font-size: 0.75rem;
-    color: var(--secondary-text-color);
-    line-height: 1.4;
+
+  .wl-tab[aria-selected="true"] {
+    color: var(--primary-color);
   }
-  .walk-time-list {
+
+  /* The underline is a child element rather than a border-bottom so it can
+     bleed past the button's horizontal padding to the full tab width. */
+  .wl-tab-underline {
+    display: block;
+    height: 2px;
+    margin: 7px -14px -1px;
+    border-radius: 2px 2px 0 0;
+    background: transparent;
+  }
+
+  .wl-tab[aria-selected="true"] .wl-tab-underline {
+    background: var(--primary-color);
+  }
+
+  .wl-tab:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+
+  .wl-panel {
+    padding: 14px 16px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .wl-panel--stops {
+    gap: 14px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Section
+   * ---------------------------------------------------------------- */
+
+  .wl-section {
+    border: 1px solid var(--divider-color);
+    border-radius: 10px;
+    background: var(--card-background-color);
+    overflow: hidden;
+  }
+
+  .wl-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--secondary-background-color);
+    border-bottom: 1px solid var(--divider-color);
+  }
+
+  .wl-section-title {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--primary-text-color);
+    overflow-wrap: anywhere;
+  }
+
+  .wl-section-hint {
+    font-size: 0.71875rem;
+    font-weight: 400;
+    line-height: 1.35;
+    color: var(--secondary-text-color);
+    text-align: right;
+  }
+
+  .wl-section-body {
+    padding: 6px 12px 12px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ha-form sets its own vertical rhythm between fields; the section already
+     supplies the outer padding, so strip the top gap it would add. */
+  .wl-section-body ha-form {
+    display: block;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Bespoke rows (chips / direction / walk time / colour)
+   * ---------------------------------------------------------------- */
+
+  .wl-group {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .wl-group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .wl-label {
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--secondary-text-color);
+  }
+
+  .wl-label--grow {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .wl-note {
+    font-size: 0.71875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--secondary-text-color);
+  }
+
+  .wl-divide {
+    padding-top: 12px;
+    border-top: 1px solid var(--divider-color);
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Line chip — 34px tall for density, 44px hit area for WCAG 2.2 (2.5.8).
+   * The ::before overlay is what buys both; do not replace it with padding.
+   * ---------------------------------------------------------------- */
+
+  .wl-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .wl-chip {
+    --wl-chip-color: var(--primary-color);
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 5px;
+    border: 2px solid var(--wl-chip-color);
+    background: transparent;
+    color: var(--wl-chip-color);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    forced-color-adjust: none;
+  }
+
+  .wl-chip::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: -5px;
+    bottom: -5px;
+  }
+
+  .wl-chip[aria-pressed="true"] {
+    background: var(--wl-chip-color);
+    color: #fff;
+  }
+
+  .wl-chip:hover {
+    background: color-mix(in srgb, var(--wl-chip-color) 16%, transparent);
+  }
+
+  .wl-chip[aria-pressed="true"]:hover {
+    background: color-mix(in srgb, var(--wl-chip-color) 88%, #000);
+  }
+
+  /* Offset outline rather than box-shadow: on a chip filled with its own line
+     colour a shadow-based ring disappears into the fill. */
+  .wl-chip:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  .wl-chip-mode {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    opacity: 0.85;
+  }
+
+  .wl-chip-mode ha-icon {
+    --mdc-icon-size: 14px;
+    display: block;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Read-only line badge
+   * ---------------------------------------------------------------- */
+
+  .wl-badge {
+    flex: none;
+    min-width: 34px;
+    height: 24px;
+    padding: 0 7px;
+    box-sizing: border-box;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 24px;
+    text-align: center;
+    forced-color-adjust: none;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Direction buttons
+   * ---------------------------------------------------------------- */
+
+  .wl-dirs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .wl-dir {
+    flex: 1;
+    min-width: 0;
+    min-height: 34px;
+    padding: 4px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 0.78125rem;
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: center;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  .wl-dir[aria-pressed="true"] {
+    border-color: var(--primary-color);
+    background: var(--wl-ripple);
+    color: var(--primary-color);
+  }
+
+  .wl-dir:hover:not([aria-disabled="true"]) {
+    background: var(--wl-hover);
+  }
+
+  /* Dashed rather than merely faded: the border style survives forced-colors
+     mode, where opacity does not. */
+  .wl-dir[aria-disabled="true"] {
+    border-style: dashed;
+    background: transparent;
+    color: var(--secondary-text-color);
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
+  .wl-dir:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  .wl-dir--compact {
+    flex: 1 1 0;
+    min-width: 44px;
+  }
+
+  .wl-dir--compact ha-icon {
+    --mdc-icon-size: 16px;
+  }
+
+  .wl-override-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .wl-override-row .wl-dirs {
+    flex: 1;
+    min-width: 0;
+    gap: 5px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Walk-time row
+   * ---------------------------------------------------------------- */
+
+  .wl-walk-list {
     display: flex;
     flex-direction: column;
     gap: 6px;
   }
-  .walk-time-row {
-    display: grid;
-    grid-template-columns: 44px 1fr 72px;
+
+  .wl-walk-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+
+  .wl-walk-dest {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.35;
+    color: var(--primary-text-color);
+    overflow-wrap: anywhere;
+  }
+
+  /* Stepper shell. The mockup specified −/value/+ only; the value stays a real
+     text input so a 12-minute walk is one keystroke rather than twelve taps. */
+  .wl-stepper {
+    display: flex;
+    align-items: center;
+    flex: none;
+    border: 1px solid var(--divider-color);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--card-background-color);
+  }
+
+  .wl-step-btn {
+    width: 34px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+  }
+
+  .wl-step-btn ha-icon {
+    --mdc-icon-size: 18px;
+  }
+
+  .wl-step-btn:hover:not(:disabled) {
+    background: var(--wl-hover);
+  }
+
+  .wl-step-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .wl-step-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+
+  .wl-step-value {
+    width: 38px;
+    box-sizing: border-box;
+    padding: 0 2px;
+    border: 0;
+    border-left: 1px solid var(--divider-color);
+    border-right: 1px solid var(--divider-color);
+    background: transparent;
+    color: var(--primary-text-color);
+    font-size: 0.84375rem;
+    font-weight: 500;
+    line-height: 36px;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    /* Native spinners duplicate the −/+ buttons and shrink the hit area. */
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .wl-step-value::-webkit-outer-spin-button,
+  .wl-step-value::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .wl-step-value:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Colour override row
+   * ---------------------------------------------------------------- */
+
+  .wl-color-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .wl-color-field {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 10px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+    cursor: pointer;
+  }
+
+  .wl-swatch {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    border: 1px solid var(--divider-color);
+    forced-color-adjust: none;
+  }
+
+  .wl-color-hex {
+    font-size: 0.78125rem;
+    line-height: 1;
+    font-family: ui-monospace, Menlo, monospace;
+    color: var(--primary-text-color);
+  }
+
+  /* The real input is transparent and covers the field, so its own focus ring
+     is invisible — lift the ring onto the field (WCAG 2.4.7). */
+  .wl-color-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .wl-color-field:focus-within {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  .wl-icon-btn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+    color: var(--secondary-text-color);
+    cursor: pointer;
+  }
+
+  .wl-icon-btn:hover:not(:disabled) {
+    background: var(--wl-hover);
+  }
+
+  .wl-icon-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .wl-icon-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Stop block, empty state, add button
+   * ---------------------------------------------------------------- */
+
+  .wl-stop-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .wl-index {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    box-sizing: border-box;
+    border-radius: 11px;
+    background: var(--card-background-color);
+    border: 1px solid var(--divider-color);
+    color: var(--secondary-text-color);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 20px;
+    text-align: center;
+  }
+
+  .wl-empty {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+    text-align: center;
+    padding: 18px 14px;
+    border: 1px dashed var(--divider-color);
+    border-radius: 8px;
+    background: var(--wl-sunken);
+  }
+
+  .wl-empty-title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--primary-text-color);
+  }
+
+  .wl-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    border: 1px dashed var(--divider-color);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--primary-color);
+    font-size: 0.84375rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .wl-add:hover {
+    background: var(--wl-hover);
+  }
+
+  .wl-add:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Station header strip — direct manipulation.
+   *
+   * The bar mocks a physical black sign, so its surfaces are literal
+   * colours rather than theme tokens: themed chrome here would stop the
+   * widget looking like the thing it edits.
+   * ---------------------------------------------------------------- */
+
+  .wl-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 8px 0 4px;
+  }
+
+  .wl-strip-bar {
+    display: flex;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 10px;
+    background: var(--wl-signage-housing);
+    border: 1px solid var(--divider-color);
+  }
+
+  .wl-zone {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px dashed var(--wl-signage-outline);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .wl-zone--selected {
+    border: 2px solid var(--primary-color);
+    background: var(--wl-signage-selected);
+  }
+
+  .wl-zone:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  .wl-zone-tokens {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    width: 100%;
+  }
+
+  /* Right zone right-aligns its tokens so the preview matches how the card
+     lays the two sides out against the centre of the strip. */
+  .wl-zone--right .wl-zone-tokens {
+    justify-content: flex-end;
+  }
+
+  .wl-token {
+    display: flex;
+    align-items: center;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 3px;
+    color: var(--wl-signage-ink);
+    font-size: 0.6875rem;
+    font-weight: 400;
+    line-height: 1;
+    white-space: nowrap;
+    forced-color-adjust: none;
+  }
+
+  .wl-token ha-icon {
+    --mdc-icon-size: 16px;
+  }
+
+  .wl-token--chip {
+    background: var(--wl-signage-chip);
+  }
+
+  .wl-strip-switch {
+    display: flex;
     align-items: center;
     gap: 8px;
   }
-  .walk-time-badge {
-    text-align: center;
-    font-weight: 700;
-    color: #fff;
-    border-radius: 4px;
-    padding: 2px 4px;
-    font-size: 0.9em;
-    background: var(--primary-color);
+
+  /* ---------------------------------------------------------------- *
+   * Segmented control — used by the side switch. Enum config fields use
+   * ha-form's select instead; this exists for editor-local UI state that
+   * never reaches the config.
+   * ---------------------------------------------------------------- */
+
+  .wl-seg {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    background: var(--secondary-background-color);
+    border-radius: 8px;
   }
-  .walk-time-towards {
-    font-size: 0.8125rem;
+
+  .wl-seg-btn {
+    border: 0;
+    cursor: pointer;
+    padding: 8px 12px;
+    min-height: 34px;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--secondary-text-color);
+    font-size: 0.78125rem;
+    font-weight: 500;
+    line-height: 1.2;
+  }
+
+  .wl-seg-btn[aria-pressed="true"] {
+    background: var(--card-background-color);
+    color: var(--primary-color);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+  }
+
+  .wl-seg-btn:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  /* ---------------------------------------------------------------- *
+   * Slot panel — the four fields for whichever side is selected.
+   * ---------------------------------------------------------------- */
+
+  .wl-slot {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--primary-color);
+    border-radius: 10px;
+    background: var(--wl-sunken);
+  }
+
+  .wl-pict-grid,
+  .wl-tray {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .wl-pict {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
     color: var(--primary-text-color);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    cursor: pointer;
   }
-  .walk-time-input {
+
+  .wl-pict ha-icon,
+  .wl-tray-btn ha-icon,
+  .wl-pill ha-icon {
+    --mdc-icon-size: 18px;
+  }
+
+  .wl-pict[aria-pressed="true"],
+  .wl-tray-btn[aria-pressed="true"] {
+    border-color: var(--primary-color);
+    background: var(--wl-ripple);
+    color: var(--primary-color);
+  }
+
+  .wl-pict:hover,
+  .wl-tray-btn:hover {
+    background: var(--wl-hover);
+  }
+
+  .wl-pict:focus-visible,
+  .wl-tray-btn:focus-visible,
+  .wl-pill-x:focus-visible,
+  .wl-text:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+
+  .wl-tray-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--divider-color);
+    border-radius: 8px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 0.78125rem;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .wl-text {
     width: 100%;
     box-sizing: border-box;
-    padding: 4px 8px;
+    min-height: 44px;
+    padding: 0 12px;
     border: 1px solid var(--divider-color);
-    border-radius: 4px;
-    background: var(--card-background-color, transparent);
+    border-radius: 8px;
+    background: var(--card-background-color);
     color: var(--primary-text-color);
     font-size: 0.8125rem;
-    text-align: right;
+    line-height: 1.4;
   }
-`;function Kt(e){e.stopPropagation()}
-// Schema-driven Lovelace editor for the Wiener Linien Austria modern card.
-let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>function(e,t){const i=`ui.panel.lovelace.editor.card.generic.${e.name}`,n=t.hass?.localize?.(i);if(n)return n;const r=t.et(e.name);if(r!==`${t.editorNamespace}.${e.name}`&&r!==e.name)return r;if(t.cardLookup&&t.cardNamespace){const i=t.cardLookup(e.name);if(i!==`${t.cardNamespace}.${e.name}`&&i!==e.name)return i}return e.name}(e,{hass:this.hass,et:e=>this._et(e),editorNamespace:"modern.editor"}),this._computeHelper=e=>function(e,t){const i=`${e.name}_helper`,n=t.et(i);if(n!==`${t.editorNamespace}.${i}`&&n!==i)return n}(e,{et:e=>this._et(e),editorNamespace:"modern.editor"}),this._onFormChanged=e=>{if(!this._config)return;const t=e.detail.value,i=t.entities,n=Array.isArray(i)?i.filter(e=>"string"==typeof e&&e.length>0):[],r=new Map;for(const e of this._config.entities)r.set(e.entity,e);const a=n.map(e=>r.get(e)??{entity:e}),o=pt({...this._config,...t,entities:a});this._fire(o)}}setConfig(e){this._config=pt(e)}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config"))return!0;const t=e.get("hass");if(!t||!this.hass)return!0;const i=this._config.entities.map(e=>e.entity);return i.some(e=>t.states[e]!==this.hass.states[e])}_et(e){return We(`modern.editor.${e}`,{hassLanguage:this.hass?.language})}_t(e){return We(`modern.${e}`,{hassLanguage:this.hass?.language})}_fire(e){var t,i;this._config=e,t="config-changed",i={config:e},this.dispatchEvent(new CustomEvent(t,{detail:i,bubbles:!0,composed:!0}))}_schema(){return[{name:"entities",required:!0,selector:{entity:{multiple:!0,filter:{domain:"sensor",integration:"wiener_linien_austria"}}}},{name:"layout",selector:{select:{mode:"dropdown",options:[{value:"stacked",label:this._et("layout_stacked")},{value:"tabs",label:this._et("layout_tabs")}]}}},{type:"expandable",name:"display",title:this._et("section_display"),flatten:!0,schema:[{name:"max_departures",selector:{number:{min:0,max:20,step:1,mode:"slider"}}},{name:"hide_header",selector:{boolean:{}}},{name:"show_hero_metric",selector:{boolean:{}}},{name:"show_departures",selector:{boolean:{}}},{name:"show_stops_ahead",selector:{boolean:{}}},{name:"show_qr_button",selector:{boolean:{}}},{name:"show_platform",selector:{boolean:{}}},{name:"show_accessibility",selector:{boolean:{}}},{name:"accessibility_only",selector:{boolean:{}}},{name:"show_cooling",selector:{boolean:{}}},{name:"show_type_icon",selector:{boolean:{}}},{name:"show_traffic_info",selector:{boolean:{}}},{name:"show_elevator_info",selector:{boolean:{}}},{name:"show_delay",selector:{boolean:{}}},{name:"show_delay_colors",selector:{boolean:{}}},{name:"hide_attribution",selector:{boolean:{}}}]}]}_formData(){if(!this._config)return{};const e=this._config.entities.map(e=>e.entity);return{...this._config,entities:e}}_updateStop(e,t){if(!this._config)return;const i=this._config.entities.map(i=>i.entity===e?t({...i}):i);this._fire({...this._config,entities:i})}_toggleLine(e,t){this._updateStop(e,e=>{const i=new Set(e.lines??[]);return i.has(t)?i.delete(t):i.add(t),i.size>0?e.lines=[...i]:delete e.lines,e})}_setDirection(e,t){this._updateStop(e,e=>(null===t?delete e.direction:e.direction=t,e))}_setLineDirection(e,t,i){this._updateStop(e,e=>{const n={...e.line_directions??{}};return null===i?delete n[t]:n[t]=i,Object.keys(n).length?e.line_directions=n:delete e.line_directions,e})}_setWalkTime(e,t,i){const n=function(e,t){const i=e.trim(),n=""===i?NaN:Number(i);return""===i||Number.isFinite(n)||console.warn(`[wiener-linien-austria] walk-time "${e}" for ${t} is not a number — clearing`),Number.isFinite(n)&&n>0?Math.min(120,Math.round(n)):null}(i,`${e}/${t}`);this._updateStop(e,e=>{const i={...e.walk_times??{}};return null===n?delete i[t]:i[t]=n,Object.keys(i).length?e.walk_times=i:delete e.walk_times,e})}_setLineColor(e,t){if(!this._config)return;const i={...this._config.line_colors,[e.toUpperCase()]:t};this._fire({...this._config,line_colors:i})}_resetLineColor(e){if(!this._config)return;const t={...this._config.line_colors};delete t[e.toUpperCase()],this._fire({...this._config,line_colors:t})}_attrs(e){return this.hass?.states?.[e]?.attributes}render(){return this._config?q`
-      <div class="editor">
-        <ha-form
-          .hass=${this.hass}
-          .data=${this._formData()}
-          .schema=${this._schema()}
-          .computeLabel=${this._computeLabel}
-          .computeHelper=${this._computeHelper}
-          @value-changed=${this._onFormChanged}
-        ></ha-form>
-        ${this._renderPerStopSections()}
-        ${this._renderColorsSection()}
+
+  .wl-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 6px 0 11px;
+    border: 1px solid var(--divider-color);
+    border-radius: 18px;
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 0.78125rem;
+    line-height: 1;
+  }
+
+  .wl-pill-x {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    border-radius: 12px;
+    background: var(--wl-hover);
+    color: var(--secondary-text-color);
+    cursor: pointer;
+  }
+
+  .wl-pill-x ha-icon {
+    --mdc-icon-size: 14px;
+  }
+`,Vt=o`
+  :host {
+    --wl-sunken: color-mix(in srgb, var(--primary-text-color) 3%, var(--card-background-color));
+    --wl-hover: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+    --wl-ripple: color-mix(in srgb, var(--primary-color) 14%, transparent);
+    /* The signage bar is a mock of a physical black sign, not themed chrome —
+       these stay literal on purpose. Changing them to theme tokens would make
+       the widget stop looking like the thing it is editing. */
+    --wl-signage-housing: #0d0d0d;
+    --wl-signage-selected: #171717;
+    --wl-signage-outline: #3a3a3a;
+    --wl-signage-chip: #2a2a2a;
+    --wl-signage-ink: #f2f2f2;
+  }
+`;function Gt(e,t,i){return j`
+    <div class="wl-tabs" role="tablist">
+      ${e.map((r,n)=>j`<button
+          type="button"
+          class="wl-tab"
+          role="tab"
+          id=${`wl-tab-${r.key}`}
+          aria-selected=${t===r.key?"true":"false"}
+          aria-controls=${`wl-panel-${r.key}`}
+          tabindex=${t===r.key?"0":"-1"}
+          @click=${()=>i(r.key)}
+          @keydown=${t=>((t,r)=>{const n="ArrowRight"===t.key?1:"ArrowLeft"===t.key?-1:0;if(!n)return;t.preventDefault();const a=e[(r+n+e.length)%e.length];a&&i(a.key)})(t,n)}
+        >
+          ${r.label}
+          <span class="wl-tab-underline" aria-hidden="true"></span>
+        </button>`)}
+    </div>
+  `}function Kt(e,t){return j`
+    <section class="wl-section">
+      <header class="wl-section-header">
+        <span class="wl-section-title">${e.title}</span>
+        ${e.hint?j`<span class="wl-section-hint">${e.hint}</span>`:I}
+      </header>
+      <div class="wl-section-body">${t}</div>
+    </section>
+  `}function Qt(e){return Kt(e,j`<ha-form
+      .hass=${e.hass}
+      .data=${e.data}
+      .schema=${e.schema}
+      .computeLabel=${e.computeLabel}
+      .computeHelper=${e.computeHelper}
+      @value-changed=${t=>{t.stopPropagation(),e.onChange(t.detail.value)}}
+    ></ha-form>`)}const Zt={},Yt=me(class extends we{constructor(e){if(super(e),e.type!==ge&&e.type!==fe&&e.type!==_e)throw Error("The `live` directive is not allowed on child or event bindings");if(!(e=>void 0===e.strings)(e))throw Error("`live` bindings can only contain a single expression")}render(e){return e}update(e,[t]){if(t===F||t===I)return t;const i=e.element,r=e.name;if(e.type===ge){if(t===i[r])return F}else if(e.type===_e){if(!!t===i.hasAttribute(r))return F}else if(e.type===fe&&i.getAttribute(r)===t+"")return F;return((e,t=Zt)=>{e._$AH=t})(e),t}});function Jt(e){e.stopPropagation()}const Xt=120;function ei(e,t,i){const r=new Set;for(const n of e)n.direction===t&&(i&&n.line!==i||n.towards&&r.add(n.towards));return[...r].sort()}function ti(e,t){const i=new Set;for(const r of e)t&&r.line!==t||"H"!==r.direction&&"R"!==r.direction||i.add(r.direction);return i}function ii(e,t,i,r){const n=function(e,t){return e?.states?.[t]?.attributes}(e,t.entity),a=!n,o=n?.stop_name||t.entity,s=n?.line_colors??{},l=e=>ft(e,i.lineColorOverrides,s,"#5b6470"),d=vt(n),h=new Set(t.lines??[]),c=function(e){const t=[],i=new Set;for(const r of e?.departures??[]){const e=String(r.direction??""),n=`${r.line}|${e}|${r.towards}`;i.has(n)||(i.add(n),t.push({line:r.line,direction:e,towards:r.towards,type:r.type}))}return t.sort((e,t)=>e.line===t.line?e.towards.localeCompare(t.towards):e.line.localeCompare(t.line)),t}(n),p=new Map;for(const e of n?.departures??[])e.line&&e.type&&!p.has(e.line)&&p.set(e.line,e.type);const u=e=>({full:i.t("H"===e?"dir_h":"dir_r"),short:i.t("H"===e?"dir_h_short":"dir_r_short")});return j`
+    <section class="wl-section">
+      <header class="wl-section-header">
+        ${i.total>1?j`<span class="wl-index" aria-hidden="true">${i.index}</span>`:I}
+        <span class="wl-section-title">${o}</span>
+      </header>
+      <div class="wl-stop-body">
+        ${a?function(e,t,i){return j`
+    <ha-alert alert-type="error">
+      ${t.t("entity_missing").replace("{entity}",e.entity)}
+      ${i.remove?j`<button
+            type="button"
+            slot="action"
+            class="wl-add"
+            @click=${()=>i.remove?.(e.entity)}
+          >
+            ${t.et("remove_stop")}
+          </button>`:I}
+    </ha-alert>
+  `}(t,i,r):I}
+        ${function(e,t,i,r){const{lines:n,picked:a,colorOf:o,typeByLine:s}=r,l=a.size?t.et("lines_selected").replace("{n}",String(a.size)).replace("{total}",String(n.length)):t.et("lines_empty_means_all");return j`
+    <div class="wl-group">
+      <div class="wl-group-head">
+        <span class="wl-label wl-label--grow">${t.et("lines_label")}</span>
+        ${n.length?j`<span class="wl-note">${l}</span>`:I}
       </div>
-    `:I}_renderPerStopSections(){const e=this._config;return e.entities.length?q`${e.entities.map(e=>this._renderStopFilter(e))}`:I}_dirPillStrings(e){return{full:this._t("H"===e?"dir_h":"dir_r"),short:this._t("H"===e?"dir_h_short":"dir_r_short")}}_stopWideDirectionLabel(e,t){const i=new Set;for(const n of e)n.direction===t&&n.towards&&i.add(n.towards);return bt([...i].sort(),this._dirPillStrings(t))}_perLineDirectionLabel(e,t,i){const n=new Set;for(const r of e)r.line===t&&r.direction===i&&r.towards&&n.add(r.towards);return bt([...n].sort(),this._dirPillStrings(i))}_renderStopFilter(e){const t=this._attrs(e.entity);if(!t)return q`
-        <ha-alert alert-type="warning">
-          ${this._t("entity_missing").replace("{entity}",e.entity)}
-        </ha-alert>
-      `;const i=t.stop_name||e.entity,n=this._config.line_colors,r=t.line_colors??{},a=vt(t),o=new Map;for(const e of t.departures??[])e.line&&e.type&&!o.has(e.line)&&o.set(e.line,e.type);const s=new Set(e.lines??[]),l=e.direction??null,d=e.line_directions??{},h=s.size>0?a.filter(e=>s.has(e)):a,c=h.length>=2,p=function(e){const t=[],i=new Set;for(const n of e?.departures??[]){const e=String(n.direction??""),r=`${n.line}|${e}|${n.towards}`;i.has(r)||(i.add(r),t.push({line:n.line,direction:e,towards:n.towards,type:n.type}))}return t.sort((e,t)=>e.line===t.line?e.towards.localeCompare(t.towards):e.line.localeCompare(t.line)),t}(t),u=new Set;for(const e of p)"H"!==e.direction&&"R"!==e.direction||u.add(e.direction);const f=u.has("H"),_=u.has("R"),g=1===u.size,m="H"===l||null===l&&g&&f,w="R"===l||null===l&&g&&_,b=null===l&&!g;return q`
-      <div class="stop-filter">
-        <div class="stop-filter-header">${i}</div>
-
-        <div class="stop-filter-row">
-          <div class="stop-filter-row-label">${this._et("lines_label")}</div>
-          <div class="line-chips">
-            ${a.length?a.map(t=>{const i=0===s.size||s.has(t),a=ft(t,n,r),l=Ve(o.get(t))??"mdi:bus-stop";return q`<button
-                    type="button"
-                    class=${be({chip:!0,selected:i})}
-                    style=${xe({"--chip-color":a})}
-                    aria-pressed=${i?"true":"false"}
-                    aria-label="${this._et("lines_label")}: ${t}"
-                    @click=${()=>this._toggleLine(e.entity,t)}
-                  >
-                    <ha-icon icon=${l} aria-hidden="true"></ha-icon>
-                    <span>${t}</span>
-                  </button>`}):q`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
-          </div>
-        </div>
-
-        <div class="stop-filter-row">
-          <div class="stop-filter-row-label">${this._et("direction_label")}</div>
-          <div class="direction-buttons">
-            <button
-              type="button"
-              class=${be({active:m})}
-              ?disabled=${!f}
-              title=${f?"":this._et("direction_unavailable")}
-              @click=${()=>f&&this._setDirection(e.entity,"H")}
-            >${this._stopWideDirectionLabel(p,"H")}</button>
-            <button
-              type="button"
-              class=${be({active:w})}
-              ?disabled=${!_}
-              title=${_?"":this._et("direction_unavailable")}
-              @click=${()=>_&&this._setDirection(e.entity,"R")}
-            >${this._stopWideDirectionLabel(p,"R")}</button>
-            <button
-              type="button"
-              class=${be({active:b})}
-              ?disabled=${g}
-              title=${g?this._et("direction_unavailable"):""}
-              @click=${()=>!g&&this._setDirection(e.entity,null)}
-            >${this._t("dir_both")}</button>
-          </div>
-        </div>
-
-        ${c?q`
-              <div class="stop-filter-row">
-                <div class="stop-filter-row-label">${this._et("per_line_direction_label")}</div>
-                <div class="editor-hint">${this._et("per_line_direction_hint")}</div>
-                <div class="per-line-dir-list">
-                  ${h.map(t=>{const i=ft(t,n,r),a=d[t]??null,o=(e=>{const t=new Set;for(const i of p)i.line===e&&("H"!==i.direction&&"R"!==i.direction||t.add(i.direction));return t})(t),s=o.has("H"),l=o.has("R"),h=1===o.size,c="H"===a||null===a&&h&&s,u="R"===a||null===a&&h&&l,f=null===a&&!h,_=this._et("per_line_direction_aria").replace("{line}",t),g=this._et("direction_unavailable"),m=e=>this._perLineDirectionLabel(p,t,e);return q`
-                      <div class="per-line-dir-row" role="group" aria-label=${_}>
-                        <span class="per-line-dir-badge" style=${xe({background:i})}>${t}</span>
-                        <div class="direction-buttons">
-                          <button
-                            type="button"
-                            class=${be({active:c})}
-                            aria-pressed=${c?"true":"false"}
-                            ?disabled=${!s}
-                            title=${s?"":g}
-                            @click=${()=>s&&this._setLineDirection(e.entity,t,"H")}
-                          >${m("H")}</button>
-                          <button
-                            type="button"
-                            class=${be({active:u})}
-                            aria-pressed=${u?"true":"false"}
-                            ?disabled=${!l}
-                            title=${l?"":g}
-                            @click=${()=>l&&this._setLineDirection(e.entity,t,"R")}
-                          >${m("R")}</button>
-                          <button
-                            type="button"
-                            class=${be({active:f})}
-                            aria-pressed=${f?"true":"false"}
-                            ?disabled=${h}
-                            title=${h?g:""}
-                            @click=${()=>!h&&this._setLineDirection(e.entity,t,null)}
-                          >${this._t("dir_both")}</button>
-                        </div>
-                      </div>
-                    `})}
-                </div>
-              </div>
-            `:I}
-
-        ${this._renderWalkTimes(e,l,d)}
+      ${n.length?j`<div class="wl-chips">
+            ${n.map(r=>{const n=t.singleLine?a.has(r):0===a.size||a.has(r),l=Ve(s.get(r));return j`<button
+                type="button"
+                class="wl-chip"
+                style=${xe({"--wl-chip-color":o(r)})}
+                aria-pressed=${n?"true":"false"}
+                aria-label=${t.et(n?"line_active_aria":"line_inactive_aria").replace("{line}",r)}
+                @click=${()=>i.toggleLine(e.entity,r)}
+              >
+                ${l?j`<span class="wl-chip-mode"
+                      ><ha-icon icon=${l} aria-hidden="true"></ha-icon
+                    ></span>`:I}
+                ${r}
+              </button>`})}
+          </div>`:j`<div class="wl-empty">
+            <span class="wl-empty-title">${t.et("no_lines_title")}</span>
+            <span class="wl-note">${t.et("no_lines_hint")}</span>
+          </div>`}
+    </div>
+  `}(t,i,r,{lines:d,picked:h,colorOf:l,typeByLine:p})}
+        ${!a&&d.length?function(e,t,i,r){const{triplets:n,picked:a,lines:o,dirStrings:s}=r,l=e.direction??null,d=ti(n),h=d.has("H"),c=d.has("R"),p=1===d.size,u="H"===l||null===l&&p&&h,f="R"===l||null===l&&p&&c,g=null===l&&!p,_=e=>function(e,t){return 0===e.size||e.has(t)}(d,e)?bt(ei(n,e),s(e)):`${s(e).short}: ${t.et("direction_not_served")}`,m=[...a][0]??o[0],w=c?"":t.et("direction_note_one_way").replace("{line}",m??"");return j`
+    <div class="wl-group">
+      <span class="wl-label">${t.et("direction_label")}</span>
+      <div class="wl-dirs">
+        ${ri({label:_("H"),active:u,disabled:!h,title:h?t.t("dir_h"):t.et("direction_unavailable"),onClick:()=>i.setDirection(e.entity,"H")})}
+        ${ri({label:_("R"),active:f,disabled:!c,title:c?t.t("dir_r"):t.et("direction_unavailable"),onClick:()=>i.setDirection(e.entity,"R")})}
+        ${t.singleLine?I:ri({label:t.t("dir_both"),active:g,disabled:p,title:p?t.et("direction_unavailable"):t.t("dir_both"),onClick:()=>i.setDirection(e.entity,null)})}
       </div>
-    `}_renderWalkTimes(e,t,i){const n=this._config.line_colors,r=this._attrs(e.entity),a=r?.line_colors??{},o=function(e){const t=new Map;for(const i of e?.departures??[]){const e=String(i.direction??""),n=wt(i.line,e);let r=t.get(n);r||(r={line:i.line,direction:e,type:i.type,termini:[]},t.set(n,r)),i.towards&&!r.termini.includes(i.towards)&&r.termini.push(i.towards)}const i=Array.from(t.values());return i.sort((e,t)=>e.line===t.line?e.direction.localeCompare(t.direction):e.line.localeCompare(t.line)),i}(r),s=new Set(e.lines??[]),l=o.filter(e=>{if(s.size>0&&!s.has(e.line))return!1;const n=i[e.line]??t;return!n||e.direction===n});return l.length?q`
-      <div class="stop-filter-row">
-        <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
-        <div class="editor-hint">${this._et("walk_time_hint")}</div>
-        <div class="walk-time-list">
-          ${l.map(t=>{const i=ft(t.line,n,a),r=wt(t.line,t.direction),o=e.walk_times?.[r],s=t.termini.join(" / "),l=s?`→ ${s}`:"",d=t.termini.length>1?this._et("walk_time_branching_hint"):"";return q`
-              <div class="walk-time-row">
-                <span class="walk-time-badge" style=${xe({background:i})}>${t.line}</span>
-                <span class="walk-time-towards" title=${d||s}>${l}</span>
+      ${w?j`<span class="wl-note">${w}</span>`:I}
+    </div>
+  `}(t,i,r,{triplets:c,picked:h,lines:d,dirStrings:u}):I}
+        ${a||i.singleLine?I:function(e,t,i,r){const{triplets:n,picked:a,lines:o,colorOf:s,dirStrings:l}=r,d=a.size>0?o.filter(e=>a.has(e)):o;if(d.length<2)return I;const h=e.line_directions??{},c=e.direction??null;return j`
+    <div class="wl-group wl-divide">
+      <span class="wl-label">${t.et("per_line_direction_label")}</span>
+      ${d.map(r=>{const a=ti(n,r),o=h[r]??null,d=a.has("H"),c=a.has("R"),p=1===a.size,u=e=>t.et("per_line_direction_aria").replace("{line}",r).replace("{direction}",null===e?t.t("dir_both"):bt(ei(n,e,r),l(e)));return j`
+          <div class="wl-override-row">
+            <span class="wl-badge" style=${xe({background:s(r)})}
+              >${r}</span
+            >
+            <div class="wl-dirs">
+              ${ri({label:l("H").short,active:"H"===o||null===o&&p&&d,disabled:!d,compact:!0,title:ei(n,"H",r).join(" / ")||t.t("dir_h"),ariaLabel:u("H"),onClick:()=>i.setLineDirection(e.entity,r,"H")})}
+              ${ri({label:l("R").short,active:"R"===o||null===o&&p&&c,disabled:!c,compact:!0,title:ei(n,"R",r).join(" / ")||t.t("dir_r"),ariaLabel:u("R"),onClick:()=>i.setLineDirection(e.entity,r,"R")})}
+              ${ri({label:"",icon:"mdi:swap-horizontal",active:null===o&&!p,disabled:p,compact:!0,title:t.t("dir_both"),ariaLabel:u(null),onClick:()=>i.setLineDirection(e.entity,r,null)})}
+            </div>
+          </div>
+        `})}
+      ${null===c?I:j`<span class="wl-note">${t.et("per_line_direction_hint")}</span>`}
+    </div>
+  `}(t,i,r,{triplets:c,picked:h,lines:d,colorOf:l,dirStrings:u})}
+        ${a?I:function(e,t,i,r){const{attrs:n,picked:a,colorOf:o}=r,s=e.line_directions??{},l=e.direction??null,d=function(e){const t=new Map;for(const i of e?.departures??[]){const e=String(i.direction??""),r=wt(i.line,e);let n=t.get(r);n||(n={line:i.line,direction:e,type:i.type,termini:[]},t.set(r,n)),i.towards&&!n.termini.includes(i.towards)&&n.termini.push(i.towards)}const i=Array.from(t.values());return i.sort((e,t)=>e.line===t.line?e.direction.localeCompare(t.direction):e.line.localeCompare(t.line)),i}(n).filter(e=>{if(a.size>0&&!a.has(e.line))return!1;const t=s[e.line]??l;return!t||e.direction===t});return d.length?j`
+    <div class="wl-group wl-divide">
+      <div class="wl-group-head">
+        <span class="wl-label wl-label--grow">${t.et("section_walk_time")}</span>
+        <span class="wl-note">${t.et("walk_time_unit")}</span>
+      </div>
+      <span class="wl-note">${t.et("walk_time_hint")}</span>
+      <div class="wl-walk-list">
+        ${d.map(r=>{const n=wt(r.line,r.direction),a=e.walk_times?.[n],s=r.termini.join(" / "),l=t.et("walk_time_aria").replace("{line}",r.line).replace("{towards}",s),d=t=>{const r=(a??0)+t;i.setWalkTime(e.entity,n,r<1?null:Math.min(Xt,r))};return j`
+            <div class="wl-walk-row">
+              <span class="wl-badge" style=${xe({background:o(r.line)})}
+                >${r.line}</span
+              >
+              <span
+                class="wl-walk-dest"
+                title=${r.termini.length>1?t.et("walk_time_branching_hint"):s}
+                >→ ${s}</span
+              >
+              <span class="wl-stepper">
+                <button
+                  type="button"
+                  class="wl-step-btn"
+                  ?disabled=${void 0===a}
+                  aria-label=${t.et("walk_time_less_aria").replace("{line}",r.line)}
+                  @click=${()=>d(-1)}
+                >
+                  <ha-icon icon="mdi:minus" aria-hidden="true"></ha-icon>
+                </button>
                 <input
                   type="number"
-                  class="walk-time-input"
-                  min="0"
-                  max="120"
+                  class="wl-step-value"
+                  min=${1}
+                  max=${Xt}
                   step="1"
                   inputmode="numeric"
-                  placeholder=${this._et("walk_time_placeholder")}
-                  aria-label=${this._et("walk_time_aria").replace("{line}",t.line).replace("{towards}",s)}
-                  .value=${Vt(void 0!==o?String(o):"")}
-                  @keydown=${Kt}
-                  @keyup=${Kt}
-                  @keypress=${Kt}
-                  @change=${t=>this._setWalkTime(e.entity,r,t.target.value)}
+                  placeholder=${t.et("walk_time_placeholder")}
+                  aria-label=${l}
+                  .value=${Yt(void 0!==a?String(a):"")}
+                  @keydown=${Jt}
+                  @keyup=${Jt}
+                  @keypress=${Jt}
+                  @change=${t=>i.setWalkTime(e.entity,n,function(e,t){const i=e.trim(),r=""===i?NaN:Number(i);return""===i||Number.isFinite(r)||console.warn(`[wiener-linien-austria] walk-time "${e}" for ${t} is not a number — clearing`),Number.isFinite(r)&&r>0?Math.min(120,Math.round(r)):null}(t.target.value,`${e.entity}/${n}`))}
                 />
-              </div>
-            `})}
-        </div>
+                <button
+                  type="button"
+                  class="wl-step-btn"
+                  ?disabled=${(a??0)>=Xt}
+                  aria-label=${t.et("walk_time_more_aria").replace("{line}",r.line)}
+                  @click=${()=>d(1)}
+                >
+                  <ha-icon icon="mdi:plus" aria-hidden="true"></ha-icon>
+                </button>
+              </span>
+            </div>
+          `})}
       </div>
-    `:I}_renderColorsSection(){const e=this._config,t=function(e,t){const i=new Set;for(const n of t){const t=e?.states?.[n]?.attributes;for(const e of vt(t))i.add(e)}return Array.from(i).sort()}(this.hass,e.entities.map(e=>e.entity)),i=e.line_colors,n=mt(this.hass,e.entities.map(e=>e.entity));return q`
-      <div class="editor-section">
-        <div class="section-header">${this._et("section_colors")}</div>
-        <div class="editor-hint">${this._et("colors_hint")}</div>
-        ${t.length?t.map(e=>{const t=ft(e,i,n,"#888888"),r=t.startsWith("#")?t:"#888888",a=Boolean(i[e.toUpperCase()]),o=this._et("pick_color_for_line").replace("{line}",e);return q`
-                <div class="color-row">
-                  <span class="line-preview" aria-hidden="true" style=${xe({background:t})}>${e}</span>
-                  <label
-                    class="color-swatch"
-                    style=${xe({"--swatch-color":r})}
-                    title=${o}
+    </div>
+  `:I}
+// Lovelace editor for the Wiener Linien Austria modern card (v2 editor system).
+(t,i,r,{attrs:n,picked:h,colorOf:l})}
+      </div>
+    </section>
+  `}function ri(e){return j`<button
+    type="button"
+    class=${be({"wl-dir":!0,"wl-dir--compact":!!e.compact})}
+    aria-pressed=${e.active?"true":"false"}
+    aria-disabled=${e.disabled?"true":"false"}
+    aria-label=${e.ariaLabel??e.label}
+    title=${e.title}
+    @click=${t=>{e.disabled?t.preventDefault():e.onClick()}}
+  >
+    ${e.icon?j`<ha-icon icon=${e.icon} aria-hidden="true"></ha-icon>`:e.label}
+  </button>`}let ni=class extends se{constructor(){super(...arguments),this._tab="stops",this._onEntitiesChanged=e=>{if(e.stopPropagation(),!this._config)return;const t=e.detail.value.entities,i=Array.isArray(t)?t.filter(e=>"string"==typeof e&&e.length>0):[],r=new Map(this._config.entities.map(e=>[e.entity,e]));this._commit(pt({...this._config,entities:i.map(e=>r.get(e)??{entity:e})}))},this._computeLabel=e=>{const t=this.hass?.localize?.(`ui.panel.lovelace.editor.card.generic.${e.name}`);return t||this._i18n.et(e.name)},this._computeHelper=e=>{const{et:t}=this._i18n,i=this._config;if("accessibility_only"===e.name&&!i?.show_accessibility)return t("accessibility_only_requires");if("show_delay_colors"===e.name&&!i?.show_delay)return t("show_delay_colors_requires");if("layout"===e.name&&(i?.entities.length??0)<2)return t("layout_requires");const r=`${e.name}_helper`,n=t(r);return n===r?void 0:n}}setConfig(e){this._config=pt(e)}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config")||e.has("_tab"))return!0;const t=e.get("hass");if(!t||!this.hass)return!0;const i=this._config.entities.map(e=>e.entity);return i.some(e=>t.states[e]!==this.hass.states[e])}get _i18n(){return function(e,t){const i={hassLanguage:t};return{t:t=>We(`${e}.${t}`,i),et:t=>{const r=`${e}.editor.${t}`,n=We(r,i);if(n!==r)return n;const a=`common.editor.${t}`,o=We(a,i);return o===a?t:o}}}("modern",this.hass?.language)}_commit(e){var t,i;this._config=e,t="config-changed",i={config:e},this.dispatchEvent(new CustomEvent(t,{detail:i,bubbles:!0,composed:!0}))}_patch(e){this._config&&this._commit(pt({...this._config,...e}))}_updateStop(e,t){if(!this._config)return;const i=this._config.entities.map(i=>i.entity===e?t({...i}):i);this._commit({...this._config,entities:i})}get _stopCallbacks(){return{toggleLine:(e,t)=>this._updateStop(e,e=>{const i=new Set(e.lines??[]);return i.has(t)?i.delete(t):i.add(t),i.size?e.lines=[...i]:delete e.lines,e}),setDirection:(e,t)=>this._updateStop(e,e=>(null===t?delete e.direction:e.direction=t,e)),setLineDirection:(e,t,i)=>this._updateStop(e,e=>{const r={...e.line_directions??{}};return null===i?delete r[t]:r[t]=i,Object.keys(r).length?e.line_directions=r:delete e.line_directions,e}),setWalkTime:(e,t,i)=>this._updateStop(e,e=>{const r={...e.walk_times??{}};return null===i?delete r[t]:r[t]=i,Object.keys(r).length?e.walk_times=r:delete e.walk_times,e}),remove:e=>{this._config&&this._commit({...this._config,entities:this._config.entities.filter(t=>t.entity!==e)})}}}render(){if(!this._config)return I;const{et:e}=this._i18n;return j`
+      <div class="wl-editor">
+        ${Gt([{key:"stops",label:e("tab_stops")},{key:"display",label:e("tab_display")},{key:"tweaks",label:e("tab_tweaks")}],this._tab,e=>{this._tab=e})}
+        ${t=this._tab,i=this._renderActiveTab(),j`
+    <div
+      class=${"stops"===t?"wl-panel wl-panel--stops":"wl-panel"}
+      role="tabpanel"
+      id=${`wl-panel-${t}`}
+      aria-labelledby=${`wl-tab-${t}`}
+    >
+      ${i}
+    </div>
+  `}
+      </div>
+    `;var t,i}_renderActiveTab(){switch(this._tab){case"stops":return this._renderStops();case"display":return this._renderDisplay();case"tweaks":return this._renderColors()}}_renderStops(){const e=this._config,{t:t,et:i}=this._i18n;return j`
+      <ha-form
+        .hass=${this.hass}
+        .data=${{entities:e.entities.map(e=>e.entity)}}
+        .schema=${[{name:"entities",required:!0,selector:{entity:{multiple:!0,filter:{domain:"sensor",integration:"wiener_linien_austria"}}}}]}
+        .computeLabel=${this._computeLabel}
+        .computeHelper=${this._computeHelper}
+        @value-changed=${this._onEntitiesChanged}
+      ></ha-form>
+      ${e.entities.map((r,n)=>ii(this.hass,r,{index:n+1,total:e.entities.length,lineColorOverrides:e.line_colors,t:t,et:i},this._stopCallbacks))}
+    `}_renderDisplay(){const e=this._config,{et:t}=this._i18n,i={hass:this.hass,computeLabel:this._computeLabel,computeHelper:this._computeHelper,onChange:e=>this._patch(e)};return j`
+      ${Qt({...i,title:t("section_layout"),hint:t("section_layout_hint"),data:{layout:e.layout,max_departures:e.max_departures,hide_header:e.hide_header,show_hero_metric:e.show_hero_metric,show_departures:e.show_departures,show_stops_ahead:e.show_stops_ahead,show_qr_button:e.show_qr_button},schema:[{name:"layout",disabled:e.entities.length<2,selector:{select:{mode:"dropdown",options:[{value:"stacked",label:t("layout_stacked")},{value:"tabs",label:t("layout_tabs")}]}}},{name:"max_departures",selector:{number:{min:0,max:20,step:1,mode:"slider"}}},{name:"hide_header",selector:{boolean:{}}},{name:"show_hero_metric",selector:{boolean:{}}},{name:"show_departures",selector:{boolean:{}}},{name:"show_stops_ahead",selector:{boolean:{}}},{name:"show_qr_button",selector:{boolean:{}}}]})}
+      ${Qt({...i,title:t("section_departure_row"),hint:t("section_departure_row_hint"),data:{show_platform:e.show_platform,show_accessibility:e.show_accessibility,accessibility_only:e.accessibility_only,show_cooling:e.show_cooling,show_type_icon:e.show_type_icon},schema:[{name:"show_platform",selector:{boolean:{}}},{name:"show_accessibility",selector:{boolean:{}}},{name:"accessibility_only",disabled:!e.show_accessibility,selector:{boolean:{}}},{name:"show_cooling",selector:{boolean:{}}},{name:"show_type_icon",selector:{boolean:{}}}]})}
+      ${Qt({...i,title:t("section_disruptions"),data:{show_traffic_info:e.show_traffic_info,show_elevator_info:e.show_elevator_info,show_delay:e.show_delay,show_delay_colors:e.show_delay_colors,hide_attribution:e.hide_attribution},schema:[{name:"show_traffic_info",selector:{boolean:{}}},{name:"show_elevator_info",selector:{boolean:{}}},{name:"show_delay",selector:{boolean:{}}},{name:"show_delay_colors",disabled:!e.show_delay,selector:{boolean:{}}},{name:"hide_attribution",selector:{boolean:{}}}]})}
+    `}_renderColors(){const e=this._config,{et:t}=this._i18n,i=e.entities.map(e=>e.entity),r=function(e,t){const i=new Set;for(const r of t){const t=e?.states?.[r]?.attributes;for(const e of vt(t))i.add(e)}return Array.from(i).sort()}(this.hass,i),n=mt(this.hass,i);return Kt({title:t("section_colors"),hint:t("section_colors_hint")},r.length?j`<div class="wl-group">
+            <span class="wl-note">${t("colors_hint")}</span>
+            ${r.map(i=>{const r=ft(i,e.line_colors,n,"#888888"),a=r.startsWith("#")?r:"#888888",o=Boolean(e.line_colors[i.toUpperCase()]),s=t("pick_color_for_line").replace("{line}",i);return j`
+                <div class="wl-color-row">
+                  <span
+                    class="wl-badge"
+                    style=${xe({background:r})}
+                    aria-hidden="true"
+                    >${i}</span
                   >
-                    <ha-icon icon="mdi:palette-swatch-variant" aria-hidden="true"></ha-icon>
-                    <span class="color-swatch-hex">${r.toUpperCase()}</span>
+                  <label class="wl-color-field" title=${s}>
+                    <span
+                      class="wl-swatch"
+                      style=${xe({background:a})}
+                      aria-hidden="true"
+                    ></span>
+                    <span class="wl-color-hex">${a.toUpperCase()}</span>
                     <input
                       type="color"
-                      class="color-swatch-input"
-                      .value=${r}
-                      aria-label=${o}
-                      @input=${t=>this._setLineColor(e,t.target.value)}
-                      @change=${t=>this._setLineColor(e,t.target.value)}
+                      class="wl-color-input"
+                      .value=${a}
+                      aria-label=${s}
+                      @input=${e=>this._setLineColor(i,e.target.value)}
+                      @change=${e=>this._setLineColor(i,e.target.value)}
                     />
                   </label>
                   <button
                     type="button"
-                    class="reset-btn"
-                    ?disabled=${!a}
-                    @click=${()=>a&&this._resetLineColor(e)}
-                  >${this._et("reset_color")}</button>
+                    class="wl-icon-btn"
+                    ?disabled=${!o}
+                    aria-label=${t("reset_color_aria").replace("{line}",i)}
+                    title=${t("reset_color")}
+                    @click=${()=>this._resetLineColor(i)}
+                  >
+                    <ha-icon icon="mdi:restore" aria-hidden="true"></ha-icon>
+                  </button>
                 </div>
-              `}):q`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
-      </div>
-    `}static{this.styles=[Gt,o`
-    .stop-filter {
-      background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
-      border-radius: 12px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .stop-filter-header {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--primary-text-color);
-    }
-    .stop-filter-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .stop-filter-row-label {
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: var(--primary-text-color);
-    }
-    .line-chips,
-    .per-line-dir-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .per-line-dir-list {
-      flex-direction: column;
-      gap: 4px;
-    }
-    .per-line-dir-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .per-line-dir-badge {
-      min-width: 36px;
-      text-align: center;
-      font-weight: 700;
-      color: #fff;
-      border-radius: 4px;
-      padding: 2px 6px;
-      font-size: 0.8125rem;
-    }
-    /* Line chip — outlined-by-default, filled-when-selected, with the
-       MoT icon beside the line label. Mirrors linz-linien's chip
-       pattern: --chip-color is set inline per line (GTFS palette →
-       colorForLine), the CSS does state via .selected + the
-       color-mix hover tint. */
-    .chip {
-      --chip-color: var(--primary-color);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      min-height: 32px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      cursor: pointer;
-      transition:
-        background-color var(--ha-animation-duration-fast, 150ms) ease,
-        color var(--ha-animation-duration-fast, 150ms) ease;
-      border: 1.5px solid var(--chip-color);
-      background: transparent;
-      color: var(--primary-text-color);
-      forced-color-adjust: none;
-    }
-    .chip ha-icon {
-      --mdc-icon-size: 16px;
-      color: var(--chip-color);
-      flex-shrink: 0;
-      transition: color var(--ha-animation-duration-fast, 150ms) ease;
-    }
-    .chip:hover {
-      background: color-mix(in srgb, var(--chip-color) 16%, transparent);
-    }
-    .chip.selected {
-      background: var(--chip-color);
-      color: #fff;
-    }
-    .chip.selected ha-icon {
-      color: #fff;
-    }
-    .chip:focus-visible {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-    }
-    .direction-buttons {
-      display: inline-flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .direction-buttons button {
-      padding: 8px 14px;
-      border-radius: 18px;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color, #fff);
-      color: var(--primary-text-color);
-      font-size: 0.8125rem;
-      cursor: pointer;
-      min-width: 44px;
-      min-height: 36px;
-    }
-    .direction-buttons button.active {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
-      border-color: var(--primary-color);
-    }
-    .direction-buttons button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    /* walk-time rules live in editor-shared-styles. The modern editor
-       styles its badge bg per-line via styleMap (vs the shared default
-       var(--primary-color)), but the box-model rules are identical. */
-    .color-row {
-      display: grid;
-      grid-template-columns: 60px 1fr auto;
-      align-items: center;
-      gap: 12px;
-      margin-top: 6px;
-    }
-    .line-preview {
-      text-align: center;
-      font-weight: 700;
-      color: #fff;
-      border-radius: 6px;
-      padding: 4px 6px;
-      font-size: 0.8125rem;
-    }
-    .color-swatch {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color, #fff);
-      cursor: pointer;
-    }
-    .color-swatch::before {
-      content: "";
-      width: 16px;
-      height: 16px;
-      border-radius: 4px;
-      background: var(--swatch-color, #888888);
-    }
-    .color-swatch-hex {
-      font-size: 0.75rem;
-      font-variant-numeric: tabular-nums;
-      color: var(--secondary-text-color);
-    }
-    .color-swatch-input {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-    }
-    /* The real <input type="color"> is opacity:0, so its own focus ring
-       is invisible — lift the ring onto the label for keyboard users
-       (WCAG 2.4.7 Focus Visible). */
-    .color-swatch:focus-within {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-    }
-    .reset-btn {
-      padding: 6px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--divider-color);
-      background: transparent;
-      color: var(--primary-text-color);
-      font-size: 0.75rem;
-      cursor: pointer;
-    }
-    .reset-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-  `]}};var Zt;e([pe({attribute:!1})],Qt.prototype,"hass",void 0),e([ue()],Qt.prototype,"_config",void 0),Qt=e([de("wiener-linien-austria-card-editor")],Qt);{const e=window;e.customCards=e.customCards??[],e.customCards.some(e=>"wiener-linien-austria-card"===e.type)||e.customCards.push({type:"wiener-linien-austria-card",name:"Wiener Linien Austria",description:"Abfahrtsmonitor mit Störungen und Aufzugsinfo",preview:!0,getEntitySuggestion:(e,t)=>t.startsWith("sensor.")?"wiener_linien_austria"!==e?.entities?.[t]?.platform?null:{config:{type:"custom:wiener-linien-austria-card",entities:[t]}}:null})}function Yt(e){return e===Ie?"platform_short_rail":"platform_short_bus"}const Jt=new Map;let Xt=class extends se{constructor(){super(...arguments),this._activeTab=0,this._versionMismatch=null,this._expandedTraffic=new Set,this._expandedElevator=new Set,this._expandedRows=new Set,this._expandedTransfers=new Set,this._debugTraffic=[],this._debugElevator=[],this._qrOpenFor=null,this._devPaletteOpen=!1,this._versionCheckDone=!1,this._fallbackWarned=!1,this._resolvedStopsMemo=null,this._nightlineHourMemo=null,this._devTogglePalette=()=>{this._devPaletteOpen=!this._devPaletteOpen},this._devTrafficVariant=0,this._devElevatorVariant=0,this._devTestTraffic=()=>{const e=this._resolveStops(),t=[];for(const i of e)for(const e of this._attrs(i.entity).departures??[])e.line&&e.towards&&t.push(e);const i=this._randomFrom(t),n=i?.line||"U?",r=i?.towards||"Unbekannt",a=new Date,o=Zt.DEV_TRAFFIC_SHAPES,s=o[this._devTrafficVariant%o.length];this._devTrafficVariant+=1;const l=s.html(n,r);this._debugTraffic=[...this._debugTraffic,{name:`DEBUG-T-${Date.now()}`,title:`${n}: ${s.label}`,description:l.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim(),description_html:l,location:"Debug-Stelle",related_lines:[n],time_start:new Date(a.getTime()-18e5).toISOString(),time_end:new Date(a.getTime()+108e5).toISOString(),time_created:new Date(a.getTime()-18e5).toISOString(),time_last_update:a.toISOString(),status:"active"}]},this._devTestElevator=()=>{const e=this._resolveStops(),t=this._randomFrom(e);if(!t)return;const i=this._attrs(t.entity),n=i.stop_name||t.entity,r=i.departures??[],a=this._randomFrom(r),o=a?.line||"",s=a?.towards||"Unbekannt",l=new Date,d=[{description:`${o||"U3"} Mittelbahnsteig - Zwischengeschoss Zugang ${n} - Ausgang ${n}`,reason:"Aufzug ist wegen Bauarbeiten bis 03.08.2026 außer Betrieb!"},{description:`${o||"U6"} Bahnsteig Richtung ${s} - Ausgang ${n}`,reason:"An der Instandsetzung wird bereits gearbeitet."},{description:`Ausgang ${n}`,reason:"Der Aufzug steht aus nicht näher bekannter Ursache still."}],h=d[this._devElevatorVariant%d.length];this._devElevatorVariant+=1,this._debugElevator=[...this._debugElevator,{__debug_entity:t.entity,name:`DEBUG-E-${Date.now()}`,station:n,description:h.description,reason:h.reason,status:"außer Betrieb",related_lines:o?[o]:[],time_start:new Date(l.getTime()-27e5).toISOString(),time_end:new Date(l.getTime()+144e5).toISOString()}]},this._devClear=()=>{this._debugTraffic=[],this._debugElevator=[],this._devPaletteOpen=!1}}static{Zt=this}setConfig(e){if(!e||"object"!=typeof e)throw new Error("wiener-linien-austria-card: config must be an object");const t=Array.isArray(e.entities),i="string"==typeof e.entity;if(!t&&!i)throw new Error("wiener-linien-austria-card: 'entities' (array) or legacy 'entity' (string) is required");const n=pt(e);if((Array.isArray(e.entities)?e.entities.length:i?1:0)>0&&0===n.entities.length)throw new Error("wiener-linien-austria-card: every configured entity was rejected (must start with `sensor.`) — see browser console for per-entry details");this._config=n,this._expandedRows=new Set,this._expandedTraffic=new Set,this._expandedElevator=new Set,this._expandedTransfers=new Set,this._qrOpenFor=null,this._activeTab=0,this._fallbackWarned=!1,this._debugTraffic=[],this._debugElevator=[]}getCardSize(){const e=this._config?.entities.length??1;return Math.min(12,3+3*e)}getGridOptions(){return{columns:12,rows:"auto",min_columns:6,min_rows:3}}static getConfigElement(){return document.createElement("wiener-linien-austria-card-editor")}static getStubConfig(e){const t=_t(e)[0];return{entities:t?[t]:[],max_departures:6}}connectedCallback(){super.connectedCallback(),function(){if("undefined"==typeof document)return;if(document.getElementById(ze))return;const e=document.createElement("style");e.id=ze,e.textContent='\n@font-face {\n  font-family: "WL Sans";\n  src: url("/wiener-linien-austria/fonts/wl-sans-regular.woff2") format("woff2");\n  font-weight: 400;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Sans";\n  src: url("/wiener-linien-austria/fonts/wl-sans-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Sans Condensed";\n  src: url("/wiener-linien-austria/fonts/wl-sans-condensed-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Mono";\n  src: url("/wiener-linien-austria/fonts/wl-mono-regular.woff2") format("woff2");\n  font-weight: 400;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Mono";\n  src: url("/wiener-linien-austria/fonts/wl-mono-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n',document.head.appendChild(e)}(),!this._versionCheckDone&&this.hass?.callWS&&(this._versionCheckDone=!0,this._checkCardVersion())}willUpdate(e){if(this._resolvedStopsMemo=null,this._nightlineHourMemo=null,this._config&&(e.has("_config")||e.has("hass"))){const e=this._resolveStops();if(e.length&&this._activeTab>=e.length&&(this._activeTab=0),this._qrOpenFor){const t=new Set(e.map(e=>e.entity));t.has(this._qrOpenFor)||(this._qrOpenFor=null)}}}updated(e){if(!e.has("_qrOpenFor")&&!e.has("hass")&&!e.has("_config"))return;if(!this._qrOpenFor)return;const t=this.renderRoot.querySelector(".qr-panel.expanded .qr-canvas");if(!t)return;const i=t.getAttribute("data-qr-text")??"",n=t.getAttribute("data-qr-rendered-for")??"";i&&i!==n&&(this._renderTintedQr(t),t.setAttribute("data-qr-rendered-for",i))}_renderTintedQr(e){const t=e.closest(".station"),i=t&&getComputedStyle(t).getPropertyValue("--wl-accent").trim()||"#000";for(;e.firstChild;)e.removeChild(e.firstChild);Se.render({text:e.getAttribute("data-qr-text")??"",radius:0,ecLevel:"H",fill:i,background:"#fff",size:220},e);const n=e.querySelector("canvas");if(!(n instanceof HTMLCanvasElement))return void console.error("[wiener-linien-austria-card] QR canvas unavailable");const r=n.getContext("2d");if(!r)return void console.error("[wiener-linien-austria-card] QR canvas unavailable");const a=e.getAttribute("data-qr-icon")??"mdi:bus-stop",o=this._mdiPathFor(a);if(!o)return;const s=n.width,l=n.height,d=Math.round(.22*s),h=Math.round((s-d)/2),c=Math.round((l-d)/2),p=Math.round(.18*d),u=h-p,f=c-p,_=d+2*p,g=Math.round(.2*d);r.fillStyle="#fff","function"==typeof r.roundRect?(r.beginPath(),r.roundRect(u,f,_,_,g),r.fill()):r.fillRect(u,f,_,_),r.save(),r.translate(h,c),r.scale(d/24,d/24),r.fillStyle=i,r.fill(new Path2D(o)),r.restore()}_mdiPathFor(e){switch(e){case"mdi:subway-variant":return"M18,11H13V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M11,11H6V6H11M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M12,2C7.58,2 4,2.5 4,6V15.5A3.5,3.5 0 0,0 7.5,19L6,20.5V21H18V20.5L16.5,19A3.5,3.5 0 0,0 20,15.5V6C20,2.5 16.42,2 12,2Z";case"mdi:tram":return"M19,16.94V8.5C19,5.71 16.39,5.1 13,5L13.75,3.5H17V2H7V3.5H11.75L11,5C7.86,5.11 5,5.73 5,8.5V16.94C5,18.39 6.19,19.6 7.59,19.91L6,21.5V22H8.23L10.23,20H14L16,22H18V21.5L16.5,20H16.42C18.11,20 19,18.63 19,16.94M12,18.5A1.5,1.5 0 0,1 10.5,17A1.5,1.5 0 0,1 12,15.5A1.5,1.5 0 0,1 13.5,17A1.5,1.5 0 0,1 12,18.5M17,14H7V9H17V14Z";case"mdi:bus":return"M18,11H6V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16Z";default:return"M22 7V16C22 16.71 21.62 17.36 21 17.72V19.25C21 19.66 20.66 20 20.25 20H19.75C19.34 20 19 19.66 19 19.25V18H12V19.25C12 19.66 11.66 20 11.25 20H10.75C10.34 20 10 19.66 10 19.25V17.72C9.39 17.36 9 16.71 9 16V7C9 4 12 4 15.5 4S22 4 22 7M13 15C13 14.45 12.55 14 12 14S11 14.45 11 15 11.45 16 12 16 13 15.55 13 15M20 15C20 14.45 19.55 14 19 14S18 14.45 18 15 18.45 16 19 16 20 15.55 20 15M20 7H11V11H20V7M7 9.5C6.97 8.12 5.83 7 4.45 7.05C3.07 7.08 1.97 8.22 2 9.6C2.03 10.77 2.86 11.77 4 12V20H5V12C6.18 11.76 7 10.71 7 9.5Z"}}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config")||e.has("_activeTab")||e.has("_versionMismatch")||e.has("_expandedTraffic")||e.has("_expandedElevator")||e.has("_expandedRows")||e.has("_expandedTransfers")||e.has("_qrOpenFor")||e.has("_debugTraffic")||e.has("_debugElevator"))return!0;const t=e.get("hass");if(!t||!this.hass)return!0;const i=this._resolveStops().map(e=>e.entity);return i.some(e=>t.states[e]!==this.hass.states[e])}_lang(){return this.hass?.language?.startsWith("de")?"de":"en"}_t(e,t){return We(`modern.${e}`,{hassLanguage:this.hass?.language},t)}async _checkCardVersion(){try{this._versionMismatch=await async function(e,t,i){if(!e?.callWS)return null;try{const n=await e.callWS({type:t});if(n?.version&&n.version!==i)return n.version}catch{}return null}(this.hass,"wiener_linien_austria/card_version","1.8.1")}catch(e){console.warn("[wiener-linien-austria-card] version probe failed",e)}}_resolveStops(){if(null!==this._resolvedStopsMemo)return this._resolvedStopsMemo;const e=this._computeResolvedStops();return this._resolvedStopsMemo=e,e}_computeResolvedStops(){const e=(this._config?.entities??[]).filter(e=>this.hass?.states?.[e.entity]);if(e.length)return e;const t=_t(this.hass)[0];if(t){if(!this._fallbackWarned&&(this._config?.entities?.length??0)>0){this._fallbackWarned=!0;const e=this._config?.entities.map(e=>e.entity).join(", ");console.warn(`[wiener-linien-austria-card] configured entity "${e}" not in hass.states; falling back to "${t}"`)}return[{entity:t}]}return[]}_attrs(e){return this.hass?.states?.[e]?.attributes??{}}render(){if(!this._config)return I;if(!this.hass)return q`<ha-card><div class="wrap"></div></ha-card>`;const e=this._config,t=this._resolveStops(),i="tabs"===e.layout&&t.length>=2,n=e.hide_attribution?"":t.map(e=>this._attrs(e.entity).attribution).find(e=>"string"==typeof e&&e.length>0)||"Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";return q`
+              `})}
+          </div>`:j`<div class="wl-empty">
+            <span class="wl-empty-title">${t("no_lines_title")}</span>
+            <span class="wl-note">${t("colors_empty_hint")}</span>
+          </div>`)}_setLineColor(e,t){this._config&&this._commit({...this._config,line_colors:{...this._config.line_colors,[e.toUpperCase()]:t}})}_resetLineColor(e){if(!this._config)return;const t={...this._config.line_colors};delete t[e.toUpperCase()],this._commit({...this._config,line_colors:t})}static{this.styles=[Vt,It]}};var ai;e([pe({attribute:!1})],ni.prototype,"hass",void 0),e([ue()],ni.prototype,"_config",void 0),e([ue()],ni.prototype,"_tab",void 0),ni=e([de("wiener-linien-austria-card-editor")],ni);{const e=window;e.customCards=e.customCards??[],e.customCards.some(e=>"wiener-linien-austria-card"===e.type)||e.customCards.push({type:"wiener-linien-austria-card",name:"Wiener Linien Austria",description:"Abfahrtsmonitor mit Störungen und Aufzugsinfo",preview:!0,getEntitySuggestion:(e,t)=>t.startsWith("sensor.")?"wiener_linien_austria"!==e?.entities?.[t]?.platform?null:{config:{type:"custom:wiener-linien-austria-card",entities:[t]}}:null})}function oi(e){return e===Ie?"platform_short_rail":"platform_short_bus"}const si=new Map;let li=class extends se{constructor(){super(...arguments),this._activeTab=0,this._versionMismatch=null,this._expandedTraffic=new Set,this._expandedElevator=new Set,this._expandedRows=new Set,this._expandedTransfers=new Set,this._debugTraffic=[],this._debugElevator=[],this._qrOpenFor=null,this._devPaletteOpen=!1,this._versionCheckDone=!1,this._fallbackWarned=!1,this._resolvedStopsMemo=null,this._nightlineHourMemo=null,this._devTogglePalette=()=>{this._devPaletteOpen=!this._devPaletteOpen},this._devTrafficVariant=0,this._devElevatorVariant=0,this._devTestTraffic=()=>{const e=this._resolveStops(),t=[];for(const i of e)for(const e of this._attrs(i.entity).departures??[])e.line&&e.towards&&t.push(e);const i=this._randomFrom(t),r=i?.line||"U?",n=i?.towards||"Unbekannt",a=new Date,o=ai.DEV_TRAFFIC_SHAPES,s=o[this._devTrafficVariant%o.length];this._devTrafficVariant+=1;const l=s.html(r,n);this._debugTraffic=[...this._debugTraffic,{name:`DEBUG-T-${Date.now()}`,title:`${r}: ${s.label}`,description:l.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim(),description_html:l,location:"Debug-Stelle",related_lines:[r],time_start:new Date(a.getTime()-18e5).toISOString(),time_end:new Date(a.getTime()+108e5).toISOString(),time_created:new Date(a.getTime()-18e5).toISOString(),time_last_update:a.toISOString(),status:"active"}]},this._devTestElevator=()=>{const e=this._resolveStops(),t=this._randomFrom(e);if(!t)return;const i=this._attrs(t.entity),r=i.stop_name||t.entity,n=i.departures??[],a=this._randomFrom(n),o=a?.line||"",s=a?.towards||"Unbekannt",l=new Date,d=[{description:`${o||"U3"} Mittelbahnsteig - Zwischengeschoss Zugang ${r} - Ausgang ${r}`,reason:"Aufzug ist wegen Bauarbeiten bis 03.08.2026 außer Betrieb!"},{description:`${o||"U6"} Bahnsteig Richtung ${s} - Ausgang ${r}`,reason:"An der Instandsetzung wird bereits gearbeitet."},{description:`Ausgang ${r}`,reason:"Der Aufzug steht aus nicht näher bekannter Ursache still."}],h=d[this._devElevatorVariant%d.length];this._devElevatorVariant+=1,this._debugElevator=[...this._debugElevator,{__debug_entity:t.entity,name:`DEBUG-E-${Date.now()}`,station:r,description:h.description,reason:h.reason,status:"außer Betrieb",related_lines:o?[o]:[],time_start:new Date(l.getTime()-27e5).toISOString(),time_end:new Date(l.getTime()+144e5).toISOString()}]},this._devClear=()=>{this._debugTraffic=[],this._debugElevator=[],this._devPaletteOpen=!1}}static{ai=this}setConfig(e){if(!e||"object"!=typeof e)throw new Error("wiener-linien-austria-card: config must be an object");const t=Array.isArray(e.entities),i="string"==typeof e.entity;if(!t&&!i)throw new Error("wiener-linien-austria-card: 'entities' (array) or legacy 'entity' (string) is required");const r=pt(e);if((Array.isArray(e.entities)?e.entities.length:i?1:0)>0&&0===r.entities.length)throw new Error("wiener-linien-austria-card: every configured entity was rejected (must start with `sensor.`) — see browser console for per-entry details");this._config=r,this._expandedRows=new Set,this._expandedTraffic=new Set,this._expandedElevator=new Set,this._expandedTransfers=new Set,this._qrOpenFor=null,this._activeTab=0,this._fallbackWarned=!1,this._debugTraffic=[],this._debugElevator=[]}getCardSize(){const e=this._config?.entities.length??1;return Math.min(12,3+3*e)}getGridOptions(){return{columns:12,rows:"auto",min_columns:6,min_rows:3}}static getConfigElement(){return document.createElement("wiener-linien-austria-card-editor")}static getStubConfig(e){const t=gt(e)[0];return{entities:t?[t]:[],max_departures:6}}connectedCallback(){super.connectedCallback(),function(){if("undefined"==typeof document)return;if(document.getElementById(ze))return;const e=document.createElement("style");e.id=ze,e.textContent='\n@font-face {\n  font-family: "WL Sans";\n  src: url("/wiener-linien-austria/fonts/wl-sans-regular.woff2") format("woff2");\n  font-weight: 400;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Sans";\n  src: url("/wiener-linien-austria/fonts/wl-sans-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Sans Condensed";\n  src: url("/wiener-linien-austria/fonts/wl-sans-condensed-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Mono";\n  src: url("/wiener-linien-austria/fonts/wl-mono-regular.woff2") format("woff2");\n  font-weight: 400;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Mono";\n  src: url("/wiener-linien-austria/fonts/wl-mono-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n',document.head.appendChild(e)}(),!this._versionCheckDone&&this.hass?.callWS&&(this._versionCheckDone=!0,this._checkCardVersion())}willUpdate(e){if(this._resolvedStopsMemo=null,this._nightlineHourMemo=null,this._config&&(e.has("_config")||e.has("hass"))){const e=this._resolveStops();if(e.length&&this._activeTab>=e.length&&(this._activeTab=0),this._qrOpenFor){const t=new Set(e.map(e=>e.entity));t.has(this._qrOpenFor)||(this._qrOpenFor=null)}}}updated(e){if(!e.has("_qrOpenFor")&&!e.has("hass")&&!e.has("_config"))return;if(!this._qrOpenFor)return;const t=this.renderRoot.querySelector(".qr-panel.expanded .qr-canvas");if(!t)return;const i=t.getAttribute("data-qr-text")??"",r=t.getAttribute("data-qr-rendered-for")??"";i&&i!==r&&(this._renderTintedQr(t),t.setAttribute("data-qr-rendered-for",i))}_renderTintedQr(e){const t=e.closest(".station"),i=t&&getComputedStyle(t).getPropertyValue("--wl-accent").trim()||"#000";for(;e.firstChild;)e.removeChild(e.firstChild);Se.render({text:e.getAttribute("data-qr-text")??"",radius:0,ecLevel:"H",fill:i,background:"#fff",size:220},e);const r=e.querySelector("canvas");if(!(r instanceof HTMLCanvasElement))return void console.error("[wiener-linien-austria-card] QR canvas unavailable");const n=r.getContext("2d");if(!n)return void console.error("[wiener-linien-austria-card] QR canvas unavailable");const a=e.getAttribute("data-qr-icon")??"mdi:bus-stop",o=this._mdiPathFor(a);if(!o)return;const s=r.width,l=r.height,d=Math.round(.22*s),h=Math.round((s-d)/2),c=Math.round((l-d)/2),p=Math.round(.18*d),u=h-p,f=c-p,g=d+2*p,_=Math.round(.2*d);n.fillStyle="#fff","function"==typeof n.roundRect?(n.beginPath(),n.roundRect(u,f,g,g,_),n.fill()):n.fillRect(u,f,g,g),n.save(),n.translate(h,c),n.scale(d/24,d/24),n.fillStyle=i,n.fill(new Path2D(o)),n.restore()}_mdiPathFor(e){switch(e){case"mdi:subway-variant":return"M18,11H13V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M11,11H6V6H11M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M12,2C7.58,2 4,2.5 4,6V15.5A3.5,3.5 0 0,0 7.5,19L6,20.5V21H18V20.5L16.5,19A3.5,3.5 0 0,0 20,15.5V6C20,2.5 16.42,2 12,2Z";case"mdi:tram":return"M19,16.94V8.5C19,5.71 16.39,5.1 13,5L13.75,3.5H17V2H7V3.5H11.75L11,5C7.86,5.11 5,5.73 5,8.5V16.94C5,18.39 6.19,19.6 7.59,19.91L6,21.5V22H8.23L10.23,20H14L16,22H18V21.5L16.5,20H16.42C18.11,20 19,18.63 19,16.94M12,18.5A1.5,1.5 0 0,1 10.5,17A1.5,1.5 0 0,1 12,15.5A1.5,1.5 0 0,1 13.5,17A1.5,1.5 0 0,1 12,18.5M17,14H7V9H17V14Z";case"mdi:bus":return"M18,11H6V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16Z";default:return"M22 7V16C22 16.71 21.62 17.36 21 17.72V19.25C21 19.66 20.66 20 20.25 20H19.75C19.34 20 19 19.66 19 19.25V18H12V19.25C12 19.66 11.66 20 11.25 20H10.75C10.34 20 10 19.66 10 19.25V17.72C9.39 17.36 9 16.71 9 16V7C9 4 12 4 15.5 4S22 4 22 7M13 15C13 14.45 12.55 14 12 14S11 14.45 11 15 11.45 16 12 16 13 15.55 13 15M20 15C20 14.45 19.55 14 19 14S18 14.45 18 15 18.45 16 19 16 20 15.55 20 15M20 7H11V11H20V7M7 9.5C6.97 8.12 5.83 7 4.45 7.05C3.07 7.08 1.97 8.22 2 9.6C2.03 10.77 2.86 11.77 4 12V20H5V12C6.18 11.76 7 10.71 7 9.5Z"}}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config")||e.has("_activeTab")||e.has("_versionMismatch")||e.has("_expandedTraffic")||e.has("_expandedElevator")||e.has("_expandedRows")||e.has("_expandedTransfers")||e.has("_qrOpenFor")||e.has("_debugTraffic")||e.has("_debugElevator"))return!0;const t=e.get("hass");if(!t||!this.hass)return!0;const i=this._resolveStops().map(e=>e.entity);return i.some(e=>t.states[e]!==this.hass.states[e])}_lang(){return this.hass?.language?.startsWith("de")?"de":"en"}_t(e,t){return We(`modern.${e}`,{hassLanguage:this.hass?.language},t)}async _checkCardVersion(){try{this._versionMismatch=await async function(e,t,i){if(!e?.callWS)return null;try{const r=await e.callWS({type:t});if(r?.version&&r.version!==i)return r.version}catch{}return null}(this.hass,"wiener_linien_austria/card_version","1.8.1")}catch(e){console.warn("[wiener-linien-austria-card] version probe failed",e)}}_resolveStops(){if(null!==this._resolvedStopsMemo)return this._resolvedStopsMemo;const e=this._computeResolvedStops();return this._resolvedStopsMemo=e,e}_computeResolvedStops(){const e=(this._config?.entities??[]).filter(e=>this.hass?.states?.[e.entity]);if(e.length)return e;const t=gt(this.hass)[0];if(t){if(!this._fallbackWarned&&(this._config?.entities?.length??0)>0){this._fallbackWarned=!0;const e=this._config?.entities.map(e=>e.entity).join(", ");console.warn(`[wiener-linien-austria-card] configured entity "${e}" not in hass.states; falling back to "${t}"`)}return[{entity:t}]}return[]}_attrs(e){return this.hass?.states?.[e]?.attributes??{}}render(){if(!this._config)return I;if(!this.hass)return j`<ha-card><div class="wrap"></div></ha-card>`;const e=this._config,t=this._resolveStops(),i="tabs"===e.layout&&t.length>=2,r=e.hide_attribution?"":t.map(e=>this._attrs(e.entity).attribution).find(e=>"string"==typeof e&&e.length>0)||"Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";return j`
       <ha-card>
         ${i?this._renderTabs(t,this._activeTab):I}
         <div class="wrap">
-          ${qe(this._versionMismatch,e=>this._t(e))}
+          ${je(this._versionMismatch,e=>this._t(e))}
           ${e.show_traffic_info?this._renderTrafficBanner(t):I}
           ${this._renderBody(t,i)}
-          ${this._renderFooter(n)}
+          ${this._renderFooter(r)}
         </div>
       </ha-card>
-    `}_renderFooter(e){const t=this._isDevMode();return e||t?q`
-      ${e?q`<div class="foot">
+    `}_renderFooter(e){const t=this._isDevMode();return e||t?j`
+      ${e?j`<div class="foot">
             <span class="timestamp">${e}</span>
           </div>`:I}
       ${t?this._renderDevModePanel():I}
-    `:I}_renderBody(e,t){if(!e.length)return this._renderEmpty();if(t){const t=e[this._activeTab]??e[0];return q`${this._renderStop(t,this._activeTab)}`}return q`${e.map(e=>this._renderStop(e))}`}_renderEmpty(){const e=_t(this.hass).length?"no_entities_picked":"no_entities_available";return q`<div class="empty" role="status" aria-live="polite">${this._t(e)}</div>`}_renderTabs(e,t){return q`
+    `:I}_renderBody(e,t){if(!e.length)return this._renderEmpty();if(t){const t=e[this._activeTab]??e[0];return j`${this._renderStop(t,this._activeTab)}`}return j`${e.map(e=>this._renderStop(e))}`}_renderEmpty(){const e=gt(this.hass).length?"no_entities_picked":"no_entities_available";return j`<div class="empty" role="status" aria-live="polite">${this._t(e)}</div>`}_renderTabs(e,t){return j`
       <div class="tabbar">
         <div class="tabs" role="tablist">
-        ${e.map((i,n)=>{const r=this._attrs(i.entity),a=r.stop_name||r.friendly_name||i.entity,o=n===t;return q`<button
+        ${e.map((i,r)=>{const n=this._attrs(i.entity),a=n.stop_name||n.friendly_name||i.entity,o=r===t;return j`<button
             type="button"
             role="tab"
-            id=${`wl-tab-${n}`}
-            aria-controls=${`wl-tabpanel-${n}`}
-            class=${be({tab:!0,active:n===t})}
+            id=${`wl-tab-${r}`}
+            aria-controls=${`wl-tabpanel-${r}`}
+            class=${be({tab:!0,active:r===t})}
             aria-selected=${o?"true":"false"}
             tabindex=${o?"0":"-1"}
-            @click=${()=>this._setActiveTab(n)}
-            @keydown=${t=>this._onTabKeydown(t,n,e.length)}
+            @click=${()=>this._setActiveTab(r)}
+            @keydown=${t=>this._onTabKeydown(t,r,e.length)}
           >${a}</button>`})}
         </div>
         ${this._renderTabActions(e,t)}
       </div>
-    `}_renderTabActions(e,t){if(!this._config.hide_header)return I;const i=e[t]??e[0];if(!i)return I;const n=this._attrs(i.entity),r=n.stop_name||n.friendly_name||i.entity,a=this._stopMapUrl(r,n.latitude,n.longitude),o=this._stopGeoUri(r,n.latitude,n.longitude),s=!1!==this._config.show_qr_button,l=s&&null!==o;return a||l?q`<div
+    `}_renderTabActions(e,t){if(!this._config.hide_header)return I;const i=e[t]??e[0];if(!i)return I;const r=this._attrs(i.entity),n=r.stop_name||r.friendly_name||i.entity,a=this._stopMapUrl(n,r.latitude,r.longitude),o=this._stopGeoUri(n,r.latitude,r.longitude),s=!1!==this._config.show_qr_button,l=s&&null!==o;return a||l?j`<div
       class=${be({"tab-actions":!0,reserved:s})}
     >
-      ${this._renderStopActions(i.entity,r,a,l)}
-    </div>`:I}_setActiveTab(e){if(!Number.isFinite(e))return;const t=this._resolveStops(),i=Math.max(0,Math.min(t.length-1,Math.floor(e)));if(i===this._activeTab)return;const n=t[this._activeTab]?.entity,r=t[i]?.entity;n&&r&&this._qrOpenFor===n&&(this._qrOpenFor=r),this._activeTab=i}_onTabKeydown(e,t,i){let n=t;switch(e.key){case"ArrowRight":n=(t+1)%i;break;case"ArrowLeft":n=(t-1+i)%i;break;case"Home":n=0;break;case"End":n=i-1;break;default:return}e.preventDefault(),this._setActiveTab(n),this.updateComplete.then(()=>{const e=this.shadowRoot?.querySelectorAll('.tabs [role="tab"]');e?.[n]?.focus()}).catch(e=>{console.warn("[wiener-linien-austria-card] tab focus skipped",e)})}_renderStopHeader(e,t,i,n,r,a,o){return q`<header class="head">
+      ${this._renderStopActions(i.entity,n,a,l)}
+    </div>`:I}_setActiveTab(e){if(!Number.isFinite(e))return;const t=this._resolveStops(),i=Math.max(0,Math.min(t.length-1,Math.floor(e)));if(i===this._activeTab)return;const r=t[this._activeTab]?.entity,n=t[i]?.entity;r&&n&&this._qrOpenFor===r&&(this._qrOpenFor=n),this._activeTab=i}_onTabKeydown(e,t,i){let r=t;switch(e.key){case"ArrowRight":r=(t+1)%i;break;case"ArrowLeft":r=(t-1+i)%i;break;case"Home":r=0;break;case"End":r=i-1;break;default:return}e.preventDefault(),this._setActiveTab(r),this.updateComplete.then(()=>{const e=this.shadowRoot?.querySelectorAll('.tabs [role="tab"]');e?.[r]?.focus()}).catch(e=>{console.warn("[wiener-linien-austria-card] tab focus skipped",e)})}_renderStopHeader(e,t,i,r,n,a,o){return j`<header class="head">
       <span class="icon-tile" aria-hidden="true">
-        <ha-icon icon=${r}></ha-icon>
+        <ha-icon icon=${n}></ha-icon>
       </span>
       <div class="title-block">
-        <h3 class="title">${je(t,e.entity)}</h3>
-        ${n?.line?q`<p class="subtitle">${je(n.towards)}</p>`:I}
+        <h3 class="title">${Fe(t,e.entity)}</h3>
+        ${r?.line?j`<p class="subtitle">${Fe(r.towards)}</p>`:I}
       </div>
-      ${a||o?q`<div class="head-actions">
+      ${a||o?j`<div class="head-actions">
             ${this._renderStopActions(e.entity,i,a,o)}
           </div>`:I}
-    </header>`}_renderStopActions(e,t,i,n){const r=this._t("open_in_maps"),a=this._t("qr_open");return q`
-      ${n?q`<button
+    </header>`}_renderStopActions(e,t,i,r){const n=this._t("open_in_maps"),a=this._t("qr_open");return j`
+      ${r?j`<button
             type="button"
             class=${be({"icon-action":!0,"qr-toggle":!0,expanded:this._qrOpenFor===e})}
             title=${a}
@@ -2300,23 +2967,23 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
             aria-controls="wl-qr-${yt(e)}"
             @click=${()=>this._toggleQrFor(e)}
           ><ha-icon icon="mdi:qrcode" aria-hidden="true"></ha-icon></button>`:I}
-      ${i?q`<a
+      ${i?j`<a
             class="icon-action"
             href=${i}
             target="_blank"
             rel="noopener noreferrer"
-            title=${r}
-            aria-label="${r}: ${t}"
+            title=${n}
+            aria-label="${n}: ${t}"
           ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon></a>`:I}
-    `}_renderStopHero(e,t,i,n){return q`<div class="hero-host">
+    `}_renderStopHero(e,t,i,r){return j`<div class="hero-host">
       <div class="hero">
         <div class="hero-time" aria-live="polite" aria-atomic="true">
           <span class="hero-min">${i}</span>
-          ${n?q`<span class="hero-unit">${n}</span>`:I}
+          ${r?j`<span class="hero-unit">${r}</span>`:I}
         </div>
         ${t.flatMap(t=>[this._renderHeroEntry(t,e.entity),this._renderHeroPanelForEntry(t,e.entity)])}
       </div>
-    </div>`}_renderStop(e,t){const i=this._attrs(e.entity),n=i.stop_name||i.friendly_name,r=n||e.entity,a=function(e,t){const{lines:i,direction:n,line_directions:r,walk_times:a,accessibility_only:o}=t,s=i&&i.length?new Set(i):null;return e.filter(e=>{if(s&&!s.has(e.line))return!1;const t=r?.[e.line]??n;if(t&&e.direction!==t)return!1;if(a){const t=a[wt(e.line,String(e.direction??""))];if("number"==typeof t&&e.countdown<t)return!1}return!(o&&!e.barrier_free)})}(Array.isArray(i.departures)?i.departures:[],{...e,accessibility_only:this._config.accessibility_only}),o=Array.isArray(i.elevator_info)?i.elevator_info:[],s=this._debugElevator.filter(t=>t.__debug_entity===e.entity),l=[...o,...s],d=this._config.show_elevator_info&&l.length>0,h=this._stopMapUrl(r,i.latitude,i.longitude),c=this._stopGeoUri(r,i.latitude,i.longitude),p=!1!==this._config.show_qr_button&&null!==c,u=!this._config.hide_header||void 0!==t,f=this._computeHeroGroup(a),_=f[0],g=this._config.show_hero_metric?new Set(f):new Set,m=a.filter(e=>!g.has(e)),w=m.slice(0,this._config.max_departures),b="number"==typeof i.stale_departures?i.stale_departures:0,v=gt(this.hass,e.entity),y=_?ft(_.line||"",this._config.line_colors,v):"var(--primary-color)",x=($=_?.type,Ve($)??"mdi:bus-stop");var $;const k=_&&Number.isFinite(_.countdown)?_.countdown:null,S=null===k?"—":k<=0?this._t("now"):String(k),A=null!==k&&k>0?this._t("min"):"",z=jt(y,this._colorScheme()),E=void 0!==t;return q`
+    </div>`}_renderStop(e,t){const i=this._attrs(e.entity),r=i.stop_name||i.friendly_name,n=r||e.entity,a=function(e,t){const{lines:i,direction:r,line_directions:n,walk_times:a,accessibility_only:o}=t,s=i&&i.length?new Set(i):null;return e.filter(e=>{if(s&&!s.has(e.line))return!1;const t=n?.[e.line]??r;if(t&&e.direction!==t)return!1;if(a){const t=a[wt(e.line,String(e.direction??""))];if("number"==typeof t&&e.countdown<t)return!1}return!(o&&!e.barrier_free)})}(Array.isArray(i.departures)?i.departures:[],{...e,accessibility_only:this._config.accessibility_only}),o=Array.isArray(i.elevator_info)?i.elevator_info:[],s=this._debugElevator.filter(t=>t.__debug_entity===e.entity),l=[...o,...s],d=this._config.show_elevator_info&&l.length>0,h=this._stopMapUrl(n,i.latitude,i.longitude),c=this._stopGeoUri(n,i.latitude,i.longitude),p=!1!==this._config.show_qr_button&&null!==c,u=!this._config.hide_header||void 0!==t,f=this._computeHeroGroup(a),g=f[0],_=this._config.show_hero_metric?new Set(f):new Set,m=a.filter(e=>!_.has(e)),w=m.slice(0,this._config.max_departures),b="number"==typeof i.stale_departures?i.stale_departures:0,v=_t(this.hass,e.entity),y=g?ft(g.line||"",this._config.line_colors,v):"var(--primary-color)",x=($=g?.type,Ve($)??"mdi:bus-stop");var $;const k=g&&Number.isFinite(g.countdown)?g.countdown:null,S=null===k?"—":k<=0?this._t("now"):String(k),A=null!==k&&k>0?this._t("min"):"",z=Ft(y,this._colorScheme()),E=void 0!==t;return j`
       <section
         class="station"
         style="--wl-accent: ${y};${z?` --wl-accent-text: ${z};`:""}"
@@ -2324,33 +2991,33 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         role=${E?"tabpanel":I}
         aria-labelledby=${E?`wl-tab-${t}`:I}
         tabindex=${E?"0":I}
-        aria-label=${r}
+        aria-label=${n}
       >
-        ${this._config.hide_header?I:this._renderStopHeader(e,n,r,_,x,h,p)}
-        ${p&&c&&u?this._renderQrPanel(e.entity,r,c,x,this._qrOpenFor===e.entity):I}
+        ${this._config.hide_header?I:this._renderStopHeader(e,r,n,g,x,h,p)}
+        ${p&&c&&u?this._renderQrPanel(e.entity,n,c,x,this._qrOpenFor===e.entity):I}
 
-        ${this._config.show_hero_metric&&_?this._renderStopHero(e,f,S,A):I}
+        ${this._config.show_hero_metric&&g?this._renderStopHero(e,f,S,A):I}
         ${d?this._renderElevatorDetails(l):I}
-        ${this._config.show_departures&&this._config.max_departures>0?w.length?q`${b>0?q`<div class="stale-note" role="status" aria-live="polite">
+        ${this._config.show_departures&&this._config.max_departures>0?w.length?j`${b>0?j`<div class="stale-note" role="status" aria-live="polite">
                       ${this._t("stale_feed_partial")}
                     </div>`:I}
                 <ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
                   ${w.map((t,i)=>this._renderRow(t,e.entity,i))}
                 </ul>`:this._renderEmptyState(i,b):I}
       </section>
-    `}_renderEmptyState(e,t){if(t>0){const t=e.stale_since?Pt(e.stale_since,this._lang()):"";return q`<div class="empty stale" role="status" aria-live="polite">
+    `}_renderEmptyState(e,t){if(t>0){const t=e.stale_since?Pt(e.stale_since,this._lang()):"";return j`<div class="empty stale" role="status" aria-live="polite">
         <div class="empty-title">${this._t("stale_feed")}</div>
         <div class="empty-detail">${this._t("stale_feed_detail")}</div>
-        ${t?q`<div class="empty-meta">
+        ${t?j`<div class="empty-meta">
               ${this._t("stale_feed_since",{time:t})}
             </div>`:I}
-      </div>`}return q`<div class="empty" role="status" aria-live="polite">
+      </div>`}return j`<div class="empty" role="status" aria-live="polite">
       ${this._t(e.server_time?"betriebsschluss":"no_data")}
-    </div>`}_renderElevatorDetails(e){return q`
+    </div>`}_renderElevatorDetails(e){return j`
       <div class="alert-list">
         ${e.map(e=>this._renderElevatorDetail(e))}
       </div>
-    `}_renderElevatorDetail(e){const t=e.description||e.station||"",i=function(e){return e.split(/\s+-\s+/).map(e=>e.trim().replace(/\.$/,"")).filter(Boolean)}(t),n=e.reason||"",r=function(e){for(const[t,i]of Tt)if(t.test(e))return i;return Et}(n),a=Pt(e.time_end,this._lang()),o=Boolean(n||a),s=this._expandedElevator.has(e.name);return q`
+    `}_renderElevatorDetail(e){const t=e.description||e.station||"",i=function(e){return e.split(/\s+-\s+/).map(e=>e.trim().replace(/\.$/,"")).filter(Boolean)}(t),r=e.reason||"",n=function(e){for(const[t,i]of Tt)if(t.test(e))return i;return Et}(r),a=Pt(e.time_end,this._lang()),o=Boolean(r||a),s=this._expandedElevator.has(e.name);return j`
       <div
         class=${be({alert:!0,expanded:s,"no-detail":!o})}
         role=${o?"button":"group"}
@@ -2365,33 +3032,33 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
           <div class="alert-summary">
             <div class="alert-title">
               <span lang="de" class="lift-path"
-                >${i.map((e,t)=>q`${t?q`<span class="lift-path-sep" aria-hidden="true">›</span>`:I}<span>${e}</span>`)}</span
+                >${i.map((e,t)=>j`${t?j`<span class="lift-path-sep" aria-hidden="true">›</span>`:I}<span>${e}</span>`)}</span
               >
             </div>
           </div>
-          ${o?q`<div class="alert-detail">
+          ${o?j`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${n?q`<div class="alert-desc lift-reason">
-                        <ha-icon icon=${r} aria-hidden="true"></ha-icon>
-                        <span lang="de">${n}</span>
+                  ${r?j`<div class="alert-desc lift-reason">
+                        <ha-icon icon=${n} aria-hidden="true"></ha-icon>
+                        <span lang="de">${r}</span>
                       </div>`:I}
-                  ${a?q`<div class="alert-meta">
+                  ${a?j`<div class="alert-meta">
                         <span>${this._t("elevator_until")} ${a}</span>
                       </div>`:I}
                 </div>
               </div>`:I}
         </div>
-        ${o?q`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:I}
+        ${o?j`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:I}
       </div>
-    `}_toggleElevator(e){this._expandedElevator=xt(this._expandedElevator,e)}_onExpanderKeydown(e,t,i){t&&("Enter"!==e.key&&" "!==e.key||(e.preventDefault(),i()))}_renderTrafficBanner(e){const t=new Set,i=[];for(const n of e)for(const e of this._attrs(n.entity).traffic_info??[])t.has(e.name)||(t.add(e.name),i.push(e));for(const e of this._debugTraffic)t.has(e.name)||(t.add(e.name),i.push(e));if(!i.length)return I;const n=mt(this.hass,this._config.entities.map(e=>e.entity));return q`
+    `}_toggleElevator(e){this._expandedElevator=xt(this._expandedElevator,e)}_onExpanderKeydown(e,t,i){t&&("Enter"!==e.key&&" "!==e.key||(e.preventDefault(),i()))}_renderTrafficBanner(e){const t=new Set,i=[];for(const r of e)for(const e of this._attrs(r.entity).traffic_info??[])t.has(e.name)||(t.add(e.name),i.push(e));for(const e of this._debugTraffic)t.has(e.name)||(t.add(e.name),i.push(e));if(!i.length)return I;const r=mt(this.hass,this._config.entities.map(e=>e.entity));return j`
       <div class="alert-list">
-        ${i.map(e=>this._renderTrafficItem(e,n))}
+        ${i.map(e=>this._renderTrafficItem(e,r))}
       </div>
-    `}_renderTrafficNotice(e){const t=e.blocks.reduce((e,t)=>"heading"===t.kind?e+1:e,0),i=t>1?e.blocks:e.blocks.filter(e=>"heading"!==e.kind);return q`
+    `}_renderTrafficNotice(e){const t=e.blocks.reduce((e,t)=>"heading"===t.kind?e+1:e,0),i=t>1?e.blocks:e.blocks.filter(e=>"heading"!==e.kind);return j`
       <div class="alert-desc" lang="de">
-        ${i.map(e=>"heading"===e.kind?q`<p class="alert-desc-heading">${e.text}</p>`:q`<p>${e.text}</p>`)}
-        ${e.facts.length?q`<dl class="alert-facts">
-              ${e.facts.map(e=>q`<div class="alert-fact">
+        ${i.map(e=>"heading"===e.kind?j`<p class="alert-desc-heading">${e.text}</p>`:j`<p>${e.text}</p>`)}
+        ${e.facts.length?j`<dl class="alert-facts">
+              ${e.facts.map(e=>j`<div class="alert-fact">
                   <dt>
                     <ha-icon icon=${e.icon} aria-hidden="true"></ha-icon>${e.label}
                   </dt>
@@ -2399,7 +3066,7 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
                 </div>`)}
             </dl>`:I}
       </div>
-    `}_renderTrafficItem(e,t){const i=this._config.line_colors,n=Array.isArray(e.related_lines)?e.related_lines:[],r=Nt(e.description_html||e.description||""),a=r.blocks.length>0||r.facts.length>0,o=Pt(e.time_end,this._lang()),s=Pt(e.time_last_update,this._lang()),l=Pt(e.time_created,this._lang()),d=s&&s!==l?s:"",h=Boolean(e.location||o||d),c=Boolean(a||h),p=this._expandedTraffic.has(e.name),u={alert:!0,expanded:p,"no-detail":!c},f=e.title||this._t("traffic_label");return q`
+    `}_renderTrafficItem(e,t){const i=this._config.line_colors,r=Array.isArray(e.related_lines)?e.related_lines:[],n=Ot(e.description_html||e.description||""),a=n.blocks.length>0||n.facts.length>0,o=Pt(e.time_end,this._lang()),s=Pt(e.time_last_update,this._lang()),l=Pt(e.time_created,this._lang()),d=s&&s!==l?s:"",h=Boolean(e.location||o||d),c=Boolean(a||h),p=this._expandedTraffic.has(e.name),u={alert:!0,expanded:p,"no-detail":!c},f=e.title||this._t("traffic_label");return j`
       <div
         class=${be(u)}
         role=${c?"button":"group"}
@@ -2412,37 +3079,37 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         <ha-icon icon="mdi:alert-octagon" aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
-            ${n.length?q`<div class="alert-lines">
-                  ${n.map(e=>q`<span
+            ${r.length?j`<div class="alert-lines">
+                  ${r.map(e=>j`<span
                       class="alert-line-badge"
                       style=${xe(ut(e,i,t))}
                     >${e}</span>`)}
                 </div>`:I}
-            <div class="alert-title">${e.title?je(e.title):this._t("traffic_label")}</div>
+            <div class="alert-title">${e.title?Fe(e.title):this._t("traffic_label")}</div>
           </div>
-          ${c?q`<div class="alert-detail">
+          ${c?j`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${a?this._renderTrafficNotice(r):I}
-                  ${h?q`<div class="alert-meta">
-                        ${e.location?q`<span class="alert-location-chip">
-                              <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>${je(e.location)}
+                  ${a?this._renderTrafficNotice(n):I}
+                  ${h?j`<div class="alert-meta">
+                        ${e.location?j`<span class="alert-location-chip">
+                              <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>${Fe(e.location)}
                             </span>`:I}
-                        ${o?q`<span>${this._t("traffic_until")} ${o}</span>`:I}
-                        ${d?q`<span>${this._t("traffic_updated")} ${d}</span>`:I}
+                        ${o?j`<span>${this._t("traffic_until")} ${o}</span>`:I}
+                        ${d?j`<span>${this._t("traffic_updated")} ${d}</span>`:I}
                       </div>`:I}
                 </div>
               </div>`:I}
         </div>
-        ${c?q`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:I}
+        ${c?j`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:I}
       </div>
-    `}_toggleTraffic(e){this._expandedTraffic=xt(this._expandedTraffic,e)}_computeHeroGroup(e){if(0===e.length)return[];const t=e=>Number.isFinite(e.countdown)?e.countdown:Number.POSITIVE_INFINITY,i=Math.min(...e.map(t));return Number.isFinite(i)?i<=0?e.filter(e=>t(e)<=0):e.filter(e=>t(e)===i):[e[0]]}_expandState(e,t,i){const n=function(e,t){return!1!==e&&Array.isArray(t.stops_ahead)&&t.stops_ahead.length>0}(this._config.show_stops_ahead,e),r=this._rowKey(e,t),a=n&&this._expandedRows.has(r),o=a?"stops_ahead_aria_hide":"stops_ahead_aria_show";return{hasStopsAhead:n,rowKey:r,expanded:a,panelId:this._panelId(e,t,i),ariaLabel:n?this._t(o,{line:e.line||"?",towards:e.towards||""}):""}}_renderStopsAheadInner(e,t,i,n){const r=this._config.line_colors,a=gt(this.hass,n);return q`
+    `}_toggleTraffic(e){this._expandedTraffic=xt(this._expandedTraffic,e)}_computeHeroGroup(e){if(0===e.length)return[];const t=e=>Number.isFinite(e.countdown)?e.countdown:Number.POSITIVE_INFINITY,i=Math.min(...e.map(t));return Number.isFinite(i)?i<=0?e.filter(e=>t(e)<=0):e.filter(e=>t(e)===i):[e[0]]}_expandState(e,t,i){const r=function(e,t){return!1!==e&&Array.isArray(t.stops_ahead)&&t.stops_ahead.length>0}(this._config.show_stops_ahead,e),n=this._rowKey(e,t),a=r&&this._expandedRows.has(n),o=a?"stops_ahead_aria_hide":"stops_ahead_aria_show";return{hasStopsAhead:r,rowKey:n,expanded:a,panelId:this._panelId(e,t,i),ariaLabel:r?this._t(o,{line:e.line||"?",towards:e.towards||""}):""}}_renderStopsAheadInner(e,t,i,r){const n=this._config.line_colors,a=_t(this.hass,r);return j`
       <ol
         class="stops-ahead"
-        style=${xe({"--stops-ahead-line":ft(t,r,a)})}
+        style=${xe({"--stops-ahead-line":ft(t,n,a)})}
       >
-        ${e.map((e,t)=>this._renderStopAhead(e,t,i,r,a))}
+        ${e.map((e,t)=>this._renderStopAhead(e,t,i,n,a))}
       </ol>
-    `}_renderHeroEntry(e,t){const i=ut(e.line||"",this._config.line_colors,gt(this.hass,t)),n=this._config.show_platform&&e.platform?String(e.platform):null,r=!!e.barrier_free&&this._config.show_accessibility,a=!!e.cooling&&this._config.show_cooling,o=this._config.show_type_icon?Ve(e.type):null,{hasStopsAhead:s,rowKey:l,expanded:d,panelId:h,ariaLabel:c}=this._expandState(e,t,"hero"),p={"hero-entry":!0,expandable:s,expanded:d},u=e.line||"?";return q`
+    `}_renderHeroEntry(e,t){const i=ut(e.line||"",this._config.line_colors,_t(this.hass,t)),r=this._config.show_platform&&e.platform?String(e.platform):null,n=!!e.barrier_free&&this._config.show_accessibility,a=!!e.cooling&&this._config.show_cooling,o=this._config.show_type_icon?Ve(e.type):null,{hasStopsAhead:s,rowKey:l,expanded:d,panelId:h,ariaLabel:c}=this._expandState(e,t,"hero"),p={"hero-entry":!0,expandable:s,expanded:d},u=e.line||"?";return j`
       <div
         class=${be(p)}
         style=${s?`--stops-ahead-line: ${i.background};`:I}
@@ -2458,16 +3125,16 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
           class="line-badge"
           style=${xe(i)}
         >${u}</span>
-        ${o?q`<ha-icon
+        ${o?j`<ha-icon
               class="type-icon"
               icon=${o}
               aria-hidden="true"
             ></ha-icon>`:I}
-        <span class="hero-direction">${je(e.towards)}</span>
-        ${n?q`<span class="hero-platform"
-              >${this._t(Yt(e.type))} ${n}</span
+        <span class="hero-direction">${Fe(e.towards)}</span>
+        ${r?j`<span class="hero-platform"
+              >${this._t(oi(e.type))} ${r}</span
             >`:I}
-        ${r?q`<span
+        ${n?j`<span
               class="hero-a11y"
               role="img"
               aria-label=${this._t("barrier_free_title")}
@@ -2478,7 +3145,7 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
                 aria-hidden="true"
               ></ha-icon>
             </span>`:I}
-        ${a?q`<span
+        ${a?j`<span
               class="hero-cooling"
               role="img"
               aria-label=${this._t("cooling_title")}
@@ -2486,13 +3153,13 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
             >
               <ha-icon icon="mdi:snowflake" aria-hidden="true"></ha-icon>
             </span>`:I}
-        ${s?q`<ha-icon
+        ${s?j`<ha-icon
               class="hero-chevron"
               icon="mdi:chevron-down"
               aria-hidden="true"
             ></ha-icon>`:I}
       </div>
-    `}_renderHeroPanelForEntry(e,t){const{hasStopsAhead:i,rowKey:n,expanded:r,panelId:a}=this._expandState(e,t,"hero");return i?this._renderHeroStopsAheadPanel(e.stops_ahead,a,r,e.line||"?",n,t):I}_renderHeroStopsAheadPanel(e,t,i,n,r,a){return q`
+    `}_renderHeroPanelForEntry(e,t){const{hasStopsAhead:i,rowKey:r,expanded:n,panelId:a}=this._expandState(e,t,"hero");return i?this._renderHeroStopsAheadPanel(e.stops_ahead,a,n,e.line||"?",r,t):I}_renderHeroStopsAheadPanel(e,t,i,r,n,a){return j`
       <div
         class=${be({"hero-detail":!0,expanded:i})}
         id=${t}
@@ -2500,10 +3167,10 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         aria-hidden=${i?"false":"true"}
       >
         <div class="hero-detail-inner">
-          ${this._renderStopsAheadInner(e,n,r,a)}
+          ${this._renderStopsAheadInner(e,r,n,a)}
         </div>
       </div>
-    `}_colorScheme(){return!0===this.hass?.themes?.darkMode?"dark":!1===this.hass?.themes?.darkMode?"light":void 0}_rowAccentText(e){const t=this._colorScheme();return void 0===t?null:jt(e,t)??"var(--primary-text-color)"}_renderRow(e,t,i=0){const n=this._config.line_colors,r=gt(this.hass,t),a=e.line||"?",o=ut(a,n,r),s=Number.isFinite(e.countdown)?e.countdown:null,l=null===s?"—":s<=0?this._t("now"):`${s} ${this._t("min")}`,d=function(e,t){if(!e||!t)return null;const i=Date.parse(e),n=Date.parse(t);return Number.isFinite(i)&&Number.isFinite(n)?Math.round((n-i)/6e4):null}(e.time_planned,e.time_real),h=this._config.show_delay&&null!==d&&d>=1?1===d?this._t("delay_singular"):this._t("delay_plural",{n:d}):"",c=this._config.show_delay_colors;let p="";null!==s&&s<=0?p="now":c&&null!==d?d>=1?p="late":d<=-1&&(p="early"):p="";const u="now"===p?this._rowAccentText(o.background):null,f=this._config.show_accessibility,_=this._config.show_cooling,g=Boolean(e.traffic_jam||f&&e.barrier_free||_&&e.cooling),m=this._config.show_platform&&e.platform?String(e.platform):null,w=this._config.show_type_icon?Ve(e.type):null,{hasStopsAhead:b,rowKey:v,expanded:y,panelId:x,ariaLabel:$}=this._expandState(e,t,"row"),k=q`
+    `}_colorScheme(){return!0===this.hass?.themes?.darkMode?"dark":!1===this.hass?.themes?.darkMode?"light":void 0}_rowAccentText(e){const t=this._colorScheme();return void 0===t?null:Ft(e,t)??"var(--primary-text-color)"}_renderRow(e,t,i=0){const r=this._config.line_colors,n=_t(this.hass,t),a=e.line||"?",o=ut(a,r,n),s=Number.isFinite(e.countdown)?e.countdown:null,l=null===s?"—":s<=0?this._t("now"):`${s} ${this._t("min")}`,d=function(e,t){if(!e||!t)return null;const i=Date.parse(e),r=Date.parse(t);return Number.isFinite(i)&&Number.isFinite(r)?Math.round((r-i)/6e4):null}(e.time_planned,e.time_real),h=this._config.show_delay&&null!==d&&d>=1?1===d?this._t("delay_singular"):this._t("delay_plural",{n:d}):"",c=this._config.show_delay_colors;let p="";null!==s&&s<=0?p="now":c&&null!==d?d>=1?p="late":d<=-1&&(p="early"):p="";const u="now"===p?this._rowAccentText(o.background):null,f=this._config.show_accessibility,g=this._config.show_cooling,_=Boolean(e.traffic_jam||f&&e.barrier_free||g&&e.cooling),m=this._config.show_platform&&e.platform?String(e.platform):null,w=this._config.show_type_icon?Ve(e.type):null,{hasStopsAhead:b,rowKey:v,expanded:y,panelId:x,ariaLabel:$}=this._expandState(e,t,"row"),k=j`
       <li
         class=${be({"dep-row":!0,expandable:b,expanded:y})}
         style=${`--row-i: ${i};${u?` --wl-accent-text: ${u};`:""}${b?` --stops-ahead-line: ${o.background};`:""}`}
@@ -2517,31 +3184,31 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
       >
         <div class="line-badge" style=${xe(o)}>${a}</div>
         <div class="towards">
-          ${w?q`<ha-icon class="type-icon" icon=${w} aria-hidden="true"></ha-icon>`:I}
+          ${w?j`<ha-icon class="type-icon" icon=${w} aria-hidden="true"></ha-icon>`:I}
           <div class="towards-rows">
-            <span class="towards-name">${je(e.towards)}</span>${h?q`<span class="delay">${h}</span>`:I}
+            <span class="towards-name">${Fe(e.towards)}</span>${h?j`<span class="delay">${h}</span>`:I}
           </div>
         </div>
-        ${m||g?q`<span class="row-end">
-              ${m?q`<span class="row-platform"
-                    >${this._t(Yt(e.type))} ${m}</span
+        ${m||_?j`<span class="row-end">
+              ${m?j`<span class="row-platform"
+                    >${this._t(oi(e.type))} ${m}</span
                   >`:I}
-              ${g?q`<span class="row-flags">
-                    ${e.traffic_jam?q`<ha-icon
+              ${_?j`<span class="row-flags">
+                    ${e.traffic_jam?j`<ha-icon
                           class="disturbance"
                           icon="mdi:alert-circle"
                           role="img"
                           aria-label=${this._t("disturbance_title")}
                           title=${this._t("disturbance_title")}
                         ></ha-icon>`:I}
-                    ${f&&e.barrier_free?q`<ha-icon
+                    ${f&&e.barrier_free?j`<ha-icon
                           class="a11y"
                           icon="mdi:wheelchair-accessibility"
                           role="img"
                           aria-label=${this._t("barrier_free_title")}
                           title=${this._t("barrier_free_title")}
                         ></ha-icon>`:I}
-                    ${_&&e.cooling?q`<ha-icon
+                    ${g&&e.cooling?j`<ha-icon
                           class="cooling"
                           icon="mdi:snowflake"
                           role="img"
@@ -2549,16 +3216,16 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
                           title=${this._t("cooling_title")}
                         ></ha-icon>`:I}
                   </span>`:I}
-            </span>`:q`<span></span>`}
+            </span>`:j`<span></span>`}
         <!-- Conditional spread avoids classMap({ "": true }) when cdState is "". -->
         <div class=${be({countdown:!0,...p?{[p]:!0}:{}})}>${l}</div>
-        ${b?q`<ha-icon
+        ${b?j`<ha-icon
               class="row-chevron"
               icon="mdi:chevron-down"
               aria-hidden="true"
             ></ha-icon>`:I}
       </li>
-    `;return b?[k,this._renderStopsAheadPanel(e.stops_ahead,x,y,a,v,t)]:k}_renderStopsAheadPanel(e,t,i,n,r,a){return q`
+    `;return b?[k,this._renderStopsAheadPanel(e.stops_ahead,x,y,a,v,t)]:k}_renderStopsAheadPanel(e,t,i,r,n,a){return j`
       <li
         class=${be({"dep-row-detail":!0,expanded:i})}
         id=${t}
@@ -2566,16 +3233,16 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         aria-hidden=${i?"false":"true"}
       >
         <div class="dep-row-detail-inner">
-          ${this._renderStopsAheadInner(e,n,r,a)}
+          ${this._renderStopsAheadInner(e,r,n,a)}
         </div>
       </li>
-    `}_renderStopAhead(e,t,i,n,r){const a=e.lines??[],o=this._isNightlineHour(),s=[],l=[];for(const e of a)/^U\d/.test(e)||o&&/^N\d/.test(e)?s.push(e):l.push(e);const d=this._transferKey(i,t),h=this._expandedTransfers.has(d),c={"stops-ahead-stop":!0,terminus:!!e.is_terminus,"transfers-expanded":h},p=s.length?q`<span class="stops-ahead-metros">
-          ${s.map(e=>q`<span
+    `}_renderStopAhead(e,t,i,r,n){const a=e.lines??[],o=this._isNightlineHour(),s=[],l=[];for(const e of a)/^U\d/.test(e)||o&&/^N\d/.test(e)?s.push(e):l.push(e);const d=this._transferKey(i,t),h=this._expandedTransfers.has(d),c={"stops-ahead-stop":!0,terminus:!!e.is_terminus,"transfers-expanded":h},p=s.length?j`<span class="stops-ahead-metros">
+          ${s.map(e=>j`<span
               class="stops-ahead-line-chip"
-              style=${xe(ut(e,n,r))}
+              style=${xe(ut(e,r,n))}
               >${e}</span
             >`)}
-        </span>`:I,u=l.length?q`<button
+        </span>`:I,u=l.length?j`<button
           type="button"
           class="stops-ahead-other-toggle"
           aria-expanded=${h?"true":"false"}
@@ -2585,42 +3252,42 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         >
           <span class="stops-ahead-other-count">+${l.length}</span>
           <ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
-        </button>`:I,f=l.length&&h?q`<div class="stops-ahead-others">
-            ${l.map(e=>q`<span
+        </button>`:I,f=l.length&&h?j`<div class="stops-ahead-others">
+            ${l.map(e=>j`<span
                 class="stops-ahead-line-chip stops-ahead-line-chip--other"
-                style=${xe(ut(e,n,r))}
+                style=${xe(ut(e,r,n))}
                 >${e}</span
               >`)}
-          </div>`:I,_=l.length>0,g=_?this._t(h?"stops_ahead_other_hide":"stops_ahead_other_show",{count:l.length,stop:e.name}):"";return q`
+          </div>`:I,g=l.length>0,_=g?this._t(h?"stops_ahead_other_hide":"stops_ahead_other_show",{count:l.length,stop:e.name}):"";return j`
       <li class=${be(c)}>
         <div
           class="stops-ahead-row"
-          role=${_?"button":I}
-          tabindex=${_?"0":I}
-          aria-expanded=${_?h?"true":"false":I}
-          aria-label=${_?g:I}
-          @click=${_?e=>{e.stopPropagation(),this._toggleTransfers(d)}:I}
-          @keydown=${_?e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),e.stopPropagation(),this._toggleTransfers(d))}:I}
+          role=${g?"button":I}
+          tabindex=${g?"0":I}
+          aria-expanded=${g?h?"true":"false":I}
+          aria-label=${g?_:I}
+          @click=${g?e=>{e.stopPropagation(),this._toggleTransfers(d)}:I}
+          @keydown=${g?e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),e.stopPropagation(),this._toggleTransfers(d))}:I}
         >
           <span class="stops-ahead-dot" aria-hidden="true"></span>
-          <span class="stops-ahead-name">${je(e.name)}</span>
+          <span class="stops-ahead-name">${Fe(e.name)}</span>
           ${p} ${u}
         </div>
         ${f}
       </li>
-    `}_toggleTransfers(e){this._expandedTransfers=xt(this._expandedTransfers,e)}_isNightlineHour(){if(null!==this._nightlineHourMemo)return this._nightlineHourMemo;const e=function(e){let t=Jt.get(e);return t||(t=new Intl.DateTimeFormat("en-GB",{timeZone:e,hour:"2-digit",minute:"2-digit",hour12:!1}),Jt.set(e,t)),t}("Europe/Vienna").formatToParts(new Date),t=Number(e.find(e=>"hour"===e.type)?.value??"0"),i=Number(e.find(e=>"minute"===e.type)?.value??"0"),n=60*t+i,r=n>=1435||n<=315;return this._nightlineHourMemo=r,r}_rowKey(e,t){const i=e.time_planned??`cd${e.countdown}`;return`${t}|${e.line}|${e.direction}|${e.towards??""}|${i}`}_panelId(e,t,i){const n=yt(t),r="hero"===i?"wl-hero-stopsahead":"wl-stopsahead",a=(e.time_planned??`cd${e.countdown}`).replace(/[^a-z0-9_-]/gi,"_");return`${r}-${n}-${e.line}-${e.direction}-${a}`}_toggleRow(e){this._expandedRows=xt(this._expandedRows,e)}_transferKey(e,t){return`${e}|${t}`}_stopMapUrl(e,t,i){let n=null;return"number"==typeof t&&"number"==typeof i?n=`https://stadtplan.wien.gv.at/#/@${i},${t},17.5,0,0,standard/themes`:e&&(n=`https://www.openstreetmap.org/search?query=${encodeURIComponent(`${e}, Wien`)}`),n?("string"!=typeof(r=n)?"":/^https?:\/\//i.test(r)?r:"")||null:null;var r}_stopGeoUri(e,t,i){if("number"!=typeof t||"number"!=typeof i)return null;return`geo:${t},${i}?q=${t},${i}${e?`(${encodeURIComponent(e)})`:""}`}_toggleQrFor(e){this._qrOpenFor=this._qrOpenFor===e?null:e}_renderQrPanel(e,t,i,n,r){const a=`wl-qr-${yt(e)}`,o=this._t("qr_dialog_title"),s=this._t("qr_dialog_hint");return q`
+    `}_toggleTransfers(e){this._expandedTransfers=xt(this._expandedTransfers,e)}_isNightlineHour(){if(null!==this._nightlineHourMemo)return this._nightlineHourMemo;const e=function(e){let t=si.get(e);return t||(t=new Intl.DateTimeFormat("en-GB",{timeZone:e,hour:"2-digit",minute:"2-digit",hour12:!1}),si.set(e,t)),t}("Europe/Vienna").formatToParts(new Date),t=Number(e.find(e=>"hour"===e.type)?.value??"0"),i=Number(e.find(e=>"minute"===e.type)?.value??"0"),r=60*t+i,n=r>=1435||r<=315;return this._nightlineHourMemo=n,n}_rowKey(e,t){const i=e.time_planned??`cd${e.countdown}`;return`${t}|${e.line}|${e.direction}|${e.towards??""}|${i}`}_panelId(e,t,i){const r=yt(t),n="hero"===i?"wl-hero-stopsahead":"wl-stopsahead",a=(e.time_planned??`cd${e.countdown}`).replace(/[^a-z0-9_-]/gi,"_");return`${n}-${r}-${e.line}-${e.direction}-${a}`}_toggleRow(e){this._expandedRows=xt(this._expandedRows,e)}_transferKey(e,t){return`${e}|${t}`}_stopMapUrl(e,t,i){let r=null;return"number"==typeof t&&"number"==typeof i?r=`https://stadtplan.wien.gv.at/#/@${i},${t},17.5,0,0,standard/themes`:e&&(r=`https://www.openstreetmap.org/search?query=${encodeURIComponent(`${e}, Wien`)}`),r?("string"!=typeof(n=r)?"":/^https?:\/\//i.test(n)?n:"")||null:null;var n}_stopGeoUri(e,t,i){if("number"!=typeof t||"number"!=typeof i)return null;return`geo:${t},${i}?q=${t},${i}${e?`(${encodeURIComponent(e)})`:""}`}_toggleQrFor(e){this._qrOpenFor=this._qrOpenFor===e?null:e}_renderQrPanel(e,t,i,r,n){const a=`wl-qr-${yt(e)}`,o=this._t("qr_dialog_title"),s=this._t("qr_dialog_hint");return j`
       <div
-        class=${be({"qr-panel":!0,expanded:r})}
+        class=${be({"qr-panel":!0,expanded:n})}
         id=${a}
         role="region"
-        aria-hidden=${r?"false":"true"}
+        aria-hidden=${n?"false":"true"}
         aria-label="${o}: ${t}"
       >
         <div class="qr-panel-inner">
           <div
             class="qr-panel-body"
             role="button"
-            tabindex=${r?"0":"-1"}
+            tabindex=${n?"0":"-1"}
             aria-label=${this._t("qr_dialog_close")}
             @click=${()=>this._toggleQrFor(e)}
             @keydown=${t=>this._onExpanderKeydown(t,!0,()=>this._toggleQrFor(e))}
@@ -2630,13 +3297,13 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
               role="img"
               aria-label="${o}: ${t}"
               data-qr-text=${i}
-              data-qr-icon=${n}
+              data-qr-icon=${r}
             ></div>
             <p class="qr-panel-hint">${s}</p>
           </div>
         </div>
       </div>
-    `}_isDevMode(){try{if((window.location.search||"").includes("wl_debug=1"))return!0;if("1"===window.localStorage?.getItem("wl_debug"))return!0}catch(e){console.warn("[wiener-linien-austria-card] dev-mode probe failed (SSR/restricted ctx?)",e)}return!1}_renderDevModePanel(){return this._isDevMode()?q`
+    `}_isDevMode(){try{if((window.location.search||"").includes("wl_debug=1"))return!0;if("1"===window.localStorage?.getItem("wl_debug"))return!0}catch(e){console.warn("[wiener-linien-austria-card] dev-mode probe failed (SSR/restricted ctx?)",e)}return!1}_renderDevModePanel(){return this._isDevMode()?j`
       <div class="dev-strip">
         <span class="dev-strip-label">${this._t("devmode_title")}</span>
         <button type="button" @click=${this._devTestTraffic}>${this._t("devmode_traffic_btn")}</button>
@@ -2653,21 +3320,21 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
         </button>
       </div>
       ${this._devPaletteOpen?this._renderDevPalette():I}
-    `:I}static{this.DEV_GROUNDS={dark:"#1c1c1c",light:"#ffffff"}}static{this.DEV_SURFACES=[{label:"hero",ratio:.12},{label:"row",ratio:.06}]}static{this.DEV_PALETTE=[{label:"U1",hex:"#E3000F"},{label:"U2",hex:"#A862A4"},{label:"U3",hex:"#EF7C00"},{label:"U4",hex:"#319F49"},{label:"U6",hex:"#9D6830"},{label:"Tram",hex:"#C00808"},{label:"Bus",hex:"#0A295D"},{label:"Nightline",hex:Ee},{label:"Badner Bahn",hex:"#000000"},{label:"Weiß",hex:"#FFFFFF"}]}_devPaletteEntries(){const e=Zt.DEV_PALETTE.map(e=>({...e,live:!1})),t=new Set(e.map(e=>e.hex.toUpperCase())),i=mt(this.hass,(this._config?.entities??[]).map(e=>e.entity));for(const[n,r]of Object.entries(i)){if(!r?.bg)continue;const i=`#${r.bg}`.toUpperCase();t.has(i)||(t.add(i),e.push({label:n,hex:i,live:!0}))}return e}_renderDevPalette(){return q`
+    `:I}static{this.DEV_GROUNDS={dark:"#1c1c1c",light:"#ffffff"}}static{this.DEV_SURFACES=[{label:"hero",ratio:.12},{label:"row",ratio:.06}]}static{this.DEV_PALETTE=[{label:"U1",hex:"#E3000F"},{label:"U2",hex:"#A862A4"},{label:"U3",hex:"#EF7C00"},{label:"U4",hex:"#319F49"},{label:"U6",hex:"#9D6830"},{label:"Tram",hex:"#C00808"},{label:"Bus",hex:"#0A295D"},{label:"Nightline",hex:Ee},{label:"Badner Bahn",hex:"#000000"},{label:"Weiß",hex:"#FFFFFF"}]}_devPaletteEntries(){const e=ai.DEV_PALETTE.map(e=>({...e,live:!1})),t=new Set(e.map(e=>e.hex.toUpperCase())),i=mt(this.hass,(this._config?.entities??[]).map(e=>e.entity));for(const[r,n]of Object.entries(i)){if(!n?.bg)continue;const i=`#${n.bg}`.toUpperCase();t.has(i)||(t.add(i),e.push({label:r,hex:i,live:!0}))}return e}_renderDevPalette(){return j`
       <div class="dev-palette">
         ${this._devPaletteEntries().map(e=>this._renderDevPaletteRow(e))}
       </div>
-    `}_renderDevPaletteRow(e){return q`
+    `}_renderDevPaletteRow(e){return j`
       <div class="dev-pal-row">
         <div class="dev-pal-id">
           <span class="dev-pal-badge" style="background: ${e.hex};">${e.label}</span>
           <code>${e.hex.toUpperCase()}${e.live?" ·live":""}</code>
         </div>
-        ${["dark","light"].map(t=>{const i=jt(e.hex,t),n=Zt.DEV_GROUNDS[t];return q`
-            <div class="dev-pal-scheme" style="background: ${n};">
+        ${["dark","light"].map(t=>{const i=Ft(e.hex,t),r=ai.DEV_GROUNDS[t];return j`
+            <div class="dev-pal-scheme" style="background: ${r};">
               <span class="dev-pal-scheme-label">${t}</span>
-              ${Zt.DEV_SURFACES.map(t=>{const r=function(e,t,i){const n=Ft(e),r=Ft(t);if(!n||!r)return null;const a=[0,1,2].map(e=>Ot(Bt(n[e])*i+Bt(r[e])*(1-i)));return"#"+a.map(e=>Math.round(255*e).toString(16).padStart(2,"0")).join("")}(e.hex,n,t.ratio)??n,a=i?function(e,t){const i=Ft(e),n=Ft(t);if(!i||!n)return null;const r=qt(i),a=qt(n);return(Math.max(r,a)+.05)/(Math.min(r,a)+.05)}(i,r):null,o=null!==a&&a>=4.5;return q`
-                  <div class="dev-pal-chip" style="background: ${r};">
+              ${ai.DEV_SURFACES.map(t=>{const n=function(e,t,i){const r=qt(e),n=qt(t);if(!r||!n)return null;const a=[0,1,2].map(e=>Nt(Bt(r[e])*i+Bt(n[e])*(1-i)));return"#"+a.map(e=>Math.round(255*e).toString(16).padStart(2,"0")).join("")}(e.hex,r,t.ratio)??r,a=i?function(e,t){const i=qt(e),r=qt(t);if(!i||!r)return null;const n=jt(i),a=jt(r);return(Math.max(n,a)+.05)/(Math.min(n,a)+.05)}(i,n):null,o=null!==a&&a>=4.5;return j`
+                  <div class="dev-pal-chip" style="background: ${n};">
                     <span
                       class="dev-pal-word"
                       style=${i?`color: ${i};`:I}
@@ -2683,4 +3350,4 @@ let Qt=class extends se{constructor(){super(...arguments),this._computeLabel=e=>
             </div>
           `})}
       </div>
-    `}_randomFrom(e){if(0===e.length)return null;return e[Math.floor(Math.random()*e.length)]}static{this.DEV_TRAFFIC_SHAPES=[{label:"Bauarbeiten",html:(e,t)=>`<p>Die Linie ${e} fährt derzeit nicht Richtung ${t}.</p><p><br></p><p>Weichen Sie ersatzweise auf die Linien E3, 46 und 49 aus.</p><p><br></p><p>Voraussichtliche Dauer: 31. August.</p><p><br></p><p>Grund: Bauarbeiten im Bereich zwischen Westbahnhof U und Hütteldorfer Straße U.</p>`},{label:"Run-on (ungetrennt)",html:e=>`<p>Linie ${e}:Betrieb nur zwischen Schottentor U und Dornbach. Weichen Sie ersatzweise auf die Linie 43A aus.Voraussichtliche Dauer: 31.07.2026.Grund: Gleisbauarbeiten im Bereich Dornbacher Straße.</p>`},{label:"Mehrere Linien",html:e=>`<p>Linie ${e}:</p><p>Kein Betrieb zwischen Lerchenfelder Straße und Franz-Josefs-Bahnhof S.</p><p>Betrieb zwischen Westbahnhof S U und Lerchenfelder Straße.</p><p>Linie 12:</p><p>Betrieb nur zwischen Hillerstraße und Franz-Josefs-Bahnhof S.</p><p>Linien 40, 41, 42:</p><p>Kein Betrieb. Die Außenäste werden von den Linien 37 und 38 übernommen.</p><p>Die Störung dauert voraussichtlich bis Ende August.</p>`},{label:"Unfall, Uhrzeit",html:e=>`<p>Linie ${e}:</p><p>Unregelmäßige Intervalle in beiden Richtungen.</p><p>Voraussichtliche Dauer: 11:30 Uhr.</p><p>Grund: Verkehrsunfall im Bereich Gersthofer Straße 140.</p>`},{label:"Unbekannter Grund",html:e=>`<p>Linie ${e}:</p><p>Es kommt zu Verzögerungen im Betrieb.</p><p>Voraussichtliche Dauer: Ende August.</p><p>Grund: Vorübergehend nicht näher bekannte Ursache.</p>`}]}static{this.styles=Ae}};e([pe({attribute:!1})],Xt.prototype,"hass",void 0),e([ue()],Xt.prototype,"_config",void 0),e([ue()],Xt.prototype,"_activeTab",void 0),e([ue()],Xt.prototype,"_versionMismatch",void 0),e([ue()],Xt.prototype,"_expandedTraffic",void 0),e([ue()],Xt.prototype,"_expandedElevator",void 0),e([ue()],Xt.prototype,"_expandedRows",void 0),e([ue()],Xt.prototype,"_expandedTransfers",void 0),e([ue()],Xt.prototype,"_debugTraffic",void 0),e([ue()],Xt.prototype,"_debugElevator",void 0),e([ue()],Xt.prototype,"_qrOpenFor",void 0),e([ue()],Xt.prototype,"_devPaletteOpen",void 0),Xt=Zt=e([de("wiener-linien-austria-card")],Xt);export{Xt as WienerLinienAustriaCard};
+    `}_randomFrom(e){if(0===e.length)return null;return e[Math.floor(Math.random()*e.length)]}static{this.DEV_TRAFFIC_SHAPES=[{label:"Bauarbeiten",html:(e,t)=>`<p>Die Linie ${e} fährt derzeit nicht Richtung ${t}.</p><p><br></p><p>Weichen Sie ersatzweise auf die Linien E3, 46 und 49 aus.</p><p><br></p><p>Voraussichtliche Dauer: 31. August.</p><p><br></p><p>Grund: Bauarbeiten im Bereich zwischen Westbahnhof U und Hütteldorfer Straße U.</p>`},{label:"Run-on (ungetrennt)",html:e=>`<p>Linie ${e}:Betrieb nur zwischen Schottentor U und Dornbach. Weichen Sie ersatzweise auf die Linie 43A aus.Voraussichtliche Dauer: 31.07.2026.Grund: Gleisbauarbeiten im Bereich Dornbacher Straße.</p>`},{label:"Mehrere Linien",html:e=>`<p>Linie ${e}:</p><p>Kein Betrieb zwischen Lerchenfelder Straße und Franz-Josefs-Bahnhof S.</p><p>Betrieb zwischen Westbahnhof S U und Lerchenfelder Straße.</p><p>Linie 12:</p><p>Betrieb nur zwischen Hillerstraße und Franz-Josefs-Bahnhof S.</p><p>Linien 40, 41, 42:</p><p>Kein Betrieb. Die Außenäste werden von den Linien 37 und 38 übernommen.</p><p>Die Störung dauert voraussichtlich bis Ende August.</p>`},{label:"Unfall, Uhrzeit",html:e=>`<p>Linie ${e}:</p><p>Unregelmäßige Intervalle in beiden Richtungen.</p><p>Voraussichtliche Dauer: 11:30 Uhr.</p><p>Grund: Verkehrsunfall im Bereich Gersthofer Straße 140.</p>`},{label:"Unbekannter Grund",html:e=>`<p>Linie ${e}:</p><p>Es kommt zu Verzögerungen im Betrieb.</p><p>Voraussichtliche Dauer: Ende August.</p><p>Grund: Vorübergehend nicht näher bekannte Ursache.</p>`}]}static{this.styles=Ae}};e([pe({attribute:!1})],li.prototype,"hass",void 0),e([ue()],li.prototype,"_config",void 0),e([ue()],li.prototype,"_activeTab",void 0),e([ue()],li.prototype,"_versionMismatch",void 0),e([ue()],li.prototype,"_expandedTraffic",void 0),e([ue()],li.prototype,"_expandedElevator",void 0),e([ue()],li.prototype,"_expandedRows",void 0),e([ue()],li.prototype,"_expandedTransfers",void 0),e([ue()],li.prototype,"_debugTraffic",void 0),e([ue()],li.prototype,"_debugElevator",void 0),e([ue()],li.prototype,"_qrOpenFor",void 0),e([ue()],li.prototype,"_devPaletteOpen",void 0),li=ai=e([de("wiener-linien-austria-card")],li);export{li as WienerLinienAustriaCard};

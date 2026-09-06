@@ -1,53 +1,62 @@
-// Schema-driven Lovelace editor for the Wiener Linien Austria modern card.
+// Lovelace editor for the Wiener Linien Austria modern card (v2 editor system).
 //
-// Gotchas (the WHYs that bite, not the design map):
+// Three tabs, flat sections, one shared stop block — see editor-shell.ts for
+// why the structure is what it is.
 //
-// * **Storage-shape translator** at the form-changed boundary —
-//   ha-form's entity selector with `multiple: true` emits a flat
-//   `string[]`; the saved config carries `Array<NormalisedModernStop>`
-//   to preserve per-stop overrides. Without the translator, every
-//   add/remove cycle would wipe every per-stop override silently.
+// v1's modern editor was the worst offender on structure: seventeen fields in
+// a single collapsible section, with no grouping by what the user was trying
+// to do. Those seventeen are now three sections named after card regions
+// (Aufbau / Abfahrtszeile / Störungen & Verspätungen), so "hide the platform
+// number" is one tab away rather than twenty-five rows down.
 //
-// * **Editor `_config` lifecycle** — custom editors do NOT receive a
-//   re-`setConfig()` after dispatching `config-changed`. The form
-//   handler must set `this._config = next` BEFORE firing the event,
-//   else the next render reads stale state.
+// Two invariants carried over from v1, both load-bearing:
 //
-// (The `expandable` + `flatten: true` gotcha is documented at its call
-// site in `_schema()`.)
+// * **Storage-shape translator** at the entities boundary — ha-form's entity
+//   selector with `multiple: true` emits a flat `string[]`, while the saved
+//   config carries per-stop overrides. Without the translator every add/remove
+//   cycle would silently wipe every stop's lines, direction and walk times.
+//
+// * **`_config` before `fireEvent`** — custom editors do not receive a
+//   re-`setConfig()` after `config-changed`, so a fireEvent-only path leaves
+//   `_config` stale and the next render reverts the form.
 
-import { LitElement, css, html, nothing, type CSSResultGroup, type PropertyValues, type TemplateResult } from "lit";
+import {
+  LitElement,
+  html,
+  nothing,
+  type CSSResultGroup,
+  type PropertyValues,
+  type TemplateResult,
+} from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { classMap } from "lit/directives/class-map.js";
-import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type { HomeAssistant, LovelaceCardEditor } from "./types.js";
 
-import { editorBaseStyles } from "./editor-shared-styles.js";
-import { coerceWalkTime, resolveEditorHelper, resolveEditorLabel, swallowEditorKeys } from "./editor-shared.js";
-import { fireEvent } from "./utils.js";
-import { translate } from "./localize/localize.js";
+import { editorStyles } from "./editor/editor-styles.js";
+import { editorTokens } from "./editor/editor-tokens.js";
+import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
+import {
+  renderFormSection,
+  renderPanel,
+  renderSection,
+  renderTabs,
+  type TabKey,
+} from "./editor/editor-shell.js";
+import { renderStopBlock, type StopBlockCallbacks } from "./editor/stop-block.js";
 import type {
   HaFormSchema,
-  WienerLinienAttrs,
+  HomeAssistant,
+  LovelaceCardEditor,
   WienerLinienCardConfig,
 } from "./types.js";
+import { fireEvent } from "./utils.js";
 import {
   colorForLine,
   normaliseModernConfig,
   type NormalisedModernConfig,
   type NormalisedModernStop,
 } from "./utils/config.js";
-import {
-  collectLinesInSelection,
-  formatDirectionPillLabel,
-  lineDirKey,
-  linesAtStop,
-  pairsAtStop,
-  tripletsAtStop,
-} from "./utils/departures.js";
+import { collectLinesInSelection } from "./utils/departures.js";
 import { firstLineColorsMap } from "./utils/entities.js";
-import { lineTypeIcon } from "./utils/mot.js";
 
 @customElement("wiener-linien-austria-card-editor")
 export class WienerLinienAustriaCardEditor
@@ -57,6 +66,7 @@ export class WienerLinienAustriaCardEditor
   @property({ attribute: false }) public hass?: HomeAssistant;
 
   @state() private _config?: NormalisedModernConfig;
+  @state() private _tab: TabKey = "stops";
 
   public setConfig(config: WienerLinienCardConfig): void {
     this._config = normaliseModernConfig(config);
@@ -64,165 +74,30 @@ export class WienerLinienAustriaCardEditor
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    if (changed.has("_config")) return true;
-    // hass fires for every state change anywhere in HA — only re-render
-    // when one of the configured entities actually changed.
+    if (changed.has("_config") || changed.has("_tab")) return true;
+    // hass fires for every state change anywhere in HA — only re-render when
+    // one of the configured entities actually changed.
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
     const eids = this._config.entities.map((s) => s.entity);
     return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
   }
 
-  private _et(key: string): string {
-    return translate(`modern.editor.${key}`, { hassLanguage: this.hass?.language });
+  private get _i18n(): EditorTranslators {
+    return editorTranslators("modern", this.hass?.language);
   }
 
-  private _t(key: string): string {
-    return translate(`modern.${key}`, { hassLanguage: this.hass?.language });
-  }
-
-  private _fire(next: NormalisedModernConfig): void {
-    // CRITICAL: set _config BEFORE fireEvent. Custom editors don't
-    // receive a re-setConfig after config-changed, so a fireEvent-only
-    // path leaves _config stale and the next render reverts the form
-    // to its pre-change value.
+  private _commit(next: NormalisedModernConfig): void {
     this._config = next;
     fireEvent(this, "config-changed", { config: next });
   }
 
-  // ------------------------------------------------------------------
-  // ha-form schema + computed labels/helpers
-  // ------------------------------------------------------------------
-
-  private _schema(): ReadonlyArray<HaFormSchema> {
-    return [
-      {
-        name: "entities",
-        required: true,
-        selector: {
-          entity: {
-            multiple: true,
-            filter: { domain: "sensor", integration: "wiener_linien_austria" },
-          },
-        },
-      },
-      {
-        name: "layout",
-        selector: {
-          select: {
-            mode: "dropdown",
-            options: [
-              { value: "stacked", label: this._et("layout_stacked") },
-              { value: "tabs", label: this._et("layout_tabs") },
-            ],
-          },
-        },
-      },
-      {
-        // `flatten: true` — every toggle below writes flat to `data`
-        // (e.g. `data.show_hero_metric`), matching the card's flat
-        // config-key reads. See HaFormExpandableSchema docstring.
-        type: "expandable",
-        name: "display",
-        title: this._et("section_display"),
-        flatten: true,
-        schema: [
-          {
-            name: "max_departures",
-            selector: {
-              number: { min: 0, max: 20, step: 1, mode: "slider" },
-            },
-          },
-          { name: "hide_header", selector: { boolean: {} } },
-          { name: "show_hero_metric", selector: { boolean: {} } },
-          { name: "show_departures", selector: { boolean: {} } },
-          { name: "show_stops_ahead", selector: { boolean: {} } },
-          { name: "show_qr_button", selector: { boolean: {} } },
-          { name: "show_platform", selector: { boolean: {} } },
-          { name: "show_accessibility", selector: { boolean: {} } },
-          { name: "accessibility_only", selector: { boolean: {} } },
-          { name: "show_cooling", selector: { boolean: {} } },
-          { name: "show_type_icon", selector: { boolean: {} } },
-          { name: "show_traffic_info", selector: { boolean: {} } },
-          { name: "show_elevator_info", selector: { boolean: {} } },
-          { name: "show_delay", selector: { boolean: {} } },
-          { name: "show_delay_colors", selector: { boolean: {} } },
-          { name: "hide_attribution", selector: { boolean: {} } },
-        ],
-      },
-    ];
-  }
-
-  /** Field-label / helper-text resolution lives in `editor-shared.ts`
-   *  so the modern and retro editors can't drift on the lookup chain. */
-  private _computeLabel = (field: { name: string }): string =>
-    resolveEditorLabel(field, {
-      hass: this.hass,
-      et: (k) => this._et(k),
-      editorNamespace: "modern.editor",
-    });
-
-  private _computeHelper = (field: { name: string }): string | undefined =>
-    resolveEditorHelper(field, {
-      et: (k) => this._et(k),
-      editorNamespace: "modern.editor",
-    });
-
-  /** Translate the saved-config shape (Array<NormalisedModernStop>) to
-   *  ha-form's input shape (flat string[]). Per-stop overrides are
-   *  rendered separately below the form. */
-  private _formData(): Record<string, unknown> {
-    if (!this._config) return {};
-    const entities = this._config.entities.map((s) => s.entity);
-    return {
-      ...this._config,
-      entities,
-    };
-  }
-
-  /** Translate ha-form's value back to NormalisedModernConfig. The
-   *  storage-shape translator is the critical piece: when the user
-   *  adds/removes a stop via the entity selector, ha-form emits a
-   *  flat `string[]`, but we must preserve per-stop overrides
-   *  (lines, direction, walk_times, line_directions) for the surviving
-   *  entities. Match by entity id; new entities get a bare
-   *  `{ entity: id }` placeholder. */
-  private _onFormChanged = (
-    ev: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
+  private _patch(value: Record<string, unknown>): void {
     if (!this._config) return;
-    const value = ev.detail.value;
-    const rawEntities = value["entities"];
-    const newEntityIds: string[] = Array.isArray(rawEntities)
-      ? rawEntities.filter((s): s is string => typeof s === "string" && s.length > 0)
-      : [];
-    // Index current per-stop overrides by entity id.
-    const byEntity = new Map<string, NormalisedModernStop>();
-    for (const stop of this._config.entities) {
-      byEntity.set(stop.entity, stop);
-    }
-    // Rebuild in the order ha-form produced (so user-visible order
-    // tracks the selector). New entities get a placeholder; surviving
-    // entities preserve their overrides.
-    const nextEntities: NormalisedModernStop[] = newEntityIds.map(
-      (eid) => byEntity.get(eid) ?? { entity: eid },
-    );
-
-    // Pipe through normaliseModernConfig so the boolean coercion + slider
-    // clamp + layout narrowing stay consistent with the card's setConfig.
-    // Spread existing _config first to preserve dashboard passthrough
-    // fields AND `type` (which ha-form's value never carries).
-    const next = normaliseModernConfig({
-      ...this._config,
-      ...value,
-      entities: nextEntities,
-    });
-    this._fire(next);
-  };
-
-  // ------------------------------------------------------------------
-  // Bespoke per-stop mutators (line chips, direction, walk-times)
-  // ------------------------------------------------------------------
+    // Spread the existing config first so dashboard passthrough fields AND
+    // `type` survive — ha-form's value carries neither.
+    this._commit(normaliseModernConfig({ ...this._config, ...value }));
+  }
 
   private _updateStop(
     eid: string,
@@ -232,73 +107,52 @@ export class WienerLinienAustriaCardEditor
     const entities = this._config.entities.map((s) =>
       s.entity === eid ? mutator({ ...s }) : s,
     );
-    this._fire({ ...this._config, entities });
+    this._commit({ ...this._config, entities });
   }
 
-  private _toggleLine(eid: string, line: string): void {
-    this._updateStop(eid, (s) => {
-      const cur = new Set(s.lines ?? []);
-      if (cur.has(line)) cur.delete(line);
-      else cur.add(line);
-      if (cur.size > 0) s.lines = [...cur];
-      else delete s.lines;
-      return s;
-    });
-  }
-
-  private _setDirection(eid: string, dir: "H" | "R" | null): void {
-    this._updateStop(eid, (s) => {
-      if (dir === null) delete s.direction;
-      else s.direction = dir;
-      return s;
-    });
-  }
-
-  private _setLineDirection(
-    eid: string,
-    line: string,
-    dir: "H" | "R" | null,
-  ): void {
-    this._updateStop(eid, (s) => {
-      const cur = { ...(s.line_directions ?? {}) };
-      if (dir === null) delete cur[line];
-      else cur[line] = dir;
-      if (Object.keys(cur).length) s.line_directions = cur;
-      else delete s.line_directions;
-      return s;
-    });
-  }
-
-  private _setWalkTime(eid: string, key: string, raw: string): void {
-    const clean = coerceWalkTime(raw, `${eid}/${key}`);
-    this._updateStop(eid, (s) => {
-      const cur = { ...(s.walk_times ?? {}) };
-      if (clean === null) delete cur[key];
-      else cur[key] = clean;
-      if (Object.keys(cur).length) s.walk_times = cur;
-      else delete s.walk_times;
-      return s;
-    });
-  }
-
-  private _setLineColor(line: string, color: string): void {
-    if (!this._config) return;
-    const line_colors = {
-      ...this._config.line_colors,
-      [line.toUpperCase()]: color,
+  private get _stopCallbacks(): StopBlockCallbacks {
+    return {
+      toggleLine: (eid, line) =>
+        this._updateStop(eid, (s) => {
+          const cur = new Set(s.lines ?? []);
+          if (cur.has(line)) cur.delete(line);
+          else cur.add(line);
+          if (cur.size) s.lines = [...cur];
+          else delete s.lines;
+          return s;
+        }),
+      setDirection: (eid, dir) =>
+        this._updateStop(eid, (s) => {
+          if (dir === null) delete s.direction;
+          else s.direction = dir;
+          return s;
+        }),
+      setLineDirection: (eid, line, dir) =>
+        this._updateStop(eid, (s) => {
+          const cur = { ...(s.line_directions ?? {}) };
+          if (dir === null) delete cur[line];
+          else cur[line] = dir;
+          if (Object.keys(cur).length) s.line_directions = cur;
+          else delete s.line_directions;
+          return s;
+        }),
+      setWalkTime: (eid, key, minutes) =>
+        this._updateStop(eid, (s) => {
+          const cur = { ...(s.walk_times ?? {}) };
+          if (minutes === null) delete cur[key];
+          else cur[key] = minutes;
+          if (Object.keys(cur).length) s.walk_times = cur;
+          else delete s.walk_times;
+          return s;
+        }),
+      remove: (eid) => {
+        if (!this._config) return;
+        this._commit({
+          ...this._config,
+          entities: this._config.entities.filter((s) => s.entity !== eid),
+        });
+      },
     };
-    this._fire({ ...this._config, line_colors });
-  }
-
-  private _resetLineColor(line: string): void {
-    if (!this._config) return;
-    const line_colors = { ...this._config.line_colors };
-    delete line_colors[line.toUpperCase()];
-    this._fire({ ...this._config, line_colors });
-  }
-
-  private _attrs(eid: string): WienerLinienAttrs | undefined {
-    return this.hass?.states?.[eid]?.attributes as WienerLinienAttrs | undefined;
   }
 
   // ------------------------------------------------------------------
@@ -307,342 +161,235 @@ export class WienerLinienAustriaCardEditor
 
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
+    const { et } = this._i18n;
     return html`
-      <div class="editor">
-        <ha-form
-          .hass=${this.hass}
-          .data=${this._formData()}
-          .schema=${this._schema()}
-          .computeLabel=${this._computeLabel}
-          .computeHelper=${this._computeHelper}
-          @value-changed=${this._onFormChanged}
-        ></ha-form>
-        ${this._renderPerStopSections()}
-        ${this._renderColorsSection()}
+      <div class="wl-editor">
+        ${renderTabs(
+          [
+            { key: "stops", label: et("tab_stops") },
+            { key: "display", label: et("tab_display") },
+            { key: "tweaks", label: et("tab_tweaks") },
+          ],
+          this._tab,
+          (key) => {
+            this._tab = key;
+          },
+        )}
+        ${renderPanel(this._tab, this._renderActiveTab())}
       </div>
     `;
   }
 
-  private _renderPerStopSections(): TemplateResult | typeof nothing {
+  private _renderActiveTab(): TemplateResult | typeof nothing {
+    switch (this._tab) {
+      case "stops":
+        return this._renderStops();
+      case "display":
+        return this._renderDisplay();
+      case "tweaks":
+        return this._renderColors();
+    }
+  }
+
+  private _renderStops(): TemplateResult {
     const cfg = this._config!;
-    if (!cfg.entities.length) return nothing;
-    return html`${cfg.entities.map((stop) => this._renderStopFilter(stop))}`;
-  }
-
-  /** Per-call resolution so a runtime language change is picked up on
-   *  the next render. */
-  private _dirPillStrings(dir: "H" | "R"): { full: string; short: string } {
-    return {
-      full: this._t(dir === "H" ? "dir_h" : "dir_r"),
-      short: this._t(dir === "H" ? "dir_h_short" : "dir_r_short"),
-    };
-  }
-
-  /** Stop-wide direction-button label: pools every terminus visible in
-   *  `dir` across every line at the stop. Useful at hub stops where the
-   *  user wants to know "Hinfahrt = which destinations?" before
-   *  committing to the filter. */
-  private _stopWideDirectionLabel(
-    triplets: ReadonlyArray<{ line: string; direction: string; towards: string }>,
-    dir: "H" | "R",
-  ): string {
-    const termini = new Set<string>();
-    for (const t of triplets) {
-      if (t.direction === dir && t.towards) termini.add(t.towards);
-    }
-    return formatDirectionPillLabel([...termini].sort(), this._dirPillStrings(dir));
-  }
-
-  /** Per-line direction-button label: terminus(es) for one specific line
-   *  in `dir`. Same compact / fallback behaviour as the stop-wide label. */
-  private _perLineDirectionLabel(
-    triplets: ReadonlyArray<{ line: string; direction: string; towards: string }>,
-    line: string,
-    dir: "H" | "R",
-  ): string {
-    const termini = new Set<string>();
-    for (const t of triplets) {
-      if (t.line === line && t.direction === dir && t.towards) {
-        termini.add(t.towards);
-      }
-    }
-    return formatDirectionPillLabel([...termini].sort(), this._dirPillStrings(dir));
-  }
-
-  private _renderStopFilter(stop: NormalisedModernStop): TemplateResult {
-    const attrs = this._attrs(stop.entity);
-    // Entity disappeared from HA (integration removed, entity disabled,
-    // typo in saved config) — surface an explicit alert under the
-    // entities selector instead of silently rendering nothing. ha-form's
-    // entity selector flags the row visually but emits no user-readable
-    // error; this fills the WCAG 3.3.1 (Error Identification) gap so
-    // the user knows the saved config references something that no
-    // longer exists. Card render path silently skips the same case.
-    if (!attrs) {
-      return html`
-        <ha-alert alert-type="warning">
-          ${this._t("entity_missing").replace("{entity}", stop.entity)}
-        </ha-alert>
-      `;
-    }
-    const stopName = attrs.stop_name || stop.entity;
-    const overrides = this._config!.line_colors;
-    const lineColors = attrs.line_colors ?? {};
-    const lines = linesAtStop(attrs);
-    // Per-line vehicle type lookup so each chip can render its MoT icon
-    // (mdi:subway-variant / mdi:tram / mdi:bus). First-seen-wins on
-    // collision because Wiener Linien lines have a stable single MoT.
-    const typeByLine = new Map<string, string>();
-    for (const d of attrs.departures ?? []) {
-      if (d.line && d.type && !typeByLine.has(d.line)) {
-        typeByLine.set(d.line, d.type);
-      }
-    }
-    const picked = new Set(stop.lines ?? []);
-    const dir = stop.direction ?? null;
-    const lineDirs = stop.line_directions ?? {};
-
-    const effectiveLines = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
-    const showPerLineDir = effectiveLines.length >= 2;
-
-    const allTriplets = tripletsAtStop(attrs);
-
-    const dirsForLine = (line: string): Set<"H" | "R"> => {
-      const out = new Set<"H" | "R">();
-      for (const t of allTriplets) {
-        if (t.line !== line) continue;
-        if (t.direction === "H" || t.direction === "R") out.add(t.direction);
-      }
-      return out;
-    };
-    const stopAvailableDirs = new Set<"H" | "R">();
-    for (const t of allTriplets) {
-      if (t.direction === "H" || t.direction === "R") stopAvailableDirs.add(t.direction);
-    }
-    const stopHasH = stopAvailableDirs.has("H");
-    const stopHasR = stopAvailableDirs.has("R");
-    const stopOnlyOne = stopAvailableDirs.size === 1;
-    const stopActiveH = dir === "H" || (dir === null && stopOnlyOne && stopHasH);
-    const stopActiveR = dir === "R" || (dir === null && stopOnlyOne && stopHasR);
-    const stopActiveBoth = dir === null && !stopOnlyOne;
-
+    const { t, et } = this._i18n;
     return html`
-      <div class="stop-filter">
-        <div class="stop-filter-header">${stopName}</div>
-
-        <div class="stop-filter-row">
-          <div class="stop-filter-row-label">${this._et("lines_label")}</div>
-          <div class="line-chips">
-            ${lines.length
-              ? lines.map((l) => {
-                  const isOn = picked.size === 0 || picked.has(l);
-                  const color = colorForLine(l, overrides, lineColors);
-                  const icon = lineTypeIcon(typeByLine.get(l)) ?? "mdi:bus-stop";
-                  return html`<button
-                    type="button"
-                    class=${classMap({ chip: true, selected: isOn })}
-                    style=${styleMap({ "--chip-color": color })}
-                    aria-pressed=${isOn ? "true" : "false"}
-                    aria-label="${this._et("lines_label")}: ${l}"
-                    @click=${() => this._toggleLine(stop.entity, l)}
-                  >
-                    <ha-icon icon=${icon} aria-hidden="true"></ha-icon>
-                    <span>${l}</span>
-                  </button>`;
-                })
-              : html`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
-          </div>
-        </div>
-
-        <div class="stop-filter-row">
-          <div class="stop-filter-row-label">${this._et("direction_label")}</div>
-          <div class="direction-buttons">
-            <button
-              type="button"
-              class=${classMap({ active: stopActiveH })}
-              ?disabled=${!stopHasH}
-              title=${!stopHasH ? this._et("direction_unavailable") : ""}
-              @click=${() => stopHasH && this._setDirection(stop.entity, "H")}
-            >${this._stopWideDirectionLabel(allTriplets, "H")}</button>
-            <button
-              type="button"
-              class=${classMap({ active: stopActiveR })}
-              ?disabled=${!stopHasR}
-              title=${!stopHasR ? this._et("direction_unavailable") : ""}
-              @click=${() => stopHasR && this._setDirection(stop.entity, "R")}
-            >${this._stopWideDirectionLabel(allTriplets, "R")}</button>
-            <button
-              type="button"
-              class=${classMap({ active: stopActiveBoth })}
-              ?disabled=${stopOnlyOne}
-              title=${stopOnlyOne ? this._et("direction_unavailable") : ""}
-              @click=${() => !stopOnlyOne && this._setDirection(stop.entity, null)}
-            >${this._t("dir_both")}</button>
-          </div>
-        </div>
-
-        ${showPerLineDir
-          ? html`
-              <div class="stop-filter-row">
-                <div class="stop-filter-row-label">${this._et("per_line_direction_label")}</div>
-                <div class="editor-hint">${this._et("per_line_direction_hint")}</div>
-                <div class="per-line-dir-list">
-                  ${effectiveLines.map((l) => {
-                    const color = colorForLine(l, overrides, lineColors);
-                    const lineDir = lineDirs[l] ?? null;
-                    const lineAvail = dirsForLine(l);
-                    const lineHasH = lineAvail.has("H");
-                    const lineHasR = lineAvail.has("R");
-                    const lineOnlyOne = lineAvail.size === 1;
-                    const lineActiveH = lineDir === "H" || (lineDir === null && lineOnlyOne && lineHasH);
-                    const lineActiveR = lineDir === "R" || (lineDir === null && lineOnlyOne && lineHasR);
-                    const lineActiveBoth = lineDir === null && !lineOnlyOne;
-                    const ariaLabel = this._et("per_line_direction_aria").replace("{line}", l);
-                    const dirUnavailable = this._et("direction_unavailable");
-                    const labelFor = (d: "H" | "R"): string =>
-                      this._perLineDirectionLabel(allTriplets, l, d);
-                    return html`
-                      <div class="per-line-dir-row" role="group" aria-label=${ariaLabel}>
-                        <span class="per-line-dir-badge" style=${styleMap({ background: color })}>${l}</span>
-                        <div class="direction-buttons">
-                          <button
-                            type="button"
-                            class=${classMap({ active: lineActiveH })}
-                            aria-pressed=${lineActiveH ? "true" : "false"}
-                            ?disabled=${!lineHasH}
-                            title=${!lineHasH ? dirUnavailable : ""}
-                            @click=${() => lineHasH && this._setLineDirection(stop.entity, l, "H")}
-                          >${labelFor("H")}</button>
-                          <button
-                            type="button"
-                            class=${classMap({ active: lineActiveR })}
-                            aria-pressed=${lineActiveR ? "true" : "false"}
-                            ?disabled=${!lineHasR}
-                            title=${!lineHasR ? dirUnavailable : ""}
-                            @click=${() => lineHasR && this._setLineDirection(stop.entity, l, "R")}
-                          >${labelFor("R")}</button>
-                          <button
-                            type="button"
-                            class=${classMap({ active: lineActiveBoth })}
-                            aria-pressed=${lineActiveBoth ? "true" : "false"}
-                            ?disabled=${lineOnlyOne}
-                            title=${lineOnlyOne ? dirUnavailable : ""}
-                            @click=${() => !lineOnlyOne && this._setLineDirection(stop.entity, l, null)}
-                          >${this._t("dir_both")}</button>
-                        </div>
-                      </div>
-                    `;
-                  })}
-                </div>
-              </div>
-            `
-          : nothing}
-
-        ${this._renderWalkTimes(stop, dir, lineDirs)}
-      </div>
+      <ha-form
+        .hass=${this.hass}
+        .data=${{ entities: cfg.entities.map((s) => s.entity) }}
+        .schema=${[
+          {
+            name: "entities",
+            required: true,
+            selector: {
+              entity: {
+                multiple: true,
+                filter: { domain: "sensor", integration: "wiener_linien_austria" },
+              },
+            },
+          },
+        ] satisfies ReadonlyArray<HaFormSchema>}
+        .computeLabel=${this._computeLabel}
+        .computeHelper=${this._computeHelper}
+        @value-changed=${this._onEntitiesChanged}
+      ></ha-form>
+      ${cfg.entities.map((stop, i) =>
+        renderStopBlock(
+          this.hass,
+          stop,
+          {
+            index: i + 1,
+            total: cfg.entities.length,
+            lineColorOverrides: cfg.line_colors,
+            t,
+            et,
+          },
+          this._stopCallbacks,
+        ),
+      )}
     `;
   }
 
-  private _renderWalkTimes(
-    stop: NormalisedModernStop,
-    dir: "H" | "R" | null,
-    lineDirs: Record<string, "H" | "R">,
-  ): TemplateResult | typeof nothing {
-    const overrides = this._config!.line_colors;
-    const attrs = this._attrs(stop.entity);
-    const lineColors = attrs?.line_colors ?? {};
-    const allPairs = pairsAtStop(attrs);
-    const picked = new Set(stop.lines ?? []);
-    const pairs = allPairs.filter((p) => {
-      if (picked.size > 0 && !picked.has(p.line)) return false;
-      const effDir = lineDirs[p.line] ?? dir;
-      if (effDir && p.direction !== effDir) return false;
-      return true;
-    });
-    if (!pairs.length) return nothing;
-    return html`
-      <div class="stop-filter-row">
-        <div class="stop-filter-row-label">${this._et("walk_time_label")}</div>
-        <div class="editor-hint">${this._et("walk_time_hint")}</div>
-        <div class="walk-time-list">
-          ${pairs.map((p) => {
-            const color = colorForLine(p.line, overrides, lineColors);
-            const key = lineDirKey(p.line, p.direction);
-            const val = stop.walk_times?.[key];
-            const terminusLabel = p.termini.join(" / ");
-            const arrow = terminusLabel ? `→ ${terminusLabel}` : "";
-            const branchingHint =
-              p.termini.length > 1 ? this._et("walk_time_branching_hint") : "";
-            return html`
-              <div class="walk-time-row">
-                <span class="walk-time-badge" style=${styleMap({ background: color })}>${p.line}</span>
-                <span class="walk-time-towards" title=${branchingHint || terminusLabel}>${arrow}</span>
-                <input
-                  type="number"
-                  class="walk-time-input"
-                  min="0"
-                  max="120"
-                  step="1"
-                  inputmode="numeric"
-                  placeholder=${this._et("walk_time_placeholder")}
-                  aria-label=${this._et("walk_time_aria")
-                    .replace("{line}", p.line)
-                    .replace("{towards}", terminusLabel)}
-                  .value=${live(val !== undefined ? String(val) : "")}
-                  @keydown=${swallowEditorKeys}
-                  @keyup=${swallowEditorKeys}
-                  @keypress=${swallowEditorKeys}
-                  @change=${(ev: Event) =>
-                    this._setWalkTime(
-                      stop.entity,
-                      key,
-                      (ev.target as HTMLInputElement).value,
-                    )}
-                />
-              </div>
-            `;
-          })}
-        </div>
-      </div>
-    `;
-  }
-
-  /** Per-line colour swatch grid — bespoke because native
-   *  `<input type="color">` is the right primitive for picking a
-   *  hex value, and ha-form has no equivalent selector. */
-  private _renderColorsSection(): TemplateResult {
-    const cfg = this._config!;
-    const lines = collectLinesInSelection(this.hass, cfg.entities.map((s) => s.entity));
-    const overrides = cfg.line_colors;
-    const lineColors = firstLineColorsMap(
-      this.hass,
-      cfg.entities.map((s) => s.entity),
+  private _onEntitiesChanged = (
+    ev: CustomEvent<{ value: Record<string, unknown> }>,
+  ): void => {
+    ev.stopPropagation();
+    if (!this._config) return;
+    const raw = ev.detail.value["entities"];
+    const ids = Array.isArray(raw)
+      ? raw.filter((s): s is string => typeof s === "string" && s.length > 0)
+      : [];
+    const byEntity = new Map(this._config.entities.map((s) => [s.entity, s]));
+    this._commit(
+      normaliseModernConfig({
+        ...this._config,
+        entities: ids.map((eid) => byEntity.get(eid) ?? { entity: eid }),
+      }),
     );
+  };
+
+  private _renderDisplay(): TemplateResult {
+    const cfg = this._config!;
+    const { et } = this._i18n;
+    const common = {
+      hass: this.hass,
+      computeLabel: this._computeLabel,
+      computeHelper: this._computeHelper,
+      onChange: (v: Record<string, unknown>) => this._patch(v),
+    };
+
     return html`
-      <div class="editor-section">
-        <div class="section-header">${this._et("section_colors")}</div>
-        <div class="editor-hint">${this._et("colors_hint")}</div>
-        ${lines.length
-          ? lines.map((line) => {
-              const current = colorForLine(line, overrides, lineColors, "#888888");
+      ${renderFormSection({
+        ...common,
+        title: et("section_layout"),
+        hint: et("section_layout_hint"),
+        data: {
+          layout: cfg.layout,
+          max_departures: cfg.max_departures,
+          hide_header: cfg.hide_header,
+          show_hero_metric: cfg.show_hero_metric,
+          show_departures: cfg.show_departures,
+          show_stops_ahead: cfg.show_stops_ahead,
+          show_qr_button: cfg.show_qr_button,
+        },
+        schema: [
+          {
+            name: "layout",
+            // Only meaningful with more than one stop — with a single stop
+            // there is nothing to stack or tab between.
+            disabled: cfg.entities.length < 2,
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "stacked", label: et("layout_stacked") },
+                  { value: "tabs", label: et("layout_tabs") },
+                ],
+              },
+            },
+          },
+          {
+            name: "max_departures",
+            selector: { number: { min: 0, max: 20, step: 1, mode: "slider" } },
+          },
+          { name: "hide_header", selector: { boolean: {} } },
+          { name: "show_hero_metric", selector: { boolean: {} } },
+          { name: "show_departures", selector: { boolean: {} } },
+          { name: "show_stops_ahead", selector: { boolean: {} } },
+          { name: "show_qr_button", selector: { boolean: {} } },
+        ],
+      })}
+      ${renderFormSection({
+        ...common,
+        title: et("section_departure_row"),
+        hint: et("section_departure_row_hint"),
+        data: {
+          show_platform: cfg.show_platform,
+          show_accessibility: cfg.show_accessibility,
+          accessibility_only: cfg.accessibility_only,
+          show_cooling: cfg.show_cooling,
+          show_type_icon: cfg.show_type_icon,
+        },
+        schema: [
+          { name: "show_platform", selector: { boolean: {} } },
+          { name: "show_accessibility", selector: { boolean: {} } },
+          {
+            name: "accessibility_only",
+            disabled: !cfg.show_accessibility,
+            selector: { boolean: {} },
+          },
+          { name: "show_cooling", selector: { boolean: {} } },
+          { name: "show_type_icon", selector: { boolean: {} } },
+        ],
+      })}
+      ${renderFormSection({
+        ...common,
+        title: et("section_disruptions"),
+        data: {
+          show_traffic_info: cfg.show_traffic_info,
+          show_elevator_info: cfg.show_elevator_info,
+          show_delay: cfg.show_delay,
+          show_delay_colors: cfg.show_delay_colors,
+          hide_attribution: cfg.hide_attribution,
+        },
+        schema: [
+          { name: "show_traffic_info", selector: { boolean: {} } },
+          { name: "show_elevator_info", selector: { boolean: {} } },
+          { name: "show_delay", selector: { boolean: {} } },
+          {
+            name: "show_delay_colors",
+            disabled: !cfg.show_delay,
+            selector: { boolean: {} },
+          },
+          { name: "hide_attribution", selector: { boolean: {} } },
+        ],
+      })}
+    `;
+  }
+
+  /** Per-line colour overrides. Bespoke because this is a Record whose keys are
+   *  discovered at runtime from the selected stops — exactly the residue
+   *  ha-form is not meant to model. Only lines currently in the selection get a
+   *  row; an override for a line no longer selected stays in the config
+   *  untouched rather than being silently dropped. */
+  private _renderColors(): TemplateResult {
+    const cfg = this._config!;
+    const { et } = this._i18n;
+    const eids = cfg.entities.map((s) => s.entity);
+    const lines = collectLinesInSelection(this.hass, eids);
+    const gtfs = firstLineColorsMap(this.hass, eids);
+
+    return renderSection(
+      { title: et("section_colors"), hint: et("section_colors_hint") },
+      lines.length
+        ? html`<div class="wl-group">
+            <span class="wl-note">${et("colors_hint")}</span>
+            ${lines.map((line) => {
+              const current = colorForLine(line, cfg.line_colors, gtfs, "#888888");
               const hex = current.startsWith("#") ? current : "#888888";
-              const hasOverride = Boolean(overrides[line.toUpperCase()]);
-              const ariaPick = this._et("pick_color_for_line").replace("{line}", line);
+              const overridden = Boolean(cfg.line_colors[line.toUpperCase()]);
+              const pick = et("pick_color_for_line").replace("{line}", line);
               return html`
-                <div class="color-row">
-                  <span class="line-preview" aria-hidden="true" style=${styleMap({ background: current })}>${line}</span>
-                  <label
-                    class="color-swatch"
-                    style=${styleMap({ "--swatch-color": hex })}
-                    title=${ariaPick}
+                <div class="wl-color-row">
+                  <span
+                    class="wl-badge"
+                    style=${styleMap({ background: current })}
+                    aria-hidden="true"
+                    >${line}</span
                   >
-                    <ha-icon icon="mdi:palette-swatch-variant" aria-hidden="true"></ha-icon>
-                    <span class="color-swatch-hex">${hex.toUpperCase()}</span>
+                  <label class="wl-color-field" title=${pick}>
+                    <span
+                      class="wl-swatch"
+                      style=${styleMap({ background: hex })}
+                      aria-hidden="true"
+                    ></span>
+                    <span class="wl-color-hex">${hex.toUpperCase()}</span>
                     <input
                       type="color"
-                      class="color-swatch-input"
+                      class="wl-color-input"
                       .value=${hex}
-                      aria-label=${ariaPick}
+                      aria-label=${pick}
                       @input=${(ev: Event) =>
                         this._setLineColor(line, (ev.target as HTMLInputElement).value)}
                       @change=${(ev: Event) =>
@@ -651,205 +398,67 @@ export class WienerLinienAustriaCardEditor
                   </label>
                   <button
                     type="button"
-                    class="reset-btn"
-                    ?disabled=${!hasOverride}
-                    @click=${() => hasOverride && this._resetLineColor(line)}
-                  >${this._et("reset_color")}</button>
+                    class="wl-icon-btn"
+                    ?disabled=${!overridden}
+                    aria-label=${et("reset_color_aria").replace("{line}", line)}
+                    title=${et("reset_color")}
+                    @click=${() => this._resetLineColor(line)}
+                  >
+                    <ha-icon icon="mdi:restore" aria-hidden="true"></ha-icon>
+                  </button>
                 </div>
               `;
-            })
-          : html`<div class="editor-hint">${this._et("no_lines_available")}</div>`}
-      </div>
-    `;
+            })}
+          </div>`
+        : html`<div class="wl-empty">
+            <span class="wl-empty-title">${et("no_lines_title")}</span>
+            <span class="wl-note">${et("colors_empty_hint")}</span>
+          </div>`,
+    );
   }
 
-  static override styles: CSSResultGroup = [
-    editorBaseStyles,
-    css`
-    .stop-filter {
-      background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
-      border-radius: 12px;
-      padding: 14px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
+  /** Both `@input` and `@change` are wired on purpose: `input` fires
+   *  continuously while the user drags inside the OS picker, `change` once on
+   *  commit. Without `input` the card preview only recolours after the picker
+   *  closes, so the user cannot see the colour they are choosing. */
+  private _setLineColor(line: string, color: string): void {
+    if (!this._config) return;
+    this._commit({
+      ...this._config,
+      line_colors: { ...this._config.line_colors, [line.toUpperCase()]: color },
+    });
+  }
+
+  private _resetLineColor(line: string): void {
+    if (!this._config) return;
+    const line_colors = { ...this._config.line_colors };
+    delete line_colors[line.toUpperCase()];
+    this._commit({ ...this._config, line_colors });
+  }
+
+  private _computeLabel = (field: { name: string }): string => {
+    const ha = this.hass?.localize?.(
+      `ui.panel.lovelace.editor.card.generic.${field.name}`,
+    );
+    return ha || this._i18n.et(field.name);
+  };
+
+  private _computeHelper = (field: { name: string }): string | undefined => {
+    const { et } = this._i18n;
+    const cfg = this._config;
+    if (field.name === "accessibility_only" && !cfg?.show_accessibility) {
+      return et("accessibility_only_requires");
     }
-    .stop-filter-header {
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: var(--primary-text-color);
+    if (field.name === "show_delay_colors" && !cfg?.show_delay) {
+      return et("show_delay_colors_requires");
     }
-    .stop-filter-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+    if (field.name === "layout" && (cfg?.entities.length ?? 0) < 2) {
+      return et("layout_requires");
     }
-    .stop-filter-row-label {
-      font-size: 0.8125rem;
-      font-weight: 500;
-      color: var(--primary-text-color);
-    }
-    .line-chips,
-    .per-line-dir-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .per-line-dir-list {
-      flex-direction: column;
-      gap: 4px;
-    }
-    .per-line-dir-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .per-line-dir-badge {
-      min-width: 36px;
-      text-align: center;
-      font-weight: 700;
-      color: #fff;
-      border-radius: 4px;
-      padding: 2px 6px;
-      font-size: 0.8125rem;
-    }
-    /* Line chip — outlined-by-default, filled-when-selected, with the
-       MoT icon beside the line label. Mirrors linz-linien's chip
-       pattern: --chip-color is set inline per line (GTFS palette →
-       colorForLine), the CSS does state via .selected + the
-       color-mix hover tint. */
-    .chip {
-      --chip-color: var(--primary-color);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      min-height: 32px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 0.8125rem;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      cursor: pointer;
-      transition:
-        background-color var(--ha-animation-duration-fast, 150ms) ease,
-        color var(--ha-animation-duration-fast, 150ms) ease;
-      border: 1.5px solid var(--chip-color);
-      background: transparent;
-      color: var(--primary-text-color);
-      forced-color-adjust: none;
-    }
-    .chip ha-icon {
-      --mdc-icon-size: 16px;
-      color: var(--chip-color);
-      flex-shrink: 0;
-      transition: color var(--ha-animation-duration-fast, 150ms) ease;
-    }
-    .chip:hover {
-      background: color-mix(in srgb, var(--chip-color) 16%, transparent);
-    }
-    .chip.selected {
-      background: var(--chip-color);
-      color: #fff;
-    }
-    .chip.selected ha-icon {
-      color: #fff;
-    }
-    .chip:focus-visible {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-    }
-    .direction-buttons {
-      display: inline-flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-    .direction-buttons button {
-      padding: 8px 14px;
-      border-radius: 18px;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color, #fff);
-      color: var(--primary-text-color);
-      font-size: 0.8125rem;
-      cursor: pointer;
-      min-width: 44px;
-      min-height: 36px;
-    }
-    .direction-buttons button.active {
-      background: var(--primary-color);
-      color: var(--text-primary-color, #fff);
-      border-color: var(--primary-color);
-    }
-    .direction-buttons button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    /* walk-time rules live in editor-shared-styles. The modern editor
-       styles its badge bg per-line via styleMap (vs the shared default
-       var(--primary-color)), but the box-model rules are identical. */
-    .color-row {
-      display: grid;
-      grid-template-columns: 60px 1fr auto;
-      align-items: center;
-      gap: 12px;
-      margin-top: 6px;
-    }
-    .line-preview {
-      text-align: center;
-      font-weight: 700;
-      color: #fff;
-      border-radius: 6px;
-      padding: 4px 6px;
-      font-size: 0.8125rem;
-    }
-    .color-swatch {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--divider-color);
-      background: var(--card-background-color, #fff);
-      cursor: pointer;
-    }
-    .color-swatch::before {
-      content: "";
-      width: 16px;
-      height: 16px;
-      border-radius: 4px;
-      background: var(--swatch-color, #888888);
-    }
-    .color-swatch-hex {
-      font-size: 0.75rem;
-      font-variant-numeric: tabular-nums;
-      color: var(--secondary-text-color);
-    }
-    .color-swatch-input {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-    }
-    /* The real <input type="color"> is opacity:0, so its own focus ring
-       is invisible — lift the ring onto the label for keyboard users
-       (WCAG 2.4.7 Focus Visible). */
-    .color-swatch:focus-within {
-      outline: 2px solid var(--primary-color);
-      outline-offset: 2px;
-    }
-    .reset-btn {
-      padding: 6px 12px;
-      border-radius: 6px;
-      border: 1px solid var(--divider-color);
-      background: transparent;
-      color: var(--primary-text-color);
-      font-size: 0.75rem;
-      cursor: pointer;
-    }
-    .reset-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-  `,
-  ];
+    const key = `${field.name}_helper`;
+    const value = et(key);
+    return value === key ? undefined : value;
+  };
+
+  static override styles: CSSResultGroup = [editorTokens, editorStyles];
 }
