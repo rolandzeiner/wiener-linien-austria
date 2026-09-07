@@ -1,9 +1,10 @@
-// Shared render helpers used by BOTH bundled cards (modern + retro).
+// Shared render helpers used by all three bundled cards (modern + retro
+// + flap).
 // Extracted so the version-banner + the WS card-version probe live in
 // one place — each card stays focused on its own rendering rather than
 // carrying its own copy of the integration-upgrade plumbing. Each card
-// passes its own WS probe `type` string and bundle version so the two
-// banners don't cross-fire when both cards sit on the same dashboard.
+// passes its own WS probe `type` string and bundle version so the
+// banners don't cross-fire when several cards sit on the same dashboard.
 //
 // Conventions:
 // - Pure functions: no `this`, take what they need as arguments,

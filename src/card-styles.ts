@@ -1811,8 +1811,7 @@ export const cardStyles = css`
     }
   }
   .dep-row,
-  .hero-host,
-  .alert-row {
+  .hero-host {
     animation: wlRowReveal 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
     animation-delay: calc(min(var(--row-i, 0), 6) * 55ms);
   }

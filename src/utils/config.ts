@@ -496,6 +496,10 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "header_left",
   "header_right",
   "show_line_pill",
+  // Legacy alias for show_line_pill — read by the normaliser for
+  // back-compat, so it must NOT leak into the passthrough and get
+  // written back into the user's saved config.
+  "line_pill",
   "line_stripe",
   "housing",
   "show_unit",

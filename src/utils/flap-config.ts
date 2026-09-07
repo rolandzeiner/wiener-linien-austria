@@ -167,6 +167,10 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "header_right",
   "hide_attribution",
   "show_line_column",
+  // Legacy alias for show_line_column (inverted polarity) — read by the
+  // normaliser for back-compat, so it must NOT leak into the passthrough
+  // and get written back into the user's saved config.
+  "line_pill",
   "housing",
 ]);
 

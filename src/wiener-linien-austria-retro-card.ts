@@ -80,7 +80,7 @@ const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
 {
   const win = window as unknown as WindowWithCustomCards;
   win.customCards = win.customCards ?? [];
-  if (!win.customCards.some((c) => c["type"] === "wiener-linien-austria-retro-card")) {
+  if (!win.customCards.some((c) => c.type === "wiener-linien-austria-retro-card")) {
     win.customCards.push({
       type: "wiener-linien-austria-retro-card",
       name: "Wiener Linien Austria — Retro",

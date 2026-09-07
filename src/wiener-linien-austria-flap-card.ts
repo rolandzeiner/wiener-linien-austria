@@ -264,6 +264,21 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       this._versionCheckDone = true;
       void this._checkCardVersion();
     }
+    // Re-arm the march after a detach/reattach (HA rebuilds the dashboard
+    // on load). `disconnectedCallback` cleared the timer, and
+    // `_diffFlipField` only re-arms when a value CHANGES — so reconnecting
+    // with unchanged data would leave the board parked mid-flip on
+    // intermediate glyphs until the next countdown tick happened to move
+    // it. Same hazard the retro card's ticker re-arm exists for.
+    if (this._hasPendingFlips()) this._ensureMarchTimer();
+  }
+
+  /** Any field whose displayed text hasn't reached its target yet — i.e.
+   *  the march is unfinished and needs a timer to carry it. */
+  private _hasPendingFlips(): boolean {
+    return Object.entries(this._target).some(
+      ([key, target]) => this._displayed[key] !== target,
+    );
   }
 
   public override disconnectedCallback(): void {
