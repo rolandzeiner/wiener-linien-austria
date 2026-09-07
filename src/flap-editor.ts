@@ -345,7 +345,6 @@ export class WienerLinienAustriaFlapCardEditor
           accessibility_only: cfg.accessibility_only,
           show_min_unit: cfg.show_min_unit,
           size: cfg.size,
-          hide_attribution: cfg.hide_attribution,
         },
         schema: [
           { name: "max_rows", selector: { number: { min: 1, max: 8, step: 1, mode: "slider" } } },
@@ -375,7 +374,6 @@ export class WienerLinienAustriaFlapCardEditor
               },
             },
           },
-          { name: "hide_attribution", selector: { boolean: {} } },
         ],
       })}
     `;
@@ -384,19 +382,30 @@ export class WienerLinienAustriaFlapCardEditor
   private _renderTweaks(): TemplateResult {
     const cfg = this._config!;
     const { et } = this._i18n;
-    return renderFormSection({
+    const common = {
       hass: this.hass,
-      title: et("section_tweaks"),
-      hint: et("section_tweaks_hint"),
-      data: { show_line_column: cfg.show_line_column, housing: cfg.housing },
-      schema: [
-        { name: "show_line_column", selector: { boolean: {} } },
-        { name: "housing", selector: { boolean: {} } },
-      ],
       computeLabel: this._computeLabel,
       computeHelper: this._computeHelper,
-      onChange: (v) => this._patch(v),
-    });
+      onChange: (v: Record<string, unknown>) => this._patch(v),
+    };
+    return html`
+      ${renderFormSection({
+        ...common,
+        title: et("section_tweaks"),
+        hint: et("section_tweaks_hint"),
+        data: { show_line_column: cfg.show_line_column, housing: cfg.housing },
+        schema: [
+          { name: "show_line_column", selector: { boolean: {} } },
+          { name: "housing", selector: { boolean: {} } },
+        ],
+      })}
+      ${renderFormSection({
+        ...common,
+        title: et("section_footer"),
+        data: { hide_attribution: cfg.hide_attribution },
+        schema: [{ name: "hide_attribution", selector: { boolean: {} } }],
+      })}
+    `;
   }
 
   private _patchHeaderSide(

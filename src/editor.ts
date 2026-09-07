@@ -186,7 +186,7 @@ export class WienerLinienAustriaCardEditor
       case "display":
         return this._renderDisplay();
       case "tweaks":
-        return this._renderColors();
+        return this._renderMisc();
     }
   }
 
@@ -330,7 +330,6 @@ export class WienerLinienAustriaCardEditor
           show_elevator_info: cfg.show_elevator_info,
           show_delay: cfg.show_delay,
           show_delay_colors: cfg.show_delay_colors,
-          hide_attribution: cfg.hide_attribution,
         },
         schema: [
           { name: "show_traffic_info", selector: { boolean: {} } },
@@ -341,8 +340,24 @@ export class WienerLinienAustriaCardEditor
             disabled: !cfg.show_delay,
             selector: { boolean: {} },
           },
-          { name: "hide_attribution", selector: { boolean: {} } },
         ],
+      })}
+    `;
+  }
+
+  private _renderMisc(): TemplateResult {
+    const cfg = this._config!;
+    const { et } = this._i18n;
+    return html`
+      ${this._renderColors()}
+      ${renderFormSection({
+        hass: this.hass,
+        title: et("section_footer"),
+        data: { hide_attribution: cfg.hide_attribution },
+        schema: [{ name: "hide_attribution", selector: { boolean: {} } }],
+        computeLabel: this._computeLabel,
+        computeHelper: this._computeHelper,
+        onChange: (v) => this._patch(v),
       })}
     `;
   }
