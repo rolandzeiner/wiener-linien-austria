@@ -19,6 +19,7 @@
 
 import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
+import { live } from "lit/directives/live.js";
 
 import type { RetroHeaderExit, RetroHeaderSide } from "../types.js";
 import {
@@ -300,8 +301,14 @@ function renderChipsAndIcons(
       </div>
 
       ${icons.length < MAX_HEADER_ICONS
-        ? html`<ha-icon-picker
-            .value=${""}
+        ? // live() is load-bearing here. A plain .value="" binding makes Lit
+          // compare the previous bound value ("") against the new one ("") and
+          // skip the update — so after the first pick the element keeps showing
+          // the icon it chose and no further pick registers. live() compares
+          // against the element's actual DOM value instead, so it is cleared on
+          // every render and ready for the next pick.
+          html`<ha-icon-picker
+            .value=${live("")}
             .label=${opts.et("add_icon")}
             @value-changed=${(ev: CustomEvent<{ value?: string }>) => {
               const v = ev.detail?.value;

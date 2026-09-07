@@ -95,7 +95,15 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
     const cleaned = r.extra_icons
       .filter((v): v is string => typeof v === "string")
       .map((v) => v.trim())
-      .filter((v) => v.startsWith("mdi:") && v.length >= 5 && v.length <= 64)
+      // Any registered icon set, not just mdi:. The card renders these through
+      // <ha-icon>, which resolves whatever sets the instance has installed, so
+      // a user with a custom-icons integration can pick `hue:adore-mirror` and
+      // it will display. The old mdi:-only rule dated from v1's free-text
+      // input, where it guarded against garbage; v2 picks through
+      // ha-icon-picker, which only emits icons that actually resolve, so the
+      // shape check is all that is needed — and the narrow rule was silently
+      // discarding valid picks on save.
+      .filter((v) => /^[a-z0-9_-]+:[a-z0-9_-]+$/i.test(v) && v.length <= 64)
       .slice(0, 3);
     if (cleaned.length > 0) extra_icons = cleaned;
   }

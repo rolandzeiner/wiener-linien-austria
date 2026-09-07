@@ -362,6 +362,25 @@ export class WienerLinienAustriaRetroCardEditor
           { name: "accessibility_only", selector: { boolean: {} } },
         ],
       })}
+      ${renderFormSection({
+        ...common,
+        title: et("section_extras"),
+        hint: et("section_extras_hint"),
+        data: {
+          message_ticker: cfg.message_ticker,
+          message_text: cfg.message_text ?? "",
+          wheelchair_race: cfg.wheelchair_race,
+        },
+        schema: [
+          { name: "message_ticker", selector: { boolean: {} } },
+          {
+            name: "message_text",
+            disabled: !cfg.message_ticker,
+            selector: { text: {} },
+          },
+          { name: "wheelchair_race", selector: { boolean: {} } },
+        ],
+      })}
     `;
   }
 
@@ -422,25 +441,6 @@ export class WienerLinienAustriaRetroCardEditor
           { name: "line_stripe", selector: { boolean: {} } },
           { name: "housing", selector: { boolean: {} } },
           { name: "flicker", selector: { boolean: {} } },
-        ],
-      })}
-      ${renderFormSection({
-        ...common,
-        title: et("section_extras"),
-        hint: et("section_extras_hint"),
-        data: {
-          message_ticker: cfg.message_ticker,
-          message_text: cfg.message_text ?? "",
-          wheelchair_race: cfg.wheelchair_race,
-        },
-        schema: [
-          { name: "message_ticker", selector: { boolean: {} } },
-          {
-            name: "message_text",
-            disabled: !cfg.message_ticker,
-            selector: { text: {} },
-          },
-          { name: "wheelchair_race", selector: { boolean: {} } },
         ],
       })}
     `;
