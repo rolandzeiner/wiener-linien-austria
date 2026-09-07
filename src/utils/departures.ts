@@ -57,7 +57,7 @@ export interface Pair {
 // editors to render one walk-time row per pair regardless of how many
 // termini the API currently exposes. The first-seen `type` is captured
 // for icon rendering; `termini` accumulates every towards label seen.
-export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
+function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   const byKey = new Map<string, Pair>();
   for (const d of attrs?.departures ?? []) {
     const dir = String(d.direction ?? "");
