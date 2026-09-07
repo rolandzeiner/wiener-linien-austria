@@ -45,6 +45,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .const import (
     ALERT_FEED_ELEVATOR,
     ALERT_FEED_TRAFFIC,
+    ALERT_FEED_TRAFFIC_SHORT,
     ALERTS_SEQ_KEY,
     API_BASE_URL,
     DOMAIN,
@@ -66,7 +67,20 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class TrafficInfo:
-    """One service disruption affecting one or more lines."""
+    """One service notice, from either the long or the short disruption feed.
+
+    `category` says which feed it came from, and that decides how
+    `get_alerts_for` matches it:
+
+    - `stoerunglang` — control-centre disruptions, scoped to whole LINES
+      ("U1: Verspätungen"). Matched against the sensor's tracked lines;
+      `related_stops` is empty for these.
+    - `stoerungkurz` — the text the physical stop displays, scoped to
+      individual PLATFORMS ("Ersatzverkehr / Busse halten bei Haltestelle
+      N71"). Matched against the sensor's RBLs, never its lines: a works
+      notice naming one platform must not surface at every other stop on
+      the same line.
+    """
 
     name: str  # stable upstream id, e.g. "I20260420-0032"
     title: str  # "49A: Verkehrsunfall"
@@ -80,19 +94,24 @@ class TrafficInfo:
     location: str | None = None  # free-text locality, e.g. "Stadionallee"
     time_created: str | None = None  # when the alert was first posted
     time_last_update: str | None = None  # when the alert was last edited
-    # Pre-computed frozenset over `related_lines` — used by
-    # `get_alerts_for` for the per-sensor set-intersection that runs on
-    # every state attribute read AND every template fetch. Without this
-    # cache, each read built a fresh `set(t.related_lines)` per traffic
-    # info per call, churning ~hundreds of allocations across busy
-    # dashboards. Built in __post_init__ from the immutable parsed
-    # `related_lines` list so it's correct from construction onward.
+    category: str = ALERT_FEED_TRAFFIC
+    related_stops: list[int] = field(default_factory=list)  # RBLs (short feed)
+    # Pre-computed frozensets — used by `get_alerts_for` for the per-sensor
+    # set-intersection that runs on every state attribute read AND every
+    # template fetch. Without this cache, each read built a fresh
+    # `set(t.related_lines)` per traffic info per call, churning ~hundreds
+    # of allocations across busy dashboards. Built in __post_init__ from
+    # the immutable parsed lists so they're correct from construction on.
     related_lines_set: frozenset[str] = field(
+        init=False, default=frozenset(), repr=False, compare=False
+    )
+    related_stops_set: frozenset[int] = field(
         init=False, default=frozenset(), repr=False, compare=False
     )
 
     def __post_init__(self) -> None:
         self.related_lines_set = frozenset(self.related_lines)
+        self.related_stops_set = frozenset(self.related_stops)
 
     def to_dict(self) -> dict[str, Any]:
         """Render as plain dict for sensor attributes / diagnostics."""
@@ -102,6 +121,7 @@ class TrafficInfo:
             "description": self.description,
             "description_html": self.description_html,
             "related_lines": list(self.related_lines),
+            "related_stops": list(self.related_stops),
             "line_types": dict(self.line_types),
             "location": self.location,
             "time_start": self.time_start,
@@ -109,6 +129,7 @@ class TrafficInfo:
             "time_created": self.time_created,
             "time_last_update": self.time_last_update,
             "status": self.status,
+            "category": self.category,
         }
 
 
@@ -172,7 +193,11 @@ _FETCH_FAILED: Final[_FetchFailed] = _FetchFailed()
 
 # Feed names requested in the single combined call, in a fixed order so the
 # request URL is stable across ticks.
-_REQUESTED_FEEDS: Final[tuple[str, ...]] = (ALERT_FEED_TRAFFIC, ALERT_FEED_ELEVATOR)
+_REQUESTED_FEEDS: Final[tuple[str, ...]] = (
+    ALERT_FEED_TRAFFIC,
+    ALERT_FEED_TRAFFIC_SHORT,
+    ALERT_FEED_ELEVATOR,
+)
 
 
 async def _fetch_info_lists(
@@ -304,8 +329,17 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
         parsed = [_parse_traffic(x) for x in result[ALERT_FEED_TRAFFIC]]
         # Drop resolved entries — upstream keeps them in the feed for a
         # while after the disruption ends, but users don't want them on
-        # the card.
-        domain_data[TRAFFIC_INFO_KEY] = [t for t in parsed if t.status == "active"]
+        # the card. Only the long feed carries a status; see
+        # `_parse_traffic_short` for why the short one can't be filtered
+        # this way.
+        short = _merge_short_duplicates(
+            [_parse_traffic_short(x) for x in result[ALERT_FEED_TRAFFIC_SHORT]]
+        )
+        # One list, one card banner. `category` keeps them distinguishable
+        # for the matcher and for anyone reading the attribute.
+        domain_data[TRAFFIC_INFO_KEY] = [
+            t for t in parsed if t.status == "active"
+        ] + short
         domain_data[ELEVATOR_INFO_KEY] = [
             _parse_elevator(x) for x in result[ALERT_FEED_ELEVATOR]
         ]
@@ -361,6 +395,103 @@ def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
         time_last_update=_str_or_none(time.get("lastUpdate")),
         status=str(raw.get("status") or ""),
     )
+
+
+def _parse_traffic_short(raw: dict[str, Any]) -> TrafficInfo:
+    """Parse one trafficInfos entry for name=stoerungkurz.
+
+    Three things differ from the long feed and all three bite if ignored
+    (measured across all 19 live entries, 2026-09-07):
+
+    - **No `status` field at all.** The long feed is filtered to
+      `status == "active"`; applying that here would drop every entry.
+      These are bounded by `time.start`/`time.end` instead.
+    - **`title` and `description` are byte-identical** in all 19. Emitting
+      both would make the card render the same sentence as its own summary
+      and again as its body, so we split one field into the two the card
+      wants.
+    - **No `descriptionHTML`.** Left empty; the card falls back to
+      `description`.
+
+    The split: 15 of 19 titles carry a category label on the first line
+    ("Bauarbeiten", "Ersatzverkehr", "3A Netzänderung") followed by the
+    detail, which maps exactly onto title + description. The remaining 4
+    are one long sentence with no newline, so we split after the first
+    sentence instead — leaving the whole paragraph as a collapsed summary
+    reads badly at ~130 characters.
+    """
+    text = str(raw.get("title") or raw.get("description") or "").strip()
+    title, description = _split_short_text(text)
+    time = raw.get("time") or {}
+    return TrafficInfo(
+        name=str(raw.get("name") or ""),
+        title=title,
+        description=description,
+        related_lines=_as_str_list(raw.get("relatedLines")),
+        related_stops=_as_int_list(raw.get("relatedStops")),
+        time_start=_str_or_none(time.get("start")),
+        time_end=_str_or_none(time.get("end")),
+        # No upstream status on this feed. "active" is the honest value:
+        # presence in the feed IS the active signal, and it keeps the
+        # attribute shape uniform for consumers that filter on it.
+        status="active",
+        category=ALERT_FEED_TRAFFIC_SHORT,
+    )
+
+
+def _split_short_text(text: str) -> tuple[str, str]:
+    """Split a stoerungkurz text into (summary, detail).
+
+    Prefers the first line break, falling back to the first sentence end.
+    Returns `(text, "")` when neither offers a split point — a short
+    single-clause notice is fine as a summary with no body.
+    """
+    head, sep, rest = text.partition("\n")
+    if not sep:
+        head, sep, rest = text.partition(". ")
+        if sep:
+            head += "."
+    return (_collapse_ws(head), _collapse_ws(rest))
+
+
+def _collapse_ws(text: str) -> str:
+    """Collapse whitespace runs to single spaces and trim.
+
+    Upstream pads these fields with stray newlines — one entry ends
+    "Frauenstiftgasse 7\n\n\n" and another breaks a street number across
+    three lines. Left alone they render as blank paragraphs in the card.
+    """
+    return " ".join(text.split())
+
+
+def _merge_short_duplicates(items: list[TrafficInfo]) -> list[TrafficInfo]:
+    """Collapse short notices that carry identical text.
+
+    Upstream publishes one entry per (stop, line) pair, so a single
+    physical sign shared by two lines arrives twice: `R500-408` and
+    `R500-101` are both "Bhf. Hütteldorf / ÖBB-Ersatzbus für <80" at RBL
+    500, differing only in `relatedLines`. The card dedupes by `name`, so
+    both would render — the same banner twice at the same stop. Merge them
+    into one notice carrying the union of lines and stops, keeping the
+    first entry's id so the card's expand-state key stays stable.
+    """
+    merged: dict[tuple[str, str], TrafficInfo] = {}
+    for item in items:
+        key = (item.title, item.description)
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = item
+            continue
+        for line in item.related_lines:
+            if line not in existing.related_lines:
+                existing.related_lines.append(line)
+        for stop in item.related_stops:
+            if stop not in existing.related_stops:
+                existing.related_stops.append(stop)
+        # Rebuild the lookup sets after mutating the backing lists.
+        existing.related_lines_set = frozenset(existing.related_lines)
+        existing.related_stops_set = frozenset(existing.related_stops)
+    return list(merged.values())
 
 
 def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
@@ -452,8 +583,14 @@ def get_alerts_for(
 ) -> tuple[list[TrafficInfo], list[ElevatorInfo]]:
     """Return traffic + elevator alerts relevant to a given stop.
 
-    - Traffic: match if any `related_lines` overlaps `lines`. If `lines` is
-      empty/None, return all traffic alerts (fall-through).
+    - Traffic (`stoerunglang`): match if any `related_lines` overlaps
+      `lines`. If `lines` is empty/None, return all of them (fall-through).
+    - Traffic (`stoerungkurz`): match ONLY if any `related_stops` overlaps
+      `rbls`. No line fall-through and no all-traffic fall-through: these
+      are the texts a single platform's display shows, so a works notice
+      for one stop must never appear at the other 30 stops on that line.
+      An entry with no `related_stops` is unmatchable and therefore
+      dropped — in practice upstream sets it on every one.
     - Elevator: match if any `related_stops` overlaps `rbls`. If `rbls` is
       empty/None, return []. An elevator outage with no `related_stops` is
       only surfaced when it also matches on `related_lines`.
@@ -462,11 +599,13 @@ def get_alerts_for(
     all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
     all_elevator: list[ElevatorInfo] = domain_data.get(ELEVATOR_INFO_KEY, []) or []
 
-    matched_traffic: list[TrafficInfo] = (
-        [t for t in all_traffic if t.related_lines_set & lines]
-        if lines
-        else list(all_traffic)
-    )
+    matched_traffic: list[TrafficInfo] = []
+    for t in all_traffic:
+        if t.category == ALERT_FEED_TRAFFIC_SHORT:
+            if rbls and t.related_stops_set & rbls:
+                matched_traffic.append(t)
+        elif not lines or t.related_lines_set & lines:
+            matched_traffic.append(t)
 
     matched_elevator: list[ElevatorInfo] = []
     if rbls:

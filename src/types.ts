@@ -276,6 +276,12 @@ export interface TrafficInfoAttr {
   time_created?: string;
   time_last_update?: string;
   status?: string;
+  // Which upstream feed this came from: "stoerunglang" (line-scoped
+  // control-centre disruption) or "stoerungkurz" (the platform's own
+  // display text, already filtered to this card's stops on the Python
+  // side). Both render in the same banner; the field is here so a
+  // consumer can tell them apart.
+  category?: string;
 }
 
 export interface ElevatorInfoAttr {

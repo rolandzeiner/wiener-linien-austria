@@ -15,7 +15,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared across all three cards *(2.0.0)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
-- **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*.
+- **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
 
 ## Screenshots
@@ -139,7 +139,7 @@ Each stop gets one sensor. Home Assistant names it in your interface language, s
 | `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys. All three card editors use them to offer only directions this stop actually serves. |
 | `stale_departures` | int | Records dropped this poll because the feed stopped advancing them. |
 | `stale_since` | ISO string \| None | Newest planned time among those dropped — roughly when the feed froze. |
-| `traffic_info` | list[dict] | Service disruptions matching tracked lines. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`. |
+| `traffic_info` | list[dict] | Service disruptions. `category` says which feed a notice came from: `stoerunglang` matches your tracked lines, `stoerungkurz` is the stop's own display text and matches only this stop's RBLs. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
 ### Departure shape
@@ -155,14 +155,14 @@ Two live endpoints and three static catalogues, on separate cadences:
 | What | Endpoint | Cadence |
 |---|---|---|
 | Live departures per stop | `/monitor?stopId=…` | Per-entry, default 60 s (30–600 s) |
-| Traffic + elevator alerts | `/trafficInfoList` (×2) | Domain-wide, 5 min — shared across all entries |
+| Traffic + elevator alerts | `/trafficInfoList` (one request, three feeds) | Domain-wide, 5 min — shared across all entries |
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 
 Every outbound call shares a **15 s domain-wide cooldown** plus a 30 s per-entry floor. That sits at or above the 15-second minimum interval conventionally cited for the OGD real-time endpoint — Wiener Linien publish no numeric cap, so the figure is convention rather than rule.
 
-Requests send `Accept-Encoding: gzip` and conditional-GET validators (`If-None-Match` / `If-Modified-Since`), so unchanged ticks return `304 Not Modified` and reuse the cached payload — roughly halving steady-state bandwidth. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
+Requests send `Accept-Encoding: gzip`, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
 > **After a Home Assistant restart**: alerts (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min. Departures fetch immediately.
 

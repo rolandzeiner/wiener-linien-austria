@@ -99,6 +99,11 @@ ALERTS_SEQ_KEY: Final = "alerts_seq"
 # resolved through `data.trafficInfoCategories`. See alerts.py.
 ALERT_FEED_TRAFFIC: Final = "stoerunglang"
 ALERT_FEED_ELEVATOR: Final = "aufzugsinfo"
+# The text the physical stop display shows — works detours, moved boarding
+# points, permanently closed stops. Scoped to individual platforms rather
+# than whole lines, so it is matched on RBL. Surfaced in the same card
+# banner as `stoerunglang`; see alerts.TrafficInfo.
+ALERT_FEED_TRAFFIC_SHORT: Final = "stoerungkurz"
 # Reference-count of live config entries — used to drive the domain-wide
 # cleanup (cancelling the alerts + static refresh timers, dropping the
 # in-memory caches) when the *last* entry is removed.

@@ -15,8 +15,10 @@ from custom_components.wiener_linien_austria.alerts import (
     TrafficInfo,
     _fetch_info_lists,
     _FetchFailed,
+    _merge_short_duplicates,
     _parse_elevator,
     _parse_traffic,
+    _parse_traffic_short,
     _split_by_category,
     async_refresh_alerts,
     get_alerts_for,
@@ -24,6 +26,7 @@ from custom_components.wiener_linien_austria.alerts import (
 from custom_components.wiener_linien_austria.const import (
     ALERT_FEED_ELEVATOR,
     ALERT_FEED_TRAFFIC,
+    ALERT_FEED_TRAFFIC_SHORT,
     DOMAIN,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
@@ -206,9 +209,11 @@ async def test_get_alerts_for_no_lines_returns_all_traffic(hass: HomeAssistant) 
 def _combined_body(
     traffic: list[dict[str, Any]] | None = None,
     elevator: list[dict[str, Any]] | None = None,
+    short: list[dict[str, Any]] | None = None,
     *,
     traffic_id: int = 2,
     elevator_id: int = 1,
+    short_id: int = 3,
 ) -> dict[str, Any]:
     """Build a realistic multi-`name` /trafficInfoList payload.
 
@@ -227,6 +232,9 @@ def _combined_body(
     if traffic is not None:
         categories.append({"id": traffic_id, "name": ALERT_FEED_TRAFFIC})
         infos += [{**t, "refTrafficInfoCategoryId": traffic_id} for t in traffic]
+    if short is not None:
+        categories.append({"id": short_id, "name": ALERT_FEED_TRAFFIC_SHORT})
+        infos += [{**t, "refTrafficInfoCategoryId": short_id} for t in short]
     return {
         "message": {"messageCode": 1},
         "data": {"trafficInfos": infos, "trafficInfoCategories": categories},
@@ -291,6 +299,7 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     params = fake_session.get.call_args.kwargs["params"]
     assert [v for k, v in params if k == "name"] == [
         ALERT_FEED_TRAFFIC,
+        ALERT_FEED_TRAFFIC_SHORT,
         ALERT_FEED_ELEVATOR,
     ]
 
@@ -548,6 +557,212 @@ async def test_fetch_info_lists_filters_non_dict_entries(
 
 
 # ---------------------------------------------------------------------------
+# stoerungkurz: parsing, duplicate merge, and stop-scoped matching
+# ---------------------------------------------------------------------------
+
+
+def test_parse_traffic_short_splits_title_on_newline() -> None:
+    """The category label leads, the detail follows — 15 of 19 live entries.
+
+    Upstream sends title == description byte-for-byte, so emitting both
+    verbatim makes the card render the same sentence as its own summary
+    and again as its body.
+    """
+    raw = {
+        "name": "R318-437",
+        "title": "Bauarbeiten\nBusse halten Pasettistraße vor Hellwagstraße",
+        "description": "Bauarbeiten\nBusse halten Pasettistraße vor Hellwagstraße",
+        "relatedLines": ["37A"],
+        "relatedStops": [318],
+        "time": {"start": "2026-09-01T00:00:00.000+0200"},
+    }
+    t = _parse_traffic_short(raw)
+    assert t.title == "Bauarbeiten"
+    assert t.description == "Busse halten Pasettistraße vor Hellwagstraße"
+    assert t.related_stops == [318]
+    assert t.category == ALERT_FEED_TRAFFIC_SHORT
+    # No upstream status on this feed; the long feed's active-filter would
+    # otherwise drop every entry.
+    assert t.status == "active"
+
+
+def test_parse_traffic_short_falls_back_to_sentence_split() -> None:
+    """The 4 live entries with no newline split after the first sentence."""
+    text = (
+        "Haltestelle Parlament zur Beschleunigung der Straßenbahnlinien "
+        "dauerhaft aufgelassen. Bitte auf nahegelegene Haltestellen ausweichen."
+    )
+    t = _parse_traffic_short({"name": "S16", "title": text, "relatedStops": [16]})
+    assert t.title.endswith("dauerhaft aufgelassen.")
+    assert t.description == "Bitte auf nahegelegene Haltestellen ausweichen."
+
+
+def test_parse_traffic_short_collapses_upstream_whitespace() -> None:
+    """Stray newlines upstream would render as blank paragraphs in the card.
+
+    Both shapes are live: one entry ends with three trailing newlines,
+    another breaks a street number across three lines.
+    """
+    t = _parse_traffic_short(
+        {
+            "name": "R2207-0",
+            "title": "Bauarbeiten\nZüge halten bei\nBrünnerstraße \n76 - 78",
+        }
+    )
+    assert t.description == "Züge halten bei Brünnerstraße 76 - 78"
+
+    t2 = _parse_traffic_short(
+        {
+            "name": "R1150-0",
+            "title": "Bauarbeiten\nBusse halten\nFrauenstiftgasse 7\n\n\n",
+        }
+    )
+    assert t2.description == "Busse halten Frauenstiftgasse 7"
+
+
+def test_parse_traffic_short_single_clause_has_no_body() -> None:
+    """Nothing to split on leaves the whole text as the summary."""
+    t = _parse_traffic_short({"name": "X1", "title": "Ersatzverkehr"})
+    assert t.title == "Ersatzverkehr"
+    assert t.description == ""
+
+
+def test_merge_short_duplicates_unions_lines_and_stops() -> None:
+    """One physical sign shared by two lines arrives as two entries.
+
+    Live example: R500-408 and R500-101 are both "Bhf. Hütteldorf / ÖBB-
+    Ersatzbus für <80" at RBL 500, differing only in relatedLines. The card
+    dedupes by `name`, so both would render as the same banner twice.
+    """
+    raw = {
+        "title": "Bhf. Hütteldorf\nÖBB-Ersatzbus für <80",
+        "relatedStops": [500],
+    }
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": "R500-408", "relatedLines": ["8A"]}),
+            _parse_traffic_short({**raw, "name": "R500-101", "relatedLines": ["1"]}),
+        ]
+    )
+    assert len(merged) == 1
+    # First id wins so the card's expand-state key stays stable.
+    assert merged[0].name == "R500-408"
+    assert merged[0].related_lines == ["8A", "1"]
+    assert merged[0].related_stops == [500]
+    # The lookup sets must be rebuilt after the backing lists were mutated,
+    # or the matcher below silently misses the merged-in values.
+    assert merged[0].related_lines_set == frozenset({"8A", "1"})
+    assert merged[0].related_stops_set == frozenset({500})
+
+
+def _seed_short(hass: HomeAssistant, *infos: TrafficInfo) -> None:
+    hass.data.setdefault(DOMAIN, {})[TRAFFIC_INFO_KEY] = list(infos)
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = []
+
+
+def _short(name: str, stops: list[int], lines: list[str]) -> TrafficInfo:
+    return _parse_traffic_short(
+        {
+            "name": name,
+            "title": f"Bauarbeiten\n{name}",
+            "relatedStops": stops,
+            "relatedLines": lines,
+        }
+    )
+
+
+async def test_get_alerts_for_short_matches_on_stop(hass: HomeAssistant) -> None:
+    """A short notice surfaces at the platform it names."""
+    _seed_short(hass, _short("A", stops=[4111], lines=["U1"]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert [t.name for t in traffic] == ["A"]
+
+
+async def test_get_alerts_for_short_never_matches_on_line_alone(
+    hass: HomeAssistant,
+) -> None:
+    """The whole point of the stop scoping.
+
+    A works notice for one platform must not appear at the other ~30 stops
+    on the same line. The user tracks U1, the notice names U1, but it is
+    attached to a stop this card does not show — so it must not surface.
+    """
+    _seed_short(hass, _short("A", stops=[9999], lines=["U1"]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert traffic == []
+
+
+async def test_get_alerts_for_short_has_no_all_traffic_fallthrough(
+    hass: HomeAssistant,
+) -> None:
+    """Long notices fall through when the sensor tracks no lines; short ones
+    must not — an unscoped card would otherwise show every works notice in
+    Vienna."""
+    _seed_short(hass, _short("A", stops=[9999], lines=[]))
+    traffic, _ = get_alerts_for(hass, set(), {4111})
+    assert traffic == []
+
+
+async def test_get_alerts_for_mixes_both_categories(hass: HomeAssistant) -> None:
+    """Both feeds land in one list for the single card banner, each matched
+    by its own rule."""
+    long_notice = _parse_traffic(
+        {
+            "name": "LONG",
+            "title": "U1: Verspätungen",
+            "relatedLines": ["U1"],
+            "status": "active",
+            "time": {},
+        }
+    )
+    _seed_short(hass, long_notice, _short("SHORT", stops=[4111], lines=[]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert sorted(t.name for t in traffic) == ["LONG", "SHORT"]
+    assert {t.category for t in traffic} == {
+        ALERT_FEED_TRAFFIC,
+        ALERT_FEED_TRAFFIC_SHORT,
+    }
+
+
+async def test_async_refresh_alerts_populates_short_notices(
+    hass: HomeAssistant,
+) -> None:
+    """End-to-end: the short feed reaches the traffic cache, deduped."""
+    body = _combined_body(
+        traffic=[],
+        elevator=[],
+        short=[
+            {
+                "name": "R500-408",
+                "title": "Bhf. Hütteldorf\nÖBB-Ersatzbus für <80",
+                "relatedLines": ["8A"],
+                "relatedStops": [500],
+                "time": {},
+            },
+            {
+                "name": "R500-101",
+                "title": "Bhf. Hütteldorf\nÖBB-Ersatzbus für <80",
+                "relatedLines": ["1"],
+                "relatedStops": [500],
+                "time": {},
+            },
+        ],
+    )
+    fake_session = MagicMock()
+    fake_session.get = MagicMock(return_value=make_response_cm(_json_response(body)))
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=fake_session,
+    ):
+        await async_refresh_alerts(hass)
+
+    cached = hass.data[DOMAIN][TRAFFIC_INFO_KEY]
+    assert len(cached) == 1
+    assert cached[0].category == ALERT_FEED_TRAFFIC_SHORT
+    assert cached[0].to_dict()["related_stops"] == [500]
+
+
+# ---------------------------------------------------------------------------
 # _split_by_category: routing a combined payload back into per-feed lists
 # ---------------------------------------------------------------------------
 
@@ -589,7 +804,11 @@ def test_split_by_category_absent_category_yields_empty_list() -> None:
         "trafficInfos": [{"name": "T1", "refTrafficInfoCategoryId": 7}],
     }
     out = _split_by_category(data)
-    assert set(out) == {ALERT_FEED_TRAFFIC, ALERT_FEED_ELEVATOR}
+    assert set(out) == {
+        ALERT_FEED_TRAFFIC,
+        ALERT_FEED_TRAFFIC_SHORT,
+        ALERT_FEED_ELEVATOR,
+    }
     assert out[ALERT_FEED_ELEVATOR] == []
 
 
@@ -620,8 +839,12 @@ def test_split_by_category_drops_unknown_and_malformed() -> None:
 
 
 def test_split_by_category_handles_empty_payload() -> None:
-    """A `data` object with neither key still yields both feeds, empty."""
-    assert _split_by_category({}) == {ALERT_FEED_TRAFFIC: [], ALERT_FEED_ELEVATOR: []}
+    """A `data` object with neither key still yields every feed, empty."""
+    assert _split_by_category({}) == {
+        ALERT_FEED_TRAFFIC: [],
+        ALERT_FEED_TRAFFIC_SHORT: [],
+        ALERT_FEED_ELEVATOR: [],
+    }
 
 
 async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> None:
