@@ -57,7 +57,8 @@ import {
   splitLocationPath,
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
-import { delayMinutes, formatTime } from "./utils/time.js";
+import { formatTime } from "./utils/time.js";
+import { deriveRowState } from "./utils/row-state.js";
 import {
   accentTextColor,
   contrastRatio,
@@ -1506,31 +1507,31 @@ export class WienerLinienAustriaCard extends LitElement {
     const lineColors = lineColorsFor(this.hass, entityId);
     const line = d.line || "?";
     const badgeStyle = chipPalette(line, overrides, lineColors);
-    const cd = Number.isFinite(d.countdown) ? d.countdown : null;
-    const cdLabel = cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
+    // The row's decisions live in utils/row-state.ts (pure, unit-tested);
+    // only the label text is built here, because it needs `_t()`.
+    const {
+      countdown: cd,
+      signedDelay,
+      cdState,
+      hasFlags,
+      platform: rowPlatform,
+    } = deriveRowState(d, {
+      showDelayColors: this._config!.show_delay_colors,
+      showAccessibility: this._config!.show_accessibility,
+      showCooling: this._config!.show_cooling,
+      showPlatform: this._config!.show_platform,
+    });
 
-    // Signed delay (positive = late, negative = early). Computed
-    // independently of show_delay so the state-colour classes still
-    // light up even when the verbose "1 Minute verspätet" text is off.
-    const signedDelay = delayMinutes(d.time_planned, d.time_real);
-    const showDelayText = this._config!.show_delay;
+    const showA11y = this._config!.show_accessibility;
+    const showCooling = this._config!.show_cooling;
+
+    const cdLabel = cd === null ? "—" : cd <= 0 ? this._t("now") : `${cd} ${this._t("min")}`;
     const delayText =
-      showDelayText && signedDelay !== null && signedDelay >= 1
+      this._config!.show_delay && signedDelay !== null && signedDelay >= 1
         ? signedDelay === 1
           ? this._t("delay_singular")
           : this._t("delay_plural", { n: signedDelay })
         : "";
-
-    // Row state — `now` overrides late/early when cd<=0. Empty string
-    // when none apply; the classMap below skips falsy entries.
-    // `show_delay_colors` gates late/early only: `now` is the line's own
-    // accent, not a schedule-deviation signal, so it stays either way.
-    const showDelayColors = this._config!.show_delay_colors;
-    let cdState: "now" | "late" | "early" | "" = "";
-    if (cd !== null && cd <= 0) cdState = "now";
-    else if (!showDelayColors || signedDelay === null) cdState = "";
-    else if (signedDelay >= 1) cdState = "late";
-    else if (signedDelay <= -1) cdState = "early";
 
     // Only `now` reads --wl-accent-text inside a row, so only `now` needs
     // the override — late/early carry their own semantic tokens. Same
@@ -1538,16 +1539,6 @@ export class WienerLinienAustriaCard extends LitElement {
     // never disagree about which line this row is.
     const nowColor =
       cdState === "now" ? this._rowAccentText(badgeStyle.background) : null;
-
-    const showA11y = this._config!.show_accessibility;
-    const showCooling = this._config!.show_cooling;
-    const hasFlags = Boolean(
-      d.traffic_jam ||
-        (showA11y && d.barrier_free) ||
-        (showCooling && d.cooling),
-    );
-    const rowPlatform =
-      this._config!.show_platform && d.platform ? String(d.platform) : null;
 
     const typeIcon = this._config!.show_type_icon ? lineTypeIcon(d.type) : null;
 
