@@ -598,8 +598,11 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  first row's platform changes" problem the old side-toggle was
    *  there to work around. */
   show_platform?: boolean | undefined;
-  /** Show the WL-orange station-name band. Mirrors the retro card's
-   *  field of the same name. Default `true`. */
+  /** Show the WL-orange station-name band. Shares its name and meaning
+   *  with the retro card's field, but NOT its default: flap defaults
+   *  `true` (the band is part of the Solari board's identity), retro
+   *  defaults `false` (the LED panel shipped without one). Deliberate —
+   *  see `CARD_DEFAULTS` in utils/card-vocabulary.ts. */
   show_station_name?: boolean | undefined;
   /** Background colour for the station-name band. Defaults to the
    *  first tracked line's GTFS colour (sentinel `"line"`); user can
@@ -647,7 +650,10 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
   /** Tweak — wrap the board in the cream-cabinet housing (bevel +
    *  drop shadow). Default `true` (preserves the original flap-card
    *  look). When `false`, the board sits flush against the dashboard
-   *  with no surround — matches the retro card's `housing` semantics
-   *  (off = flush, on = bezel). */
+   *  with no surround. Shares the retro card's `housing` semantics
+   *  (off = flush, on = bezel) but NOT its default: retro defaults
+   *  `false`, because the LED panel shipped flush and existing cards
+   *  must stay that way. Deliberate — see `CARD_DEFAULTS` in
+   *  utils/card-vocabulary.ts. */
   housing?: boolean | undefined;
 }

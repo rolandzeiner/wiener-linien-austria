@@ -25,6 +25,7 @@ import type {
   WalkTimes,
   WienerLinienFlapCardConfig,
 } from "../types.js";
+import { CARD_DEFAULTS } from "./card-vocabulary.js";
 import {
   filterPassthrough,
   normaliseRetroHeaderSide,
@@ -49,7 +50,7 @@ const FLAP_STATION_BG_LITERALS: ReadonlySet<FlapStationBg> = new Set([
 ] as const);
 
 function normaliseStationBg(raw: unknown): FlapStationBg {
-  if (typeof raw !== "string") return "line";
+  if (typeof raw !== "string") return CARD_DEFAULTS.station_bg.flap;
   if (FLAP_STATION_BG_LITERALS.has(raw as FlapStationBg)) {
     return raw as FlapStationBg;
   }
@@ -59,7 +60,7 @@ function normaliseStationBg(raw: unknown): FlapStationBg {
     // map (typo, removed line, off-network sensor).
     return raw as FlapStationBg;
   }
-  return "line";
+  return CARD_DEFAULTS.station_bg.flap;
 }
 
 function asBool(v: unknown, fallback: boolean): boolean {
@@ -183,7 +184,7 @@ export function normaliseFlapConfig(
   // (now labelled "Groß" / "Large").
   const size: FlapSize = FLAP_SIZES.has(raw.size as FlapSize)
     ? (raw.size as FlapSize)
-    : "small";
+    : CARD_DEFAULTS.size.flap;
 
   // max_rows 1..8 — multi-stop merge can produce 6-8 imminent departures.
   const maxRowsRaw = Number(raw.max_rows);
@@ -258,7 +259,7 @@ export function normaliseFlapConfig(
       ? raw.show_station_name
       : typeof legacyStation === "boolean"
         ? legacyStation
-        : true;
+        : CARD_DEFAULTS.show_station_name.flap;
 
   return {
     ...passthrough,
@@ -266,10 +267,10 @@ export function normaliseFlapConfig(
     entities,
     size,
     max_rows,
-    show_platform: asBool(raw.show_platform, true),
+    show_platform: asBool(raw.show_platform, CARD_DEFAULTS.show_platform.flap),
     show_station_name,
     station_bg,
-    show_min_unit: asBool(raw.show_min_unit, true),
+    show_min_unit: asBool(raw.show_min_unit, CARD_DEFAULTS.unit_caption.flap),
     show_accessibility: asBool(raw.show_accessibility, true),
     accessibility_only: raw.accessibility_only === true,
     // Master gate for the signage header strip — defaults `false` so
@@ -295,6 +296,6 @@ export function normaliseFlapConfig(
       raw.show_line_column !== undefined
         ? raw.show_line_column === true
         : raw.line_pill !== true,
-    housing: asBool(raw.housing, true),
+    housing: asBool(raw.housing, CARD_DEFAULTS.housing.flap),
   };
 }

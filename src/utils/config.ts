@@ -1,4 +1,5 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
+import { CARD_DEFAULTS } from "./card-vocabulary.js";
 import { RETRO_HEADER_MDI_EXIT_KEYS } from "./retro-station-icons.js";
 import type {
   LineColorsMap,
@@ -507,10 +508,12 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   const direction = raw.direction === "R" ? "R" : "H";
-  const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize) ? (raw.size as RetroSize) : "regular";
+  const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize)
+    ? (raw.size as RetroSize)
+    : CARD_DEFAULTS.size.retro;
   const station_bg: RetroStationBg = RETRO_STATION_BG.has(raw.station_bg as RetroStationBg)
     ? (raw.station_bg as RetroStationBg)
-    : "default";
+    : CARD_DEFAULTS.station_bg.retro;
   const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
     ? (raw.style as RetroStyle)
     : "classic";
@@ -525,11 +528,14 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     // asBool, not `?? true` — YAML is untyped, and `?? ` passes a
     // non-boolean straight through (`show_platform: 0` yielded `0`,
     // hiding the column, where modern and flap both yield `true`).
-    show_platform: asBool(raw.show_platform, true),
+    show_platform: asBool(raw.show_platform, CARD_DEFAULTS.show_platform.retro),
     platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
       ? (raw.platform_side as RetroPlatformSide)
       : "auto",
-    show_station_name: asBool(raw.show_station_name, false),
+    show_station_name: asBool(
+      raw.show_station_name,
+      CARD_DEFAULTS.show_station_name.retro,
+    ),
     station_bg,
     size,
     style,
@@ -565,8 +571,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
         ? raw.show_line_pill === true
         : raw.line_pill === true,
     line_stripe: raw.line_stripe === true,
-    housing: raw.housing === true,
-    show_unit: raw.show_unit === true,
+    housing: asBool(raw.housing, CARD_DEFAULTS.housing.retro),
+    show_unit: asBool(raw.show_unit, CARD_DEFAULTS.unit_caption.retro),
   };
 }
 

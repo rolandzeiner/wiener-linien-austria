@@ -24,6 +24,7 @@ import type {
 } from "./types.js";
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
+import { ROW_CAP } from "./utils/card-vocabulary.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
@@ -836,7 +837,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       walk_times: cfg.walk_times,
       accessibility_only: cfg.accessibility_only,
     });
-    const rows = matching.slice(0, 2);
+    // The LED panel's layout is built for exactly two rows, so this cap
+    // is a constant rather than a config key — named in card-vocabulary
+    // alongside modern's `max_departures` and flap's `max_rows`.
+    const rows = matching.slice(0, ROW_CAP.retro);
 
     const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
     const platform = cfg.show_platform ? rawPlatform : null;
