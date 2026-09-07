@@ -143,6 +143,12 @@ ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 # publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
+# Translation key for the 316 raise. Named here rather than inlined at the
+# raise site because the batch group's backoff has to recognise a rate-limit
+# failure to widen on the first one (see `MonitorBatchGroup._note_failure`),
+# and a bare string compared against a bare string is a silent drift risk.
+RATE_LIMIT_TRANSLATION_KEY: Final = "api_rate_limited"
+
 # The remaining documented `messageCode` values (Schnittstellendokumentation
 # V1.5, 21.05.2026, §3.1.4). Each gets its own translated message, because
 # they ask different things of whoever reads the log: 311 clears itself,

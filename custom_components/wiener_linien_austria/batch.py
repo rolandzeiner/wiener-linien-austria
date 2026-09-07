@@ -49,6 +49,7 @@ from .const import (
     DOMAIN,
     ERR_RATE_LIMIT,
     MONITOR_ENDPOINT,
+    RATE_LIMIT_TRANSLATION_KEY,
     UPSTREAM_ERROR_KEYS,
     USER_AGENT,
 )
@@ -140,7 +141,18 @@ class MonitorBatchGroup:
             )
 
     async def _async_timer_tick(self, _now: Any) -> None:
-        """Fetch once for the whole group and fan the result out to members."""
+        """Fetch once for the whole group and fan the result out to members.
+
+        Every step is guarded, for the same reason `__init__.py` guards its two
+        periodic callbacks: an exception escaping an
+        `async_track_time_interval` callback is logged by HA core under its
+        generic listener namespace rather than this integration's, and it skips
+        the backoff bookkeeping below — so an unguarded raise would leave the
+        group hammering the API at full cadence while looking silent.
+
+        The fan-out loops are guarded per member, not around the loop, so one
+        member whose slice fails to parse cannot starve the members after it.
+        """
         # Snapshot members up front — the fetch awaits, and a concurrent
         # unload could mutate the dict mid-iteration otherwise.
         members = list(self._members.values())
@@ -149,13 +161,54 @@ class MonitorBatchGroup:
         try:
             result = await self.async_fetch()
         except UpdateFailed as err:
+            self._note_failure(
+                rate_limited=err.translation_key == RATE_LIMIT_TRANSLATION_KEY
+            )
+            self._fan_out_error(members, err)
+            return
+        except Exception as err:  # noqa: BLE001 — periodic callback safety net
+            # `async_fetch` raises `UpdateFailed` for everything it anticipates;
+            # anything else (a Repairs-registry write, a member side effect)
+            # still has to count as a failure so backoff engages.
+            _LOGGER.warning("Combined monitor fetch failed: %s", err)
             self._note_failure()
-            for coordinator in members:
-                coordinator.batch_set_error(err)
+            self._fan_out_error(members, _unexpected_failure(err))
             return
         self._note_success()
         for coordinator in members:
-            coordinator.batch_apply(result)
+            try:
+                coordinator.batch_apply(result)
+            except Exception as err:  # noqa: BLE001 — one member must not starve the rest
+                _LOGGER.warning(
+                    "Applying the combined /monitor response failed for entry %s: %s",
+                    coordinator.entry_id,
+                    err,
+                )
+                self._set_member_error(coordinator, _unexpected_failure(err))
+
+    def _fan_out_error(
+        self,
+        members: list[WienerLinienAustriaCoordinator],
+        err: UpdateFailed,
+    ) -> None:
+        """Mark every member's update as failed, one member at a time."""
+        for coordinator in members:
+            self._set_member_error(coordinator, err)
+
+    def _set_member_error(
+        self,
+        coordinator: WienerLinienAustriaCoordinator,
+        err: UpdateFailed,
+    ) -> None:
+        """Push a failure onto one member, swallowing a listener-side raise."""
+        try:
+            coordinator.batch_set_error(err)
+        except Exception as exc:  # noqa: BLE001 — periodic callback safety net
+            _LOGGER.warning(
+                "Recording the batch failure for entry %s failed: %s",
+                coordinator.entry_id,
+                exc,
+            )
 
     # ------------------------------------------------------------------
     # Fetch
@@ -284,24 +337,50 @@ class MonitorBatchGroup:
         self._consecutive_failures = 0
         self._reschedule(self._normal_interval)
 
-    def _note_failure(self) -> None:
+    def _note_failure(self, *, rate_limited: bool = False) -> None:
         """Bump the failure counter and widen the cadence with jittered backoff.
 
         First failure holds the configured cadence (transient hiccups
         shouldn't slow the loop). From the second onward the interval doubles,
         capped at ``BACKOFF_CAP_SECONDS``. Jitter (+/-10%) avoids a
         thundering-herd retry when the API recovers. Reset on the next success.
+
+        ``rate_limited`` is the one exception. Error 316 is not a hiccup to
+        ride out — it is upstream saying in as many words that we are polling
+        too fast, so holding cadence for one more interval just to confirm it
+        spends another request proving what the API already told us. Widen on
+        the first one instead.
         """
         self._consecutive_failures += 1
-        if self._consecutive_failures < 2:
+        if self._consecutive_failures < 2 and not rate_limited:
             return
+        # A 316 on the very first failure has nothing to exponentiate yet;
+        # floor the exponent at 1 so it still halves the request rate rather
+        # than rescheduling to the cadence it already has.
+        exponent = max(self._consecutive_failures - 1, 1)
         normal_secs = self._normal_interval.total_seconds()
         backoff_secs = min(
-            normal_secs * (2 ** (self._consecutive_failures - 1)),
+            normal_secs * (2**exponent),
             BACKOFF_CAP_SECONDS,
         )
         jittered = backoff_secs * random.uniform(0.9, 1.1)
         self._reschedule(timedelta(seconds=jittered))
+
+
+def _unexpected_failure(err: Exception) -> UpdateFailed:
+    """Wrap an unanticipated exception as a translated ``UpdateFailed``.
+
+    The guarded callback paths still have to hand members a failure that
+    carries `translation_domain` / `translation_key`, never a bare string.
+    """
+    return UpdateFailed(
+        translation_domain=DOMAIN,
+        translation_key="api_invalid_response",
+        translation_placeholders={
+            "status": "0",
+            "error": f"{type(err).__name__}: {err}",
+        },
+    )
 
 
 def _safe_int(value: Any) -> int | None:

@@ -440,6 +440,92 @@ async def test_timer_tick_error_marks_all_members(hass: HomeAssistant) -> None:
     assert b.last_update_success is False
 
 
+async def test_timer_tick_isolates_a_failing_member(
+    hass: HomeAssistant, monitor_fixture
+) -> None:
+    """A member whose slice fails to parse must not starve the members after it.
+
+    `batch_apply` -> `_parse_slice` reaches `_parse_monitor_body` and
+    `stops_ahead_for_match`, neither of which promises to raise only
+    `UpdateFailed`. Before the guard, a raise on member B ended the fan-out
+    loop and member C never saw this tick's data at all.
+    """
+    group = MonitorBatchGroup(hass, 60)
+    a = _member(hass, data={CONF_RBLS: [4111]}, unique_id="a")
+    b = _member(hass, data={CONF_RBLS: [4118]}, unique_id="b")
+    c = _member(hass, data={CONF_RBLS: [4111, 4118]}, unique_id="c")
+    for coordinator in (a, b, c):
+        group.add_member(coordinator)
+        coordinator.attach_batch(group)
+    b._parse_slice = MagicMock(  # type: ignore[method-assign]
+        side_effect=RuntimeError("catalogue blew up")
+    )
+
+    with _patch_get(
+        group, MagicMock(return_value=make_response_cm(_ok_response(monitor_fixture)))
+    ):
+        await group._async_timer_tick(None)
+
+    # The member after the failing one still got this tick's data.
+    assert a.last_update_success is True
+    assert c.last_update_success is True
+    assert c.data is not None and c.data.departures
+    # The failing member is marked unavailable rather than left on stale data.
+    assert b.last_update_success is False
+    assert isinstance(b.last_exception, UpdateFailed)
+    assert b.last_exception.translation_key == "api_invalid_response"
+
+
+async def test_timer_tick_survives_unexpected_fetch_error(
+    hass: HomeAssistant,
+) -> None:
+    """A non-UpdateFailed raise out of the fetch still counts as a failure.
+
+    Without the guard it escaped into the `async_track_time_interval`
+    callback — logged under HA core's namespace, and `_note_failure` never
+    ran, so backoff never engaged on that path.
+    """
+    group, coordinator = _group_with_member(hass, interval=60)
+    with patch.object(
+        group, "async_fetch", AsyncMock(side_effect=RuntimeError("boom"))
+    ):
+        await group._async_timer_tick(None)
+        assert group._consecutive_failures == 1
+        assert coordinator.last_update_success is False
+        await group._async_timer_tick(None)
+
+    assert group._consecutive_failures == 2
+    # Backoff engaged despite the exception never being an UpdateFailed.
+    assert group._current_interval > timedelta(seconds=60)
+
+
+async def test_timer_tick_isolates_a_failing_member_on_the_error_path(
+    hass: HomeAssistant,
+) -> None:
+    """The error fan-out is guarded per member too.
+
+    `batch_set_error` notifies every listener, and a CoordinatorEntity
+    listener that raises would end the loop just as a parse failure does.
+    """
+    group = MonitorBatchGroup(hass, 60)
+    a = _member(hass, unique_id="a")
+    b = _member(hass, data={CONF_RBLS: [1491]}, unique_id="b")
+    for coordinator in (a, b):
+        group.add_member(coordinator)
+        coordinator.attach_batch(group)
+    a.batch_set_error = MagicMock(  # type: ignore[method-assign]
+        side_effect=RuntimeError("listener blew up")
+    )
+
+    with _patch_get(
+        group, MagicMock(side_effect=aiohttp.ClientConnectionError("down"))
+    ):
+        await group._async_timer_tick(None)
+
+    # B is still reached despite A raising.
+    assert b.last_update_success is False
+
+
 async def test_timer_tick_no_members_noop(hass: HomeAssistant) -> None:
     """A tick with no members returns without touching the network."""
     group = MonitorBatchGroup(hass, 60)
@@ -489,3 +575,35 @@ async def test_backoff_widens_then_resets(hass: HomeAssistant) -> None:
     # A success restores the normal cadence.
     group._note_success()
     assert group._current_interval == timedelta(seconds=base)
+
+
+async def test_rate_limit_widens_cadence_on_the_first_failure(
+    hass: HomeAssistant, monitor_fixture
+) -> None:
+    """Error 316 is an explicit rate-limit signal, so it skips the grace tick.
+
+    A transient 500 gets one interval of benefit of the doubt; 316 does not —
+    upstream has already said we are polling too fast, so spending another
+    request at full cadence to confirm it is exactly the wrong move.
+    """
+    group, _ = _group_with_member(hass, interval=60)
+    limited = dict(monitor_fixture)
+    limited["message"] = {"value": "Rate limit", "messageCode": ERR_RATE_LIMIT}
+
+    with _patch_get(
+        group, MagicMock(return_value=make_response_cm(_ok_response(limited)))
+    ):
+        await group._async_timer_tick(None)
+
+    assert group._consecutive_failures == 1
+    # Widened to ~2x on failure one, where a generic failure would have held 60s.
+    assert 60 * 2 * 0.9 <= group._current_interval.total_seconds() <= 60 * 2 * 1.1
+
+
+def test_generic_failure_still_holds_cadence_on_the_first_tick(
+    hass: HomeAssistant,
+) -> None:
+    """The 316 fast-path must not change the ordinary first-failure grace."""
+    group, _ = _group_with_member(hass, interval=60)
+    group._note_failure(rate_limited=False)
+    assert group._current_interval == timedelta(seconds=60)
