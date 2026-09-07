@@ -188,8 +188,19 @@ export const editorStyles = css`
     gap: 7px;
   }
 
+  /* Three tokens, mirroring the cards' --wl-accent / --wl-accent-text split:
+     --wl-chip-color is the line's FILL, --wl-chip-text is that same colour
+     lightness-clamped for use as TEXT, and --wl-chip-ink is what gets written
+     on top of the fill. The GTFS palette is a set of background colours;
+     several are illegible painted as text (bus navy #0A295D is 1.21:1 on a
+     dark card), which is why the outlined chip must never use the fill for
+     its label. See utils/color.ts and lineChipColors(). */
   .wl-chip {
     --wl-chip-color: var(--primary-color);
+    /* Hueless but legible default — the same policy the card applies when the
+       theme polarity is unknown. Never fall back to the fill here. */
+    --wl-chip-text: var(--primary-text-color);
+    --wl-chip-ink: #fff;
     position: relative;
     display: flex;
     align-items: center;
@@ -197,9 +208,9 @@ export const editorStyles = css`
     height: 34px;
     padding: 0 10px;
     border-radius: 5px;
-    border: 2px solid var(--wl-chip-color);
+    border: 2px solid var(--wl-chip-text);
     background: transparent;
-    color: var(--wl-chip-color);
+    color: var(--wl-chip-text);
     font-size: 0.8125rem;
     font-weight: 700;
     line-height: 1;
@@ -219,7 +230,9 @@ export const editorStyles = css`
 
   .wl-chip[aria-pressed="true"] {
     background: var(--wl-chip-color);
-    color: #fff;
+    /* Filled: the paired foreground the palette publishes for this line. */
+    border-color: var(--wl-chip-color);
+    color: var(--wl-chip-ink);
   }
 
   .wl-chip:hover {
@@ -253,14 +266,17 @@ export const editorStyles = css`
    * Read-only line badge
    * ---------------------------------------------------------------- */
 
+  /* Always a filled surface, so it takes the paired ink rather than a
+     hardcoded white — a nightline badge is yellow-on-navy, as on the sign. */
   .wl-badge {
+    --wl-chip-ink: #fff;
     flex: none;
     min-width: 34px;
     height: 24px;
     padding: 0 7px;
     box-sizing: border-box;
     border-radius: 5px;
-    color: #fff;
+    color: var(--wl-chip-ink);
     font-size: 0.75rem;
     font-weight: 700;
     line-height: 24px;

@@ -62,6 +62,7 @@ import { deriveRowState } from "./utils/row-state.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
 import {
   accentTextColor,
+  colorSchemeOf,
   contrastRatio,
   mixOver,
   NEUTRAL_ACCENT_TEXT,
@@ -1452,9 +1453,7 @@ export class WienerLinienAustriaCard extends LitElement {
    * instead of us guessing a polarity.
    */
   private _colorScheme(): "dark" | "light" | undefined {
-    if (this.hass?.themes?.darkMode === true) return "dark";
-    if (this.hass?.themes?.darkMode === false) return "light";
-    return undefined;
+    return colorSchemeOf(this.hass);
   }
 
   /**

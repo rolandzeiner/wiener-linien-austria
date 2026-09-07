@@ -1,4 +1,5 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
+import { accentTextColor } from "./color.js";
 import { CARD_DEFAULTS } from "./card-vocabulary.js";
 import { RETRO_HEADER_MDI_EXIT_KEYS } from "./retro-station-icons.js";
 import type {
@@ -644,4 +645,39 @@ export function colorForLine(
   fallback = "var(--primary-color)",
 ): string {
   return chipPalette(line, overrides, gtfsColors, fallback).background;
+}
+
+/**
+ * The three colours a line chip needs, off the one `chipPalette` ladder.
+ *
+ * - `fill` — the line's background colour, for surfaces that are FILLED with
+ *   it: a selected chip, a read-only badge.
+ * - `ink` — what to write on that fill. The paired foreground when the palette
+ *   publishes one (a nightline is bright yellow on deep navy, per Wiener
+ *   Linien's signage), otherwise undefined so the caller's white default
+ *   stands — matching `chipPalette`, which deliberately declines to guess a
+ *   foreground for an arbitrary user override.
+ * - `text` — the line's colour written as TEXT on the card ground, lightness-
+ *   clamped into the legible band for `scheme` by `accentTextColor`.
+ *
+ * `text` is the rung the editor used to skip. It painted `fill` as the chip's
+ * label and border, so a nightline's deep navy (#1b1464) sat on the dark
+ * editor card at roughly 1.3:1 and the chip read as an empty outline — the
+ * exact failure `accentTextColor` was written for. `undefined` when the theme
+ * polarity isn't known yet, so the caller leaves the token unset and the
+ * theme's own text colour stands.
+ */
+export function lineChipColors(
+  line: string,
+  overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
+  scheme?: "dark" | "light" | undefined,
+  fallback = "var(--primary-color)",
+): { fill: string; ink: string | undefined; text: string | undefined } {
+  const palette = chipPalette(line, overrides, gtfsColors, fallback);
+  return {
+    fill: palette.background,
+    ink: palette.color,
+    text: accentTextColor(palette.background, scheme) ?? undefined,
+  };
 }

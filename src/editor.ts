@@ -56,11 +56,12 @@ import type {
 } from "./types.js";
 import { fireEvent } from "./utils.js";
 import {
-  colorForLine,
+  lineChipColors,
   normaliseModernConfig,
   type NormalisedModernConfig,
   type NormalisedModernStop,
 } from "./utils/config.js";
+import { colorSchemeOf } from "./utils/color.js";
 import { collectLinesInSelection } from "./utils/departures.js";
 import { firstLineColorsMap } from "./utils/entities.js";
 
@@ -335,7 +336,16 @@ export class WienerLinienAustriaCardEditor
         ? html`<div class="wl-group">
             <span class="wl-note">${et("colors_hint")}</span>
             ${lines.map((line) => {
-              const current = colorForLine(line, cfg.line_colors, gtfs, "#888888");
+              // Same palette ladder the chips and badges use, so the preview
+              // badge here matches what the stop block paints for this line.
+              const palette = lineChipColors(
+                line,
+                cfg.line_colors,
+                gtfs,
+                colorSchemeOf(this.hass),
+                "#888888",
+              );
+              const current = palette.fill;
               const hex = current.startsWith("#") ? current : "#888888";
               // Real `disabled` on the reset button below, not the stop
               // block's aria-disabled idiom: with no override in place there is
@@ -348,7 +358,10 @@ export class WienerLinienAustriaCardEditor
                 <div class="wl-color-row">
                   <span
                     class="wl-badge"
-                    style=${styleMap({ background: current })}
+                    style=${styleMap({
+                      background: current,
+                      ...(palette.ink ? { "--wl-chip-ink": palette.ink } : {}),
+                    })}
                     aria-hidden="true"
                     >${line}</span
                   >

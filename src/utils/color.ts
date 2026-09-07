@@ -1,3 +1,5 @@
+import type { HomeAssistant } from "../types.js";
+
 // Accent → legible-glyph colour, computed here rather than in CSS.
 //
 // The GTFS palette is a set of *background* colours; several of them are
@@ -28,6 +30,23 @@ const LIGHT_CEILING = 0.45;
  * would otherwise inherit an ancestor's line colour).
  */
 export const NEUTRAL_ACCENT_TEXT = "var(--primary-text-color)";
+
+/**
+ * The theme's polarity, read from HA's own themes state.
+ *
+ * `undefined` means "not known yet" (the theme has not loaded), and callers
+ * must treat that as a reason not to guess: leave the accent-as-text token
+ * unset so the theme's own text colour stands — legible but hueless, never
+ * invisible. Shared by the cards and the editors so the two cannot end up
+ * clamping against different polarities on the same screen.
+ */
+export function colorSchemeOf(
+  hass: HomeAssistant | undefined,
+): "dark" | "light" | undefined {
+  if (hass?.themes?.darkMode === true) return "dark";
+  if (hass?.themes?.darkMode === false) return "light";
+  return undefined;
+}
 
 type Rgb = readonly [number, number, number];
 

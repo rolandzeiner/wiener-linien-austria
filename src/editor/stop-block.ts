@@ -23,7 +23,8 @@ import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import type { HomeAssistant, WienerLinienAttrs } from "../types.js";
-import { colorForLine } from "../utils/config.js";
+import { lineChipColors } from "../utils/config.js";
+import { colorSchemeOf } from "../utils/color.js";
 import {
   directionSurface,
   effectiveLines,
@@ -90,6 +91,25 @@ export interface StopBlockOptions {
   et(key: string): string;
 }
 
+/** What `colorOf` hands each renderer. Mirrors `lineChipColors`'s return. */
+type LineColors = { fill: string; ink: string | undefined; text: string | undefined };
+
+/** Chip tokens. `--wl-chip-text` is left unset when the theme polarity is
+ *  unknown, so the CSS default (`--primary-text-color`) stands rather than the
+ *  fill — legible but hueless, never invisible. Same policy as the cards. */
+function chipStyle(c: LineColors): Record<string, string> {
+  return {
+    "--wl-chip-color": c.fill,
+    ...(c.text ? { "--wl-chip-text": c.text } : {}),
+    ...(c.ink ? { "--wl-chip-ink": c.ink } : {}),
+  };
+}
+
+/** Badges are always filled, so they need the fill and its paired ink only. */
+function badgeStyle(c: LineColors): Record<string, string> {
+  return { background: c.fill, ...(c.ink ? { "--wl-chip-ink": c.ink } : {}) };
+}
+
 const WALK_MIN = 1;
 const WALK_MAX = 120;
 
@@ -139,8 +159,12 @@ export function renderStopBlock(
   const missing = !attrs;
   const stopName = attrs?.stop_name || stop.entity;
   const lineColors = attrs?.line_colors ?? {};
-  const colorOf = (line: string): string =>
-    colorForLine(line, opts.lineColorOverrides, lineColors, "#5b6470");
+  // One resolver for every line colour in the block. Returns the fill, the
+  // paired ink for filled surfaces, and the lightness-clamped variant for text
+  // — so an outlined chip never paints its label in a background colour.
+  const scheme = colorSchemeOf(hass);
+  const colorOf = (line: string): LineColors =>
+    lineChipColors(line, opts.lineColorOverrides, lineColors, scheme, "#5b6470");
 
   const picked = new Set(stop.lines ?? []);
   // A picked line the stop's own list does not mention is still configured —
@@ -224,7 +248,7 @@ function renderLines(
   ctx: {
     lines: string[];
     picked: Set<string>;
-    colorOf: (l: string) => string;
+    colorOf: (l: string) => LineColors;
     typeByLine: Map<string, string>;
   },
 ): TemplateResult {
@@ -252,7 +276,7 @@ function renderLines(
               return html`<button
                 type="button"
                 class="wl-chip"
-                style=${styleMap({ "--wl-chip-color": colorOf(line) })}
+                style=${styleMap(chipStyle(colorOf(line)))}
                 aria-pressed=${on ? "true" : "false"}
                 aria-label=${opts
                   .et(on ? "line_active_aria" : "line_inactive_aria")
@@ -419,7 +443,7 @@ function renderOverrides(
     triplets: ReadonlyArray<Triplet>;
     picked: Set<string>;
     lines: string[];
-    colorOf: (l: string) => string;
+    colorOf: (l: string) => LineColors;
     dirStrings: (d: "H" | "R") => { full: string; short: string };
   },
 ): TemplateResult {
@@ -480,7 +504,7 @@ function renderOverrides(
             );
         return html`
           <div class="wl-override-row">
-            <span class="wl-badge" style=${styleMap({ background: colorOf(line) })}
+            <span class="wl-badge" style=${styleMap(badgeStyle(colorOf(line)))}
               >${line}</span
             >
             <div class="wl-dirs">
@@ -527,7 +551,7 @@ function renderWalkTimes(
   ctx: {
     attrs: WienerLinienAttrs | undefined;
     picked: Set<string>;
-    colorOf: (l: string) => string;
+    colorOf: (l: string) => LineColors;
     lines: string[];
     dirStrings: (d: "H" | "R") => { full: string; short: string };
   },
@@ -584,7 +608,7 @@ function renderWalkTimes(
           };
           return html`
             <div class="wl-walk-row">
-              <span class="wl-badge" style=${styleMap({ background: colorOf(p.line) })}
+              <span class="wl-badge" style=${styleMap(badgeStyle(colorOf(p.line)))}
                 >${p.line}</span
               >
               <span
