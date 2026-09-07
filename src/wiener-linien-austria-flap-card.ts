@@ -198,7 +198,24 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         "wiener-linien-austria-flap-card: 'entity' must be a string",
       );
     }
-    this._config = normaliseFlapConfig(config);
+    const normalised = normaliseFlapConfig(config);
+    // If the user configured stops but every single one was rejected
+    // (wrong domain, malformed shape), surface that as a Lovelace error
+    // card instead of a silently empty board — an empty board is
+    // indistinguishable from "no departures right now". Per-entry reasons
+    // are already in the console via normaliseStopEntry. Mirrors the
+    // modern card, which has always failed loudly here.
+    const rawCount = Array.isArray(config.entities)
+      ? config.entities.length
+      : typeof config.entity === "string" && config.entity
+        ? 1
+        : 0;
+    if (rawCount > 0 && normalised.entities.length === 0) {
+      throw new Error(
+        "wiener-linien-austria-flap-card: every configured entity was rejected (must start with `sensor.`) — see browser console for per-entry details",
+      );
+    }
+    this._config = normalised;
     // Reset the marching engine on every config swap. Otherwise lowering
     // max_rows leaves orphan flip-state keys for the dropped rows, and a
     // mid-flight march timer keeps ticking toward targets that no longer

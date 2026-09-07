@@ -74,6 +74,36 @@ describe("normaliseRetroConfig — defaults", () => {
     expect(normaliseRetroConfig(retro({ entity: "" })).entity).toBeUndefined();
   });
 
+  it("coerces non-boolean YAML values rather than passing them through", () => {
+    // `?? true` used to hand `0` straight back, hiding the platform column
+    // where modern and flap both showed it. asBool is the shared guard.
+    expect(
+      normaliseRetroConfig(retro({ show_platform: 0 as never })).show_platform,
+    ).toBe(true);
+    expect(
+      normaliseRetroConfig(retro({ show_platform: "false" as never }))
+        .show_platform,
+    ).toBe(true);
+    expect(
+      normaliseRetroConfig(retro({ show_platform: false })).show_platform,
+    ).toBe(false);
+    expect(
+      normaliseRetroConfig(retro({ show_station_name: 1 as never }))
+        .show_station_name,
+    ).toBe(false);
+  });
+
+  it("agrees with the other two cards on how a non-boolean is read", () => {
+    // The concrete cross-card inconsistency finding 6 was about.
+    const retroVal = normaliseRetroConfig(
+      retro({ show_platform: 0 as never }),
+    ).show_platform;
+    const modernVal = normaliseModernConfig({
+      show_platform: 0 as never,
+    }).show_platform;
+    expect(retroVal).toBe(modernVal);
+  });
+
   it("rejects out-of-whitelist enum values instead of passing them through", () => {
     expect(normaliseRetroConfig(retro({ size: "huge" as never })).size).toBe(
       "regular",

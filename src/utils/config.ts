@@ -522,11 +522,14 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
     line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
-    show_platform: raw.show_platform ?? true,
+    // asBool, not `?? true` — YAML is untyped, and `?? ` passes a
+    // non-boolean straight through (`show_platform: 0` yielded `0`,
+    // hiding the column, where modern and flap both yield `true`).
+    show_platform: asBool(raw.show_platform, true),
     platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
       ? (raw.platform_side as RetroPlatformSide)
       : "auto",
-    show_station_name: raw.show_station_name ?? false,
+    show_station_name: asBool(raw.show_station_name, false),
     station_bg,
     size,
     style,

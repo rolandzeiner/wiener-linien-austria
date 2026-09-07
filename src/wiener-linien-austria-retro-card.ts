@@ -167,6 +167,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         "wiener-linien-austria-retro-card: 'entity' must be a string",
       );
     }
+    // Reject a wrong-domain entity loudly. The normaliser would silently
+    // drop it to `undefined` and the panel would render blank, which a
+    // user cannot tell apart from "no departures right now". The empty
+    // string stays allowed — that is the entity picker's stub state, and
+    // the editor has to be able to load on it.
+    if (
+      typeof config.entity === "string" &&
+      config.entity &&
+      !config.entity.startsWith("sensor.")
+    ) {
+      throw new Error(
+        `wiener-linien-austria-retro-card: 'entity' must be in the sensor domain (got "${config.entity}")`,
+      );
+    }
     this._config = normaliseRetroConfig(config);
     // Reset every timer / state-machine handle on config swap. Without
     // this, toggling `wheelchair_race` off mid-race leaves a victory
