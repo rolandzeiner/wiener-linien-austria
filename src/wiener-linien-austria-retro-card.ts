@@ -11,7 +11,6 @@ import type {
 
 import { RETRO_CARD_VERSION } from "./const.js";
 import { deText } from "./utils.js";
-import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
@@ -24,7 +23,7 @@ import type {
 } from "./types.js";
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
-import { ROW_CAP } from "./utils/card-vocabulary.js";
+import { deriveRetroView } from "./utils/retro-view.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
@@ -829,44 +828,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const cfg = this._config;
     const eid = this._resolveEntity();
     const attrs = (eid ? (this.hass?.states?.[eid]?.attributes ?? {}) : {}) as WienerLinienAttrs;
-    const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
+    // What to show is derived in utils/retro-view.ts (pure, unit-tested);
+    // this method only decides how to draw it.
+    const {
+      rows,
+      matching,
+      departures,
+      platform,
+      gleisLeft,
+      platformLabelKey,
+      stopName,
+    } = deriveRetroView(cfg, attrs);
+    const platformLabel = this._t(platformLabelKey);
 
-    const matching = filterDepartures(departures, {
-      direction: cfg.direction,
-      lines: cfg.line ? [cfg.line] : undefined,
-      walk_times: cfg.walk_times,
-      accessibility_only: cfg.accessibility_only,
-    });
-    // The LED panel's layout is built for exactly two rows, so this cap
-    // is a constant rather than a config key — named in card-vocabulary
-    // alongside modern's `max_departures` and flap's `max_rows`.
-    const rows = matching.slice(0, ROW_CAP.retro);
-
-    const rawPlatform = rows.find((d) => d.platform)?.platform ?? null;
-    const platform = cfg.show_platform ? rawPlatform : null;
-    // Side resolution: explicit user override wins over the auto rule
-    // (platform "2" lands on the left, else right — the U-Bahn signage
-    // convention). "auto" preserves pre-feature behaviour; "left" /
-    // "right" let users mirror a real-station view that disagrees
-    // with the heuristic (e.g. a tram stop where the published platform
-    // is "1" but the user wants the GLEIS column on the left for
-    // consistency with the next card on their dashboard).
-    let gleisLeft: boolean;
-    switch (cfg.platform_side) {
-      case "left":
-        gleisLeft = true;
-        break;
-      case "right":
-        gleisLeft = false;
-        break;
-      default:
-        gleisLeft = platform === "2";
-    }
-    const type = rows[0]?.type ?? "";
-    const isMetro = type === LINE_TYPE_METRO;
-    const platformLabel = this._t(isMetro ? "gleis" : "steig");
-
-    const stopName = attrs.stop_name || attrs.friendly_name || "";
     const showStationName = cfg.show_station_name && !!stopName;
     const stationPanel = showStationName
       ? this._renderStationName(
