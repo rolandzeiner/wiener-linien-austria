@@ -50,88 +50,91 @@ const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>
 // header-side validation (the two cards share `RetroHeaderSide`
 // shape: the chip / exit / amenity grammar is identical even though
 // each card paints the strip with its own palette).
+/** Trim and bound a free-text config string. Returns undefined for a
+ *  non-string or an empty result, so callers branch on a single
+ *  `!== undefined` test. `trim: false` preserves deliberate padding —
+ *  a date format like " d.m " uses spaces as separators. */
+function boundedText(raw: unknown, max: number, trim: boolean): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const out = trim ? raw.trim().slice(0, max) : raw.slice(0, max);
+  return out.length > 0 ? out : undefined;
+}
+
+/** Clean a user-authored string array: drop non-strings, trim, optionally
+ *  truncate each entry, drop empties and anything `accept` rejects, then
+ *  cap the count. Returns undefined for an empty result so the caller can
+ *  omit the key. Tolerant by design — one bad entry in hand-written YAML
+ *  shouldn't fail the whole side. */
+function cleanStringList(
+  raw: unknown,
+  opts: {
+    maxCount: number;
+    /** Truncate each entry to this length. Omit to leave length alone. */
+    truncateTo?: number;
+    /** Drop entries failing this test (shape and/or length). */
+    accept?: (v: string) => boolean;
+  },
+): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const { maxCount, truncateTo, accept } = opts;
+  const cleaned = raw
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => (truncateTo === undefined ? v.trim() : v.trim().slice(0, truncateTo)))
+    .filter((v) => v.length > 0 && (accept === undefined || accept(v)))
+    .slice(0, maxCount);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+/** Any registered icon set, not just mdi:. The card renders these through
+ *  <ha-icon>, which resolves whatever sets the instance has installed, so
+ *  a user with a custom-icons integration can pick `hue:adore-mirror` and
+ *  it will display. The old mdi:-only rule dated from v1's free-text
+ *  input, where it guarded against garbage; v2 picks through
+ *  ha-icon-picker, which only emits icons that actually resolve, so the
+ *  shape check is all that is needed — and the narrow rule was silently
+ *  discarding valid picks on save. */
+const ICON_KEY_RE = /^[a-z0-9_-]+:[a-z0-9_-]+$/i;
+
 export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
+  const out: RetroHeaderSide = {};
+
   const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
     ? (r.exit as RetroHeaderExit)
     : "none";
-  let text: string | undefined;
-  if (typeof r.text === "string") {
-    const trimmed = r.text.trim().slice(0, 64);
-    if (trimmed) text = trimmed;
-  }
-  const show_wc = r.show_wc === true;
-  const show_escalator = r.show_escalator === true;
-  const show_elevator = r.show_elevator === true;
-  const show_clock = r.show_clock === true;
-  const show_date = r.show_date === true;
-  // Bound the format string defensively (a runaway YAML config
-  // shouldn't blow out the strip width) but don't trim — the user
-  // may legitimately use leading/trailing spaces as separators
-  // (e.g. " d.m " to pad the chip).
-  let date_format: string | undefined;
-  if (typeof r.date_format === "string") {
-    const sliced = r.date_format.slice(0, 32);
-    if (sliced) date_format = sliced;
-  }
-  // Chip array: trim each entry, drop empties, cap text length and
-  // total count. Tolerant of YAML user error — non-string entries are
-  // skipped instead of failing the whole side.
-  let chips: string[] | undefined;
-  if (Array.isArray(r.chips)) {
-    const cleaned = r.chips
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim().slice(0, 16))
-      .filter((v) => v.length > 0)
-      .slice(0, 6);
-    if (cleaned.length > 0) chips = cleaned;
-  }
-  // Free-form MDI icon array — same chip-input pattern as `chips`,
-  // but with a `mdi:` prefix filter. User types/pastes keys in the
-  // editor; we drop anything that isn't a string starting with
-  // `mdi:`, length 5..64, and cap the list at 3.
-  let extra_icons: string[] | undefined;
-  if (Array.isArray(r.extra_icons)) {
-    const cleaned = r.extra_icons
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim())
-      // Any registered icon set, not just mdi:. The card renders these through
-      // <ha-icon>, which resolves whatever sets the instance has installed, so
-      // a user with a custom-icons integration can pick `hue:adore-mirror` and
-      // it will display. The old mdi:-only rule dated from v1's free-text
-      // input, where it guarded against garbage; v2 picks through
-      // ha-icon-picker, which only emits icons that actually resolve, so the
-      // shape check is all that is needed — and the narrow rule was silently
-      // discarding valid picks on save.
-      .filter((v) => /^[a-z0-9_-]+:[a-z0-9_-]+$/i.test(v) && v.length <= 64)
-      .slice(0, 3);
-    if (cleaned.length > 0) extra_icons = cleaned;
-  }
-  if (
-    exit === "none" &&
-    text === undefined &&
-    !show_wc &&
-    !show_escalator &&
-    !show_elevator &&
-    !show_clock &&
-    !show_date &&
-    chips === undefined &&
-    extra_icons === undefined
-  ) {
-    return undefined;
-  }
-  const out: RetroHeaderSide = {};
   if (exit !== "none") out.exit = exit;
+
+  const text = boundedText(r.text, 64, true);
   if (text !== undefined) out.text = text;
-  if (show_wc) out.show_wc = true;
-  if (show_escalator) out.show_escalator = true;
-  if (show_elevator) out.show_elevator = true;
-  if (show_clock) out.show_clock = true;
-  if (show_date) out.show_date = true;
-  if (date_format !== undefined) out.date_format = date_format;
+
+  if (r.show_wc === true) out.show_wc = true;
+  if (r.show_escalator === true) out.show_escalator = true;
+  if (r.show_elevator === true) out.show_elevator = true;
+  if (r.show_clock === true) out.show_clock = true;
+  if (r.show_date === true) out.show_date = true;
+
+  // Chips truncate to fit the strip; icon keys are rejected rather than
+  // cut, because half a key resolves to nothing.
+  const chips = cleanStringList(r.chips, { truncateTo: 16, maxCount: 6 });
   if (chips !== undefined) out.chips = chips;
-  if (extra_icons !== undefined) out.extra_icons = extra_icons;
+
+  const extraIcons = cleanStringList(r.extra_icons, {
+    maxCount: 3,
+    accept: (v) => ICON_KEY_RE.test(v) && v.length <= 64,
+  });
+  if (extraIcons !== undefined) out.extra_icons = extraIcons;
+
+  // Every field unset / falsy / "none" collapses the whole side, so the
+  // card's "is this side configured at all?" check stays a single truthy
+  // test. `date_format` is deliberately NOT part of this decision — it
+  // only modifies how `show_date` renders, and a side carrying nothing
+  // else would paint an empty strip.
+  if (Object.keys(out).length === 0) return undefined;
+
+  const dateFormat = boundedText(r.date_format, 32, false);
+  if (dateFormat !== undefined) out.date_format = dateFormat;
+
   return out;
 }
 

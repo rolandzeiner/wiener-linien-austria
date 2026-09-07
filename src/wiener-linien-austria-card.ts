@@ -1409,7 +1409,8 @@ export class WienerLinienAustriaCard extends LitElement {
       "hero",
     );
     if (!hasStopsAhead) return nothing;
-    return this._renderHeroStopsAheadPanel(
+    return this._renderStopsAheadPanel(
+      "hero",
       d.stops_ahead!,
       panelId,
       expanded,
@@ -1419,7 +1420,19 @@ export class WienerLinienAustriaCard extends LitElement {
     );
   }
 
-  private _renderHeroStopsAheadPanel(
+  /**
+   * The expandable stops-ahead panel, in both places it appears.
+   *
+   * The hero panel is a `<div>` and the row panel a `<li>` (the row list
+   * is a `<ul>`, so the panel has to be a list item to stay valid) — that
+   * is the ONLY difference, and it is why this isn't a single template.
+   * Everything else, including the ARIA wiring, is computed once above
+   * the branch: the two used to be separate methods, which is how an
+   * accessibility or expand-state fix could land on one panel and quietly
+   * miss the other.
+   */
+  private _renderStopsAheadPanel(
+    variant: "hero" | "row",
     stops: NonNullable<DepartureAttr["stops_ahead"]>,
     panelId: string,
     expanded: boolean,
@@ -1427,18 +1440,26 @@ export class WienerLinienAustriaCard extends LitElement {
     rowKey: string,
     entityId: string,
   ): TemplateResult {
-    return html`
-      <div
-        class=${classMap({ "hero-detail": true, expanded })}
-        id=${panelId}
-        role="region"
-        aria-hidden=${expanded ? "false" : "true"}
-      >
-        <div class="hero-detail-inner">
-          ${this._renderStopsAheadInner(stops, currentLine, rowKey, entityId)}
-        </div>
+    const base = variant === "hero" ? "hero-detail" : "dep-row-detail";
+    const cls = classMap({ [base]: true, expanded });
+    const hidden = expanded ? "false" : "true";
+    const body = html`
+      <div class="${base}-inner">
+        ${this._renderStopsAheadInner(stops, currentLine, rowKey, entityId)}
       </div>
     `;
+    return variant === "hero"
+      ? html`<div
+          class=${cls}
+          id=${panelId}
+          role="region"
+          aria-hidden=${hidden}
+        >
+          ${body}
+        </div>`
+      : html`<li class=${cls} id=${panelId} role="region" aria-hidden=${hidden}>
+          ${body}
+        </li>`;
   }
 
   /**
@@ -1630,30 +1651,16 @@ export class WienerLinienAustriaCard extends LitElement {
 
     return [
       rowTpl,
-      this._renderStopsAheadPanel(d.stops_ahead!, panelId, expanded, line, rowKey, entityId),
+      this._renderStopsAheadPanel(
+        "row",
+        d.stops_ahead!,
+        panelId,
+        expanded,
+        line,
+        rowKey,
+        entityId,
+      ),
     ];
-  }
-
-  private _renderStopsAheadPanel(
-    stops: NonNullable<DepartureAttr["stops_ahead"]>,
-    panelId: string,
-    expanded: boolean,
-    currentLine: string,
-    rowKey: string,
-    entityId: string,
-  ): TemplateResult {
-    return html`
-      <li
-        class=${classMap({ "dep-row-detail": true, expanded })}
-        id=${panelId}
-        role="region"
-        aria-hidden=${expanded ? "false" : "true"}
-      >
-        <div class="dep-row-detail-inner">
-          ${this._renderStopsAheadInner(stops, currentLine, rowKey, entityId)}
-        </div>
-      </li>
-    `;
   }
 
   private _renderStopAhead(

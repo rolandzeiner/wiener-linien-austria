@@ -6,6 +6,7 @@ import {
   filterPassthrough,
   normaliseModernConfig,
   normaliseRetroConfig,
+  normaliseRetroHeaderSide,
   normaliseWalkTimes,
 } from "./config.js";
 import type { WienerLinienRetroCardConfig } from "../types.js";
@@ -250,6 +251,114 @@ describe("normaliseModernConfig — defaults", () => {
     expect(
       normaliseModernConfig({ show_platform: false }).show_platform,
     ).toBe(false);
+  });
+});
+
+describe("normaliseRetroHeaderSide", () => {
+  it("returns undefined for a non-object or a fully empty side", () => {
+    expect(normaliseRetroHeaderSide(undefined)).toBeUndefined();
+    expect(normaliseRetroHeaderSide("nope")).toBeUndefined();
+    expect(normaliseRetroHeaderSide({})).toBeUndefined();
+    expect(normaliseRetroHeaderSide({ exit: "none" })).toBeUndefined();
+    // Every field unset/falsy collapses the whole side, so the card's
+    // "is this side configured at all?" check is a single truthy test.
+    expect(
+      normaliseRetroHeaderSide({ show_wc: false, text: "   ", chips: [] }),
+    ).toBeUndefined();
+  });
+
+  it("keeps the fixed exit variants and drops an unknown one", () => {
+    expect(normaliseRetroHeaderSide({ exit: "regular" })?.exit).toBe("regular");
+    expect(normaliseRetroHeaderSide({ exit: "accessible" })?.exit).toBe(
+      "accessible",
+    );
+    // Unknown value falls back to "none", which is then omitted entirely.
+    expect(normaliseRetroHeaderSide({ exit: "sideways" })).toBeUndefined();
+  });
+
+  it("trims and bounds the sign text to 64 characters", () => {
+    expect(normaliseRetroHeaderSide({ text: "  Karlsplatz  " })?.text).toBe(
+      "Karlsplatz",
+    );
+    expect(
+      normaliseRetroHeaderSide({ text: "x".repeat(200) })?.text?.length,
+    ).toBe(64);
+  });
+
+  it("bounds date_format but does not trim it", () => {
+    // Leading/trailing spaces are legitimate padding in a signage chip.
+    expect(
+      normaliseRetroHeaderSide({ show_date: true, date_format: " d.m " })
+        ?.date_format,
+    ).toBe(" d.m ");
+    expect(
+      normaliseRetroHeaderSide({ show_date: true, date_format: "d".repeat(80) })
+        ?.date_format?.length,
+    ).toBe(32);
+  });
+
+  it("does not let date_format alone bring a side to life", () => {
+    // date_format only modifies how show_date renders. On its own it must
+    // not make an otherwise-empty side "configured", or the header strip
+    // would appear with nothing in it.
+    expect(normaliseRetroHeaderSide({ date_format: "d.m.Y" })).toBeUndefined();
+    expect(
+      normaliseRetroHeaderSide({ text: "Oper", date_format: "d.m.Y" })
+        ?.date_format,
+    ).toBe("d.m.Y");
+  });
+
+  it("only sets the amenity flags when they are literally true", () => {
+    const on = normaliseRetroHeaderSide({
+      show_wc: true,
+      show_escalator: true,
+      show_elevator: true,
+      show_clock: true,
+      show_date: true,
+    });
+    expect(on).toEqual({
+      show_wc: true,
+      show_escalator: true,
+      show_elevator: true,
+      show_clock: true,
+      show_date: true,
+    });
+    expect(
+      normaliseRetroHeaderSide({ show_wc: 1, show_escalator: "yes" }),
+    ).toBeUndefined();
+  });
+
+  it("cleans the chip list: trim, drop empties, cap length and count", () => {
+    expect(
+      normaliseRetroHeaderSide({
+        chips: ["  A  ", "", "   ", "B", 42, "x".repeat(40)],
+      })?.chips,
+    ).toEqual(["A", "B", "x".repeat(16)]);
+    expect(
+      normaliseRetroHeaderSide({ chips: ["1", "2", "3", "4", "5", "6", "7"] })
+        ?.chips,
+    ).toHaveLength(6);
+  });
+
+  it("accepts any registered icon set, not just mdi, and caps at three", () => {
+    expect(
+      normaliseRetroHeaderSide({
+        extra_icons: ["mdi:parking", "hue:adore-mirror", "not-an-icon", 7],
+      })?.extra_icons,
+    ).toEqual(["mdi:parking", "hue:adore-mirror"]);
+    expect(
+      normaliseRetroHeaderSide({
+        extra_icons: ["mdi:a", "mdi:b", "mdi:c", "mdi:d"],
+      })?.extra_icons,
+    ).toHaveLength(3);
+  });
+
+  it("omits every key it did not set", () => {
+    const side = normaliseRetroHeaderSide({ text: "Oper" });
+    expect(side).toEqual({ text: "Oper" });
+    expect(side).not.toHaveProperty("exit");
+    expect(side).not.toHaveProperty("chips");
+    expect(side).not.toHaveProperty("show_wc");
   });
 });
 
