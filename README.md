@@ -9,19 +9,14 @@
 
 Vienna public transport departures for Home Assistant. Start typing your stop, choose the lines you care about — done. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data): no API key, no YAML, no RBL lookups.
 
-## Features
+## Supported Functions
 
 - **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; the state is the next-departure countdown, attributes carry the full board.
-- **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap. See [Lovelace Cards](#lovelace-cards).
+- **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared across all three cards *(2.0.0)*.
-- **Service + elevator alerts** filtered to your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline by every card. Each notice breaks out into per-line headings, the reason, and expected duration, so you can find your line without reading the whole thing *(1.7.3)*.
-- **Official line colours** — `route_color` from the Wiener Linien GTFS feed drives every line chip, pill and station band, so U1 is red and U3 orange without you configuring anything.
-- **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips.
-- **Air-conditioning flag** — a snowflake beside departures whose vehicle is air conditioned. Off by default, switched on per card. Wiener Linien report it per vehicle, so older trains and trams don't carry it *(1.8.0)*.
-- **Autocomplete stop entry** — type a stop name and the catalogue filters as you go, nearest stops first with distances shown. The line picker merges the live `/monitor` window with the static schedule, so day-only and nightline services stay selectable whenever you configure.
-- **Batched polling** — stops sharing an interval fetch in one request per tick instead of one each, so adding stops doesn't multiply API load.
-- **Stale-data guard** — Wiener Linien occasionally serve a frozen board; in August 2026 every U-Bahn stop reported the same departure for 60 hours. Records whose planned time stops advancing are dropped, and the cards say the data is out of date rather than calling it end of service *(1.7.8)*.
-- **Reconfigure** to add or remove lines without losing the entry; **Configure** to change the polling interval.
+- **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
+- **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*.
+- **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
 
 ## Screenshots
 
@@ -173,6 +168,13 @@ Requests send `Accept-Encoding: gzip` and conditional-GET validators (`If-None-M
 
 **Failure handling.** A single failed poll keeps your cadence and serves the last successful board — templates can spot staleness via `server_time`. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds. Rate-limit error 316 raises a Repairs issue that clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
 
+## Use Cases
+
+- **Leave-now notifications** — "if the next U1 toward Leopoldau is under 3 min, notify me".
+- **Dashboard departure board** — one of the bundled cards, or your own attribute-driven card.
+- **Line-triggered automations** — turn on the entrance light when the tram is approaching.
+- **Travel-time comparison** — track two stops and take whichever leaves sooner.
+
 ## Automation Examples
 
 Notify when the next train is close:
@@ -206,8 +208,6 @@ template:
           {{ matches[0].countdown if matches else 'none' }}
         unit_of_measurement: min
 ```
-
-Also works well for line-triggered automations (entrance light when the tram approaches) and travel-time comparison across two stops.
 
 ## Troubleshooting
 
