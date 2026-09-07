@@ -3,12 +3,6 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { styleMap } from "lit/directives/style-map.js";
 import QrCreator from "qr-creator";
-import {
-  mdiBus,
-  mdiBusStop,
-  mdiSubwayVariant,
-  mdiTram,
-} from "@mdi/js";
 import type {
   HomeAssistant,
   LovelaceCardEditor,
@@ -57,6 +51,7 @@ import {
   splitLocationPath,
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
+import { mdiPathForIcon } from "./utils/mdi-paths.js";
 import { formatTime } from "./utils/time.js";
 import { deriveRowState } from "./utils/row-state.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
@@ -381,8 +376,7 @@ export class WienerLinienAustriaCard extends LitElement {
       return;
     }
     const iconName = host.getAttribute("data-qr-icon") ?? "mdi:bus-stop";
-    const iconPath = this._mdiPathFor(iconName);
-    if (!iconPath) return;
+    const iconPath = mdiPathForIcon(iconName);
     // Centred icon footprint: ≈22% of the QR width — stays well inside
     // the H-level error-correction headroom while reading clearly at
     // small sizes.
@@ -419,20 +413,6 @@ export class WienerLinienAustriaCard extends LitElement {
     ctx.fillStyle = accent;
     ctx.fill(new Path2D(iconPath));
     ctx.restore();
-  }
-
-  private _mdiPathFor(iconName: string): string | null {
-    switch (iconName) {
-      case "mdi:subway-variant":
-        return mdiSubwayVariant;
-      case "mdi:tram":
-        return mdiTram;
-      case "mdi:bus":
-        return mdiBus;
-      case "mdi:bus-stop":
-      default:
-        return mdiBusStop;
-    }
   }
 
   protected override shouldUpdate(changed: PropertyValues): boolean {

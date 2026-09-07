@@ -1,5 +1,4 @@
 import typescript from "@rollup/plugin-typescript";
-import commonjs from "@rollup/plugin-commonjs";
 import { nodeResolve } from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import json from "@rollup/plugin-json";
@@ -19,10 +18,16 @@ const onwarn = (warning, warn) => {
   warn(warning);
 };
 
+// No @rollup/plugin-commonjs here on purpose. Every runtime dependency
+// (lit, qr-creator) ships an ESM `module` entry, so node-resolve picks
+// the ESM build and there is no CJS left in the graph — verified by
+// building all three bundles with and without the plugin and getting
+// byte-identical output. If a future dependency is CJS-only, rollup
+// fails loudly with "is not exported by", and the fix is to reinstate
+// the plugin here.
 const basePlugins = () =>
   [
     nodeResolve(),
-    commonjs(),
     typescript(),
     json(),
     !dev && terser({ format: { comments: /Wiener Linien Austria/ } }),
