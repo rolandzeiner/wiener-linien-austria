@@ -59,6 +59,7 @@ import {
 } from "./utils/traffic-notice.js";
 import { formatTime } from "./utils/time.js";
 import { deriveRowState } from "./utils/row-state.js";
+import { splitHeroAndRows } from "./utils/hero-group.js";
 import {
   accentTextColor,
   contrastRatio,
@@ -848,16 +849,10 @@ export class WienerLinienAustriaCard extends LitElement {
     // unreachable one in the DOM.
     const hasQrToggle = !this._config!.hide_header || tabIndex !== undefined;
 
-    const heroGroup = this._computeHeroGroup(filtered);
-    const heroLead = heroGroup[0];
-
-    // Object-identity dedupe works because heroGroup holds references
-    // into the same `filtered` array.
-    const heroDedupe = this._config!.show_hero_metric
-      ? new Set<DepartureAttr>(heroGroup)
-      : new Set<DepartureAttr>();
-    const remaining = filtered.filter((d) => !heroDedupe.has(d));
-    const rows = remaining.slice(0, this._config!.max_departures);
+    const { heroGroup, heroLead, rows } = splitHeroAndRows(filtered, {
+      showHeroMetric: this._config!.show_hero_metric,
+      maxDepartures: this._config!.max_departures,
+    });
     // Records the coordinator dropped this poll because upstream stopped
     // advancing them. Drives both the "some lines are missing" note above
     // a partially-filled list and the empty-state copy below it.
@@ -1227,22 +1222,6 @@ export class WienerLinienAustriaCard extends LitElement {
    * 6-min entry into the hero. Returns [] if there are no usable
    * departures.
    */
-  private _computeHeroGroup(filtered: DepartureAttr[]): DepartureAttr[] {
-    if (filtered.length === 0) return [];
-    const cdOf = (d: DepartureAttr): number =>
-      Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
-
-    const minCd = Math.min(...filtered.map(cdOf));
-    if (!Number.isFinite(minCd)) {
-      // Every entry had non-finite countdown — `_resolveStops` already
-      // guaranteed we have one entry, surface it as the single hero.
-      return [filtered[0]!];
-    }
-    if (minCd <= 0) {
-      return filtered.filter((d) => cdOf(d) <= 0);
-    }
-    return filtered.filter((d) => cdOf(d) === minCd);
-  }
 
   /**
    * Render one hero-entry row (line badge + direction + optional
