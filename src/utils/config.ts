@@ -95,6 +95,23 @@ function cleanStringList(
  *  discarding valid picks on save. */
 const ICON_KEY_RE = /^[a-z0-9_-]+:[a-z0-9_-]+$/i;
 
+/** Header-strip capacity and length limits.
+ *
+ *  Single source of truth, imported by the editor's header strip. These used to
+ *  exist twice — as `MAX_HEADER_*` constants in the editor and as bare literals
+ *  here — so raising a cap in the editor let the user add a chip that this
+ *  normaliser then silently truncated away on save. Whatever the editor offers
+ *  and whatever the normaliser keeps are now the same numbers by construction. */
+export const HEADER_MAX_CHIPS = 6;
+export const HEADER_MAX_ICONS = 3;
+export const HEADER_MAX_CHIP_LEN = 16;
+export const HEADER_MAX_TEXT_LEN = 64;
+export const HEADER_MAX_DATE_FORMAT_LEN = 32;
+/** Not exported: the editor picks icons through `ha-icon-picker`, which only
+ *  emits keys that already resolve, so this bound is a normaliser-side sanity
+ *  check on hand-written YAML rather than a cap the editor has to mirror. */
+const HEADER_MAX_ICON_KEY_LEN = 64;
+
 export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
@@ -105,7 +122,7 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
     : "none";
   if (exit !== "none") out.exit = exit;
 
-  const text = boundedText(r.text, 64, true);
+  const text = boundedText(r.text, HEADER_MAX_TEXT_LEN, true);
   if (text !== undefined) out.text = text;
 
   if (r.show_wc === true) out.show_wc = true;
@@ -116,12 +133,15 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
 
   // Chips truncate to fit the strip; icon keys are rejected rather than
   // cut, because half a key resolves to nothing.
-  const chips = cleanStringList(r.chips, { truncateTo: 16, maxCount: 6 });
+  const chips = cleanStringList(r.chips, {
+    truncateTo: HEADER_MAX_CHIP_LEN,
+    maxCount: HEADER_MAX_CHIPS,
+  });
   if (chips !== undefined) out.chips = chips;
 
   const extraIcons = cleanStringList(r.extra_icons, {
-    maxCount: 3,
-    accept: (v) => ICON_KEY_RE.test(v) && v.length <= 64,
+    maxCount: HEADER_MAX_ICONS,
+    accept: (v) => ICON_KEY_RE.test(v) && v.length <= HEADER_MAX_ICON_KEY_LEN,
   });
   if (extraIcons !== undefined) out.extra_icons = extraIcons;
 
@@ -132,7 +152,7 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
   // else would paint an empty strip.
   if (Object.keys(out).length === 0) return undefined;
 
-  const dateFormat = boundedText(r.date_format, 32, false);
+  const dateFormat = boundedText(r.date_format, HEADER_MAX_DATE_FORMAT_LEN, false);
   if (dateFormat !== undefined) out.date_format = dateFormat;
 
   return out;

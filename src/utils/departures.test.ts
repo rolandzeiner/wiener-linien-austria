@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  directionSurface,
+  effectiveLines,
   filterDepartures,
   lineDirKey,
   shouldShowStopsAhead,
   walkTimePairs,
 } from "./departures.js";
-import type { DepartureAttr } from "../types.js";
+import type { DepartureAttr, WienerLinienAttrs } from "../types.js";
 
 function dep(over: Partial<DepartureAttr> = {}): DepartureAttr {
   return {
@@ -264,5 +266,98 @@ describe("walkTimePairs — rows the walk-time control offers", () => {
         stopDirection: null,
       }),
     ).toEqual([]);
+  });
+});
+
+describe("directionSurface — unknown is not 'not served'", () => {
+  const attrs = (over: Partial<WienerLinienAttrs> = {}): WienerLinienAttrs =>
+    ({ departures: [], ...over }) as WienerLinienAttrs;
+
+  it("reports unknown when there is no data at all", () => {
+    const s = directionSurface(attrs());
+    expect(s.unknown).toBe(true);
+    expect(s.oneWay).toBeNull();
+    expect(s.available.size).toBe(0);
+  });
+
+  it("reports unknown for a sensor that is missing entirely", () => {
+    expect(directionSurface(undefined).unknown).toBe(true);
+  });
+
+  // The regression that motivated the whole helper: a tracked nightline has no
+  // live departures in the afternoon, and reading that as "not served" left its
+  // direction buttons disabled — permanently, for a retro card, since the block
+  // suppresses the "both" button in singleLine mode.
+  it("keeps a tracked line's directions alive with no live departures", () => {
+    const s = directionSurface(
+      attrs({ tracked_line_keys: ["N25|H", "N25|R"], departures: [] }),
+      "N25",
+    );
+    expect(s.unknown).toBe(false);
+    expect([...s.available].sort()).toEqual(["H", "R"]);
+    expect(s.oneWay).toBeNull();
+  });
+
+  it("reports a genuinely one-way tracked line as oneWay, not unknown", () => {
+    const s = directionSurface(attrs({ tracked_line_keys: ["13A|H"] }), "13A");
+    expect(s.unknown).toBe(false);
+    expect(s.oneWay).toBe("H");
+  });
+
+  it("narrows tracked keys to the requested line", () => {
+    const a = attrs({ tracked_line_keys: ["U1|H", "U1|R", "13A|H"] });
+    expect(directionSurface(a, "13A").oneWay).toBe("H");
+    expect([...directionSurface(a, "U1").available].sort()).toEqual(["H", "R"]);
+  });
+
+  it("falls back to live departures when no tracked keys exist", () => {
+    const s = directionSurface(
+      attrs({ departures: [dep({ line: "U1", direction: "R" })] }),
+      "U1",
+    );
+    expect(s.oneWay).toBe("R");
+  });
+
+  it("prefers tracked keys over live departures", () => {
+    // Live data says H only; the user tracks both. Tracked wins, so the R
+    // button stays enabled outside the hours R runs.
+    const s = directionSurface(
+      attrs({
+        tracked_line_keys: ["U1|H", "U1|R"],
+        departures: [dep({ line: "U1", direction: "H" })],
+      }),
+      "U1",
+    );
+    expect([...s.available].sort()).toEqual(["H", "R"]);
+  });
+
+  it("ignores malformed direction components", () => {
+    expect(directionSurface(attrs({ tracked_line_keys: ["U1|X", "U1|"] })).unknown).toBe(
+      true,
+    );
+  });
+});
+
+describe("effectiveLines — a configured line is never silently dropped", () => {
+  it("returns every line when nothing is picked", () => {
+    expect(effectiveLines(["U1", "U3"], new Set())).toEqual(["U1", "U3"]);
+  });
+
+  it("narrows to the picked lines", () => {
+    expect(effectiveLines(["U1", "U3", "U6"], new Set(["U3"]))).toEqual(["U3"]);
+  });
+
+  // A saved card whose stop later dropped that line from tracked_lines used to
+  // end up with no walk-time rows and an empty {line} in the one-way note.
+  it("keeps a picked line the stop list no longer mentions", () => {
+    expect(effectiveLines(["U1"], new Set(["N25"]))).toEqual(["N25"]);
+  });
+
+  it("keeps both the known and the stranded picks", () => {
+    expect(effectiveLines(["U1", "U3"], new Set(["U1", "N25"]))).toEqual(["U1", "N25"]);
+  });
+
+  it("does not duplicate a pick that is already in the list", () => {
+    expect(effectiveLines(["U1"], new Set(["U1"]))).toEqual(["U1"]);
   });
 });

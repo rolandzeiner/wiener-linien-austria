@@ -51,8 +51,13 @@ import type {
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { fireEvent } from "./utils.js";
+import {
+  editorHelper,
+  editorLabel,
+  patchHeaderSide,
+} from "./editor/editor-common.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
-import { linesForDirection } from "./utils/departures.js";
+import { directionSurface, linesForDirection } from "./utils/departures.js";
 
 @customElement("wiener-linien-austria-retro-card-editor")
 export class WienerLinienAustriaRetroCardEditor
@@ -452,30 +457,22 @@ export class WienerLinienAustriaRetroCardEditor
     value: unknown,
   ): void {
     if (!this._config) return;
-    const cur = this._config[side] ?? {};
-    const next: RetroHeaderSide = { ...cur, [field]: value };
-    if (value === undefined) delete next[field];
-    this._patch({ [side]: next });
+    this._patch({ [side]: patchHeaderSide(this._config[side], field, value) });
   }
 
   /** Directions tracked at `entity`. Tracked-line keys win — once the user has
    *  chosen which lines to follow in the integration's config flow, only
-   *  directions with at least one tracked line are offered. Falls back to live
-   *  departures for older sensor caches. */
+   *  directions with at least one tracked line are offered; live departures are
+   *  the fallback for older sensor caches.
+   *
+   *  Shares `directionSurface` with the stop block, which is the point: this
+   *  method and the block's direction buttons used to answer the same question
+   *  from different data, so the editor could autocorrect to a direction whose
+   *  button the block had disabled. */
   private _availableDirections(
     entity: string | undefined = this._config?.entity,
-  ): Set<"H" | "R"> {
-    const attrs = this._attrs(entity);
-    const out = new Set<"H" | "R">();
-    for (const key of attrs?.tracked_line_keys ?? []) {
-      const [, dir] = key.split("|", 2);
-      if (dir === "H" || dir === "R") out.add(dir);
-    }
-    if (out.size > 0) return out;
-    for (const d of attrs?.departures ?? []) {
-      if (d.direction === "H" || d.direction === "R") out.add(d.direction);
-    }
-    return out;
+  ): ReadonlySet<"H" | "R"> {
+    return directionSurface(this._attrs(entity)).available;
   }
 
   /** When the entity serves only one direction AND the saved config disagrees,
@@ -516,24 +513,21 @@ export class WienerLinienAustriaRetroCardEditor
     });
   }
 
-  private _computeLabel = (field: { name: string }): string => {
-    const ha = this.hass?.localize?.(
-      `ui.panel.lovelace.editor.card.generic.${field.name}`,
-    );
-    return ha || this._i18n.et(field.name);
-  };
+  private _computeLabel = (field: { name: string }): string =>
+    editorLabel(this.hass, this._i18n, field.name);
 
   private _computeHelper = (field: { name: string }): string | undefined => {
     const { et } = this._i18n;
-    if (field.name === "message_text" && !this._config?.message_ticker) {
-      return et("message_text_requires");
-    }
-    if (field.name === "platform_side" && !this._config?.show_platform) {
-      return et("platform_side_requires");
-    }
-    const key = `${field.name}_helper`;
-    const value = et(key);
-    return value === key ? undefined : value;
+    // The dependency reason belongs on the field it gates, not in a note the
+    // user has to associate by eye.
+    return editorHelper(this._i18n, field.name, {
+      ...(this._config?.message_ticker
+        ? {}
+        : { message_text: et("message_text_requires") }),
+      ...(this._config?.show_platform
+        ? {}
+        : { platform_side: et("platform_side_requires") }),
+    });
   };
 
   static override styles: CSSResultGroup = [editorTokens, editorStyles];

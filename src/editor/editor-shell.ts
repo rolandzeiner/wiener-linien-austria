@@ -25,8 +25,6 @@ import type { HaFormSchema, HomeAssistant } from "../types.js";
 
 export type TabKey = "stops" | "display" | "tweaks";
 
-export const TAB_ORDER: ReadonlyArray<TabKey> = ["stops", "display", "tweaks"];
-
 export interface TabDef {
   key: TabKey;
   label: string;
@@ -46,8 +44,17 @@ export function renderTabs(
     ev.preventDefault();
     // Wrap, so arrowing past either end lands on the far tab rather than
     // dead-ending — matches the ARIA authoring practices for tabs.
-    const next = tabs[(index + delta + tabs.length) % tabs.length];
-    if (next) onSelect(next.key);
+    const nextIndex = (index + delta + tabs.length) % tabs.length;
+    const next = tabs[nextIndex];
+    if (!next) return;
+    onSelect(next.key);
+    // Selection alone is not enough. The roving tabindex moves to the newly
+    // selected tab, so leaving DOM focus on the old button — now tabindex="-1"
+    // — drops the user out of the tablist on their next Tab and tells a screen
+    // reader nothing about the tab they just arrowed to (WCAG 2.4.3).
+    const bar = (ev.currentTarget as HTMLElement).parentElement;
+    const target = bar?.children[nextIndex];
+    if (target instanceof HTMLElement) target.focus();
   };
 
   return html`

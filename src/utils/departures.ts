@@ -130,6 +130,80 @@ export function linesForDirection(
   return [...out].sort();
 }
 
+/** What is known about the directions served at a stop, optionally narrowed
+ *  to one line.
+ *
+ *  Three states, not two. "Both directions run", "only one direction runs" and
+ *  "we have no data right now" are genuinely different answers, and collapsing
+ *  the last two into a single `available` set is what left tracked nightlines
+ *  unconfigurable in the afternoon: every direction control read an empty set
+ *  as "not served" and disabled itself.
+ *
+ *  Source precedence mirrors `linesForDirection` — `tracked_line_keys` (what
+ *  the user opted into in the config flow) wins, live departures are the
+ *  fallback for sensor caches that pre-date it. A line the user tracks
+ *  therefore keeps its direction buttons alive outside the hours it runs.
+ */
+export interface DirectionSurface {
+  /** Directions known to be served. Empty means "unknown", never "none". */
+  available: ReadonlySet<"H" | "R">;
+  /** No data for this scope right now — a nightline in the afternoon, a cold
+   *  sensor, a stop whose feed is briefly empty. Callers must treat this as
+   *  "we don't know" and leave controls enabled. */
+  unknown: boolean;
+  /** The only direction served, when the data genuinely says one-way. `null`
+   *  when both run AND when `unknown` — an absent answer is not a one-way
+   *  answer, which is the distinction the old `!hasR` test threw away. */
+  oneWay: "H" | "R" | null;
+}
+
+export function directionSurface(
+  attrs: WienerLinienAttrs | undefined,
+  line?: string | undefined,
+): DirectionSurface {
+  const available = new Set<"H" | "R">();
+  for (const key of attrs?.tracked_line_keys ?? []) {
+    const [keyLine, dir] = key.split("|", 2);
+    if (line && keyLine !== line) continue;
+    if (dir === "H" || dir === "R") available.add(dir);
+  }
+  if (available.size === 0) {
+    for (const d of attrs?.departures ?? []) {
+      if (line && d.line !== line) continue;
+      if (d.direction === "H" || d.direction === "R") available.add(d.direction);
+    }
+  }
+  const only = [...available];
+  return {
+    available,
+    unknown: available.size === 0,
+    oneWay: available.size === 1 ? (only[0] ?? null) : null,
+  };
+}
+
+/** The lines actually in play for a stop: the picked ones when the user has
+ *  narrowed the selection, every line at the stop otherwise (an empty
+ *  selection means "all").
+ *
+ *  A picked line missing from `lines` is kept rather than dropped. The saved
+ *  config referencing a line the current list does not mention is a data gap,
+ *  not a deselection — dropping it silently emptied retro's walk-time section
+ *  whenever a stop's tracked lines changed under a saved card. Shared so the
+ *  chip row, the direction controls and the walk-time rows cannot disagree
+ *  about which lines this stop is showing.
+ */
+export function effectiveLines(
+  lines: ReadonlyArray<string>,
+  picked: ReadonlySet<string>,
+): string[] {
+  if (picked.size === 0) return [...lines];
+  const out = lines.filter((l) => picked.has(l));
+  for (const l of picked) {
+    if (!out.includes(l)) out.push(l);
+  }
+  return out;
+}
+
 // Tracked list wins; without it, union the static catalogue with live
 // departures so a brand-new line that hasn't made it into the static
 // catalogue yet is still listed once it appears in the realtime feed.
@@ -253,7 +327,7 @@ export function walkTimePairs(
   });
 
   const seen = new Set(live.map((p) => p.line));
-  const effective = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
+  const effective = effectiveLines(lines, picked);
   const synthetic: Pair[] = [];
   for (const line of effective) {
     if (seen.has(line)) continue;

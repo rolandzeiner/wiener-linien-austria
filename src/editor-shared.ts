@@ -7,8 +7,14 @@
 /** HA's card-editor dialog steals arrow keys (and others) for its own
  *  navigation. Number/text inputs in the bespoke editor sections must
  *  stop propagation so the user can actually edit values. Shared so the
- *  modern and retro editors bind one identical handler. */
+ *  modern and retro editors bind one identical handler.
+ *
+ *  Escape and Tab are deliberately let through. Escape is how every HA dialog
+ *  closes and Tab is how focus leaves the field; swallowing them made the
+ *  bespoke inputs the only place in the editor where those two keys did
+ *  nothing, which reads as a stuck dialog rather than a feature. */
 export function swallowEditorKeys(ev: KeyboardEvent): void {
+  if (ev.key === "Escape" || ev.key === "Tab") return;
   ev.stopPropagation();
 }
 

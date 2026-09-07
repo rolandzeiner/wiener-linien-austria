@@ -42,6 +42,13 @@ import {
   type HeaderSideKey,
 } from "./editor/header-strip.js";
 import { renderStopBlock, type StopBlockCallbacks } from "./editor/stop-block.js";
+import {
+  editorHelper,
+  editorLabel,
+  multiStopCallbacks,
+  patchHeaderSide,
+  rebuildStops,
+} from "./editor/editor-common.js";
 import type {
   HaFormSchema,
   HomeAssistant,
@@ -122,60 +129,13 @@ export class WienerLinienAustriaFlapCardEditor
     );
   }
 
-  private _updateStop(
-    eid: string,
-    mutator: (s: NormalisedFlapStop) => NormalisedFlapStop,
-  ): void {
-    if (!this._config) return;
-    const entities = this._config.entities.map((s) =>
-      s.entity === eid ? mutator({ ...s }) : s,
-    );
-    this._commit({ ...this._config, entities });
-  }
-
   private get _stopCallbacks(): StopBlockCallbacks {
-    return {
-      toggleLine: (eid, line) =>
-        this._updateStop(eid, (s) => {
-          const cur = new Set(s.lines ?? []);
-          if (cur.has(line)) cur.delete(line);
-          else cur.add(line);
-          // Tidy state on empty — drop the key rather than persist `[]`.
-          if (cur.size) s.lines = [...cur];
-          else delete s.lines;
-          return s;
-        }),
-      // One atomic write for both direction levels — the block hands over the
-      // whole desired state, so the editor never has to reason about
-      // inheritance. Tidy state on empty: absent keys rather than `{}`.
-      setDirections: (eid, next) =>
-        this._updateStop(eid, (s) => {
-          if (next.direction === null) delete s.direction;
-          else s.direction = next.direction;
-          if (Object.keys(next.lineDirections).length) {
-            s.line_directions = next.lineDirections;
-          } else {
-            delete s.line_directions;
-          }
-          return s;
-        }),
-      setWalkTime: (eid, key, minutes) =>
-        this._updateStop(eid, (s) => {
-          const cur = { ...(s.walk_times ?? {}) };
-          if (minutes === null) delete cur[key];
-          else cur[key] = minutes;
-          if (Object.keys(cur).length) s.walk_times = cur;
-          else delete s.walk_times;
-          return s;
-        }),
-      remove: (eid) => {
-        if (!this._config) return;
-        this._commit({
-          ...this._config,
-          entities: this._config.entities.filter((s) => s.entity !== eid),
-        });
+    return multiStopCallbacks<NormalisedFlapStop>(
+      () => this._config?.entities,
+      (entities) => {
+        if (this._config) this._commit({ ...this._config, entities });
       },
-    };
+    );
   }
 
   // ------------------------------------------------------------------
@@ -233,8 +193,8 @@ export class WienerLinienAustriaFlapCardEditor
             },
           },
         ] satisfies ReadonlyArray<HaFormSchema>}
-        .computeLabel=${() => et("entities")}
-        .computeHelper=${() => undefined}
+        .computeLabel=${this._computeLabel}
+        .computeHelper=${this._computeHelper}
         @value-changed=${this._onEntitiesChanged}
       ></ha-form>
       ${cfg.entities.map((stop, i) =>
@@ -254,25 +214,19 @@ export class WienerLinienAustriaFlapCardEditor
     `;
   }
 
-  /** Rebuild the entities array from the selector's flat `string[]`, preserving
-   *  per-stop overrides for surviving entries. Without this every add/remove
-   *  cycle would silently wipe every stop's lines, direction and walk times. */
   private _onEntitiesChanged = (
     ev: CustomEvent<{ value: Record<string, unknown> }>,
   ): void => {
     ev.stopPropagation();
     if (!this._config) return;
-    const raw = ev.detail.value["entities"];
-    const ids = Array.isArray(raw)
-      ? raw.filter((s): s is string => typeof s === "string" && s.length > 0)
-      : [];
-    const byEntity = new Map(this._config.entities.map((s) => [s.entity, s]));
-    this._commit({
-      ...this._config,
-      // Order follows the selector so the user-visible order tracks what they
-      // dragged; new entities get a bare placeholder.
-      entities: ids.map((eid) => byEntity.get(eid) ?? { entity: eid }),
-    });
+    // Re-normalise, matching the modern editor: a bare `{ entity }` placeholder
+    // is a raw stop entry, and the normaliser is what validates and dedupes it.
+    this._commit(
+      normaliseFlapConfig({
+        ...this._config,
+        entities: rebuildStops(this._config.entities, ev.detail.value["entities"]),
+      } as WienerLinienFlapCardConfig),
+    );
   };
 
   private _renderDisplay(): TemplateResult {
@@ -416,12 +370,7 @@ export class WienerLinienAustriaFlapCardEditor
     value: unknown,
   ): void {
     if (!this._config) return;
-    const cur = this._config[side] ?? {};
-    const next: RetroHeaderSide = { ...cur, [field]: value };
-    // Tidy state on empty — an undefined write removes the key outright so the
-    // saved YAML never carries `text: undefined`.
-    if (value === undefined) delete next[field];
-    this._patch({ [side]: next });
+    this._patch({ [side]: patchHeaderSide(this._config[side], field, value) });
   }
 
   /** Station-band background options: the sentinel, then one entry per line the
@@ -461,25 +410,18 @@ export class WienerLinienAustriaFlapCardEditor
     return options;
   }
 
-  private _computeLabel = (field: { name: string }): string => {
-    // HA core localises common field names centrally — reuse those so the card
-    // only translates its own bespoke fields.
-    const ha = this.hass?.localize?.(
-      `ui.panel.lovelace.editor.card.generic.${field.name}`,
-    );
-    return ha || this._i18n.et(field.name);
-  };
+  private _computeLabel = (field: { name: string }): string =>
+    editorLabel(this.hass, this._i18n, field.name);
 
   private _computeHelper = (field: { name: string }): string | undefined => {
     const { et } = this._i18n;
     // The dependency reason belongs on the field it gates, not in a note the
     // user has to associate by eye.
-    if (field.name === "accessibility_only" && !this._config?.show_accessibility) {
-      return et("accessibility_only_requires");
-    }
-    const key = `${field.name}_helper`;
-    const value = et(key);
-    return value === key ? undefined : value;
+    return editorHelper(this._i18n, field.name, {
+      ...(this._config?.show_accessibility
+        ? {}
+        : { accessibility_only: et("accessibility_only_requires") }),
+    });
   };
 
   static override styles: CSSResultGroup = [editorTokens, editorStyles];

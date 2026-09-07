@@ -42,6 +42,12 @@ import {
   type TabKey,
 } from "./editor/editor-shell.js";
 import { renderStopBlock, type StopBlockCallbacks } from "./editor/stop-block.js";
+import {
+  editorHelper,
+  editorLabel,
+  multiStopCallbacks,
+  rebuildStops,
+} from "./editor/editor-common.js";
 import type {
   HaFormSchema,
   HomeAssistant,
@@ -99,59 +105,13 @@ export class WienerLinienAustriaCardEditor
     this._commit(normaliseModernConfig({ ...this._config, ...value }));
   }
 
-  private _updateStop(
-    eid: string,
-    mutator: (s: NormalisedModernStop) => NormalisedModernStop,
-  ): void {
-    if (!this._config) return;
-    const entities = this._config.entities.map((s) =>
-      s.entity === eid ? mutator({ ...s }) : s,
-    );
-    this._commit({ ...this._config, entities });
-  }
-
   private get _stopCallbacks(): StopBlockCallbacks {
-    return {
-      toggleLine: (eid, line) =>
-        this._updateStop(eid, (s) => {
-          const cur = new Set(s.lines ?? []);
-          if (cur.has(line)) cur.delete(line);
-          else cur.add(line);
-          if (cur.size) s.lines = [...cur];
-          else delete s.lines;
-          return s;
-        }),
-      // One atomic write for both direction levels — the block hands over the
-      // whole desired state, so the editor never has to reason about
-      // inheritance. Tidy state on empty: absent keys rather than `{}`.
-      setDirections: (eid, next) =>
-        this._updateStop(eid, (s) => {
-          if (next.direction === null) delete s.direction;
-          else s.direction = next.direction;
-          if (Object.keys(next.lineDirections).length) {
-            s.line_directions = next.lineDirections;
-          } else {
-            delete s.line_directions;
-          }
-          return s;
-        }),
-      setWalkTime: (eid, key, minutes) =>
-        this._updateStop(eid, (s) => {
-          const cur = { ...(s.walk_times ?? {}) };
-          if (minutes === null) delete cur[key];
-          else cur[key] = minutes;
-          if (Object.keys(cur).length) s.walk_times = cur;
-          else delete s.walk_times;
-          return s;
-        }),
-      remove: (eid) => {
-        if (!this._config) return;
-        this._commit({
-          ...this._config,
-          entities: this._config.entities.filter((s) => s.entity !== eid),
-        });
+    return multiStopCallbacks<NormalisedModernStop>(
+      () => this._config?.entities,
+      (entities) => {
+        if (this._config) this._commit({ ...this._config, entities });
       },
-    };
+    );
   }
 
   // ------------------------------------------------------------------
@@ -235,15 +195,10 @@ export class WienerLinienAustriaCardEditor
   ): void => {
     ev.stopPropagation();
     if (!this._config) return;
-    const raw = ev.detail.value["entities"];
-    const ids = Array.isArray(raw)
-      ? raw.filter((s): s is string => typeof s === "string" && s.length > 0)
-      : [];
-    const byEntity = new Map(this._config.entities.map((s) => [s.entity, s]));
     this._commit(
       normaliseModernConfig({
         ...this._config,
-        entities: ids.map((eid) => byEntity.get(eid) ?? { entity: eid }),
+        entities: rebuildStops(this._config.entities, ev.detail.value["entities"]),
       }),
     );
   };
@@ -382,6 +337,11 @@ export class WienerLinienAustriaCardEditor
             ${lines.map((line) => {
               const current = colorForLine(line, cfg.line_colors, gtfs, "#888888");
               const hex = current.startsWith("#") ? current : "#888888";
+              // Real `disabled` on the reset button below, not the stop
+              // block's aria-disabled idiom: with no override in place there is
+              // genuinely nothing to reset, and the swatch already shows that.
+              // aria-disabled is reserved for options whose unavailability is
+              // itself information the user needs (see dirButton).
               const overridden = Boolean(cfg.line_colors[line.toUpperCase()]);
               const pick = et("pick_color_for_line").replace("{line}", line);
               return html`
@@ -450,28 +410,21 @@ export class WienerLinienAustriaCardEditor
     this._commit({ ...this._config, line_colors });
   }
 
-  private _computeLabel = (field: { name: string }): string => {
-    const ha = this.hass?.localize?.(
-      `ui.panel.lovelace.editor.card.generic.${field.name}`,
-    );
-    return ha || this._i18n.et(field.name);
-  };
+  private _computeLabel = (field: { name: string }): string =>
+    editorLabel(this.hass, this._i18n, field.name);
 
   private _computeHelper = (field: { name: string }): string | undefined => {
     const { et } = this._i18n;
     const cfg = this._config;
-    if (field.name === "accessibility_only" && !cfg?.show_accessibility) {
-      return et("accessibility_only_requires");
-    }
-    if (field.name === "show_delay_colors" && !cfg?.show_delay) {
-      return et("show_delay_colors_requires");
-    }
-    if (field.name === "layout" && (cfg?.entities.length ?? 0) < 2) {
-      return et("layout_requires");
-    }
-    const key = `${field.name}_helper`;
-    const value = et(key);
-    return value === key ? undefined : value;
+    // The dependency reason belongs on the field it gates, not in a note the
+    // user has to associate by eye.
+    return editorHelper(this._i18n, field.name, {
+      ...(cfg?.show_accessibility
+        ? {}
+        : { accessibility_only: et("accessibility_only_requires") }),
+      ...(cfg?.show_delay ? {} : { show_delay_colors: et("show_delay_colors_requires") }),
+      ...((cfg?.entities.length ?? 0) >= 2 ? {} : { layout: et("layout_requires") }),
+    });
   };
 
   static override styles: CSSResultGroup = [editorTokens, editorStyles];

@@ -25,11 +25,14 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, WienerLinienAttrs } from "../types.js";
 import { colorForLine } from "../utils/config.js";
 import {
+  directionSurface,
+  effectiveLines,
   formatDirectionPillLabel,
   lineDirKey,
   linesAtStop,
   tripletsAtStop,
   walkTimePairs,
+  type DirectionSurface,
   type Triplet,
 } from "../utils/departures.js";
 import { lineTypeIcon } from "../utils/mot.js";
@@ -114,18 +117,6 @@ function terminiFor(
   return [...out].sort();
 }
 
-function directionsAvailable(
-  triplets: ReadonlyArray<Triplet>,
-  line?: string,
-): Set<"H" | "R"> {
-  const out = new Set<"H" | "R">();
-  for (const t of triplets) {
-    if (line && t.line !== line) continue;
-    if (t.direction === "H" || t.direction === "R") out.add(t.direction);
-  }
-  return out;
-}
-
 /** Per-line rows replace the stop-wide control once two or more lines are in
  *  play. Below that the stop-wide control is the only direction picker there
  *  is — which is the whole of retro's model, so it can never be dropped
@@ -136,12 +127,6 @@ function showPerLineDirections(
 ): boolean {
   if (opts.singleLine) return false;
   return effectiveLines(ctx.lines, ctx.picked).length >= 2;
-}
-
-/** An empty selection means "all lines", so effective lines are the picked
- *  ones when there are any and every line at the stop otherwise. */
-function effectiveLines(lines: string[], picked: Set<string>): string[] {
-  return picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
 }
 
 export function renderStopBlock(
@@ -157,8 +142,15 @@ export function renderStopBlock(
   const colorOf = (line: string): string =>
     colorForLine(line, opts.lineColorOverrides, lineColors, "#5b6470");
 
-  const lines = linesAtStop(attrs);
   const picked = new Set(stop.lines ?? []);
+  // A picked line the stop's own list does not mention is still configured —
+  // the integration's tracked lines may have changed under a saved card. Keep
+  // it in the list so it gets a chip, a direction row and a walk-time row, and
+  // can actually be deselected. Dropping it stranded the config invisibly.
+  const known = linesAtStop(attrs);
+  const lines = picked.size
+    ? [...new Set([...known, ...picked])].sort()
+    : known;
   const triplets = tripletsAtStop(attrs);
 
   // Per-line vehicle type so each chip carries its mode icon. First-seen wins:
@@ -190,8 +182,8 @@ export function renderStopBlock(
             // while a line row says H), and the stop-wide label degrades into
             // soup at a hub because it pools termini across every line.
             showPerLineDirections(opts, { lines, picked })
-            ? renderOverrides(stop, opts, cb, { triplets, picked, lines, colorOf, dirStrings })
-            : renderDirection(stop, opts, cb, { triplets, picked, lines, dirStrings })
+            ? renderOverrides(stop, opts, cb, { attrs, triplets, picked, lines, colorOf, dirStrings })
+            : renderDirection(stop, opts, cb, { attrs, triplets, picked, lines, dirStrings })
           : nothing}
         ${!missing ? renderWalkTimes(stop, opts, cb, { attrs, picked, colorOf, lines, dirStrings }) : nothing}
       </div>
@@ -289,13 +281,14 @@ function renderDirection(
   opts: StopBlockOptions,
   cb: StopBlockCallbacks,
   ctx: {
+    attrs: WienerLinienAttrs | undefined;
     triplets: ReadonlyArray<Triplet>;
     picked: Set<string>;
     lines: string[];
     dirStrings: (d: "H" | "R") => { full: string; short: string };
   },
 ): TemplateResult {
-  const { triplets, picked, lines, dirStrings } = ctx;
+  const { attrs, triplets, picked, lines, dirStrings } = ctx;
   const effective = effectiveLines(lines, picked);
   // This control only renders with at most one line in play, so scope the
   // terminus labels to that line. Pooling termini across every line at the
@@ -303,15 +296,19 @@ function renderDirection(
   // "H: Enkplatz U, Grillgasse / Floridsdorf / Michelbeuern - AKH +1".
   const scope = effective.length === 1 ? effective[0] : undefined;
   const dir = stop.direction ?? null;
-  const avail = directionsAvailable(triplets, scope);
-  const hasH = avail.has("H");
-  const hasR = avail.has("R");
-  const onlyOne = avail.size === 1;
+  // Same three-state surface the per-line rows use. This control is the ONLY
+  // direction picker retro has (singleLine suppresses "both"), so reading an
+  // empty set as "not served" disabled every button it owns and left a tracked
+  // nightline unconfigurable outside the hours it runs.
+  const surface: DirectionSurface = directionSurface(attrs, scope);
+  const hasH = surface.available.has("H");
+  const hasR = surface.available.has("R");
+  const onlyOne = surface.oneWay !== null;
 
   // With one direction served, that is what the card shows whether or not the
   // config says so — reflect it rather than leaving all three buttons unset.
-  const activeH = dir === "H" || (dir === null && onlyOne && hasH);
-  const activeR = dir === "R" || (dir === null && onlyOne && hasR);
+  const activeH = dir === "H" || (dir === null && surface.oneWay === "H");
+  const activeR = dir === "R" || (dir === null && surface.oneWay === "R");
   const activeBoth = dir === null && !onlyOne;
 
   // Changing the stop-wide value drops any override on the lines it governs,
@@ -325,13 +322,17 @@ function renderDirection(
   };
 
   const label = (d: "H" | "R"): string =>
-    avail.size === 0 || avail.has(d)
+    surface.unknown || surface.available.has(d)
       ? formatDirectionPillLabel(terminiFor(triplets, d, scope), dirStrings(d))
       : `${dirStrings(d).short}: ${opts.et("direction_not_served")}`;
 
-  const note = !hasR && effective.length
-    ? opts.et("direction_note_one_way").replace("{line}", effective[0] ?? "")
-    : "";
+  // Only claim one-way when the data actually says so. The old `!hasR` test
+  // also fired on "no data", telling the user their bidirectional nightline
+  // ran in one direction.
+  const note =
+    surface.oneWay !== null && effective.length === 1
+      ? opts.et("direction_note_one_way").replace("{line}", effective[0] ?? "")
+      : "";
 
   return html`
     <div class="wl-group">
@@ -340,15 +341,21 @@ function renderDirection(
         ${dirButton({
           label: label("H"),
           active: activeH,
-          disabled: !hasH,
-          title: hasH ? opts.t("dir_h") : opts.et("direction_unavailable"),
+          // `unknown` enables both — see DirectionSurface. Only a set that
+          // genuinely says one-way disables the other button.
+          disabled: !surface.unknown && !hasH,
+          title: hasH || surface.unknown
+            ? opts.t("dir_h")
+            : opts.et("direction_unavailable"),
           onClick: () => commit("H"),
         })}
         ${dirButton({
           label: label("R"),
           active: activeR,
-          disabled: !hasR,
-          title: hasR ? opts.t("dir_r") : opts.et("direction_unavailable"),
+          disabled: !surface.unknown && !hasR,
+          title: hasR || surface.unknown
+            ? opts.t("dir_r")
+            : opts.et("direction_unavailable"),
           onClick: () => commit("R"),
         })}
         ${opts.singleLine
@@ -408,6 +415,7 @@ function renderOverrides(
   opts: StopBlockOptions,
   cb: StopBlockCallbacks,
   ctx: {
+    attrs: WienerLinienAttrs | undefined;
     triplets: ReadonlyArray<Triplet>;
     picked: Set<string>;
     lines: string[];
@@ -415,7 +423,7 @@ function renderOverrides(
     dirStrings: (d: "H" | "R") => { full: string; short: string };
   },
 ): TemplateResult {
-  const { triplets, picked, lines, colorOf, dirStrings } = ctx;
+  const { attrs, triplets, picked, lines, colorOf, dirStrings } = ctx;
   const effective = effectiveLines(lines, picked);
   const lineDirs = stop.line_directions ?? {};
   const stopDir = stop.direction ?? null;
@@ -448,17 +456,18 @@ function renderOverrides(
     <div class="wl-group">
       <span class="wl-label">${opts.et("direction_label")}</span>
       ${effective.map((line) => {
-        const avail = directionsAvailable(triplets, line);
+        // No data at all for this line — a nightline in the afternoon — is "we
+        // don't know", not "not served". Disabling both buttons there left
+        // tracked lines permanently unconfigurable outside the hours they run.
+        // An empty set enables both; a set that genuinely says one-way still
+        // disables the other. Shared with the stop-wide control above so the
+        // two can no longer answer this question differently.
+        const surface = directionSurface(attrs, line);
         const cur = effectiveDir(line);
-        const hasH = avail.has("H");
-        const hasR = avail.has("R");
-        const onlyOne = avail.size === 1;
-        // No live departures at all for this line — a nightline in the
-        // afternoon — is "we don't know", not "not served". Disabling both
-        // buttons there left tracked lines permanently unconfigurable
-        // outside the hours they run. An empty set enables both; a set that
-        // genuinely says one-way still disables the other.
-        const unknown = avail.size === 0;
+        const hasH = surface.available.has("H");
+        const hasR = surface.available.has("R");
+        const onlyOne = surface.oneWay !== null;
+        const unknown = surface.unknown;
         const aria = (d: "H" | "R" | null): string =>
           opts
             .et("per_line_direction_aria")
@@ -477,7 +486,7 @@ function renderOverrides(
             <div class="wl-dirs">
               ${dirButton({
                 label: dirStrings("H").short,
-                active: cur === "H" || (cur === null && onlyOne && hasH),
+                active: cur === "H" || (cur === null && surface.oneWay === "H"),
                 disabled: !unknown && !hasH,
                 compact: true,
                 title: terminiFor(triplets, "H", line).join(" / ") || opts.t("dir_h"),
@@ -486,7 +495,7 @@ function renderOverrides(
               })}
               ${dirButton({
                 label: dirStrings("R").short,
-                active: cur === "R" || (cur === null && onlyOne && hasR),
+                active: cur === "R" || (cur === null && surface.oneWay === "R"),
                 disabled: !unknown && !hasR,
                 compact: true,
                 title: terminiFor(triplets, "R", line).join(" / ") || opts.t("dir_r"),
@@ -559,6 +568,12 @@ function renderWalkTimes(
             .et("walk_time_aria")
             .replace("{line}", p.line)
             .replace("{towards}", terminus);
+          // The stepper buttons use a real `disabled`, not dirButton's
+          // aria-disabled. The two cases differ: an unavailable direction is a
+          // choice the user should still hear about and be told the reason for,
+          // whereas a stepper at its limit says nothing the value next to it
+          // does not already say — so dropping it from the tab order shortens
+          // the keyboard sweep instead of hiding an option.
           const bump = (delta: number): void => {
             const next = (val ?? 0) + delta;
             cb.setWalkTime(

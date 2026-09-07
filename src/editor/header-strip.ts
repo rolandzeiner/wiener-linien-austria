@@ -27,6 +27,13 @@ import {
   RETRO_HEADER_MDI_EXITS,
 } from "../utils/retro-station-icons.js";
 import { swallowEditorKeys } from "../editor-shared.js";
+import {
+  HEADER_MAX_CHIPS,
+  HEADER_MAX_CHIP_LEN,
+  HEADER_MAX_DATE_FORMAT_LEN,
+  HEADER_MAX_ICONS,
+  HEADER_MAX_TEXT_LEN,
+} from "../utils/config.js";
 
 export type HeaderSideKey = "header_left" | "header_right";
 
@@ -59,9 +66,6 @@ const EXIT_CHOICES: ReadonlyArray<{ value: RetroHeaderExit; icon: string; labelK
   { value: "none", icon: "mdi:close-circle-outline", labelKey: "header_exit_none" },
 ];
 
-export const MAX_HEADER_CHIPS = 6;
-export const MAX_HEADER_ICONS = 3;
-
 export interface HeaderStripCallbacks {
   /** Patch one field on one side. The editor merges and normalises. */
   patch(side: HeaderSideKey, field: keyof RetroHeaderSide, value: unknown): void;
@@ -80,29 +84,47 @@ interface Token {
   label: string;
   icon?: string;
   kind: "icon" | "text" | "chip";
+  /** What a screen reader should hear for this token. Icon tokens render no
+   *  text, so without this the zone button announced only "left" / "right" and
+   *  a non-sighted user could not tell what the sign was configured to show —
+   *  on a control whose entire premise is that the bar IS the preview. */
+  name: string;
 }
 
 /** Build the token list for one side in the exact order the card renders it:
  *  exit pictogram, free text, amenity icons, extra icons, then text chips. */
-function tokensFor(side: RetroHeaderSide | undefined, emptyLabel: string): Token[] {
+function tokensFor(
+  side: RetroHeaderSide | undefined,
+  emptyLabel: string,
+  et: (key: string) => string,
+): Token[] {
   const out: Token[] = [];
-  if (!side) return [{ label: emptyLabel, kind: "text" }];
+  if (!side) return [{ label: emptyLabel, kind: "text", name: emptyLabel }];
 
   if (side.exit && side.exit !== "none") {
     const choice = EXIT_CHOICES.find((c) => c.value === side.exit);
-    out.push({ label: "", icon: choice?.icon ?? side.exit, kind: "icon" });
+    out.push({
+      label: "",
+      icon: choice?.icon ?? side.exit,
+      kind: "icon",
+      name: choice ? et(choice.labelKey) : side.exit,
+    });
   }
-  if (side.text) out.push({ label: side.text, kind: "text" });
+  if (side.text) out.push({ label: side.text, kind: "text", name: side.text });
   for (const a of AMENITIES) {
-    if (side[a.key]) out.push({ label: "", icon: a.icon, kind: "icon" });
+    if (side[a.key]) {
+      out.push({ label: "", icon: a.icon, kind: "icon", name: et(a.labelKey) });
+    }
   }
   for (const icon of side.extra_icons ?? []) {
-    out.push({ label: "", icon, kind: "icon" });
+    // A user-picked MDI key has no catalogue entry — the key itself is the
+    // most specific name available.
+    out.push({ label: "", icon, kind: "icon", name: icon });
   }
   for (const chip of side.chips ?? []) {
-    out.push({ label: chip, kind: "chip" });
+    out.push({ label: chip, kind: "chip", name: chip });
   }
-  if (!out.length) out.push({ label: emptyLabel, kind: "text" });
+  if (!out.length) out.push({ label: emptyLabel, kind: "text", name: emptyLabel });
   return out;
 }
 
@@ -166,7 +188,7 @@ export function renderHeaderStrip(
           <input
             type="text"
             class="wl-text"
-            maxlength="64"
+            maxlength=${HEADER_MAX_TEXT_LEN}
             .value=${side.text ?? ""}
             aria-label=${opts.et("text")}
             placeholder=${opts.et("text_placeholder")}
@@ -200,7 +222,7 @@ export function renderHeaderStrip(
             ? html`<input
                 type="text"
                 class="wl-text"
-                maxlength="32"
+                maxlength=${HEADER_MAX_DATE_FORMAT_LEN}
                 .value=${side.date_format ?? ""}
                 aria-label=${opts.et("date_format")}
                 placeholder=${opts.et("date_format_placeholder")}
@@ -230,7 +252,8 @@ function renderZone(
 ): TemplateResult {
   const cfg = key === "header_left" ? opts.left : opts.right;
   const selected = opts.selected === key;
-  const tokens = tokensFor(cfg, empty);
+  const tokens = tokensFor(cfg, empty, opts.et);
+  const sideName = opts.et(key === "header_left" ? "header_left" : "header_right");
   return html`<button
     type="button"
     class=${classMap({
@@ -239,7 +262,7 @@ function renderZone(
       "wl-zone--right": key === "header_right",
     })}
     aria-pressed=${selected ? "true" : "false"}
-    aria-label=${opts.et(key === "header_left" ? "header_left" : "header_right")}
+    aria-label=${`${sideName}: ${tokens.map((t) => t.name).join(", ")}`}
     @click=${() => cb.selectSide(key)}
   >
     <span class="wl-zone-tokens">
@@ -268,8 +291,8 @@ function renderChipsAndIcons(
       <span class="wl-label"
         >${opts
           .et("header_chips_and_icons")
-          .replace("{chips}", String(MAX_HEADER_CHIPS))
-          .replace("{icons}", String(MAX_HEADER_ICONS))}</span
+          .replace("{chips}", String(HEADER_MAX_CHIPS))
+          .replace("{icons}", String(HEADER_MAX_ICONS))}</span
       >
       <div class="wl-tray">
         ${icons.map(
@@ -300,7 +323,7 @@ function renderChipsAndIcons(
         )}
       </div>
 
-      ${icons.length < MAX_HEADER_ICONS
+      ${icons.length < HEADER_MAX_ICONS
         ? // live() is load-bearing here. A plain .value="" binding makes Lit
           // compare the previous bound value ("") against the new one ("") and
           // skip the update — so after the first pick the element keeps showing
@@ -315,24 +338,24 @@ function renderChipsAndIcons(
               // The picker re-fires with an empty value when it clears itself
               // after a commit; ignore that echo or we would append "".
               if (!v) return;
-              patch("extra_icons", [...icons, v].slice(0, MAX_HEADER_ICONS));
+              patch("extra_icons", [...icons, v].slice(0, HEADER_MAX_ICONS));
             }}
           ></ha-icon-picker>`
         : nothing}
-      ${chips.length < MAX_HEADER_CHIPS
+      ${chips.length < HEADER_MAX_CHIPS
         ? html`<input
             type="text"
             class="wl-text"
-            maxlength="16"
+            maxlength=${HEADER_MAX_CHIP_LEN}
             aria-label=${opts.et("add_chip")}
             placeholder=${opts.et("add_chip")}
             @keydown=${(ev: KeyboardEvent) => {
-              ev.stopPropagation();
+              swallowEditorKeys(ev);
               if (ev.key !== "Enter") return;
               const el = ev.target as HTMLInputElement;
               const v = el.value.trim();
               if (!v) return;
-              patch("chips", [...chips, v].slice(0, MAX_HEADER_CHIPS));
+              patch("chips", [...chips, v].slice(0, HEADER_MAX_CHIPS));
               el.value = "";
             }}
             @keyup=${swallowEditorKeys}
