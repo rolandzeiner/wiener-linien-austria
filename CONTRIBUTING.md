@@ -80,6 +80,30 @@ View per-file coverage locally:
 pytest tests/ --cov-report=term-missing
 ```
 
+## Card tests
+
+`npm test` runs vitest over `src/**/*.test.ts`. There is no vitest config file,
+and adding one is usually the wrong move — the suite runs in two environments and
+picks between them per file:
+
+- **node (the default)** for the pure functions: config normalisers, departure
+  filtering, time and colour helpers, the catalogue-health checks in
+  `src/localize/localize.test.ts`.
+- **happy-dom**, opted into with a `// @vitest-environment happy-dom` docblock on
+  the first line, for anything that renders a component. `src/editor/editor-smoke.test.ts`
+  is the only such file today; it mounts the three card editors, drives a control
+  and asserts the `config-changed` payload.
+
+The HA components the editors host (`ha-form`, `ha-icon`, `ha-alert`,
+`ha-icon-picker`) are deliberately never defined in tests. An undefined element
+is inert, Lit renders straight through it, and not stubbing them is what keeps
+this layer free of a test harness.
+
+Two things happy-dom gets wrong, so don't chase them: its `outline` shorthand
+parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`.
+Both are fine in every browser HA supports — assert on the source, not on parsed
+`cssText`.
+
 ## Snapshot tests
 
 Diagnostics output is pinned via `syrupy`. Snapshots live under `tests/snapshots/`. After an intentional change to the diagnostics shape (new field, redaction-set drift), regenerate:
