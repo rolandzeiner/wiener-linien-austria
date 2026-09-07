@@ -111,7 +111,7 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Retro".
 A Solari split-flap board — characters cascade one tile at a time toward the target letter, mimicking the rattle of the mechanical originals from European stations.
 
 - **Multi-stop merge** — add as many stops as you like; the board shows 1–8 rows, sorted by countdown across all of them.
-- **Column headers** — *LINIE / RICHTUNG / STUFENLOS / ANKUNFT* above the board.
+- **Column headers** — *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT* above the board. The platform column reads *STEIG* outside the U-Bahn, and drops out when the API reports no platform.
 - **Per-row GLEIS / STEIG tile** — own column, aligned across all rows.
 - **Station-name band** — tints to the first tracked line by default; the editor also offers any tracked line, plus solid *White* and *Black*.
 - **Signage header strip** — same grammar as the retro card, recoloured for the cabinet palette.
