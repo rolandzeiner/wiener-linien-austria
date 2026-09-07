@@ -147,19 +147,17 @@ export class WienerLinienAustriaRetroCardEditor
         else next.line = line;
         this._commit(next);
       },
-      // The card always renders one direction, so null (the shared block's
-      // "both") is not reachable here — singleLine suppresses that button.
-      setDirection: (_eid, dir) => {
-        if (!this._config || dir === null) return;
-        const next: NormalisedRetroConfig = { ...this._config, direction: dir };
+      // Retro always renders one direction, so the block's "both" (null) is
+      // unreachable — singleLine suppresses that button — and per-line
+      // overrides never render, so `lineDirections` is ignored here.
+      setDirections: (_eid, next) => {
+        if (!this._config || next.direction === null) return;
+        const cfg: NormalisedRetroConfig = { ...this._config, direction: next.direction };
         // Re-pick the line if the saved one doesn't run in the new direction,
         // so the user never lands on a coherent-looking but empty card.
-        const linesNow = linesForDirection(this._attrs(next.entity), dir);
-        if (!next.line || !linesNow.includes(next.line)) next.line = linesNow[0];
-        this._commit(next);
-      },
-      setLineDirection: () => {
-        /* singleLine mode never renders per-line overrides */
+        const linesNow = linesForDirection(this._attrs(cfg.entity), next.direction);
+        if (!cfg.line || !linesNow.includes(cfg.line)) cfg.line = linesNow[0];
+        this._commit(cfg);
       },
       setWalkTime: (_eid, key, minutes) => {
         if (!this._config) return;

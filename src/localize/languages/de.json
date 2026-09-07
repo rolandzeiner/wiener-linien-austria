@@ -25,8 +25,6 @@
       "no_lines_hint": "Wähle zuerst eine Haltestelle — die Linien kommen live aus der API.",
       "no_lines_title": "Noch keine Linien verfügbar",
       "per_line_direction_aria": "Linie {line}: {direction}",
-      "per_line_direction_hint": "Ohne eigene Wahl folgt eine Linie der Richtung oben.",
-      "per_line_direction_label": "Richtung je Linie (überschreibt oben)",
       "remove_chip_aria": "Chip {chip} entfernen",
       "remove_icon_aria": "Symbol {icon} entfernen",
       "remove_stop": "Haltestelle entfernen",

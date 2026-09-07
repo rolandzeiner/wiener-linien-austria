@@ -52,8 +52,19 @@ export interface StopView {
 
 export interface StopBlockCallbacks {
   toggleLine(entity: string, line: string): void;
-  setDirection(entity: string, dir: "H" | "R" | null): void;
-  setLineDirection(entity: string, line: string, dir: "H" | "R" | null): void;
+  /** Both direction levels write through here, as one atomic change.
+   *
+   *  They cannot be two independent setters. `line_directions` has no "both"
+   *  value — absence means "inherit the stop-wide direction" — so with
+   *  `stop.direction` set, clearing a line's override does not give that line
+   *  both directions, it silently re-inherits. The block therefore computes
+   *  the whole desired state (materialising inherited values and clearing the
+   *  stop-wide key when the per-line level takes over) and the editor just
+   *  writes it. */
+  setDirections(
+    entity: string,
+    next: { direction: "H" | "R" | null; lineDirections: Record<string, "H" | "R"> },
+  ): void;
   setWalkTime(entity: string, key: string, minutes: number | null): void;
   /** Omitted on single-stop cards (retro), where removing the only stop would
    *  leave an unrenderable card. */
@@ -115,6 +126,24 @@ function directionsAvailable(
   return out;
 }
 
+/** Per-line rows replace the stop-wide control once two or more lines are in
+ *  play. Below that the stop-wide control is the only direction picker there
+ *  is — which is the whole of retro's model, so it can never be dropped
+ *  outright. */
+function showPerLineDirections(
+  opts: StopBlockOptions,
+  ctx: { lines: string[]; picked: Set<string> },
+): boolean {
+  if (opts.singleLine) return false;
+  return effectiveLines(ctx.lines, ctx.picked).length >= 2;
+}
+
+/** An empty selection means "all lines", so effective lines are the picked
+ *  ones when there are any and every line at the stop otherwise. */
+function effectiveLines(lines: string[], picked: Set<string>): string[] {
+  return picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
+}
+
 export function renderStopBlock(
   hass: HomeAssistant | undefined,
   stop: StopView,
@@ -156,10 +185,13 @@ export function renderStopBlock(
         ${missing ? renderMissing(stop, opts, cb) : nothing}
         ${renderLines(stop, opts, cb, { lines, picked, colorOf, typeByLine })}
         ${!missing && lines.length
-          ? renderDirection(stop, opts, cb, { triplets, picked, lines, dirStrings })
-          : nothing}
-        ${!missing && !opts.singleLine
-          ? renderOverrides(stop, opts, cb, { triplets, picked, lines, colorOf, dirStrings })
+          ? // Exactly one direction control is shown at a time. Two levels at
+            // once read as contradicting each other (the stop-wide row says R
+            // while a line row says H), and the stop-wide label degrades into
+            // soup at a hub because it pools termini across every line.
+            showPerLineDirections(opts, { lines, picked })
+            ? renderOverrides(stop, opts, cb, { triplets, picked, lines, colorOf, dirStrings })
+            : renderDirection(stop, opts, cb, { triplets, picked, lines, dirStrings })
           : nothing}
         ${!missing ? renderWalkTimes(stop, opts, cb, { attrs, picked, colorOf }) : nothing}
       </div>
@@ -264,27 +296,41 @@ function renderDirection(
   },
 ): TemplateResult {
   const { triplets, picked, lines, dirStrings } = ctx;
+  const effective = effectiveLines(lines, picked);
+  // This control only renders with at most one line in play, so scope the
+  // terminus labels to that line. Pooling termini across every line at the
+  // stop is what produced labels like
+  // "H: Enkplatz U, Grillgasse / Floridsdorf / Michelbeuern - AKH +1".
+  const scope = effective.length === 1 ? effective[0] : undefined;
   const dir = stop.direction ?? null;
-  const avail = directionsAvailable(triplets);
+  const avail = directionsAvailable(triplets, scope);
   const hasH = avail.has("H");
   const hasR = avail.has("R");
   const onlyOne = avail.size === 1;
 
-  // With one direction served, that direction is what the card shows whether or
-  // not the config says so — reflect that in the pressed state rather than
-  // leaving all three buttons looking unset.
+  // With one direction served, that is what the card shows whether or not the
+  // config says so — reflect it rather than leaving all three buttons unset.
   const activeH = dir === "H" || (dir === null && onlyOne && hasH);
   const activeR = dir === "R" || (dir === null && onlyOne && hasR);
   const activeBoth = dir === null && !onlyOne;
 
+  // Changing the stop-wide value drops any override on the lines it governs,
+  // so the control the user is looking at is the one that actually applies.
+  const commit = (next: "H" | "R" | null): void => {
+    const kept: Record<string, "H" | "R"> = {};
+    for (const [line, value] of Object.entries(stop.line_directions ?? {})) {
+      if (!effective.includes(line)) kept[line] = value;
+    }
+    cb.setDirections(stop.entity, { direction: next, lineDirections: kept });
+  };
+
   const label = (d: "H" | "R"): string =>
-    hasDir(avail, d)
-      ? formatDirectionPillLabel(terminiFor(triplets, d), dirStrings(d))
+    avail.size === 0 || avail.has(d)
+      ? formatDirectionPillLabel(terminiFor(triplets, d, scope), dirStrings(d))
       : `${dirStrings(d).short}: ${opts.et("direction_not_served")}`;
 
-  const firstLine = [...picked][0] ?? lines[0];
-  const note = !hasR
-    ? opts.et("direction_note_one_way").replace("{line}", firstLine ?? "")
+  const note = !hasR && effective.length
+    ? opts.et("direction_note_one_way").replace("{line}", effective[0] ?? "")
     : "";
 
   return html`
@@ -296,14 +342,14 @@ function renderDirection(
           active: activeH,
           disabled: !hasH,
           title: hasH ? opts.t("dir_h") : opts.et("direction_unavailable"),
-          onClick: () => cb.setDirection(stop.entity, "H"),
+          onClick: () => commit("H"),
         })}
         ${dirButton({
           label: label("R"),
           active: activeR,
           disabled: !hasR,
           title: hasR ? opts.t("dir_r") : opts.et("direction_unavailable"),
-          onClick: () => cb.setDirection(stop.entity, "R"),
+          onClick: () => commit("R"),
         })}
         ${opts.singleLine
           ? nothing
@@ -312,16 +358,12 @@ function renderDirection(
               active: activeBoth,
               disabled: onlyOne,
               title: onlyOne ? opts.et("direction_unavailable") : opts.t("dir_both"),
-              onClick: () => cb.setDirection(stop.entity, null),
+              onClick: () => commit(null),
             })}
       </div>
       ${note ? html`<span class="wl-note">${note}</span>` : nothing}
     </div>
   `;
-}
-
-function hasDir(avail: Set<"H" | "R">, d: "H" | "R"): boolean {
-  return avail.size === 0 || avail.has(d);
 }
 
 interface DirButtonSpec {
@@ -372,21 +414,42 @@ function renderOverrides(
     colorOf: (l: string) => string;
     dirStrings: (d: "H" | "R") => { full: string; short: string };
   },
-): TemplateResult | typeof nothing {
+): TemplateResult {
   const { triplets, picked, lines, colorOf, dirStrings } = ctx;
-  const effective = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
-  // One line has nothing to override — the stop-wide direction already says it.
-  if (effective.length < 2) return nothing;
-
+  const effective = effectiveLines(lines, picked);
   const lineDirs = stop.line_directions ?? {};
   const stopDir = stop.direction ?? null;
 
+  /** What a line actually resolves to right now. A line with no override
+   *  inherits the stop-wide value, and showing that inherited value is the
+   *  point: v1 displayed "both" for every un-overridden line, so the per-line
+   *  rows appeared to contradict the stop-wide row above them. */
+  const effectiveDir = (line: string): "H" | "R" | null => lineDirs[line] ?? stopDir;
+
+  /** Write the whole picture at once: materialise every line's currently
+   *  effective direction, apply the user's change, and clear the stop-wide key.
+   *  Clearing it is what makes the "both" button mean both — while
+   *  `stop.direction` is set, an absent override re-inherits instead. */
+  const commit = (line: string, next: "H" | "R" | null): void => {
+    const lineDirections: Record<string, "H" | "R"> = {};
+    for (const l of effective) {
+      const value = l === line ? next : effectiveDir(l);
+      if (value) lineDirections[l] = value;
+    }
+    // Overrides for lines outside the current selection are none of this
+    // control's business — carry them through untouched.
+    for (const [l, value] of Object.entries(lineDirs)) {
+      if (!effective.includes(l)) lineDirections[l] = value;
+    }
+    cb.setDirections(stop.entity, { direction: null, lineDirections });
+  };
+
   return html`
-    <div class="wl-group wl-divide">
-      <span class="wl-label">${opts.et("per_line_direction_label")}</span>
+    <div class="wl-group">
+      <span class="wl-label">${opts.et("direction_label")}</span>
       ${effective.map((line) => {
         const avail = directionsAvailable(triplets, line);
-        const cur = lineDirs[line] ?? null;
+        const cur = effectiveDir(line);
         const hasH = avail.has("H");
         const hasR = avail.has("R");
         const onlyOne = avail.size === 1;
@@ -413,7 +476,7 @@ function renderOverrides(
                 compact: true,
                 title: terminiFor(triplets, "H", line).join(" / ") || opts.t("dir_h"),
                 ariaLabel: aria("H"),
-                onClick: () => cb.setLineDirection(stop.entity, line, "H"),
+                onClick: () => commit(line, "H"),
               })}
               ${dirButton({
                 label: dirStrings("R").short,
@@ -422,7 +485,7 @@ function renderOverrides(
                 compact: true,
                 title: terminiFor(triplets, "R", line).join(" / ") || opts.t("dir_r"),
                 ariaLabel: aria("R"),
-                onClick: () => cb.setLineDirection(stop.entity, line, "R"),
+                onClick: () => commit(line, "R"),
               })}
               ${dirButton({
                 label: "",
@@ -432,15 +495,12 @@ function renderOverrides(
                 compact: true,
                 title: opts.t("dir_both"),
                 ariaLabel: aria(null),
-                onClick: () => cb.setLineDirection(stop.entity, line, null),
+                onClick: () => commit(line, null),
               })}
             </div>
           </div>
         `;
       })}
-      ${stopDir === null
-        ? nothing
-        : html`<span class="wl-note">${opts.et("per_line_direction_hint")}</span>`}
     </div>
   `;
 }

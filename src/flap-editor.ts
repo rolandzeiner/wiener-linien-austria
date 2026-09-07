@@ -145,19 +145,18 @@ export class WienerLinienAustriaFlapCardEditor
           else delete s.lines;
           return s;
         }),
-      setDirection: (eid, dir) =>
+      // One atomic write for both direction levels — the block hands over the
+      // whole desired state, so the editor never has to reason about
+      // inheritance. Tidy state on empty: absent keys rather than `{}`.
+      setDirections: (eid, next) =>
         this._updateStop(eid, (s) => {
-          if (dir === null) delete s.direction;
-          else s.direction = dir;
-          return s;
-        }),
-      setLineDirection: (eid, line, dir) =>
-        this._updateStop(eid, (s) => {
-          const cur = { ...(s.line_directions ?? {}) };
-          if (dir === null) delete cur[line];
-          else cur[line] = dir;
-          if (Object.keys(cur).length) s.line_directions = cur;
-          else delete s.line_directions;
+          if (next.direction === null) delete s.direction;
+          else s.direction = next.direction;
+          if (Object.keys(next.lineDirections).length) {
+            s.line_directions = next.lineDirections;
+          } else {
+            delete s.line_directions;
+          }
           return s;
         }),
       setWalkTime: (eid, key, minutes) =>
