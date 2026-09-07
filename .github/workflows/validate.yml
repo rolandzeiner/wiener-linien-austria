@@ -162,6 +162,12 @@ jobs:
         # in strict mode. Run tsc separately so TS regressions surface in
         # CI instead of slipping into the bundle.
         run: npx tsc --noEmit
+      - name: Card unit tests
+        # Pure-function coverage of the three config normalisers, the
+        # departure filter and the time helpers. The normaliser tests
+        # double as the spec for cross-card config defaults, which is
+        # where this integration's drift has historically hidden.
+        run: npm test
       - name: Build card bundles
         run: npm run build
       - name: Assert the committed bundles match a fresh build
@@ -188,3 +194,5 @@ jobs:
         run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-card.js
       - name: Syntax-check retro bundle
         run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-retro-card.js
+      - name: Syntax-check flap bundle
+        run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-flap-card.js
