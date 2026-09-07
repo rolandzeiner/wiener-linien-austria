@@ -59,7 +59,7 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
 - **Exact (`x.y.z`)** for three specific cases:
   1. **The package is unmaintained**, so a range floats over code nobody is watching. `qr-creator` is at its only release, built with a 2019 toolchain.
   2. **The "version" is really content, not an API.** A patch release can change what you get without changing any signature.
-  3. **The version is mirrored somewhere else** and the two must move together. `vitest` is exact because its version and the `vite`/`rolldown` stack under it decide whether `?raw` imports keep working.
+  3. **The version is mirrored somewhere else** and the two must move together. `vitest` is exact because its version and the `vite`/`rolldown` stack under it decide whether `?raw` imports keep working. `@vitest/coverage-v8` is exact for the same reason and must be bumped in lockstep with `vitest` — the provider reaches into vitest internals and refuses to load on a mismatched minor.
 
 Bumping an exact pin is a deliberate act — say why in the commit message.
 
@@ -77,8 +77,25 @@ That combination — invisible to static analysis, mandatory at build time — i
 View per-file coverage locally:
 
 ```bash
-pytest tests/ --cov-report=term-missing
+pytest tests/ --cov-report=term-missing   # Python
+npm run test:coverage                     # cards
 ```
+
+`test:coverage` carries its whole configuration as CLI flags rather than a
+vitest config file, for the reason in **Card tests** below. Two of those flags
+are load-bearing: `--coverage.include=src/**/*.ts` makes vitest report files no
+test imports (without it the three card bundles are absent from the report
+entirely, not listed at 0%), and `--coverage.reporter=json` writes
+`coverage/coverage-final.json` in Istanbul format, which is what
+`fallow health --coverage` reads. Feeding fallow real coverage instead of its
+estimate cut the findings above threshold from 128 to 100 and the criticals
+from 53 to 36 — the difference was all false alarms on covered code.
+
+The three card files still report as `estimated` there, and that is not a
+misconfiguration: no test imports them, so V8 emits a stub entry with an empty
+`fnMap` and fallow has nothing to match. Only a test that actually imports a
+card can fix that. `coverage/` is gitignored, and excluded from
+`scripts/dev-push.sh` — `.gitignore` does not filter rsync.
 
 ## Card tests
 

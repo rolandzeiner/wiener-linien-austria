@@ -23,6 +23,10 @@ __pycache__/
 coverage.xml
 htmlcov/
 .tox/
+# vitest --coverage output (npm run test:coverage). Also excluded from
+# scripts/dev-push.sh — .gitignore does not filter rsync, so anything
+# dropped in the tree can otherwise ship to the live HA box.
+coverage/
 
 # Build / dist / packaging
 build/
