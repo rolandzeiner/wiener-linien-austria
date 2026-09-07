@@ -342,8 +342,6 @@ export class WienerLinienAustriaRetroCardEditor
           show_platform: cfg.show_platform,
           platform_side: cfg.platform_side,
           accessibility_only: cfg.accessibility_only,
-          size: cfg.size,
-          style: cfg.style,
         },
         schema: [
           { name: "show_platform", selector: { boolean: {} } },
@@ -362,6 +360,37 @@ export class WienerLinienAustriaRetroCardEditor
             },
           },
           { name: "accessibility_only", selector: { boolean: {} } },
+        ],
+      })}
+    `;
+  }
+
+  private _renderTweaks(): TemplateResult {
+    const cfg = this._config!;
+    const { et } = this._i18n;
+    const common = {
+      hass: this.hass,
+      computeLabel: this._computeLabel,
+      computeHelper: this._computeHelper,
+      onChange: (v: Record<string, unknown>) => this._patch(v),
+    };
+    return html`
+      ${renderFormSection({
+        ...common,
+        title: et("section_led_panel"),
+        // size and style lead: they are the coarse choices the rest of the
+        // section refines, and they used to sit a tab away from the tweaks
+        // that modify the same surface.
+        data: {
+          size: cfg.size,
+          style: cfg.style,
+          show_unit: cfg.show_unit,
+          show_line_pill: cfg.show_line_pill,
+          line_stripe: cfg.line_stripe,
+          housing: cfg.housing,
+          flicker: cfg.flicker,
+        },
+        schema: [
           {
             name: "size",
             selector: {
@@ -388,49 +417,33 @@ export class WienerLinienAustriaRetroCardEditor
               },
             },
           },
+          { name: "show_unit", selector: { boolean: {} } },
+          { name: "show_line_pill", selector: { boolean: {} } },
+          { name: "line_stripe", selector: { boolean: {} } },
+          { name: "housing", selector: { boolean: {} } },
+          { name: "flicker", selector: { boolean: {} } },
+        ],
+      })}
+      ${renderFormSection({
+        ...common,
+        title: et("section_extras"),
+        hint: et("section_extras_hint"),
+        data: {
+          message_ticker: cfg.message_ticker,
+          message_text: cfg.message_text ?? "",
+          wheelchair_race: cfg.wheelchair_race,
+        },
+        schema: [
+          { name: "message_ticker", selector: { boolean: {} } },
+          {
+            name: "message_text",
+            disabled: !cfg.message_ticker,
+            selector: { text: {} },
+          },
+          { name: "wheelchair_race", selector: { boolean: {} } },
         ],
       })}
     `;
-  }
-
-  private _renderTweaks(): TemplateResult {
-    const cfg = this._config!;
-    const { et } = this._i18n;
-    return renderFormSection({
-      hass: this.hass,
-      title: et("section_tweaks"),
-      hint: et("section_tweaks_hint"),
-      data: {
-        show_unit: cfg.show_unit,
-        show_line_pill: cfg.show_line_pill,
-        line_stripe: cfg.line_stripe,
-        housing: cfg.housing,
-        flicker: cfg.flicker,
-        message_ticker: cfg.message_ticker,
-        message_text: cfg.message_text ?? "",
-        wheelchair_race: cfg.wheelchair_race,
-      },
-      schema: [
-        { name: "show_unit", selector: { boolean: {} } },
-        { name: "show_line_pill", selector: { boolean: {} } },
-        { name: "line_stripe", selector: { boolean: {} } },
-        { name: "housing", selector: { boolean: {} } },
-        { name: "flicker", selector: { boolean: {} } },
-        { name: "message_ticker", selector: { boolean: {} } },
-        // Kept visible and disabled rather than added and removed from the
-        // schema as v1 did — a field that appears and disappears as you toggle
-        // reads as a glitch, and the disabled state says why it is inert.
-        {
-          name: "message_text",
-          disabled: !cfg.message_ticker,
-          selector: { text: {} },
-        },
-        { name: "wheelchair_race", selector: { boolean: {} } },
-      ],
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onChange: (v) => this._patch(v),
-    });
   }
 
   private _patchHeaderSide(

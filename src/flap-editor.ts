@@ -343,8 +343,6 @@ export class WienerLinienAustriaFlapCardEditor
           show_platform: cfg.show_platform,
           show_accessibility: cfg.show_accessibility,
           accessibility_only: cfg.accessibility_only,
-          show_min_unit: cfg.show_min_unit,
-          size: cfg.size,
         },
         schema: [
           { name: "max_rows", selector: { number: { min: 1, max: 8, step: 1, mode: "slider" } } },
@@ -359,20 +357,6 @@ export class WienerLinienAustriaFlapCardEditor
             // hacs.json floor is 2025.1.0.)
             disabled: !cfg.show_accessibility,
             selector: { boolean: {} },
-          },
-          { name: "show_min_unit", selector: { boolean: {} } },
-          {
-            name: "size",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "small", label: et("size_small") },
-                  { value: "medium", label: et("size_medium") },
-                  { value: "regular", label: et("size_regular") },
-                ],
-              },
-            },
           },
         ],
       })}
@@ -391,10 +375,28 @@ export class WienerLinienAustriaFlapCardEditor
     return html`
       ${renderFormSection({
         ...common,
-        title: et("section_tweaks"),
-        hint: et("section_tweaks_hint"),
-        data: { show_line_column: cfg.show_line_column, housing: cfg.housing },
+        title: et("section_board"),
+        data: {
+          size: cfg.size,
+          show_min_unit: cfg.show_min_unit,
+          show_line_column: cfg.show_line_column,
+          housing: cfg.housing,
+        },
         schema: [
+          {
+            name: "size",
+            selector: {
+              select: {
+                mode: "dropdown",
+                options: [
+                  { value: "small", label: et("size_small") },
+                  { value: "medium", label: et("size_medium") },
+                  { value: "regular", label: et("size_regular") },
+                ],
+              },
+            },
+          },
+          { name: "show_min_unit", selector: { boolean: {} } },
           { name: "show_line_column", selector: { boolean: {} } },
           { name: "housing", selector: { boolean: {} } },
         ],
