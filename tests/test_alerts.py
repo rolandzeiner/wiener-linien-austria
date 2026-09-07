@@ -13,14 +13,17 @@ from homeassistant.core import HomeAssistant
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
     TrafficInfo,
-    _fetch_info_list,
+    _fetch_info_lists,
     _FetchFailed,
     _parse_elevator,
     _parse_traffic,
+    _split_by_category,
     async_refresh_alerts,
     get_alerts_for,
 )
 from custom_components.wiener_linien_austria.const import (
+    ALERT_FEED_ELEVATOR,
+    ALERT_FEED_TRAFFIC,
     DOMAIN,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
@@ -200,65 +203,96 @@ async def test_get_alerts_for_no_lines_returns_all_traffic(hass: HomeAssistant) 
 # ---------------------------------------------------------------------------
 
 
+def _combined_body(
+    traffic: list[dict[str, Any]] | None = None,
+    elevator: list[dict[str, Any]] | None = None,
+    *,
+    traffic_id: int = 2,
+    elevator_id: int = 1,
+) -> dict[str, Any]:
+    """Build a realistic multi-`name` /trafficInfoList payload.
+
+    Mirrors the live shape measured 2026-09-07: one flat `trafficInfos`
+    list, every entry tagged with `refTrafficInfoCategoryId`, resolved
+    through a `trafficInfoCategories` table. The default ids deliberately
+    put `aufzugsinfo` at 1 and `stoerunglang` at 2 — the reverse of the
+    order the `name=` params are sent in — because that is what upstream
+    actually returns and the routing must not depend on request order.
+    """
+    infos: list[dict[str, Any]] = []
+    categories: list[dict[str, Any]] = []
+    if elevator is not None:
+        categories.append({"id": elevator_id, "name": ALERT_FEED_ELEVATOR})
+        infos += [{**e, "refTrafficInfoCategoryId": elevator_id} for e in elevator]
+    if traffic is not None:
+        categories.append({"id": traffic_id, "name": ALERT_FEED_TRAFFIC})
+        infos += [{**t, "refTrafficInfoCategoryId": traffic_id} for t in traffic]
+    return {
+        "message": {"messageCode": 1},
+        "data": {"trafficInfos": infos, "trafficInfoCategories": categories},
+    }
+
+
+def _json_response(body: dict[str, Any]) -> MagicMock:
+    """A MagicMock response whose .json() resolves to `body`."""
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    return resp
+
+
 async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> None:
-    """One fetch for stoerunglang + one for aufzugsinfo, caches populated."""
-    traffic_body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "T1",
-                    "title": "U4: Short",
-                    "description": "x",
-                    "relatedLines": ["U4"],
-                    "status": "active",
-                    "time": {},
-                }
-            ]
-        },
-    }
-    elevator_body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "E1",
-                    "title": "Stephansplatz",
-                    "description": "U1 exit",
-                    "attributes": {
-                        "station": "Stephansplatz",
-                        "reason": "renovation",
-                        "relatedLines": ["U1"],
-                        "relatedStops": [4111],
-                        "status": "außer Betrieb",
-                    },
-                    "time": {},
-                }
-            ]
-        },
-    }
+    """ONE fetch carrying both names populates both caches.
 
-    resp_traffic = MagicMock()
-    resp_traffic.raise_for_status = MagicMock()
-    resp_traffic.json = AsyncMock(return_value=traffic_body)
-    resp_elevator = MagicMock()
-    resp_elevator.raise_for_status = MagicMock()
-    resp_elevator.json = AsyncMock(return_value=elevator_body)
-
-    def fake_get(url: str, **kwargs: object) -> MagicMock:
-        name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return make_response_cm(
-            resp_elevator if name == "aufzugsinfo" else resp_traffic
-        )
+    Also pins the request shape that makes that possible: repeated `name=`
+    params in a single GET. Two separate calls would still populate the
+    caches, so asserting the call count is the only thing that stops a
+    refactor silently reintroducing the second request — and with it the
+    15-second domain-lock stall it used to cost every cycle.
+    """
+    body = _combined_body(
+        traffic=[
+            {
+                "name": "T1",
+                "title": "U4: Short",
+                "description": "x",
+                "relatedLines": ["U4"],
+                "status": "active",
+                "time": {},
+            }
+        ],
+        elevator=[
+            {
+                "name": "E1",
+                "title": "Stephansplatz",
+                "description": "U1 exit",
+                "attributes": {
+                    "station": "Stephansplatz",
+                    "reason": "renovation",
+                    "relatedLines": ["U1"],
+                    "relatedStops": [4111],
+                    "status": "außer Betrieb",
+                },
+                "time": {},
+            }
+        ],
+    )
 
     fake_session = MagicMock()
-    fake_session.get = MagicMock(side_effect=fake_get)
+    fake_session.get = MagicMock(return_value=make_response_cm(_json_response(body)))
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
         await async_refresh_alerts(hass)
+
+    assert fake_session.get.call_count == 1, "both feeds must ride in one request"
+    params = fake_session.get.call_args.kwargs["params"]
+    assert [v for k, v in params if k == "name"] == [
+        ALERT_FEED_TRAFFIC,
+        ALERT_FEED_ELEVATOR,
+    ]
 
     traffic = hass.data[DOMAIN][TRAFFIC_INFO_KEY]
     elevator = hass.data[DOMAIN][ELEVATOR_INFO_KEY]
@@ -269,45 +303,31 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
 
 async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None:
     """`status: resolved` entries must not reach the cache."""
-    traffic_body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "ACTIVE",
-                    "title": "U4: disrupt",
-                    "description": "x",
-                    "relatedLines": ["U4"],
-                    "status": "active",
-                    "time": {},
-                },
-                {
-                    "name": "DONE",
-                    "title": "U1: over",
-                    "description": "y",
-                    "relatedLines": ["U1"],
-                    "status": "resolved",
-                    "time": {},
-                },
-            ]
-        },
-    }
-    elevator_body = {"message": {"messageCode": 1}, "data": {"trafficInfos": []}}
-
-    def _resp(body: dict[str, Any]) -> MagicMock:
-        r = MagicMock()
-        r.raise_for_status = MagicMock()
-        r.json = AsyncMock(return_value=body)
-        return r
-
-    def fake_get(url: str, **kwargs: object) -> MagicMock:
-        name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return make_response_cm(
-            _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
-        )
-
+    traffic_body = _combined_body(
+        traffic=[
+            {
+                "name": "ACTIVE",
+                "title": "U4: disrupt",
+                "description": "x",
+                "relatedLines": ["U4"],
+                "status": "active",
+                "time": {},
+            },
+            {
+                "name": "DONE",
+                "title": "U1: over",
+                "description": "y",
+                "relatedLines": ["U1"],
+                "status": "resolved",
+                "time": {},
+            },
+        ],
+        elevator=[],
+    )
     fake_session = MagicMock()
-    fake_session.get = MagicMock(side_effect=fake_get)
+    fake_session.get = MagicMock(
+        return_value=make_response_cm(_json_response(traffic_body))
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -336,12 +356,12 @@ async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None
     assert hass.data[DOMAIN][ELEVATOR_INFO_KEY] == []
 
 
-async def test_fetch_info_list_propagates_unexpected_errors(
+async def test_fetch_info_lists_propagates_unexpected_errors(
     hass: HomeAssistant,
 ) -> None:
     """Unexpected exceptions (programming errors) must propagate.
 
-    The except-list in `_fetch_info_list` is deliberately narrow
+    The except-list in `_fetch_info_lists` is deliberately narrow
     (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError,
     ValueError) so real bugs surface during development instead of being
     silently swallowed by the 5-min periodic refresh. HA's
@@ -357,11 +377,11 @@ async def test_fetch_info_list_propagates_unexpected_errors(
         ),
         pytest.raises(RuntimeError),
     ):
-        await _fetch_info_list(hass, "stoerunglang")
+        await _fetch_info_lists(hass)
 
 
 # ---------------------------------------------------------------------------
-# _fetch_info_list: direct tests of the per-name helper's error branches
+# _fetch_info_lists: direct tests of the combined helper's error branches
 # ---------------------------------------------------------------------------
 
 
@@ -377,7 +397,7 @@ def _mock_session(resp: MagicMock) -> MagicMock:
     return fake
 
 
-async def test_fetch_info_list_http_error_returns_failed(
+async def test_fetch_info_lists_http_error_returns_failed(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -405,7 +425,7 @@ async def test_fetch_info_list_http_error_returns_failed(
             return_value=fake_session,
         ),
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
     records = [r for r in caplog.records if r.name == ALERTS_LOGGER]
@@ -415,7 +435,7 @@ async def test_fetch_info_list_http_error_returns_failed(
     assert records[0].exc_info is None
 
 
-async def test_fetch_info_list_bad_content_type_still_warns(
+async def test_fetch_info_lists_bad_content_type_still_warns(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -438,7 +458,7 @@ async def test_fetch_info_list_bad_content_type_still_warns(
             return_value=fake_session,
         ),
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
     records = [r for r in caplog.records if r.name == ALERTS_LOGGER]
@@ -446,7 +466,7 @@ async def test_fetch_info_list_bad_content_type_still_warns(
     assert records[0].exc_info is not None
 
 
-async def test_fetch_info_list_non_ok_message_code_returns_failed(
+async def test_fetch_info_lists_non_ok_message_code_returns_failed(
     hass: HomeAssistant,
 ) -> None:
     """messageCode ≠ 1 drops the payload as _FETCH_FAILED — the cache
@@ -464,11 +484,11 @@ async def test_fetch_info_list_non_ok_message_code_returns_failed(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_non_dict_body_returns_failed(
+async def test_fetch_info_lists_non_dict_body_returns_failed(
     hass: HomeAssistant,
 ) -> None:
     """JSON that decodes to a non-object returns _FETCH_FAILED so the
@@ -482,23 +502,24 @@ async def test_fetch_info_list_non_dict_body_returns_failed(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_filters_non_dict_entries(
+async def test_fetch_info_lists_filters_non_dict_entries(
     hass: HomeAssistant,
 ) -> None:
     """trafficInfos items that aren't dicts are silently filtered out."""
     body = {
         "message": {"messageCode": 1},
         "data": {
+            "trafficInfoCategories": [{"id": 2, "name": ALERT_FEED_TRAFFIC}],
             "trafficInfos": [
-                {"name": "good", "title": "y"},
+                {"name": "good", "title": "y", "refTrafficInfoCategoryId": 2},
                 "not-a-dict",
                 None,
                 42,
-            ]
+            ],
         },
     }
     resp = MagicMock()
@@ -510,8 +531,14 @@ async def test_fetch_info_list_filters_non_dict_entries(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == [{"name": "good", "title": "y"}]
+        result = await _fetch_info_lists(hass)
+    assert not isinstance(result, _FetchFailed)
+    assert result[ALERT_FEED_TRAFFIC] == [
+        {"name": "good", "title": "y", "refTrafficInfoCategoryId": 2}
+    ]
+    # The feed we asked for but upstream had nothing for is present and empty,
+    # never missing — the caller indexes both keys unconditionally.
+    assert result[ALERT_FEED_ELEVATOR] == []
 
 
 # ---------------------------------------------------------------------------
@@ -521,111 +548,80 @@ async def test_fetch_info_list_filters_non_dict_entries(
 
 
 # ---------------------------------------------------------------------------
-# Conditional GET — 304 Not Modified
+# _split_by_category: routing a combined payload back into per-feed lists
 # ---------------------------------------------------------------------------
 
 
-async def test_async_refresh_alerts_304_keeps_existing_cache(
-    hass: HomeAssistant,
-) -> None:
-    """A 304 from `/trafficInfoList` must leave the existing parsed cache alone.
+def test_split_by_category_ignores_request_order() -> None:
+    """Routing follows the category table, never the order names were sent.
 
-    Regression guard for the conditional-GET path. If 304 incorrectly fell
-    through to `resp.json()` we'd either crash (304 has no body) or wipe
-    the existing cache. The fix: detect status==304 and return the
-    `_NOT_MODIFIED` sentinel, which `async_refresh_alerts` interprets as
-    "don't touch the cache".
+    Measured against the live API 2026-09-07: `stoerunglang` sent as the
+    FIRST `name=` param came back as category id 2, `aufzugsinfo` as id 1.
+    Anything that infers the feed from parameter position gets both feeds
+    backwards, and the failure is silent — elevator outages would render as
+    line disruptions and vice versa.
     """
-    # Pre-seed the cache so we can assert it survives.
-    pre_existing_traffic = TrafficInfo(
-        name="PRE",
-        title="U1: prior",
-        description="x",
-        related_lines=["U1"],
-        time_start=None,
-        time_end=None,
-        status="active",
-    )
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [pre_existing_traffic]
-    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = []
-
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = {"ETag": '"abc"'}
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(
-        side_effect=AssertionError("must not call .json() on 304")
-    )
-
-    fake_session = MagicMock()
-    fake_session.get = MagicMock(return_value=make_response_cm(resp_304))
-
-    with patch(
-        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
-        return_value=fake_session,
-    ):
-        await async_refresh_alerts(hass)
-
-    # Cache survives 304 untouched.
-    assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == [pre_existing_traffic]
-
-
-async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
-    hass: HomeAssistant,
-) -> None:
-    """After a 200 captures ETag/Last-Modified, the next call sends them back."""
-    body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "T1",
-                    "title": "U1: x",
-                    "relatedLines": ["U1"],
-                    "status": "active",
-                    "time": {},
-                }
-            ]
-        },
+    data = {
+        "trafficInfoCategories": [
+            {"id": 1, "name": ALERT_FEED_ELEVATOR},
+            {"id": 2, "name": ALERT_FEED_TRAFFIC},
+        ],
+        "trafficInfos": [
+            {"name": "E1", "refTrafficInfoCategoryId": 1},
+            {"name": "T1", "refTrafficInfoCategoryId": 2},
+        ],
     }
-    resp_first = MagicMock()
-    resp_first.status = 200
-    resp_first.headers = {
-        "ETag": '"v1"',
-        "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT",
+    out = _split_by_category(data)
+    assert [e["name"] for e in out[ALERT_FEED_ELEVATOR]] == ["E1"]
+    assert [t["name"] for t in out[ALERT_FEED_TRAFFIC]] == ["T1"]
+
+
+def test_split_by_category_absent_category_yields_empty_list() -> None:
+    """A feed with no current disruptions is absent upstream, empty here.
+
+    The docs are explicit that `trafficInfoCategories` lists a category only
+    when it has entries. That absence means "nothing active", which must
+    CLEAR the cache — returning a missing key instead would either KeyError
+    in the caller or preserve a resolved disruption forever.
+    """
+    data = {
+        "trafficInfoCategories": [{"id": 7, "name": ALERT_FEED_TRAFFIC}],
+        "trafficInfos": [{"name": "T1", "refTrafficInfoCategoryId": 7}],
     }
-    resp_first.raise_for_status = MagicMock()
-    resp_first.json = AsyncMock(return_value=body)
+    out = _split_by_category(data)
+    assert set(out) == {ALERT_FEED_TRAFFIC, ALERT_FEED_ELEVATOR}
+    assert out[ALERT_FEED_ELEVATOR] == []
 
-    resp_second = MagicMock()
-    resp_second.status = 200
-    resp_second.headers = {}
-    resp_second.raise_for_status = MagicMock()
-    resp_second.json = AsyncMock(return_value=body)
 
-    fake_session = MagicMock()
-    fake_session.get = MagicMock(
-        side_effect=[
-            make_response_cm(resp_first),
-            make_response_cm(resp_first),
-            make_response_cm(resp_second),
-            make_response_cm(resp_second),
-        ]
-    )
+def test_split_by_category_drops_unknown_and_malformed() -> None:
+    """Entries we can't attribute to a requested feed are dropped.
 
-    with patch(
-        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
-        return_value=fake_session,
-    ):
-        await async_refresh_alerts(hass)
-        await async_refresh_alerts(hass)
+    Covers a fifth category appearing upstream (we only ever asked for two),
+    a non-integer category ref, and non-dict rows in either list.
+    """
+    data = {
+        "trafficInfoCategories": [
+            {"id": 1, "name": ALERT_FEED_ELEVATOR},
+            {"id": 4, "name": "fahrtreppeninfo"},
+            "not-a-dict",
+            {"id": "5", "name": ALERT_FEED_TRAFFIC},
+        ],
+        "trafficInfos": [
+            {"name": "E1", "refTrafficInfoCategoryId": 1},
+            {"name": "ESCALATOR", "refTrafficInfoCategoryId": 4},
+            {"name": "NO_REF"},
+            {"name": "BAD_REF", "refTrafficInfoCategoryId": "1"},
+            "not-a-dict",
+        ],
+    }
+    out = _split_by_category(data)
+    assert [e["name"] for e in out[ALERT_FEED_ELEVATOR]] == ["E1"]
+    assert out[ALERT_FEED_TRAFFIC] == []
 
-    # Find the third call (start of the second refresh, stoerunglang again).
-    second_pass_calls = fake_session.get.call_args_list[2:]
-    assert any(
-        c.kwargs["headers"].get("If-None-Match") == '"v1"' for c in second_pass_calls
-    ), "second refresh must echo the ETag captured on first response"
+
+def test_split_by_category_handles_empty_payload() -> None:
+    """A `data` object with neither key still yields both feeds, empty."""
+    assert _split_by_category({}) == {ALERT_FEED_TRAFFIC: [], ALERT_FEED_ELEVATOR: []}
 
 
 async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> None:

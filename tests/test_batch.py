@@ -1,10 +1,10 @@
 """Tests for the shared MonitorBatchGroup fetcher.
 
-These cover the HTTP / 304 / rate-limit / backoff / domain-cooldown behaviour
-that used to live on the per-entry coordinator, now re-homed to the batch
-group, PLUS the batching-specific behaviour: RBL union/dedupe, one combined
-request for N members, and per-member fan-out (each member keeps only its own
-stops, a missing RBL yields empty-not-error).
+These cover the HTTP / rate-limit / backoff / domain-cooldown behaviour that
+used to live on the per-entry coordinator, now re-homed to the batch group,
+PLUS the batching-specific behaviour: RBL union/dedupe, one combined request
+for N members, and per-member fan-out (each member keeps only its own stops,
+a missing RBL yields empty-not-error).
 """
 
 from __future__ import annotations
@@ -146,7 +146,6 @@ async def test_fetch_success_returns_body_and_sets_meta(
         result = await group.async_fetch()
 
     assert isinstance(result, BatchResult)
-    assert result.not_modified is False
     assert result.body is monitor_fixture
     assert coordinator.last_error_code == 1
     assert coordinator.server_time == monitor_fixture["message"]["serverTime"]
@@ -393,53 +392,6 @@ async def test_domain_cooldown_no_sleep_when_elapsed(
 
 
 # ---------------------------------------------------------------------------
-# Conditional GET — 304 Not Modified
-# ---------------------------------------------------------------------------
-
-
-async def test_304_returns_cached_body(hass: HomeAssistant, monitor_fixture) -> None:
-    """A 304 revalidation returns the cached body with not_modified=True."""
-    group, _ = _group_with_member(hass)
-    headers = {"ETag": '"abc"', "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
-    resp_200 = _ok_response(monitor_fixture, headers=headers)
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = headers
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(
-        side_effect=AssertionError("must not call .json() on 304")
-    )
-
-    mock_get = MagicMock(
-        side_effect=[make_response_cm(resp_200), make_response_cm(resp_304)]
-    )
-    with _patch_get(group, mock_get):
-        first = await group.async_fetch()
-        second = await group.async_fetch()
-
-    assert first.not_modified is False
-    assert second.not_modified is True
-    assert second.body is first.body
-    # Conditional header was echoed on the second call.
-    assert mock_get.call_args_list[1].kwargs["headers"].get("If-None-Match") == '"abc"'
-
-
-async def test_304_without_cached_body_raises(hass: HomeAssistant) -> None:
-    """A 304 with no cached body to revalidate surfaces as UpdateFailed."""
-    group, _ = _group_with_member(hass)
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = {}
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(side_effect=ValueError("304 has no body"))
-    with (
-        _patch_get(group, MagicMock(return_value=make_response_cm(resp_304))),
-        pytest.raises(UpdateFailed),
-    ):
-        await group.async_fetch()
-
-
-# ---------------------------------------------------------------------------
 # Fan-out — timer tick distributes the shared body to members
 # ---------------------------------------------------------------------------
 
@@ -486,30 +438,6 @@ async def test_timer_tick_error_marks_all_members(hass: HomeAssistant) -> None:
 
     assert a.last_update_success is False
     assert b.last_update_success is False
-
-
-async def test_timer_tick_not_modified_keeps_prior_data(
-    hass: HomeAssistant, monitor_fixture
-) -> None:
-    """A 304 tick leaves each member's existing data untouched."""
-    group, coordinator = _group_with_member(hass)
-    headers = {"ETag": '"abc"'}
-    resp_200 = _ok_response(monitor_fixture, headers=headers)
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = headers
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(side_effect=AssertionError("no body on 304"))
-
-    mock_get = MagicMock(
-        side_effect=[make_response_cm(resp_200), make_response_cm(resp_304)]
-    )
-    with _patch_get(group, mock_get):
-        await group._async_timer_tick(None)
-        first_data = coordinator.data
-        await group._async_timer_tick(None)
-
-    assert coordinator.data is first_data
 
 
 async def test_timer_tick_no_members_noop(hass: HomeAssistant) -> None:

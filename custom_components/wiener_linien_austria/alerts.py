@@ -6,10 +6,29 @@ Both user-visible alert types are surfaced by the same endpoint, just via the
 - `stoerunglang` — line/route disruptions (scope: city-wide)
 - `aufzugsinfo` — elevator out-of-service notices (scope: per station + per RBL)
 
+Both names travel in ONE request. `name=` may be repeated (Schnittstellen-
+dokumentation V1.5 §4.2.1), and the response tags every entry with a
+`refTrafficInfoCategoryId` that resolves through `data.trafficInfoCategories`.
+That halves the alert request count (576/day to 288/day) and — the reason it
+actually matters — removes a 15-second stall from the domain lock every cycle:
+two `_fetch_info_list` calls gathered concurrently both took
+`async_enforce_domain_cooldown`, which sleeps *inside* the lock by design, so
+the second always waited its full slice while any `/monitor` tick queued behind
+it. Category ids are assigned per response and NOT in request order (measured
+2026-09-07: `stoerunglang` sent first came back as id 2), so always resolve
+through the category table rather than assuming an ordering.
+
 Fetched on a slow (5 min) domain-wide cadence — these don't change any faster
 than a few times an hour and aggregating across all entries keeps the
 integration's outbound request rate trivial. Each sensor filters the cached
 lists by its own (lines, RBLs) at attribute-read time.
+
+Two further categories exist and are deliberately not requested yet:
+`stoerungkurz` (stop-display short text; every live entry carries
+`relatedStops`) and `fahrtreppeninfo` (escalator outages; parses with the same
+shape as `aufzugsinfo`). Both would ride along for zero extra requests, but
+they need sensor attributes, translations and card rendering to be useful, so
+they are their own change.
 """
 
 from __future__ import annotations
@@ -24,7 +43,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
-    ALERT_CACHE_VALIDATORS_KEY,
+    ALERT_FEED_ELEVATOR,
+    ALERT_FEED_TRAFFIC,
     ALERTS_SEQ_KEY,
     API_BASE_URL,
     DOMAIN,
@@ -34,7 +54,7 @@ from .const import (
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
-from .http import CacheValidators, base_request_headers
+from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
 
 _LOGGER = logging.getLogger(__name__)
@@ -139,60 +159,45 @@ class ElevatorInfo:
 # ---------------------------------------------------------------------------
 
 
-# Sentinels for 304 responses + soft failures. Dedicated classes so the
-# return-type union narrows under `mypy --strict` and callers can
-# distinguish "kept cache (304)" / "kept cache (fetch failed)" from
-# "200 returned an empty list" — the third case must overwrite the
-# cache (resolved disruption was the only entry), the first two must
-# leave it alone.
-class _NotModified:
-    """Sentinel type for 304 Not Modified responses."""
-
-
+# Sentinel for soft failures. A dedicated class so the return-type union
+# narrows under `mypy --strict` and callers can distinguish "kept cache
+# (fetch failed)" from "200 returned an empty list" — the latter must
+# overwrite the cache (a resolved disruption was the only entry), the
+# former must leave it alone.
 class _FetchFailed:
     """Sentinel type for fetch / parse failures."""
 
 
-_NOT_MODIFIED: Final[_NotModified] = _NotModified()
 _FETCH_FAILED: Final[_FetchFailed] = _FetchFailed()
 
+# Feed names requested in the single combined call, in a fixed order so the
+# request URL is stable across ticks.
+_REQUESTED_FEEDS: Final[tuple[str, ...]] = (ALERT_FEED_TRAFFIC, ALERT_FEED_ELEVATOR)
 
-async def _fetch_info_list(
-    hass: HomeAssistant, name: str
-) -> list[dict[str, Any]] | _NotModified | _FetchFailed:
-    """GET /trafficInfoList?name=<name> with conditional-GET caching.
 
-    Returns:
-    - `list[dict]`        on a successful 200 (possibly empty)
-    - `_NOT_MODIFIED`     on a 304 (cache still fresh)
-    - `_FETCH_FAILED`     on any fetch/parse failure (advisory, never fatal)
+async def _fetch_info_lists(
+    hass: HomeAssistant,
+) -> dict[str, list[dict[str, Any]]] | _FetchFailed:
+    """GET /trafficInfoList once for every feed name we care about.
+
+    Returns a `{feed name: entries}` dict on a successful 200 — with a key
+    present for every requested feed, empty list included, because the
+    upstream omits `trafficInfoCategories` entries that currently have no
+    disruptions. Returns `_FETCH_FAILED` on any fetch/parse failure
+    (advisory, never fatal — the caller keeps the previous cache).
     """
     session = async_get_clientsession(hass)
     url = f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}"
-    # Use `get` not `setdefault` — if the domain dict was torn down
-    # during a prior await, don't recreate it just to stash validators.
-    # Caller (`async_refresh_alerts`) already guarded on entry; this is
-    # belt-and-braces for an unload that races mid-fetch.
-    domain_data = hass.data.get(DOMAIN)
-    if not domain_data:
-        return _FETCH_FAILED
-    validators_by_name: dict[str, CacheValidators] = domain_data.setdefault(
-        ALERT_CACHE_VALIDATORS_KEY, {}
-    )
-    validators = validators_by_name.setdefault(name, CacheValidators())
     headers = base_request_headers(USER_AGENT)
-    headers.update(validators.to_request_headers())
+    names = ",".join(_REQUESTED_FEEDS)
     try:
         await async_enforce_domain_cooldown(hass)
         async with session.get(
             url,
-            params=[("name", name)],
+            params=[("name", name) for name in _REQUESTED_FEEDS],
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=15),
         ) as resp:
-            if resp.status == 304:
-                validators.update_from_response(resp)
-                return _NOT_MODIFIED
             resp.raise_for_status()
             body = await resp.json()
             if not isinstance(body, dict):
@@ -201,15 +206,11 @@ async def _fetch_info_list(
             if message.get("messageCode") not in (1, None):
                 _LOGGER.debug(
                     "trafficInfoList?name=%s returned non-OK messageCode %s",
-                    name,
+                    names,
                     message.get("messageCode"),
                 )
                 return _FETCH_FAILED
-            # Only capture validators after the body has fully validated —
-            # never for an error reply we wouldn't accept anyway.
-            validators.update_from_response(resp)
-            infos = (body.get("data") or {}).get("trafficInfos") or []
-            return [x for x in infos if isinstance(x, dict)]
+            return _split_by_category(body.get("data") or {})
     except asyncio.CancelledError:
         # HA shutting down with a fetch in flight. Re-raise without logging:
         # the user can do nothing about it, and the noise buries real faults.
@@ -220,7 +221,7 @@ async def _fetch_info_list(
         # wrong content type. Rare and actionable, so keep the traceback.
         # Must be caught before ClientError below: ContentTypeError is a
         # subclass of ClientResponseError, which is a subclass of ClientError.
-        _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
+        _LOGGER.warning("Failed to refresh %s alerts", names, exc_info=True)
         return _FETCH_FAILED
     except (TimeoutError, aiohttp.ClientError) as err:
         # Transient upstream trouble — the OGD endpoint sheds load with
@@ -228,15 +229,51 @@ async def _fetch_info_list(
         # previous cache survives, so there is nothing for the user to act
         # on. Debug, not warning: a traceback per occurrence buried real
         # faults (29 of them in one week on an otherwise healthy install).
-        _LOGGER.debug("Failed to refresh %s alerts: %s", name, err)
+        _LOGGER.debug("Failed to refresh %s alerts: %s", names, err)
         return _FETCH_FAILED
+
+
+def _split_by_category(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Route a combined `trafficInfoList` payload back into per-feed lists.
+
+    `data.trafficInfoCategories` maps `id` to `name`; every entry in
+    `data.trafficInfos` points at one through `refTrafficInfoCategoryId`.
+    The ids are assigned per response and carry no relationship to the order
+    the `name=` params were sent in, so the table is the only safe route.
+
+    Every requested feed gets a key even when upstream omits its category —
+    the docs are explicit that a category appears only when it currently has
+    disruptions, and "no disruptions" must clear the cache rather than
+    preserve a resolved one. Entries whose category is unknown (a fifth
+    category appearing upstream, or a malformed row) are dropped: we only
+    ever asked for the feeds in `_REQUESTED_FEEDS`.
+    """
+    names_by_id: dict[int, str] = {}
+    for category in data.get("trafficInfoCategories") or []:
+        if not isinstance(category, dict):
+            continue
+        cat_id = category.get("id")
+        cat_name = category.get("name")
+        if isinstance(cat_id, int) and isinstance(cat_name, str):
+            names_by_id[cat_id] = cat_name
+
+    out: dict[str, list[dict[str, Any]]] = {name: [] for name in _REQUESTED_FEEDS}
+    for entry in data.get("trafficInfos") or []:
+        if not isinstance(entry, dict):
+            continue
+        cat_id = entry.get("refTrafficInfoCategoryId")
+        if not isinstance(cat_id, int):
+            continue
+        feed = names_by_id.get(cat_id)
+        if feed is not None and feed in out:
+            out[feed].append(entry)
+    return out
 
 
 async def async_refresh_alerts(hass: HomeAssistant) -> None:
     """Refresh both traffic and elevator alerts into hass.data.
 
-    Safe to call whenever; failures keep the previous cache, and a 304
-    response from the conditional-GET path also keeps it untouched.
+    Safe to call whenever; a failed fetch keeps the previous cache.
 
     Bails immediately when the domain has been torn down (no entries
     left). The periodic timer is unsubscribed in `async_unload_entry`,
@@ -248,51 +285,45 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
         return
 
-    traffic_result, elevator_result = await asyncio.gather(
-        _fetch_info_list(hass, "stoerunglang"),
-        _fetch_info_list(hass, "aufzugsinfo"),
-    )
+    result = await _fetch_info_lists(hass)
 
-    # Re-check after the gather — `await` boundaries are cancellation
+    # Re-check after the fetch — `await` boundaries are cancellation
     # points, and unload may have run while we were waiting on the
     # network. Same risk as the entry guard above.
     domain_data = hass.data.get(DOMAIN)
     if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
         return
 
-    # 304 Not Modified → leave the existing cache exactly as it was.
-    # Fetch/parse failure → also leave it. Only an actual successful
-    # 200 (possibly empty) overwrites — a legitimately empty list must
-    # clear stale resolved entries.
-    traffic_not_modified = isinstance(traffic_result, _NotModified)
-    elevator_not_modified = isinstance(elevator_result, _NotModified)
-
-    if isinstance(traffic_result, list):
-        parsed = [_parse_traffic(x) for x in traffic_result]
+    # Fetch/parse failure → leave both caches exactly as they were. Only an
+    # actual successful 200 (possibly empty) overwrites — a legitimately
+    # empty list must clear stale resolved entries. Both feeds now travel in
+    # one request, so they succeed or fail together; there is no longer a
+    # mixed case to reason about.
+    failed = isinstance(result, _FetchFailed)
+    if not isinstance(result, _FetchFailed):
+        parsed = [_parse_traffic(x) for x in result[ALERT_FEED_TRAFFIC]]
         # Drop resolved entries — upstream keeps them in the feed for a
         # while after the disruption ends, but users don't want them on
         # the card.
         domain_data[TRAFFIC_INFO_KEY] = [t for t in parsed if t.status == "active"]
-    elif TRAFFIC_INFO_KEY not in domain_data:
-        domain_data[TRAFFIC_INFO_KEY] = []
+        domain_data[ELEVATOR_INFO_KEY] = [
+            _parse_elevator(x) for x in result[ALERT_FEED_ELEVATOR]
+        ]
+    else:
+        domain_data.setdefault(TRAFFIC_INFO_KEY, [])
+        domain_data.setdefault(ELEVATOR_INFO_KEY, [])
 
-    if isinstance(elevator_result, list):
-        domain_data[ELEVATOR_INFO_KEY] = [_parse_elevator(x) for x in elevator_result]
-    elif ELEVATOR_INFO_KEY not in domain_data:
-        domain_data[ELEVATOR_INFO_KEY] = []
-
-    # Bump even on the 304/no-change path: the sensor cache treats
-    # "alerts seq advanced" as "rebuild," and that's the cheapest signal
-    # we have. A spurious rebuild every ~5 min is fine; missing a real
-    # change for hours because the cache key didn't move is not.
+    # Bump even on the failure path: the sensor cache treats "alerts seq
+    # advanced" as "rebuild," and that's the cheapest signal we have. A
+    # spurious rebuild every ~5 min is fine; missing a real change for hours
+    # because the cache key didn't move is not.
     domain_data[ALERTS_SEQ_KEY] = int(domain_data.get(ALERTS_SEQ_KEY, 0)) + 1
 
     _LOGGER.debug(
-        "Alerts refreshed: %d traffic, %d elevator (traffic_304=%s, elevator_304=%s)",
+        "Alerts refreshed: %d traffic, %d elevator (failed=%s)",
         len(domain_data.get(TRAFFIC_INFO_KEY, [])),
         len(domain_data.get(ELEVATOR_INFO_KEY, [])),
-        traffic_not_modified,
-        elevator_not_modified,
+        failed,
     )
 
 

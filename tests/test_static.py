@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
+from homeassistant.util import dt as dt_util
 
+from custom_components.wiener_linien_austria.const import (
+    DOMAIN,
+    DOMAIN_COOLDOWN_SECONDS,
+    DOMAIN_LAST_CALL_KEY,
+    USER_AGENT,
+)
 from custom_components.wiener_linien_austria.static import (
     STORE_KEY,
     STORE_VERSION,
@@ -361,14 +369,13 @@ async def test_async_refresh_catalogue_store_save_error_still_returns_fresh(
 
 
 # ---------------------------------------------------------------------------
-# _fetch_and_build: live network simulation, conditional GET branches
+# _fetch_and_build: live network simulation
 # ---------------------------------------------------------------------------
 
 
-def _csv_response(text: str, *, etag: str = '"v1"', status: int = 200) -> MagicMock:
+def _csv_response(text: str, *, status: int = 200) -> MagicMock:
     resp = MagicMock()
     resp.status = status
-    resp.headers = {"ETag": etag, "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT"}
     resp.raise_for_status = MagicMock()
     resp.text = AsyncMock(return_value=text)
     return resp
@@ -378,11 +385,11 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     """Cold-start: every CSV comes back 200, parse + merge into a catalogue."""
     from custom_components.wiener_linien_austria import static as static_mod
 
-    haltestellen_resp = _csv_response(HALTESTELLEN_CSV, etag='"halte-v1"')
-    haltepunkte_resp = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v1"')
-    linien_resp = _csv_response(LINIEN_CSV, etag='"linien-v1"')
-    fahr_resp = _csv_response(FAHR_CSV, etag='"fahr-v1"')
-    routes_resp = _csv_response(ROUTES_CSV, etag='"routes-v1"')
+    haltestellen_resp = _csv_response(HALTESTELLEN_CSV)
+    haltepunkte_resp = _csv_response(HALTEPUNKTE_CSV)
+    linien_resp = _csv_response(LINIEN_CSV)
+    fahr_resp = _csv_response(FAHR_CSV)
+    routes_resp = _csv_response(ROUTES_CSV)
 
     fake_session = MagicMock()
     fake_session.get = MagicMock(
@@ -403,12 +410,6 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
 
     assert sorted(catalogue.stations_by_diva.keys()) == [60200123, 60201012]
     assert sorted(catalogue.stations_by_diva[60201012].rbls) == [4111, 4118]
-    # Validators captured for the next conditional GET.
-    assert catalogue.validators["haltestellen"].etag == '"halte-v1"'
-    assert catalogue.validators["haltepunkte"].etag == '"punkte-v1"'
-    assert catalogue.validators["linien"].etag == '"linien-v1"'
-    assert catalogue.validators["fahrwegverlaeufe"].etag == '"fahr-v1"'
-    assert catalogue.validators["routes"].etag == '"routes-v1"'
     # Trip-pattern index built from the fresh linien + fahrwegverlaeufe,
     # enriched with the GTFS route colours from the fresh routes payload.
     assert catalogue.trip_patterns is not None
@@ -416,116 +417,114 @@ async def test_fetch_and_build_both_csvs_fresh(hass: HomeAssistant) -> None:
     assert catalogue.trip_patterns.colors_by_line["U1"] == "E3000F"
 
 
-async def test_fetch_and_build_all_304_returns_prior_unchanged(
-    hass: HomeAssistant,
-) -> None:
-    """Every CSV unchanged → return prior catalogue verbatim, no rewrite."""
-    from custom_components.wiener_linien_austria import static as static_mod
-    from custom_components.wiener_linien_austria.http import CacheValidators
+# ---------------------------------------------------------------------------
+# Domain cooldown + request headers on the static burst
+# ---------------------------------------------------------------------------
 
-    prior = _sample()
-    prior.validators = {
-        "haltestellen": CacheValidators(etag='"halte-v1"'),
-        "haltepunkte": CacheValidators(etag='"punkte-v1"'),
-        "linien": CacheValidators(etag='"linien-v1"'),
-        "fahrwegverlaeufe": CacheValidators(etag='"fahr-v1"'),
-        "routes": CacheValidators(etag='"routes-v1"'),
-    }
-    prior.trip_patterns = _build_sample_index()
 
-    def _not_modified() -> MagicMock:
-        nm = MagicMock()
-        nm.status = 304
-        nm.headers = {}
-        nm.raise_for_status = MagicMock()
-        nm.text = AsyncMock(side_effect=AssertionError("must not call .text() on 304"))
-        return nm
-
-    fake_session = MagicMock()
-    fake_session.get = MagicMock(
+def _all_csvs_ok() -> MagicMock:
+    """A fake session serving every one of the five static files."""
+    session = MagicMock()
+    session.get = MagicMock(
         side_effect=[
-            make_response_cm(_not_modified()),
-            make_response_cm(_not_modified()),
-            make_response_cm(_not_modified()),
-            make_response_cm(_not_modified()),
-            make_response_cm(_not_modified()),
+            make_response_cm(_csv_response(HALTESTELLEN_CSV)),
+            make_response_cm(_csv_response(HALTEPUNKTE_CSV)),
+            make_response_cm(_csv_response(LINIEN_CSV)),
+            make_response_cm(_csv_response(FAHR_CSV)),
+            make_response_cm(_csv_response(ROUTES_CSV)),
         ]
     )
-
-    with patch(
-        "custom_components.wiener_linien_austria.static.async_get_clientsession",
-        return_value=fake_session,
-    ):
-        result = await static_mod._fetch_and_build(hass, prior=prior)
-
-    # Same object — identity check, the optimisation we want to lock in.
-    assert result is prior
+    return session
 
 
-async def test_fetch_and_build_one_304_one_fresh(
-    hass: HomeAssistant,
-) -> None:
-    """Half-and-half: haltestellen 304, haltepunkte fresh — re-merge correctly.
+@pytest.mark.real_domain_cooldown
+async def test_fetch_and_build_takes_the_domain_cooldown(hass: HomeAssistant) -> None:
+    """The weekly static burst waits out the domain cooldown before firing.
 
-    This is the trickiest branch in static._fetch_and_build. The prior
-    station list is reused, but RBLs are rebuilt from the freshly-fetched
-    haltepunkte CSV. A bug here would either drop stations entirely or
-    duplicate RBLs across loads. The trip-pattern CSVs are 304 too so
-    the prior trip-pattern index carries forward unchanged.
+    Regression guard: `static.py` used to bypass `rate_limit` entirely, so a
+    weekly five-file burst could land directly on top of a `/monitor` tick
+    while `rate_limit.py`'s docstring claimed to cover every outbound call.
     """
     from custom_components.wiener_linien_austria import static as static_mod
-    from custom_components.wiener_linien_austria.http import CacheValidators
 
-    # Prior already has Stephansplatz with RBLs [9999] (intentionally weird so
-    # we can detect whether the merge correctly REPLACED them with [4111, 4118]).
-    prior_stations = _parse_haltestellen(HALTESTELLEN_CSV)
-    prior_stations[60201012].rbls = [9999]  # placeholder
-    prior = StaticCatalogue(
-        stations_by_diva=prior_stations,
-        last_fetched="2026-04-20T12:00:00+00:00",
-        validators={
-            "haltestellen": CacheValidators(etag='"halte-v1"'),
-            "haltepunkte": CacheValidators(etag='"punkte-v1"'),
-            "linien": CacheValidators(etag='"linien-v1"'),
-            "fahrwegverlaeufe": CacheValidators(etag='"fahr-v1"'),
-            "routes": CacheValidators(etag='"routes-v1"'),
-        },
-        trip_patterns=_build_sample_index(),
+    elapsed = 1.0
+    hass.data.setdefault(DOMAIN, {})[DOMAIN_LAST_CALL_KEY] = (
+        dt_util.utcnow() - timedelta(seconds=elapsed)
     )
 
-    def _304() -> MagicMock:
-        nm = MagicMock()
-        nm.status = 304
-        nm.headers = {}
-        nm.raise_for_status = MagicMock()
-        nm.text = AsyncMock(side_effect=AssertionError("304 has no body"))
-        return nm
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static.async_get_clientsession",
+            return_value=_all_csvs_ok(),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
+            new_callable=AsyncMock,
+        ) as mock_sleep,
+    ):
+        await static_mod._fetch_and_build(hass, prior=None)
 
-    punkte_fresh = _csv_response(HALTEPUNKTE_CSV, etag='"punkte-v2"')
+    mock_sleep.assert_awaited_once()
+    assert abs(mock_sleep.call_args.args[0] - (DOMAIN_COOLDOWN_SECONDS - elapsed)) < 0.5
 
-    fake_session = MagicMock()
-    fake_session.get = MagicMock(
-        side_effect=[
-            make_response_cm(_304()),
-            make_response_cm(punkte_fresh),
-            make_response_cm(_304()),
-            make_response_cm(_304()),
-            make_response_cm(_304()),
-        ]
+
+@pytest.mark.real_domain_cooldown
+async def test_fetch_and_build_takes_the_cooldown_once_not_per_file(
+    hass: HomeAssistant,
+) -> None:
+    """One cooldown slot for the whole burst, not one per file.
+
+    Taking it per file would serialise a fail-soft background refresh into
+    5 x DOMAIN_COOLDOWN_SECONDS of held lock and stall every `/monitor` tick
+    behind it — strictly worse than the bypass it replaced.
+    """
+    from custom_components.wiener_linien_austria import static as static_mod
+
+    hass.data.setdefault(DOMAIN, {})[DOMAIN_LAST_CALL_KEY] = (
+        dt_util.utcnow() - timedelta(seconds=1.0)
     )
+    session = _all_csvs_ok()
 
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static.async_get_clientsession",
+            return_value=session,
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.rate_limit.asyncio.sleep",
+            new_callable=AsyncMock,
+        ) as mock_sleep,
+    ):
+        await static_mod._fetch_and_build(hass, prior=None)
+
+    assert session.get.call_count == 5
+    assert mock_sleep.await_count == 1
+
+
+async def test_static_downloads_send_user_agent_and_gzip(
+    hass: HomeAssistant,
+) -> None:
+    """Every static download carries the canonical User-Agent + gzip.
+
+    The fourth outbound call site alongside the three in test_user_agent.py.
+    """
+    from custom_components.wiener_linien_austria import static as static_mod
+
+    session = _all_csvs_ok()
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_clientsession",
-        return_value=fake_session,
+        return_value=session,
     ):
-        result = await static_mod._fetch_and_build(hass, prior=prior)
+        await static_mod._fetch_and_build(hass, prior=None)
 
-    # Stations preserved (haltestellen 304), RBLs rebuilt from fresh haltepunkte.
-    assert sorted(result.stations_by_diva.keys()) == [60200123, 60201012]
-    assert sorted(result.stations_by_diva[60201012].rbls) == [4111, 4118]
-    # Trip-pattern index carried forward from prior (both pattern CSVs 304).
-    assert result.trip_patterns is not None
-    assert "U1" in result.trip_patterns.lines_by_label
+    assert session.get.call_count == 5
+    for call in session.get.call_args_list:
+        headers = call.kwargs["headers"]
+        assert headers["User-Agent"] == USER_AGENT
+        assert headers["Accept-Encoding"] == "gzip"
+        # No conditional-GET validators: the upstream never answers 304.
+        assert "If-None-Match" not in headers
+        assert "If-Modified-Since" not in headers
 
 
 async def test_async_refresh_catalogue_keeps_cache_on_failure(

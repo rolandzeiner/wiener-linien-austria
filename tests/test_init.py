@@ -15,7 +15,6 @@ import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.const import (
-    ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_UNSUB_KEY,
     DOMAIN,
     DOMAIN_LAST_CALL_KEY,
@@ -50,7 +49,6 @@ async def test_unload_last_entry_tears_down_domain_state(
     # Seed a cache entry to verify it's dropped on last-entry unload.
     domain_data[TRAFFIC_INFO_KEY] = ["sentinel"]
     domain_data[ELEVATOR_INFO_KEY] = ["sentinel"]
-    domain_data[ALERT_CACHE_VALIDATORS_KEY] = {"x": "y"}
     domain_data[DOMAIN_LAST_CALL_KEY] = "fake-ts"
 
     assert await hass.config_entries.async_unload(entry.entry_id)
@@ -61,7 +59,6 @@ async def test_unload_last_entry_tears_down_domain_state(
     for key in (
         TRAFFIC_INFO_KEY,
         ELEVATOR_INFO_KEY,
-        ALERT_CACHE_VALIDATORS_KEY,
         DOMAIN_LAST_CALL_KEY,
     ):
         assert key not in domain_data, f"{key} should be dropped on last unload"

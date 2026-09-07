@@ -26,7 +26,6 @@ from .alerts import async_refresh_alerts
 from .batch import MonitorBatchGroup
 from .card_registration import JSModuleRegistration
 from .const import (
-    ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_SECONDS,
     ALERTS_REFRESH_UNSUB_KEY,
     BATCH_REGISTRY_KEY,
@@ -360,15 +359,14 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     if isinstance(registry, dict):
         for group in registry.values():
             group.stop()
-    # Drop the rest of the domain-wide state — caches and validators
-    # are stale by definition once no entry is around to consume them.
+    # Drop the rest of the domain-wide state — the caches are stale by
+    # definition once no entry is around to consume them.
     # RESOURCES_REGISTERED_KEY pops too so the next first-entry boot
     # re-runs JSModuleRegistration.async_register — covers the user's
     # delete-last-entry + async_remove_entry-tore-down-resources case.
     for stale_key in (
         TRAFFIC_INFO_KEY,
         ELEVATOR_INFO_KEY,
-        ALERT_CACHE_VALIDATORS_KEY,
         DOMAIN_LAST_CALL_KEY,
         LOCK_KEY,
         LOCK_LOOP_KEY,

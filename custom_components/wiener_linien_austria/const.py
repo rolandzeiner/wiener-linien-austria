@@ -94,10 +94,11 @@ ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
 # refresh on their own ~5-min cadence (independent of the per-stop
 # coordinator tick), the sensor sees the bump and rebuilds.
 ALERTS_SEQ_KEY: Final = "alerts_seq"
-# Cache validators (ETag / Last-Modified) per alert feed, captured from
-# the previous /trafficInfoList response so unchanged feeds come back
-# as 304 Not Modified instead of full bodies.
-ALERT_CACHE_VALIDATORS_KEY: Final = "alert_cache_validators"
+# `/trafficInfoList` feed names. Both travel as repeated `name=` params in
+# ONE request; the response tags each entry with a `refTrafficInfoCategoryId`
+# resolved through `data.trafficInfoCategories`. See alerts.py.
+ALERT_FEED_TRAFFIC: Final = "stoerunglang"
+ALERT_FEED_ELEVATOR: Final = "aufzugsinfo"
 # Reference-count of live config entries — used to drive the domain-wide
 # cleanup (cancelling the alerts + static refresh timers, dropping the
 # in-memory caches) when the *last* entry is removed.
