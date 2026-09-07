@@ -28,8 +28,8 @@ import {
   formatDirectionPillLabel,
   lineDirKey,
   linesAtStop,
-  pairsAtStop,
   tripletsAtStop,
+  walkTimePairs,
   type Triplet,
 } from "../utils/departures.js";
 import { lineTypeIcon } from "../utils/mot.js";
@@ -193,7 +193,7 @@ export function renderStopBlock(
             ? renderOverrides(stop, opts, cb, { triplets, picked, lines, colorOf, dirStrings })
             : renderDirection(stop, opts, cb, { triplets, picked, lines, dirStrings })
           : nothing}
-        ${!missing ? renderWalkTimes(stop, opts, cb, { attrs, picked, colorOf }) : nothing}
+        ${!missing ? renderWalkTimes(stop, opts, cb, { attrs, picked, colorOf, lines, dirStrings }) : nothing}
       </div>
     </section>
   `;
@@ -453,6 +453,12 @@ function renderOverrides(
         const hasH = avail.has("H");
         const hasR = avail.has("R");
         const onlyOne = avail.size === 1;
+        // No live departures at all for this line — a nightline in the
+        // afternoon — is "we don't know", not "not served". Disabling both
+        // buttons there left tracked lines permanently unconfigurable
+        // outside the hours they run. An empty set enables both; a set that
+        // genuinely says one-way still disables the other.
+        const unknown = avail.size === 0;
         const aria = (d: "H" | "R" | null): string =>
           opts
             .et("per_line_direction_aria")
@@ -472,7 +478,7 @@ function renderOverrides(
               ${dirButton({
                 label: dirStrings("H").short,
                 active: cur === "H" || (cur === null && onlyOne && hasH),
-                disabled: !hasH,
+                disabled: !unknown && !hasH,
                 compact: true,
                 title: terminiFor(triplets, "H", line).join(" / ") || opts.t("dir_h"),
                 ariaLabel: aria("H"),
@@ -481,7 +487,7 @@ function renderOverrides(
               ${dirButton({
                 label: dirStrings("R").short,
                 active: cur === "R" || (cur === null && onlyOne && hasR),
-                disabled: !hasR,
+                disabled: !unknown && !hasR,
                 compact: true,
                 title: terminiFor(triplets, "R", line).join(" / ") || opts.t("dir_r"),
                 ariaLabel: aria("R"),
@@ -513,9 +519,11 @@ function renderWalkTimes(
     attrs: WienerLinienAttrs | undefined;
     picked: Set<string>;
     colorOf: (l: string) => string;
+    lines: string[];
+    dirStrings: (d: "H" | "R") => { full: string; short: string };
   },
 ): TemplateResult | typeof nothing {
-  const { attrs, picked, colorOf } = ctx;
+  const { attrs, picked, colorOf, lines, dirStrings } = ctx;
   const lineDirs = stop.line_directions ?? {};
   const stopDir = stop.direction ?? null;
 
@@ -523,10 +531,11 @@ function renderWalkTimes(
   // `towards` flips poll-to-poll on branching termini, so a triple-keyed
   // threshold would silently miss every vehicle labelled with the other
   // terminus. See lineDirKey.
-  const pairs = pairsAtStop(attrs).filter((p) => {
-    if (picked.size > 0 && !picked.has(p.line)) return false;
-    const eff = lineDirs[p.line] ?? stopDir;
-    return !eff || p.direction === eff;
+  const pairs = walkTimePairs(attrs, {
+    lines,
+    picked,
+    lineDirections: lineDirs,
+    stopDirection: stopDir,
   });
   if (!pairs.length) return nothing;
 
@@ -541,7 +550,11 @@ function renderWalkTimes(
         ${pairs.map((p) => {
           const key = lineDirKey(p.line, p.direction);
           const val = stop.walk_times?.[key];
-          const terminus = p.termini.join(" / ");
+          const terminus = p.termini.length
+            ? p.termini.join(" / ")
+            : p.direction === "H" || p.direction === "R"
+              ? dirStrings(p.direction).full
+              : "";
           const aria = opts
             .et("walk_time_aria")
             .replace("{line}", p.line)

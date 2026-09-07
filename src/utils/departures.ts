@@ -217,3 +217,55 @@ export function shouldShowStopsAhead(
     d.stops_ahead.length > 0
   );
 }
+
+/**
+ * The (line, direction) rows the walk-time control offers for one stop.
+ *
+ * Live departures supply real termini. A line the user tracks that has no
+ * live departures right now — a nightline in the afternoon — still gets
+ * rows, because otherwise its walk time is only configurable during the
+ * hours it actually runs, which for a nightline is the middle of the
+ * night. Those synthetic rows carry no termini (there is no data to name
+ * one), so the caller labels them with the direction instead.
+ *
+ * Rows are filtered to the direction the line resolves to: its own
+ * override, else the stop-wide setting, else both.
+ */
+export function walkTimePairs(
+  attrs: WienerLinienAttrs | undefined,
+  opts: {
+    /** Every line at this stop, from the tracked-line list. */
+    lines: string[];
+    /** Lines the user narrowed to. Empty means "all of them". */
+    picked: ReadonlySet<string>;
+    lineDirections: Record<string, "H" | "R">;
+    stopDirection: "H" | "R" | null;
+  },
+): Pair[] {
+  const { lines, picked, lineDirections, stopDirection } = opts;
+  const resolved = (line: string): "H" | "R" | null =>
+    lineDirections[line] ?? stopDirection;
+
+  const live = pairsAtStop(attrs).filter((p) => {
+    if (picked.size > 0 && !picked.has(p.line)) return false;
+    const eff = resolved(p.line);
+    return !eff || p.direction === eff;
+  });
+
+  const seen = new Set(live.map((p) => p.line));
+  const effective = picked.size > 0 ? lines.filter((l) => picked.has(l)) : lines;
+  const synthetic: Pair[] = [];
+  for (const line of effective) {
+    if (seen.has(line)) continue;
+    const eff = resolved(line);
+    for (const dir of eff ? [eff] : (["H", "R"] as const)) {
+      synthetic.push({ line, direction: dir, type: "", termini: [] });
+    }
+  }
+
+  return [...live, ...synthetic].sort((a, b) =>
+    a.line === b.line
+      ? a.direction.localeCompare(b.direction)
+      : a.line.localeCompare(b.line),
+  );
+}

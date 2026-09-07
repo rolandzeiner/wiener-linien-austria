@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { filterDepartures, lineDirKey, shouldShowStopsAhead } from "./departures.js";
+import {
+  filterDepartures,
+  lineDirKey,
+  shouldShowStopsAhead,
+  walkTimePairs,
+} from "./departures.js";
 import type { DepartureAttr } from "../types.js";
 
 function dep(over: Partial<DepartureAttr> = {}): DepartureAttr {
@@ -143,5 +148,121 @@ describe("shouldShowStopsAhead", () => {
 
   it("defaults to on when the toggle is unset", () => {
     expect(shouldShowStopsAhead(undefined, withStops)).toBe(true);
+  });
+});
+
+describe("walkTimePairs — rows the walk-time control offers", () => {
+  const NONE = new Set<string>();
+  // Westbahnhof at 15:00: U3 and U6 are running, the N6 nightline is not.
+  const daytime = {
+    departures: [
+      dep({ line: "U3", direction: "H", towards: "Simmering" }),
+      dep({ line: "U3", direction: "R", towards: "Ottakring" }),
+      dep({ line: "U6", direction: "H", towards: "Floridsdorf" }),
+      dep({ line: "U6", direction: "R", towards: "Siebenhirten" }),
+    ],
+    tracked_lines: ["N6", "U3", "U6"],
+  } as never;
+  const tracked = ["N6", "U3", "U6"];
+
+  it("gives a tracked nightline rows even with no live departures", () => {
+    // The bug: N6 got no row at all, so its walk time could only be set
+    // between roughly 00:30 and 05:00, when the line actually runs.
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: NONE,
+      lineDirections: {},
+      stopDirection: null,
+    });
+    const n6 = rows.filter((p) => p.line === "N6");
+    expect(n6.map((p) => p.direction)).toEqual(["H", "R"]);
+  });
+
+  it("leaves synthetic rows without termini, so the caller names them", () => {
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: NONE,
+      lineDirections: {},
+      stopDirection: null,
+    });
+    expect(rows.find((p) => p.line === "N6")?.termini).toEqual([]);
+    // A line with live data keeps its real terminus.
+    expect(
+      rows.find((p) => p.line === "U3" && p.direction === "H")?.termini,
+    ).toEqual(["Simmering"]);
+  });
+
+  it("does not duplicate a line that already has live rows", () => {
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: NONE,
+      lineDirections: {},
+      stopDirection: null,
+    });
+    expect(rows.filter((p) => p.line === "U3")).toHaveLength(2);
+    expect(rows).toHaveLength(6);
+  });
+
+  it("narrows a synthetic line to the stop-wide direction", () => {
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: NONE,
+      lineDirections: {},
+      stopDirection: "H",
+    });
+    expect(rows.filter((p) => p.line === "N6").map((p) => p.direction)).toEqual([
+      "H",
+    ]);
+  });
+
+  it("lets a per-line override beat the stop-wide direction", () => {
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: NONE,
+      lineDirections: { N6: "R" },
+      stopDirection: "H",
+    });
+    expect(rows.filter((p) => p.line === "N6").map((p) => p.direction)).toEqual([
+      "R",
+    ]);
+  });
+
+  it("honours the user's line selection for synthetic rows too", () => {
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: new Set(["U3"]),
+      lineDirections: {},
+      stopDirection: null,
+    });
+    expect(rows.every((p) => p.line === "U3")).toBe(true);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("sorts by line then direction so rows do not jump between polls", () => {
+    const rows = walkTimePairs(daytime, {
+      lines: tracked,
+      picked: NONE,
+      lineDirections: {},
+      stopDirection: null,
+    });
+    expect(rows.map((p) => `${p.line}|${p.direction}`)).toEqual([
+      "N6|H",
+      "N6|R",
+      "U3|H",
+      "U3|R",
+      "U6|H",
+      "U6|R",
+    ]);
+  });
+
+  it("returns nothing when the stop tracks no lines at all", () => {
+    expect(
+      walkTimePairs(undefined, {
+        lines: [],
+        picked: NONE,
+        lineDirections: {},
+        stopDirection: null,
+      }),
+    ).toEqual([]);
   });
 });
