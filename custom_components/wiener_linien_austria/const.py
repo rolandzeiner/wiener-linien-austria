@@ -166,10 +166,11 @@ UPSTREAM_ERROR_KEYS: Final[dict[int, str]] = {
     ERR_NO_DATA: "api_no_data",
 }
 
-# MeansOfTransport values → rough categorisation for UI icons. Mirrored
-# in src/utils/mot.ts; tests/test_card_version.py:test_line_type_constants
-# asserts byte-identity. `LineType` carries the same set as a Literal so
-# call sites can declare the narrow shape without restating the strings.
+# MeansOfTransport values → rough categorisation for UI icons. Mirrored in
+# src/utils/mot.ts; test_line_type_constants_match_python_and_ts pins these
+# four names against it by name — a fifth constant added to one side only
+# would pass. `LineType` carries the same set as a Literal so call sites can
+# declare the narrow shape without restating the strings.
 LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
@@ -184,9 +185,10 @@ Direction = Literal["H", "R"]
 # Each JS file carries a `const CARD_VERSION` that must match the
 # corresponding Python constant below byte-for-byte, else the reload
 # banner loops. All three version in lockstep with the integration
-# (mirrored in src/const.ts; tests/test_card_version.py asserts both
-# directions). Each card still ships an independent WS probe so a
-# mismatch on one bundle doesn't show a banner on the others.
+# (mirrored in src/const.ts; tests/test_card_version.py checks each
+# constant here AND each literal there against manifest.json). Each card
+# still ships an independent WS probe so a mismatch on one bundle doesn't
+# show a banner on the others.
 CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
 CARD_FILENAME: Final = "wiener-linien-austria-card.js"

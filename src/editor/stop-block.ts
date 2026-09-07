@@ -44,10 +44,8 @@ import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
  *  the call site. */
 export interface StopView {
   entity: string;
-  // `?: T | undefined` is the dual form used across this codebase: it lets a
-  // caller either omit the key or assign an explicit `undefined` (retro passes
-  // `cfg.walk_times` straight through, which is `WalkTimes | undefined`). The
-  // bare `?:` form alone is rejected under `exactOptionalPropertyTypes`.
+  // Dual form (see utils/config.ts): retro passes `cfg.walk_times` straight
+  // through, and that is `WalkTimes | undefined`.
   lines?: string[] | undefined;
   direction?: "H" | "R" | undefined;
   line_directions?: Record<string, "H" | "R"> | undefined;
@@ -320,10 +318,10 @@ function renderDirection(
   // "H: Enkplatz U, Grillgasse / Floridsdorf / Michelbeuern - AKH +1".
   const scope = effective.length === 1 ? effective[0] : undefined;
   const dir = stop.direction ?? null;
-  // Same three-state surface the per-line rows use. This control is the ONLY
-  // direction picker retro has (singleLine suppresses "both"), so reading an
-  // empty set as "not served" disabled every button it owns and left a tracked
-  // nightline unconfigurable outside the hours it runs.
+  // Same three-state surface the per-line rows use — see DirectionSurface.
+  // This control is the ONLY direction picker retro has (singleLine
+  // suppresses "both"), so getting the empty case wrong disabled every
+  // button it owns.
   const surface: DirectionSurface = directionSurface(attrs, scope);
   const hasH = surface.available.has("H");
   const hasR = surface.available.has("R");
@@ -350,9 +348,7 @@ function renderDirection(
       ? formatDirectionPillLabel(terminiFor(triplets, d, scope), dirStrings(d))
       : `${dirStrings(d).short}: ${opts.et("direction_not_served")}`;
 
-  // Only claim one-way when the data actually says so. The old `!hasR` test
-  // also fired on "no data", telling the user their bidirectional nightline
-  // ran in one direction.
+  // Only claim one-way when the data actually says so — see DirectionSurface.
   const note =
     surface.oneWay !== null && effective.length === 1
       ? opts.et("direction_note_one_way").replace("{line}", effective[0] ?? "")
@@ -480,12 +476,9 @@ function renderOverrides(
     <div class="wl-group">
       <span class="wl-label">${opts.et("direction_label")}</span>
       ${effective.map((line) => {
-        // No data at all for this line — a nightline in the afternoon — is "we
-        // don't know", not "not served". Disabling both buttons there left
-        // tracked lines permanently unconfigurable outside the hours they run.
-        // An empty set enables both; a set that genuinely says one-way still
-        // disables the other. Shared with the stop-wide control above so the
-        // two can no longer answer this question differently.
+        // Empty set enables both; only a set that genuinely says one-way
+        // disables the other. See DirectionSurface. Shared with the stop-wide
+        // control above so the two can't answer this differently.
         const surface = directionSurface(attrs, line);
         const cur = effectiveDir(line);
         const hasH = surface.available.has("H");
@@ -560,10 +553,7 @@ function renderWalkTimes(
   const lineDirs = stop.line_directions ?? {};
   const stopDir = stop.direction ?? null;
 
-  // One row per (line, direction) pair, never per (line, direction, terminus):
-  // `towards` flips poll-to-poll on branching termini, so a triple-keyed
-  // threshold would silently miss every vehicle labelled with the other
-  // terminus. See lineDirKey.
+  // One row per (line, direction) pair, never per terminus — see lineDirKey.
   const pairs = walkTimePairs(attrs, {
     lines,
     picked,

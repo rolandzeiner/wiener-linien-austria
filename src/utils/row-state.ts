@@ -1,10 +1,10 @@
 // Per-row view state for the modern card.
 //
 // Extracted from `_renderRow` for the same reason as utils/retro-view.ts:
-// the decisions a row makes — is it due now, is it late, does it get a
-// flag strip — were tangled into a 165-line template method and could not
-// be tested. The label text stays in the card, because it needs the
-// card's translate callback; everything here is language-independent.
+// the decisions a row makes — due now, late, flag strip — were tangled into
+// the template and could not be tested. The label text stays in the card,
+// because it needs the translate callback; everything here is
+// language-independent.
 
 import { delayMinutes } from "./time.js";
 import type { DepartureAttr } from "../types.js";

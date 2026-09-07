@@ -10,16 +10,12 @@
 // retro card and "hide an entire column" on the flap card, one key with
 // opposite effects on two cards of the same integration.
 //
-// So every concept more than one card exposes is declared HERE, with each
-// card's value next to its sibling's. Changing a default is then a diff in
-// this file where the other card's value is on the adjacent line, rather
-// than a one-line edit in a normaliser 300 lines away from its sibling.
-//
-// The divergences below are DELIBERATE. Each is annotated with why. This
-// file documents what is, not what ought to be — do not "harmonise" a pair
-// without an explicit decision, because every default here is load-bearing
-// for existing installs: changing one silently restyles every dashboard
-// that already uses that card.
+// So every concept more than one card exposes is declared HERE, each card's
+// value on the line next to its sibling's. The divergences are DELIBERATE
+// and annotated: this file records what IS, not what ought to be. Do not
+// "harmonise" a pair without an explicit decision — every default here is
+// load-bearing, and changing one silently restyles every dashboard already
+// using that card.
 //
 // The matching assertions live in utils/flap-config.test.ts
 // ("cross-card config vocabulary"), so a change here fails a test that
@@ -43,9 +39,6 @@
 //   constant because the LED panel's layout is built for exactly two rows.
 // - Line filter. Retro takes a single `line`; modern and flap take a
 //   `lines` array per stop. Retro is a single-stop, single-line card.
-// - Attribution. Modern and flap render a CC-BY footer gated by
-//   `hide_attribution`. The retro card renders none and has no key for
-//   it. This one is a known gap, not a deliberate divergence.
 // - Visibility polarity. Modern words its toggles as `hide_*`
 //   (`hide_header`, `hide_attribution`); retro and flap use `show_*`.
 //   Flap carries both. Frozen: renaming any of them breaks saved YAML.

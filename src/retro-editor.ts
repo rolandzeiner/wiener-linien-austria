@@ -107,10 +107,8 @@ export class WienerLinienAustriaRetroCardEditor
       : undefined;
   }
 
-  /** Assign `_config` BEFORE dispatching. Custom editors do NOT receive a
-   *  re-setConfig after config-changed, so a fireEvent-only path leaves
-   *  `_config` stale and the next render reverts the form. Centralised so the
-   *  write paths cannot drift on this invariant. */
+  /** Assign `_config` BEFORE dispatching — see editor/editor-common.ts.
+   *  Centralised so the write paths cannot drift on the invariant. */
   private _commit(next: NormalisedRetroConfig): void {
     this._config = next;
     fireEvent(this, "config-changed", { config: next });
@@ -518,8 +516,6 @@ export class WienerLinienAustriaRetroCardEditor
 
   private _computeHelper = (field: { name: string }): string | undefined => {
     const { et } = this._i18n;
-    // The dependency reason belongs on the field it gates, not in a note the
-    // user has to associate by eye.
     return editorHelper(this._i18n, field.name, {
       ...(this._config?.message_ticker
         ? {}

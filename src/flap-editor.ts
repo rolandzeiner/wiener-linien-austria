@@ -12,10 +12,8 @@
 // from live departures), and the station-header strip, whose whole point is
 // that you edit it on a picture of the bar.
 //
-// Editor `_config` lifecycle gotcha, unchanged from v1: custom editors do NOT
-// receive a re-`setConfig()` after dispatching `config-changed`, so `_commit`
-// assigns `this._config` BEFORE firing. A fireEvent-only path leaves `_config`
-// stale and the next render reverts the form to its pre-change value.
+// `_commit` assigns `this._config` BEFORE firing `config-changed` — see
+// editor/editor-common.ts for why that ordering is load-bearing.
 
 import {
   LitElement,
@@ -304,11 +302,9 @@ export class WienerLinienAustriaFlapCardEditor
           { name: "show_accessibility", selector: { boolean: {} } },
           {
             name: "accessibility_only",
-            // Shown disabled with the reason in its helper rather than hidden.
-            // Hiding a dependent field makes the user hunt for a row that
-            // vanished; disabling it teaches the rule. (`visible:` would be the
-            // declarative way, but it needs frontend 2026.8 and this repo's
-            // hacs.json floor is 2025.1.0.)
+            // Disabled with the reason in its helper rather than hidden: a
+            // vanished row makes the user hunt, a disabled one teaches the
+            // rule. Why not `visible:` — see HaFormBaseSchema in types.ts.
             disabled: !cfg.show_accessibility,
             selector: { boolean: {} },
           },

@@ -11,9 +11,11 @@ Flow:
                         exactly (a partial name, a typo). Runs the catalogue
                         search over what was typed and offers the hits as a
                         shortlist, plus a "search again" escape hatch.
-  3. `select_lines`   — live `/monitor` call with the station's RBLs; each
-                        returned line × direction is presented as a pre-checked
-                        option. Submitting saves the entry.
+  3. `select_lines`   — the station's line × direction pairs, merged from a
+                        live `/monitor` call and the static catalogue, offered
+                        as an opt-in checklist. A new entry starts with nothing
+                        selected; reconfigure restores the saved picks.
+                        Submitting saves the entry.
 `async_step_reconfigure` re-enters `select_lines` for an existing entry,
 preserving unique_id. Options flow tweaks the scan interval only.
 
@@ -229,9 +231,9 @@ def _stop_options(
 
     HA renders a DROPDOWN SelectSelector as a combo box that filters on
     the option labels client-side, so shipping the whole catalogue in one
-    control gives type-to-filter over every stop without a round trip —
-    the user never has to know a stop's exact spelling, and there is no
-    second shortlist step.
+    control gives type-to-filter over every stop without a round trip.
+    Picking a suggestion goes straight to line selection; only free text
+    that matched no stop exactly falls through to `select_stop`.
 
     Ordering carries the useful default: the stops closest to the home
     location head the list with their distance shown, so the unfiltered
@@ -482,7 +484,6 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         return WienerLinienAustriaOptionsFlow()
 
     # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
     # Step 1 — user: searchable dropdown over the whole catalogue
     # ------------------------------------------------------------------
 
@@ -492,7 +493,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Build (and memoise) the stop picker options for this flow.
 
         Memoised so re-rendering the form after a validation error does
-        not repeat the distance sweep and the ~2 000-entry sort.
+        not repeat the distance sweep and the ~1 800-entry sort.
         """
         if self._stop_options is None:
             self._stop_options = _stop_options(

@@ -1,7 +1,7 @@
 """Static OGD data: stop catalogue, DIVA → RBL mapping, and line trip patterns.
 
 Wiener Linien publishes a handful of CSVs at the same base URL as the realtime
-API. We use four of them:
+API. We use five of them:
 
 - `haltestellen.csv`     — one row per station (DIVA, name, coordinates).
 - `haltepunkte.csv`      — one row per physical platform (RBL = StopID, parent
@@ -12,6 +12,9 @@ API. We use four of them:
   trip-pattern CSV, and exposes the canonical vehicle type per line.
 - `fahrwegverlaeufe.csv` — ordered RBL sequence per (LineID, PatternID,
   Direction). Powers the per-departure "stops ahead" enrichment.
+- `gtfs/routes.txt`      — GTFS route table: `route_color` / `route_text_color`
+  per line label. Drives the cards' per-line palette; the only one of the five
+  published under `doku/ogd/gtfs/`.
 
 The catalogue is stable for days/weeks at a time so we fetch it once, cache it
 on disk via `homeassistant.helpers.storage.Store`, and refresh weekly.
@@ -104,17 +107,15 @@ def _heuristic_mot(label: str) -> str | None:
     return "ptTram"
 
 
-def _line_sort_key(label: str, mot: str | None = None) -> tuple[int, int, int, str]:
+def _line_sort_key(label: str, mot: str | None = None) -> tuple[int, int, str]:
     """Return a sort key for a Wiener Linien line label.
 
-    Tier 1 — mode of transport (Metro → Tram → BusCity → BusNight →
-    unknown). Groups colour-coded modes together on the per-stop
-    changeover chips. When `mot` is None, falls back to a label-format
-    heuristic (`_heuristic_mot`) so callers without an authoritative
-    lookup still produce sensible ordering.
-    Tier 2 — leading-digit integer (so "2" < "10" < "13A"); letter-only
-    labels fall to the sentinel and sort alphabetically among themselves.
-    Tier 3 — full remaining label so "13A" < "13B".
+    mot_rank — mode of transport (Metro → Tram → BusCity → BusNight →
+    unknown), so the per-stop changeover chips group by colour-coded mode.
+    Falls back to `_heuristic_mot` when no authoritative lookup is given.
+    numeric  — leading-digit integer (so "2" < "10" < "13A"); letter-only
+    labels take the sentinel and sort alphabetically among themselves.
+    rest     — full remaining label so "13A" < "13B".
     """
     resolved_mot = mot or _heuristic_mot(label)
     mot_rank = (
@@ -130,10 +131,10 @@ def _line_sort_key(label: str, mot: str | None = None) -> tuple[int, int, int, s
         body = label
     match = _LINE_LEADING_DIGITS_RE.match(body)
     if match is None:  # never happens — re matches empty string too
-        return (mot_rank, 0, _LINE_SORT_LETTER_TIE, body)
+        return (mot_rank, _LINE_SORT_LETTER_TIE, body)
     digits, rest = match.group(1), match.group(2)
     numeric = int(digits) if digits else _LINE_SORT_LETTER_TIE
-    return (mot_rank, 0, numeric, rest)
+    return (mot_rank, numeric, rest)
 
 
 def _sort_line_labels(
@@ -491,15 +492,12 @@ async def _async_background_refresh(
 ) -> None:
     """Background-task helper: refresh + persist + publish the catalogue.
 
-    Catches every refresh failure mode (network, timeout, parse, cancel)
-    and logs at WARNING. On success, writes the new payload to Store and
-    swaps the shared catalogue ref so coordinators that read it live see
-    the refreshed data on their next parse.
-
-    Lost-update guard: if the weekly `async_refresh_catalogue` published
-    a newer catalogue while this slow migration was still fetching, the
-    result built here is discarded rather than clobbering the fresher
-    data on disk and in memory.
+    Catches every refresh failure mode (network, timeout, parse) and logs
+    at WARNING; cancellation propagates untouched, so an HA shutdown
+    landing mid-fetch is honoured. On success, writes the new payload to
+    Store and swaps the shared catalogue ref so coordinators that read it
+    live see the refreshed data on their next parse. See the lost-update
+    guard below for what it declines to publish.
     """
     try:
         refreshed = await _fetch_and_build(hass, prior=prior)
@@ -1005,9 +1003,11 @@ def _parse_trip_patterns(
 # "BB" navy, wins for the Wiener Linien customers this integration
 # primarily serves.
 _AGENCY_WIENER_LINIEN = "04"
-# 6-char uppercase hex matcher. Used to validate `route_color` /
-# `route_text_color` from GTFS routes.txt before passing the value
-# through to the card as `#HHHHHH`.
+# 6-char uppercase hex gate for `route_color` / `route_text_color` before
+# the value reaches the card as `#HHHHHH`. Not `len() == 6`: that accepts
+# garbage like "ZZZZZZ", which renders as the CSS-invalid `#ZZZZZZ` and is
+# silently ignored by the browser. Applied on both the parse path and the
+# store-reload path.
 _HEX6_RE = re.compile(r"^[0-9A-F]{6}$")
 
 
@@ -1036,10 +1036,8 @@ def _parse_route_colors(routes_text: str) -> tuple[dict[str, str], dict[str, str
     for row in reader:
         label = (row.get("route_short_name") or "").strip()
         color = (row.get("route_color") or "").strip().upper()
-        # Validate as 6-char hex — `len() == 6` alone accepts garbage like
-        # "ZZZZZZ" which the card would render as `#ZZZZZZ` (CSS-invalid,
-        # browser ignores). Falling through to the card's fallback palette
-        # is the right behaviour for a malformed upstream row.
+        # `_HEX6_RE`, not `len() == 6` — see the constant. A malformed row
+        # falls through to the card's fallback palette, which is correct.
         if not label or not _HEX6_RE.match(color):
             continue
         agency = (row.get("agency_id") or "").strip()
@@ -1080,8 +1078,10 @@ def stops_ahead_for_match(
     station name, `is_terminus` is True only on the final entry, and
     `lines` (when present) lists the other lines passing through that stop.
     The `diva` key is intentionally omitted to keep the per-stop dict small.
-    The list is hard-capped at MAX_STOPS_AHEAD entries to bound the recorder
-    attribute payload.
+    The list is hard-capped at MAX_STOPS_AHEAD entries to bound the live
+    payload — it rides inside the unrecorded `departures` attribute, so the
+    cost is the push to the frontend and WebSocket subscribers on every
+    state write, not recorder storage.
 
     The only tail truncation is short-turn based: when the live `towards`
     matches a stop on the pattern before its natural terminus, the tail is
@@ -1203,9 +1203,9 @@ def stops_ahead_for_match(
     # `is_terminus` flag on the last entry, and an optional `lines` list
     # of OTHER lines (excluding the one we're on) that pass through that
     # stop — sourced from the trip-pattern index's `lines_at_diva`. The
-    # `diva` key is dropped from the attribute on purpose: keeping the
-    # per-stop dict small lets MAX_STOPS_AHEAD-bounded full routes fit
-    # under the 16 KB recorder cap on busy multi-line stops.
+    # `diva` key is dropped from the attribute on purpose: every byte here
+    # is multiplied by MAX_STOPS_AHEAD and again by the departure list on
+    # every state write to the frontend.
     current_label = catalogue.trip_patterns.label_for_line.get(best.line_id)
     lines_at_diva = catalogue.trip_patterns.lines_at_diva
 
@@ -1275,21 +1275,13 @@ def _pick_validators(
 
 
 def _station_name_for_rbl(catalogue: StaticCatalogue, rbl: int) -> str | None:
-    """Look up the station name for a given RBL (None if unknown).
-
-    Backed by the catalogue's cached RBL index — O(1) per call after
-    the first hit on any catalogue instance.
-    """
+    """Station name for an RBL, or None. O(1) via the catalogue's index."""
     entry = catalogue.index_by_rbl().get(rbl)
     return entry[1] if entry is not None else None
 
 
 def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:
-    """Look up the parent DIVA for a given RBL (None if unknown).
-
-    Backed by the catalogue's cached RBL index — O(1) per call after
-    the first hit on any catalogue instance.
-    """
+    """Parent DIVA for an RBL, or None. O(1) via the catalogue's index."""
     entry = catalogue.index_by_rbl().get(rbl)
     return entry[0] if entry is not None else None
 
@@ -1367,10 +1359,8 @@ def _trip_patterns_from_store(
             )
             for k, v in (raw.get("lines_at_diva") or {}).items()
         }
-        # Validate with `_HEX6_RE`, not `len() == 6` — the latter accepts
-        # garbage like "ZZZZZZ" that the card would render as the CSS-invalid
-        # `#ZZZZZZ`. Mirrors the parse path in `_parse_route_colors` so the
-        # store-reload path can't admit colours the parse path would reject.
+        # Same `_HEX6_RE` gate as `_parse_route_colors`, so the store-reload
+        # path can't admit colours the parse path would reject.
         colors_by_line = {
             str(k): str(v).upper()
             for k, v in (raw.get("colors_by_line") or {}).items()

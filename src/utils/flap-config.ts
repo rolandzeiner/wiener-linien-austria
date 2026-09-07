@@ -67,13 +67,9 @@ function asBool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
 
-/** A stop after normalisation. Optional fields use plain `?:` (no
- *  `| undefined`) so under `exactOptionalPropertyTypes` callers can't
- *  set them to explicit `undefined` — the normaliser only ever
- *  produces absence, and absence is what the rest of the renderer
- *  branches on (e.g. `stop.direction === undefined` = "no direction
- *  filter"). The raw config interface keeps `| undefined` because
- *  user-authored YAML can legitimately carry the explicit form. */
+/** A stop after normalisation. Bare `?:` per the optionality convention in
+ *  utils/config.ts — the renderer branches on absence, e.g.
+ *  `stop.direction === undefined` means "no direction filter". */
 export interface NormalisedFlapStop {
   entity: string;
   lines?: string[];
@@ -123,10 +119,8 @@ export interface NormalisedFlapConfigValidated {
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
   hide_attribution: boolean;
-  /** v2.0.0 rename of `line_pill`, with the polarity flipped so the label can
-   *  read positively. The old key hid the line column when true and shared a
-   *  name with retro's `line_pill`, which *showed* a pill — the same key
-   *  meaning opposite things on two cards of one integration. Migrated in
+  /** v2.0.0 rename of `line_pill` with the polarity flipped, so the label can
+   *  read positively; see utils/card-vocabulary.ts. Migrated in
    *  `normaliseFlapConfig`; old YAML keeps working. */
   show_line_column: boolean;
   housing: boolean;
@@ -200,9 +194,8 @@ export function normaliseFlapConfig(
     : 2;
 
   // Back-compat: flat single-entity shape gets promoted to entities[0].
-  // Conditional spread (not undefined-pass-through) because
-  // `exactOptionalPropertyTypes` rejects `{ lines: undefined }` against
-  // the `lines?: string[]` declaration in FlapStopConfig.
+  // Conditional spread, not undefined-pass-through: `{ lines: undefined }`
+  // is rejected against FlapStopConfig's bare `lines?: string[]`.
   let rawEntities: unknown[] = [];
   if (Array.isArray(raw.entities)) {
     rawEntities = raw.entities;
@@ -287,11 +280,9 @@ export function normaliseFlapConfig(
     //   show_line_column = true → line column visible
     //   housing          = true → cream cabinet wraps the board
     //
-    // v2.0.0 migration: `line_pill` (true = HIDE the column) became
-    // `show_line_column` (true = show it). A config carrying only the old key
-    // is read through the inversion, so an existing card renders identically
-    // after the upgrade. The new key wins when both are present, which is what
-    // a user who has re-saved in the v2 editor expects.
+    // v2.0.0 migration: `line_pill` (true = HIDE) became `show_line_column`
+    // (true = show). Old-key-only configs read through the inversion and
+    // render identically; the new key wins when both are present.
     show_line_column:
       raw.show_line_column !== undefined
         ? raw.show_line_column === true

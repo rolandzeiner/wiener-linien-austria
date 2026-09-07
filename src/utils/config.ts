@@ -42,15 +42,6 @@ const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>
   ...RETRO_HEADER_MDI_EXIT_KEYS,
 ]);
 
-/** Header-side normaliser. Returns `undefined` when every field is
- *  unset / falsy / `"none"`, so the card's "is this side configured
- *  at all?" check collapses to a single truthy test. Hard bounds on
- *  `text` length defensively guard against a runaway YAML config
- *  blowing out the strip width. */
-// Exported so the flap card's config normaliser can reuse the same
-// header-side validation (the two cards share `RetroHeaderSide`
-// shape: the chip / exit / amenity grammar is identical even though
-// each card paints the strip with its own palette).
 /** Trim and bound a free-text config string. Returns undefined for a
  *  non-string or an empty result, so callers branch on a single
  *  `!== undefined` test. `trim: false` preserves deliberate padding —
@@ -113,6 +104,16 @@ export const HEADER_MAX_DATE_FORMAT_LEN = 32;
  *  check on hand-written YAML rather than a cap the editor has to mirror. */
 const HEADER_MAX_ICON_KEY_LEN = 64;
 
+/** Header-side normaliser. Returns `undefined` when every field is
+ *  unset / falsy / `"none"`, so the card's "is this side configured
+ *  at all?" check collapses to a single truthy test. Hard bounds on
+ *  `text` length defensively guard against a runaway YAML config
+ *  blowing out the strip width.
+ *
+ *  Exported so the flap card's config normaliser can reuse the same
+ *  header-side validation: the two cards share the `RetroHeaderSide`
+ *  shape, and the chip / exit / amenity grammar is identical even
+ *  though each card paints the strip with its own palette. */
 export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
@@ -188,12 +189,9 @@ export function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
       );
       continue;
     }
-    // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the
-    // current shape is a (line, direction) pair ("U1|R") so the
-    // threshold applies to every train on that direction regardless of
-    // which terminus the API currently labels them with. Collapse any
-    // surviving triple keys to pairs and, on collision, keep the
-    // larger value (more conservative for the user).
+    // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the current
+    // shape is a pair ("U1|R") — see lineDirKey. Collapse survivors to pairs
+    // and, on collision, keep the larger value (conservative for the user).
     const parts = k.split("|");
     const key = parts.length >= 3 ? `${parts[0]}|${parts[1]}` : k;
     const rounded = Math.round(n);
@@ -462,10 +460,15 @@ export interface NormalisedRetroConfigValidated {
   // See NormalisedModernConfig.type — HA requires `type` on every config
   // in the `config-changed` payload or it flags "Kein Typ angegeben".
   type: string;
-  // `?: T | undefined` is the dual form that lets callers EITHER omit the
-  // key (e.g. `delete next.line`) OR assign `undefined` explicitly. The
-  // bare `?:` form alone would reject explicit `undefined` under
-  // `exactOptionalPropertyTypes`, so we widen with the union.
+  // OPTIONALITY CONVENTION for the whole codebase; other declarations point
+  // here rather than restating it.
+  //   `?: T | undefined` — the DUAL form. Lets callers either omit the key
+  //     (`delete next.line`) or assign `undefined` explicitly, which the bare
+  //     form rejects under `exactOptionalPropertyTypes`. Used by every RAW
+  //     config interface, because user-authored YAML can carry either shape.
+  //   `?: T` — the bare form. Used by every NORMALISED interface: the
+  //     normalisers only ever produce absence, and absence is what the
+  //     renderers branch on.
   entity?: string | undefined;
   direction: "H" | "R";
   line?: string | undefined;
@@ -484,9 +487,8 @@ export interface NormalisedRetroConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
-  /** v2.0.0 rename of `line_pill`. Same polarity — only the name changed, so
-   *  that flap's opposite-meaning key of the same name could be split off.
-   *  See the migration in `normaliseRetroConfig`. */
+  /** v2.0.0 rename of `line_pill`; same polarity, only the name changed.
+   *  See utils/card-vocabulary.ts and the migration in `normaliseRetroConfig`. */
   show_line_pill: boolean;
   line_stripe: boolean;
   housing: boolean;
@@ -586,10 +588,9 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
-    // v2.0.0 migration: `line_pill` kept its meaning here but gave up its name,
-    // because flap used the same key for the opposite effect (hiding a whole
-    // column). Polarity is unchanged, so old YAML renders identically; the new
-    // key wins when both are present.
+    // v2.0.0 migration: `line_pill` kept its meaning but gave up its name —
+    // see utils/card-vocabulary.ts. Polarity unchanged, so old YAML renders
+    // identically; the new key wins when both are present.
     show_line_pill:
       raw.show_line_pill !== undefined
         ? raw.show_line_pill === true
@@ -605,11 +606,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
 //   1. user-config `line_colors` (per-line override) — `color` is left
 //      unset so the card's CSS default (white) applies, since we can't
 //      know what reads well on an arbitrary user colour.
-//   2. nightline category rule (`^N\d`) — wins OVER GTFS for N-prefix
-//      lines. GTFS publishes nightlines as bus navy (`0A295D`), but
-//      Wiener Linien's signage convention pairs a deeper navy with
-//      bright yellow numerals; that pairing only reads correctly when
-//      the nightline rule beats the GTFS lookup.
+//   2. nightline category rule (`^N\d`) — deliberately wins OVER GTFS for
+//      N-prefix lines; see NIGHTLINE_BG in const.ts.
 //   3. GTFS `routes.txt` from the integration's `line_colors` attribute
 //   4. neutral fallback (`var(--primary-color)`)
 //

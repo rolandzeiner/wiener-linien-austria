@@ -16,9 +16,8 @@
 //   config carries per-stop overrides. Without the translator every add/remove
 //   cycle would silently wipe every stop's lines, direction and walk times.
 //
-// * **`_config` before `fireEvent`** — custom editors do not receive a
-//   re-`setConfig()` after `config-changed`, so a fireEvent-only path leaves
-//   `_config` stale and the next render reverts the form.
+// * **`_config` before `fireEvent`** — see `multiStopCallbacks` in
+//   editor/editor-common.ts.
 
 import {
   LitElement,
@@ -429,8 +428,6 @@ export class WienerLinienAustriaCardEditor
   private _computeHelper = (field: { name: string }): string | undefined => {
     const { et } = this._i18n;
     const cfg = this._config;
-    // The dependency reason belongs on the field it gates, not in a note the
-    // user has to associate by eye.
     return editorHelper(this._i18n, field.name, {
       ...(cfg?.show_accessibility
         ? {}

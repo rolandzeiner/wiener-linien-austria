@@ -30,9 +30,8 @@ export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] 
   const seen = new Set<string>();
   for (const d of attrs?.departures ?? []) {
     const dir = String(d.direction ?? "");
-    // Triple-keyed dedupe — a (line, direction, towards) triple is the
-    // smallest unit the picker shows. Walk-times use lineDirKey (pair)
-    // because the threshold doesn't depend on the active terminus.
+    // Triple-keyed dedupe — the triple is the smallest unit the picker
+    // shows. Walk-times key by pair instead; see lineDirKey.
     const key = `${d.line}|${dir}|${d.towards}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -46,10 +45,9 @@ export interface Pair {
   line: string;
   direction: string;
   type: string;
-  // Display-only label: list of every terminus seen for this pair, in
-  // first-seen order. The walk-time row uses the joined string (e.g.
-  // "Oberlaa / Alaudagasse") in the UI so the user knows what their
-  // threshold covers, but the saved key is the pair, not the label.
+  // Display-only: every terminus seen for this pair, first-seen order. The
+  // walk-time row joins them ("Oberlaa / Alaudagasse") so the user sees what
+  // the threshold covers; the saved key is still the pair.
   termini: string[];
 }
 
@@ -237,8 +235,7 @@ export function collectLinesInSelection(
 }
 
 export interface ModernStopFilter {
-  // `?: T | undefined` — see NormalisedRetroConfigValidated comment for
-  // the dual-form rationale under exactOptionalPropertyTypes.
+  // Dual form — see the optionality convention in utils/config.ts.
   lines?: string[] | undefined;
   direction?: "H" | "R" | undefined;
   // Per-line direction override. Takes precedence over `direction`.

@@ -1,9 +1,8 @@
 // Structure recovery for Wiener Linien disruption notices.
 //
 // Upstream ships `descriptionHTML` as bare <p> and <br> — no emphasis, no
-// lists, no classes (verified across all 218 live trafficInfos entries: 102
-// <p>, 44 <br>, nothing else). The STRUCTURE is there, but only as a writing
-// convention inside the prose:
+// lists, no classes (surveyed across every live trafficInfos entry). The
+// STRUCTURE is there, but only as a writing convention inside the prose:
 //
 //   Linie 5:                          ← per-line section header
 //   Kein Betrieb zwischen A und B.    ← statements about that line
@@ -17,9 +16,9 @@
 // disruptions (one notice covering seven tram lines) are the case that
 // benefits most — as flat prose they are a wall of text.
 //
-// It also repairs a real upstream defect: in 4 of the 10 entries carrying
-// HTML, the labelled facts are glued to the preceding sentence with no
-// separator at all — "…auf die Linie 43A aus.Voraussichtliche Dauer:
+// It also repairs a real upstream defect: in some entries carrying HTML the
+// labelled facts are glued to the preceding sentence with no separator at
+// all — "…auf die Linie 43A aus.Voraussichtliche Dauer:
 // 31.07.2026.Grund: Gleisbauarbeiten." Splitting is anchored ONLY to the
 // literal label strings the operator templates (see FACT_LABELS), never to
 // general punctuation: a generic "period followed by capital" rule would
@@ -31,12 +30,8 @@
 // dropped, which costs nothing today (zero occurrences) and is the reason
 // this can be escaped rather than sanitised.
 //
-// Extraction goes through `DOMParser`, not regex tag-stripping. Regex is the
-// obvious first reach and the wrong tool: removing a tag can reassemble the
-// tag it was removing (`<scr<script>ipt src=x>`), so it needs iterating to a
-// fixpoint, and it still mis-reads `>` inside an attribute value. The
-// browser's parser has neither problem and decodes entities on the way, so
-// there is no entity table to maintain either.
+// Extraction goes through `DOMParser`, not regex tag-stripping — see
+// `toLines` for why regex is the obvious first reach and the wrong tool.
 //
 // The module also carries two helpers for the LIFT feed —
 // `iconForElevatorReason` and `splitLocationPath`. They live here rather

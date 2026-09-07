@@ -102,14 +102,9 @@ function renderHeaderSide(
       html`<span class="retro-station-header__chip">${chipText}</span>`,
   );
   const chipsRightOrder = [...chipNodes].reverse();
-  // Optional clock + date chips — `show_clock` / `show_date` per side.
-  // Both sit beyond the chips at the innermost edge of their side
-  // (rightmost on `left`, leftmost on `right`). Order from outermost to
-  // innermost: chips → date → clock. So when a side enables both, the
-  // time is closest to the centre of the strip (the primary station-
-  // board info), with the supporting date one slot further out.
-  // Suppressed if server_time hasn't arrived yet (no "NaN:NaN" while the
-  // integration warms up) or the user's format string evaluates empty.
+  // Optional clock + date chips. Suppressed if server_time hasn't arrived
+  // yet (no "NaN:NaN" while the integration warms up) or the user's format
+  // string evaluates empty. Placement is in the order note below.
   const clockText = side.show_clock ? formatClock(serverTime) : null;
   const clockNode = clockText
     ? html`<span
@@ -136,15 +131,8 @@ function renderHeaderSide(
         >${dateText}</span
       >`
     : nothing;
-  // Canonical render order mirrors the original signage. Right side
-  // mirrors the left: exit always at the outer edge of the card,
-  // amenities ordered so the *same* glyph (elevator) is always closest to
-  // the text on both sides — wheelchair-relevant info gets the same
-  // visual prominence regardless of header side. Mirror invariant for
-  // extra_icons + chips: index 0 of either array sits closest to the WC
-  // tile on both sides. Date and clock chips sit at the innermost edge:
-  // date one slot out, clock at the very edge so time stays closest to
-  // the centre.
+  // Canonical render order — see `renderStationHeader` for the rule and why
+  // the right side mirrors the left.
   return pos === "left"
     ? html`${exitNode}${textNode}${elv}${esc}${wc}${mdiTileNodes}${chipNodes}${dateNode}${clockNode}`
     : html`${clockNode}${dateNode}${chipsRightOrder}${mdiTilesRightOrder}${wc}${esc}${elv}${textNode}${exitNode}`;
@@ -155,11 +143,13 @@ function renderHeaderSide(
  *  `header_left` / `header_right` in YAML is byte-identical to its
  *  pre-header behaviour.
  *
- *  Per-side render order — amenity order is mirrored so the same glyph
- *  always sits the same distance from the station name on both sides:
- *  elevator nearest the text, then escalator, then WC:
- *   - LEFT:  [exit] [text] [Elevator] [Escalator] [WC] …
- *   - RIGHT: … [WC] [Escalator] [Elevator] [text] [exit]
+ *  Per-side render order, mirrored so the same glyph always sits the same
+ *  distance from the station name on both sides — wheelchair-relevant info
+ *  keeps its prominence whichever side it is on. Outward from the text:
+ *   - LEFT:  [exit] [text] [Elevator] [Escalator] [WC] [icons] [chips] [date] [clock]
+ *   - RIGHT: [clock] [date] [chips] [icons] [WC] [Escalator] [Elevator] [text] [exit]
+ *  Index 0 of `extra_icons` / `chips` sits closest to the WC tile on both
+ *  sides; clock sits innermost so the time is nearest the strip's centre.
  *
  *  `t` is the card's flat-key translate callback; `lang` is the HA
  *  language for the date chip's locale-aware tokens. */

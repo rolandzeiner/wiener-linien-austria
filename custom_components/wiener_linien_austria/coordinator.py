@@ -44,13 +44,10 @@ _LOGGER = logging.getLogger(__name__)
 
 # Public type alias — threaded through every signature that reads
 # `entry.runtime_data` (Platinum `runtime-data` + `strict-typing` rules).
-# Signatures that only use the entry for construction (coordinator
-# `__init__`) or for IDs/title (sensor `__init__`, options-flow
-# staticmethod) keep plain `ConfigEntry`. Hoisted to the top of the
-# module so external readers see the public-API shape before the
-# implementation; PEP 695 `type` evaluates the RHS lazily, so the
-# forward reference to `WienerLinienAustriaCoordinator` resolves at
-# use-time, not definition-time.
+# Signatures that only use the entry for construction or for IDs/title
+# keep plain `ConfigEntry`. Declared here rather than below the class
+# because PEP 695 `type` evaluates its RHS lazily, so the forward
+# reference resolves at use-time.
 type WienerLinienConfigEntry = ConfigEntry[WienerLinienAustriaCoordinator]
 
 
@@ -464,9 +461,9 @@ def _parse_monitor_body(
     reference_time = _parse_iso(server_time) or dt_util.utcnow()
     stale_cutoff = reference_time - STALE_DEPARTURE_MAX_AGE
     monitors = (body.get("data") or {}).get("monitors") or []
-    # Narrow `catalogue` once for the loop below — mypy carries the
-    # narrowing across the closure boundary if we hand it through a
-    # local alias that's either the catalogue or None.
+    # Narrow `catalogue` once for the loop below: enrichment needs both
+    # "not None" and "has a trip-pattern index", and folding the pair into
+    # one alias keeps that test out of the per-row hot path.
     pattern_catalogue: StaticCatalogue | None = (
         catalogue
         if catalogue is not None and catalogue.trip_patterns is not None
@@ -479,8 +476,7 @@ def _parse_monitor_body(
     # match would intermittently drop the whole line block. Each departure
     # keeps its own `vehicle.towards` so the actual destination is preserved.
     # Malformed keys (no pipe) are dropped silently — they could never
-    # match `(line_name, direction)` anyway. The walrus binds the split
-    # once per key so the comp can both length-check and index it.
+    # match `(line_name, direction)` anyway.
     selected_pairs: set[tuple[str, str]] | None = (
         None
         if selected is None

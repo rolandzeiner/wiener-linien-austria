@@ -27,9 +27,11 @@ npm run build           # Rollup builds three bundles into
 
 ## Card-version sync
 
-Two cards, two version constants. Both `CARD_VERSION` and `RETRO_CARD_VERSION` in `src/const.ts` must stay byte-identical to the same names in `custom_components/wiener_linien_austria/const.py` — `tests/test_card_version.py` enforces both pairs. Bump all four in the same commit (TS constants drive the served `?v=…` query string, the Python constants drive the WebSocket version check). If they drift, users get an infinite reload-banner loop.
+Three cards, three version constants. `manifest.json` is the single source of truth: `const.py` reads it at import and aliases `CARD_VERSION`, `RETRO_CARD_VERSION` and `FLAP_CARD_VERSION` to it, so the Python side needs no manual edit. The three literals in `src/const.ts` do — each must equal `manifest.json::version` byte-for-byte. `tests/test_card_version.py` checks every constant against the manifest independently, so a failure names exactly which one drifted.
 
-`manifest.json` stays at the clean (non-beta) version; the TS + Python constants can carry a `-beta-N` suffix during development. The README badge auto-fetches the latest release tag, so it needs no manual edit.
+A version bump is therefore two files: `manifest.json` and `src/const.ts`. The TS constants drive the served `?v=…` query string; the Python constants drive the WebSocket version check. If they drift, users get an infinite reload-banner loop — the card sees a mismatch, shows the reload banner, the reload re-serves the same JS, and the banner comes straight back.
+
+Because the TS literals are asserted equal to the manifest, none of the three can carry a `-beta-N` suffix on its own; the manifest version is whatever the cards say. Bump both files in the same commit as a rebuilt bundle — `validate.yml` asserts the committed `www/` matches a fresh `npm run build`. The README badge auto-fetches the latest release tag, so it needs no manual edit.
 
 ## Tooling & config
 

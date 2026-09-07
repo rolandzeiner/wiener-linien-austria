@@ -211,13 +211,8 @@ async def _fetch_info_list(
             infos = (body.get("data") or {}).get("trafficInfos") or []
             return [x for x in infos if isinstance(x, dict)]
     except asyncio.CancelledError:
-        # Cooperative cancellation — usually fired when HA is shutting
-        # down and our `_periodic_alerts` task is being torn down with
-        # an in-flight fetch still pending. The aiohttp session may
-        # already be closed too, surfacing as one of the broader errors
-        # below. Re-raise without logging so the shutdown signal
-        # propagates cleanly and we don't pollute the log with a noisy
-        # warning that the user can do nothing about.
+        # HA shutting down with a fetch in flight. Re-raise without logging:
+        # the user can do nothing about it, and the noise buries real faults.
         raise
     except (aiohttp.ContentTypeError, ValueError):
         # The endpoint answered, but not with the JSON object we expect —
@@ -228,7 +223,7 @@ async def _fetch_info_list(
         _LOGGER.warning("Failed to refresh %s alerts", name, exc_info=True)
         return _FETCH_FAILED
     except (TimeoutError, aiohttp.ClientError) as err:
-        # Transient upstream trouble — the ÖDV endpoint sheds load with
+        # Transient upstream trouble — the OGD endpoint sheds load with
         # 502/503 and times out sporadically. Alerts are advisory and the
         # previous cache survives, so there is nothing for the user to act
         # on. Debug, not warning: a traceback per occurrence buried real

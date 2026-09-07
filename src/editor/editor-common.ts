@@ -1,12 +1,9 @@
 // Logic shared by the three card editors.
 //
-// v2 extracted the shared *widgets* — the tab shell, the stop block, the header
-// strip — but left the shared *class* unextracted, so each editor still carried
-// its own copy of the stop mutations, the entity rebuild, the header-side patch
-// and the label resolvers. Ten of twelve clone groups in the repo sat entirely
-// inside the editors, and every copy could drift on its own: the modern and
-// flap entity handlers had already diverged on whether to re-normalise, and the
-// three `computeLabel`s had produced three different words for one control.
+// v2 extracted the shared widgets but left the shared logic in each editor,
+// where the copies drifted: the modern and flap entity handlers disagreed on
+// whether to re-normalise, and three `computeLabel`s produced three words for
+// one control.
 //
 // These are plain functions rather than a base class on purpose. The editors
 // differ in config shape (retro is flat and single-stop, modern and flap carry
@@ -22,10 +19,8 @@ import type { HomeAssistant, RetroHeaderSide } from "../types.js";
 /** The per-stop shape the multi-stop editors mutate. `NormalisedModernStop`
  *  and `NormalisedFlapStop` are structurally identical and both satisfy it.
  *
- *  Optional fields use the bare `?:` form, matching both normalisers: under
- *  `exactOptionalPropertyTypes` the callbacks below only ever produce absence
- *  (via `delete`), never an explicit `undefined`, which is what the renderers
- *  branch on. */
+ *  Bare `?:` form, matching both normalisers — the callbacks below produce
+ *  absence via `delete`, never an explicit `undefined`. See utils/config.ts. */
 export interface MutableStop {
   entity: string;
   lines?: string[];
@@ -38,8 +33,10 @@ export interface MutableStop {
  * The four stop-block callbacks for a multi-stop editor.
  *
  * `commit` receives the whole rebuilt entities array and is responsible for
- * assigning `_config` before dispatching `config-changed` — the invariant that
- * keeps a custom editor's form from reverting on the next render.
+ * assigning `_config` BEFORE dispatching `config-changed`. That ordering is
+ * the load-bearing invariant of every editor here: custom editors get no
+ * re-`setConfig()` after `config-changed`, so a fireEvent-only path leaves
+ * `_config` stale and the next render reverts the form.
  *
  * Every mutation tidies to absence rather than an empty container, so saved
  * YAML never accumulates `lines: []` or `walk_times: {}`.

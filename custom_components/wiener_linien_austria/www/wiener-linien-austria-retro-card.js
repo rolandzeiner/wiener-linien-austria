@@ -60,9 +60,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     display: block;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Shell: tab bar + scrolling column
-   * ---------------------------------------------------------------- */
+  /* Shell: tab bar + scrolling column */
 
   .wl-editor {
     display: flex;
@@ -130,9 +128,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     gap: 14px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Section
-   * ---------------------------------------------------------------- */
+  /* Section */
 
   .wl-section {
     border: 1px solid var(--divider-color);
@@ -180,9 +176,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     display: block;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Bespoke rows (chips / direction / walk time / colour)
-   * ---------------------------------------------------------------- */
+  /* Bespoke rows (chips / direction / walk time / colour) */
 
   .wl-group {
     display: flex;
@@ -220,10 +214,8 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     border-top: 1px solid var(--divider-color);
   }
 
-  /* ---------------------------------------------------------------- *
-   * Line chip — 34px tall for density, 44px hit area for WCAG 2.2 (2.5.8).
-   * The ::before overlay is what buys both; do not replace it with padding.
-   * ---------------------------------------------------------------- */
+  /* Line chip — 34px tall for density, 44px hit area for WCAG 2.2 (2.5.8).
+     The ::before overlay is what buys both; do not replace it with padding. */
 
   .wl-chips {
     display: flex;
@@ -305,9 +297,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     display: block;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Read-only line badge
-   * ---------------------------------------------------------------- */
+  /* Read-only line badge */
 
   /* Always a filled surface, so it takes the paired ink rather than a
      hardcoded white — a nightline badge is yellow-on-navy, as on the sign. */
@@ -327,9 +317,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     forced-color-adjust: none;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Direction buttons
-   * ---------------------------------------------------------------- */
+  /* Direction buttons */
 
   .wl-dirs {
     display: flex;
@@ -401,9 +389,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     gap: 5px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Walk-time row
-   * ---------------------------------------------------------------- */
+  /* Walk-time row */
 
   .wl-walk-list {
     display: flex;
@@ -500,9 +486,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     outline-offset: -2px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Colour override row
-   * ---------------------------------------------------------------- */
+  /* Colour override row */
 
   .wl-color-row {
     display: flex;
@@ -582,9 +566,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     outline-offset: 2px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Stop block, empty state, add button
-   * ---------------------------------------------------------------- */
+  /* Stop block, empty state, add button */
 
   .wl-stop-body {
     padding: 12px;
@@ -652,13 +634,10 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     outline-offset: 2px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Station header strip — direct manipulation.
-   *
-   * The bar mocks a physical black sign, so its surfaces are literal
-   * colours rather than theme tokens: themed chrome here would stop the
-   * widget looking like the thing it edits.
-   * ---------------------------------------------------------------- */
+  /* Station header strip — direct manipulation.
+     The bar mocks a physical black sign, so its surfaces are literal
+     colours rather than theme tokens: themed chrome here would stop the
+     widget looking like the thing it edits. */
 
   .wl-strip {
     display: flex;
@@ -741,11 +720,9 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     gap: 8px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Segmented control — used by the side switch. Enum config fields use
-   * ha-form's select instead; this exists for editor-local UI state that
-   * never reaches the config.
-   * ---------------------------------------------------------------- */
+  /* Segmented control — used by the side switch. Enum config fields use
+     ha-form's select instead; this exists for editor-local UI state that
+     never reaches the config. */
 
   .wl-seg {
     display: flex;
@@ -779,9 +756,7 @@ function e(e,t,i,r){var n,a=arguments.length,o=a<3?t:null===r?r=Object.getOwnPro
     outline-offset: 2px;
   }
 
-  /* ---------------------------------------------------------------- *
-   * Slot panel — the four fields for whichever side is selected.
-   * ---------------------------------------------------------------- */
+  /* Slot panel — the four fields for whichever side is selected. */
 
   .wl-slot {
     display: flex;

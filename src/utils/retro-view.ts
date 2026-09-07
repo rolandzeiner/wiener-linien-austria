@@ -1,11 +1,9 @@
 // View-state derivation for the retro card.
 //
-// The retro card's `render()` was ~110 lines of deriving what to show
-// followed by one template describing how to draw it. This module owns
-// the first half: given a normalised config and the sensor's attributes,
-// work out which departures are visible and how the platform column
-// resolves. It is a pure function, so unlike the template it can be —
-// and is — unit tested.
+// The retro card's `render()` derived what to show and then drew it. This
+// module owns the first half: given a normalised config and the sensor's
+// attributes, work out which departures are visible and how the platform
+// column resolves. Pure, so unlike the template it is unit tested.
 //
 // Translation stays with the card: this returns the platform label's
 // translation KEY, not a translated string, so the module has no

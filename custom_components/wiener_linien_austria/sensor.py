@@ -152,16 +152,13 @@ class WienerLinienStopSensor(
             line_names = {d.line for d in departures if d.line}
         rbls = {int(r) for r in config.get(CONF_RBLS) or []}
 
-        # `hass` was resolved above the cache check — same reasoning:
-        # prefer `self.hass` (set by HA during `async_added_to_hass`)
-        # and fall back to the coordinator's ref so tests that read
-        # `extra_state_attributes` without routing through HA core
-        # still resolve.
         traffic, elevator = get_alerts_for(hass, line_names, rbls)
 
         # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
-        # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) stay under HA's
-        # 16 KB recorder attribute cap. The card respects its own
+        # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) don't pay to
+        # publish rows nothing renders. NOT a recorder budget — `departures`
+        # is in `_unrecorded_attributes` below; see MAX_DEPARTURES_IN_ATTRS in
+        # const.py for what the cap actually bounds. The card respects its own
         # max_departures setting (≤ 20) so nothing the UI shows is lost.
         capped = [d.to_dict() for d in departures[:MAX_DEPARTURES_IN_ATTRS]]
 
@@ -169,9 +166,9 @@ class WienerLinienStopSensor(
         # the Wiener Linien catalogue, not just lines at this stop) because
         # the card's stops_ahead trail can render chips for transfer lines
         # at OTHER stops — scoping here would leave those chips colourless.
-        # Total size is ~3 KB regardless of stop, well under the recorder's
-        # 16 KB attribute cap, and the data is identical across sensors so
-        # the recorder dedupes it via the state-diff path.
+        # Affordable at ~3 KB regardless of stop, and unrecorded below, so
+        # the cost is the live push to the frontend on every state write,
+        # not anything the recorder stores.
         line_colors = self._line_colors()
 
         # Static-catalogue line list for THIS stop — every line that
@@ -296,12 +293,8 @@ class WienerLinienStopSensor(
         document the workaround: a template binary_sensor that
         flips on `(now() - server_time) > threshold`.
 
-        DO NOT lift this pattern naively to other integrations
-        without the same UX-vs-contract trade-off being made
-        deliberately. Especially not for entities driving
-        automations more than dashboards. The cleaner alternative is a
-        separate `binary_sensor.<...>_stale` entity — see the
-        portfolio-liftables reference, item 13 (maintainer note; the
-        file is not in this repo).
+        Don't lift this naively: a separate `binary_sensor.<...>_stale`
+        is the cleaner shape for anything driving automations rather
+        than dashboards.
         """
         return self.coordinator.data is not None

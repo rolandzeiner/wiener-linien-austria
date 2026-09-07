@@ -247,8 +247,6 @@ export class WienerLinienAustriaCard extends LitElement {
 
   public override connectedCallback(): void {
     super.connectedCallback();
-    // Register the WL webfaces on document.head — see font-face.ts for
-    // why Shadow-DOM @font-face can't be trusted on Android WebView.
     registerWlFonts();
     // One-shot WS version probe — per-instance, but cheap (HA caches the
     // command registration). Gated by _versionCheckDone so re-adding the
@@ -1073,7 +1071,7 @@ export class WienerLinienAustriaCard extends LitElement {
    *
    *  Everything here is a plain Lit text binding — upstream text is escaped
    *  by the template, never interpreted as markup. `lang="de"` because the
-   *  ÖDV publishes German only, whatever locale the card is running in;
+   *  OGD feed publishes German only, whatever locale the card runs in;
    *  without it a screen reader in an English UI reads street names with
    *  English phonetics. */
   private _renderTrafficNotice(notice: TrafficNotice): TemplateResult {
@@ -1193,22 +1191,6 @@ export class WienerLinienAustriaCard extends LitElement {
     this._expandedTraffic = toggleInSet(this._expandedTraffic, name);
   }
 
-  /**
-   * Compute the hero group: the lead departure plus any others tied
-   * on the exact same countdown. When the lead is at Jetzt (cd <= 0),
-   * group every entry that's also at Jetzt — multiple lines all
-   * arriving simultaneously is precisely the case where surfacing all
-   * of them in the hero is most useful. Outside the Jetzt case, fall
-   * back to strict tie-only grouping so a 5-min lead doesn't pull a
-   * 6-min entry into the hero. Returns [] if there are no usable
-   * departures.
-   */
-
-  /**
-   * Render one hero-entry row (line badge + direction + optional
-   * platform pill + optional wheelchair pill). Used inside the
-   * hero-meta column; one entry per departure in the hero group.
-   */
   /** Resolve the expand-to-show-stops_ahead state for a departure rendered
    *  either in the hero block or in the row list. Both surfaces share the
    *  same `rowKey`, so opening the panel from one leaves the same panel
@@ -1269,6 +1251,11 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
+  /**
+   * Render one hero-entry row (line badge + direction + optional
+   * platform pill + optional wheelchair pill). Used inside the
+   * hero-meta column; one entry per departure in the hero group.
+   */
   private _renderHeroEntry(d: DepartureAttr, entityId: string): TemplateResult {
     const accentLine = d.line || "";
     const accentStyle = chipPalette(
@@ -1623,9 +1610,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // any time, plus night lines (N-prefix + digit) WHEN they're
     // actually running. Outside the night window the N-chips fold
     // back into the +N toggle so the daytime trail stays compact.
-    // Wiener Linien NightLine runs daily ~00:30–05:00 with first/last
-    // buses spreading from ~23:55 to ~05:15 across all routes — we
-    // use that envelope as the active window.
+    // Night window per `_isNightlineHour`.
     const allLines = s.lines ?? [];
     const nightActive = this._isNightlineHour();
     const inlineLines: string[] = [];
@@ -1778,10 +1763,10 @@ export class WienerLinienAustriaCard extends LitElement {
     return `${entityId}|${d.line}|${d.direction}|${d.towards ?? ""}|${stableId}`;
   }
 
-  // Per-surface DOM id for the stops-ahead panel. Distinct prefix between
-  // Stable id keyed on time_planned (countdown mutates every minute and
-  // would break aria-controls mid-tick). hero / row variants get
-  // different prefixes so an in-page anchor can target either surface.
+  // Per-surface DOM id for the stops-ahead panel. Keyed on time_planned
+  // (countdown mutates every minute and would break aria-controls
+  // mid-tick). hero / row variants get different prefixes so an in-page
+  // anchor can target either surface.
   private _panelId(d: DepartureAttr, entityId: string, prefix: "hero" | "row"): string {
     const safeEid = safeDomId(entityId);
     const suffix = prefix === "hero" ? "wl-hero-stopsahead" : "wl-stopsahead";

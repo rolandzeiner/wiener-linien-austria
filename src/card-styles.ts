@@ -14,12 +14,10 @@ import { css } from "lit";
 // so it stays a consistent, theme-owned affordance rather than shifting hue
 // per station.
 //
-// Webfonts (WL Sans / WL Sans Condensed / WL Mono) are NOT declared
-// here: `@font-face` inside Shadow DOM is unreliable on older engines
-// (Android System WebView). `registerWlFonts()` from `./font-face`
-// injects the faces on `document.head` instead — the card just
-// references the families by name. See font-face.ts / www/fonts/
-// NOTICE.md for the rationale, provenance + GUST Font License terms.
+// Webfonts (WL Sans / WL Sans Condensed / WL Mono) are NOT declared here —
+// `registerWlFonts()` injects them on `document.head` instead, and the card
+// just references the families by name. See font-face.ts for why Shadow DOM
+// cannot hold them, and www/fonts/NOTICE.md for provenance + licence.
 export const cardStyles = css`
   :host {
     /* color-scheme enables light-dark() and steers forced-colors

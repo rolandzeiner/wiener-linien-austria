@@ -4,7 +4,7 @@
 // entity table for the `unsafeHTML` disruption path. That path is gone —
 // utils/traffic-notice.ts now parses notices into a typed model rendered
 // through ordinary Lit bindings, so nothing here escapes or decodes markup
-// any more. Worth renaming to utils/dom.ts; only one import site.
+// any more.
 
 /** Slugify an entity id (or any string) into a value safe for use in DOM
  *  id / aria-controls attributes. Replaces anything outside [A-Za-z0-9_]

@@ -1,10 +1,8 @@
 // Which departures go in the modern card's hero block, and which fall
 // through to the row list beneath it.
 //
-// This was a private method on the card that happened to use no `this` —
-// pure logic sitting inside a 124-line template method, where it could
-// not be tested. It decides the most prominent thing on the card, so it
-// is worth pinning.
+// Extracted from the card's render path so it can be unit tested — it
+// decides the most prominent thing on the card, so it is worth pinning.
 
 import type { DepartureAttr } from "../types.js";
 

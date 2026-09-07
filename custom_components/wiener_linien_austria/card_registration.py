@@ -3,9 +3,8 @@
 Canonical pattern from the HA developer community guide:
 https://community.home-assistant.io/t/developer-guide-embedded-lovelace-card-in-a-home-assistant-integration/974909
 
-This integration ships three bundled cards (modern + retro + flap)
-registered via a single ``JSModuleRegistration`` instance — adding a
-fourth card is one row in ``JSMODULES`` below.
+This integration ships three bundled cards (modern + retro + flap),
+registered via a single ``JSModuleRegistration`` instance.
 
 ``resources`` itself is a ``ResourceYAMLCollection |
 ResourceStorageCollection`` union; the type-only import + ``cast``

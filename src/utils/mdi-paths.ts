@@ -1,27 +1,18 @@
 // Vendored Material Design Icons path geometry for the QR-code canvas.
 //
-// WHY THESE ARE INLINE AND NOT AN `@mdi/js` IMPORT
+// `new Path2D(...)` in `_renderTintedQr` (wiener-linien-austria-card.ts)
+// needs literal SVG path data, so HA's <ha-icon> / <ha-svg-icon> cannot
+// serve this call site — only the raw `d` attribute will do. Depending on
+// `@mdi/js` for four constants meant a 6.3 MB, 7,447-icon package that
+// rollup already tree-shook to exactly these four, so vendoring changes no
+// icon and no rendered pixel; it drops install-time and supply-chain
+// weight. Same precedent as utils/retro-station-icons.ts: icon path data
+// is content, not an API.
 //
-// These four strings are consumed by `new Path2D(...)` when the modern
-// card paints its QR code onto a <canvas> — see `_drawStopIcon` in
-// wiener-linien-austria-card.ts. That is a geometry API: it needs the
-// literal SVG path data, so HA's <ha-icon> / <ha-svg-icon> elements (used
-// elsewhere in this repo, e.g. the editor's reset button) cannot serve
-// this call site. Only the raw `d` attribute will do.
-//
-// Depending on `@mdi/js` to obtain four constants meant carrying a
-// 6.3 MB package that exports 7,447 icons. Rollup tree-shook it correctly
-// — only these four reached the bundle — so this vendoring changes no
-// shipped byte. What it removes is the install-time and supply-chain
-// weight of the dependency, and it follows the precedent already set by
-// utils/retro-station-icons.ts, which inlines its glyphs for the same
-// reason: icon path data is content, not an API.
-//
-// PROVENANCE — Material Design Icons v7.4.47, Apache-2.0. Copied verbatim
-// from @mdi/js's `mdi.js` exports named below. All four use MDI's
-// standard 24x24 viewBox, which is what the canvas scale factor in
-// `_drawStopIcon` assumes. To refresh, reinstall @mdi/js at the desired
-// version and re-copy; do not hand-edit the geometry.
+// PROVENANCE — Material Design Icons v7.4.47, Apache-2.0, copied verbatim
+// from @mdi/js. All four use MDI's standard 24x24 viewBox, which the canvas
+// scale factor in `_renderTintedQr` assumes. To refresh, reinstall @mdi/js
+// at the desired version and re-copy; never hand-edit the geometry.
 
 /** MDI `mdiSubwayVariant` (v7.4.47) — 24x24 viewBox. */
 const mdiSubwayVariant = "M18,11H13V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M11,11H6V6H11M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M12,2C7.58,2 4,2.5 4,6V15.5A3.5,3.5 0 0,0 7.5,19L6,20.5V21H18V20.5L16.5,19A3.5,3.5 0 0,0 20,15.5V6C20,2.5 16.42,2 12,2Z";

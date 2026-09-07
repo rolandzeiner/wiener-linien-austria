@@ -11,9 +11,9 @@ import type { WienerLinienAttrs } from "../types.js";
 // substring match on `attribution.includes("wiener linien")` could
 // false-positive on any third-party integration whose attribution
 // happened to mention Wiener Linien (e.g. a custom dashboard widget,
-// a derived template sensor). The structural keys are emitted by
-// our coordinator's `_attr_extra_state_attributes` and are unique to
-// our sensor shape.
+// a derived template sensor). The structural keys come from the stop
+// sensor's `extra_state_attributes` property (sensor.py) and are unique
+// to our sensor shape.
 export function findWienerLinienEntities(hass: HomeAssistant | undefined): string[] {
   if (!hass) return [];
   const matches: string[] = [];

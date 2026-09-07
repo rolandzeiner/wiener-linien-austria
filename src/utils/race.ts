@@ -7,16 +7,12 @@
 // caller maps those onto CSS custom properties.
 //
 // Lives outside the card so the rendering class focuses on UI concerns
-// instead of carrying ~140 lines of probability + linear-interpolation
-// math inline.
+// rather than carrying the probability + linear-interpolation math inline.
 
 export type Racer = "A" | "B";
 
-// Tuning constants — kept module-private. Only `RACE_FINISH_X_FALLBACK_CQW`
-// is `export`ed (consumed by the retro card as a fallback when the live
-// finish-line measurement isn't available yet); every other tunable is
-// referenced solely by `computeRaceParams` in this file. Re-exporting
-// them would bloat the bundle's public surface without buying anything.
+// Tuning constants. Only `RACE_FINISH_X_FALLBACK_CQW` is exported — the
+// retro card needs it before the live finish-line measurement lands.
 const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
   ["A", "A", "B"], ["B", "B", "A"],   // single late swap
   ["A", "B", "B"], ["B", "A", "A"],   // single mid swap

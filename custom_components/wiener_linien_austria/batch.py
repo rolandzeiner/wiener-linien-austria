@@ -78,9 +78,10 @@ class MonitorBatchGroup:
         self._members: dict[str, WienerLinienAustriaCoordinator] = {}
         self._session = async_get_clientsession(hass)
         # Conditional-GET validators for the combined request. Reset whenever
-        # the member RBL set changes so a stale ETag can't yield a misleading
-        # 304 against a different query (the server would 200 anyway, but
-        # resetting keeps the intent explicit).
+        # the member RBL set changes: a stale ETag would otherwise be sent
+        # against a different query. (The server would 200 anyway; resetting
+        # keeps the intent explicit.) Enforced in `_invalidate_rbl_cache` and
+        # again at fetch time, since membership can move either side of a tick.
         self._cache = CacheValidators()
         self._cached_rbls: tuple[int, ...] = ()
         self._last_body: dict[str, Any] | None = None
@@ -189,8 +190,6 @@ class MonitorBatchGroup:
         rbls = self.union_rbls()
         rbl_tuple = tuple(rbls)
         if rbl_tuple != self._cached_rbls:
-            # Membership changed since the last fetch — the cached validators
-            # belong to a different query. Drop them.
             self._cache = CacheValidators()
             self._cached_rbls = rbl_tuple
             self._last_body = None

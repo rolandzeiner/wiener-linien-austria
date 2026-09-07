@@ -34,7 +34,7 @@ export async function checkCardVersionWS(
     const r = await hass.callWS<{ version?: string }>({ type });
     if (r?.version && r.version !== bundleVersion) return r.version;
   } catch {
-    // Silent: older backend without the WS handler.
+    // Older backend without the WS handler — see above.
   }
   return null;
 }
@@ -42,10 +42,8 @@ export async function checkCardVersionWS(
 /**
  * Best-effort cache-storage wipe followed by a hard reload. The reload
  * picks up the freshly-cached JS bundle so the version-mismatch banner
- * clears on next mount. Stamps a sessionStorage flag BEFORE reloading
- * so the next mount can detect a stuck-reload loop (Service Worker /
- * CDN refusing to invalidate) and short-circuit instead of looping the
- * banner forever — see `wasReloadAttemptedFor` below.
+ * clears on next mount. Stamps a sessionStorage flag BEFORE reloading —
+ * see `wasReloadAttemptedFor` below for what reads it.
  */
 export function reloadAfterCacheWipe(forVersion?: string | null): void {
   try {
@@ -109,12 +107,8 @@ export function renderVersionBanner(
   className = "banner",
 ): TemplateResult | typeof nothing {
   if (!mismatch) return nothing;
-  // Stuck-reload anti-loop: if the user already clicked reload for
-  // this exact mismatch in the current tab session and the mismatch
-  // is STILL present, the cache invalidation didn't take effect
-  // (Service Worker, aggressive CDN, or a browser ignoring the
-  // versioned URL). Surface a "stuck" state instead of a second
-  // reload button so the banner can't loop indefinitely.
+  // Reload already tried for this mismatch and it is STILL here — show the
+  // stuck state rather than a second reload button. See wasReloadAttemptedFor.
   if (wasReloadAttemptedFor(mismatch)) {
     const stuckMsg = t("version_reload_stuck");
     return html`

@@ -1,54 +1,30 @@
-# Test/lint dependencies. Deliberately short: PHACC governs the whole
-# test stack, and this file only declares what PHACC does NOT pin.
+# Test/lint dependencies. PHACC governs the whole test stack; this file
+# declares only what PHACC does NOT pin.
 #
-# THE RULE — do not declare anything PHACC already pins with `==`.
+# THE RULE — never declare anything PHACC pins with `==`. As of 0.13.361
+# that covers pytest, pytest-asyncio, pytest-cov, pytest-timeout, syrupy
+# and freezegun. A floor for any of them has exactly one candidate to
+# resolve against, so it either matches (dead weight) or contradicts it
+# (unresolvable). The three that used to sit here resolved to
+# byte-identical versions once removed — verified against a clean 3.14
+# venv, 2026-09-07. Consequence: pytest, syrupy and freezegun are
+# imported directly by tests/ while arriving purely as transitives.
 #
-# pytest-homeassistant-custom-component pins its test stack exactly. As
-# of 0.13.361 its METADATA carries, among others:
+# ACCEPTED RISK — if PHACC ever loosened a pin to `>=`, a transitive minor
+# could land unreviewed. Re-add a floor only with a named upstream change.
 #
-#     pytest==9.0.3          pytest-asyncio==1.4.0
-#     pytest-cov==7.1.0      pytest-timeout==2.4.0
-#     syrupy==6.0.0          freezegun==1.5.5
+# PHACC tracks HA core including betas, so a patch bump can land on a beta
+# and break lint (mypy --strict is the usual casualty) with no runtime
+# fault. Fix with a temporary exact `==` pin carrying its removal
+# condition — never by widening the range.
 #
-# A floor here for any of those cannot do anything. The resolver has
-# exactly one candidate — PHACC's — so a `>=x,<y` range either matches it
-# (dead weight) or contradicts it (unresolvable). This file used to carry
-# floors for pytest-asyncio, pytest-cov and pytest-timeout justified as
-# "so a transitive minor release can't break green-on-main"; PHACC leaves
-# no room for such a release, so they never protected anything. Removing
-# them resolves to byte-identical versions — verified against a clean
-# 3.14 venv on 2026-09-07.
-#
-# The same reasoning already governed syrupy, which was documented as
-# omitted for exactly this reason. The three floors were the inconsistent
-# case, not syrupy.
-#
-# Note this means pytest, syrupy and freezegun are imported directly by
-# tests/ while arriving purely as PHACC transitives. That is the accepted
-# consequence of the rule: PHACC is the single source of truth for the
-# test stack, and pytest.ini documents which of its plugins we rely on
-# (asyncio_mode, --cov, timeout).
-#
-# THE RISK WE ACCEPT — if PHACC ever loosened a pin from `==` to `>=`, a
-# transitive minor could land unreviewed. Mitigation is that PHACC's
-# exact-pin style has been stable for its whole life, and its pins are
-# one `pip show` away. Re-add a floor here only with a named upstream
-# change that made it load-bearing again.
-#
-# PHACC tracks HA core including betas, so a patch bump can land on a
-# beta and break lint (mypy --strict is the usual casualty) with no
-# runtime fault. The fix is a temporary exact `==` pin carrying the
-# reason and the condition for removing it — not widening the range.
-# Drop the pin once the siblings are green on a later release.
-#
-# PHACC 0.13.361 wraps HA core 2026.9.0b4 and requires Python >=3.14, so
-# the CI workflow tracks 3.14 in lockstep — see validate.yml's tests job.
+# PHACC 0.13.361 wraps HA core 2026.9.0b4 and needs Python >=3.14; CI
+# tracks 3.14 in lockstep (validate.yml, tests job).
 pytest-homeassistant-custom-component>=0.13.361,<0.14
 
-# NOT pinned by PHACC, so these two are ours to govern. Exact by design:
-# the `rev:` values in .pre-commit-config.yaml must equal these, or the
-# local gate lints with a different ruleset than the one deciding
-# green-on-main. Dependabot is configured to ignore both hook repos so it
-# cannot desync them; bump pin and rev in the same commit.
+# Not pinned by PHACC, so ours to govern. Exact by design: the `rev:`
+# values in .pre-commit-config.yaml must equal these or the local gate
+# lints with a different ruleset than CI. Dependabot ignores both hook
+# repos; bump pin and rev in the same commit.
 mypy==2.3.1
 ruff==0.16.5

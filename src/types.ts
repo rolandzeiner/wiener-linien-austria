@@ -1,9 +1,9 @@
 // Local mirror of the HA / Lovelace types this card actually uses.
 // Replaces the `custom-card-helpers` dependency — the package is
 // effectively unmaintained and bundled HA-internal types drift faster
-// than its release cadence. `fireEvent` is duplicated as a 6-line shim
-// inside the editor modules (see `editor.ts` and `retro-editor.ts`),
-// keeping the types layer free of any value-side helper.
+// than its release cadence. Value-side helpers stay out of this layer:
+// `fireEvent` has one implementation, in utils.ts, which all three
+// editors import.
 
 /** Single entity in `hass.states`. The attributes bag is open-ended —
  *  the integration's coordinator emits the keys these cards read
@@ -200,12 +200,8 @@ export type HaFormSchema =
   | HaFormGridSchema
   | HaFormExpandableSchema;
 
-/** `<ha-icon-picker>` element shape. The v2 header-strip editor is the
- *  first place in this codebase that can use it: the picker's popover does
- *  not round-trip its click commit when nested inside a `flatten: false`
- *  expandable, which is why v1's editors fell back to a `select` carrying
- *  the whole MDI catalogue. Outside `ha-form` we own the event plumbing and
- *  the real picker works. */
+/** `<ha-icon-picker>` element shape. Only usable outside `ha-form` — see
+ *  editor/header-strip.ts for why nesting it in an expandable breaks it. */
 interface HaIconPickerElement extends HTMLElement {
   value?: string;
   label?: string;
@@ -365,7 +361,6 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   entities?: Array<ModernStopConfig | string> | undefined;
   // v0.1.x back-compat: single-entity legacy shape is promoted to entities[0]
   // inside normaliseConfig. Both shapes read here; only `entities` survives.
-  // `?: T | undefined` dual form for exactOptionalPropertyTypes compatibility.
   entity?: string | undefined;
   lines?: string[] | undefined;
   direction?: "H" | "R" | "" | undefined;
@@ -477,8 +472,8 @@ export interface RetroHeaderSide {
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
-  // `?: T | undefined` — dual form for `exactOptionalPropertyTypes`
-  // compatibility (callers may set or omit each field).
+  // `?: T | undefined` throughout — see the optionality convention in
+  // utils/config.ts.
   entity?: string | undefined;
   direction?: "H" | "R" | undefined;
   line?: string | undefined;
@@ -509,10 +504,9 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
-  /** Superseded by `show_line_pill` in v2.0.0 — same meaning, new name. The
-   *  flap card used this same key for the opposite effect (hiding an entire
-   *  column), so it was split rather than left to mislead. Still read by
-   *  `normaliseRetroConfig` so existing YAML keeps working.
+  /** Superseded by `show_line_pill` in v2.0.0 — same meaning, new name; see
+   *  utils/card-vocabulary.ts for why the name had to be given up. Still read
+   *  by `normaliseRetroConfig` so existing YAML keeps working.
    *  @deprecated Use `show_line_pill`. */
   line_pill?: boolean | undefined;
   /** Tweak — render the line code as a filled rounded pill in the
@@ -635,12 +629,9 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  and complies with the Wiener Linien OGD licence requirement
    *  unless the user explicitly opts out. */
   hide_attribution?: boolean | undefined;
-  /** Superseded by `show_line_column` in v2.0.0, which inverts the polarity so
-   *  the editor label can read positively. The name was borrowed from the
-   *  retro card's `line_pill` "by convention", but the effect was different —
-   *  hiding a whole column versus rendering a pill — so one key meant opposite
-   *  things on two cards of the same integration. Still read by
-   *  `normaliseFlapConfig` so existing YAML keeps working.
+  /** Superseded by `show_line_column` in v2.0.0, which inverts the polarity
+   *  so the editor label can read positively; see utils/card-vocabulary.ts.
+   *  Still read by `normaliseFlapConfig` so existing YAML keeps working.
    *  @deprecated Use `show_line_column` (inverted). */
   line_pill?: boolean | undefined;
   /** Show the line column. Default `true`. Turn it off for single-line setups
