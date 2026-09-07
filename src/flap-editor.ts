@@ -27,6 +27,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { editorStyles } from "./editor/editor-styles.js";
 import { editorTokens } from "./editor/editor-tokens.js";
+import { headerStripStyles } from "./editor/header-strip-styles.js";
 import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
 import {
   renderFormSection,
@@ -288,8 +289,8 @@ export class WienerLinienAustriaFlapCardEditor
       })}
       ${renderFormSection({
         ...common,
-        title: et("section_display"),
-        hint: et("section_display_hint"),
+        title: et("section_departure_row"),
+        hint: et("section_board"),
         data: {
           max_rows: cfg.max_rows,
           show_platform: cfg.show_platform,
@@ -420,5 +421,10 @@ export class WienerLinienAustriaFlapCardEditor
     });
   };
 
-  static override styles: CSSResultGroup = [editorTokens, editorStyles];
+  static override styles: CSSResultGroup = [
+    editorTokens,
+    editorStyles,
+    // Only the two cards that render the strip pay for its rules.
+    headerStripStyles,
+  ];
 }

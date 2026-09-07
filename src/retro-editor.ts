@@ -28,6 +28,7 @@ import { customElement, property, state } from "lit/decorators.js";
 
 import { editorStyles } from "./editor/editor-styles.js";
 import { editorTokens } from "./editor/editor-tokens.js";
+import { headerStripStyles } from "./editor/header-strip-styles.js";
 import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
 import {
   renderFormSection,
@@ -339,8 +340,8 @@ export class WienerLinienAustriaRetroCardEditor
       })}
       ${renderFormSection({
         ...common,
-        title: et("section_display"),
-        hint: et("section_display_hint"),
+        title: et("section_departure_row"),
+        hint: et("section_led_panel"),
         data: {
           show_platform: cfg.show_platform,
           platform_side: cfg.platform_side,
@@ -526,5 +527,10 @@ export class WienerLinienAustriaRetroCardEditor
     });
   };
 
-  static override styles: CSSResultGroup = [editorTokens, editorStyles];
+  static override styles: CSSResultGroup = [
+    editorTokens,
+    editorStyles,
+    // Only the two cards that render the strip pay for its rules.
+    headerStripStyles,
+  ];
 }

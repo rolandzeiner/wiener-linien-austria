@@ -39,10 +39,14 @@ export const editorStyles = css`
 
   .wl-tab {
     flex: 1;
+    /* Flex children refuse to shrink below their content by default, so
+       without this a long label (German "Haltestellen") widens the tab bar
+       past the dialog instead of ellipsing. */
+    min-width: 0;
     border: 0;
     background: transparent;
     cursor: pointer;
-    padding: 12px 14px 0;
+    padding: 12px 8px 0;
     font-size: 0.78125rem;
     font-weight: 500;
     line-height: 1.2;
@@ -55,12 +59,21 @@ export const editorStyles = css`
     color: var(--primary-color);
   }
 
+  /* Ellipsis lives on the label rather than on the button: overflow:hidden
+     on .wl-tab would clip the underline's negative-margin bleed below. */
+  .wl-tab-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   /* The underline is a child element rather than a border-bottom so it can
      bleed past the button's horizontal padding to the full tab width. */
   .wl-tab-underline {
     display: block;
     height: 2px;
-    margin: 7px -14px -1px;
+    margin: 7px -8px -1px;
     border-radius: 2px 2px 0 0;
     background: transparent;
   }
@@ -591,243 +604,26 @@ export const editorStyles = css`
     outline-offset: 2px;
   }
 
-  /* Station header strip — direct manipulation.
-     The bar mocks a physical black sign, so its surfaces are literal
-     colours rather than theme tokens: themed chrome here would stop the
-     widget looking like the thing it edits. */
+  /* Forced colours.
+     Several surfaces above carry forced-color-adjust:none, because a line
+     chip that loses its line colour stops being identifiable. Opting out also
+     forfeits the guaranteed contrast the forced palette provides, so each one
+     gets a CanvasText boundary back — the trade card-styles.ts already makes
+     at the end of its own sheet. Selected state is a --wl-ripple tint in the
+     normal palette and a tint is exactly what forced-colors flattens, so it is
+     restated as a Highlight outline; the :not(:focus-visible) keeps the focus
+     ring winning, since this block sits after the focus rules. */
+  @media (forced-colors: active) {
+    .wl-chip,
+    .wl-badge,
+    .wl-swatch {
+      outline: 1px solid CanvasText;
+    }
 
-  .wl-strip {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 8px 0 4px;
-  }
-
-  .wl-strip-bar {
-    display: flex;
-    gap: 6px;
-    padding: 8px;
-    border-radius: 10px;
-    background: var(--wl-signage-housing);
-    border: 1px solid var(--divider-color);
-  }
-
-  .wl-zone {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    min-height: 44px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    border: 1px dashed var(--wl-signage-outline);
-    background: transparent;
-    cursor: pointer;
-  }
-
-  .wl-zone--selected {
-    border: 2px solid var(--primary-color);
-    background: var(--wl-signage-selected);
-  }
-
-  .wl-zone:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-  }
-
-  .wl-zone-tokens {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    align-items: center;
-    width: 100%;
-  }
-
-  /* Right zone right-aligns its tokens so the preview matches how the card
-     lays the two sides out against the centre of the strip. */
-  .wl-zone--right .wl-zone-tokens {
-    justify-content: flex-end;
-  }
-
-  .wl-token {
-    display: flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 6px;
-    border-radius: 3px;
-    color: var(--wl-signage-ink);
-    font-size: 0.6875rem;
-    font-weight: 400;
-    line-height: 1;
-    white-space: nowrap;
-    forced-color-adjust: none;
-  }
-
-  .wl-token ha-icon {
-    --mdc-icon-size: 16px;
-  }
-
-  .wl-token--chip {
-    background: var(--wl-signage-chip);
-  }
-
-  .wl-strip-switch {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  /* Segmented control — used by the side switch. Enum config fields use
-     ha-form's select instead; this exists for editor-local UI state that
-     never reaches the config. */
-
-  .wl-seg {
-    display: flex;
-    gap: 4px;
-    padding: 3px;
-    background: var(--secondary-background-color);
-    border-radius: 8px;
-  }
-
-  .wl-seg-btn {
-    border: 0;
-    cursor: pointer;
-    padding: 8px 12px;
-    min-height: 34px;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--secondary-text-color);
-    font-size: 0.78125rem;
-    font-weight: 500;
-    line-height: 1.2;
-  }
-
-  .wl-seg-btn[aria-pressed="true"] {
-    background: var(--card-background-color);
-    color: var(--primary-color);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
-  }
-
-  .wl-seg-btn:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-  }
-
-  /* Slot panel — the four fields for whichever side is selected. */
-
-  .wl-slot {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 12px;
-    border: 1px solid var(--primary-color);
-    border-radius: 10px;
-    background: var(--wl-sunken);
-  }
-
-  .wl-pict-grid,
-  .wl-tray {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .wl-pict {
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--divider-color);
-    border-radius: 8px;
-    background: var(--card-background-color);
-    color: var(--primary-text-color);
-    cursor: pointer;
-  }
-
-  .wl-pict ha-icon,
-  .wl-tray-btn ha-icon,
-  .wl-pill ha-icon {
-    --mdc-icon-size: 18px;
-  }
-
-  .wl-pict[aria-pressed="true"],
-  .wl-tray-btn[aria-pressed="true"] {
-    border-color: var(--primary-color);
-    background: var(--wl-ripple);
-    color: var(--primary-color);
-  }
-
-  .wl-pict:hover,
-  .wl-tray-btn:hover {
-    background: var(--wl-hover);
-  }
-
-  .wl-pict:focus-visible,
-  .wl-tray-btn:focus-visible,
-  .wl-pill-x:focus-visible,
-  .wl-text:focus-visible {
-    outline: 2px solid var(--primary-color);
-    outline-offset: 2px;
-  }
-
-  .wl-tray-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 44px;
-    padding: 0 12px;
-    border: 1px solid var(--divider-color);
-    border-radius: 8px;
-    background: var(--card-background-color);
-    color: var(--primary-text-color);
-    font-size: 0.78125rem;
-    font-weight: 500;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .wl-text {
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 44px;
-    padding: 0 12px;
-    border: 1px solid var(--divider-color);
-    border-radius: 8px;
-    background: var(--card-background-color);
-    color: var(--primary-text-color);
-    font-size: 0.8125rem;
-    line-height: 1.4;
-  }
-
-  .wl-pill {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    min-height: 36px;
-    padding: 0 6px 0 11px;
-    border: 1px solid var(--divider-color);
-    border-radius: 18px;
-    background: var(--card-background-color);
-    color: var(--primary-text-color);
-    font-size: 0.78125rem;
-    line-height: 1;
-  }
-
-  .wl-pill-x {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 0;
-    border-radius: 12px;
-    background: var(--wl-hover);
-    color: var(--secondary-text-color);
-    cursor: pointer;
-  }
-
-  .wl-pill-x ha-icon {
-    --mdc-icon-size: 14px;
+    .wl-chip[aria-pressed="true"]:not(:focus-visible),
+    .wl-dir[aria-pressed="true"]:not(:focus-visible) {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
   }
 `;

@@ -37,6 +37,13 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
 
 - `pyproject.toml` — source of truth for ruff (target-version, line-length), mypy (strict, ignore_missing_imports, files), and coverage config. Change rules here, not in CI flags.
   - **`target-version` tracks the oldest Python we support, never the one CI runs.** `hacs.json` promises HA ≥ 2025.1.0, which runs on Python 3.12, so `target-version = "py312"` — even though the venv and CI are on 3.14. Pointing it at the CI interpreter lets ruff rewrite code into syntax our users cannot parse and then stay silent about it; that is how v1.7.1 shipped a SyntaxError (issue #91). The `compile-floor-python` CI job byte-compiles the shipped package on 3.12 as an independent backstop. Raise all three together or not at all.
+- `scripts/strip-css-comments.mjs` — rollup transform that removes comments and
+  indentation from Lit ``css`` templates in production builds. Terser minifies
+  JavaScript, and a tagged template's contents are string data, so without this
+  every explanatory CSS comment shipped to users; it was 17.8% of the modern
+  bundle. Comments stay intact in `npm run dev`. It must sit *after*
+  `typescript()` in `rollup.config.mjs` — that plugin emits from a TS program
+  reading the file off disk, so anything upstream of it is silently discarded.
 - `pytest.ini` — pytest config and the **`--cov-fail-under=90` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~91%.
 - `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes (and keep `const.ATTRIBUTION` in sync).
 
@@ -91,6 +98,7 @@ mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
 ruff check .
 ruff format --check .   # separate: `ruff check` never inspects formatting
 npx tsc --noEmit
+npm test
 npm run build
 ```
 

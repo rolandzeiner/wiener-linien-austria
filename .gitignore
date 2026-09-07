@@ -132,10 +132,14 @@ config/
 
 # ───────────────────────────────────────────────────────────────────
 # Personal dev tooling — push/sync scripts targeting a dev box, scratch.
-# `scripts/*` ignores all files in scripts/ by default, then the
-# time MDI name extractor (required for `npm run build` to succeed).
+# `scripts/*` ignores everything in scripts/ by default; anything the build
+# actually needs has to be un-ignored below, or `npm run build` fails on a
+# fresh clone and in CI while still working on the machine that wrote it.
+# (The MDI name extractor this block used to un-ignore went away with the v2
+# editor rewrite; its exception went with it, leaving nothing here to name.)
 # ───────────────────────────────────────────────────────────────────
 scripts/*
+!scripts/strip-css-comments.mjs
 dev-push.sh
 dev/
 test/

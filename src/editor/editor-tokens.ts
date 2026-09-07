@@ -28,13 +28,5 @@ export const editorTokens = css`
     --wl-sunken: color-mix(in srgb, var(--primary-text-color) 3%, var(--card-background-color));
     --wl-hover: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
     --wl-ripple: color-mix(in srgb, var(--primary-color) 14%, transparent);
-    /* The signage bar is a mock of a physical black sign, not themed chrome —
-       these stay literal on purpose. Changing them to theme tokens would make
-       the widget stop looking like the thing it is editing. */
-    --wl-signage-housing: #0d0d0d;
-    --wl-signage-selected: #171717;
-    --wl-signage-outline: #3a3a3a;
-    --wl-signage-chip: #2a2a2a;
-    --wl-signage-ink: #f2f2f2;
   }
 `;

@@ -66,12 +66,22 @@ export function renderTabs(
           role="tab"
           id=${`wl-tab-${tab.key}`}
           aria-selected=${active === tab.key ? "true" : "false"}
-          aria-controls=${`wl-panel-${tab.key}`}
+          aria-controls=${
+            // Only the active panel is in the DOM (see renderPanel), so an
+            // aria-controls on an inactive tab names an id that does not
+            // exist: an aria-valid-attr-value violation, and a reference AT
+            // can follow into nothing. Rendering all three panels to keep the
+            // attribute honest would instantiate three ha-form trees to hide
+            // two, so the attribute is dropped where it has no referent
+            // instead — `nothing` as a whole attribute value removes it. Tabs
+            // without aria-controls are valid ARIA.
+            active === tab.key ? `wl-panel-${tab.key}` : nothing
+          }
           tabindex=${active === tab.key ? "0" : "-1"}
           @click=${() => onSelect(tab.key)}
           @keydown=${(ev: KeyboardEvent) => focusSibling(ev, i)}
         >
-          ${tab.label}
+          <span class="wl-tab-label">${tab.label}</span>
           <span class="wl-tab-underline" aria-hidden="true"></span>
         </button>`,
       )}

@@ -3,6 +3,8 @@ import { nodeResolve } from "@rollup/plugin-node-resolve";
 import terser from "@rollup/plugin-terser";
 import json from "@rollup/plugin-json";
 
+import stripCssComments from "./scripts/strip-css-comments.mjs";
+
 const dev = !!process.env.ROLLUP_WATCH;
 
 const banner =
@@ -29,6 +31,9 @@ const basePlugins = () =>
   [
     nodeResolve(),
     typescript(),
+    // Strictly after typescript() — see the plugin's header for why placing it
+    // earlier makes it a silent no-op.
+    !dev && stripCssComments(),
     json(),
     !dev && terser({ format: { comments: /Wiener Linien Austria/ } }),
   ].filter(Boolean);
