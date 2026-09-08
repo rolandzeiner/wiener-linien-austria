@@ -176,11 +176,11 @@ no meaningful saving. The floor sits at or above the 15-second minimum interval
 conventionally cited for the OGD real-time endpoint — Wiener Linien publish no
 numeric cap, so the figure is convention rather than rule.
 
-Requests send `Accept-Encoding: gzip`, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
+Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
 > **After a Home Assistant restart**: alerts (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min. Departures fetch immediately.
 
-**Failure handling.** A single failed poll keeps the cadence and serves the last successful board — templates can spot staleness via `server_time`. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 raises a Repairs issue per entry that clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
+**Failure handling.** A single failed poll keeps the cadence and serves the last successful board — templates can spot staleness via `server_time`. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 is the exception: it widens on the first failure instead, since upstream has already said the poll is too fast. It also raises a Repairs issue per entry, which clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
 
 ## Use Cases
 
