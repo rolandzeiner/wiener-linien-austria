@@ -153,13 +153,13 @@ jobs:
       - name: Install card deps
         run: npm ci
       - name: Audit production deps
-        # --omit=dev keeps the gate enforceable; without it Rollup-plugin
+        # --omit=dev keeps the gate enforceable; without it build-tooling
         # advisories (which never ship to users) flood the report and the
         # team learns to ignore failures.
         run: npm audit --omit=dev --audit-level=high
       - name: Type-check (strict)
-        # The ONLY type-check in the pipeline. The bundler transpiles with
-        # swc, which strips types without checking them, so nothing else in
+        # The ONLY type-check in the pipeline. Rolldown transpiles without
+        # type-checking, exactly as swc did, so nothing else in
         # this workflow would notice a type error — a broken build would go
         # green all the way to the bundle. Never make this step conditional.
         run: npx tsc --noEmit

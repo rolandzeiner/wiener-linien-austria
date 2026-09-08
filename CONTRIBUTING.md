@@ -10,7 +10,7 @@ uv pip install -r requirements_test.txt pre-commit
 pre-commit install      # runs ruff + mypy + checks on every commit
 
 npm ci                  # Lovelace card deps
-npm run build           # Rollup builds three bundles into
+npm run build           # Rolldown builds three bundles into
                         # custom_components/wiener_linien_austria/www/:
                         #   wiener-linien-austria-card.js
                         #   wiener-linien-austria-retro-card.js
@@ -37,13 +37,13 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
 
 - `pyproject.toml` — source of truth for ruff (target-version, line-length), mypy (strict, ignore_missing_imports, files), and coverage config. Change rules here, not in CI flags.
   - **`target-version` tracks the oldest Python we support, never the one CI runs.** `hacs.json` promises HA ≥ 2025.1.0, which runs on Python 3.12, so `target-version = "py312"` — even though the venv and CI are on 3.14. Pointing it at the CI interpreter lets ruff rewrite code into syntax our users cannot parse and then stay silent about it; that is how v1.7.1 shipped a SyntaxError (issue #91). The `compile-floor-python` CI job byte-compiles the shipped package on 3.12 as an independent backstop. Raise all three together or not at all.
-- `scripts/strip-css-comments.mjs` — rollup transform that removes comments and
-  indentation from Lit ``css`` templates in production builds. Terser minifies
-  JavaScript, and a tagged template's contents are string data, so without this
-  every explanatory CSS comment shipped to users; it was 17.8% of the modern
-  bundle. Comments stay intact in `npm run dev`. It must sit *after*
-  `typescript()` in `rollup.config.mjs` — that plugin emits from a TS program
-  reading the file off disk, so anything upstream of it is silently discarded.
+- `scripts/strip-css-comments.mjs` — a Rollup-API `transform` plugin that removes
+  comments and indentation from Lit ``css`` templates in production builds. A
+  minifier only minifies JavaScript, and a tagged template's contents are string
+  data, so without this every explanatory CSS comment shipped to users; it was
+  17.8% of the modern bundle. Comments stay intact in `npm run dev`. It carried
+  over to `rolldown.config.mjs` unchanged — rolldown implements the Rollup plugin
+  API — and still runs *after* the transpile step, which is the ordering it needs.
 - `pytest.ini` — pytest config and the **`--cov-fail-under=90` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~91%.
 - `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes (and keep `const.ATTRIBUTION` in sync).
 
@@ -51,11 +51,11 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
 
 `requirements_test.txt` carries its own rules in its header comment. This section covers `package.json`, which is JSON and cannot.
 
-**Runtime vs dev is a real distinction here, not bookkeeping.** The package is `private` and nothing ever installs it, so the split looks cosmetic — but CI runs `npm audit --omit=dev --audit-level=high`, and that gate only means something because the packages that actually reach a user's browser inside the bundle are the ones in `dependencies`. A build-time tool belongs in `devDependencies` even though the build needs it; anything Rollup inlines into `www/*.js` belongs in `dependencies`.
+**Runtime vs dev is a real distinction here, not bookkeeping.** The package is `private` and nothing ever installs it, so the split looks cosmetic — but CI runs `npm audit --omit=dev --audit-level=high`, and that gate only means something because the packages that actually reach a user's browser inside the bundle are the ones in `dependencies`. A build-time tool belongs in `devDependencies` even though the build needs it; anything Rolldown inlines into `www/*.js` belongs in `dependencies`.
 
 **When to pin exactly vs. allow a caret:**
 
-- **Caret (`^x.y.z`)** is the default. Use it for actively maintained packages that keep semver honestly — `lit`, `rollup`, `typescript`, the `@rollup/plugin-*` family.
+- **Caret (`^x.y.z`)** is the default. Use it for actively maintained packages that keep semver honestly — `lit`, `rolldown`, `typescript`.
 - **Exact (`x.y.z`)** for three specific cases:
   1. **The package is unmaintained**, so a range floats over code nobody is watching. `qr-creator` is at its only release, built with a 2019 toolchain.
   2. **The "version" is really content, not an API.** A patch release can change what you get without changing any signature.
@@ -63,16 +63,20 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
 
 Bumping an exact pin is a deliberate act — say why in the commit message.
 
-**Before adding a dependency, check it earns its place.** The bundle is served to every user on every dashboard load. Prefer inlining a constant over depending on a package that exports thousands of them: `utils/mdi-paths.ts` and `utils/retro-station-icons.ts` both vendor icon path geometry with provenance comments rather than pulling an icon library, because path data is content and Rollup was tree-shaking all but a handful of exports anyway.
+**Before adding a dependency, check it earns its place.** The bundle is served to every user on every dashboard load. Prefer inlining a constant over depending on a package that exports thousands of them: `utils/mdi-paths.ts` and `utils/retro-station-icons.ts` both vendor icon path geometry with provenance comments rather than pulling an icon library, because path data is content and the bundler was tree-shaking all but a handful of exports anyway.
 
-**Rollup plugins are load-bearing or they are removed.** `validate.yml` asserts the committed bundles match a fresh build, so any plugin that changes output is part of that contract. `@rollup/plugin-commonjs` was dropped once every runtime dependency shipped ESM — the three bundles built byte-identically without it. If you add a CJS-only dependency, Rollup fails loudly and the plugin goes back in.
+**Build plugins are load-bearing or they are removed.** `validate.yml` asserts the committed bundles match a fresh build, so any plugin that changes output is part of that contract. Rolldown does resolution, JSON, CommonJS interop, transpilation and minification natively, which is why the whole `@rollup/plugin-*` stack is gone rather than ported — `strip-css-comments` is the only plugin left, and it is there because nothing built in does its job.
 
-**The bundler transpiles with swc, and `tsc` is the only type-checker.** TypeScript 7 is the Go-native compiler and its npm package no longer ships the JS compiler API, so `@rollup/plugin-typescript` dies at plugin load. `@rollup/plugin-swc` transpiles in its place; `npx tsc --noEmit` still type-checks. Two consequences worth knowing:
+**Two output options are load-bearing and fail silently.** The banner must be a **legal** comment — `/*! ... */` — with `comments: { legal: true }`; a `//` banner is stripped by the minifier and only the built file's first bytes reveal it. And **`dropConsole` stays `false`**: rolldown's option is a boolean rather than terser's per-method array, so it is all-or-nothing, and most `console.*` calls in these cards sit in `catch` blocks where dropping them turns a caught error into a silent one.
 
-- **swc checks nothing.** A type error will not fail `npm run build`. `tsc --noEmit` is the single gate between a type error and a shipped bundle, which is why `validate.yml` runs it as its own step.
-- **swc's transpile settings are read out of `tsconfig.json` by `rollup.config.mjs`, never restated.** swc has its own decorator implementation, and Lit 3's `@customElement` / `@property` are legacy decorators that need `useDefineForClassFields: false`. If the two copies of that setting ever drift, class fields overwrite Lit's accessors and reactivity dies silently while the build stays green.
+**The three bundles are excluded from the `end-of-file-fixer` / `trailing-whitespace` pre-commit hooks.** Rolldown emits no trailing newline where Rollup did, so a hook that "fixes" the file *after* the build leaves the committed bundle out of sync with a fresh one — exactly what `validate.yml` asserts byte-for-byte. `output.footer: "\n"` does not work around it; the minifier strips trailing whitespace.
 
-`tslib` went with the old plugin. Nothing imports it from source and the bundles contain zero references to it — `tsconfig.json` sets no `importHelpers`, so `__decorate` is inlined. It was only ever a hard preflight check inside `@rollup/plugin-typescript`, which is why it read as dead weight for so long. Its `.fallowrc.json` `ignoreDependencies` entry went with it.
+**The bundler does not type-check, and `tsc` is the only type-checker.** This has been true since the move off `@rollup/plugin-typescript` (TypeScript 7 is the Go-native compiler and its npm package no longer ships the JS compiler API, so that plugin dies at load). swc filled the gap for one release cycle; rolldown does the transpile now. `npx tsc --noEmit` still type-checks. Two consequences worth knowing:
+
+- **The bundler checks nothing.** A type error will not fail `npm run build`. `tsc --noEmit` is the single gate between a type error and a shipped bundle, which is why `validate.yml` runs it as its own step.
+- **Decorator settings are no longer restated anywhere.** Lit 3's `@customElement` / `@property` are legacy decorators that need `useDefineForClassFields: false`. swc needed that spelled out, and `rollup.config.mjs` derived it from `tsconfig.json` to stop the two drifting; rolldown reads `tsconfig.json` itself, so there is only one copy now. If it ever regresses, class fields overwrite Lit's accessors and reactivity dies silently while the build stays green — diff the Lit reactive-property list of a built bundle to catch it.
+
+`tslib` went with `@rollup/plugin-typescript`. Nothing imports it from source and the bundles contain zero references to it — `tsconfig.json` sets no `importHelpers`, so `__decorate` is inlined. It was only ever a hard preflight check inside that plugin, which is why it read as dead weight for so long. Its `.fallowrc.json` `ignoreDependencies` entry went with it.
 
 View per-file coverage locally:
 

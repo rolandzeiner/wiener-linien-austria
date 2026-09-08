@@ -1,15 +1,16 @@
-// Rollup transform: drop authoring whitespace and comments from Lit `css`
+// Bundler transform (Rollup plugin API, run by rolldown): drop authoring
+// whitespace and comments from Lit `css`
 // templates before they reach the bundle.
 //
-// Why this is needed at all: terser minifies JavaScript, and the contents of a
-// tagged template literal are not JavaScript — they are string data. So every
+// Why this is needed at all: a minifier minifies JavaScript, and the contents
+// of a tagged template literal are not JavaScript — they are string data. So every
 // explanatory CSS comment and every level of indentation in card-styles.ts and
 // the editor sheets shipped verbatim to every user. Measured before this
 // plugin existed: 38 KB of block comments inside a 216 KB modern bundle, 17.8%
 // of the file, and that is before counting indentation.
 //
-// The `comments: /Wiener Linien Austria/` option on @rollup/plugin-terser is
-// unrelated — it governs JS comments, and its job is keeping the build banner.
+// The `comments: { legal: true }` output option is unrelated — it governs JS
+// comments, and its job is keeping the build banner.
 //
 // Scope and safety
 // ----------------
@@ -27,17 +28,17 @@
 //   newline. Nothing inside a line moves, so multi-line values keep the token
 //   separation CSS requires, and CSS strings cannot span lines.
 //
-// This plugin must run AFTER the transpiler (swc). The rule outlived the
-// plugin that motivated it: @rollup/plugin-typescript emitted from a TS
-// program that read the file off disk rather than from rollup's transform
-// chain, so anything done upstream of it was silently discarded. swc is a
-// well-behaved transform, but ordering still matters — it reprints the source,
-// so running before it means re-expanded templates downstream.
+// This plugin must run AFTER the transpiler. The rule outlived the plugin that
+// motivated it: @rollup/plugin-typescript emitted from a TS program that read
+// the file off disk rather than from the bundler's transform chain, so anything
+// done upstream of it was silently discarded. swc, and now rolldown's built-in
+// transpile, are well-behaved — but ordering still matters, because they reprint
+// the source, so running before them means re-expanded templates downstream.
 // Note the pattern below tolerates whitespace before the backtick, because an
-// emitter may reprint the tag as `css \`` with a space; swc emits it without
-// one. Both forms match.
+// emitter may reprint the tag as `css \`` with a space; rolldown emits it
+// without one. Both forms match.
 //
-// Disabled during `npm run dev` (rollup -c -w), where readable output and
+// Disabled during `npm run dev` (rolldown -c -w), where readable output and
 // working sourcemaps are worth more than bytes.
 
 const CSS_TEMPLATE = /\bcss\s*`/g;

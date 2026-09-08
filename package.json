@@ -5,20 +5,16 @@
   "description": "Lovelace custom cards for the Wiener Linien Austria HA integration",
   "type": "module",
   "scripts": {
-    "build": "rollup -c",
-    "dev": "rollup -c -w",
+    "build": "rolldown -c",
+    "dev": "rolldown -c -w",
     "build:push": "./scripts/dev-push.sh --quiet",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts"
   },
   "devDependencies": {
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "@rollup/plugin-swc": "0.4.1",
-    "@rollup/plugin-terser": "^1.0.0",
     "@vitest/coverage-v8": "4.1.11",
     "happy-dom": "20.14.0",
-    "rollup": "^4.63.1",
+    "rolldown": "1.2.7",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   },

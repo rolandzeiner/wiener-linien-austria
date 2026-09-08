@@ -1,5 +1,5 @@
 # Unified .gitignore for the *-austria HACS portfolio (6 integrations,
-# all Lit 3 + TypeScript + Rollup card + HA Python integration).
+# all Lit 3 + TypeScript + Rolldown card + HA Python integration).
 # Reviewed 2026-05-08 — composed from the union of all 6 existing files,
 # de-duplicated, with per-repo paths replaced by globbed equivalents.
 
@@ -56,7 +56,7 @@ node_modules/
 *.js.map
 
 # Bundler caches
-.rollup.cache/
+.rolldown.cache/
 .vite-cache/
 .parcel-cache/
 
