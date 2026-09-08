@@ -24,6 +24,14 @@
 // general punctuation: a generic "period followed by capital" rule would
 // break "Betrieb ab 8.Mai" and "Station St.Marx".
 //
+// The operator writes those two facts in two interchangeable ways, and a
+// notice uses one or the other: the `Label:` template above, or plain prose
+// ("Grund dafür ist ein Rettungseinsatz…", "Die Störung dauert
+// voraussichtlich bis 12:00 Uhr."). Both live simultaneously in the feed.
+// PROSE_FACT_PATTERNS reads the second form, but only when the sentence is a
+// whole line — prose has no unambiguous start marker, so it is never used to
+// SPLIT a line, only to classify one.
+//
 // Output is plain text in a typed model, rendered through ordinary Lit
 // bindings — so unlike the previous `unsafeHTML` path, nothing from upstream
 // is ever interpreted as markup. Inline emphasis from upstream would be
@@ -62,6 +70,60 @@ const FACT_RE = new RegExp(`^(${FACT_LABELS.join("|")}):\\s*(.+)$`);
  *  at the start of its line. */
 const GLUED_FACT_RE = new RegExp(`(?<=\\S)\\s*(?=(?:${FACT_LABELS.join("|")}):)`, "g");
 
+/** Nouns the operator uses for the disruption itself, for the prose duration
+ *  sentence below. Enumerated rather than left as a wildcard so that a
+ *  sentence about something else that happens to be timed ("Die Fahrt dauert
+ *  voraussichtlich bis …") isn't read as the end of the disruption. */
+const DISRUPTION_NOUNS = [
+  "Störung",
+  "Sperre",
+  "Umleitung",
+  "Unterbrechung",
+  "Behinderung",
+] as const;
+
+/** The same two facts as {@link FACT_LABELS}, written as prose instead of the
+ *  `Label:` template. The operator emits BOTH forms: a survey of the live
+ *  `stoerunglang` feed on 2026-09-08 caught the two concurrent entries using
+ *  one each — "Grund: Gleisschaden im Haltestellenbereich Quartier Belvedere
+ *  S." against "Grund dafür ist ein Rettungseinsatz im Haltestellenbereich
+ *  Donauinsel." Reading only the templated form leaves the facts block empty
+ *  for the prose half, which is what it did until now.
+ *
+ *  Each pattern consumes the WHOLE piece. These are recognised only when the
+ *  sentence stands alone as its own line, which is how the operator writes
+ *  them. Matching mid-paragraph is deliberately not attempted: unlike the
+ *  literal labels, a prose sentence has no unambiguous start marker, so
+ *  `GLUED_FACT_RE` stays anchored to literals for the reason the module
+ *  header gives. Prose left in place still reads correctly as prose, so
+ *  declining to split costs nothing. */
+const PROSE_FACT_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+  // "Die Störung dauert voraussichtlich bis 12:00 Uhr."
+  [
+    new RegExp(
+      `^Die\\s+(?:${DISRUPTION_NOUNS.join("|")})\\s+dauert\\s+voraussichtlich\\s+bis\\s+(.+)$`,
+      "i",
+    ),
+    "Voraussichtliche Dauer",
+  ],
+  // "Grund dafür ist ein Rettungseinsatz im Haltestellenbereich Donauinsel."
+  // The INDEFINITE article is dropped so the value reads like the templated
+  // form's ("Gleisschaden im Haltestellenbereich …"); a definite article is
+  // kept, because there it carries meaning ("die Sperre der Station …").
+  [/^Grund\s+(?:dafür|hierfür)\s+(?:ist|sind)\s+(?:eine?\s+)?(.+)$/i, "Grund"],
+];
+
+/** First prose pattern that consumes `piece` whole, or `null`. */
+function matchProseFact(
+  piece: string,
+): { label: string; value: string } | null {
+  for (const [pattern, label] of PROSE_FACT_PATTERNS) {
+    const match = pattern.exec(piece);
+    if (match?.[1]) return { label, value: match[1] };
+  }
+  return null;
+}
+
 export interface TrafficBlock {
   kind: "heading" | "para";
   text: string;
@@ -93,7 +155,11 @@ const REASON_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/feuerwehr|brand/i, "mdi:fire-truck"],
   [/polizei/i, "mdi:police-badge"],
   [/demonstration|kundgebung|veranstaltung|umzug|marathon/i, "mdi:account-group"],
-  [/schnee|eis|glatt/i, "mdi:snowflake"],
+  // "eis" and "glatt" are anchored to a word start: as bare substrings they
+  // fire on "Gleisschaden", "Preis", "Kreis" and "Reisende" — a track defect
+  // was being shown a snowflake. `vereis` and `glätte` are spelled out
+  // because the boundary rule would otherwise lose "Vereisung" and "Glätte".
+  [/schnee|\beis|vereis|\bglatt|gl(ä|ae)tte/i, "mdi:snowflake"],
   [/sturm|unwetter|witterung|gewitter|hitze/i, "mdi:weather-lightning-rainy"],
   // Broadest technical bucket last — "Störung" appears inside several of
   // the more specific compounds above. The maintenance vocabulary here is
@@ -315,6 +381,21 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
           label: fact[1],
           value,
           icon: iconForFact(fact[1], value),
+        });
+        continue;
+      }
+      // Same two facts in prose form. A label already captured from the
+      // templated form wins; the prose sentence then stays as a paragraph
+      // rather than being dropped, so no wording is lost if a notice ever
+      // carries both and they disagree.
+      const prose = matchProseFact(piece);
+      if (prose && !seenFacts.has(prose.label)) {
+        seenFacts.add(prose.label);
+        const value = trimTerminalPeriod(prose.value);
+        facts.push({
+          label: prose.label,
+          value,
+          icon: iconForFact(prose.label, value),
         });
         continue;
       }
