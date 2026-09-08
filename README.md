@@ -66,8 +66,7 @@ Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_comp
 
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
 2. Start typing in **Stop** (e.g. `Stephans`) and pick a suggestion. The list opens on the stops nearest your Home Assistant location, with distances shown. Submit a partial name instead to see every stop that matches.
-3. Pick the lines to track. Off-service lines — nightlines during the day, day-only lines after midnight — stay selectable.
-4. Set a polling interval (default 60 s, range 30–600 s) and save.
+3. Pick the lines to track and set the polling interval (default 60 s, range 30–600 s), then save. Off-service lines — nightlines during the day, day-only lines after midnight — stay selectable.
 
 Change tracked lines via **Reconfigure**, the polling interval via **Configure**.
 
@@ -144,7 +143,7 @@ Each stop gets one sensor. Home Assistant names it in your interface language, s
 
 ### Departure shape
 
-Each entry in `departures` carries the service (`line`, `towards`, `direction` `"H"` / `"R"`, `type` — `ptMetro` / `ptTram` / `ptBusCity` / `ptBusNight`), the timing (`countdown`, `time_planned` and `time_real` as ISO strings, `realtime`), and the stop context (`barrier_free`, `traffic_jam`, `platform`).
+Each entry in `departures` carries the service (`line`, `towards`, `direction` `"H"` / `"R"`, `type` — `ptMetro` / `ptTram` / `ptBusCity` / `ptBusNight`), the timing (`countdown`, `time_planned` and `time_real` as ISO strings, `realtime`), and the vehicle and stop context (`barrier_free`, `traffic_jam`, `platform`, `cooling`).
 
 When the static schedule resolves a matching trip, `stops_ahead` adds an ordered list of `{name, is_terminus?, lines?}` down to the terminus. `lines` holds the *other* lines passing through each stop, which the card renders as transfer chips.
 
