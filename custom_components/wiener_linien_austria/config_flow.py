@@ -297,6 +297,18 @@ async def _probe_monitor_lines(
 
     Each dict: {key, line, towards, direction, type}. Empty list on any failure
     — caller must handle by surfacing a `cannot_connect` form error.
+
+    This is the one outbound call that deliberately does NOT take
+    `async_enforce_domain_cooldown`. Every recurring caller does (batch.py,
+    alerts.py, static.py), because they run unattended and their aggregate rate
+    is what the upstream notices. This one is user-initiated, fires at most
+    twice in an entry's lifetime (initial setup and reconfigure), and the
+    cooldown sleeps *inside* the lock — taking it would freeze the config-flow
+    dialog for up to DOMAIN_COOLDOWN_SECONDS while someone is watching it, to
+    spare a free public API a single request. Not a trade worth making.
+
+    If you are here because a linter or an audit flagged the inconsistency:
+    it is deliberate, and README's Data Updates section documents it.
     """
     session = async_get_clientsession(hass)
     url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"

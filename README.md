@@ -154,19 +154,33 @@ Two live endpoints and three static catalogues, on separate cadences:
 
 | What | Endpoint | Cadence |
 |---|---|---|
-| Live departures per stop | `/monitor?stopId=…` | Per-entry, default 60 s (30–600 s) |
-| Traffic + elevator alerts | `/trafficInfoList` (one request, three feeds) | Domain-wide, 5 min — shared across all entries |
+| Live departures | `/monitor?stopId=…` | One request per interval group, default 60 s (30–600 s) |
+| Service, stop and elevator alerts | `/trafficInfoList` (one request, three feeds) | Domain-wide, 5 min — shared across all entries |
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 
-Every outbound call shares a **15 s domain-wide cooldown** plus a 30 s per-entry floor. That sits at or above the 15-second minimum interval conventionally cited for the OGD real-time endpoint — Wiener Linien publish no numeric cap, so the figure is convention rather than rule.
+**The polling interval is per entry; the request is not.** Every entry configured
+with the same interval joins one group that issues a single `/monitor` request
+carrying all their stops, then fans the response out. Adding stops at the same
+cadence costs no extra requests. The five static files likewise refresh as one
+weekly burst, not five schedules.
+
+Recurring calls share a **15 s domain-wide cooldown** plus a 30 s per-entry
+floor — that is the departure poll, the alerts refresh, and the weekly static
+burst (which takes one slot for all five files rather than stalling a
+background refresh five times over). The one exception is the live probe the
+config flow runs while you pick lines: it is user-initiated, happens at most
+twice in an entry's life, and making it wait would stall the setup dialog for
+no meaningful saving. The floor sits at or above the 15-second minimum interval
+conventionally cited for the OGD real-time endpoint — Wiener Linien publish no
+numeric cap, so the figure is convention rather than rule.
 
 Requests send `Accept-Encoding: gzip`, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
 > **After a Home Assistant restart**: alerts (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min. Departures fetch immediately.
 
-**Failure handling.** A single failed poll keeps your cadence and serves the last successful board — templates can spot staleness via `server_time`. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds. Rate-limit error 316 raises a Repairs issue that clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
+**Failure handling.** A single failed poll keeps the cadence and serves the last successful board — templates can spot staleness via `server_time`. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 raises a Repairs issue per entry that clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
 
 ## Use Cases
 
@@ -215,7 +229,7 @@ template:
 
 **"No stop matches that."** Try a shorter or partial name — `Karls` matches Karlsplatz, Karlskirche, and more. Search is case-insensitive, but umlauts matter.
 
-**Repairs issue "Wiener Linien rate limit hit".** Usually several HA instances behind one outbound IP sharing the OGD allowance. Raise the scan interval, run fewer entries, or ignore it — the integration recovers on its own.
+**Repairs issue "Wiener Linien rate limit hit".** Usually several HA instances behind one outbound IP sharing the OGD allowance. Raise the scan interval, or put your stops on the *same* interval so they share one request — adding stops at a cadence you already use costs nothing, while each distinct interval starts its own request stream. Or ignore it; the integration recovers on its own.
 
 **Bug reports.** Settings → Devices & Services → Wiener Linien Austria → ⋯ → **Download diagnostics**. The JSON carries attribution, RBL list, last error code, and coordinator timing. No personal data.
 
