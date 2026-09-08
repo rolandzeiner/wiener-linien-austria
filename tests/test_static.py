@@ -504,7 +504,7 @@ async def test_fetch_and_build_takes_the_cooldown_once_not_per_file(
 async def test_static_downloads_send_user_agent_and_gzip(
     hass: HomeAssistant,
 ) -> None:
-    """Every static download carries the canonical User-Agent + gzip.
+    """Every static download carries the canonical User-Agent.
 
     The fourth outbound call site alongside the three in test_user_agent.py.
     """
@@ -521,7 +521,8 @@ async def test_static_downloads_send_user_agent_and_gzip(
     for call in session.get.call_args_list:
         headers = call.kwargs["headers"]
         assert headers["User-Agent"] == USER_AGENT
-        assert headers["Accept-Encoding"] == "gzip"
+        # Unset on purpose — pinning would narrow aiohttp's own offer.
+        assert "Accept-Encoding" not in headers
         # No conditional-GET validators: the upstream never answers 304.
         assert "If-None-Match" not in headers
         assert "If-Modified-Since" not in headers
