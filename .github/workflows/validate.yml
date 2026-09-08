@@ -158,9 +158,10 @@ jobs:
         # team learns to ignore failures.
         run: npm audit --omit=dev --audit-level=high
       - name: Type-check (strict)
-        # Rollup's @rollup/plugin-typescript is more permissive than tsc
-        # in strict mode. Run tsc separately so TS regressions surface in
-        # CI instead of slipping into the bundle.
+        # The ONLY type-check in the pipeline. The bundler transpiles with
+        # swc, which strips types without checking them, so nothing else in
+        # this workflow would notice a type error — a broken build would go
+        # green all the way to the bundle. Never make this step conditional.
         run: npx tsc --noEmit
       - name: Card unit tests
         # Pure-function coverage of the three config normalisers, the

@@ -67,12 +67,12 @@ Bumping an exact pin is a deliberate act — say why in the commit message.
 
 **Rollup plugins are load-bearing or they are removed.** `validate.yml` asserts the committed bundles match a fresh build, so any plugin that changes output is part of that contract. `@rollup/plugin-commonjs` was dropped once every runtime dependency shipped ESM — the three bundles built byte-identically without it. If you add a CJS-only dependency, Rollup fails loudly and the plugin goes back in.
 
-**`tslib` looks removable and is not.** `.fallowrc.json` lists it under `ignoreDependencies`, and that entry is not hiding a real finding — the config is strict JSON and rejects unknown keys, so the explanation has to live here:
+**The bundler transpiles with swc, and `tsc` is the only type-checker.** TypeScript 7 is the Go-native compiler and its npm package no longer ships the JS compiler API, so `@rollup/plugin-typescript` dies at plugin load. `@rollup/plugin-swc` transpiles in its place; `npx tsc --noEmit` still type-checks. Two consequences worth knowing:
 
-- Nothing imports `tslib` from source, and the built bundles contain zero references to it. `tsconfig.json` sets no `importHelpers`, so `tsc` inlines `__decorate` rather than importing helpers.
-- But `@rollup/plugin-typescript` resolves `tslib` unconditionally in its preflight hook — `if (!inputPreserveModules && tslib === null) context.error(...)`. Not conditional on `importHelpers`. Remove the package and `npm run build` dies before it reads a single source file.
+- **swc checks nothing.** A type error will not fail `npm run build`. `tsc --noEmit` is the single gate between a type error and a shipped bundle, which is why `validate.yml` runs it as its own step.
+- **swc's transpile settings are read out of `tsconfig.json` by `rollup.config.mjs`, never restated.** swc has its own decorator implementation, and Lit 3's `@customElement` / `@property` are legacy decorators that need `useDefineForClassFields: false`. If the two copies of that setting ever drift, class fields overwrite Lit's accessors and reactivity dies silently while the build stays green.
 
-That combination — invisible to static analysis, mandatory at build time — is exactly why it reads as dead weight. Verified the hard way on 2026-09-07. Keep the dependency and keep the ignore entry.
+`tslib` went with the old plugin. Nothing imports it from source and the bundles contain zero references to it — `tsconfig.json` sets no `importHelpers`, so `__decorate` is inlined. It was only ever a hard preflight check inside `@rollup/plugin-typescript`, which is why it read as dead weight for so long. Its `.fallowrc.json` `ignoreDependencies` entry went with it.
 
 View per-file coverage locally:
 

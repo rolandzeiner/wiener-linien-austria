@@ -27,12 +27,15 @@
 //   newline. Nothing inside a line moves, so multi-line values keep the token
 //   separation CSS requires, and CSS strings cannot span lines.
 //
-// This plugin must run AFTER @rollup/plugin-typescript: that plugin emits from
-// a TS program which reads the file off disk rather than from rollup's
-// transform chain, so anything done upstream of it is silently discarded.
-// Note the pattern below tolerates whitespace before the backtick — the
-// TypeScript emitter reprints the tag as `css \`` with a space, which is what
-// this plugin actually sees.
+// This plugin must run AFTER the transpiler (swc). The rule outlived the
+// plugin that motivated it: @rollup/plugin-typescript emitted from a TS
+// program that read the file off disk rather than from rollup's transform
+// chain, so anything done upstream of it was silently discarded. swc is a
+// well-behaved transform, but ordering still matters — it reprints the source,
+// so running before it means re-expanded templates downstream.
+// Note the pattern below tolerates whitespace before the backtick, because an
+// emitter may reprint the tag as `css \`` with a space; swc emits it without
+// one. Both forms match.
 //
 // Disabled during `npm run dev` (rollup -c -w), where readable output and
 // working sourcemaps are worth more than bytes.
