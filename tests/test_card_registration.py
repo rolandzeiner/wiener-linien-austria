@@ -97,6 +97,20 @@ async def test_register_creates_all_resources_when_absent(
     static_urls = {cfg.url_path for cfg in static_args}
     assert static_urls == {CARD_URL, RETRO_CARD_URL, FLAP_CARD_URL, FONTS_URL}
 
+    # Cache headers are split by whether the URL carries a version.
+    # The three card bundles are served under `?v={version}`, so a 31-day
+    # `Cache-Control` is invalidated by the next release; the fonts
+    # directory has no buster, so a long max-age there would pin a stale
+    # subset for a month. Getting this backwards is silent in both
+    # directions — a stale font, or 443 KB re-fetched every dashboard boot.
+    cache_by_url = {cfg.url_path: cfg.cache_headers for cfg in static_args}
+    assert cache_by_url == {
+        CARD_URL: True,
+        RETRO_CARD_URL: True,
+        FLAP_CARD_URL: True,
+        FONTS_URL: False,
+    }
+
     # Three create_item calls — one per card.
     assert lovelace.resources.async_create_item.await_count == 3
     created_urls = {

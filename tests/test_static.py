@@ -26,7 +26,9 @@ from custom_components.wiener_linien_austria.static import (
     TripPatternIndex,
     _catalogue_from_store,
     _catalogue_to_store,
+    _fetch_and_build,
     _merge_haltepunkte,
+    _parse_all,
     _parse_haltestellen,
     _parse_route_colors,
     _parse_trip_patterns,
@@ -1033,3 +1035,84 @@ async def test_async_load_catalogue_pre_1_4_cache_swallows_network_failure(
     saved = await store.async_load()
     assert saved is not None
     assert saved.get("trip_patterns") is None
+
+
+# ---------------------------------------------------------------------------
+# The CSV parse block runs off the event loop
+# ---------------------------------------------------------------------------
+
+
+async def test_fetch_and_build_parses_in_the_executor(hass: HomeAssistant) -> None:
+    """The whole parse block goes through `async_add_executor_job`, once.
+
+    Measured on live data, the four parsers cost ~137 ms on Apple silicon
+    and roughly 0.5-0.9 s on a Pi 4 — dominated by fahrwegverlaeufe.csv at
+    ~87,000 rows. That lands on first setup and on every weekly refresh, so
+    inlining it back onto the loop is a real regression that no other test
+    would notice.
+
+    The "once" half matters too: `_merge_haltepunkte` mutates the stations
+    dict that `_parse_trip_patterns` then reads, so three separate hops
+    would drag that mutation across a thread boundary twice.
+    """
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static"
+            ".async_enforce_domain_cooldown",
+            new=AsyncMock(),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.static._download_text",
+            new=AsyncMock(side_effect=[HALTESTELLEN_CSV, HALTEPUNKTE_CSV]),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.static._download_or_fail_soft",
+            new=AsyncMock(
+                side_effect=[
+                    (LINIEN_CSV, False),
+                    (FAHR_CSV, False),
+                    (ROUTES_CSV, False),
+                ]
+            ),
+        ),
+        patch.object(
+            hass, "async_add_executor_job", wraps=hass.async_add_executor_job
+        ) as executor,
+    ):
+        catalogue = await _fetch_and_build(hass, prior=None)
+
+    assert catalogue.stations_by_diva
+    assert catalogue.trip_patterns is not None
+    parse_calls = [
+        call for call in executor.call_args_list if call.args[0] is _parse_all
+    ]
+    assert len(parse_calls) == 1
+
+
+def test_parse_all_touches_neither_hass_nor_the_logger() -> None:
+    """`_parse_all` must stay pure — it runs in a worker thread.
+
+    Returning errors as values instead of logging them is what keeps every
+    fail-soft decision, and every `_LOGGER` call, on the event loop.
+    """
+    result = _parse_all(HALTESTELLEN_CSV, HALTEPUNKTE_CSV, LINIEN_CSV, FAHR_CSV, None)
+
+    assert result.stations
+    assert result.trip_patterns is not None
+    assert result.trip_pattern_error is None
+    assert result.route_colors is None
+    assert result.route_color_error is None
+
+
+def test_parse_all_returns_a_broken_trip_pattern_csv_as_a_value() -> None:
+    """A parse failure comes back as `trip_pattern_error`, not as a raise.
+
+    `_fetch_and_build` relies on this to carry the prior index forward — a
+    raise here would take the station refresh down with it.
+    """
+    result = _parse_all(
+        HALTESTELLEN_CSV, HALTEPUNKTE_CSV, "not;a;linien;csv\n", "", None
+    )
+
+    assert result.stations
+    assert result.trip_patterns is None or not result.trip_patterns.patterns_by_line

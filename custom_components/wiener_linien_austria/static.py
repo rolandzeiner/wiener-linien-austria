@@ -36,7 +36,7 @@ import logging
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, NamedTuple
 
 import aiohttp
 from homeassistant.core import HomeAssistant
@@ -651,29 +651,41 @@ async def _fetch_and_build(
     fahr_text, fahr_failed = fahr_result
     routes_text, routes_failed = routes_result
 
-    stations = _parse_haltestellen(halte_text)
-    _merge_haltepunkte(stations, punkte_text)
+    # One executor hop for the whole parse block, not one per parser.
+    # Measured against live upstream data on Apple silicon: haltestellen
+    # 3.9 ms + haltepunkte 7.5 ms + trip patterns 123.9 ms + route colours
+    # 1.6 ms = ~137 ms, which projects to roughly 0.5-0.9 s on a Pi 4 —
+    # well past the point HA starts complaining about a blocked event loop,
+    # on first setup (where the user is watching a config-flow spinner) and
+    # again on every weekly refresh. The cost is almost entirely
+    # fahrwegverlaeufe.csv at ~87,000 rows.
+    #
+    # Why one hop: `_merge_haltepunkte` mutates the `stations` dict in
+    # place and `_parse_trip_patterns` reads it, so splitting the block
+    # into three hops would push that mutation across a thread boundary
+    # twice for no benefit. `_parse_all` is pure — it touches neither
+    # `hass` nor `_LOGGER` — so every warning below stays on the loop.
+    parsed = await hass.async_add_executor_job(
+        _parse_all, halte_text, punkte_text, linien_text, fahr_text, routes_text
+    )
+    stations = parsed.stations
 
     # Trip-pattern index: re-parse only when at least one of the two source
     # CSVs came back fresh AND neither failed. On any failure / both-304,
     # carry the prior index forward unchanged. Carrying prior is the
     # important fail-soft guarantee — a temporary fetch hiccup must not
     # wipe the stops_ahead feature for the next 7 days.
-    # Both source CSVs are needed to rebuild the index, and either can fail
-    # soft. On any failure, carry the prior index forward unchanged — that is
-    # the important guarantee: a temporary fetch hiccup must not wipe the
-    # stops_ahead feature for the next 7 days.
     trip_patterns = prior.trip_patterns if prior is not None else None
     pattern_status = "preserved"
     if linien_text is not None and fahr_text is not None:
-        try:
-            trip_patterns = _parse_trip_patterns(linien_text, fahr_text, stations)
-            pattern_status = "fresh"
-        except (KeyError, ValueError) as err:
+        if parsed.trip_pattern_error is not None:
             _LOGGER.warning(
                 "Trip-pattern CSV parse failed, keeping prior index: %s",
-                err,
+                parsed.trip_pattern_error,
             )
+        else:
+            trip_patterns = parsed.trip_patterns
+            pattern_status = "fresh"
     else:
         pattern_status = "fetch-failed"
 
@@ -685,8 +697,13 @@ async def _fetch_and_build(
     color_status = "preserved"
     if trip_patterns is not None:
         if routes_text is not None:
-            try:
-                bg, fg = _parse_route_colors(routes_text)
+            if parsed.route_color_error is not None:
+                _LOGGER.warning(
+                    "Route-colour CSV parse failed, keeping prior colours: %s",
+                    parsed.route_color_error,
+                )
+            elif parsed.route_colors is not None:
+                bg, fg = parsed.route_colors
                 trip_patterns = TripPatternIndex(
                     patterns_by_line=trip_patterns.patterns_by_line,
                     lines_by_label=trip_patterns.lines_by_label,
@@ -696,11 +713,6 @@ async def _fetch_and_build(
                     text_colors_by_line=fg,
                 )
                 color_status = "fresh"
-            except (KeyError, ValueError) as err:
-                _LOGGER.warning(
-                    "Route-colour CSV parse failed, keeping prior colours: %s",
-                    err,
-                )
         else:
             color_status = "fetch-failed"
 
@@ -753,6 +765,68 @@ async def _download_or_fail_soft(
     except (TimeoutError, aiohttp.ClientError) as err:
         _LOGGER.warning("Optional static CSV fetch failed (%s): %s", url, err)
         return (None, True)
+
+
+class _ParseResult(NamedTuple):
+    """Everything `_parse_all` produces in one executor hop.
+
+    Errors travel back as values rather than being logged in the worker
+    thread, so `_fetch_and_build` keeps every `_LOGGER` call — and the
+    fail-soft decisions that depend on them — on the event loop.
+    """
+
+    stations: dict[int, Station]
+    trip_patterns: TripPatternIndex | None
+    trip_pattern_error: Exception | None
+    route_colors: tuple[dict[str, str], dict[str, str]] | None
+    route_color_error: Exception | None
+
+
+def _parse_all(
+    halte_text: str,
+    punkte_text: str,
+    linien_text: str | None,
+    fahr_text: str | None,
+    routes_text: str | None,
+) -> _ParseResult:
+    """Run every CSV parse for one refresh. Pure: no `hass`, no logging.
+
+    Called through `hass.async_add_executor_job`, so it must stay free of
+    anything that assumes the event loop. Each optional parse fails soft
+    into its `*_error` field; `_fetch_and_build` decides what that means
+    (carry the prior index, mark the status, emit the warning).
+
+    Route colours are parsed whenever `routes_text` is present, even in the
+    case where the caller will discard them because no trip-pattern index
+    survived. That costs ~1.6 ms inside the executor and keeps this
+    function's branching independent of the caller's fail-soft policy.
+    """
+    stations = _parse_haltestellen(halte_text)
+    _merge_haltepunkte(stations, punkte_text)
+
+    trip_patterns: TripPatternIndex | None = None
+    trip_pattern_error: Exception | None = None
+    if linien_text is not None and fahr_text is not None:
+        try:
+            trip_patterns = _parse_trip_patterns(linien_text, fahr_text, stations)
+        except (KeyError, ValueError) as err:
+            trip_pattern_error = err
+
+    route_colors: tuple[dict[str, str], dict[str, str]] | None = None
+    route_color_error: Exception | None = None
+    if routes_text is not None:
+        try:
+            route_colors = _parse_route_colors(routes_text)
+        except (KeyError, ValueError) as err:
+            route_color_error = err
+
+    return _ParseResult(
+        stations=stations,
+        trip_patterns=trip_patterns,
+        trip_pattern_error=trip_pattern_error,
+        route_colors=route_colors,
+        route_color_error=route_color_error,
+    )
 
 
 def _parse_haltestellen(csv_text: str) -> dict[int, Station]:
