@@ -165,10 +165,25 @@ jobs:
         run: npx tsc --noEmit
       - name: Card unit tests
         # Pure-function coverage of the three config normalisers, the
-        # departure filter and the time helpers. The normaliser tests
-        # double as the spec for cross-card config defaults, which is
+        # departure filter and the time helpers, plus component-level smoke
+        # tests for the three cards and the three editors. The normaliser
+        # tests double as the spec for cross-card config defaults, which is
         # where this integration's drift has historically hidden.
         run: npm test
+      - name: Card coverage floor
+        # A ratchet, not a target. Thresholds sit a few points under the
+        # measured number so a legitimate refactor doesn't trip them,
+        # while a chunk of newly-untested code does.
+        #
+        # Read the number carefully before "improving" it: v8 instruments
+        # only modules a run imports, so before card-smoke.test.ts existed
+        # the three card entrypoints (6,568 lines, the entire user-visible
+        # surface) were absent from the report ENTIRELY rather than listed
+        # at 0%. The headline was 56.35% over a denominator that excluded
+        # the largest files in the tree; adding the smoke tests moved
+        # covered statements 833 -> 1480 and the percentage DOWN to 52.59.
+        # A falling number here can mean the denominator got honest.
+        run: npm run test:coverage:gate
       - name: Build card bundles
         run: npm run build
       - name: Assert the committed bundles match a fresh build

@@ -9,7 +9,8 @@
     "dev": "rolldown -c -w",
     "build:push": "./scripts/dev-push.sh --quiet",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts"
+    "test:coverage": "vitest run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts",
+    "test:coverage:gate": "vitest run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts --coverage.thresholds.statements=50 --coverage.thresholds.branches=43 --coverage.thresholds.functions=47 --coverage.thresholds.lines=51"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "4.1.11",

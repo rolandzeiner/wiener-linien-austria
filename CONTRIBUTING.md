@@ -85,21 +85,44 @@ pytest tests/ --cov-report=term-missing   # Python
 npm run test:coverage                     # cards
 ```
 
-`test:coverage` carries its whole configuration as CLI flags rather than a
-vitest config file, for the reason in **Card tests** below. Two of those flags
-are load-bearing: `--coverage.include=src/**/*.ts` makes vitest report files no
-test imports (without it the three card bundles are absent from the report
-entirely, not listed at 0%), and `--coverage.reporter=json` writes
-`coverage/coverage-final.json` in Istanbul format, which is what
-`fallow health --coverage` reads. Feeding fallow real coverage instead of its
-estimate cut the findings above threshold from 128 to 100 and the criticals
-from 53 to 36 — the difference was all false alarms on covered code.
+`npm run test:coverage:gate` is the same run with thresholds attached, and is
+what CI enforces. Both carry their whole configuration as CLI flags rather than
+a vitest config file, for the reason in **Card tests** below.
 
-The three card files still report as `estimated` there, and that is not a
-misconfiguration: no test imports them, so V8 emits a stub entry with an empty
-`fnMap` and fallow has nothing to match. Only a test that actually imports a
-card can fix that. `coverage/` is gitignored, and excluded from
-`scripts/dev-push.sh` — `.gitignore` does not filter rsync.
+**`--coverage.include` does not make vitest report a file no test imports.**
+That was true under vitest 3's `coverage.all`; vitest 4 removed it, and the v8
+provider instruments only modules a run actually loads. An earlier revision of
+this file claimed the opposite. Verify it in one command rather than believing
+either version:
+
+```bash
+npx vitest run --coverage --coverage.provider=v8 \
+  --coverage.reporter=text --coverage.include='src/some-unimported-file.ts'
+# -> empty table, "100% (0/0)" — not a 0% row
+```
+
+This is why the three card entrypoints — 6,568 lines, the entire user-visible
+surface — were absent from the coverage report until `src/card-smoke.test.ts`
+existed, rather than listed at 0%. The headline percentage was computed over a
+denominator that excluded the largest files in the tree. Adding the smoke tests
+moved covered statements from 833 to 1480 and the reported percentage *down*
+from 56.35% to 52.59%. **A falling number here can mean the denominator got
+honest**; read the covered/total counts, not the percentage, before concluding
+anything about a coverage change.
+
+The thresholds are a ratchet, not a target: they sit a few points under the
+measured number so a legitimate refactor doesn't trip them while a chunk of
+newly-untested code does. Raise them when coverage rises; don't lower them
+without saying why.
+
+`--coverage.reporter=json` writes `coverage/coverage-final.json` in Istanbul
+format, which is what `fallow health --coverage` reads. Feeding fallow real
+coverage instead of its estimate cut the findings above threshold from 128 to
+100 and the criticals from 53 to 36 — the difference was all false alarms on
+covered code. The three card files used to report as `estimated` there because
+no test imported them, leaving V8 to emit a stub entry with an empty `fnMap`;
+the smoke tests fixed that at the source. `coverage/` is gitignored, and
+excluded from `scripts/dev-push.sh` — `.gitignore` does not filter rsync.
 
 ## Card tests
 
