@@ -61,13 +61,14 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
 
 **When to pin exactly vs. allow a caret:**
 
-- **Caret (`^x.y.z`)** is the default. Use it for actively maintained packages that keep semver honestly — `lit`, `rolldown`, `typescript`.
-- **Exact (`x.y.z`)** for three specific cases:
+- **Caret (`^x.y.z`)** is for actively maintained runtime packages that keep semver honestly. `lit` is the only one left — everything else here meets one of the cases below.
+- **Exact (`x.y.z`)** for four specific cases:
   1. **The package is unmaintained**, so a range floats over code nobody is watching. `qr-creator` is at its only release, built with a 2019 toolchain.
   2. **The "version" is really content, not an API.** A patch release can change what you get without changing any signature.
   3. **The version is mirrored somewhere else** and the two must move together. `vitest` is exact because its version and the `vite`/`rolldown` stack under it decide whether `?raw` imports keep working. `@vitest/coverage-v8` is exact for the same reason and must be bumped in lockstep with `vitest` — the provider reaches into vitest internals and refuses to load on a mismatched minor.
+  4. **The package decides what the committed bundle looks like.** `validate.yml` asserts `www/*.js` matches a fresh build, so a floating `rolldown` or `typescript` can turn a clean tree red with no source change — and a transpiler bump that alters decorator output breaks Lit reactivity while the build stays green. Both are exact. `happy-dom` is exact on the same logic one layer down: it decides what the DOM suites see.
 
-Bumping an exact pin is a deliberate act — say why in the commit message.
+Bumping an exact pin is a deliberate act — say why in the commit message. Dependabot raises these as their own PRs rather than folding them into the monthly batch; the npm groups only cover minor and patch.
 
 **Before adding a dependency, check it earns its place.** The bundle is served to every user on every dashboard load. Prefer inlining a constant over depending on a package that exports thousands of them: `utils/mdi-paths.ts` and `utils/retro-station-icons.ts` both vendor icon path geometry with provenance comments rather than pulling an icon library, because path data is content and the bundler was tree-shaking all but a handful of exports anyway.
 
@@ -140,9 +141,15 @@ picks between them per file:
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
 - **happy-dom**, opted into with a `// @vitest-environment happy-dom` docblock on
-  the first line, for anything that renders a component. `src/editor/editor-smoke.test.ts`
-  is the only such file today; it mounts the three card editors, drives a control
-  and asserts the `config-changed` payload.
+  the first line, for anything that needs a DOM. Five files today:
+  `card-smoke.test.ts` mounts the three card entrypoints, `editor-smoke.test.ts`
+  mounts the three editors and asserts the `config-changed` payload,
+  `editor/header-strip.test.ts` drives the signage-strip editor,
+  `shared-render.test.ts` covers the stale-cache reload machinery, and
+  `utils/traffic-notice.test.ts` needs `DOMParser` to extract notice prose.
+
+Opt in per file rather than globally: only the suites that need a DOM should pay
+for booting one.
 
 The HA components the editors host (`ha-form`, `ha-icon`, `ha-alert`,
 `ha-icon-picker`) are deliberately never defined in tests. An undefined element
