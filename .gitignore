@@ -141,10 +141,17 @@ config/
 # actually needs has to be un-ignored below, or `npm run build` fails on a
 # fresh clone and in CI while still working on the machine that wrote it.
 # (The MDI name extractor this block used to un-ignore went away with the v2
-# editor rewrite; its exception went with it, leaving nothing here to name.)
+# editor rewrite; its exception went with it.)
+#
+# The same trap caught `check_module_coverage.py`: it was written, wired into
+# `validate.yml`, documented in CONTRIBUTING and cited in quality_scale.yaml —
+# and never committed, so the per-module coverage gate passed locally and the
+# CI step failed with "can't open file". Anything a workflow step invokes has
+# to be named here, not just anything the build needs.
 # ───────────────────────────────────────────────────────────────────
 scripts/*
 !scripts/strip-css-comments.mjs
+!scripts/check_module_coverage.py
 dev-push.sh
 dev/
 test/

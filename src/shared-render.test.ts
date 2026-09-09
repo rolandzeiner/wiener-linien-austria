@@ -98,10 +98,36 @@ describe("the reload-attempt guard", () => {
     // Safari private mode and friends. Worst case the user sees the
     // reload banner twice, which is strictly better than the card
     // throwing on every render.
-    vi.spyOn(window.sessionStorage, "getItem").mockImplementation(() => {
-      throw new Error("blocked");
+    //
+    // Swap the whole object rather than spying on `getItem`. happy-dom backs
+    // Storage with a Proxy, and `vi.restoreAllMocks()` does not reliably
+    // unwind a spy installed on it: the throwing stub leaked into the two
+    // `wl-reload-attempted` tests below, which then read a storage that always
+    // throws and saw the flag as unset. It reproduced on Node 24 (what CI
+    // runs) and not on Node 26, so a green local run proved nothing. Swapping
+    // the binding is the same idiom this file already uses for
+    // `window.location`, and `finally` restores it whether or not the
+    // assertion holds.
+    const real = window.sessionStorage;
+    Object.defineProperty(window, "sessionStorage", {
+      configurable: true,
+      value: {
+        getItem: () => {
+          throw new Error("blocked");
+        },
+        setItem: () => {
+          throw new Error("blocked");
+        },
+      },
     });
-    expect(wasReloadAttemptedFor("2.1.0")).toBe(false);
+    try {
+      expect(wasReloadAttemptedFor("2.1.0")).toBe(false);
+    } finally {
+      Object.defineProperty(window, "sessionStorage", {
+        configurable: true,
+        value: real,
+      });
+    }
   });
 });
 
