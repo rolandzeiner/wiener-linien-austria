@@ -59,7 +59,17 @@ rules:
     status: done
   entity-unavailable:
     status: done
-    comment: CoordinatorEntity marks entities unavailable on coordinator failure.
+    comment: >-
+      Both entities deliberately override CoordinatorEntity.available: they stay
+      available while the coordinator holds any prior data, so a transient fetch
+      failure keeps the cached board on screen instead of blanking three cards.
+      The availability signal that override suppresses is served by
+      binary_sensor.<stop>_stale (device_class problem), which reports
+      last_update_success going False and serverTime ageing past three polling
+      intervals. Entities go unavailable only before the first successful fetch,
+      when there is genuinely nothing to show. An earlier revision of this
+      comment claimed stock CoordinatorEntity behaviour, which the override has
+      never allowed.
   integration-owner:
     status: done
   log-when-unavailable:

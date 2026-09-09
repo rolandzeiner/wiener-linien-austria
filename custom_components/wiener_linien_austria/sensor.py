@@ -282,15 +282,16 @@ class WienerLinienStopSensor(
         `available=True` and the state keeps reporting the cached
         last-known value.
 
-        Mitigation: surface staleness through the `server_time`
-        attribute (templates that care about freshness can compare
-        it to `now()` and decide). For users who need
-        availability-based automations to fire on actual outages,
-        document the workaround: a template binary_sensor that
-        flips on `(now() - server_time) > threshold`.
+        Mitigation, shipped in v2.0.0: `binary_sensor.<stop>_stale`
+        (device_class `problem`) carries the signal this override
+        suppresses — it goes on when `last_update_success` flips False
+        or when `server_time` ages past three polling intervals. Gate
+        outage automations on that entity, not on this one's
+        availability. `server_time` remains on this entity for
+        templates that want to judge freshness themselves.
 
-        Don't lift this naively: a separate `binary_sensor.<...>_stale`
-        is the cleaner shape for anything driving automations rather
-        than dashboards.
+        Don't lift this override to a sibling integration without
+        taking the binary_sensor with it. On its own it is a silent
+        removal of the availability contract; the pair is the design.
         """
         return self.coordinator.data is not None

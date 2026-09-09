@@ -242,6 +242,17 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         return self._server_time
 
     @property
+    def server_time_parsed(self) -> datetime | None:
+        """Return `server_time` as an aware datetime, or None if unusable.
+
+        Exists so `binary_sensor.py` can age the payload without importing
+        `_parse_iso` across a module boundary. Always aware — see
+        `_parse_iso` for why a naive upstream value gets HA's configured
+        zone rather than UTC.
+        """
+        return _parse_iso(self._server_time)
+
+    @property
     def rbls(self) -> list[int]:
         return list(self._rbls)
 

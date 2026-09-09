@@ -17,6 +17,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
+- **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
 ## Screenshots
 
@@ -121,7 +122,15 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
 ## Sensor Attributes
 
-Each stop gets one sensor. Home Assistant names it in your interface language, so the entity ID is `sensor.<stop>_departures` on an English install and `sensor.<stop>_abfahrten` on a German one — check **Developer tools → States** if you're unsure which you have.
+Each stop gets two entities. Home Assistant names them in your interface language, so the departure sensor is `sensor.<stop>_departures` on an English install and `sensor.<stop>_abfahrten` on a German one — check **Developer tools → States** if you're unsure which you have. Alongside it sits `binary_sensor.<stop>_departure_data_stale`.
+
+### Stale-data sensor
+
+`binary_sensor.<stop>_departure_data_stale` turns on when the board stops being refreshed — either a poll failed, or the last `serverTime` is older than three polling intervals. Its attributes show the reason: `server_time`, `seconds_since_server_time`, `stale_after_seconds` and `last_update_success`.
+
+Use it instead of the departure sensor's availability. The departure sensor stays available through a short outage on purpose, so it keeps a populated board on screen rather than blanking your cards — which also means `is_state(..., 'unavailable')` and `availability_template` never fire for it. This entity carries that signal instead.
+
+### Departure sensor
 
 | Attribute | Type | Notes |
 |---|---|---|
@@ -180,7 +189,7 @@ Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monit
 
 > **After a Home Assistant restart**: alerts (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min. Departures fetch immediately.
 
-**Failure handling.** A single failed poll keeps the cadence and serves the last successful board — templates can spot staleness via `server_time`. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 is the exception: it widens on the first failure instead, since upstream has already said the poll is too fast. It also raises a Repairs issue per entry, which clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
+**Failure handling.** A single failed poll keeps the cadence and serves the last successful board. Watch `binary_sensor.<stop>_departure_data_stale` to catch that, or compare `server_time` to `now()` in a template. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 is the exception: it widens on the first failure instead, since upstream has already said the poll is too fast. It also raises a Repairs issue per entry, which clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
 
 ## Use Cases
 

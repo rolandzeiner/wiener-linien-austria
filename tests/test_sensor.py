@@ -386,12 +386,18 @@ async def test_attributes_line_colors_empty_when_catalogue_missing(
 async def test_sensor_registers_with_expected_entity_id(
     hass: HomeAssistant, mock_fetch
 ) -> None:
-    """A full async_setup_entry lands the sensor in the entity registry.
+    """A full async_setup_entry lands both entities in the entity registry.
 
-    Verifies the sensor's object_id is stable ("stephansplatz_departures"
-    because device name = 'Stephansplatz' + entity translated name = 'Departures').
-    If either side drifts, the registry row moves — which means users'
-    automations break. This is our canary for that.
+    Verifies each object_id is stable — device name 'Stephansplatz' plus the
+    translated entity name, giving "stephansplatz_departures" and
+    "stephansplatz_departure_data_stale". If either side drifts, the
+    registry rows move, which means users' automations break. This is our
+    canary for that.
+
+    The entity COUNT is asserted too, because adding a platform is exactly
+    the kind of change that silently renames things: an entity added
+    without its four translation files lands as an untranslated object_id
+    and nothing else in the suite would notice.
     """
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -400,12 +406,18 @@ async def test_sensor_registers_with_expected_entity_id(
 
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
-    assert len(entities) == 1
-    entry_row = entities[0]
-    # unique_id format is frozen (see test_unique_id_format_is_frozen)
-    assert entry_row.unique_id == f"{entry.entry_id}_stop"
+    assert len(entities) == 2
+    by_domain = {e.domain: e for e in entities}
+
+    # unique_id formats are frozen (see test_unique_id_format_is_frozen)
+    assert by_domain["sensor"].unique_id == f"{entry.entry_id}_stop"
+    assert by_domain["binary_sensor"].unique_id == f"{entry.entry_id}_stale"
     # Entity_id pattern check — device_slug + translated entity name slug
-    assert entry_row.entity_id.startswith("sensor.stephansplatz")
+    assert by_domain["sensor"].entity_id == "sensor.stephansplatz_departures"
+    assert (
+        by_domain["binary_sensor"].entity_id
+        == "binary_sensor.stephansplatz_departure_data_stale"
+    )
 
 
 async def test_sensor_state_present_after_setup(
@@ -419,7 +431,10 @@ async def test_sensor_state_present_after_setup(
 
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
-    state = hass.states.get(entities[0].entity_id)
+    # Select by domain, not by position: the entry now owns a binary_sensor
+    # too and registry order is not the setup order.
+    stop_entity = next(e for e in entities if e.domain == "sensor")
+    state = hass.states.get(stop_entity.entity_id)
     assert state is not None
     # State is the next countdown; exact value depends on fixture contents.
     # The fixture's smallest countdown is 0 so the state is stringified "0".
@@ -682,7 +697,10 @@ async def test_stale_feed_yields_unknown_state_and_signals(
 
     registry = er.async_get(hass)
     entities = er.async_entries_for_config_entry(registry, entry.entry_id)
-    state = hass.states.get(entities[0].entity_id)
+    # Select by domain, not by position: the entry now owns a binary_sensor
+    # too and registry order is not the setup order.
+    stop_entity = next(e for e in entities if e.domain == "sensor")
+    state = hass.states.get(stop_entity.entity_id)
     assert state is not None
     assert state.state == "unknown"
     assert state.attributes["departures"] == []

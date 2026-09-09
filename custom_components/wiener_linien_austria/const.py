@@ -247,6 +247,15 @@ MAX_DEPARTURES_IN_ATTRS: Final = 20
 # hide a departure on a guess.
 STALE_DEPARTURE_MAX_AGE: Final = timedelta(hours=3)
 
+# How many polling intervals the board may go unrefreshed before
+# `binary_sensor.<stop>_stale` reports a problem. Three: two consecutive
+# missed polls plus slack. One missed poll is routine — a 5xx, a rate
+# limit, a domain-cooldown collision — and absorbing exactly that is why
+# the stop sensor's `available` override exists in the first place. A
+# multiplier rather than a constant because the cadence is per entry
+# (MIN_POLL_SECONDS 30 .. MAX_POLL_SECONDS 600).
+STALE_INTERVAL_MULTIPLIER: Final = 3
+
 # Hard safety cap on `stops_ahead` length per departure. The longest Wiener
 # Linien lines are ~25 stops end-to-end; 30 gives generous headroom while
 # still protecting against runaway data on a future schema surprise.

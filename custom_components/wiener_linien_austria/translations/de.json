@@ -64,6 +64,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "stale": {
+        "name": "Abfahrtsdaten veraltet"
+      }
+    },
     "sensor": {
       "stop": {
         "name": "Abfahrten"
