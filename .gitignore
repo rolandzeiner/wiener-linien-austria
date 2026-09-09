@@ -21,6 +21,7 @@ __pycache__/
 .coverage
 .coverage.*
 coverage.xml
+coverage.json
 htmlcov/
 .tox/
 # vitest --coverage output (npm run test:coverage). Also excluded from

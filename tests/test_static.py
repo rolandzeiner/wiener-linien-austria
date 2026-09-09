@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -15,25 +17,31 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     DOMAIN_COOLDOWN_SECONDS,
     DOMAIN_LAST_CALL_KEY,
+    ENTRY_COUNT_KEY,
     USER_AGENT,
 )
 from custom_components.wiener_linien_austria.static import (
+    CATALOGUE_KEY,
     STORE_KEY,
     STORE_VERSION,
     StaticCatalogue,
     Station,
     TripPattern,
     TripPatternIndex,
+    _async_background_refresh,
     _catalogue_from_store,
     _catalogue_to_store,
+    _download_or_fail_soft,
     _fetch_and_build,
     _merge_haltepunkte,
     _parse_all,
     _parse_haltestellen,
     _parse_route_colors,
     _parse_trip_patterns,
+    async_get_catalogue,
     async_load_catalogue,
     async_refresh_catalogue,
+    async_set_cached_catalogue,
     stops_ahead_for_match,
 )
 from tests.conftest import make_response_cm
@@ -93,6 +101,18 @@ FAHR_CSV = (
     "301;2;2;4118;2\n"
     "301;2;3;4001;2\n"
 )
+
+
+def _build_catalogue(
+    last_fetched: str = "2026-04-20T12:00:00+00:00",
+) -> StaticCatalogue:
+    """A minimal resolved catalogue. `last_fetched` drives the lost-update
+    guard, which compares the ISO strings lexically."""
+    return StaticCatalogue(
+        stations_by_diva={},
+        last_fetched=last_fetched,
+        trip_patterns=None,
+    )
 
 
 def _build_sample_index() -> TripPatternIndex:
@@ -1116,3 +1136,593 @@ def test_parse_all_returns_a_broken_trip_pattern_csv_as_a_value() -> None:
 
     assert result.stations
     assert result.trip_patterns is None or not result.trip_patterns.patterns_by_line
+
+
+# ---------------------------------------------------------------------------
+# async_get_catalogue — process-wide memoisation
+# ---------------------------------------------------------------------------
+#
+# The conftest autouse fixture patches `static.async_get_catalogue`, so
+# nothing else in the suite ever runs this function. These tests import it
+# directly at module load, which binds the real object before the fixture
+# swaps the module attribute — the inner `async_load_catalogue` call still
+# resolves through module globals and stays stubbed, so there is no network.
+
+
+async def test_get_catalogue_returns_a_resolved_cache_without_loading(
+    hass: HomeAssistant,
+) -> None:
+    """A StaticCatalogue already in hass.data is returned as-is, O(1)."""
+    catalogue = _build_catalogue()
+    hass.data.setdefault(DOMAIN, {})[CATALOGUE_KEY] = catalogue
+
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_load_catalogue",
+        new_callable=AsyncMock,
+    ) as loader:
+        assert await async_get_catalogue(hass) is catalogue
+
+    loader.assert_not_awaited()
+
+
+async def test_concurrent_callers_share_one_load(hass: HomeAssistant) -> None:
+    """The config flow, every coordinator's setup and the refresher collide.
+
+    On a cold start they all ask at once. Without the in-flight task in
+    hass.data each would start its own multi-MB download of the same five
+    CSVs. This is the guarantee that they don't.
+    """
+    catalogue = _build_catalogue()
+    started = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def _slow_load(_hass: HomeAssistant) -> StaticCatalogue:
+        nonlocal calls
+        calls += 1
+        started.set()
+        await release.wait()
+        return catalogue
+
+    hass.data.setdefault(DOMAIN, {}).pop(CATALOGUE_KEY, None)
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_load_catalogue",
+        new=_slow_load,
+    ):
+        first = asyncio.create_task(async_get_catalogue(hass))
+        await started.wait()
+        second = asyncio.create_task(async_get_catalogue(hass))
+        await asyncio.sleep(0)
+        release.set()
+        results = await asyncio.gather(first, second)
+
+    assert calls == 1
+    assert results[0] is catalogue
+    assert results[1] is catalogue
+    # Resolved value replaces the task, so later callers are O(1).
+    assert hass.data[DOMAIN][CATALOGUE_KEY] is catalogue
+
+
+async def test_a_failed_load_is_not_cached(hass: HomeAssistant) -> None:
+    """The next caller must retry from scratch, not await a dead task.
+
+    Leaving the failed task in hass.data would make one transient network
+    failure permanent for the life of the HA process.
+    """
+    hass.data.setdefault(DOMAIN, {}).pop(CATALOGUE_KEY, None)
+
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static.async_load_catalogue",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("no cache, no network"),
+        ),
+        pytest.raises(RuntimeError),
+    ):
+        await async_get_catalogue(hass)
+
+    assert CATALOGUE_KEY not in hass.data[DOMAIN]
+
+
+# ---------------------------------------------------------------------------
+# async_set_cached_catalogue — the post-teardown race
+# ---------------------------------------------------------------------------
+
+
+async def test_set_cached_catalogue_is_a_noop_after_the_last_unload(
+    hass: HomeAssistant,
+) -> None:
+    """A background refresh finishing after teardown must not re-poison.
+
+    `_teardown_domain_state` sets ENTRY_COUNT_KEY to 0 rather than popping
+    it, so a presence-only check would let this through — the value is
+    what has to be tested.
+    """
+    hass.data[DOMAIN] = {ENTRY_COUNT_KEY: 0}
+    async_set_cached_catalogue(hass, _build_catalogue())
+    assert CATALOGUE_KEY not in hass.data[DOMAIN]
+
+    hass.data[DOMAIN] = {}
+    async_set_cached_catalogue(hass, _build_catalogue())
+    assert CATALOGUE_KEY not in hass.data[DOMAIN]
+
+
+async def test_set_cached_catalogue_publishes_while_entries_remain(
+    hass: HomeAssistant,
+) -> None:
+    """With a live entry, the refreshed catalogue does get published."""
+    catalogue = _build_catalogue()
+    hass.data[DOMAIN] = {ENTRY_COUNT_KEY: 1}
+    async_set_cached_catalogue(hass, catalogue)
+    assert hass.data[DOMAIN][CATALOGUE_KEY] is catalogue
+
+
+# ---------------------------------------------------------------------------
+# _async_background_refresh — every way it declines to publish
+# ---------------------------------------------------------------------------
+
+
+async def test_background_refresh_logs_and_returns_on_failure(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A failed refresh retries next week rather than crashing the task."""
+    caplog.set_level(logging.WARNING)
+    prior = _build_catalogue()
+    store = MagicMock()
+    store.async_save = AsyncMock()
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._fetch_and_build",
+        new_callable=AsyncMock,
+        side_effect=aiohttp.ClientError("upstream down"),
+    ):
+        await _async_background_refresh(hass, prior, store)
+
+    assert "Background refresh failed" in caplog.text
+    store.async_save.assert_not_awaited()
+
+
+async def test_background_refresh_propagates_cancellation(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """HA shutting down mid-fetch is not a failure to log noisily about."""
+    caplog.set_level(logging.WARNING)
+    store = MagicMock()
+    store.async_save = AsyncMock()
+
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            side_effect=asyncio.CancelledError,
+        ),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await _async_background_refresh(hass, _build_catalogue(), store)
+
+    assert "Background refresh failed" not in caplog.text
+
+
+async def test_background_refresh_skips_the_write_when_nothing_changed(
+    hass: HomeAssistant,
+) -> None:
+    """`refreshed is prior` means no write and, importantly, no re-publish.
+
+    Re-publishing `prior` could itself clobber a newer catalogue the
+    weekly refresh installed while this one was downloading.
+    """
+    prior = _build_catalogue()
+    store = MagicMock()
+    store.async_save = AsyncMock()
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._fetch_and_build",
+        new_callable=AsyncMock,
+        return_value=prior,
+    ):
+        await _async_background_refresh(hass, prior, store)
+
+    store.async_save.assert_not_awaited()
+
+
+async def test_background_refresh_declines_to_clobber_a_newer_catalogue(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The lost-update guard: weekly refresh won the race, we stand down.
+
+    This task started from `prior` and spent a while downloading. If the
+    weekly refresh published something newer meanwhile, writing our
+    result would silently roll the catalogue backwards.
+    """
+    caplog.set_level(logging.WARNING)
+    prior = _build_catalogue(last_fetched="2026-01-01T00:00:00+00:00")
+    newer = _build_catalogue(last_fetched="2026-06-01T00:00:00+00:00")
+    ours = _build_catalogue(last_fetched="2026-03-01T00:00:00+00:00")
+    hass.data[DOMAIN] = {ENTRY_COUNT_KEY: 1, CATALOGUE_KEY: newer}
+    store = MagicMock()
+    store.async_save = AsyncMock()
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._fetch_and_build",
+        new_callable=AsyncMock,
+        return_value=ours,
+    ):
+        await _async_background_refresh(hass, prior, store)
+
+    assert "superseded by a newer catalogue" in caplog.text
+    store.async_save.assert_not_awaited()
+    assert hass.data[DOMAIN][CATALOGUE_KEY] is newer
+
+
+async def test_background_refresh_publishes_even_if_the_store_write_fails(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A full disk costs persistence, not the in-memory refresh."""
+    caplog.set_level(logging.WARNING)
+    prior = _build_catalogue(last_fetched="2026-01-01T00:00:00+00:00")
+    fresh = _build_catalogue(last_fetched="2026-03-01T00:00:00+00:00")
+    hass.data[DOMAIN] = {ENTRY_COUNT_KEY: 1, CATALOGUE_KEY: prior}
+    store = MagicMock()
+    store.async_save = AsyncMock(side_effect=OSError("disk full"))
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._fetch_and_build",
+        new_callable=AsyncMock,
+        return_value=fresh,
+    ):
+        await _async_background_refresh(hass, prior, store)
+
+    assert "in-memory only" in caplog.text
+    assert hass.data[DOMAIN][CATALOGUE_KEY] is fresh
+
+
+# ---------------------------------------------------------------------------
+# async_refresh_catalogue — the weekly path
+# ---------------------------------------------------------------------------
+
+
+async def test_refresh_starts_from_scratch_on_an_unreadable_cache(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A truncated or unreadable store file is "no prior", not a crash."""
+    caplog.set_level(logging.WARNING)
+    fresh = _build_catalogue()
+
+    with (
+        patch.object(Store, "async_load", AsyncMock(side_effect=OSError("truncated"))),
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            return_value=fresh,
+        ) as build,
+        patch.object(Store, "async_save", AsyncMock()),
+    ):
+        result = await async_refresh_catalogue(hass)
+
+    assert result is fresh
+    assert "starting from scratch" in caplog.text
+    assert build.await_args.kwargs["prior"] is None
+
+
+async def test_refresh_treats_a_corrupt_payload_as_no_prior(
+    hass: HomeAssistant,
+) -> None:
+    """A cache payload that can't be rebuilt must not become `prior`.
+
+    Passing a half-built catalogue in would let `_fetch_and_build`
+    "preserve" garbage on a fail-soft leg.
+    """
+    fresh = _build_catalogue()
+
+    with (
+        patch.object(Store, "async_load", AsyncMock(return_value={"bogus": 1})),
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            return_value=fresh,
+        ) as build,
+        patch.object(Store, "async_save", AsyncMock()),
+    ):
+        assert await async_refresh_catalogue(hass) is fresh
+
+    assert build.await_args.kwargs["prior"] is None
+
+
+async def test_refresh_keeps_the_cache_when_the_fetch_fails(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Returns None so the caller leaves the existing catalogue alone."""
+    caplog.set_level(logging.WARNING)
+
+    with (
+        patch.object(Store, "async_load", AsyncMock(return_value=None)),
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            side_effect=TimeoutError,
+        ),
+    ):
+        assert await async_refresh_catalogue(hass) is None
+
+    assert "keeping cache" in caplog.text
+
+
+async def test_refresh_survives_a_failed_persist(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The refreshed catalogue is still returned when the write fails."""
+    caplog.set_level(logging.WARNING)
+    fresh = _build_catalogue()
+
+    with (
+        patch.object(Store, "async_load", AsyncMock(return_value=None)),
+        patch(
+            "custom_components.wiener_linien_austria.static._fetch_and_build",
+            new_callable=AsyncMock,
+            return_value=fresh,
+        ),
+        patch.object(Store, "async_save", AsyncMock(side_effect=OSError("disk full"))),
+    ):
+        assert await async_refresh_catalogue(hass) is fresh
+
+    assert "in-memory only" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Malformed CSV rows — skip the row, keep the file
+# ---------------------------------------------------------------------------
+#
+# Wiener Linien publish these files as a nightly export; a single bad row
+# has appeared before and must not cost the whole catalogue. Every parser
+# guards its own coercions, so these tests feed one broken row per parser
+# and assert the good rows around it survive.
+
+
+def test_merge_haltepunkte_skips_rows_with_unparseable_ids() -> None:
+    """A non-numeric StopID or DIVA drops that platform, not the file."""
+    stations = _parse_haltestellen(HALTESTELLEN_CSV)
+    broken = (
+        "StopID;DIVA;StopText;Municipality;MunicipalityID;Longitude;Latitude\n"
+        "abc;60201012;Bad StopID;Wien;49000001;16.37;48.20\n"
+        "4111;xyz;Bad DIVA;Wien;49000001;16.37;48.20\n"
+        ";;Empty;Wien;49000001;16.37;48.20\n"
+        "4118;60201012;Good row;Wien;49000001;16.3726;48.2085\n"
+    )
+
+    _merge_haltepunkte(stations, broken)
+
+    assert stations[60201012].rbls == [4118]
+
+
+def test_parse_trip_patterns_skips_broken_linien_rows() -> None:
+    """A non-numeric LineID drops that line, not the index."""
+    linien = (
+        "LineID;LineText;SortingHelp;Realtime;MeansOfTransport\n"
+        "not-a-number;U9;9;1;ptMetro\n"
+        "301;U1;1;1;ptMetro\n"
+        # Present but unlabelled — nothing to key `lines_by_label` on.
+        "999;;9;1;ptMetro\n"
+    )
+
+    index = _parse_trip_patterns(linien, FAHR_CSV)
+
+    assert index.lines_by_label == {"U1": 301}
+
+
+def test_parse_trip_patterns_skips_broken_fahrweg_rows() -> None:
+    """A row with any unparseable numeric column is dropped alone."""
+    fahr = (
+        "LineID;PatternID;StopSeqCount;StopID;Direction\n"
+        "301;1;zero;4001;1\n"
+        "301;1;1;not-an-rbl;1\n"
+        ";;;;\n"
+        "301;1;2;4111;1\n"
+        "301;1;3;4222;1\n"
+    )
+
+    index = _parse_trip_patterns(LINIEN_CSV, fahr)
+
+    assert index.patterns_by_line[301][0].stops == (4111, 4222)
+
+
+def test_parse_all_returns_a_route_colour_failure_as_a_value() -> None:
+    """A broken routes.txt must not take the trip-pattern rebuild with it.
+
+    The two are independent by design: colours only depend on routes.txt,
+    so a fresh routes payload can refresh colours even when the pattern
+    CSVs failed, and vice versa.
+    """
+    with patch(
+        "custom_components.wiener_linien_austria.static._parse_route_colors",
+        side_effect=ValueError("no route_color column"),
+    ):
+        result = _parse_all(
+            HALTESTELLEN_CSV, HALTEPUNKTE_CSV, LINIEN_CSV, FAHR_CSV, "garbage"
+        )
+
+    assert isinstance(result.route_color_error, ValueError)
+    assert result.route_colors is None
+    # The trip-pattern half is untouched.
+    assert result.trip_patterns is not None
+    assert result.trip_pattern_error is None
+
+
+# ---------------------------------------------------------------------------
+# _fetch_and_build — the fail-soft legs
+# ---------------------------------------------------------------------------
+
+
+async def _build_with(
+    hass: HomeAssistant,
+    *,
+    linien: str | None,
+    fahr: str | None,
+    routes: str | None,
+    prior: StaticCatalogue | None,
+) -> StaticCatalogue:
+    """Run `_fetch_and_build` with the optional downloads stubbed."""
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static"
+            ".async_enforce_domain_cooldown",
+            new=AsyncMock(),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.static._download_text",
+            new=AsyncMock(side_effect=[HALTESTELLEN_CSV, HALTEPUNKTE_CSV]),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.static._download_or_fail_soft",
+            new=AsyncMock(
+                side_effect=[
+                    (linien, linien is None),
+                    (fahr, fahr is None),
+                    (routes, routes is None),
+                ]
+            ),
+        ),
+    ):
+        return await _fetch_and_build(hass, prior=prior)
+
+
+async def test_fetch_carries_the_prior_index_when_the_pattern_csvs_fail(
+    hass: HomeAssistant,
+) -> None:
+    """The load-bearing fail-soft guarantee.
+
+    A temporary fetch hiccup must not wipe stops_ahead for the next seven
+    days — stations and RBLs still refresh, the trip-pattern index is
+    carried forward untouched.
+    """
+    prior = StaticCatalogue(
+        stations_by_diva={},
+        last_fetched="2026-01-01T00:00:00+00:00",
+        trip_patterns=_build_sample_index(),
+    )
+
+    catalogue = await _build_with(
+        hass, linien=None, fahr=None, routes=None, prior=prior
+    )
+
+    assert catalogue.stations_by_diva  # stations DID refresh
+    assert catalogue.trip_patterns is prior.trip_patterns
+
+
+async def test_fetch_keeps_the_prior_index_when_the_pattern_parse_fails(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Downloads succeeded but the CSV was unusable — same guarantee.
+
+    Distinct from the fetch-failure leg above: this one reaches the
+    parser and gets an exception back as a value from `_parse_all`.
+    """
+    caplog.set_level(logging.WARNING)
+    prior = StaticCatalogue(
+        stations_by_diva={},
+        last_fetched="2026-01-01T00:00:00+00:00",
+        trip_patterns=_build_sample_index(),
+    )
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._parse_trip_patterns",
+        side_effect=ValueError("unexpected column layout"),
+    ):
+        catalogue = await _build_with(
+            hass, linien=LINIEN_CSV, fahr=FAHR_CSV, routes=None, prior=prior
+        )
+
+    assert "keeping prior index" in caplog.text
+    assert catalogue.trip_patterns is prior.trip_patterns
+
+
+async def test_fetch_keeps_prior_colours_when_the_routes_parse_fails(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A broken routes.txt costs the colour refresh, nothing else."""
+    caplog.set_level(logging.WARNING)
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._parse_route_colors",
+        side_effect=ValueError("no route_color column"),
+    ):
+        catalogue = await _build_with(
+            hass, linien=LINIEN_CSV, fahr=FAHR_CSV, routes="garbage", prior=None
+        )
+
+    assert "keeping prior colours" in caplog.text
+    assert catalogue.trip_patterns is not None
+    assert catalogue.trip_patterns.patterns_by_line  # patterns still fresh
+
+
+async def test_download_or_fail_soft_reports_failure_without_raising(
+    hass: HomeAssistant, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The optional CSVs signal failure as a flag, never an exception."""
+    caplog.set_level(logging.WARNING)
+    session = MagicMock()
+
+    with patch(
+        "custom_components.wiener_linien_austria.static._download_text",
+        new=AsyncMock(side_effect=aiohttp.ClientError("connection reset")),
+    ):
+        body, failed = await _download_or_fail_soft(
+            session, "https://example.invalid/x.csv", None
+        )
+
+    assert body is None
+    assert failed is True
+    assert "Optional static CSV fetch failed" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# _catalogue_from_store — corrupt persisted payloads
+# ---------------------------------------------------------------------------
+
+
+def test_catalogue_from_store_drops_a_corrupt_trip_pattern_block(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A malformed cached index degrades to None, not to an exception.
+
+    Raising here would make a corrupt cache file a hard setup failure on
+    every restart; returning None just means one refetch on the next
+    weekly tick, with stations still loading from the same payload.
+    """
+    caplog.set_level(logging.WARNING)
+    stations = _parse_haltestellen(HALTESTELLEN_CSV)
+    payload = _catalogue_to_store(
+        StaticCatalogue(
+            stations_by_diva=stations,
+            last_fetched="2026-04-20T12:00:00+00:00",
+            trip_patterns=_build_sample_index(),
+        )
+    )
+    payload["trip_patterns"]["patterns"][0]["pattern_id"] = "not-an-int"
+
+    catalogue = _catalogue_from_store(payload)
+
+    assert catalogue.trip_patterns is None
+    assert catalogue.stations_by_diva  # stations still usable
+    assert "corrupt trip-pattern cache" in caplog.text
+
+
+def test_catalogue_from_store_drops_patterns_with_no_stops() -> None:
+    """A pattern whose stop list is empty carries no information.
+
+    Keeping it would put an entry in `patterns_by_line` that the matcher
+    then has to skip on every single departure row.
+    """
+    payload = _catalogue_to_store(
+        StaticCatalogue(
+            stations_by_diva={},
+            last_fetched="2026-04-20T12:00:00+00:00",
+            trip_patterns=_build_sample_index(),
+        )
+    )
+    for entry in payload["trip_patterns"]["patterns"]:
+        entry["stops"] = []
+
+    catalogue = _catalogue_from_store(payload)
+
+    assert catalogue.trip_patterns is not None
+    assert catalogue.trip_patterns.patterns_by_line == {}

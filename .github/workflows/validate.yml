@@ -107,6 +107,13 @@ jobs:
         run: mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
       - name: Run tests
         run: pytest tests/ -v
+      - name: Per-module coverage floor
+        # `--cov-fail-under` in pytest.ini is a single number over the whole
+        # package. The Silver `test-coverage` rule is per module, and the
+        # two are not the same gate: this repo sat at 91.81% total with
+        # diagnostics.py at 84% and quality_scale.yaml claiming `done`.
+        # pytest writes coverage.json; this reads the per-file numbers.
+        run: python scripts/check_module_coverage.py
 
   validate-card:
     # Rebuilds all three Lovelace card bundles from src/ and verifies each

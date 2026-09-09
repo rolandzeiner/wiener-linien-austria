@@ -44,7 +44,13 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
   17.8% of the modern bundle. Comments stay intact in `npm run dev`. It carried
   over to `rolldown.config.mjs` unchanged — rolldown implements the Rollup plugin
   API — and still runs *after* the transpile step, which is the ordering it needs.
-- `pytest.ini` — pytest config and the **`--cov-fail-under=90` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~91%.
+- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~96.9%.
+  - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the other twelve carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
+
+    ```bash
+    .venv/bin/python -m pytest tests/ -q
+    .venv/bin/python scripts/check_module_coverage.py
+    ```
 - `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes (and keep `const.ATTRIBUTION` in sync).
 
 ## Dependency policy

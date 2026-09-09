@@ -82,7 +82,30 @@ rules:
     comment: Wiener Linien OGD has no credentials; the coordinator has no auth branch and no token can expire.
   test-coverage:
     status: done
-    comment: Config flow (3 steps + reconfigure + search-again + abort reasons), coordinator (parse, rate-limit, cooldown, async_setup coord population, tram/bus fixture, stops_ahead enrichment + fail-soft + unknown-line + no-catalogue branches), sensor (MAX_DEPARTURES cap, alerts matching, availability), static catalogue loader (cache hit / corrupt / refresh-on-failure, five-file gather, domain-cooldown-once-per-burst, User-Agent/gzip headers, trip-pattern parsing, hybrid truncation, terminus substring match, Store v1 backwards compat for the additive trip_patterns field), alerts (single combined multi-name request, _split_by_category routing incl. request-order independence and absent/unknown categories, stoerungkurz title/description normalisation + whitespace collapse + duplicate merge + stop-scoped matching with no line or all-traffic fall-through, _fetch_info_lists error branches + line-fallback), and diagnostics are all covered.
+    comment: >-
+      Every module clears the Silver >95% floor, enforced two ways because
+      one number cannot express the rule: pytest.ini carries
+      --cov-fail-under=95 for the package total, and
+      scripts/check_module_coverage.py reads the per-file coverage.json and
+      fails on any module below 95%. Both run in CI. The per-module check
+      exists because the package total hid real gaps — the repo sat at
+      91.81% overall while diagnostics.py was at 84%, card_registration.py
+      87%, static.py 87% and __init__.py 88%, and this rule was already
+      marked done. Covered: config flow (3 steps + reconfigure +
+      search-again + abort reasons + the static-picker filters and the
+      /monitor probe's bad-payload branches), coordinator (parse,
+      rate-limit, cooldown, async_setup coord population, tram/bus fixture,
+      stops_ahead enrichment + fail-soft + unknown-line + no-catalogue
+      branches, naive/aware timestamp handling), sensor (MAX_DEPARTURES cap,
+      alerts matching, availability), binary_sensor (both staleness signals,
+      the unknown-before-first-fetch state, cadence-scaled threshold),
+      __init__ (both periodic timers incl. their safety nets, batch dereg
+      after teardown, async_remove_entry last-entry gating), static
+      catalogue (memoised load + concurrent-caller sharing + failed-load
+      eviction, background-refresh lost-update guard, weekly refresh store
+      failures, malformed CSV rows, corrupt persisted payloads, executor
+      offload), alerts, card registration (Lovelace retry + give-up,
+      delete-and-recreate fallback, LOVELACE_DATA shim), and diagnostics.
 
   # Gold
   devices:
