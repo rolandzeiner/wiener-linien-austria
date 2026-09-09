@@ -86,6 +86,12 @@ ignore = [
 # production were the real finding and are fixed (see
 # `WienerLinienAustriaCoordinator.cached_attrs`).
 "tests/*" = ["SLF"]
+# `check_module_coverage.py` is a console script whose entire output contract
+# is stdout/stderr — T201 is asking it to stop being one. The rule stays on
+# everywhere else, which is where a stray `print` is actually a defect. It
+# only started firing when the script was committed: `ruff check .` honours
+# `.gitignore`, so an ignored file is an unlinted file.
+"scripts/*" = ["T201"]
 
 [tool.mypy]
 strict = true

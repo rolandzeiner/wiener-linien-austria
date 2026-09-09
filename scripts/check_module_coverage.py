@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 FLOOR = 95.0
 COVERAGE_JSON = Path("coverage.json")
@@ -39,7 +40,7 @@ def main() -> int:
         return 2
 
     data = json.loads(COVERAGE_JSON.read_text())
-    files: dict[str, dict] = data.get("files", {})
+    files: dict[str, dict[str, Any]] = data.get("files", {})
     if not files:
         print("coverage.json carries no per-file data.", file=sys.stderr)
         return 2
@@ -73,10 +74,7 @@ def main() -> int:
         ),
         default=(100.0, "-"),
     )
-    print(
-        f"Every module clears {FLOOR:.0f}% "
-        f"(worst: {worst[1]} at {worst[0]:.2f}%)."
-    )
+    print(f"Every module clears {FLOOR:.0f}% (worst: {worst[1]} at {worst[0]:.2f}%).")
     return 0
 
 
