@@ -1726,3 +1726,161 @@ def test_catalogue_from_store_drops_patterns_with_no_stops() -> None:
 
     assert catalogue.trip_patterns is not None
     assert catalogue.trip_patterns.patterns_by_line == {}
+
+
+# ---------------------------------------------------------------------------
+# stops_ahead_for_match — the ways it declines to guess
+# ---------------------------------------------------------------------------
+#
+# Every branch below returns None or []. That is the point: the trail
+# renders a chevron on a departure row, and a wrong trail is worse than no
+# trail — it tells the user the vehicle calls at stops it does not.
+
+
+def _matcher_catalogue(
+    patterns: list[TripPattern],
+    *,
+    stations: dict[int, Station] | None = None,
+    lines_by_label: dict[str, int] | None = None,
+) -> StaticCatalogue:
+    """A catalogue carrying exactly the patterns a matcher test needs."""
+    by_line: dict[int, list[TripPattern]] = {}
+    for pattern in patterns:
+        by_line.setdefault(pattern.line_id, []).append(pattern)
+    return StaticCatalogue(
+        stations_by_diva=stations if stations is not None else {},
+        last_fetched="2026-04-20T12:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line=by_line,
+            lines_by_label=(
+                lines_by_label if lines_by_label is not None else {"U1": 301}
+            ),
+            means_by_line={301: "ptMetro"},
+            lines_at_diva={},
+        ),
+    )
+
+
+def test_stops_ahead_returns_none_without_a_trip_pattern_index() -> None:
+    """A catalogue loaded before the index landed — degrade, don't raise."""
+    catalogue = StaticCatalogue(
+        stations_by_diva={}, last_fetched="t", trip_patterns=None
+    )
+    assert stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau") is None
+
+
+def test_stops_ahead_returns_none_for_a_line_with_no_patterns() -> None:
+    """The label resolves to a line id that carries an empty pattern list.
+
+    Reachable on a half-built index, where `lines_by_label` was populated
+    from linien.csv but the matching fahrwegverlaeufe rows were dropped.
+    """
+    catalogue = _matcher_catalogue([])
+    assert stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau") is None
+
+
+def test_stops_ahead_returns_none_when_no_pattern_touches_our_rbls() -> None:
+    """Every pattern for this line runs somewhere else entirely."""
+    catalogue = _matcher_catalogue(
+        [TripPattern(line_id=301, pattern_id=1, direction=1, stops=(900, 901))]
+    )
+    assert stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau") is None
+
+
+def test_stops_ahead_skips_a_pattern_whose_terminus_has_no_name() -> None:
+    """An unnameable terminus cannot be compared against `towards`.
+
+    It falls through to the no-terminus-match path rather than matching
+    on an empty string, which would match everything.
+    """
+    catalogue = _matcher_catalogue(
+        [TripPattern(line_id=301, pattern_id=1, direction=1, stops=(4111, 999))],
+        stations={
+            1: Station(
+                diva=1,
+                name="Stephansplatz",
+                municipality="Wien",
+                longitude=16.37,
+                latitude=48.20,
+                rbls=[4111],
+            )
+        },
+    )
+
+    result = stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau")
+
+    # RBL 999 belongs to no station, so the single tail entry is dropped
+    # and the trail comes back empty rather than as a nameless bullet.
+    assert result == []
+
+
+def test_stops_ahead_refuses_to_guess_between_opposite_directions() -> None:
+    """No `towards` and patterns running both ways — return None.
+
+    Picking one would surface an arbitrary "next 8 stops" as truth, on a
+    row the user reads as a fact about their train. Silence is correct.
+    """
+    catalogue = _matcher_catalogue(
+        [
+            TripPattern(line_id=301, pattern_id=1, direction=1, stops=(4111, 5000)),
+            TripPattern(line_id=301, pattern_id=2, direction=2, stops=(4111, 6000)),
+        ]
+    )
+
+    assert stops_ahead_for_match(catalogue, "U1", [4111], "") is None
+
+
+def test_stops_ahead_still_answers_when_both_patterns_run_one_way() -> None:
+    """Ambiguity is about direction, not about pattern count.
+
+    Two same-direction branches are a normal short-turn pair; the matcher
+    picks the longer tail rather than giving up.
+    """
+    stations = {
+        i: Station(
+            diva=i,
+            name=f"Stop{i}",
+            municipality="Wien",
+            longitude=16.0,
+            latitude=48.0,
+            rbls=[4110 + i],
+        )
+        for i in range(1, 5)
+    }
+    catalogue = _matcher_catalogue(
+        [
+            TripPattern(line_id=301, pattern_id=1, direction=1, stops=(4111, 4112)),
+            TripPattern(
+                line_id=301, pattern_id=2, direction=1, stops=(4111, 4112, 4113)
+            ),
+        ],
+        stations=stations,
+    )
+
+    result = stops_ahead_for_match(catalogue, "U1", [4111], "")
+
+    assert result is not None
+    assert [s["name"] for s in result] == ["Stop2", "Stop3"]
+
+
+def test_stops_ahead_returns_empty_at_the_terminus() -> None:
+    """`[]`, not None: we matched a pattern, the tail is genuinely empty.
+
+    The card distinguishes the two — None means "no trail available",
+    `[]` means "this is the last stop".
+    """
+    catalogue = _matcher_catalogue(
+        [TripPattern(line_id=301, pattern_id=1, direction=1, stops=(4000, 4111))],
+        stations={
+            1: Station(
+                diva=1,
+                name="Leopoldau",
+                municipality="Wien",
+                longitude=16.4,
+                latitude=48.2,
+                rbls=[4111],
+            )
+        },
+    )
+
+    assert stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau") == []

@@ -163,9 +163,17 @@ class WienerLinienStopSensor(
         # the Wiener Linien catalogue, not just lines at this stop) because
         # the card's stops_ahead trail can render chips for transfer lines
         # at OTHER stops — scoping here would leave those chips colourless.
-        # Affordable at ~3 KB regardless of stop, and unrecorded below, so
-        # the cost is the live push to the frontend on every state write,
-        # not anything the recorder stores.
+        #
+        # Measured 2026-09-09 against the live catalogue: 7,242 bytes for
+        # 179 lines with bg+fg, i.e. ~26% of a 27.4 KB payload at a hub
+        # stop, and byte-identical for every entry in the install. (An
+        # earlier revision of this comment said "~3 KB"; it was never
+        # re-measured after `text_colors_by_line` was added.) Unrecorded
+        # below, so the cost is the live push to the frontend on every
+        # state write, not anything the recorder stores — but it is the
+        # largest single item in that push, and scoping it to
+        # `lines_at_stop` plus every line named in any `stops_ahead.lines`
+        # is the obvious win if this ever needs to shrink.
         line_colors = self._line_colors()
 
         # Static-catalogue line list for THIS stop — every line that
@@ -236,11 +244,24 @@ class WienerLinienStopSensor(
     def _line_colors(self) -> dict[str, dict[str, str]]:
         """Return the full GTFS palette as `{label: {bg, fg}}`.
 
-        Reads the shared catalogue ref live so a background trip-pattern
-        refresh (which also refreshes route colours) is picked up on the
-        very next sensor read. Returns `{}` when the catalogue isn't
-        loaded yet or the routes payload hasn't landed — the card has its
-        own fallbacks (nightline rule + neutral default).
+        Reads the shared catalogue ref live rather than capturing it at
+        setup, so a background trip-pattern refresh (which also refreshes
+        route colours) is picked up without a restart.
+
+        NOT on the very next sensor read, which an earlier revision of
+        this docstring claimed. This runs inside
+        `extra_state_attributes`, whose result is memoised on the
+        coordinator, and `static.async_set_cached_catalogue` publishes a
+        new catalogue without invalidating that cache. So the refreshed
+        colours land on the next coordinator tick — bounded by the
+        entry's scan interval, 60 s by default and up to 600 s at the
+        ceiling. Harmless for data that changes on a weeks-to-months
+        cadence; wrong to rely on if something ever needs the catalogue
+        promptly.
+
+        Returns `{}` when the catalogue isn't loaded yet or the routes
+        payload hasn't landed — the card has its own fallbacks
+        (nightline rule + neutral default).
         """
         domain_data = self.coordinator.hass.data.get(DOMAIN, {})
         catalogue = domain_data.get(CATALOGUE_KEY)

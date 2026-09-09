@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.const import (
     ATTRIBUTION,
     DOMAIN,
@@ -707,3 +708,72 @@ async def test_stale_feed_yields_unknown_state_and_signals(
     # The signals the cards read to explain the empty board.
     assert state.attributes["stale_departures"] == 2
     assert state.attributes["stale_since"] == "2026-08-27T06:42:00+02:00"
+
+
+async def test_line_colors_refresh_lands_on_the_next_tick_not_the_next_read(
+    hass: HomeAssistant,
+) -> None:
+    """Pins what `_line_colors` actually does, which is not what it said.
+
+    Its docstring claimed a background trip-pattern refresh was picked up
+    "on the very next sensor read". It is not: `_line_colors` runs inside
+    `extra_state_attributes`, whose result is memoised on the coordinator,
+    and `static.async_set_cached_catalogue` publishes a new catalogue
+    without invalidating that cache. So a refresh lands on the next
+    coordinator tick — bounded by the entry's scan interval, 60 s by
+    default and up to 600 s at the ceiling.
+
+    That is fine for data on a weeks-to-months cadence, and the docstring
+    is now honest about it. This test is here so the next person to
+    "optimise" the cache finds out which of the two behaviours is the
+    documented one.
+    """
+    from custom_components.wiener_linien_austria.const import ENTRY_COUNT_KEY
+    from custom_components.wiener_linien_austria.static import (
+        CATALOGUE_KEY,
+        StaticCatalogue,
+        TripPatternIndex,
+        async_set_cached_catalogue,
+    )
+
+    def _catalogue(colors: dict[str, str]) -> StaticCatalogue:
+        return StaticCatalogue(
+            stations_by_diva={},
+            last_fetched="2026-04-20T12:00:00+00:00",
+            trip_patterns=TripPatternIndex(
+                patterns_by_line={},
+                lines_by_label={},
+                means_by_line={},
+                lines_at_diva={},
+                colors_by_line=colors,
+                text_colors_by_line={},
+            ),
+        )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+
+    hass.data.setdefault(DOMAIN, {})[ENTRY_COUNT_KEY] = 1
+    hass.data[DOMAIN][CATALOGUE_KEY] = _catalogue({"U1": "E20D17"})
+    assert sensor.extra_state_attributes["line_colors"] == {"U1": {"bg": "E20D17"}}
+
+    # A background refresh publishes new colours...
+    async_set_cached_catalogue(hass, _catalogue({"U1": "FFFFFF"}))
+
+    # ...and the very next read still serves the memoised payload.
+    assert sensor.extra_state_attributes["line_colors"] == {"U1": {"bg": "E20D17"}}
+
+    # A coordinator tick is what drops the cache — and specifically
+    # `batch_apply`, the path the shared group timer actually uses.
+    # Note that stock `async_set_updated_data` on its own does NOT
+    # invalidate: invalidation lives in `batch_apply` / `_async_update_data`
+    # / `batch_set_error`, which call it before pushing. Any future code
+    # path that pushes state without going through one of those three
+    # would leave this cache stale indefinitely.
+    coordinator.batch_apply(BatchResult(body={}, server_time=None))
+    assert sensor.extra_state_attributes["line_colors"] == {"U1": {"bg": "FFFFFF"}}
