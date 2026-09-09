@@ -2,9 +2,7 @@
 // Extracted so security-critical primitives like the URL-trust gate
 // have one canonical implementation rather than two near-copies.
 //
-// Kept narrow on purpose: card-specific helpers (line-colour resolution,
-// localisation, departure filtering) stay in src/utils/* — this module
-// is reserved for primitives a future third card would also need.
+// Kept narrow on purpose: card-specific helpers stay in src/utils/*.
 
 import { html, type TemplateResult } from "lit";
 

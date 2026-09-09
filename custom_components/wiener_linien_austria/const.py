@@ -94,10 +94,16 @@ ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
 # refresh on their own ~5-min cadence (independent of the per-stop
 # coordinator tick), the sensor sees the bump and rebuilds.
 ALERTS_SEQ_KEY: Final = "alerts_seq"
-# Cache validators (ETag / Last-Modified) per alert feed, captured from
-# the previous /trafficInfoList response so unchanged feeds come back
-# as 304 Not Modified instead of full bodies.
-ALERT_CACHE_VALIDATORS_KEY: Final = "alert_cache_validators"
+# `/trafficInfoList` feed names. Both travel as repeated `name=` params in
+# ONE request; the response tags each entry with a `refTrafficInfoCategoryId`
+# resolved through `data.trafficInfoCategories`. See alerts.py.
+ALERT_FEED_TRAFFIC: Final = "stoerunglang"
+ALERT_FEED_ELEVATOR: Final = "aufzugsinfo"
+# The text the physical stop display shows — works detours, moved boarding
+# points, permanently closed stops. Scoped to individual platforms rather
+# than whole lines, so it is matched on RBL. Surfaced in the same card
+# banner as `stoerunglang`; see alerts.TrafficInfo.
+ALERT_FEED_TRAFFIC_SHORT: Final = "stoerungkurz"
 # Reference-count of live config entries — used to drive the domain-wide
 # cleanup (cancelling the alerts + static refresh timers, dropping the
 # in-memory caches) when the *last* entry is removed.
@@ -137,6 +143,12 @@ ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 # publish the exact threshold, but 316 is what the API returns).
 ERR_RATE_LIMIT: Final = 316
 
+# Translation key for the 316 raise. Named here rather than inlined at the
+# raise site because the batch group's backoff has to recognise a rate-limit
+# failure to widen on the first one (see `MonitorBatchGroup._note_failure`),
+# and a bare string compared against a bare string is a silent drift risk.
+RATE_LIMIT_TRANSLATION_KEY: Final = "api_rate_limited"
+
 # The remaining documented `messageCode` values (Schnittstellendokumentation
 # V1.5, 21.05.2026, §3.1.4). Each gets its own translated message, because
 # they ask different things of whoever reads the log: 311 clears itself,
@@ -166,10 +178,11 @@ UPSTREAM_ERROR_KEYS: Final[dict[int, str]] = {
     ERR_NO_DATA: "api_no_data",
 }
 
-# MeansOfTransport values → rough categorisation for UI icons. Mirrored
-# in src/utils/mot.ts; tests/test_card_version.py:test_line_type_constants
-# asserts byte-identity. `LineType` carries the same set as a Literal so
-# call sites can declare the narrow shape without restating the strings.
+# MeansOfTransport values → rough categorisation for UI icons. Mirrored in
+# src/utils/mot.ts; test_line_type_constants_match_python_and_ts pins these
+# four names against it by name — a fifth constant added to one side only
+# would pass. `LineType` carries the same set as a Literal so call sites can
+# declare the narrow shape without restating the strings.
 LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
@@ -184,9 +197,10 @@ Direction = Literal["H", "R"]
 # Each JS file carries a `const CARD_VERSION` that must match the
 # corresponding Python constant below byte-for-byte, else the reload
 # banner loops. All three version in lockstep with the integration
-# (mirrored in src/const.ts; tests/test_card_version.py asserts both
-# directions). Each card still ships an independent WS probe so a
-# mismatch on one bundle doesn't show a banner on the others.
+# (mirrored in src/const.ts; tests/test_card_version.py checks each
+# constant here AND each literal there against manifest.json). Each card
+# still ships an independent WS probe so a mismatch on one bundle doesn't
+# show a banner on the others.
 CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
 CARD_FILENAME: Final = "wiener-linien-austria-card.js"
@@ -232,6 +246,15 @@ MAX_DEPARTURES_IN_ATTRS: Final = 20
 # (no `timePlanned`, unparseable timestamp) is kept: fail open, never
 # hide a departure on a guess.
 STALE_DEPARTURE_MAX_AGE: Final = timedelta(hours=3)
+
+# How many polling intervals the board may go unrefreshed before
+# `binary_sensor.<stop>_stale` reports a problem. Three: two consecutive
+# missed polls plus slack. One missed poll is routine — a 5xx, a rate
+# limit, a domain-cooldown collision — and absorbing exactly that is why
+# the stop sensor's `available` override exists in the first place. A
+# multiplier rather than a constant because the cadence is per entry
+# (MIN_POLL_SECONDS 30 .. MAX_POLL_SECONDS 600).
+STALE_INTERVAL_MULTIPLIER: Final = 3
 
 # Hard safety cap on `stops_ahead` length per departure. The longest Wiener
 # Linien lines are ~25 stops end-to-end; 30 gives generous headroom while

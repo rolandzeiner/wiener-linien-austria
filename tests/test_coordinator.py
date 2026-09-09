@@ -11,6 +11,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.const import (
@@ -21,6 +22,7 @@ from custom_components.wiener_linien_austria.const import (
 from custom_components.wiener_linien_austria.coordinator import (
     MonitorData,
     WienerLinienAustriaCoordinator,
+    _parse_iso,
     _parse_monitor_body,
 )
 
@@ -847,3 +849,104 @@ def test_stale_warning_latches_until_recovery(
     with caplog.at_level("WARNING"):
         coordinator._note_stale_departures(stale)
     assert sum("Dropped 2 stale" in r.message for r in caplog.records) == 1
+
+
+# ---------------------------------------------------------------------------
+# Naive/aware timestamp handling (`_parse_iso`)
+# ---------------------------------------------------------------------------
+
+
+def _naive_body(planned: str, countdown: int = 5) -> dict:
+    """One departure whose `timePlanned` is whatever the caller passes."""
+    return {
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "U1",
+                            "towards": "Leopoldau",
+                            "direction": "H",
+                            "type": "ptMetro",
+                            "departures": {
+                                "departure": [
+                                    {
+                                        "departureTime": {
+                                            "timePlanned": planned,
+                                            "countdown": countdown,
+                                        },
+                                        "vehicle": {"towards": "Leopoldau"},
+                                    }
+                                ]
+                            },
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+
+def test_parse_iso_stamps_the_default_zone_on_a_naive_timestamp() -> None:
+    """A `timePlanned` with no offset is read as HA-local, not as UTC.
+
+    Forcing UTC would shift a Vienna timestamp by one or two hours, which
+    against `STALE_DEPARTURE_MAX_AGE` starts dropping real departures —
+    a worse failure than the `TypeError` it would be fixing.
+    """
+    parsed = _parse_iso("2026-08-29T19:11:47.000")
+
+    assert parsed is not None
+    assert parsed.tzinfo is not None
+    assert parsed.utcoffset() == dt_util.get_default_time_zone().utcoffset(
+        parsed.replace(tzinfo=None)
+    )
+
+
+def test_parse_iso_leaves_an_offset_aware_timestamp_alone() -> None:
+    """The shape the feed actually sends is passed through untouched."""
+    parsed = _parse_iso("2026-08-29T19:11:47.000+0200")
+
+    assert parsed is not None
+    assert parsed.utcoffset() == timedelta(hours=2)
+
+
+def test_naive_planned_time_with_aware_server_time_does_not_raise() -> None:
+    """One naive field is enough to reach the comparison — it must not raise.
+
+    Mixed naive/aware is the crash the zone stamp exists to prevent: the
+    record here is fresh, so it has to survive the stale filter rather
+    than take the whole parse down with a `TypeError`.
+    """
+    body = _naive_body(dt_util.now().replace(tzinfo=None).isoformat())
+
+    result = _parse_monitor_body(body, None, STALE_FIXTURE_SERVER_TIME)
+
+    assert result.stale_dropped == 0
+    assert len(result.departures) == 1
+
+
+def test_naive_planned_time_with_no_server_time_does_not_raise() -> None:
+    """The likelier trigger: `serverTime` absent, so the cutoff is UTC-aware.
+
+    `_parse_monitor_body` falls back to `dt_util.utcnow()` whenever
+    `serverTime` is missing or unparseable, so a single naive
+    `timePlanned` reaches an aware cutoff with nothing else needed.
+    """
+    body = _naive_body(dt_util.now().replace(tzinfo=None).isoformat())
+
+    result = _parse_monitor_body(body, None, None)
+
+    assert result.stale_dropped == 0
+    assert len(result.departures) == 1
+
+
+def test_naive_planned_time_is_still_dropped_when_genuinely_stale() -> None:
+    """Stamping a zone must not smuggle ghost records past the filter."""
+    frozen = (dt_util.now() - timedelta(days=2)).replace(tzinfo=None)
+    body = _naive_body(frozen.isoformat())
+
+    result = _parse_monitor_body(body, None, None)
+
+    assert result.stale_dropped == 1
+    assert result.departures == []

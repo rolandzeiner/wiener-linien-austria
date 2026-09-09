@@ -1,9 +1,9 @@
 // Local mirror of the HA / Lovelace types this card actually uses.
 // Replaces the `custom-card-helpers` dependency — the package is
 // effectively unmaintained and bundled HA-internal types drift faster
-// than its release cadence. `fireEvent` is duplicated as a 6-line shim
-// inside the editor modules (see `editor.ts` and `retro-editor.ts`),
-// keeping the types layer free of any value-side helper.
+// than its release cadence. Value-side helpers stay out of this layer:
+// `fireEvent` has one implementation, in utils.ts, which all three
+// editors import.
 
 /** Single entity in `hass.states`. The attributes bag is open-ended —
  *  the integration's coordinator emits the keys these cards read
@@ -68,6 +68,7 @@ declare global {
     "wiener-linien-austria-retro-card-editor": LovelaceCardEditor;
     "hui-error-card": LovelaceCard;
     "ha-form": HaFormElement;
+    "ha-icon-picker": HaIconPickerElement;
   }
 }
 
@@ -159,6 +160,17 @@ export type HASelector =
 export interface HaFormBaseSchema {
   name: string;
   required?: boolean;
+  /** Render the field greyed out and non-interactive. Present on HA core's own
+   *  `HaFormBaseSchema` and long supported; mirrored here because the v2
+   *  editors use it for dependent options.
+   *
+   *  We disable rather than hide, and put the reason in `computeHelper`. HA
+   *  2026.8 added a declarative `visible:` condition which would be the
+   *  cleaner tool, but it drops a hidden field's value and needs a frontend
+   *  floor this repo does not have (`hacs.json` declares HA 2025.1.0). On an
+   *  older frontend an unknown `visible` key is ignored and the field renders
+   *  unconditionally — so it is not safe to ship here yet. */
+  disabled?: boolean;
 }
 
 export interface HaFormSelectorSchema extends HaFormBaseSchema {
@@ -187,6 +199,14 @@ export type HaFormSchema =
   | HaFormSelectorSchema
   | HaFormGridSchema
   | HaFormExpandableSchema;
+
+/** `<ha-icon-picker>` element shape. Only usable outside `ha-form` — see
+ *  editor/header-strip.ts for why nesting it in an expandable breaks it. */
+interface HaIconPickerElement extends HTMLElement {
+  value?: string;
+  label?: string;
+  disabled?: boolean;
+}
 
 // `<ha-form>` element shape — mirror the props the editor sets so
 // `tsc --noEmit` validates the template at compile time.
@@ -256,6 +276,12 @@ export interface TrafficInfoAttr {
   time_created?: string;
   time_last_update?: string;
   status?: string;
+  // Which upstream feed this came from: "stoerunglang" (line-scoped
+  // control-centre disruption) or "stoerungkurz" (the platform's own
+  // display text, already filtered to this card's stops on the Python
+  // side). Both render in the same banner; the field is here so a
+  // consumer can tell them apart.
+  category?: string;
 }
 
 export interface ElevatorInfoAttr {
@@ -341,7 +367,6 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   entities?: Array<ModernStopConfig | string> | undefined;
   // v0.1.x back-compat: single-entity legacy shape is promoted to entities[0]
   // inside normaliseConfig. Both shapes read here; only `entities` survives.
-  // `?: T | undefined` dual form for exactOptionalPropertyTypes compatibility.
   entity?: string | undefined;
   lines?: string[] | undefined;
   direction?: "H" | "R" | "" | undefined;
@@ -453,8 +478,8 @@ export interface RetroHeaderSide {
 
 export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   type: string;
-  // `?: T | undefined` — dual form for `exactOptionalPropertyTypes`
-  // compatibility (callers may set or omit each field).
+  // `?: T | undefined` throughout — see the optionality convention in
+  // utils/config.ts.
   entity?: string | undefined;
   direction?: "H" | "R" | undefined;
   line?: string | undefined;
@@ -485,11 +510,16 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   show_header?: boolean | undefined;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
+  /** Superseded by `show_line_pill` in v2.0.0 — same meaning, new name; see
+   *  utils/card-vocabulary.ts for why the name had to be given up. Still read
+   *  by `normaliseRetroConfig` so existing YAML keeps working.
+   *  @deprecated Use `show_line_pill`. */
+  line_pill?: boolean | undefined;
   /** Tweak — render the line code as a filled rounded pill in the
    *  line's resolved colour (GTFS routes.txt → nightline rule →
    *  amber fallback) with a soft outer glow. Off by default; the LED
    *  panel's canonical voice is monochrome amber. */
-  line_pill?: boolean | undefined;
+  show_line_pill?: boolean | undefined;
   /** Tweak — paint a 4 px vertical bar at each row's left edge in the
    *  line's resolved colour with a faint matching glow. Off by default
    *  so pre-feature retro cards stay byte-identical. */
@@ -568,8 +598,11 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  first row's platform changes" problem the old side-toggle was
    *  there to work around. */
   show_platform?: boolean | undefined;
-  /** Show the WL-orange station-name band. Mirrors the retro card's
-   *  field of the same name. Default `true`. */
+  /** Show the WL-orange station-name band. Shares its name and meaning
+   *  with the retro card's field, but NOT its default: flap defaults
+   *  `true` (the band is part of the Solari board's identity), retro
+   *  defaults `false` (the LED panel shipped without one). Deliberate —
+   *  see `CARD_DEFAULTS` in utils/card-vocabulary.ts. */
   show_station_name?: boolean | undefined;
   /** Background colour for the station-name band. Defaults to the
    *  first tracked line's GTFS colour (sentinel `"line"`); user can
@@ -602,17 +635,22 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  and complies with the Wiener Linien OGD licence requirement
    *  unless the user explicitly opts out. */
   hide_attribution?: boolean | undefined;
-  /** Tweak — hide the line column entirely. Useful for single-line
-   *  setups where the line is implicit (e.g. a card scoped to one
-   *  metro line via per-stop `lines` filter). Default `false`. The
-   *  name mirrors the retro card's `line_pill` toggle by convention,
-   *  even though the flap-card effect is different (column hide vs
-   *  pill render); both are presentation tweaks on the line slot. */
+  /** Superseded by `show_line_column` in v2.0.0, which inverts the polarity
+   *  so the editor label can read positively; see utils/card-vocabulary.ts.
+   *  Still read by `normaliseFlapConfig` so existing YAML keeps working.
+   *  @deprecated Use `show_line_column` (inverted). */
   line_pill?: boolean | undefined;
+  /** Show the line column. Default `true`. Turn it off for single-line setups
+   *  where the line is implicit (e.g. a card scoped to one metro line via the
+   *  per-stop `lines` filter). */
+  show_line_column?: boolean | undefined;
   /** Tweak — wrap the board in the cream-cabinet housing (bevel +
    *  drop shadow). Default `true` (preserves the original flap-card
    *  look). When `false`, the board sits flush against the dashboard
-   *  with no surround — matches the retro card's `housing` semantics
-   *  (off = flush, on = bezel). */
+   *  with no surround. Shares the retro card's `housing` semantics
+   *  (off = flush, on = bezel) but NOT its default: retro defaults
+   *  `false`, because the LED panel shipped flush and existing cards
+   *  must stay that way. Deliberate — see `CARD_DEFAULTS` in
+   *  utils/card-vocabulary.ts. */
   housing?: boolean | undefined;
 }

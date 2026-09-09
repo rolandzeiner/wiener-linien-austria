@@ -27,6 +27,7 @@ from custom_components.wiener_linien_austria import (
     async_unload_entry,
 )
 from custom_components.wiener_linien_austria.const import (
+    BATCH_REGISTRY_KEY,
     CARD_VERSION,
     DOMAIN,
     FLAP_CARD_VERSION,
@@ -238,3 +239,316 @@ async def test_migrate_entry_rejects_future_version(hass: HomeAssistant) -> None
     entry.add_to_hass(hass)
 
     assert await async_migrate_entry(hass, entry) is False
+
+
+# ---------------------------------------------------------------------------
+# The two domain-wide periodic timers
+# ---------------------------------------------------------------------------
+#
+# Both callbacks wrap their body in a broad `except` on purpose: an exception
+# escaping an `async_track_time_interval` callback is logged by HA core under
+# its own generic listener namespace, not this integration's, so a repeating
+# failure would be invisible to anyone reading the integration's log. These
+# tests pin both legs — the success path publishing its result, and the
+# failure path staying inside the guard.
+
+
+def _stop_batch_timers(hass: HomeAssistant) -> None:
+    """Silence the shared /monitor timer for a time-advancing test.
+
+    These tests advance the clock by hours to fire the DOMAIN-level
+    refresh timers. The batch group's own 60 s timer fires too, reaches
+    the autouse-mocked aiohttp session, and calls `resp.raise_for_status()`
+    on an AsyncMock — which returns a coroutine that production code (and
+    real aiohttp) correctly never awaits, leaving four
+    `RuntimeWarning: coroutine ... was never awaited` in the suite.
+
+    Stopping the groups keeps each test's blast radius to the timer it
+    actually names. Widening the session mock instead would hide the same
+    noise everywhere rather than removing it.
+    """
+    registry = hass.data[DOMAIN].get(BATCH_REGISTRY_KEY) or {}
+    for group in registry.values():
+        group.stop()
+
+
+async def test_static_refresh_timer_publishes_the_new_catalogue(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """A successful weekly refresh swaps the shared catalogue ref."""
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.wiener_linien_austria.const import (
+        STATIC_CACHE_REFRESH_HOURS,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    _stop_batch_timers(hass)
+
+    sentinel = object()
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.async_refresh_catalogue",
+            new=AsyncMock(return_value=sentinel),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.async_set_cached_catalogue"
+        ) as publish,
+    ):
+        freezer.tick(timedelta(hours=STATIC_CACHE_REFRESH_HOURS + 1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    publish.assert_called_once()
+    assert publish.call_args.args[1] is sentinel
+
+
+async def test_static_refresh_timer_swallows_a_store_error(
+    hass: HomeAssistant, mock_fetch, freezer, caplog
+) -> None:
+    """Store I/O can raise past async_refresh_catalogue's own handlers.
+
+    The refresh helper catches network and parse failures itself; OSError
+    and JSONDecodeError from the Store write are what reach this guard.
+    """
+    import logging
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.wiener_linien_austria.const import (
+        STATIC_CACHE_REFRESH_HOURS,
+    )
+
+    caplog.set_level(logging.WARNING)
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    _stop_batch_timers(hass)
+
+    with patch(
+        "custom_components.wiener_linien_austria.async_refresh_catalogue",
+        new=AsyncMock(side_effect=OSError("disk full")),
+    ):
+        freezer.tick(timedelta(hours=STATIC_CACHE_REFRESH_HOURS + 1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    assert "Static-catalogue periodic refresh failed" in caplog.text
+
+
+async def test_static_refresh_timer_ignores_a_failed_refresh(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """`async_refresh_catalogue` returning None must not publish None.
+
+    Publishing it would replace a good catalogue with nothing and take
+    stops_ahead and line colours down until the next weekly tick.
+    """
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.wiener_linien_austria.const import (
+        STATIC_CACHE_REFRESH_HOURS,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    _stop_batch_timers(hass)
+
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.async_refresh_catalogue",
+            new=AsyncMock(return_value=None),
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.async_set_cached_catalogue"
+        ) as publish,
+    ):
+        freezer.tick(timedelta(hours=STATIC_CACHE_REFRESH_HOURS + 1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    publish.assert_not_called()
+
+
+async def test_alerts_refresh_timer_swallows_a_failure(
+    hass: HomeAssistant, mock_fetch, freezer, caplog
+) -> None:
+    """Same safety net on the 5-minute alerts timer."""
+    import logging
+    from datetime import timedelta
+
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    from custom_components.wiener_linien_austria.const import ALERTS_REFRESH_SECONDS
+
+    caplog.set_level(logging.WARNING)
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    _stop_batch_timers(hass)
+
+    with patch(
+        "custom_components.wiener_linien_austria.async_refresh_alerts",
+        new=AsyncMock(side_effect=RuntimeError("upstream exploded")),
+    ):
+        freezer.tick(timedelta(seconds=ALERTS_REFRESH_SECONDS + 1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    assert "Alerts periodic refresh failed" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Batch deregistration guards
+# ---------------------------------------------------------------------------
+
+
+async def test_deregister_from_batch_is_safe_after_teardown(
+    hass: HomeAssistant,
+) -> None:
+    """Dereg runs AFTER `_teardown_domain_state` popped the registry.
+
+    HA runs `entry.async_on_unload` callbacks after `async_unload_entry`
+    returns, so on the last entry the dereg fires against domain state
+    that has already been dismantled. It must be read-only there — a
+    `setdefault` would resurrect the dict this teardown just dropped, and
+    the resurrected copy would never be torn down again.
+
+    Driven against a bare coordinator rather than a live entry on
+    purpose: the point is that the function tolerates missing state, and
+    a real setup would keep putting the state back.
+    """
+    from custom_components.wiener_linien_austria import _deregister_from_batch
+    from custom_components.wiener_linien_austria.const import BATCH_REGISTRY_KEY
+    from custom_components.wiener_linien_austria.coordinator import (
+        WienerLinienAustriaCoordinator,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    # Domain dict absent entirely.
+    hass.data.pop(DOMAIN, None)
+    _deregister_from_batch(hass, coordinator)
+    assert DOMAIN not in hass.data
+
+    # Domain dict present but the registry key was popped by teardown.
+    hass.data[DOMAIN] = {}
+    _deregister_from_batch(hass, coordinator)
+    assert BATCH_REGISTRY_KEY not in hass.data[DOMAIN]
+
+    # Registry present but empty.
+    hass.data[DOMAIN][BATCH_REGISTRY_KEY] = {}
+    _deregister_from_batch(hass, coordinator)
+    assert hass.data[DOMAIN][BATCH_REGISTRY_KEY] == {}
+
+
+async def test_deregister_from_batch_ignores_an_unknown_interval(
+    hass: HomeAssistant,
+) -> None:
+    """No group at this coordinator's cadence is a no-op, not a KeyError.
+
+    Reachable whenever an entry's scan interval changed between
+    registration and unload — an options-flow save mid-unload.
+    """
+    from custom_components.wiener_linien_austria import _deregister_from_batch
+    from custom_components.wiener_linien_austria.const import BATCH_REGISTRY_KEY
+    from custom_components.wiener_linien_austria.coordinator import (
+        WienerLinienAustriaCoordinator,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+
+    other = MagicMock()
+    hass.data[DOMAIN] = {BATCH_REGISTRY_KEY: {99999: other}}
+
+    _deregister_from_batch(hass, coordinator)
+
+    assert 99999 in hass.data[DOMAIN][BATCH_REGISTRY_KEY]
+    other.remove_member.assert_not_called()
+    other.stop.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# async_remove_entry
+# ---------------------------------------------------------------------------
+
+
+async def test_remove_entry_keeps_resources_while_another_entry_remains(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Card resources are registered once per HA process, not per entry.
+
+    Unregistering on the removal of one of two entries would tear the
+    cards out of every dashboard while the other stop is still set up.
+    """
+    from homeassistant.config_entries import ConfigEntryState
+
+    from custom_components.wiener_linien_austria import async_remove_entry
+
+    first = _make_entry()
+    first.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(first.entry_id)
+    await hass.async_block_till_done()
+
+    second = _make_entry({"diva": 60200123, "stop_name": "Schwarzenbergplatz"})
+    second.add_to_hass(hass)
+    if second.state is ConfigEntryState.NOT_LOADED:
+        assert await hass.config_entries.async_setup(second.entry_id)
+        await hass.async_block_till_done()
+
+    with patch(
+        "custom_components.wiener_linien_austria.JSModuleRegistration"
+    ) as registration:
+        await async_remove_entry(hass, first)
+
+    registration.assert_not_called()
+
+
+async def test_remove_last_entry_unregisters_resources(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """The last entry going away takes the Lovelace resources with it.
+
+    Also clears the entry's Repairs issue: leaving it behind would keep
+    warning about a config entry the user has just deleted.
+    """
+    from custom_components.wiener_linien_austria import async_remove_entry
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await hass.config_entries.async_remove(entry.entry_id)
+
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.JSModuleRegistration"
+        ) as registration,
+        patch(
+            "custom_components.wiener_linien_austria.ir.async_delete_issue"
+        ) as delete_issue,
+    ):
+        registration.return_value.async_unregister = AsyncMock()
+        await async_remove_entry(hass, entry)
+
+    registration.return_value.async_unregister.assert_awaited_once()
+    delete_issue.assert_called_once()

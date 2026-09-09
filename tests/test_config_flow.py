@@ -1001,3 +1001,206 @@ def test_collision_without_line_data_still_resolves() -> None:
     )
     labels = sorted(o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en"))
     assert labels == ["Kirchengasse (Wien) · #1", "Kirchengasse (Wien) · #2"]
+
+
+# ---------------------------------------------------------------------------
+# _static_lines_for_station — the filters that keep the picker honest
+# ---------------------------------------------------------------------------
+
+
+def _station(diva: int, name: str, rbls: list[int]) -> Station:
+    return Station(
+        diva=diva,
+        name=name,
+        municipality="Wien",
+        longitude=16.37,
+        latitude=48.20,
+        rbls=rbls,
+    )
+
+
+def test_static_lines_skips_a_pattern_that_misses_this_station() -> None:
+    """A line can have short-turn and branch patterns that never call here.
+
+    Listing them would offer the user a direction their platform does not
+    actually serve, which then never produces a departure.
+    """
+    here = _station(1, "Hier", [100])
+    elsewhere = _station(2, "Woanders", [200])
+    terminus = _station(3, "Endstelle", [300])
+    catalogue = StaticCatalogue(
+        stations_by_diva={1: here, 2: elsewhere, 3: terminus},
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={
+                7: [
+                    # Does not touch RBL 100.
+                    TripPattern(line_id=7, pattern_id=1, direction=1, stops=(200, 300)),
+                ]
+            },
+            lines_by_label={"U7": 7},
+            means_by_line={7: "ptMetro"},
+            lines_at_diva={1: ("U7",)},
+        ),
+    )
+
+    assert _static_lines_for_station(catalogue, here) == []
+
+
+def test_static_lines_skips_a_pattern_terminating_here() -> None:
+    """ "U1 → Westbahnhof" while standing at Westbahnhof is noise.
+
+    The live /monitor never emits it — the vehicle has already arrived —
+    so it only ever appears via the static merge, and only as a mistake.
+    """
+    here = _station(1, "Westbahnhof", [100])
+    catalogue = StaticCatalogue(
+        stations_by_diva={1: here},
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={
+                7: [
+                    # Terminates at this station's own RBL.
+                    TripPattern(line_id=7, pattern_id=1, direction=1, stops=(50, 100)),
+                ]
+            },
+            lines_by_label={"U7": 7},
+            means_by_line={7: "ptMetro"},
+            lines_at_diva={1: ("U7",)},
+        ),
+    )
+
+    assert _static_lines_for_station(catalogue, here) == []
+
+
+def test_static_lines_skips_an_unknown_line_label() -> None:
+    """`lines_at_diva` naming a label absent from `lines_by_label`.
+
+    Reachable on a half-migrated cache, where the two indexes were built
+    by different versions of the parser.
+    """
+    here = _station(1, "Hier", [100])
+    catalogue = StaticCatalogue(
+        stations_by_diva={1: here},
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={},
+            lines_by_label={},
+            means_by_line={},
+            lines_at_diva={1: ("U99",)},
+        ),
+    )
+
+    assert _static_lines_for_station(catalogue, here) == []
+
+
+def test_static_lines_skips_a_pattern_whose_terminus_has_no_name() -> None:
+    """No resolvable terminus name means no usable `towards` label.
+
+    Offering a direction with a blank destination is worse than omitting
+    it: the user cannot tell the two directions apart in the picker.
+    """
+    here = _station(1, "Hier", [100])
+    catalogue = StaticCatalogue(
+        stations_by_diva={1: here},
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={
+                7: [
+                    # RBL 999 belongs to no station in the catalogue.
+                    TripPattern(line_id=7, pattern_id=1, direction=1, stops=(100, 999)),
+                ]
+            },
+            lines_by_label={"U7": 7},
+            means_by_line={7: "ptMetro"},
+            lines_at_diva={1: ("U7",)},
+        ),
+    )
+
+    assert _static_lines_for_station(catalogue, here) == []
+
+
+def test_static_lines_dedupes_two_patterns_in_the_same_direction() -> None:
+    """Branches sharing a direction collapse to one picker row.
+
+    Keys are `{line}|{direction}`, so a second pattern in the same
+    direction would otherwise produce a duplicate the user cannot
+    distinguish.
+    """
+    here = _station(1, "Hier", [100])
+    a = _station(2, "Endstelle A", [200])
+    b = _station(3, "Endstelle B", [300])
+    catalogue = StaticCatalogue(
+        stations_by_diva={1: here, 2: a, 3: b},
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={
+                7: [
+                    TripPattern(line_id=7, pattern_id=1, direction=1, stops=(100, 200)),
+                    TripPattern(line_id=7, pattern_id=2, direction=1, stops=(100, 300)),
+                ]
+            },
+            lines_by_label={"U7": 7},
+            means_by_line={7: "ptMetro"},
+            lines_at_diva={1: ("U7",)},
+        ),
+    )
+
+    rows = _static_lines_for_station(catalogue, here)
+
+    assert [r["key"] for r in rows] == ["U7|H"]
+
+
+# ---------------------------------------------------------------------------
+# _probe_monitor_lines — upstream shapes that must not raise
+# ---------------------------------------------------------------------------
+
+
+def _probe_response(body: object) -> MagicMock:
+    """A mock /monitor response carrying `body`.
+
+    `make_response_cm` wraps a response object, not a body — the probe
+    calls `raise_for_status()` before `json()`, so both have to exist.
+    """
+    resp = MagicMock()
+    resp.status = 200
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    return make_response_cm(resp)
+
+
+async def test_probe_returns_empty_on_a_non_dict_body(hass: HomeAssistant) -> None:
+    """A JSON array or scalar where an object was expected."""
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession"
+    ) as session:
+        session.return_value.get.return_value = _probe_response(["not", "a", "dict"])
+        assert await _probe_monitor_lines(hass, [4111]) == []
+
+
+async def test_probe_returns_empty_on_an_error_message_code(
+    hass: HomeAssistant,
+) -> None:
+    """Anything but messageCode 1 (or absent) means the payload is not data.
+
+    Code 316 is the rate limit; treating its body as a stop with no lines
+    would silently offer the user an empty picker.
+    """
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession"
+    ) as session:
+        session.return_value.get.return_value = _probe_response(
+            {"message": {"messageCode": 316}, "data": {"monitors": []}}
+        )
+        assert await _probe_monitor_lines(hass, [4111]) == []
+
+
+async def test_probe_returns_empty_on_a_transport_failure(
+    hass: HomeAssistant,
+) -> None:
+    """Probing is best-effort — the flow falls back to the static picker."""
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_get_clientsession"
+    ) as session:
+        session.return_value.get.side_effect = aiohttp.ClientError("boom")
+        assert await _probe_monitor_lines(hass, [4111]) == []

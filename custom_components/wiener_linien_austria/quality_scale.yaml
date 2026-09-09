@@ -59,7 +59,17 @@ rules:
     status: done
   entity-unavailable:
     status: done
-    comment: CoordinatorEntity marks entities unavailable on coordinator failure.
+    comment: >-
+      Both entities deliberately override CoordinatorEntity.available: they stay
+      available while the coordinator holds any prior data, so a transient fetch
+      failure keeps the cached board on screen instead of blanking three cards.
+      The availability signal that override suppresses is served by
+      binary_sensor.<stop>_stale (device_class problem), which reports
+      last_update_success going False and serverTime ageing past three polling
+      intervals. Entities go unavailable only before the first successful fetch,
+      when there is genuinely nothing to show. An earlier revision of this
+      comment claimed stock CoordinatorEntity behaviour, which the override has
+      never allowed.
   integration-owner:
     status: done
   log-when-unavailable:
@@ -72,7 +82,30 @@ rules:
     comment: Wiener Linien OGD has no credentials; the coordinator has no auth branch and no token can expire.
   test-coverage:
     status: done
-    comment: Config flow (3 steps + reconfigure + search-again + abort reasons), coordinator (parse, rate-limit, cooldown, async_setup coord population, tram/bus fixture, stops_ahead enrichment + fail-soft + unknown-line + no-catalogue branches), sensor (MAX_DEPARTURES cap, alerts matching, availability), static catalogue loader (cache hit / corrupt / refresh-on-failure, four-CSV gather, all-304 fast path, one-304 mixed branch, trip-pattern parsing, hybrid truncation, terminus substring match, Store v1 backwards compat for the additive trip_patterns field), alerts (_fetch_info_list error branches + line-fallback), and diagnostics are all covered.
+    comment: >-
+      Every module clears the Silver >95% floor, enforced two ways because
+      one number cannot express the rule: pytest.ini carries
+      --cov-fail-under=95 for the package total, and
+      scripts/check_module_coverage.py reads the per-file coverage.json and
+      fails on any module below 95%. Both run in CI. The per-module check
+      exists because the package total hid real gaps — the repo sat at
+      91.81% overall while diagnostics.py was at 84%, card_registration.py
+      87%, static.py 87% and __init__.py 88%, and this rule was already
+      marked done. Covered: config flow (3 steps + reconfigure +
+      search-again + abort reasons + the static-picker filters and the
+      /monitor probe's bad-payload branches), coordinator (parse,
+      rate-limit, cooldown, async_setup coord population, tram/bus fixture,
+      stops_ahead enrichment + fail-soft + unknown-line + no-catalogue
+      branches, naive/aware timestamp handling), sensor (MAX_DEPARTURES cap,
+      alerts matching, availability), binary_sensor (both staleness signals,
+      the unknown-before-first-fetch state, cadence-scaled threshold),
+      __init__ (both periodic timers incl. their safety nets, batch dereg
+      after teardown, async_remove_entry last-entry gating), static
+      catalogue (memoised load + concurrent-caller sharing + failed-load
+      eviction, background-refresh lost-update guard, weekly refresh store
+      failures, malformed CSV rows, corrupt persisted payloads, executor
+      offload), alerts, card registration (Lovelace retry + give-up,
+      delete-and-recreate fallback, LOVELACE_DATA shim), and diagnostics.
 
   # Gold
   devices:

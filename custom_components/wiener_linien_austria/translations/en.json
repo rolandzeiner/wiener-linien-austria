@@ -64,6 +64,11 @@
     }
   },
   "entity": {
+    "binary_sensor": {
+      "stale": {
+        "name": "Departure data stale"
+      }
+    },
     "sensor": {
       "stop": {
         "name": "Departures"

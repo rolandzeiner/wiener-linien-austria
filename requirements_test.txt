@@ -1,27 +1,30 @@
-# Minimum-version floors so a transitive minor release of any of these
-# can't break green-on-main without a commit on our side. Bump when the
-# project intentionally adopts new behaviour from a newer release.
-# Local dev tracks the floor or higher; CI installs the floor's minor
-# resolved by pip. PHACC's `==` pins govern syrupy + pytest-cov etc.,
-# so the floors below stay non-conflicting with whatever PHACC pulls in.
-# Kept floating deliberately, and identical across all five repos.
-# PHACC tracks HA core including betas, so a patch bump can land on a
-# beta and break lint (mypy --strict is the usual casualty) with no
-# runtime fault. The fix is a temporary exact `==` pin carrying the
-# reason and the condition for removing it — not widening the range.
-# Drop the pin once the siblings are green on a later release.
+# Test/lint dependencies. PHACC governs the whole test stack; this file
+# declares only what PHACC does NOT pin.
+#
+# THE RULE — never declare anything PHACC pins with `==`. As of 0.13.361
+# that covers pytest, pytest-asyncio, pytest-cov, pytest-timeout, syrupy
+# and freezegun. A floor for any of them has exactly one candidate to
+# resolve against, so it either matches (dead weight) or contradicts it
+# (unresolvable). The three that used to sit here resolved to
+# byte-identical versions once removed — verified against a clean 3.14
+# venv, 2026-09-07. Consequence: pytest, syrupy and freezegun are
+# imported directly by tests/ while arriving purely as transitives.
+#
+# ACCEPTED RISK — if PHACC ever loosened a pin to `>=`, a transitive minor
+# could land unreviewed. Re-add a floor only with a named upstream change.
+#
+# PHACC tracks HA core including betas, so a patch bump can land on a beta
+# and break lint (mypy --strict is the usual casualty) with no runtime
+# fault. Fix with a temporary exact `==` pin carrying its removal
+# condition — never by widening the range.
+#
+# PHACC 0.13.361 wraps HA core 2026.9.0b4 and needs Python >=3.14; CI
+# tracks 3.14 in lockstep (validate.yml, tests job).
 pytest-homeassistant-custom-component>=0.13.361,<0.14
-pytest-asyncio>=1.4.0,<2
-pytest-cov>=7.1.0,<8
-# Backs the `timeout` setting in pytest.ini — a hung async fixture must
-# fail the job, not idle until the runner's 6-hour cap.
-pytest-timeout>=2.4,<3
-# syrupy floor intentionally omitted: PHACC pins syrupy with `==`, so any
-# floor here either matches PHACC (redundant) or contradicts it (unresolvable).
-# Let PHACC's transitive pin govern; dependabot bumps of syrupy can't apply.
+
+# Not pinned by PHACC, so ours to govern. Exact by design: the `rev:`
+# values in .pre-commit-config.yaml must equal these or the local gate
+# lints with a different ruleset than CI. Dependabot ignores both hook
+# repos; bump pin and rev in the same commit.
 mypy==2.3.1
 ruff==0.16.5
-# Floors track PHACC 0.13.361's hard pins (pytest-cov==7.1.0,
-# syrupy==6.0.0, pytest-asyncio==1.4.0). PHACC 0.13.361 wraps HA core
-# 2026.9.0b4 and requires Python ≥3.14, so the CI workflow tracks 3.14
-# in lockstep — see validate.yml's tests job.

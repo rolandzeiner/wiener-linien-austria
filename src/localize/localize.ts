@@ -28,11 +28,8 @@ function resolveString(path: string, dictionary: Dict): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
-// Use `?:` AND `T | undefined` together so callers can either omit the
-// key or pass `undefined` explicitly — `exactOptionalPropertyTypes`
-// rejects `undefined` values for `?:` fields whose type doesn't include
-// `undefined`, and most callers in this codebase pass an explicit
-// `hass?.language` (which is `string | undefined`).
+// Dual form (see utils/config.ts): most callers pass an explicit
+// `hass?.language`, which is `string | undefined`.
 export interface TranslateContext {
   configLanguage?: string | undefined;
   hassLanguage?: string | undefined;

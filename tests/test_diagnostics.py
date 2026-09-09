@@ -214,3 +214,65 @@ async def test_diagnostics_handles_no_coordinator_data(hass: HomeAssistant) -> N
     # `server_time` and `last_error_code` are None before any successful fetch.
     assert diag["coordinator"]["server_time"] is None
     assert diag["coordinator"]["last_error_code"] is None
+
+
+async def test_diagnostics_summarises_a_loaded_trip_pattern_index(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """The loaded branch reports counts, not just `loaded: true`.
+
+    Guards the block that exists to make a user-supplied dump answer "why
+    don't I see transfer chips / line colours" without reading the logs.
+    `lines_at_diva_count` and `colors_by_line_count` are the migration
+    signal specifically: an older cache that hasn't finished its
+    background refresh has the index loaded with those dicts empty, which
+    looks identical to a healthy install if you only check `loaded`.
+    """
+    from custom_components.wiener_linien_austria.static import CATALOGUE_KEY
+
+    from .conftest import _sample_catalogue
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    catalogue = _sample_catalogue()
+    hass.data.setdefault(DOMAIN, {})[CATALOGUE_KEY] = catalogue
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    summary = diag["trip_patterns"]
+
+    assert summary["loaded"] is True
+    assert summary["line_count"] == catalogue.trip_patterns.line_count
+    assert summary["pattern_count"] == catalogue.trip_patterns.pattern_count
+    assert summary["lines_at_diva_count"] == len(catalogue.trip_patterns.lines_at_diva)
+    assert summary["colors_by_line_count"] == len(
+        catalogue.trip_patterns.colors_by_line
+    )
+
+
+async def test_diagnostics_reports_an_absent_trip_pattern_index(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """No catalogue in hass.data means `loaded: false` and no counts.
+
+    The counts must be absent rather than zero: zero would read as "the
+    index loaded and is empty", which is a different fault with a
+    different fix.
+    """
+    from custom_components.wiener_linien_austria.static import CATALOGUE_KEY
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    hass.data.setdefault(DOMAIN, {}).pop(CATALOGUE_KEY, None)
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    summary = diag["trip_patterns"]
+
+    assert summary["loaded"] is False
+    assert "line_count" not in summary
+    assert "lines_at_diva_count" not in summary

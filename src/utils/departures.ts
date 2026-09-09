@@ -30,9 +30,8 @@ export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] 
   const seen = new Set<string>();
   for (const d of attrs?.departures ?? []) {
     const dir = String(d.direction ?? "");
-    // Triple-keyed dedupe — a (line, direction, towards) triple is the
-    // smallest unit the picker shows. Walk-times use lineDirKey (pair)
-    // because the threshold doesn't depend on the active terminus.
+    // Triple-keyed dedupe — the triple is the smallest unit the picker
+    // shows. Walk-times key by pair instead; see lineDirKey.
     const key = `${d.line}|${dir}|${d.towards}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -46,10 +45,9 @@ export interface Pair {
   line: string;
   direction: string;
   type: string;
-  // Display-only label: list of every terminus seen for this pair, in
-  // first-seen order. The walk-time row uses the joined string (e.g.
-  // "Oberlaa / Alaudagasse") in the UI so the user knows what their
-  // threshold covers, but the saved key is the pair, not the label.
+  // Display-only: every terminus seen for this pair, first-seen order. The
+  // walk-time row joins them ("Oberlaa / Alaudagasse") so the user sees what
+  // the threshold covers; the saved key is still the pair.
   termini: string[];
 }
 
@@ -57,7 +55,7 @@ export interface Pair {
 // editors to render one walk-time row per pair regardless of how many
 // termini the API currently exposes. The first-seen `type` is captured
 // for icon rendering; `termini` accumulates every towards label seen.
-export function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
+function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   const byKey = new Map<string, Pair>();
   for (const d of attrs?.departures ?? []) {
     const dir = String(d.direction ?? "");
@@ -130,6 +128,80 @@ export function linesForDirection(
   return [...out].sort();
 }
 
+/** What is known about the directions served at a stop, optionally narrowed
+ *  to one line.
+ *
+ *  Three states, not two. "Both directions run", "only one direction runs" and
+ *  "we have no data right now" are genuinely different answers, and collapsing
+ *  the last two into a single `available` set is what left tracked nightlines
+ *  unconfigurable in the afternoon: every direction control read an empty set
+ *  as "not served" and disabled itself.
+ *
+ *  Source precedence mirrors `linesForDirection` — `tracked_line_keys` (what
+ *  the user opted into in the config flow) wins, live departures are the
+ *  fallback for sensor caches that pre-date it. A line the user tracks
+ *  therefore keeps its direction buttons alive outside the hours it runs.
+ */
+export interface DirectionSurface {
+  /** Directions known to be served. Empty means "unknown", never "none". */
+  available: ReadonlySet<"H" | "R">;
+  /** No data for this scope right now — a nightline in the afternoon, a cold
+   *  sensor, a stop whose feed is briefly empty. Callers must treat this as
+   *  "we don't know" and leave controls enabled. */
+  unknown: boolean;
+  /** The only direction served, when the data genuinely says one-way. `null`
+   *  when both run AND when `unknown` — an absent answer is not a one-way
+   *  answer, which is the distinction the old `!hasR` test threw away. */
+  oneWay: "H" | "R" | null;
+}
+
+export function directionSurface(
+  attrs: WienerLinienAttrs | undefined,
+  line?: string | undefined,
+): DirectionSurface {
+  const available = new Set<"H" | "R">();
+  for (const key of attrs?.tracked_line_keys ?? []) {
+    const [keyLine, dir] = key.split("|", 2);
+    if (line && keyLine !== line) continue;
+    if (dir === "H" || dir === "R") available.add(dir);
+  }
+  if (available.size === 0) {
+    for (const d of attrs?.departures ?? []) {
+      if (line && d.line !== line) continue;
+      if (d.direction === "H" || d.direction === "R") available.add(d.direction);
+    }
+  }
+  const only = [...available];
+  return {
+    available,
+    unknown: available.size === 0,
+    oneWay: available.size === 1 ? (only[0] ?? null) : null,
+  };
+}
+
+/** The lines actually in play for a stop: the picked ones when the user has
+ *  narrowed the selection, every line at the stop otherwise (an empty
+ *  selection means "all").
+ *
+ *  A picked line missing from `lines` is kept rather than dropped. The saved
+ *  config referencing a line the current list does not mention is a data gap,
+ *  not a deselection — dropping it silently emptied retro's walk-time section
+ *  whenever a stop's tracked lines changed under a saved card. Shared so the
+ *  chip row, the direction controls and the walk-time rows cannot disagree
+ *  about which lines this stop is showing.
+ */
+export function effectiveLines(
+  lines: ReadonlyArray<string>,
+  picked: ReadonlySet<string>,
+): string[] {
+  if (picked.size === 0) return [...lines];
+  const out = lines.filter((l) => picked.has(l));
+  for (const l of picked) {
+    if (!out.includes(l)) out.push(l);
+  }
+  return out;
+}
+
 // Tracked list wins; without it, union the static catalogue with live
 // departures so a brand-new line that hasn't made it into the static
 // catalogue yet is still listed once it appears in the realtime feed.
@@ -163,8 +235,7 @@ export function collectLinesInSelection(
 }
 
 export interface ModernStopFilter {
-  // `?: T | undefined` — see NormalisedRetroConfigValidated comment for
-  // the dual-form rationale under exactOptionalPropertyTypes.
+  // Dual form — see the optionality convention in utils/config.ts.
   lines?: string[] | undefined;
   direction?: "H" | "R" | undefined;
   // Per-line direction override. Takes precedence over `direction`.
@@ -215,5 +286,57 @@ export function shouldShowStopsAhead(
     showStopsAhead !== false &&
     Array.isArray(d.stops_ahead) &&
     d.stops_ahead.length > 0
+  );
+}
+
+/**
+ * The (line, direction) rows the walk-time control offers for one stop.
+ *
+ * Live departures supply real termini. A line the user tracks that has no
+ * live departures right now — a nightline in the afternoon — still gets
+ * rows, because otherwise its walk time is only configurable during the
+ * hours it actually runs, which for a nightline is the middle of the
+ * night. Those synthetic rows carry no termini (there is no data to name
+ * one), so the caller labels them with the direction instead.
+ *
+ * Rows are filtered to the direction the line resolves to: its own
+ * override, else the stop-wide setting, else both.
+ */
+export function walkTimePairs(
+  attrs: WienerLinienAttrs | undefined,
+  opts: {
+    /** Every line at this stop, from the tracked-line list. */
+    lines: string[];
+    /** Lines the user narrowed to. Empty means "all of them". */
+    picked: ReadonlySet<string>;
+    lineDirections: Record<string, "H" | "R">;
+    stopDirection: "H" | "R" | null;
+  },
+): Pair[] {
+  const { lines, picked, lineDirections, stopDirection } = opts;
+  const resolved = (line: string): "H" | "R" | null =>
+    lineDirections[line] ?? stopDirection;
+
+  const live = pairsAtStop(attrs).filter((p) => {
+    if (picked.size > 0 && !picked.has(p.line)) return false;
+    const eff = resolved(p.line);
+    return !eff || p.direction === eff;
+  });
+
+  const seen = new Set(live.map((p) => p.line));
+  const effective = effectiveLines(lines, picked);
+  const synthetic: Pair[] = [];
+  for (const line of effective) {
+    if (seen.has(line)) continue;
+    const eff = resolved(line);
+    for (const dir of eff ? [eff] : (["H", "R"] as const)) {
+      synthetic.push({ line, direction: dir, type: "", termini: [] });
+    }
+  }
+
+  return [...live, ...synthetic].sort((a, b) =>
+    a.line === b.line
+      ? a.direction.localeCompare(b.direction)
+      : a.line.localeCompare(b.line),
   );
 }

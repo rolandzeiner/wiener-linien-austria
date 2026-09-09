@@ -1,201 +1,1258 @@
-// Wiener Linien Austria — bundled by Rollup. Edit sources in src/, then `npm run build`.
-function e(e,i,t,o){var r,d=arguments.length,a=d<3?i:null===o?o=Object.getOwnPropertyDescriptor(i,t):o;if("object"==typeof Reflect&&"function"==typeof Reflect.decorate)a=Reflect.decorate(e,i,t,o);else for(var n=e.length-1;n>=0;n--)(r=e[n])&&(a=(d<3?r(a):d>3?r(i,t,a):r(i,t))||a);return d>3&&a&&Object.defineProperty(i,t,a),a}"function"==typeof SuppressedError&&SuppressedError;const i=globalThis,t=i.ShadowRoot&&(void 0===i.ShadyCSS||i.ShadyCSS.nativeShadow)&&"adoptedStyleSheets"in Document.prototype&&"replace"in CSSStyleSheet.prototype,o=Symbol(),r=new WeakMap;let d=class{constructor(e,i,t){if(this._$cssResult$=!0,t!==o)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=i}get styleSheet(){let e=this.o;const i=this.t;if(t&&void 0===e){const t=void 0!==i&&1===i.length;t&&(e=r.get(i)),void 0===e&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),t&&r.set(i,e))}return e}toString(){return this.cssText}};const a=(e,...i)=>{const t=1===e.length?e[0]:i.reduce((i,t,o)=>i+(e=>{if(!0===e._$cssResult$)return e.cssText;if("number"==typeof e)return e;throw Error("Value passed to 'css' function must be a 'css' function result: "+e+". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.")})(t)+e[o+1],e[0]);return new d(t,e,o)},n=t?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let i="";for(const t of e.cssRules)i+=t.cssText;return(e=>new d("string"==typeof e?e:e+"",void 0,o))(i)})(e):e,{is:m,defineProperty:l,getOwnPropertyDescriptor:s,getOwnPropertyNames:c,getOwnPropertySymbols:u,getPrototypeOf:h}=Object,p=globalThis,f=p.trustedTypes,g=f?f.emptyScript:"",b=p.reactiveElementPolyfillSupport,w=(e,i)=>e,k={toAttribute(e,i){switch(i){case Boolean:e=e?g:null;break;case Object:case Array:e=null==e?e:JSON.stringify(e)}return e},fromAttribute(e,i){let t=e;switch(i){case Boolean:t=null!==e;break;case Number:t=null===e?null:Number(e);break;case Object:case Array:try{t=JSON.parse(e)}catch(e){t=null}}return t}},v=(e,i)=>!m(e,i),_={attribute:!0,type:String,converter:k,reflect:!1,useDefault:!1,hasChanged:v};Symbol.metadata??=Symbol("metadata"),p.litPropertyMetadata??=new WeakMap;let y=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,i=_){if(i.state&&(i.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((i=Object.create(i)).wrapped=!0),this.elementProperties.set(e,i),!i.noAccessor){const t=Symbol(),o=this.getPropertyDescriptor(e,t,i);void 0!==o&&l(this.prototype,e,o)}}static getPropertyDescriptor(e,i,t){const{get:o,set:r}=s(this.prototype,e)??{get(){return this[i]},set(e){this[i]=e}};return{get:o,set(i){const d=o?.call(this);r?.call(this,i),this.requestUpdate(e,d,t)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??_}static _$Ei(){if(this.hasOwnProperty(w("elementProperties")))return;const e=h(this);e.finalize(),void 0!==e.l&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(w("finalized")))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(w("properties"))){const e=this.properties,i=[...c(e),...u(e)];for(const t of i)this.createProperty(t,e[t])}const e=this[Symbol.metadata];if(null!==e){const i=litPropertyMetadata.get(e);if(void 0!==i)for(const[e,t]of i)this.elementProperties.set(e,t)}this._$Eh=new Map;for(const[e,i]of this.elementProperties){const t=this._$Eu(e,i);void 0!==t&&this._$Eh.set(t,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){const i=[];if(Array.isArray(e)){const t=new Set(e.flat(1/0).reverse());for(const e of t)i.unshift(n(e))}else void 0!==e&&i.push(n(e));return i}static _$Eu(e,i){const t=i.attribute;return!1===t?void 0:"string"==typeof t?t:"string"==typeof e?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),void 0!==this.renderRoot&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){const e=new Map,i=this.constructor.elementProperties;for(const t of i.keys())this.hasOwnProperty(t)&&(e.set(t,this[t]),delete this[t]);e.size>0&&(this._$Ep=e)}createRenderRoot(){const e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return((e,o)=>{if(t)e.adoptedStyleSheets=o.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(const t of o){const o=document.createElement("style"),r=i.litNonce;void 0!==r&&o.setAttribute("nonce",r),o.textContent=t.cssText,e.appendChild(o)}})(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,i,t){this._$AK(e,t)}_$ET(e,i){const t=this.constructor.elementProperties.get(e),o=this.constructor._$Eu(e,t);if(void 0!==o&&!0===t.reflect){const r=(void 0!==t.converter?.toAttribute?t.converter:k).toAttribute(i,t.type);this._$Em=e,null==r?this.removeAttribute(o):this.setAttribute(o,r),this._$Em=null}}_$AK(e,i){const t=this.constructor,o=t._$Eh.get(e);if(void 0!==o&&this._$Em!==o){const e=t.getPropertyOptions(o),r="function"==typeof e.converter?{fromAttribute:e.converter}:void 0!==e.converter?.fromAttribute?e.converter:k;this._$Em=o;const d=r.fromAttribute(i,e.type);this[o]=d??this._$Ej?.get(o)??d,this._$Em=null}}requestUpdate(e,i,t,o=!1,r){if(void 0!==e){const d=this.constructor;if(!1===o&&(r=this[e]),t??=d.getPropertyOptions(e),!((t.hasChanged??v)(r,i)||t.useDefault&&t.reflect&&r===this._$Ej?.get(e)&&!this.hasAttribute(d._$Eu(e,t))))return;this.C(e,i,t)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,i,{useDefault:t,reflect:o,wrapped:r},d){t&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,d??i??this[e]),!0!==r||void 0!==d)||(this._$AL.has(e)||(this.hasUpdated||t||(i=void 0),this._$AL.set(e,i)),!0===o&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}const e=this.scheduleUpdate();return null!=e&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(const[e,i]of this._$Ep)this[e]=i;this._$Ep=void 0}const e=this.constructor.elementProperties;if(e.size>0)for(const[i,t]of e){const{wrapped:e}=t,o=this[i];!0!==e||this._$AL.has(i)||void 0===o||this.C(i,void 0,t,o)}}let e=!1;const i=this._$AL;try{e=this.shouldUpdate(i),e?(this.willUpdate(i),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(i)):this._$EM()}catch(i){throw e=!1,this._$EM(),i}e&&this._$AE(i)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};y.elementStyles=[],y.shadowRootOptions={mode:"open"},y[w("elementProperties")]=new Map,y[w("finalized")]=new Map,b?.({ReactiveElement:y}),(p.reactiveElementVersions??=[]).push("2.1.2");const x=globalThis,z=e=>e,S=x.trustedTypes,A=S?S.createPolicy("lit-html",{createHTML:e=>e}):void 0,$="$lit$",E=`lit$${Math.random().toFixed(9).slice(2)}$`,q="?"+E,T=`<${q}>`,L=document,R=()=>L.createComment(""),C=e=>null===e||"object"!=typeof e&&"function"!=typeof e,D=Array.isArray,M="[ \t\n\f\r]",H=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,W=/-->/g,P=/>/g,B=RegExp(`>|${M}(?:([^\\s"'>=/]+)(${M}*=${M}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,"g"),j=/'/g,N=/"/g,O=/^(?:script|style|textarea|title)$/i,U=e=>(i,...t)=>({_$litType$:e,strings:i,values:t}),F=U(1),I=U(2),K=Symbol.for("lit-noChange"),V=Symbol.for("lit-nothing"),G=new WeakMap,Z=L.createTreeWalker(L,129);function Y(e,i){if(!D(e)||!e.hasOwnProperty("raw"))throw Error("invalid template strings array");return void 0!==A?A.createHTML(i):i}const X=(e,i)=>{const t=e.length-1,o=[];let r,d=2===i?"<svg>":3===i?"<math>":"",a=H;for(let i=0;i<t;i++){const t=e[i];let n,m,l=-1,s=0;for(;s<t.length&&(a.lastIndex=s,m=a.exec(t),null!==m);)s=a.lastIndex,a===H?"!--"===m[1]?a=W:void 0!==m[1]?a=P:void 0!==m[2]?(O.test(m[2])&&(r=RegExp("</"+m[2],"g")),a=B):void 0!==m[3]&&(a=B):a===B?">"===m[0]?(a=r??H,l=-1):void 0===m[1]?l=-2:(l=a.lastIndex-m[2].length,n=m[1],a=void 0===m[3]?B:'"'===m[3]?N:j):a===N||a===j?a=B:a===W||a===P?a=H:(a=B,r=void 0);const c=a===B&&e[i+1].startsWith("/>")?" ":"";d+=a===H?t+T:l>=0?(o.push(n),t.slice(0,l)+$+t.slice(l)+E+c):t+E+(-2===l?i:c)}return[Y(e,d+(e[t]||"<?>")+(2===i?"</svg>":3===i?"</math>":"")),o]};class Q{constructor({strings:e,_$litType$:i},t){let o;this.parts=[];let r=0,d=0;const a=e.length-1,n=this.parts,[m,l]=X(e,i);if(this.el=Q.createElement(m,t),Z.currentNode=this.el.content,2===i||3===i){const e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;null!==(o=Z.nextNode())&&n.length<a;){if(1===o.nodeType){if(o.hasAttributes())for(const e of o.getAttributeNames())if(e.endsWith($)){const i=l[d++],t=o.getAttribute(e).split(E),a=/([.?@])?(.*)/.exec(i);n.push({type:1,index:r,name:a[2],strings:t,ctor:"."===a[1]?oe:"?"===a[1]?re:"@"===a[1]?de:te}),o.removeAttribute(e)}else e.startsWith(E)&&(n.push({type:6,index:r}),o.removeAttribute(e));if(O.test(o.tagName)){const e=o.textContent.split(E),i=e.length-1;if(i>0){o.textContent=S?S.emptyScript:"";for(let t=0;t<i;t++)o.append(e[t],R()),Z.nextNode(),n.push({type:2,index:++r});o.append(e[i],R())}}}else if(8===o.nodeType)if(o.data===q)n.push({type:2,index:r});else{let e=-1;for(;-1!==(e=o.data.indexOf(E,e+1));)n.push({type:7,index:r}),e+=E.length-1}r++}}static createElement(e,i){const t=L.createElement("template");return t.innerHTML=e,t}}function J(e,i,t=e,o){if(i===K)return i;let r=void 0!==o?t._$Co?.[o]:t._$Cl;const d=C(i)?void 0:i._$litDirective$;return r?.constructor!==d&&(r?._$AO?.(!1),void 0===d?r=void 0:(r=new d(e),r._$AT(e,t,o)),void 0!==o?(t._$Co??=[])[o]=r:t._$Cl=r),void 0!==r&&(i=J(e,r._$AS(e,i.values),r,o)),i}class ee{constructor(e,i){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=i}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){const{el:{content:i},parts:t}=this._$AD,o=(e?.creationScope??L).importNode(i,!0);Z.currentNode=o;let r=Z.nextNode(),d=0,a=0,n=t[0];for(;void 0!==n;){if(d===n.index){let i;2===n.type?i=new ie(r,r.nextSibling,this,e):1===n.type?i=new n.ctor(r,n.name,n.strings,this,e):6===n.type&&(i=new ae(r,this,e)),this._$AV.push(i),n=t[++a]}d!==n?.index&&(r=Z.nextNode(),d++)}return Z.currentNode=L,o}p(e){let i=0;for(const t of this._$AV)void 0!==t&&(void 0!==t.strings?(t._$AI(e,t,i),i+=t.strings.length-2):t._$AI(e[i])),i++}}class ie{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,i,t,o){this.type=2,this._$AH=V,this._$AN=void 0,this._$AA=e,this._$AB=i,this._$AM=t,this.options=o,this._$Cv=o?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode;const i=this._$AM;return void 0!==i&&11===e?.nodeType&&(e=i.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,i=this){e=J(this,e,i),C(e)?e===V||null==e||""===e?(this._$AH!==V&&this._$AR(),this._$AH=V):e!==this._$AH&&e!==K&&this._(e):void 0!==e._$litType$?this.$(e):void 0!==e.nodeType?this.T(e):(e=>D(e)||"function"==typeof e?.[Symbol.iterator])(e)?this.k(e):this._(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==V&&C(this._$AH)?this._$AA.nextSibling.data=e:this.T(L.createTextNode(e)),this._$AH=e}$(e){const{values:i,_$litType$:t}=e,o="number"==typeof t?this._$AC(e):(void 0===t.el&&(t.el=Q.createElement(Y(t.h,t.h[0]),this.options)),t);if(this._$AH?._$AD===o)this._$AH.p(i);else{const e=new ee(o,this),t=e.u(this.options);e.p(i),this.T(t),this._$AH=e}}_$AC(e){let i=G.get(e.strings);return void 0===i&&G.set(e.strings,i=new Q(e)),i}k(e){D(this._$AH)||(this._$AH=[],this._$AR());const i=this._$AH;let t,o=0;for(const r of e)o===i.length?i.push(t=new ie(this.O(R()),this.O(R()),this,this.options)):t=i[o],t._$AI(r),o++;o<i.length&&(this._$AR(t&&t._$AB.nextSibling,o),i.length=o)}_$AR(e=this._$AA.nextSibling,i){for(this._$AP?.(!1,!0,i);e!==this._$AB;){const i=z(e).nextSibling;z(e).remove(),e=i}}setConnected(e){void 0===this._$AM&&(this._$Cv=e,this._$AP?.(e))}}class te{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,i,t,o,r){this.type=1,this._$AH=V,this._$AN=void 0,this.element=e,this.name=i,this._$AM=o,this.options=r,t.length>2||""!==t[0]||""!==t[1]?(this._$AH=Array(t.length-1).fill(new String),this.strings=t):this._$AH=V}_$AI(e,i=this,t,o){const r=this.strings;let d=!1;if(void 0===r)e=J(this,e,i,0),d=!C(e)||e!==this._$AH&&e!==K,d&&(this._$AH=e);else{const o=e;let a,n;for(e=r[0],a=0;a<r.length-1;a++)n=J(this,o[t+a],i,a),n===K&&(n=this._$AH[a]),d||=!C(n)||n!==this._$AH[a],n===V?e=V:e!==V&&(e+=(n??"")+r[a+1]),this._$AH[a]=n}d&&!o&&this.j(e)}j(e){e===V?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??"")}}class oe extends te{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===V?void 0:e}}class re extends te{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==V)}}class de extends te{constructor(e,i,t,o,r){super(e,i,t,o,r),this.type=5}_$AI(e,i=this){if((e=J(this,e,i,0)??V)===K)return;const t=this._$AH,o=e===V&&t!==V||e.capture!==t.capture||e.once!==t.once||e.passive!==t.passive,r=e!==V&&(t===V||o);o&&this.element.removeEventListener(this.name,this,t),r&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){"function"==typeof this._$AH?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}}class ae{constructor(e,i,t){this.element=e,this.type=6,this._$AN=void 0,this._$AM=i,this.options=t}get _$AU(){return this._$AM._$AU}_$AI(e){J(this,e)}}const ne=x.litHtmlPolyfillSupport;ne?.(Q,ie),(x.litHtmlVersions??=[]).push("3.3.2");const me=globalThis;let le=class extends y{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){const e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){const i=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=((e,i,t)=>{const o=t?.renderBefore??i;let r=o._$litPart$;if(void 0===r){const e=t?.renderBefore??null;o._$litPart$=r=new ie(i.insertBefore(R(),e),e,void 0,t??{})}return r._$AI(e),r})(i,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return K}};le._$litElement$=!0,le.finalized=!0,me.litElementHydrateSupport?.({LitElement:le});const se=me.litElementPolyfillSupport;se?.({LitElement:le}),(me.litElementVersions??=[]).push("4.2.2");const ce=e=>(i,t)=>{void 0!==t?t.addInitializer(()=>{customElements.define(e,i)}):customElements.define(e,i)},ue={attribute:!0,type:String,converter:k,reflect:!1,hasChanged:v},he=(e=ue,i,t)=>{const{kind:o,metadata:r}=t;let d=globalThis.litPropertyMetadata.get(r);if(void 0===d&&globalThis.litPropertyMetadata.set(r,d=new Map),"setter"===o&&((e=Object.create(e)).wrapped=!0),d.set(t.name,e),"accessor"===o){const{name:o}=t;return{set(t){const r=i.get.call(this);i.set.call(this,t),this.requestUpdate(o,r,e,!0,t)},init(i){return void 0!==i&&this.C(o,void 0,e,i),i}}}if("setter"===o){const{name:o}=t;return function(t){const r=this[o];i.call(this,t),this.requestUpdate(o,r,e,!0,t)}}throw Error("Unsupported decorator location: "+o)};function pe(e){return(i,t)=>"object"==typeof t?he(e,i,t):((e,i,t)=>{const o=i.hasOwnProperty(t);return i.constructor.createProperty(t,e),o?Object.getOwnPropertyDescriptor(i,t):void 0})(e,i,t)}function fe(e){return pe({...e,state:!0,attribute:!1})}const ge=1,be=3,we=4,ke=e=>(...i)=>({_$litDirective$:e,values:i});let ve=class{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,i,t){this._$Ct=e,this._$AM=i,this._$Ci=t}_$AS(e,i){return this.update(e,i)}update(e,i){return this.render(...i)}};const _e=ke(class extends ve{constructor(e){if(super(e),e.type!==ge||"class"!==e.name||e.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(e){return" "+Object.keys(e).filter(i=>e[i]).join(" ")+" "}update(e,[i]){if(void 0===this.st){this.st=new Set,void 0!==e.strings&&(this.nt=new Set(e.strings.join(" ").split(/\s/).filter(e=>""!==e)));for(const e in i)i[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(i)}const t=e.element.classList;for(const e of this.st)e in i||(t.remove(e),this.st.delete(e));for(const e in i){const o=!!i[e];o===this.st.has(e)||this.nt?.has(e)||(o?(t.add(e),this.st.add(e)):(t.remove(e),this.st.delete(e)))}return K}}),ye={},xe=(e,i=ye)=>e._$AH=i,ze=ke(class extends ve{constructor(){super(...arguments),this.key=V}render(e,i){return this.key=e,i}update(e,[i,t]){return i!==this.key&&(xe(e),this.key=i),t}}),Se="important",Ae=" !"+Se,$e=ke(class extends ve{constructor(e){if(super(e),e.type!==ge||"style"!==e.name||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((i,t)=>{const o=e[t];return null==o?i:i+`${t=t.includes("-")?t:t.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,"-$&").toLowerCase()}:${o};`},"")}update(e,[i]){const{style:t}=e.element;if(void 0===this.ft)return this.ft=new Set(Object.keys(i)),this.render(i);for(const e of this.ft)null==i[e]&&(this.ft.delete(e),e.includes("-")?t.removeProperty(e):t[e]=null);for(const e in i){const o=i[e];if(null!=o){this.ft.add(e);const i="string"==typeof o&&o.endsWith(Ae);e.includes("-")||i?t.setProperty(e,i?o.slice(0,-11):o,i?Se:""):t[e]=o}}return K}});function Ee(e,i){return e?F`<span lang="de">${e}</span>`:i??""}var qe={no_data:"Keine Abfahrten verfügbar",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",stale_feed_detail:"Die Wiener Linien melden für diese Haltestelle veraltete Abfahrtszeiten. Sobald wieder Echtzeitdaten kommen, füllt sich die Anzeige automatisch.",stale_feed_since:"Letzte gemeldete Abfahrt: {time}",stale_feed_partial:"Einzelne Linien melden keine aktuellen Zeiten.",min:"Min",now:"Jetzt",platform_short_rail:"Gleis",platform_short_bus:"Steig",version_update:"Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie einen anderen Sensor oder entfernen Sie ihn aus den Haltestellen dieser Karte.",no_entities_picked:"Keine Haltestelle ausgewählt",no_entities_available:"Keine Wiener-Linien-Sensoren gefunden",departures_list:"Kommende Abfahrten",barrier_free_title:"Barrierefrei zugänglich",cooling_title:"Klimatisiert",disturbance_title:"Verkehrsbehinderung gemeldet",stops_ahead_aria_show:"Streckenverlauf für {line} Richtung {towards} anzeigen",stops_ahead_aria_hide:"Streckenverlauf für {line} Richtung {towards} ausblenden",stops_ahead_transfer_aria:"Umsteigen auf {lines}",stops_ahead_other_show:"{count} weitere Linien bei {stop} anzeigen",stops_ahead_other_hide:"Weitere Linien bei {stop} ausblenden",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",dir_both:"Beide",traffic_label:"Störung",traffic_until:"Bis",traffic_updated:"aktualisiert",elevator_label:"Aufzug außer Betrieb",elevator_until:"Bis",open_in_maps:"In Karte öffnen",qr_open:"QR-Code anzeigen",qr_dialog_title:"QR-Code für Haltestelle",qr_dialog_hint:"Mit dem Smartphone scannen — öffnet die Haltestelle in der Karten-App.",qr_dialog_close:"QR-Code schließen",delay_singular:"1 Min. verspätet",delay_plural:"{n} Min. verspätet",devmode_title:"DEV",devmode_traffic_btn:"Störung testen",devmode_elevator_btn:"Aufzug testen",devmode_colors_btn:"Linienfarben",devmode_clear_btn:"Löschen",editor:{lines_label:"Linien",direction_label:"Richtung",per_line_direction_label:"Richtung pro Linie",per_line_direction_hint:"Optional: Richtung pro Linie festlegen. Beide = dem Feld Richtung folgen.",per_line_direction_aria:"Richtung für Linie {line}",direction_unavailable:"Keine Abfahrten in dieser Richtung",walk_time_label:"Fußweg (min)",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis Sie dort sind. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",section_colors:"Linienfarben",colors_hint:"Optional: Farben überschreiben. U-Bahn-Standardwerte sind gesetzt.",reset_color:"Zurücksetzen",pick_color_for_line:"Farbe für Linie {line} wählen",section_display:"Anzeige",max_departures:"Anzahl Abfahrten pro Haltestelle",show_accessibility:"Barrierefrei-Symbol anzeigen",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",show_cooling:"Klimaanlagen-Symbol anzeigen",show_cooling_helper:"Zeigt eine Schneeflocke neben Abfahrten mit klimatisiertem Fahrzeug. Wiener Linien melden das pro Fahrzeug — ältere Garnituren liefern die Angabe nicht.",show_type_icon:"Verkehrsmittel-Symbol anzeigen",show_platform:"Gleis/Steig anzeigen",show_traffic_info:"Störungen anzeigen",show_elevator_info:"Aufzugsausfälle anzeigen",show_delay:"Verspätungen anzeigen",show_delay_colors:"Verspätungen farblich hervorheben",show_delay_colors_helper:"Färbt die Minutenzahl rot, wenn eine Abfahrt verspätet ist, und grün, wenn sie zu früh kommt.",show_hero_metric:"Hauptbereich anzeigen",show_departures:"Abfahrtsliste anzeigen",show_stops_ahead:"Zwischenstopps anzeigen",show_qr_button:"QR-Code-Schaltfläche anzeigen",hide_header:"Kopfzeile ausblenden",hide_header_helper:"Wenn aktiv, wird die Titelleiste der Karte ausgeblendet.",hide_attribution:"Datenquelle ausblenden",hide_attribution_helper:"Wenn aktiv, wird die Quellenangabe ausgeblendet.",layout:"Layout mehrerer Haltestellen",layout_stacked:"Gestapelt",layout_tabs:"Reiter",no_lines_available:"Linien erscheinen hier, sobald Haltestellen ausgewählt wurden."}},Te={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",version_update:"Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie oben einen anderen Sensor.",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",race_finished:"Barrierefreiheits-Rennen beendet",race_starting_in:"Rennen startet in {n}",race_winner_announce:"Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen",barrier_free_title:"Barrierefrei zugänglich",unit_min:"min",via_prefix:"ÜBER",aria_start_race:"Barrierefreiheits-Rennen starten",aria_dismiss_message:"Lauftext schließen",header:{icon_exit:"Ausgang",icon_exit_access:"Stufenloser Ausgang",icon_wc:"WC",icon_escalator:"Rolltreppe",icon_elevator:"Aufzug",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe"},editor:{direction:"Richtung",line:"Linie",size:"Größe",style:"Stil",station_bg:"Stationsschild-Hintergrund",section_display:"Anzeige",section_walk_time:"Fußweg zur Haltestelle",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis Sie dort sind. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_no_data:"Keine Abfahrten in dieser Richtung. Richtung wechseln oder warten, bis der Sensor Linien meldet.",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",show_platform:"Gleis/Steig anzeigen",platform_side:"Gleis/Steig-Seite",platform_side_helper:"Standard folgt der Wiener-Linien-Beschilderung (Gleis 2 links, sonst rechts). Manuell überschreibbar.",platform_side_auto:"Automatisch (1 = rechts, 2 = links)",platform_side_left:"Immer links",platform_side_right:"Immer rechts",show_station_name:"Stationsnamen anzeigen",section_station:"Stationsnamen-Schild",station_bg_default:"Standard",station_bg_white:"Weiß",station_bg_black:"Schwarz",size_small:"Klein",size_medium:"Mittel",size_regular:"Normal",style_classic:"Klassisch",style_warm:"Warm",style_pixel:"Punktmatrix",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",flicker:"Linien-Flimmern",wheelchair_race:"Rollstuhl-Rennen",message_ticker:"Laufschrift",message_ticker_helper:"Zeigt alle 5 Minuten eine eigene Nachricht als Laufschrift über die Anzeige.",message_text:"Nachricht",message_text_helper:"Der Text, der über die Anzeige läuft.",section_header:"Stationskopfzeile",section_header_helper:"Schwarzer Streifen über dem Stationsnamen, wie auf U-Bahn-Schildern. Optional.",show_header:"Stationskopfzeile anzeigen",show_header_helper:"Einschalten zeigt den schwarzen Streifen über dem Stationsnamen. Einstellungen pro Seite bleiben gespeichert.",header_left:"Linke Seite",header_left_helper:"Ausgangssymbol am linken Rand.",header_right:"Rechte Seite",header_right_helper:"Ausgangssymbol am rechten Rand.",exit:"Ausgangssymbol",header_exit_none:"Kein",header_exit_regular:"Ausgang",header_exit_accessible:"Stufenloser Ausgang",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe",text:"Beschriftung",text_helper:"z. B. Name der nächsten Station.",show_wc:"WC-Symbol anzeigen",show_escalator:"Rolltreppen-Symbol anzeigen",show_elevator:"Aufzug-Symbol anzeigen",show_clock:"Uhr-Plakette anzeigen",show_clock_helper:"Aktuelle Uhrzeit (HH:MM) als weiße Plakette am innen liegenden Rand dieser Seite.",show_date:"Datums-Plakette anzeigen",show_date_helper:"Aktuelles Datum als weiße Plakette neben der Uhr.",date_format:"Datumsformat",date_format_helper:"Beispiel: d.m.Y → 25.05.2026. Zeichen: d j (Tag), m n (Monat), Y y (Jahr), D l (Wochentag), M F (Monatsname). Alles andere bleibt unverändert.",extra_icons:"Zusätzliche Symbole",extra_icons_helper:"Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",chips:"Zusätzliche Beschriftungen",chips_helper:"Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen.",section_tweaks:"Feinschliff",section_tweaks_helper:"Optische Extras. Beeinflussen nichts an den Daten, ändern nur das Aussehen.",show_unit:"Einheit „min“ anzeigen",show_unit_helper:"Kleines „min“ in Amber-Versalien nach jeder Minutenzahl.",line_pill:"Linien-Plakette",line_pill_helper:"Liniencode als gefüllte Plakette in der offiziellen Linienfarbe mit weißer LED-Schrift.",line_stripe:"Linien-Seitenstreifen",line_stripe_helper:"4-Pixel-Balken am linken Rand jeder Zeile in der Linienfarbe.",housing:"LED-Gehäuse",housing_helper:"Dunkler Rahmen um die LED-Anzeige mit dezentem Glas-Reflex obenauf."}},Le={no_entity:"Keine Haltestelle ausgewählt",no_data:"Keine Abfahrten",no_data_wrong_direction:"Keine Abfahrten in dieser Richtung",no_data_wrong_line:"Keine Abfahrten für diese Linie",betriebsschluss:"Betriebsschluss",stale_feed:"Keine aktuellen Daten",dir_h:"Hinfahrt",dir_r:"Rückfahrt",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"STEIG",col_line:"LINIE",col_dest:"RICHTUNG",col_step_free:"STUFENLOS",col_cd:"ANKUNFT",version_update:"Klappanzeige wurde auf v{v} aktualisiert — bitte neu laden",version_reload:"Neu laden",version_reload_stuck:"Neu laden hat die neue Version nicht übernommen. Schließen Sie diesen Browser-Tab und öffnen Sie das Dashboard erneut, oder löschen Sie die Website-Daten für Home Assistant in den Browser-Einstellungen.",entity_missing:"Sensor {entity} existiert nicht mehr. Wählen Sie oben einen anderen Sensor.",departures_list:"Kommende Abfahrten",at_platform:"Einfahrt",countdown_minutes:"{n} Minuten",barrier_free_title:"Barrierefrei zugänglich",not_barrier_free_title:"Nicht barrierefrei",unit_min:"min",dir_both:"Beide",header:{icon_exit:"Ausgang",icon_exit_access:"Stufenloser Ausgang",icon_wc:"WC",icon_escalator:"Rolltreppe",icon_elevator:"Aufzug",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe"},editor:{direction:"Richtung",direction_label:"Richtung",line:"Linie",lines_label:"Linien",stop_section_hint:"Abfahrten dieser Haltestelle filtern. „Beide“ zeigt beide Richtungen; ohne Linienauswahl werden alle Linien an der Haltestelle berücksichtigt.",size:"Größe",entities:"Haltestellen",section_display:"Anzeige",section_walk_time:"Fußweg",walk_time_hint:"Abfahrten ausblenden, die bereits weg wären, bis Sie dort sind. Leer lassen = kein Filter.",walk_time_branching_hint:"Gilt für alle Endstationen in dieser Richtung",walk_time_no_data:"Keine passenden Abfahrten. Richtung wechseln oder warten, bis der Sensor Linien meldet.",walk_time_placeholder:"–",walk_time_aria:"Fußweg in Minuten für Linie {line} Richtung {towards}",max_rows:"Anzahl Zeilen",max_rows_helper:"Wie viele Abfahrten die Tafel zeigt (1–8). Über alle Haltestellen zusammengeführt, nach Abfahrtszeit sortiert.",section_station:"Stationsnamen-Schild",section_station_helper:"Das farbige Band mit Stationsname und Uhrzeit am oberen Rand der Tafel.",show_station_name:"Stationsnamen anzeigen",show_station_name_helper:"Farbiges Band mit Stationsname und Uhrzeit am oberen Rand der Karte.",station_bg:"Hintergrund Stationsschild",station_bg_helper:"Standard ist die Farbe der ersten erfassten Linie (z. B. Rot für U1, Orange für U3). Bei mehreren Linien kann eine bestimmte Linie gewählt oder auf Weiß bzw. Schwarz umgestellt werden.",station_bg_line:"Erste Linie",station_bg_white:"Weiß",station_bg_black:"Schwarz",section_tweaks:"Feinschliff",section_tweaks_helper:"Optische Extras. Beeinflussen nichts an den Daten, ändern nur das Aussehen.",line_pill:"Linien-Spalte ausblenden",line_pill_helper:"Blendet die Linien-Spalte komplett aus. Sinnvoll, wenn die Karte auf eine einzelne Linie eingegrenzt ist (die Linie ist dann implizit).",housing:"Gehäuse",housing_helper:"Umrahmt die Tafel mit dem Gehäuse inkl. dezenter Innenkante und Schlagschatten. Gehäusefarbe folgt dem HA-Theme (cremefarben im Hellmodus, dunkel im Dunkelmodus). Aus = Tafel sitzt bündig auf dem Dashboard.",show_accessibility:"Rollstuhl-Plakette anzeigen",show_accessibility_helper:"Zeigt eine Rollstuhl-Plakette neben barrierefreien Abfahrten.",accessibility_only:"Nur barrierefreie Abfahrten anzeigen",show_min_unit:"Einheit „min“ anzeigen",show_min_unit_helper:"Kleines „min“ neben der Minutenzahl, wie auf echten Stationstafeln.",hide_attribution:"Datenquelle ausblenden",hide_attribution_helper:"Wenn aktiv, wird die CC-BY-Quellenangabe am unteren Rand der Karte ausgeblendet. Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern der Hinweis nicht an anderer Stelle im Dashboard erscheint.",size_small:"Normal",size_medium:"Mittel",size_regular:"Groß",show_platform:"Gleis/Steig anzeigen",show_platform_helper:"Fügt jeder Zeile eine eigene Gleis-Plakette zwischen Ziel und Minutenzahl hinzu. Wird nur eingeblendet, wenn mindestens eine sichtbare Zeile einen Gleis-Wert hat.",section_header:"Stationskopfzeile",section_header_helper:"Dunkler Streifen über dem orangen Stationsband mit Ausgangs-Symbolen, Service-Plaketten, Beschriftungen, Uhr + Datum. Optional.",show_header:"Kopfzeile anzeigen",show_header_helper:"Hauptschalter. Einstellungen pro Seite bleiben gespeichert.",header_left:"Linke Seite",header_left_helper:"Ausgangssymbol am linken Rand.",header_right:"Rechte Seite",header_right_helper:"Ausgangssymbol am rechten Rand.",exit:"Ausgangssymbol",header_exit_none:"Kein",header_exit_regular:"Ausgang",header_exit_accessible:"Stufenloser Ausgang",icon_mdi_exit_run:"Ausgang (laufende Person)",icon_mdi_exit_to_app:"Ausgang (Tür)",icon_mdi_door_open:"Offene Tür",icon_mdi_stairs:"Treppe",text:"Beschriftung",text_helper:"z. B. Name der nächsten Station.",show_wc:"WC-Symbol anzeigen",show_escalator:"Rolltreppen-Symbol anzeigen",show_elevator:"Aufzug-Symbol anzeigen",show_clock:"Uhr-Plakette anzeigen",show_clock_helper:"Aktuelle Uhrzeit (HH:MM) als cremefarbene Plakette am innen liegenden Rand dieser Seite.",show_date:"Datums-Plakette anzeigen",show_date_helper:"Aktuelles Datum als cremefarbene Plakette neben der Uhr.",date_format:"Datumsformat",date_format_helper:"Beispiel: d.m.Y → 25.05.2026. Zeichen: d j (Tag), m n (Monat), Y y (Jahr), D l (Wochentag), M F (Monatsname). Alles andere bleibt unverändert.",extra_icons:"Zusätzliche Symbole",extra_icons_helper:"Bis zu 3 MDI-Symbole pro Seite. Im Katalog suchen oder einen mdi:-Schlüssel einfügen.",chips:"Zusätzliche Beschriftungen",chips_helper:"Kurze Beschriftungen nach den Symbolen (z. B. Gleis- oder Liniennummern). Maximal 6 pro Seite, je 16 Zeichen."}},Re={modern:qe,retro:Te,flap:Le},Ce={no_data:"No departures available",betriebsschluss:"End of service",stale_feed:"No live data",stale_feed_detail:"Wiener Linien is sending out-of-date departure times for this stop. Departures return automatically once live data resumes.",stale_feed_since:"Last reported departure: {time}",stale_feed_partial:"Some lines aren't reporting current times.",min:"min",now:"Now",platform_short_rail:"Track",platform_short_bus:"Bay",version_update:"Wiener Linien Austria updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor, or remove it from this card's stops.",no_entities_picked:"No stop selected",no_entities_available:"No Wiener Linien sensors found",departures_list:"Upcoming departures",barrier_free_title:"Step-free access",cooling_title:"Air conditioned",disturbance_title:"Traffic disruption reported",stops_ahead_aria_show:"Show stops ahead for {line} towards {towards}",stops_ahead_aria_hide:"Hide stops ahead for {line} towards {towards}",stops_ahead_transfer_aria:"Change to {lines}",stops_ahead_other_show:"Show {count} more lines at {stop}",stops_ahead_other_hide:"Hide other lines at {stop}",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",dir_both:"Both",traffic_label:"Disruption",traffic_until:"Until",traffic_updated:"updated",elevator_label:"Elevator out of service",elevator_until:"Until",open_in_maps:"Open in maps",qr_open:"Show QR code",qr_dialog_title:"QR code for stop",qr_dialog_hint:"Scan with your phone — opens the stop in your maps app.",qr_dialog_close:"Close QR code",delay_singular:"1 min. late",delay_plural:"{n} min. late",devmode_title:"DEV",devmode_traffic_btn:"Test disruption",devmode_elevator_btn:"Test elevator",devmode_colors_btn:"Line colours",devmode_clear_btn:"Clear",editor:{lines_label:"Lines",direction_label:"Direction",per_line_direction_label:"Per-line direction",per_line_direction_hint:"Optional: pick a direction per line. Both = follow the Direction field.",per_line_direction_aria:"Direction for line {line}",direction_unavailable:"No departures in this direction",walk_time_label:"Walking time (min)",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",section_colors:"Line colours",colors_hint:"Optional overrides. Metro defaults are already set.",reset_color:"Reset",pick_color_for_line:"Pick colour for line {line}",section_display:"Display",max_departures:"Departures per stop",show_accessibility:"Show step-free icon",accessibility_only:"Only show step-free departures",show_cooling:"Show air-conditioning icon",show_cooling_helper:"Shows a snowflake beside departures with an air-conditioned vehicle. Wiener Linien report this per vehicle — older trains and trams don't send it.",show_type_icon:"Show vehicle-type icon",show_platform:"Show platform / track",show_traffic_info:"Show disruption alerts",show_elevator_info:"Show elevator outages",show_delay:"Show delays",show_delay_colors:"Colour-code delays",show_delay_colors_helper:"Turns the countdown number red when a departure runs late and green when it runs early.",show_hero_metric:"Show featured departure",show_departures:"Show departure list",show_stops_ahead:"Show intermediate stops",show_qr_button:"Show QR-code button",hide_header:"Hide header",hide_header_helper:"When on, the card title bar is hidden.",hide_attribution:"Hide data source",hide_attribution_helper:"When on, the data-source credit is hidden.",layout:"Multi-stop layout",layout_stacked:"Stacked",layout_tabs:"Tabs",no_lines_available:"Lines appear here once stops are selected."}},De={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",stale_feed:"No live data",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"PLATF.",steig:"BAY",version_update:"Retro card updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.",departures_list:"Upcoming departures",at_platform:"Arriving",countdown_minutes:"{n} minutes",race_finished:"Accessibility race finished",race_starting_in:"Race starting in {n}",race_winner_announce:"Wheelchair {n} wins the accessibility race",barrier_free_title:"Step-free access",unit_min:"min",via_prefix:"VIA",aria_start_race:"Start accessibility race",aria_dismiss_message:"Dismiss scrolling message",header:{icon_exit:"Exit",icon_exit_access:"Step-free exit",icon_wc:"Toilet",icon_escalator:"Escalator",icon_elevator:"Elevator",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs"},editor:{direction:"Direction",line:"Line",size:"Size",style:"Style",station_bg:"Station-name background",section_display:"Display",section_walk_time:"Walking time to stop",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_no_data:"No departures in this direction. Switch direction or wait until the sensor reports lines.",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",show_platform:"Show platform / track",platform_side:"Platform side",platform_side_helper:"Default follows Wiener Linien signage (platform 2 on the left, otherwise right). Override manually if needed.",platform_side_auto:"Auto (1 = right, 2 = left)",platform_side_left:"Always left",platform_side_right:"Always right",show_station_name:"Show station name",section_station:"Station name sign",station_bg_default:"Default",station_bg_white:"White",station_bg_black:"Black",size_small:"Small",size_medium:"Medium",size_regular:"Regular",style_classic:"Classic",style_warm:"Warm",style_pixel:"Dot matrix",accessibility_only:"Only show step-free departures",flicker:"Line badge flicker",wheelchair_race:"Wheelchair race",message_ticker:"Scrolling message",message_ticker_helper:"Runs a custom message across the display every 5 minutes.",message_text:"Message",message_text_helper:"The text that scrolls across the display.",section_header:"Station header",section_header_helper:"Black strip above the station name, like on U-Bahn signs. Optional.",show_header:"Show station header",show_header_helper:"Turn on to show the black strip above the station name. Per-side settings stay saved when off.",header_left:"Left side",header_left_helper:"Exit icon sits on the left edge.",header_right:"Right side",header_right_helper:"Exit icon sits on the right edge.",exit:"Exit icon",header_exit_none:"None",header_exit_regular:"Exit",header_exit_accessible:"Step-free exit",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs",text:"Sign text",text_helper:"E.g. name of the next station.",show_wc:"Show toilet icon",show_escalator:"Show escalator icon",show_elevator:"Show elevator icon",show_clock:"Show clock chip",show_clock_helper:"Current time (HH:MM) as a white chip at the innermost edge of this side.",show_date:"Show date chip",show_date_helper:"Current date as a white chip next to the clock.",date_format:"Date format",date_format_helper:"Example: d.m.Y → 25.05.2026. Tokens: d j (day), m n (month), Y y (year), D l (weekday), M F (month name). Anything else passes through unchanged.",extra_icons:"Extra icons",extra_icons_helper:"Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",chips:"Extra labels",chips_helper:"Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each.",section_tweaks:"Tweaks",section_tweaks_helper:"Visual flourishes. No data behaviour, just looks.",show_unit:'Show "min" unit',show_unit_helper:'Trail each countdown number with a small amber "min" caption.',line_pill:"Line-colour pill",line_pill_helper:"Render the line code as a filled pill in the official line colour with white LED text.",line_stripe:"Line-colour side stripe",line_stripe_helper:"A 4 px coloured bar at the left edge of each row, matched to the line.",housing:"LED housing",housing_helper:"Dark bezel around the LED panel with a subtle glass reflection on top."}},Me={no_entity:"No stop selected",no_data:"No departures",no_data_wrong_direction:"No departures in this direction",no_data_wrong_line:"No departures for this line",betriebsschluss:"End of service",stale_feed:"No live data",dir_h:"Outbound",dir_r:"Return",dir_h_short:"H",dir_r_short:"R",gleis:"GLEIS",steig:"BAY",col_line:"LINE",col_dest:"DIRECTION",col_step_free:"STEP-FREE",col_cd:"ARRIVAL",version_update:"Flap card updated to v{v} — please reload",version_reload:"Reload",version_reload_stuck:"Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.",entity_missing:"Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.",departures_list:"Upcoming departures",at_platform:"Arriving",countdown_minutes:"{n} minutes",barrier_free_title:"Step-free access",not_barrier_free_title:"Step-free access not available",unit_min:"min",dir_both:"Both",header:{icon_exit:"Exit",icon_exit_access:"Step-free exit",icon_wc:"Toilet",icon_escalator:"Escalator",icon_elevator:"Elevator",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs"},editor:{direction:"Direction",direction_label:"Direction",line:"Line",lines_label:"Lines",stop_section_hint:"Filter this stop’s departures. Pick “Both” to merge both directions; leave lines empty to include all lines at the stop.",size:"Size",entities:"Stops",section_display:"Display",section_walk_time:"Walking time",walk_time_hint:"Hide departures that would already be gone by the time you reach the platform. Leave blank for no filter.",walk_time_branching_hint:"Applies to all termini in this direction",walk_time_no_data:"No departures matched. Pick a direction or wait until the sensor reports lines.",walk_time_placeholder:"–",walk_time_aria:"Walk time in minutes for line {line} towards {towards}",max_rows:"Number of rows",max_rows_helper:"How many departures to show on the board (1–8). Merged across all stops, sorted by countdown.",section_station:"Station name sign",section_station_helper:"The coloured band with the station name + clock at the top of the board.",show_station_name:"Show station name",show_station_name_helper:"Coloured band with the station name and current time at the top of the card.",station_bg:"Station-name background",station_bg_helper:"Default is the colour of the first tracked line (e.g. red for U1, orange for U3). On multi-line boards you can pick a specific line, or override with solid white or black.",station_bg_line:"First line",station_bg_white:"White",station_bg_black:"Black",section_tweaks:"Tweaks",section_tweaks_helper:"Visual flourishes. No data behaviour, just looks.",line_pill:"Hide line column",line_pill_helper:"Drops the line column from the board entirely. Useful when the card is scoped to a single line (the line is implicit).",housing:"Cabinet housing",housing_helper:"Wraps the board in the cabinet with a soft inset bevel and drop shadow. Cabinet colour follows your HA theme (cream on light, dark on dark). When off, the board sits flush against the dashboard.",show_accessibility:"Show step-free tile",show_accessibility_helper:"Add a wheelchair pictogram tile next to step-free departures.",accessibility_only:"Only show step-free departures",show_min_unit:'Show "min" caption',show_min_unit_helper:"Small label next to the countdown number, like real station boards.",hide_attribution:"Hide data source",hide_attribution_helper:"When on, the CC-BY credit at the bottom of the card is hidden. The Wiener Linien Open Government Data licence requires visible attribution unless you keep the credit elsewhere on the dashboard.",size_small:"Normal",size_medium:"Medium",size_regular:"Large",show_platform:"Show platform / track",show_platform_helper:"Adds a per-row platform tile between the destination and the countdown. Only shown when at least one visible row has a platform value.",section_header:"Station header strip",section_header_helper:"Dark band above the orange station band with exit icons, amenity tiles, chips, clock + date. Optional.",show_header:"Show header strip",show_header_helper:"Master toggle. Per-side settings stay saved when off.",header_left:"Left side",header_left_helper:"Exit icon sits on the left edge.",header_right:"Right side",header_right_helper:"Exit icon sits on the right edge.",exit:"Exit icon",header_exit_none:"None",header_exit_regular:"Exit",header_exit_accessible:"Step-free exit",icon_mdi_exit_run:"Exit (running person)",icon_mdi_exit_to_app:"Exit (door)",icon_mdi_door_open:"Open door",icon_mdi_stairs:"Stairs",text:"Sign text",text_helper:"E.g. name of the next station.",show_wc:"Show toilet icon",show_escalator:"Show escalator icon",show_elevator:"Show elevator icon",show_clock:"Show clock chip",show_clock_helper:"Current time (HH:MM) as a cream chip at the innermost edge of this side.",show_date:"Show date chip",show_date_helper:"Current date as a cream chip next to the clock.",date_format:"Date format",date_format_helper:"Example: d.m.Y → 25.05.2026. Tokens: d j (day), m n (month), Y y (year), D l (weekday), M F (month name). Anything else passes through unchanged.",extra_icons:"Extra icons",extra_icons_helper:"Pick up to 3 MDI icons per side. Type to search the catalog, or paste an mdi: key.",chips:"Extra labels",chips_helper:"Short labels after the icons (e.g. platform or line numbers). Up to 6, 16 characters each."}},He={modern:Ce,retro:De,flap:Me};const We={de:Object.freeze({__proto__:null,default:Re,flap:Le,modern:qe,retro:Te}),en:Object.freeze({__proto__:null,default:He,flap:Me,modern:Ce,retro:De})},Pe=We.de??{};function Be(e,i){const t=function(e,i){return e.split(".").reduce((e,i)=>{if(e&&"object"==typeof e&&i in e)return e[i]},i)}(e,i);return"string"==typeof t?t:void 0}function je(e,i,t){const o=function(e){return"en"===((e.configLanguage||e.hassLanguage||"de").split(/[-_]/)[0]??"de")?"en":"de"}(i);let r=Be(e,We[o]??Pe);if(void 0===r&&(r=Be(e,Pe)),void 0===r)return e;if(t)for(const[e,i]of Object.entries(t))r=r.replace(`{${e}}`,String(i));return r}function Ne(e,i,t="banner"){if(!e)return V;if(function(e){if(!e)return!1;try{return"1"===window.sessionStorage?.getItem(`wl-reload-attempted-${e}`)}catch{return!1}}(e)){const e=i("version_reload_stuck");return F`
-      <div class=${t} role="alert" aria-live="assertive">
+/*! Wiener Linien Austria — bundled by Rolldown. Edit sources in src/, then `npm run build`. */
+var e=Object.defineProperty,t=(t,n)=>{let r={};for(var i in t)e(r,i,{get:t[i],enumerable:!0});return n||e(r,Symbol.toStringTag,{value:`Module`}),r};
+/**
+* @license
+* Copyright 2019 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+const n=globalThis,r=n.ShadowRoot&&(n.ShadyCSS===void 0||n.ShadyCSS.nativeShadow)&&`adoptedStyleSheets`in Document.prototype&&`replace`in CSSStyleSheet.prototype,i=Symbol(),a=new WeakMap;var o=class{constructor(e,t,n){if(this._$cssResult$=!0,n!==i)throw Error("CSSResult is not constructable. Use `unsafeCSS` or `css` instead.");this.cssText=e,this.t=t}get styleSheet(){let e=this.o,t=this.t;if(r&&e===void 0){let n=t!==void 0&&t.length===1;n&&(e=a.get(t)),e===void 0&&((this.o=e=new CSSStyleSheet).replaceSync(this.cssText),n&&a.set(t,e))}return e}toString(){return this.cssText}};const s=e=>new o(typeof e==`string`?e:e+``,void 0,i),c=(e,...t)=>new o(e.length===1?e[0]:t.reduce((t,n,r)=>t+(e=>{if(!0===e._$cssResult$)return e.cssText;if(typeof e==`number`)return e;throw Error(`Value passed to 'css' function must be a 'css' function result: `+e+`. Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.`)})(n)+e[r+1],e[0]),e,i),l=(e,t)=>{if(r)e.adoptedStyleSheets=t.map(e=>e instanceof CSSStyleSheet?e:e.styleSheet);else for(let r of t){let t=document.createElement(`style`),i=n.litNonce;i!==void 0&&t.setAttribute(`nonce`,i),t.textContent=r.cssText,e.appendChild(t)}},u=r?e=>e:e=>e instanceof CSSStyleSheet?(e=>{let t=``;for(let n of e.cssRules)t+=n.cssText;return s(t)})(e):e,{is:d,defineProperty:f,getOwnPropertyDescriptor:p,getOwnPropertyNames:m,getOwnPropertySymbols:h,getPrototypeOf:g}=Object,_=globalThis,v=_.trustedTypes,y=v?v.emptyScript:``,b=_.reactiveElementPolyfillSupport,x=(e,t)=>e,S={toAttribute(e,t){
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+switch(t){case Boolean:e=e?y:null;break;case Object:case Array:e=e==null?e:JSON.stringify(e)}return e},fromAttribute(e,t){let n=e;switch(t){case Boolean:n=e!==null;break;case Number:n=e===null?null:Number(e);break;case Object:case Array:try{n=JSON.parse(e)}catch{n=null}}return n}},C=(e,t)=>!d(e,t),ee={attribute:!0,type:String,converter:S,reflect:!1,useDefault:!1,hasChanged:C};Symbol.metadata??=Symbol(`metadata`),_.litPropertyMetadata??=new WeakMap;var w=class extends HTMLElement{static addInitializer(e){this._$Ei(),(this.l??=[]).push(e)}static get observedAttributes(){return this.finalize(),this._$Eh&&[...this._$Eh.keys()]}static createProperty(e,t=ee){if(t.state&&(t.attribute=!1),this._$Ei(),this.prototype.hasOwnProperty(e)&&((t=Object.create(t)).wrapped=!0),this.elementProperties.set(e,t),!t.noAccessor){let n=Symbol(),r=this.getPropertyDescriptor(e,n,t);r!==void 0&&f(this.prototype,e,r)}}static getPropertyDescriptor(e,t,n){let{get:r,set:i}=p(this.prototype,e)??{get(){return this[t]},set(e){this[t]=e}};return{get:r,set(t){let a=r?.call(this);i?.call(this,t),this.requestUpdate(e,a,n)},configurable:!0,enumerable:!0}}static getPropertyOptions(e){return this.elementProperties.get(e)??ee}static _$Ei(){if(this.hasOwnProperty(x(`elementProperties`)))return;let e=g(this);e.finalize(),e.l!==void 0&&(this.l=[...e.l]),this.elementProperties=new Map(e.elementProperties)}static finalize(){if(this.hasOwnProperty(x(`finalized`)))return;if(this.finalized=!0,this._$Ei(),this.hasOwnProperty(x(`properties`))){let e=this.properties,t=[...m(e),...h(e)];for(let n of t)this.createProperty(n,e[n])}let e=this[Symbol.metadata];if(e!==null){let t=litPropertyMetadata.get(e);if(t!==void 0)for(let[e,n]of t)this.elementProperties.set(e,n)}this._$Eh=new Map;for(let[e,t]of this.elementProperties){let n=this._$Eu(e,t);n!==void 0&&this._$Eh.set(n,e)}this.elementStyles=this.finalizeStyles(this.styles)}static finalizeStyles(e){let t=[];if(Array.isArray(e)){let n=new Set(e.flat(1/0).reverse());for(let e of n)t.unshift(u(e))}else e!==void 0&&t.push(u(e));return t}static _$Eu(e,t){let n=t.attribute;return!1===n?void 0:typeof n==`string`?n:typeof e==`string`?e.toLowerCase():void 0}constructor(){super(),this._$Ep=void 0,this.isUpdatePending=!1,this.hasUpdated=!1,this._$Em=null,this._$Ev()}_$Ev(){this._$ES=new Promise(e=>this.enableUpdating=e),this._$AL=new Map,this._$E_(),this.requestUpdate(),this.constructor.l?.forEach(e=>e(this))}addController(e){(this._$EO??=new Set).add(e),this.renderRoot!==void 0&&this.isConnected&&e.hostConnected?.()}removeController(e){this._$EO?.delete(e)}_$E_(){let e=new Map,t=this.constructor.elementProperties;for(let n of t.keys())this.hasOwnProperty(n)&&(e.set(n,this[n]),delete this[n]);e.size>0&&(this._$Ep=e)}createRenderRoot(){let e=this.shadowRoot??this.attachShadow(this.constructor.shadowRootOptions);return l(e,this.constructor.elementStyles),e}connectedCallback(){this.renderRoot??=this.createRenderRoot(),this.enableUpdating(!0),this._$EO?.forEach(e=>e.hostConnected?.())}enableUpdating(e){}disconnectedCallback(){this._$EO?.forEach(e=>e.hostDisconnected?.())}attributeChangedCallback(e,t,n){this._$AK(e,n)}_$ET(e,t){let n=this.constructor.elementProperties.get(e),r=this.constructor._$Eu(e,n);if(r!==void 0&&!0===n.reflect){let i=(n.converter?.toAttribute===void 0?S:n.converter).toAttribute(t,n.type);this._$Em=e,i==null?this.removeAttribute(r):this.setAttribute(r,i),this._$Em=null}}_$AK(e,t){let n=this.constructor,r=n._$Eh.get(e);if(r!==void 0&&this._$Em!==r){let e=n.getPropertyOptions(r),i=typeof e.converter==`function`?{fromAttribute:e.converter}:e.converter?.fromAttribute===void 0?S:e.converter;this._$Em=r;let a=i.fromAttribute(t,e.type);this[r]=a??this._$Ej?.get(r)??a,this._$Em=null}}requestUpdate(e,t,n,r=!1,i){if(e!==void 0){let a=this.constructor;if(!1===r&&(i=this[e]),n??=a.getPropertyOptions(e),!((n.hasChanged??C)(i,t)||n.useDefault&&n.reflect&&i===this._$Ej?.get(e)&&!this.hasAttribute(a._$Eu(e,n))))return;this.C(e,t,n)}!1===this.isUpdatePending&&(this._$ES=this._$EP())}C(e,t,{useDefault:n,reflect:r,wrapped:i},a){n&&!(this._$Ej??=new Map).has(e)&&(this._$Ej.set(e,a??t??this[e]),!0!==i||a!==void 0)||(this._$AL.has(e)||(this.hasUpdated||n||(t=void 0),this._$AL.set(e,t)),!0===r&&this._$Em!==e&&(this._$Eq??=new Set).add(e))}async _$EP(){this.isUpdatePending=!0;try{await this._$ES}catch(e){Promise.reject(e)}let e=this.scheduleUpdate();return e!=null&&await e,!this.isUpdatePending}scheduleUpdate(){return this.performUpdate()}performUpdate(){if(!this.isUpdatePending)return;if(!this.hasUpdated){if(this.renderRoot??=this.createRenderRoot(),this._$Ep){for(let[e,t]of this._$Ep)this[e]=t;this._$Ep=void 0}let e=this.constructor.elementProperties;if(e.size>0)for(let[t,n]of e){let{wrapped:e}=n,r=this[t];!0!==e||this._$AL.has(t)||r===void 0||this.C(t,void 0,n,r)}}let e=!1,t=this._$AL;try{e=this.shouldUpdate(t),e?(this.willUpdate(t),this._$EO?.forEach(e=>e.hostUpdate?.()),this.update(t)):this._$EM()}catch(t){throw e=!1,this._$EM(),t}e&&this._$AE(t)}willUpdate(e){}_$AE(e){this._$EO?.forEach(e=>e.hostUpdated?.()),this.hasUpdated||(this.hasUpdated=!0,this.firstUpdated(e)),this.updated(e)}_$EM(){this._$AL=new Map,this.isUpdatePending=!1}get updateComplete(){return this.getUpdateComplete()}getUpdateComplete(){return this._$ES}shouldUpdate(e){return!0}update(e){this._$Eq&&=this._$Eq.forEach(e=>this._$ET(e,this[e])),this._$EM()}updated(e){}firstUpdated(e){}};w.elementStyles=[],w.shadowRootOptions={mode:`open`},w[x(`elementProperties`)]=new Map,w[x(`finalized`)]=new Map,b?.({ReactiveElement:w}),(_.reactiveElementVersions??=[]).push(`2.1.2`);
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+const T=globalThis,te=e=>e,E=T.trustedTypes,ne=E?E.createPolicy(`lit-html`,{createHTML:e=>e}):void 0,D=`$lit$`,O=`lit$${Math.random().toFixed(9).slice(2)}$`,k=`?`+O,re=`<${k}>`,A=document,j=()=>A.createComment(``),M=e=>e===null||typeof e!=`object`&&typeof e!=`function`,ie=Array.isArray,ae=e=>ie(e)||typeof e?.[Symbol.iterator]==`function`,oe=`[ 	
+\f\r]`,N=/<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g,se=/-->/g,ce=/>/g,P=RegExp(`>|${oe}(?:([^\\s"'>=/]+)(${oe}*=${oe}*(?:[^ \t\n\f\r"'\`<>=]|("|')|))|$)`,`g`),le=/'/g,ue=/"/g,de=/^(?:script|style|textarea|title)$/i,fe=e=>(t,...n)=>({_$litType$:e,strings:t,values:n}),F=fe(1),pe=fe(2),I=Symbol.for(`lit-noChange`),L=Symbol.for(`lit-nothing`),me=new WeakMap,R=A.createTreeWalker(A,129);function he(e,t){if(!ie(e)||!e.hasOwnProperty(`raw`))throw Error(`invalid template strings array`);return ne===void 0?t:ne.createHTML(t)}const ge=(e,t)=>{let n=e.length-1,r=[],i,a=t===2?`<svg>`:t===3?`<math>`:``,o=N;for(let t=0;t<n;t++){let n=e[t],s,c,l=-1,u=0;for(;u<n.length&&(o.lastIndex=u,c=o.exec(n),c!==null);)u=o.lastIndex,o===N?c[1]===`!--`?o=se:c[1]===void 0?c[2]===void 0?c[3]!==void 0&&(o=P):(de.test(c[2])&&(i=RegExp(`</`+c[2],`g`)),o=P):o=ce:o===P?c[0]===`>`?(o=i??N,l=-1):c[1]===void 0?l=-2:(l=o.lastIndex-c[2].length,s=c[1],o=c[3]===void 0?P:c[3]===`"`?ue:le):o===ue||o===le?o=P:o===se||o===ce?o=N:(o=P,i=void 0);let d=o===P&&e[t+1].startsWith(`/>`)?` `:``;a+=o===N?n+re:l>=0?(r.push(s),n.slice(0,l)+D+n.slice(l)+O+d):n+O+(l===-2?t:d)}return[he(e,a+(e[n]||`<?>`)+(t===2?`</svg>`:t===3?`</math>`:``)),r]};var _e=class e{constructor({strings:t,_$litType$:n},r){let i;this.parts=[];let a=0,o=0,s=t.length-1,c=this.parts,[l,u]=ge(t,n);if(this.el=e.createElement(l,r),R.currentNode=this.el.content,n===2||n===3){let e=this.el.content.firstChild;e.replaceWith(...e.childNodes)}for(;(i=R.nextNode())!==null&&c.length<s;){if(i.nodeType===1){if(i.hasAttributes())for(let e of i.getAttributeNames())if(e.endsWith(D)){let t=u[o++],n=i.getAttribute(e).split(O),r=/([.?@])?(.*)/.exec(t);c.push({type:1,index:a,name:r[2],strings:n,ctor:r[1]===`.`?be:r[1]===`?`?xe:r[1]===`@`?Se:B}),i.removeAttribute(e)}else e.startsWith(O)&&(c.push({type:6,index:a}),i.removeAttribute(e));if(de.test(i.tagName)){let e=i.textContent.split(O),t=e.length-1;if(t>0){i.textContent=E?E.emptyScript:``;for(let n=0;n<t;n++)i.append(e[n],j()),R.nextNode(),c.push({type:2,index:++a});i.append(e[t],j())}}}else if(i.nodeType===8){if(i.data===k)c.push({type:2,index:a});else{let e=-1;for(;(e=i.data.indexOf(O,e+1))!==-1;)c.push({type:7,index:a}),e+=O.length-1}}a++}}static createElement(e,t){let n=A.createElement(`template`);return n.innerHTML=e,n}};function z(e,t,n=e,r){if(t===I)return t;let i=r===void 0?n._$Cl:n._$Co?.[r],a=M(t)?void 0:t._$litDirective$;return i?.constructor!==a&&(i?._$AO?.(!1),a===void 0?i=void 0:(i=new a(e),i._$AT(e,n,r)),r===void 0?n._$Cl=i:(n._$Co??=[])[r]=i),i!==void 0&&(t=z(e,i._$AS(e,t.values),i,r)),t}var ve=class{constructor(e,t){this._$AV=[],this._$AN=void 0,this._$AD=e,this._$AM=t}get parentNode(){return this._$AM.parentNode}get _$AU(){return this._$AM._$AU}u(e){let{el:{content:t},parts:n}=this._$AD,r=(e?.creationScope??A).importNode(t,!0);R.currentNode=r;let i=R.nextNode(),a=0,o=0,s=n[0];for(;s!==void 0;){if(a===s.index){let t;s.type===2?t=new ye(i,i.nextSibling,this,e):s.type===1?t=new s.ctor(i,s.name,s.strings,this,e):s.type===6&&(t=new Ce(i,this,e)),this._$AV.push(t),s=n[++o]}a!==s?.index&&(i=R.nextNode(),a++)}return R.currentNode=A,r}p(e){let t=0;for(let n of this._$AV)n!==void 0&&(n.strings===void 0?n._$AI(e[t]):(n._$AI(e,n,t),t+=n.strings.length-2)),t++}},ye=class e{get _$AU(){return this._$AM?._$AU??this._$Cv}constructor(e,t,n,r){this.type=2,this._$AH=L,this._$AN=void 0,this._$AA=e,this._$AB=t,this._$AM=n,this.options=r,this._$Cv=r?.isConnected??!0}get parentNode(){let e=this._$AA.parentNode,t=this._$AM;return t!==void 0&&e?.nodeType===11&&(e=t.parentNode),e}get startNode(){return this._$AA}get endNode(){return this._$AB}_$AI(e,t=this){e=z(this,e,t),M(e)?e===L||e==null||e===``?(this._$AH!==L&&this._$AR(),this._$AH=L):e!==this._$AH&&e!==I&&this._(e):e._$litType$===void 0?e.nodeType===void 0?ae(e)?this.k(e):this._(e):this.T(e):this.$(e)}O(e){return this._$AA.parentNode.insertBefore(e,this._$AB)}T(e){this._$AH!==e&&(this._$AR(),this._$AH=this.O(e))}_(e){this._$AH!==L&&M(this._$AH)?this._$AA.nextSibling.data=e:this.T(A.createTextNode(e)),this._$AH=e}$(e){let{values:t,_$litType$:n}=e,r=typeof n==`number`?this._$AC(e):(n.el===void 0&&(n.el=_e.createElement(he(n.h,n.h[0]),this.options)),n);if(this._$AH?._$AD===r)this._$AH.p(t);else{let e=new ve(r,this),n=e.u(this.options);e.p(t),this.T(n),this._$AH=e}}_$AC(e){let t=me.get(e.strings);return t===void 0&&me.set(e.strings,t=new _e(e)),t}k(t){ie(this._$AH)||(this._$AH=[],this._$AR());let n=this._$AH,r,i=0;for(let a of t)i===n.length?n.push(r=new e(this.O(j()),this.O(j()),this,this.options)):r=n[i],r._$AI(a),i++;i<n.length&&(this._$AR(r&&r._$AB.nextSibling,i),n.length=i)}_$AR(e=this._$AA.nextSibling,t){for(this._$AP?.(!1,!0,t);e!==this._$AB;){let t=te(e).nextSibling;te(e).remove(),e=t}}setConnected(e){this._$AM===void 0&&(this._$Cv=e,this._$AP?.(e))}},B=class{get tagName(){return this.element.tagName}get _$AU(){return this._$AM._$AU}constructor(e,t,n,r,i){this.type=1,this._$AH=L,this._$AN=void 0,this.element=e,this.name=t,this._$AM=r,this.options=i,n.length>2||n[0]!==``||n[1]!==``?(this._$AH=Array(n.length-1).fill(new String),this.strings=n):this._$AH=L}_$AI(e,t=this,n,r){let i=this.strings,a=!1;if(i===void 0)e=z(this,e,t,0),a=!M(e)||e!==this._$AH&&e!==I,a&&(this._$AH=e);else{let r=e,o,s;for(e=i[0],o=0;o<i.length-1;o++)s=z(this,r[n+o],t,o),s===I&&(s=this._$AH[o]),a||=!M(s)||s!==this._$AH[o],s===L?e=L:e!==L&&(e+=(s??``)+i[o+1]),this._$AH[o]=s}a&&!r&&this.j(e)}j(e){e===L?this.element.removeAttribute(this.name):this.element.setAttribute(this.name,e??``)}},be=class extends B{constructor(){super(...arguments),this.type=3}j(e){this.element[this.name]=e===L?void 0:e}},xe=class extends B{constructor(){super(...arguments),this.type=4}j(e){this.element.toggleAttribute(this.name,!!e&&e!==L)}},Se=class extends B{constructor(e,t,n,r,i){super(e,t,n,r,i),this.type=5}_$AI(e,t=this){if((e=z(this,e,t,0)??L)===I)return;let n=this._$AH,r=e===L&&n!==L||e.capture!==n.capture||e.once!==n.once||e.passive!==n.passive,i=e!==L&&(n===L||r);r&&this.element.removeEventListener(this.name,this,n),i&&this.element.addEventListener(this.name,this,e),this._$AH=e}handleEvent(e){typeof this._$AH==`function`?this._$AH.call(this.options?.host??this.element,e):this._$AH.handleEvent(e)}},Ce=class{constructor(e,t,n){this.element=e,this.type=6,this._$AN=void 0,this._$AM=t,this.options=n}get _$AU(){return this._$AM._$AU}_$AI(e){z(this,e)}};const we={M:D,P:O,A:k,C:1,L:ge,R:ve,D:ae,V:z,I:ye,H:B,N:xe,U:Se,B:be,F:Ce},Te=T.litHtmlPolyfillSupport;Te?.(_e,ye),(T.litHtmlVersions??=[]).push(`3.3.2`);const Ee=(e,t,n)=>{let r=n?.renderBefore??t,i=r._$litPart$;if(i===void 0){let e=n?.renderBefore??null;r._$litPart$=i=new ye(t.insertBefore(j(),e),e,void 0,n??{})}return i._$AI(e),i},De=globalThis
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+;var V=class extends w{constructor(){super(...arguments),this.renderOptions={host:this},this._$Do=void 0}createRenderRoot(){let e=super.createRenderRoot();return this.renderOptions.renderBefore??=e.firstChild,e}update(e){let t=this.render();this.hasUpdated||(this.renderOptions.isConnected=this.isConnected),super.update(e),this._$Do=Ee(t,this.renderRoot,this.renderOptions)}connectedCallback(){super.connectedCallback(),this._$Do?.setConnected(!0)}disconnectedCallback(){super.disconnectedCallback(),this._$Do?.setConnected(!1)}render(){return I}};V._$litElement$=!0,V.finalized=!0,De.litElementHydrateSupport?.({LitElement:V});const Oe=De.litElementPolyfillSupport;Oe?.({LitElement:V}),(De.litElementVersions??=[]).push(`4.2.2`);
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+const ke=e=>(t,n)=>{n===void 0?customElements.define(e,t):n.addInitializer(()=>{customElements.define(e,t)})},Ae={attribute:!0,type:String,converter:S,reflect:!1,hasChanged:C},je=(e=Ae,t,n)=>{
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+let{kind:r,metadata:i}=n,a=globalThis.litPropertyMetadata.get(i);if(a===void 0&&globalThis.litPropertyMetadata.set(i,a=new Map),r===`setter`&&((e=Object.create(e)).wrapped=!0),a.set(n.name,e),r===`accessor`){let{name:r}=n;return{set(n){let i=t.get.call(this);t.set.call(this,n),this.requestUpdate(r,i,e,!0,n)},init(t){return t!==void 0&&this.C(r,void 0,e,t),t}}}if(r===`setter`){let{name:r}=n;return function(n){let i=this[r];t.call(this,n),this.requestUpdate(r,i,e,!0,n)}}throw Error(`Unsupported decorator location: `+r)};function Me(e){return(t,n)=>typeof n==`object`?je(e,t,n):((e,t,n)=>{let r=t.hasOwnProperty(n);return t.constructor.createProperty(n,e),r?Object.getOwnPropertyDescriptor(t,n):void 0})(e,t,n)}
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/function H(e){return Me({...e,state:!0,attribute:!1})}
+/**
+* @license
+* Copyright 2017 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+const U={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},Ne=e=>(...t)=>({_$litDirective$:e,values:t});var Pe=class{constructor(e){}get _$AU(){return this._$AM._$AU}_$AT(e,t,n){this._$Ct=e,this._$AM=t,this._$Ci=n}_$AS(e,t){return this.update(e,t)}update(e,t){return this.render(...t)}};
+/**
+* @license
+* Copyright 2018 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/const W=Ne(class extends Pe{constructor(e){if(super(e),e.type!==U.ATTRIBUTE||e.name!==`class`||e.strings?.length>2)throw Error("`classMap()` can only be used in the `class` attribute and must be the only part in the attribute.")}render(e){return` `+Object.keys(e).filter(t=>e[t]).join(` `)+` `}update(e,[t]){if(this.st===void 0){this.st=new Set,e.strings!==void 0&&(this.nt=new Set(e.strings.join(` `).split(/\s/).filter(e=>e!==``)));for(let e in t)t[e]&&!this.nt?.has(e)&&this.st.add(e);return this.render(t)}let n=e.element.classList;for(let e of this.st)e in t||(n.remove(e),this.st.delete(e));for(let e in t){let r=!!t[e];r===this.st.has(e)||this.nt?.has(e)||(r?(n.add(e),this.st.add(e)):(n.remove(e),this.st.delete(e)))}return I}}),{I:Fe}=we,Ie=e=>e.strings===void 0,Le={},Re=(e,t=Le)=>e._$AH=t,ze=Ne(class extends Pe{constructor(){
+/**
+* @license
+* Copyright 2020 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+/**
+* @license
+* Copyright 2021 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+super(...arguments),this.key=L}render(e,t){return this.key=e,t}update(e,[t,n]){return t!==this.key&&(Re(e),this.key=t),n}}),G=Ne(class extends Pe{constructor(e){
+/**
+* @license
+* Copyright 2018 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/
+if(super(e),e.type!==U.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw Error("The `styleMap` directive must be used in the `style` attribute and must be the only part in the attribute.")}render(e){return Object.keys(e).reduce((t,n)=>{let r=e[n];return r==null?t:t+`${n=n.includes(`-`)?n:n.replace(/(?:^(webkit|moz|ms|o)|)(?=[A-Z])/g,`-$&`).toLowerCase()}:${r};`},``)}update(e,[t]){let{style:n}=e.element;if(this.ft===void 0)return this.ft=new Set(Object.keys(t)),this.render(t);for(let e of this.ft)t[e]??(this.ft.delete(e),e.includes(`-`)?n.removeProperty(e):n[e]=null);for(let e in t){let r=t[e];if(r!=null){this.ft.add(e);let t=typeof r==`string`&&r.endsWith(` !important`);e.includes(`-`)||t?n.setProperty(e,t?r.slice(0,-11):r,t?`important`:``):n[e]=r}}return I}});function Be(e,t){return e?F`<span lang="de">${e}</span>`:t??``}function Ve(e,t,n){e.dispatchEvent(new CustomEvent(t,{detail:n,bubbles:!0,composed:!0}))}var He=t({common:()=>Ue,default:()=>qe,flap:()=>Ke,modern:()=>We,retro:()=>Ge}),Ue={editor:{add_chip:`Chip hinzufügen`,add_icon:`Symbol hinzufügen`,date_format_placeholder:`d.m.Y`,direction_label:`Fahrtrichtung`,direction_not_served:`nicht bedient`,direction_note_one_way:`Rückfahrt deaktiviert: {line} endet hier.`,direction_unavailable:`Keine Abfahrten in dieser Richtung`,entities:`Haltestellen`,entity:`Haltestelle`,header_amenities:`Symbole in diesem Slot`,header_bar_aria:`Stationsanzeige — Seite wählen`,header_chips_and_icons:`Textchips (max. {chips}) und Extra-Symbole (max. {icons})`,header_left:`Linke Seite`,header_pick_side_hint:`Seite antippen, dann unten füllen`,header_right:`Rechte Seite`,header_side_aria:`Seite der Stationsanzeige`,header_slot_empty:`leer`,line_active_aria:`Linie {line} aktiv`,line_inactive_aria:`Linie {line} inaktiv`,lines_empty_means_all:`leer = alle Linien`,lines_label:`Linien an dieser Haltestelle`,lines_selected:`{n} von {total}`,no_lines_hint:`Die Linien erscheinen, sobald diese Haltestelle Abfahrten meldet.`,no_lines_title:`Noch keine Linien verfügbar`,per_line_direction_aria:`Linie {line}: {direction}`,remove_chip_aria:`Chip {chip} entfernen`,remove_icon_aria:`Symbol {icon} entfernen`,remove_stop:`Haltestelle entfernen`,section_board:`Fallblatt-Tafel`,section_departure_row:`Abfahrtszeile`,section_extras:`Extras`,section_extras_hint:`optional`,section_footer:`Fußzeile`,section_header:`Stationsanzeige`,section_header_hint:`Direkt am Balken`,section_led_panel:`LED-Anzeige`,section_station:`Stationsband`,section_walk_time:`Gehzeit zur Haltestelle`,show_clock_short:`Uhr`,show_date_short:`Datum`,show_elevator_short:`Lift`,show_escalator_short:`Rolltreppe`,show_wc_short:`WC`,size_medium:`Mittel`,size_regular:`Standard`,size_small:`Klein`,tab_display:`Anzeige`,tab_stop:`Haltestelle`,tab_stops:`Haltestellen`,tab_tweaks:`Stil`,text_placeholder:`z. B. Name der nächsten Station`,walk_time_aria:`Gehzeit in Minuten für Linie {line} Richtung {towards}`,walk_time_branching_hint:`Gilt für alle Endstationen in dieser Richtung`,walk_time_hint:`Blendet Abfahrten aus, die ohne dich abfahren würden. Leer = kein Filter.`,walk_time_less_aria:`Gehzeit für Linie {line} verringern`,walk_time_more_aria:`Gehzeit für Linie {line} erhöhen`,walk_time_placeholder:`–`,walk_time_unit:`Minuten`}},We={no_data:`Keine Abfahrten verfügbar`,betriebsschluss:`Betriebsschluss`,stale_feed:`Keine aktuellen Daten`,stale_feed_detail:`Die Wiener Linien melden für diese Haltestelle veraltete Abfahrtszeiten. Sobald wieder Echtzeitdaten kommen, füllt sich die Anzeige automatisch.`,stale_feed_since:`Letzte gemeldete Abfahrt: {time}`,stale_feed_partial:`Einzelne Linien melden keine aktuellen Zeiten.`,min:`Min`,now:`Jetzt`,platform_short_rail:`Gleis`,platform_short_bus:`Steig`,version_update:`Wiener Linien Austria wurde auf v{v} aktualisiert — bitte neu laden`,version_reload:`Neu laden`,version_reload_stuck:`Neu laden hat die neue Version nicht übernommen. Schließe diesen Browser-Tab und öffne das Dashboard erneut, oder lösche die Website-Daten für Home Assistant in den Browser-Einstellungen.`,entity_missing:`Sensor {entity} existiert nicht mehr. Wähle einen anderen Sensor oder entferne ihn aus den Haltestellen dieser Karte.`,no_entities_picked:`Keine Haltestelle ausgewählt`,no_entities_available:`Keine Wiener-Linien-Sensoren gefunden`,departures_list:`Kommende Abfahrten`,barrier_free_title:`Barrierefrei zugänglich`,cooling_title:`Klimatisiert`,disturbance_title:`Verkehrsbehinderung gemeldet`,stops_ahead_aria_show:`Streckenverlauf für {line} Richtung {towards} anzeigen`,stops_ahead_aria_hide:`Streckenverlauf für {line} Richtung {towards} ausblenden`,stops_ahead_other_show:`{count} weitere Linien bei {stop} anzeigen`,stops_ahead_other_hide:`Weitere Linien bei {stop} ausblenden`,dir_h:`Hinfahrt`,dir_r:`Rückfahrt`,dir_h_short:`H`,dir_r_short:`R`,dir_both:`Beide`,traffic_label:`Störung`,traffic_until:`Bis`,traffic_updated:`aktualisiert`,elevator_until:`Bis`,open_in_maps:`In Karte öffnen`,qr_open:`QR-Code anzeigen`,qr_dialog_title:`QR-Code für Haltestelle`,qr_dialog_hint:`Mit dem Smartphone scannen — öffnet die Haltestelle in der Karten-App.`,qr_dialog_close:`QR-Code schließen`,delay_singular:`1 Min. verspätet`,delay_plural:`{n} Min. verspätet`,devmode_title:`DEV`,devmode_traffic_btn:`Störung testen`,devmode_elevator_btn:`Aufzug testen`,devmode_colors_btn:`Linienfarben`,devmode_clear_btn:`Löschen`,editor:{accessibility_only:`Nur barrierefreie Abfahrten anzeigen`,accessibility_only_requires:`Braucht „Barrierefrei-Symbol anzeigen“.`,colors_empty_hint:`Wähle im ersten Reiter Haltestellen aus — ihre Linien erscheinen dann hier.`,colors_hint:`Optional. Ohne Überschreibung gilt die offizielle Linienfarbe.`,hide_attribution:`Datenquelle ausblenden`,hide_attribution_helper:`Wenn aktiv, wird die Quellenangabe ausgeblendet.`,hide_header:`Kopfzeile ausblenden`,hide_header_helper:`Wenn aktiv, wird die Titelleiste der Karte ausgeblendet.`,layout:`Layout mehrerer Haltestellen`,layout_requires:`Wirkt erst ab zwei Haltestellen.`,layout_stacked:`Gestapelt`,layout_tabs:`Reiter`,max_departures:`Anzahl Abfahrten pro Haltestelle`,pick_color_for_line:`Farbe für Linie {line} wählen`,reset_color:`Auf Standard zurücksetzen`,reset_color_aria:`Linienfarbe {line} auf Standard zurücksetzen`,section_colors:`Linienfarben`,section_colors_hint:`überschreibt API-Farbe`,section_departure_row_hint:`pro Zeile`,section_disruptions:`Störungen & Verspätungen`,section_layout:`Aufbau`,section_layout_hint:`Struktur`,show_accessibility:`Barrierefrei-Symbol anzeigen`,show_cooling:`Klimaanlagen-Symbol anzeigen`,show_cooling_helper:`Zeigt eine Schneeflocke neben Abfahrten mit klimatisiertem Fahrzeug. Wiener Linien melden das pro Fahrzeug — ältere Garnituren liefern die Angabe nicht.`,show_delay:`Verspätungen anzeigen`,show_delay_colors:`Verspätungen farblich hervorheben`,show_delay_colors_helper:`Färbt die Minutenzahl rot, wenn eine Abfahrt verspätet ist, und grün, wenn sie zu früh kommt.`,show_delay_colors_requires:`Braucht „Verspätungen anzeigen“.`,show_departures:`Abfahrtsliste anzeigen`,show_elevator_info:`Aufzugsausfälle anzeigen`,show_hero_metric:`Nächste Abfahrt groß anzeigen`,show_platform:`Gleis/Steig anzeigen`,show_qr_button:`QR-Code-Schaltfläche anzeigen`,show_stops_ahead:`Zwischenstationen anzeigen`,show_traffic_info:`Störungen anzeigen`,show_type_icon:`Verkehrsmittel-Symbol anzeigen`}},Ge={editor:{accessibility_only:`Nur barrierefreie Abfahrten anzeigen`,chips:`Zusätzliche Beschriftungen`,date_format:`Datumsformat`,exit:`Ausgangssymbol`,extra_icons:`Zusätzliche Symbole`,flicker:`LED-Flackern simulieren`,header_exit_accessible:`Stufenloser Ausgang`,header_exit_none:`Kein`,header_exit_regular:`Ausgang`,housing:`LED-Gehäuserahmen anzeigen`,housing_helper:`Dunkler Rahmen um die LED-Anzeige mit dezentem Glas-Reflex obenauf.`,icon_mdi_door_open:`Offene Tür`,icon_mdi_exit_run:`Ausgang (laufende Person)`,icon_mdi_exit_to_app:`Ausgang (Tür)`,icon_mdi_stairs:`Treppe`,line_stripe:`Seitlichen Linienstreifen anzeigen`,line_stripe_helper:`4-Pixel-Balken am linken Rand jeder Zeile in der Linienfarbe.`,message_text:`Nachricht`,message_text_requires:`Braucht „Lauftext anzeigen“.`,message_ticker:`Laufschrift`,message_ticker_helper:`Zeigt alle 5 Minuten eine eigene Nachricht als Laufschrift über die Anzeige.`,platform_side:`Gleis/Steig-Seite`,platform_side_auto:`Automatisch (1 = rechts, 2 = links)`,platform_side_helper:`Standard folgt der Wiener-Linien-Beschilderung (Gleis 2 links, sonst rechts). Manuell überschreibbar.`,platform_side_left:`Immer links`,platform_side_requires:`Braucht „Steig anzeigen“.`,platform_side_right:`Immer rechts`,show_clock:`Uhr-Plakette anzeigen`,show_date:`Datums-Plakette anzeigen`,show_header:`Stationsanzeige anzeigen`,show_header_helper:`Hauptschalter. Einstellungen pro Seite bleiben gespeichert.`,show_line_pill:`Linien-Plakette anzeigen`,show_line_pill_helper:`Liniencode als gefüllte Plakette in der Linienfarbe statt als schlichter Text.`,show_platform:`Steig anzeigen`,show_station_name:`Stationsnamen anzeigen`,show_unit:`Einheit „min“ anzeigen`,show_unit_helper:`Kleines „min“ in Amber-Versalien nach jeder Minutenzahl.`,size:`Größe`,station_bg:`Stationsschild-Hintergrund`,station_bg_black:`Schwarz`,station_bg_default:`Standard`,station_bg_white:`Weiß`,style:`Stil`,style_classic:`Klassisch`,style_pixel:`Punktmatrix`,style_warm:`Warm`,text:`Beschriftung`,wheelchair_race:`Rollstuhl-Rennen (Easter Egg)`},aria_dismiss_message:`Lauftext schließen`,aria_start_race:`Barrierefreiheits-Rennen starten`,at_platform:`Einfahrt`,barrier_free_title:`Barrierefrei zugänglich`,betriebsschluss:`Betriebsschluss`,countdown_minutes:`{n} Minuten`,departures_list:`Kommende Abfahrten`,dir_both:`Beide`,dir_h:`Hinfahrt`,dir_h_short:`H`,dir_r:`Rückfahrt`,dir_r_short:`R`,entity_missing:`Sensor {entity} existiert nicht mehr. Wähle oben einen anderen Sensor.`,gleis:`GLEIS`,header:{icon_exit:`Ausgang`,icon_exit_access:`Stufenloser Ausgang`,icon_wc:`WC`,icon_escalator:`Rolltreppe`,icon_elevator:`Aufzug`,icon_mdi_exit_run:`Ausgang (laufende Person)`,icon_mdi_exit_to_app:`Ausgang (Tür)`,icon_mdi_door_open:`Offene Tür`,icon_mdi_stairs:`Treppe`},no_data:`Keine Abfahrten`,no_data_wrong_direction:`Keine Abfahrten in dieser Richtung`,no_data_wrong_line:`Keine Abfahrten für diese Linie`,no_entity:`Keine Haltestelle ausgewählt`,race_finished:`Barrierefreiheits-Rennen beendet`,race_starting_in:`Rennen startet in {n}`,race_winner_announce:`Rollstuhl {n} gewinnt das Barrierefreiheits-Rennen`,stale_feed:`Keine aktuellen Daten`,steig:`STEIG`,unit_min:`min`,version_reload:`Neu laden`,version_reload_stuck:`Neu laden hat die neue Version nicht übernommen. Schließe diesen Browser-Tab und öffne das Dashboard erneut, oder lösche die Website-Daten für Home Assistant in den Browser-Einstellungen.`,version_update:`Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden`,via_prefix:`ÜBER`},Ke={no_entity:`Keine Haltestelle ausgewählt`,no_data:`Keine Abfahrten`,no_data_wrong_direction:`Keine Abfahrten in dieser Richtung`,no_data_wrong_line:`Keine Abfahrten für diese Linie`,betriebsschluss:`Betriebsschluss`,stale_feed:`Keine aktuellen Daten`,dir_h:`Hinfahrt`,dir_r:`Rückfahrt`,dir_h_short:`H`,dir_r_short:`R`,gleis:`GLEIS`,steig:`STEIG`,col_line:`LINIE`,col_dest:`RICHTUNG`,col_step_free:`STUFENLOS`,col_cd:`ANKUNFT`,version_update:`Klappanzeige wurde auf v{v} aktualisiert — bitte neu laden`,version_reload:`Neu laden`,version_reload_stuck:`Neu laden hat die neue Version nicht übernommen. Schließe diesen Browser-Tab und öffne das Dashboard erneut, oder lösche die Website-Daten für Home Assistant in den Browser-Einstellungen.`,entity_missing:`Sensor {entity} existiert nicht mehr. Wähle oben einen anderen Sensor.`,departures_list:`Kommende Abfahrten`,at_platform:`Einfahrt`,countdown_minutes:`{n} Minuten`,barrier_free_title:`Barrierefrei zugänglich`,not_barrier_free_title:`Nicht barrierefrei`,unit_min:`min`,dir_both:`Beide`,header:{icon_exit:`Ausgang`,icon_exit_access:`Stufenloser Ausgang`,icon_wc:`WC`,icon_escalator:`Rolltreppe`,icon_elevator:`Aufzug`,icon_mdi_exit_run:`Ausgang (laufende Person)`,icon_mdi_exit_to_app:`Ausgang (Tür)`,icon_mdi_door_open:`Offene Tür`,icon_mdi_stairs:`Treppe`},editor:{accessibility_only:`Nur barrierefreie Abfahrten anzeigen`,accessibility_only_requires:`Braucht „Rollstuhl-Plakette anzeigen“.`,chips:`Zusätzliche Beschriftungen`,date_format:`Datumsformat`,exit:`Ausgangssymbol`,extra_icons:`Zusätzliche Symbole`,header_exit_accessible:`Stufenloser Ausgang`,header_exit_none:`Kein`,header_exit_regular:`Ausgang`,hide_attribution:`Datenquelle ausblenden`,hide_attribution_helper:`Wenn aktiv, wird die CC-BY-Quellenangabe am unteren Rand der Karte ausgeblendet. Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern der Hinweis nicht an anderer Stelle im Dashboard erscheint.`,housing:`Gehäuserahmen anzeigen`,housing_helper:`Umrahmt die Tafel mit dem Gehäuse inkl. dezenter Innenkante und Schlagschatten. Gehäusefarbe folgt dem HA-Theme (cremefarben im Hellmodus, dunkel im Dunkelmodus). Aus = Tafel sitzt bündig auf dem Dashboard.`,icon_mdi_door_open:`Offene Tür`,icon_mdi_exit_run:`Ausgang (laufende Person)`,icon_mdi_exit_to_app:`Ausgang (Tür)`,icon_mdi_stairs:`Treppe`,max_rows:`Anzahl Zeilen`,max_rows_helper:`Wie viele Abfahrten die Tafel zeigt (1–8). Über alle Haltestellen zusammengeführt, nach Abfahrtszeit sortiert.`,show_accessibility:`Rollstuhl-Plakette anzeigen`,show_accessibility_helper:`Zeigt eine Rollstuhl-Plakette neben barrierefreien Abfahrten.`,show_clock:`Uhr-Plakette anzeigen`,show_date:`Datums-Plakette anzeigen`,show_header:`Stationsanzeige anzeigen`,show_header_helper:`Hauptschalter. Einstellungen pro Seite bleiben gespeichert.`,show_line_column:`Linienspalte anzeigen`,show_line_column_helper:`Zeigt die Spalte mit dem Liniencode. Ausschalten, wenn die Tafel ohnehin nur eine Linie zeigt.`,show_min_unit:`Einheit „min“ anzeigen`,show_min_unit_helper:`Kleines „min“ neben der Minutenzahl, wie auf echten Stationstafeln.`,show_platform:`Gleis/Steig anzeigen`,show_platform_helper:`Fügt jeder Zeile eine eigene Gleis-Plakette zwischen Ziel und Minutenzahl hinzu. Wird nur eingeblendet, wenn mindestens eine sichtbare Zeile einen Gleis-Wert hat.`,show_station_name:`Stationsnamen anzeigen`,show_station_name_helper:`Farbiges Band mit Stationsname und Uhrzeit am oberen Rand der Karte.`,size:`Größe`,station_bg:`Hintergrund Stationsschild`,station_bg_black:`Schwarz`,station_bg_helper:`Standard ist die Farbe der ersten erfassten Linie (z. B. Rot für U1, Orange für U3). Bei mehreren Linien kann eine bestimmte Linie gewählt oder auf Weiß bzw. Schwarz umgestellt werden.`,station_bg_line:`Erste Linie`,station_bg_white:`Weiß`,text:`Beschriftung`}},qe={common:Ue,modern:We,retro:Ge,flap:Ke},Je=t({common:()=>Ye,default:()=>$e,flap:()=>Qe,modern:()=>Xe,retro:()=>Ze}),Ye={editor:{add_chip:`Add chip`,add_icon:`Add icon`,date_format_placeholder:`d.m.Y`,direction_label:`Direction`,direction_not_served:`not served`,direction_note_one_way:`Return direction disabled: {line} terminates here.`,direction_unavailable:`No departures in this direction`,entities:`Stops`,entity:`Stop`,header_amenities:`Icons in this slot`,header_bar_aria:`Station sign — choose a side`,header_chips_and_icons:`Text chips (max. {chips}) and extra icons (max. {icons})`,header_left:`Left side`,header_pick_side_hint:`Tap a side, then fill it in below`,header_right:`Right side`,header_side_aria:`Station sign side`,header_slot_empty:`empty`,line_active_aria:`Line {line} active`,line_inactive_aria:`Line {line} inactive`,lines_empty_means_all:`empty = all lines`,lines_label:`Lines at this stop`,lines_selected:`{n} of {total}`,no_lines_hint:`Lines appear as soon as this stop reports departures.`,no_lines_title:`No lines yet`,per_line_direction_aria:`Line {line}: {direction}`,remove_chip_aria:`Remove chip {chip}`,remove_icon_aria:`Remove icon {icon}`,remove_stop:`Remove stop`,section_board:`Split-flap board`,section_departure_row:`Departure row`,section_extras:`Extras`,section_extras_hint:`optional`,section_footer:`Footer`,section_header:`Station sign`,section_header_hint:`Edit on the bar`,section_led_panel:`LED panel`,section_station:`Station band`,section_walk_time:`Walking time to the stop`,show_clock_short:`Clock`,show_date_short:`Date`,show_elevator_short:`Elevator`,show_escalator_short:`Escalator`,show_wc_short:`WC`,size_medium:`Medium`,size_regular:`Standard`,size_small:`Small`,tab_display:`Display`,tab_stop:`Stop`,tab_stops:`Stops`,tab_tweaks:`Style`,text_placeholder:`e.g. name of the next station`,walk_time_aria:`Walking time in minutes for line {line} towards {towards}`,walk_time_branching_hint:`Applies to every terminus in this direction`,walk_time_hint:`Hides departures that would leave without you. Empty = no filter.`,walk_time_less_aria:`Decrease walking time for line {line}`,walk_time_more_aria:`Increase walking time for line {line}`,walk_time_placeholder:`–`,walk_time_unit:`minutes`}},Xe={no_data:`No departures available`,betriebsschluss:`End of service`,stale_feed:`No live data`,stale_feed_detail:`Wiener Linien is sending out-of-date departure times for this stop. Departures return automatically once live data resumes.`,stale_feed_since:`Last reported departure: {time}`,stale_feed_partial:`Some lines aren't reporting current times.`,min:`min`,now:`Now`,platform_short_rail:`Track`,platform_short_bus:`Bay`,version_update:`Wiener Linien Austria updated to v{v} — please reload`,version_reload:`Reload`,version_reload_stuck:`Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.`,entity_missing:`Sensor {entity} no longer exists. Pick a different sensor, or remove it from this card's stops.`,no_entities_picked:`No stop selected`,no_entities_available:`No Wiener Linien sensors found`,departures_list:`Upcoming departures`,barrier_free_title:`Step-free access`,cooling_title:`Air conditioned`,disturbance_title:`Traffic disruption reported`,stops_ahead_aria_show:`Show stops ahead for {line} towards {towards}`,stops_ahead_aria_hide:`Hide stops ahead for {line} towards {towards}`,stops_ahead_other_show:`Show {count} more lines at {stop}`,stops_ahead_other_hide:`Hide other lines at {stop}`,dir_h:`Outbound`,dir_r:`Return`,dir_h_short:`H`,dir_r_short:`R`,dir_both:`Both`,traffic_label:`Disruption`,traffic_until:`Until`,traffic_updated:`updated`,elevator_until:`Until`,open_in_maps:`Open in maps`,qr_open:`Show QR code`,qr_dialog_title:`QR code for stop`,qr_dialog_hint:`Scan with your phone — opens the stop in your maps app.`,qr_dialog_close:`Close QR code`,delay_singular:`1 min. late`,delay_plural:`{n} min. late`,devmode_title:`DEV`,devmode_traffic_btn:`Test disruption`,devmode_elevator_btn:`Test elevator`,devmode_colors_btn:`Line colours`,devmode_clear_btn:`Clear`,editor:{accessibility_only:`Only show step-free departures`,accessibility_only_requires:`Requires “Show accessibility icon”.`,colors_empty_hint:`Pick stops on the Stops tab — their lines will show up here.`,colors_hint:`Optional. Without an override the official line colour applies.`,hide_attribution:`Hide data source`,hide_attribution_helper:`When on, the data-source credit is hidden.`,hide_header:`Hide header`,hide_header_helper:`When on, the card title bar is hidden.`,layout:`Multi-stop layout`,layout_requires:`Only takes effect with two or more stops.`,layout_stacked:`Stacked`,layout_tabs:`Tabs`,max_departures:`Departures per stop`,pick_color_for_line:`Pick colour for line {line}`,reset_color:`Reset to default`,reset_color_aria:`Reset line colour {line} to default`,section_colors:`Line colours`,section_colors_hint:`overrides the API colour`,section_departure_row_hint:`per row`,section_disruptions:`Disruptions & delays`,section_layout:`Structure`,section_layout_hint:`Layout`,show_accessibility:`Show step-free icon`,show_cooling:`Show air-conditioning icon`,show_cooling_helper:`Shows a snowflake beside departures with an air-conditioned vehicle. Wiener Linien report this per vehicle — older trains and trams don't send it.`,show_delay:`Show delays`,show_delay_colors:`Colour-code delays`,show_delay_colors_helper:`Turns the countdown number red when a departure runs late and green when it runs early.`,show_delay_colors_requires:`Requires “Show delays”.`,show_departures:`Show departure list`,show_elevator_info:`Show elevator outages`,show_hero_metric:`Show next departure large`,show_platform:`Show platform / track`,show_qr_button:`Show QR-code button`,show_stops_ahead:`Show intermediate stops`,show_traffic_info:`Show disruption alerts`,show_type_icon:`Show vehicle-type icon`}},Ze={editor:{accessibility_only:`Only show step-free departures`,chips:`Extra labels`,date_format:`Date format`,exit:`Exit icon`,extra_icons:`Extra icons`,flicker:`Simulate LED flicker`,header_exit_accessible:`Step-free exit`,header_exit_none:`None`,header_exit_regular:`Exit`,housing:`Show LED cabinet frame`,housing_helper:`Dark bezel around the LED panel with a subtle glass reflection on top.`,icon_mdi_door_open:`Open door`,icon_mdi_exit_run:`Exit (running person)`,icon_mdi_exit_to_app:`Exit (door)`,icon_mdi_stairs:`Stairs`,line_stripe:`Show line stripe`,line_stripe_helper:`A 4 px coloured bar at the left edge of each row, matched to the line.`,message_text:`Message`,message_text_requires:`Requires “Show ticker”.`,message_ticker:`Scrolling message`,message_ticker_helper:`Runs a custom message across the display every 5 minutes.`,platform_side:`Platform side`,platform_side_auto:`Auto (1 = right, 2 = left)`,platform_side_helper:`Default follows Wiener Linien signage (platform 2 on the left, otherwise right). Override manually if needed.`,platform_side_left:`Always left`,platform_side_requires:`Requires “Show platform”.`,platform_side_right:`Always right`,show_clock:`Show clock chip`,show_date:`Show date chip`,show_header:`Show station sign`,show_header_helper:`Master switch. Per-side settings are kept.`,show_line_pill:`Show line badge`,show_line_pill_helper:`Renders the line code as a filled badge in the line colour rather than plain text.`,show_platform:`Show platform`,show_station_name:`Show station name`,show_unit:`Show the “min” unit`,show_unit_helper:`Trail each countdown number with a small amber "min" caption.`,size:`Size`,station_bg:`Station-name background`,station_bg_black:`Black`,station_bg_default:`Default`,station_bg_white:`White`,style:`Style`,style_classic:`Classic`,style_pixel:`Dot matrix`,style_warm:`Warm`,text:`Sign text`,wheelchair_race:`Wheelchair race (easter egg)`},aria_dismiss_message:`Dismiss scrolling message`,aria_start_race:`Start accessibility race`,at_platform:`Arriving`,barrier_free_title:`Step-free access`,betriebsschluss:`End of service`,countdown_minutes:`{n} minutes`,departures_list:`Upcoming departures`,dir_both:`Both`,dir_h:`Outbound`,dir_h_short:`H`,dir_r:`Return`,dir_r_short:`R`,entity_missing:`Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.`,gleis:`PLATF.`,header:{icon_exit:`Exit`,icon_exit_access:`Step-free exit`,icon_wc:`Toilet`,icon_escalator:`Escalator`,icon_elevator:`Elevator`,icon_mdi_exit_run:`Exit (running person)`,icon_mdi_exit_to_app:`Exit (door)`,icon_mdi_door_open:`Open door`,icon_mdi_stairs:`Stairs`},no_data:`No departures`,no_data_wrong_direction:`No departures in this direction`,no_data_wrong_line:`No departures for this line`,no_entity:`No stop selected`,race_finished:`Accessibility race finished`,race_starting_in:`Race starting in {n}`,race_winner_announce:`Wheelchair {n} wins the accessibility race`,stale_feed:`No live data`,steig:`BAY`,unit_min:`min`,version_reload:`Reload`,version_reload_stuck:`Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.`,version_update:`Retro card updated to v{v} — please reload`,via_prefix:`VIA`},Qe={no_entity:`No stop selected`,no_data:`No departures`,no_data_wrong_direction:`No departures in this direction`,no_data_wrong_line:`No departures for this line`,betriebsschluss:`End of service`,stale_feed:`No live data`,dir_h:`Outbound`,dir_r:`Return`,dir_h_short:`H`,dir_r_short:`R`,gleis:`PLATF.`,steig:`BAY`,col_line:`LINE`,col_dest:`DIRECTION`,col_step_free:`STEP-FREE`,col_cd:`ARRIVAL`,version_update:`Flap card updated to v{v} — please reload`,version_reload:`Reload`,version_reload_stuck:`Reload didn't pick up the new version. Close this browser tab and reopen the dashboard, or clear your browser's site data for Home Assistant.`,entity_missing:`Sensor {entity} no longer exists. Pick a different sensor in the entity selector above.`,departures_list:`Upcoming departures`,at_platform:`Arriving`,countdown_minutes:`{n} minutes`,barrier_free_title:`Step-free access`,not_barrier_free_title:`Step-free access not available`,unit_min:`min`,dir_both:`Both`,header:{icon_exit:`Exit`,icon_exit_access:`Step-free exit`,icon_wc:`Toilet`,icon_escalator:`Escalator`,icon_elevator:`Elevator`,icon_mdi_exit_run:`Exit (running person)`,icon_mdi_exit_to_app:`Exit (door)`,icon_mdi_door_open:`Open door`,icon_mdi_stairs:`Stairs`},editor:{accessibility_only:`Only show step-free departures`,accessibility_only_requires:`Requires “Show wheelchair badge”.`,chips:`Extra labels`,date_format:`Date format`,exit:`Exit icon`,extra_icons:`Extra icons`,header_exit_accessible:`Step-free exit`,header_exit_none:`None`,header_exit_regular:`Exit`,hide_attribution:`Hide data source`,hide_attribution_helper:`When on, the CC-BY credit at the bottom of the card is hidden. The Wiener Linien Open Government Data licence requires visible attribution unless you keep the credit elsewhere on the dashboard.`,housing:`Show cabinet frame`,housing_helper:`Wraps the board in the cabinet with a soft inset bevel and drop shadow. Cabinet colour follows your HA theme (cream on light, dark on dark). When off, the board sits flush against the dashboard.`,icon_mdi_door_open:`Open door`,icon_mdi_exit_run:`Exit (running person)`,icon_mdi_exit_to_app:`Exit (door)`,icon_mdi_stairs:`Stairs`,max_rows:`Number of rows`,max_rows_helper:`How many departures to show on the board (1–8). Merged across all stops, sorted by countdown.`,show_accessibility:`Show step-free tile`,show_accessibility_helper:`Add a wheelchair pictogram tile next to step-free departures.`,show_clock:`Show clock chip`,show_date:`Show date chip`,show_header:`Show station sign`,show_header_helper:`Master switch. Per-side settings are kept.`,show_line_column:`Show line column`,show_line_column_helper:`Shows the column carrying the line code. Turn it off when the board only ever shows one line.`,show_min_unit:`Show "min" caption`,show_min_unit_helper:`Small label next to the countdown number, like real station boards.`,show_platform:`Show platform / track`,show_platform_helper:`Adds a per-row platform tile between the destination and the countdown. Only shown when at least one visible row has a platform value.`,show_station_name:`Show station name`,show_station_name_helper:`Coloured band with the station name and current time at the top of the card.`,size:`Size`,station_bg:`Station-name background`,station_bg_black:`Black`,station_bg_helper:`Default is the colour of the first tracked line (e.g. red for U1, orange for U3). On multi-line boards you can pick a specific line, or override with solid white or black.`,station_bg_line:`First line`,station_bg_white:`White`,text:`Sign text`}},$e={common:Ye,modern:Xe,retro:Ze,flap:Qe};const et={de:He,en:Je},tt=et.de??{};function nt(e,t){return e.split(`.`).reduce((e,t)=>{if(e&&typeof e==`object`&&t in e)return e[t]},t)}function rt(e,t){let n=nt(e,t);return typeof n==`string`?n:void 0}function it(e){return((e.configLanguage||e.hassLanguage||`de`).split(/[-_]/)[0]??`de`)===`en`?`en`:`de`}function at(e,t,n){let r=it(t),i=rt(e,et[r]??tt);if(i===void 0&&(i=rt(e,tt)),i===void 0)return e;if(n)for(let[e,t]of Object.entries(n))i=i.replace(`{${e}}`,String(t));return i}async function ot(e,t,n){if(!e?.callWS)return null;try{let r=await e.callWS({type:t});if(r?.version&&r.version!==n)return r.version}catch{}return null}function st(e){try{window.caches?.keys?.().then(e=>{e.forEach(e=>window.caches?.delete?.(e))})}catch{}if(e)try{window.sessionStorage?.setItem(`wl-reload-attempted-${e}`,`1`)}catch{}window.location.reload()}function ct(e){if(!e)return!1;try{return window.sessionStorage?.getItem(`wl-reload-attempted-${e}`)===`1`}catch{return!1}}function lt(e,t,n=`banner`){if(!e)return L;if(ct(e)){let e=t(`version_reload_stuck`);return F`
+      <div class=${n} role="alert" aria-live="assertive">
         <span>${e}</span>
       </div>
-    `}const o=i("version_update").replace("{v}",e),r=i("version_reload");return F`
-    <div class=${t} role="alert" aria-live="assertive">
-      <span>${o}</span>
+    `}let r=t(`version_update`).replace(`{v}`,e),i=t(`version_reload`);return F`
+    <div class=${n} role="alert" aria-live="assertive">
+      <span>${r}</span>
       <button
         type="button"
-        aria-label=${r}
-        @click=${()=>function(e){try{window.caches?.keys?.().then(e=>{e.forEach(e=>window.caches?.delete?.(e))})}catch{}if(e)try{window.sessionStorage?.setItem(`wl-reload-attempted-${e}`,"1")}catch{}window.location.reload()}(e)}
+        aria-label=${i}
+        @click=${()=>st(e)}
       >
-        ${r}
+        ${i}
       </button>
     </div>
-  `}const Oe={exit:{kind:"svg",viewBox:"0 0 36.29 29.04",glyphPointsTo:"left",labelKey:"icon_exit",shapes:()=>I`
+  `}function ut(e){if(e?.themes?.darkMode===!0)return`dark`;if(e?.themes?.darkMode===!1)return`light`}const dt=e=>Math.min(1,Math.max(0,e)),K=e=>e<=.04045?e/12.92:((e+.055)/1.055)**2.4,ft=e=>e<=.0031308?e*12.92:1.055*e**(1/2.4)-.055;function pt(e){let t=e.trim();if(!t||t.includes(`var(`))return null;let n=/^#[0-9a-f]{3,8}$/i.test(t)?t.slice(1):``;if(!n){let e=``;try{let n=document.createElement(`span`).style;n.color=t,e=n.color.trim()}catch{return null}let n=/^rgba?\(([^)]+)\)$/.exec(e);if(!n?.[1])return null;let[r,i,a]=n[1].split(/[,\s/]+/).filter(Boolean).map(Number);return r===void 0||i===void 0||a===void 0||![r,i,a].every(Number.isFinite)?null:[K(r/255),K(i/255),K(a/255)]}if((n.length===3||n.length===4)&&(n=[...n.slice(0,3)].map(e=>e+e).join(``)),n.length!==6&&n.length!==8)return null;let r=Number.parseInt(n.slice(0,6),16);return Number.isFinite(r)?[K((r>>16&255)/255),K((r>>8&255)/255),K((r&255)/255)]:null}function mt([e,t,n]){let r=Math.cbrt(.4122214708*e+.5363325363*t+.0514459929*n),i=Math.cbrt(.2119034982*e+.6806995451*t+.1073969566*n),a=Math.cbrt(.0883024619*e+.2817188376*t+.6299787005*n);return[.2104542553*r+.793617785*i-.0040720468*a,1.9779984951*r-2.428592205*i+.4505937099*a,.0259040371*r+.7827717662*i-.808675766*a]}function ht([e,t,n]){let r=(e+.3963377774*t+.2158037573*n)**3,i=(e-.1055613458*t-.0638541728*n)**3,a=(e-.0894841775*t-1.291485548*n)**3;return[4.0767416621*r-3.3077115913*i+.2309699292*a,-1.2684380046*r+2.6097574011*i-.3413193965*a,-.0041960863*r-.7034186147*i+1.707614701*a]}const gt=([e,t,n])=>`#`+[e,t,n].map(e=>Math.round(dt(ft(e))*255).toString(16).padStart(2,`0`)).join(``);function _t(e,t){if(t===void 0)return null;let n=pt(e);if(!n)return null;let[r,i,a]=mt(n),o=t===`dark`?Math.max(.72,r):Math.min(.45,r);if(o===r)return gt(n);let s=Math.hypot(i,a),c=Math.atan2(a,i),l=ht([o,s*Math.cos(c),s*Math.sin(c)]);return gt([dt(l[0]),dt(l[1]),dt(l[2])])}const q={show_station_name:{retro:!1,flap:!0},housing:{retro:!1,flap:!0},size:{retro:`regular`,flap:`small`},unit_caption:{retro:!1,flap:!0},station_bg:{retro:`default`,flap:`line`},show_platform:{retro:!0,flap:!0}},vt={retro:2},yt={exit:{kind:`svg`,viewBox:`0 0 36.29 29.04`,glyphPointsTo:`left`,labelKey:`icon_exit`,shapes:()=>pe`
       <polygon points="31.29 0 18.99 0 13.99 0 13.99 5 13.99 10.31 18.99 10.31 18.99 5 31.29 5 31.29 24.04 18.99 24.04 18.99 18.44 13.99 18.44 13.99 24.04 13.99 29.04 18.99 29.04 31.29 29.04 36.29 29.04 36.29 24.04 36.29 5 36.29 0 31.29 0"/>
       <polygon points="24.22 12.38 7.65 12.38 12.5 7.53 6.85 7.53 0 14.37 6.85 21.23 12.51 21.23 12.51 21.23 7.66 16.38 24.22 16.38 24.22 12.38"/>
-    `},"exit-access":{kind:"svg",viewBox:"0 0 36.29 29.04",glyphPointsTo:"right",labelKey:"icon_exit_access",shapes:()=>I`
+    `},"exit-access":{kind:`svg`,viewBox:`0 0 36.29 29.04`,glyphPointsTo:`right`,labelKey:`icon_exit_access`,shapes:()=>pe`
       <polygon points="17.3 18.73 17.3 24.04 5 24.04 5 5 17.3 5 17.3 10.59 22.3 10.59 22.3 5 22.3 0 17.3 0 5 0 0 0 0 5 0 24.04 0 29.04 5 29.04 17.3 29.04 22.3 29.04 22.3 24.04 22.3 18.73 17.3 18.73"/>
       <circle cx="9.97" cy="8.73" r="1.05"/>
       <path d="M9.04,10.69h0v4.12h0c0,.36.5.66,1.12.66h3.48l1.2,2.87h1l-1.2-2.87-.39-.93h-2.97v-1.47h2.32s-.09-.68-.58-.68h-1.74v-1.7h0c0-.36-.5-.66-1.12-.66s-1.12.29-1.12.66Z"/>
       <path d="M11.67,18.74c1.04-.58,1.78-1.63,1.91-2.87h-.72c-.18,1.49-1.45,2.64-2.98,2.64-1.66,0-3.01-1.35-3.01-3.01,0-1.21.71-2.24,1.74-2.72v-.77c-1.43.52-2.45,1.89-2.45,3.49,0,2.05,1.67,3.72,3.72,3.72h6.32v-.48h-4.53Z"/>
       <polygon points="29.44 7.81 23.79 7.81 23.79 7.81 28.63 12.66 17.3 12.66 17.3 16.66 28.64 16.66 23.79 21.51 29.45 21.51 36.29 14.66 29.44 7.81"/>
-    `},wc:{kind:"text",text:"WC",labelKey:"icon_wc"},escalator:{kind:"svg",viewBox:"0 0 36.74 28.3",labelKey:"icon_escalator",shapes:()=>I`
+    `},wc:{kind:`text`,text:`WC`,labelKey:`icon_wc`},escalator:{kind:`svg`,viewBox:`0 0 36.74 28.3`,labelKey:`icon_escalator`,shapes:()=>pe`
       <polygon points="27.05 0 27.05 3.08 23.69 3.08 23.69 6.17 20.32 6.17 20.32 9.25 16.96 9.25 16.96 12.33 13.64 12.33 13.64 15.42 10.28 15.42 10.28 18.5 6.91 18.5 6.91 22.14 0 22.14 0 28.3 7.97 28.3 30.42 6.17 36.74 6.17 36.74 0 27.05 0"/>
-    `},elevator:{kind:"svg",viewBox:"0 0 24.01 36.69",labelKey:"icon_elevator",shapes:()=>I`
+    `},elevator:{kind:`svg`,viewBox:`0 0 24.01 36.69`,labelKey:`icon_elevator`,shapes:()=>pe`
       <path d="M14.82,19.29h-5.63c-.37,0-.68.3-.68.68v5.15c0,.37.3.68.68.68s.68-.3.68-.68v-4.48h.42v12.32c0,.37.3.68.68.68s.68-.3.68-.68v-7.42h.73v7.42c0,.37.3.68.68.68s.68-.3.68-.68v-12.32h.42v4.48c0,.37.3.68.68.68s.68-.3.68-.68v-5.15c0-.37-.3-.68-.68-.68Z"/>
       <circle cx="12" cy="17.3" r="1.57"/>
       <path d="M22.6,14.1v21.18H1.41V14.1h21.18M24.01,12.68H0v24.01h24.01V12.68h0Z"/>
       <polygon points="11.11 4.94 6.17 0 1.23 4.94 1.23 7.6 5.23 3.61 5.23 11.48 7.11 11.48 7.11 3.61 11.11 7.6 11.11 4.94"/>
       <polygon points="12.9 6.54 17.84 11.48 22.78 6.54 22.78 3.87 18.78 7.87 18.78 0 16.9 0 16.9 7.87 12.9 3.87 12.9 6.54"/>
-    `}},Ue=["mdi:exit-run","mdi:exit-to-app","mdi:door-open","mdi:stairs"],Fe={"mdi:exit-run":{labelKey:"icon_mdi_exit_run",glyphPointsTo:"right"},"mdi:exit-to-app":{labelKey:"icon_mdi_exit_to_app",glyphPointsTo:"right"},"mdi:door-open":{labelKey:"icon_mdi_door_open"},"mdi:stairs":{labelKey:"icon_mdi_stairs"}};function Ie(e,i){const t=Oe[e];if("text"===t.kind)return F`<span class="retro-station-header__tile" role="img" aria-label=${i.ariaLabel}>
-      <span class="retro-station-header__monogram" aria-hidden="true">${t.text}</span>
-    </span>`;const o=i.flipX?"retro-station-header__icon retro-station-header__icon--flip-x":"retro-station-header__icon";return F`<span class="retro-station-header__tile" role="img" aria-label=${i.ariaLabel}>
+    `}},bt=[`mdi:exit-run`,`mdi:exit-to-app`,`mdi:door-open`,`mdi:stairs`],xt={"mdi:exit-run":{labelKey:`icon_mdi_exit_run`,glyphPointsTo:`right`},"mdi:exit-to-app":{labelKey:`icon_mdi_exit_to_app`,glyphPointsTo:`right`},"mdi:door-open":{labelKey:`icon_mdi_door_open`},"mdi:stairs":{labelKey:`icon_mdi_stairs`}};function St(e){return typeof e==`string`&&e in xt}function Ct(e,t){let n=yt[e];if(n.kind===`text`)return F`<span class="retro-station-header__tile" role="img" aria-label=${t.ariaLabel}>
+      <span class="retro-station-header__monogram" aria-hidden="true">${n.text}</span>
+    </span>`;let r=t.flipX?`retro-station-header__icon retro-station-header__icon--flip-x`:`retro-station-header__icon`;return F`<span class="retro-station-header__tile" role="img" aria-label=${t.ariaLabel}>
     <svg
-      class=${o}
-      viewBox=${t.viewBox}
+      class=${r}
+      viewBox=${n.viewBox}
       aria-hidden="true"
       xmlns="http://www.w3.org/2000/svg"
-    >${t.shapes()}</svg>
-  </span>`}const Ke=new Set(["small","medium","regular"]),Ve=new Set(["default","white","black"]),Ge=new Set(["classic","warm","pixel"]),Ze=new Set(["auto","left","right"]),Ye=new Set(["none","regular","accessible",...Ue]);function Xe(e){if(!e||"object"!=typeof e)return;const i=e,t=Ye.has(i.exit)?i.exit:"none";let o;if("string"==typeof i.text){const e=i.text.trim().slice(0,64);e&&(o=e)}const r=!0===i.show_wc,d=!0===i.show_escalator,a=!0===i.show_elevator,n=!0===i.show_clock,m=!0===i.show_date;let l,s,c;if("string"==typeof i.date_format){const e=i.date_format.slice(0,32);e&&(l=e)}if(Array.isArray(i.chips)){const e=i.chips.filter(e=>"string"==typeof e).map(e=>e.trim().slice(0,16)).filter(e=>e.length>0).slice(0,6);e.length>0&&(s=e)}if(Array.isArray(i.extra_icons)){const e=i.extra_icons.filter(e=>"string"==typeof e).map(e=>e.trim()).filter(e=>e.startsWith("mdi:")&&e.length>=5&&e.length<=64).slice(0,3);e.length>0&&(c=e)}if(!("none"!==t||void 0!==o||r||d||a||n||m||void 0!==s||void 0!==c))return;const u={};return"none"!==t&&(u.exit=t),void 0!==o&&(u.text=o),r&&(u.show_wc=!0),d&&(u.show_escalator=!0),a&&(u.show_elevator=!0),n&&(u.show_clock=!0),m&&(u.show_date=!0),void 0!==l&&(u.date_format=l),void 0!==s&&(u.chips=s),void 0!==c&&(u.extra_icons=c),u}function Qe(e){if(!e||"object"!=typeof e)return;const i={};for(const[t,o]of Object.entries(e)){const e="number"==typeof o?o:"string"==typeof o?Number(o):NaN;if(!Number.isFinite(e)||e<0||e>120){console.warn(`[wiener-linien-austria] walk_times["${t}"] = ${JSON.stringify(o)} is not a finite number in 0..120 — dropping`);continue}const r=t.split("|"),d=r.length>=3?`${r[0]}|${r[1]}`:t,a=Math.round(e),n=i[d];i[d]=void 0===n?a:Math.max(n,a)}return Object.keys(i).length?i:void 0}const Je=new Set(["type","entity","direction","line","show_platform","platform_side","show_station_name","station_bg","size","style","flicker","wheelchair_race","accessibility_only","message_ticker","message_text","walk_times","show_header","header_left","header_right","line_pill","line_stripe","housing","show_unit"]);function ei(e){const i="R"===e.direction?"R":"H",t=Ke.has(e.size)?e.size:"regular",o=Ve.has(e.station_bg)?e.station_bg:"default",r=Ge.has(e.style)?e.style:"classic",d=function(e,i){const t={};if(!e||"object"!=typeof e)return t;for(const[o,r]of Object.entries(e))i.has(o)||(t[o]=r);return t}(e,Je);return{...d,type:e.type||"custom:wiener-linien-austria-retro-card",entity:"string"==typeof e.entity&&e.entity.startsWith("sensor.")?e.entity:void 0,direction:i,line:"string"==typeof e.line&&e.line?e.line:void 0,show_platform:e.show_platform??!0,platform_side:Ze.has(e.platform_side)?e.platform_side:"auto",show_station_name:e.show_station_name??!1,station_bg:o,size:t,style:r,flicker:!0===e.flicker,wheelchair_race:!0===e.wheelchair_race,accessibility_only:!0===e.accessibility_only,message_ticker:!0===e.message_ticker,message_text:"string"==typeof e.message_text&&e.message_text.trim()?e.message_text.slice(0,160):void 0,walk_times:Qe(e.walk_times),show_header:!0===e.show_header,header_left:Xe(e.header_left),header_right:Xe(e.header_right),line_pill:!0===e.line_pill,line_stripe:!0===e.line_stripe,housing:!0===e.housing,show_unit:!0===e.show_unit}}function ii(e,i,t={},o="var(--primary-color)"){const r=e.toUpperCase();if(void 0!==i[r])return{background:i[r]};if(/^N\d/.test(r))return{background:"#1b1464",color:"#fef200"};const d=t[e]??t[r];return d?.bg?d.fg?{background:`#${d.bg}`,color:`#${d.fg}`}:{background:`#${d.bg}`}:{background:o}}function ti(e,i){return`${e}|${i}`}function oi(e,i){if(!e)return[];const t=new Set;if(e.tracked_line_keys?.length){for(const o of e.tracked_line_keys){const[e,r]=o.split("|",2);e&&(i&&r!==i||t.add(e))}if(t.size>0)return[...t].sort()}for(const o of e.departures??[])i&&o.direction!==i||o.line&&t.add(o.line);return[...t].sort()}function ri(e,i){const{lines:t,direction:o,line_directions:r,walk_times:d,accessibility_only:a}=i,n=t&&t.length?new Set(t):null;return e.filter(e=>{if(n&&!n.has(e.line))return!1;const i=r?.[e.line]??o;if(i&&e.direction!==i)return!1;if(d){const i=d[ti(e.line,String(e.direction??""))];if("number"==typeof i&&e.countdown<i)return!1}return!(a&&!e.barrier_free)})}function di(e){if(!e)return[];const i=[];for(const[t,o]of Object.entries(e.states??{})){if(!t.startsWith("sensor."))continue;const e=o?.attributes??{};"number"==typeof e.diva&&(Array.isArray(e.departures)&&e.next_by_line&&"object"==typeof e.next_by_line&&i.push(t))}return i.sort(),i}const ai="wl-austria-fonts";function ni(e){return String(e).padStart(2,"0")}function mi(e,i,t){if(!e||!i)return null;const o=Date.parse(e);return Number.isFinite(o)?function(e,i,t="de"){if(!i)return"";const o="en"===t?"en-GB":"de-AT",r=()=>e.toLocaleDateString(o,{weekday:"long"}),d=()=>e.toLocaleDateString(o,{weekday:"short"}),a=()=>e.toLocaleDateString(o,{month:"long"}),n=()=>e.toLocaleDateString(o,{month:"short"});let m="",l=0;for(;l<i.length;){const t=i[l];if("\\"===t&&l+1<i.length)m+=i[l+1],l+=2;else{switch(t){case"d":m+=ni(e.getDate());break;case"j":m+=String(e.getDate());break;case"D":m+=d();break;case"l":m+=r();break;case"m":m+=ni(e.getMonth()+1);break;case"n":m+=String(e.getMonth()+1);break;case"M":m+=n();break;case"F":m+=a();break;case"Y":m+=String(e.getFullYear());break;case"y":m+=ni(e.getFullYear()%100);break;case"H":m+=ni(e.getHours());break;case"G":m+=String(e.getHours());break;case"h":m+=ni((e.getHours()+11)%12+1);break;case"g":m+=String((e.getHours()+11)%12+1);break;case"i":m+=ni(e.getMinutes());break;case"s":m+=ni(e.getSeconds());break;default:m+=t??""}l++}}return m}(new Date(o),i,t):null}function li(e,i,t,o,r){let d=V;if("regular"===e.exit||"accessible"===e.exit){const t="regular"===e.exit?"exit":"exit-access";d=Ie(t,{ariaLabel:o(`header.${Oe[t].labelKey}`),flipX:Oe[t].glyphPointsTo!==i})}else if(e.exit&&function(e){return"string"==typeof e&&e in Fe}(e.exit)){const t=Fe[e.exit];d=function(e,i){const t=i.flipX?"retro-station-header__mdi retro-station-header__mdi--flip-x":"retro-station-header__mdi";return F`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${i.ariaLabel}>
-    <ha-icon class=${t} icon=${e}></ha-icon>
-  </span>`}(e.exit,{ariaLabel:o(`header.${t.labelKey}`),flipX:void 0!==t.glyphPointsTo&&t.glyphPointsTo!==i})}const a=e.text?F`<span class="retro-station-header__text">${e.text}</span>`:V,n=e=>Ie(e,{ariaLabel:o(`header.${Oe[e].labelKey}`)}),m=e.show_wc?n("wc"):V,l=e.show_escalator?n("escalator"):V,s=e.show_elevator?n("elevator"):V,c=(e.extra_icons??[]).map(e=>F`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${e}>
+    >${n.shapes()}</svg>
+  </span>`}function wt(e,t){let n=t.flipX?`retro-station-header__mdi retro-station-header__mdi--flip-x`:`retro-station-header__mdi`;return F`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${t.ariaLabel}>
+    <ha-icon class=${n} icon=${e}></ha-icon>
+  </span>`}function Tt(e,t){return F`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${t}>
     <ha-icon class="retro-station-header__mdi" icon=${e}></ha-icon>
-  </span>`),u=[...c].reverse(),h=(e.chips??[]).map(e=>F`<span class="retro-station-header__chip">${e}</span>`),p=[...h].reverse(),f=e.show_clock?function(e){if(!e)return null;const i=Date.parse(e);if(!Number.isFinite(i))return null;const t=new Date(i);return`${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}`}(t):null,g=f?F`<span
+  </span>`}function Et(e,t){return typeof e==`boolean`?e:t}const Dt=new Set([`small`,`medium`,`regular`]),Ot=new Set([`default`,`white`,`black`]),kt=new Set([`classic`,`warm`,`pixel`]),At=new Set([`auto`,`left`,`right`]),jt=new Set([`none`,`regular`,`accessible`,...bt]);function Mt(e,t,n){if(typeof e!=`string`)return;let r=n?e.trim().slice(0,t):e.slice(0,t);return r.length>0?r:void 0}function Nt(e,t){if(!Array.isArray(e))return;let{maxCount:n,truncateTo:r,accept:i}=t,a=e.filter(e=>typeof e==`string`).map(e=>r===void 0?e.trim():e.trim().slice(0,r)).filter(e=>e.length>0&&(i===void 0||i(e))).slice(0,n);return a.length>0?a:void 0}const Pt=/^[a-z0-9_-]+:[a-z0-9_-]+$/i;function Ft(e){if(!e||typeof e!=`object`)return;let t=e,n={},r=jt.has(t.exit)?t.exit:`none`;r!==`none`&&(n.exit=r);let i=Mt(t.text,64,!0);i!==void 0&&(n.text=i),t.show_wc===!0&&(n.show_wc=!0),t.show_escalator===!0&&(n.show_escalator=!0),t.show_elevator===!0&&(n.show_elevator=!0),t.show_clock===!0&&(n.show_clock=!0),t.show_date===!0&&(n.show_date=!0);let a=Nt(t.chips,{truncateTo:16,maxCount:6});a!==void 0&&(n.chips=a);let o=Nt(t.extra_icons,{maxCount:3,accept:e=>Pt.test(e)&&e.length<=64});if(o!==void 0&&(n.extra_icons=o),Object.keys(n).length===0)return;let s=Mt(t.date_format,32,!1);return s!==void 0&&(n.date_format=s),n}function It(e,t){let n={};if(!e||typeof e!=`object`)return n;for(let[r,i]of Object.entries(e))t.has(r)||(n[r]=i);return n}function Lt(e){if(!e||typeof e!=`object`)return;let t={};for(let[n,r]of Object.entries(e)){let e=typeof r==`number`?r:typeof r==`string`?Number(r):NaN;if(!Number.isFinite(e)||e<0||e>120){console.warn(`[wiener-linien-austria] walk_times["${n}"] = ${JSON.stringify(r)} is not a finite number in 0..120 — dropping`);continue}let i=n.split(`|`),a=i.length>=3?`${i[0]}|${i[1]}`:n,o=Math.round(e),s=t[a];t[a]=s===void 0?o:Math.max(s,o)}return Object.keys(t).length?t:void 0}const Rt=new Set([`type`,`entity`,`direction`,`line`,`show_platform`,`platform_side`,`show_station_name`,`station_bg`,`size`,`style`,`flicker`,`wheelchair_race`,`accessibility_only`,`message_ticker`,`message_text`,`walk_times`,`show_header`,`header_left`,`header_right`,`show_line_pill`,`line_pill`,`line_stripe`,`housing`,`show_unit`]);function zt(e){let t=e.direction===`R`?`R`:`H`,n=Dt.has(e.size)?e.size:q.size.retro,r=Ot.has(e.station_bg)?e.station_bg:q.station_bg.retro,i=kt.has(e.style)?e.style:`classic`;return{...It(e,Rt),type:e.type||`custom:wiener-linien-austria-retro-card`,entity:typeof e.entity==`string`&&e.entity.startsWith(`sensor.`)?e.entity:void 0,direction:t,line:typeof e.line==`string`&&e.line?e.line:void 0,show_platform:Et(e.show_platform,q.show_platform.retro),platform_side:At.has(e.platform_side)?e.platform_side:`auto`,show_station_name:Et(e.show_station_name,q.show_station_name.retro),station_bg:r,size:n,style:i,flicker:e.flicker===!0,wheelchair_race:e.wheelchair_race===!0,accessibility_only:e.accessibility_only===!0,message_ticker:e.message_ticker===!0,message_text:typeof e.message_text==`string`&&e.message_text.trim()?e.message_text.slice(0,160):void 0,walk_times:Lt(e.walk_times),show_header:e.show_header===!0,header_left:Ft(e.header_left),header_right:Ft(e.header_right),show_line_pill:e.show_line_pill===void 0?e.line_pill===!0:e.show_line_pill===!0,line_stripe:e.line_stripe===!0,housing:Et(e.housing,q.housing.retro),show_unit:Et(e.show_unit,q.unit_caption.retro)}}function Bt(e,t,n={},r=`var(--primary-color)`){let i=e.toUpperCase();if(t[i]!==void 0)return{background:t[i]};if(/^N\d/.test(i))return{background:`#1b1464`,color:`#fef200`};let a=n[e]??n[i];return a?.bg?a.fg?{background:`#${a.bg}`,color:`#${a.fg}`}:{background:`#${a.bg}`}:{background:r}}function Vt(e,t,n={},r,i=`var(--primary-color)`){let a=Bt(e,t,n,i);return{fill:a.background,ink:a.color,text:_t(a.background,r)??void 0}}function Ht(e,t){return`${e}|${t}`}function Ut(e){let t=[],n=new Set;for(let r of e?.departures??[]){let e=String(r.direction??``),i=`${r.line}|${e}|${r.towards}`;n.has(i)||(n.add(i),t.push({line:r.line,direction:e,towards:r.towards,type:r.type}))}return t.sort((e,t)=>e.line===t.line?e.towards.localeCompare(t.towards):e.line.localeCompare(t.line)),t}function Wt(e){let t=new Map;for(let n of e?.departures??[]){let e=String(n.direction??``),r=Ht(n.line,e),i=t.get(r);i||(i={line:n.line,direction:e,type:n.type,termini:[]},t.set(r,i)),n.towards&&!i.termini.includes(n.towards)&&i.termini.push(n.towards)}let n=Array.from(t.values());return n.sort((e,t)=>e.line===t.line?e.direction.localeCompare(t.direction):e.line.localeCompare(t.line)),n}function Gt(e,t){if(!e.length)return t.full;let n=e.slice(0,3).join(` / `),r=e.length>3?` +${e.length-3}`:``;return`${t.short}: ${n}${r}`}function Kt(e,t){if(!e)return[];let n=new Set;if(e.tracked_line_keys?.length){for(let r of e.tracked_line_keys){let[e,i]=r.split(`|`,2);e&&(t&&i!==t||n.add(e))}if(n.size>0)return[...n].sort()}for(let r of e.departures??[])t&&r.direction!==t||r.line&&n.add(r.line);return[...n].sort()}function qt(e,t){let n=new Set;for(let r of e?.tracked_line_keys??[]){let[e,i]=r.split(`|`,2);t&&e!==t||(i===`H`||i===`R`)&&n.add(i)}if(n.size===0)for(let r of e?.departures??[])t&&r.line!==t||(r.direction===`H`||r.direction===`R`)&&n.add(r.direction);let r=[...n];return{available:n,unknown:n.size===0,oneWay:n.size===1?r[0]??null:null}}function Jt(e,t){if(t.size===0)return[...e];let n=e.filter(e=>t.has(e));for(let e of t)n.includes(e)||n.push(e);return n}function Yt(e){if(e?.tracked_lines?.length)return[...e.tracked_lines].sort();let t=new Set;if(e?.lines_at_stop?.length)for(let n of e.lines_at_stop)t.add(n);for(let n of e?.departures??[])n.line&&t.add(n.line);return Array.from(t).sort()}function Xt(e,t){let{lines:n,direction:r,line_directions:i,walk_times:a,accessibility_only:o}=t,s=n&&n.length?new Set(n):null;return e.filter(e=>{if(s&&!s.has(e.line))return!1;let t=i?.[e.line]??r;if(t&&e.direction!==t)return!1;if(a){let t=a[Ht(e.line,String(e.direction??``))];if(typeof t==`number`&&e.countdown<t)return!1}return!(o&&!e.barrier_free)})}function Zt(e,t){let{lines:n,picked:r,lineDirections:i,stopDirection:a}=t,o=e=>i[e]??a,s=Wt(e).filter(e=>{if(r.size>0&&!r.has(e.line))return!1;let t=o(e.line);return!t||e.direction===t}),c=new Set(s.map(e=>e.line)),l=Jt(n,r),u=[];for(let e of l){if(c.has(e))continue;let t=o(e);for(let n of t?[t]:[`H`,`R`])u.push({line:e,direction:n,type:``,termini:[]})}return[...s,...u].sort((e,t)=>e.line===t.line?e.direction.localeCompare(t.direction):e.line.localeCompare(t.line))}const Qt=`ptMetro`;function $t(e){switch(e){case Qt:return`mdi:subway-variant`;case`ptTram`:return`mdi:tram`;case`ptBusCity`:case`ptBusNight`:return`mdi:bus`;default:return null}}function en(e,t){let n=Array.isArray(t.departures)?t.departures:[],r=Xt(n,{direction:e.direction,lines:e.line?[e.line]:void 0,walk_times:e.walk_times,accessibility_only:e.accessibility_only}),i=r.slice(0,vt.retro),a=i.find(e=>e.platform)?.platform??null,o=e.show_platform?a:null,s;switch(e.platform_side){case`left`:s=!0;break;case`right`:s=!1;break;default:s=o===`2`}let c=(i[0]?.type??``)===Qt;return{rows:i,matching:r,departures:n,platform:o,gleisLeft:s,platformLabelKey:c?`gleis`:`steig`,stopName:t.stop_name||t.friendly_name||``}}function tn(e){if(!e)return[];let t=[];for(let[n,r]of Object.entries(e.states??{})){if(!n.startsWith(`sensor.`))continue;let e=r?.attributes??{};typeof e.diva==`number`&&Array.isArray(e.departures)&&e.next_by_line&&typeof e.next_by_line==`object`&&t.push(n)}return t.sort(),t}const nn=`wl-austria-fonts`;function rn(){if(typeof document>`u`||document.getElementById(nn))return;let e=document.createElement(`style`);e.id=nn,e.textContent=`
+@font-face {
+  font-family: "WL Sans";
+  src: url("/wiener-linien-austria/fonts/wl-sans-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "WL Sans";
+  src: url("/wiener-linien-austria/fonts/wl-sans-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "WL Sans Condensed";
+  src: url("/wiener-linien-austria/fonts/wl-sans-condensed-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "WL Mono";
+  src: url("/wiener-linien-austria/fonts/wl-mono-regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "WL Mono";
+  src: url("/wiener-linien-austria/fonts/wl-mono-bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+`,document.head.appendChild(e)}function an(e){if(!e)return null;let t=Date.parse(e);if(!Number.isFinite(t))return null;let n=new Date(t);return`${String(n.getHours()).padStart(2,`0`)}:${String(n.getMinutes()).padStart(2,`0`)}`}function J(e){return String(e).padStart(2,`0`)}function on(e,t,n=`de`){if(!t)return``;let r=n===`en`?`en-GB`:`de-AT`,i=()=>e.toLocaleDateString(r,{weekday:`long`}),a=()=>e.toLocaleDateString(r,{weekday:`short`}),o=()=>e.toLocaleDateString(r,{month:`long`}),s=()=>e.toLocaleDateString(r,{month:`short`}),c=``,l=0;for(;l<t.length;){let n=t[l];if(n===`\\`&&l+1<t.length){c+=t[l+1],l+=2;continue}switch(n){case`d`:c+=J(e.getDate());break;case`j`:c+=String(e.getDate());break;case`D`:c+=a();break;case`l`:c+=i();break;case`m`:c+=J(e.getMonth()+1);break;case`n`:c+=String(e.getMonth()+1);break;case`M`:c+=s();break;case`F`:c+=o();break;case`Y`:c+=String(e.getFullYear());break;case`y`:c+=J(e.getFullYear()%100);break;case`H`:c+=J(e.getHours());break;case`G`:c+=String(e.getHours());break;case`h`:c+=J((e.getHours()+11)%12+1);break;case`g`:c+=String((e.getHours()+11)%12+1);break;case`i`:c+=J(e.getMinutes());break;case`s`:c+=J(e.getSeconds());break;default:c+=n??``}l++}return c}function sn(e,t,n){if(!e||!t)return null;let r=Date.parse(e);return Number.isFinite(r)?on(new Date(r),t,n):null}function cn(e,t,n,r,i){let a=L;if(e.exit===`regular`||e.exit===`accessible`){let n=e.exit===`regular`?`exit`:`exit-access`;a=Ct(n,{ariaLabel:r(`header.${yt[n].labelKey}`),flipX:yt[n].glyphPointsTo!==t})}else if(e.exit&&St(e.exit)){let n=xt[e.exit];a=wt(e.exit,{ariaLabel:r(`header.${n.labelKey}`),flipX:n.glyphPointsTo!==void 0&&n.glyphPointsTo!==t})}let o=e.text?F`<span class="retro-station-header__text">${e.text}</span>`:L,s=e=>Ct(e,{ariaLabel:r(`header.${yt[e].labelKey}`)}),c=e.show_wc?s(`wc`):L,l=e.show_escalator?s(`escalator`):L,u=e.show_elevator?s(`elevator`):L,d=(e.extra_icons??[]).map(e=>Tt(e,e)),f=[...d].reverse(),p=(e.chips??[]).map(e=>F`<span class="retro-station-header__chip">${e}</span>`),m=[...p].reverse(),h=e.show_clock?an(n):null,g=h?F`<span
         class="retro-station-header__chip retro-station-header__chip--clock"
       >
         <ha-icon
           class="retro-station-header__chip-icon"
           icon="mdi:clock-outline"
         ></ha-icon>
-        <span>${f}</span>
-      </span>`:V,b=e.show_date?mi(t,e.date_format??"d.m.Y",r):null,w=b?F`<span
+        <span>${h}</span>
+      </span>`:L,_=e.show_date?sn(n,e.date_format??`d.m.Y`,i):null,v=_?F`<span
         class="retro-station-header__chip retro-station-header__chip--date"
-        >${b}</span
-      >`:V;return"left"===i?F`${d}${a}${s}${l}${m}${c}${h}${w}${g}`:F`${g}${w}${p}${u}${m}${l}${s}${a}${d}`}const si=[["A","A","B"],["B","B","A"],["A","B","B"],["B","A","A"],["A","B","A"],["B","A","B"]],ci=[100,250],ui=[200,500],hi=[500,900],pi=[.25,.5,.75],fi=[3,2.5,2.5];function gi(e){const i=(e,i)=>e+Math.random()*(i-e),t=Math.random()<.5?"A":"B",o=Math.random()<.3?"A"===t?"B":"A":t,r=si.filter(e=>e[2]===o),d=r[Math.floor(Math.random()*r.length)],a=Math.random(),n=a<.4?i(ci[0],ci[1]):a<.75?i(ui[0],ui[1]):i(hi[0],hi[1]),m=i(2400,2700),l=m+n,s=m*i(1.08,1.15),c=l*i(1.08,1.15),u="A"===t?s:c,h="B"===t?s:c,p="A"===t?m:l,f="B"===t?m:l,g=e.a,b=e.b,w=e.finishCqw,k=Math.max(g,b),v=Math.max(20,92-k),_=(e,i)=>{const t=k+pi[i]*v,o=d[i]===e,r=fi[i];return a=.6,t+(o?r:-r)+(2*Math.random()-1)*a;var a},y=_("A",0),x=_("A",1),z=_("A",2),S=_("B",0),A=_("B",1),$=_("B",2),E=(e,i,t)=>{const o=w-t,r=e-.75*i;if(o<=0||r<=1)return Math.max(t+5,102);const d=t+.25*o*i/r;return Math.max(102,Math.min(135,d))},q=E(p,u,z),T=E(f,h,$),L=(e,i,t,o,r,d)=>{const a=[[0,.25,e,i],[.25,.5,i,t],[.5,.75,t,o],[.75,1,o,r]];for(const[e,i,t,o]of a){if(t>=w)return e*d;if(o>=w){return(e+(w-t)/(o-t)*(i-e))*d}}return Number.POSITIVE_INFINITY},R=L(g,y,x,z,q,u),C=L(b,S,A,$,T,h);return{winner:R<=C?"A":"B",winnerCrossT:Math.min(R,C),cssVars:{"--race-a-duration":`${u}ms`,"--race-b-duration":`${h}ms`,"--race-a-end":q-g+"cqw","--race-b-end":T-b+"cqw","--race-a-x-25":y-g+"cqw","--race-a-x-50":x-g+"cqw","--race-a-x-75":z-g+"cqw","--race-b-x-25":S-b+"cqw","--race-b-x-50":A-b+"cqw","--race-b-x-75":$-b+"cqw"}}}const bi=ke(class extends ve{constructor(e){if(super(e),e.type!==be&&e.type!==ge&&e.type!==we)throw Error("The `live` directive is not allowed on child or event bindings");if(!(e=>void 0===e.strings)(e))throw Error("`live` bindings can only contain a single expression")}render(e){return e}update(e,[i]){if(i===K||i===V)return i;const t=e.element,o=e.name;if(e.type===be){if(i===t[o])return K}else if(e.type===we){if(!!i===t.hasAttribute(o))return K}else if(e.type===ge&&t.getAttribute(o)===i+"")return K;return xe(e),i}}),wi=a`
-  :host {
-    display: block;
-  }
-  .editor {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-  .editor-section {
-    background: var(--secondary-background-color, rgba(0, 0, 0, 0.04));
-    border-radius: 12px;
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .section-header {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.6px;
-    text-transform: uppercase;
-    color: var(--secondary-text-color);
-  }
-  .editor-hint {
-    font-size: 0.75rem;
-    color: var(--secondary-text-color);
-    line-height: 1.4;
-  }
-  .walk-time-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .walk-time-row {
-    display: grid;
-    grid-template-columns: 44px 1fr 72px;
-    align-items: center;
-    gap: 8px;
-  }
-  .walk-time-badge {
-    text-align: center;
-    font-weight: 700;
-    color: #fff;
-    border-radius: 4px;
-    padding: 2px 4px;
-    font-size: 0.9em;
-    background: var(--primary-color);
-  }
-  .walk-time-towards {
-    font-size: 0.8125rem;
-    color: var(--primary-text-color);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .walk-time-input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 4px 8px;
-    border: 1px solid var(--divider-color);
-    border-radius: 4px;
-    background: var(--card-background-color, transparent);
-    color: var(--primary-text-color);
-    font-size: 0.8125rem;
-    text-align: right;
-  }
-`;function ki(e){e.stopPropagation()}
-// Schema-driven Lovelace editor for the Wiener Linien Austria retro card.
-const vi=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","mdi:abugida-devanagari","mdi:abugida-thai","mdi:access-point","mdi:access-point-check","mdi:access-point-minus","mdi:access-point-network","mdi:access-point-network-off","mdi:access-point-off","mdi:access-point-plus","mdi:access-point-remove","mdi:account","mdi:account-alert","mdi:account-alert-outline","mdi:account-arrow-down","mdi:account-arrow-down-outline","mdi:account-arrow-left","mdi:account-arrow-left-outline","mdi:account-arrow-right","mdi:account-arrow-right-outline","mdi:account-arrow-up","mdi:account-arrow-up-outline","mdi:account-badge","mdi:account-badge-outline","mdi:account-box","mdi:account-box-edit-outline","mdi:account-box-minus-outline","mdi:account-box-multiple","mdi:account-box-multiple-outline","mdi:account-box-outline","mdi:account-box-plus-outline","mdi:account-cancel","mdi:account-cancel-outline","mdi:account-card","mdi:account-card-outline","mdi:account-cash","mdi:account-cash-outline","mdi:account-check","mdi:account-check-outline","mdi:account-child","mdi:account-child-circle","mdi:account-child-outline","mdi:account-circle","mdi:account-circle-outline","mdi:account-clock","mdi:account-clock-outline","mdi:account-cog","mdi:account-cog-outline","mdi:account-convert","mdi:account-convert-outline","mdi:account-cowboy-hat","mdi:account-cowboy-hat-outline","mdi:account-credit-card","mdi:account-credit-card-outline","mdi:account-details","mdi:account-details-outline","mdi:account-edit","mdi:account-edit-outline","mdi:account-eye","mdi:account-eye-outline","mdi:account-file","mdi:account-file-outline","mdi:account-file-text","mdi:account-file-text-outline","mdi:account-filter","mdi:account-filter-outline","mdi:account-group","mdi:account-group-outline","mdi:account-hard-hat","mdi:account-hard-hat-outline","mdi:account-heart","mdi:account-heart-outline","mdi:account-injury","mdi:account-injury-outline","mdi:account-key","mdi:account-key-outline","mdi:account-lock","mdi:account-lock-open","mdi:account-lock-open-outline","mdi:account-lock-outline","mdi:account-minus","mdi:account-minus-outline","mdi:account-multiple","mdi:account-multiple-check","mdi:account-multiple-check-outline","mdi:account-multiple-minus","mdi:account-multiple-minus-outline","mdi:account-multiple-outline","mdi:account-multiple-plus","mdi:account-multiple-plus-outline","mdi:account-multiple-remove","mdi:account-multiple-remove-outline","mdi:account-music","mdi:account-music-outline","mdi:account-network","mdi:account-network-off","mdi:account-network-off-outline","mdi:account-network-outline","mdi:account-off","mdi:account-off-outline","mdi:account-outline","mdi:account-plus","mdi:account-plus-outline","mdi:account-question","mdi:account-question-outline","mdi:account-reactivate","mdi:account-reactivate-outline","mdi:account-remove","mdi:account-remove-outline","mdi:account-school","mdi:account-school-outline","mdi:account-search","mdi:account-search-outline","mdi:account-settings","mdi:account-settings-outline","mdi:account-star","mdi:account-star-outline","mdi:account-supervisor","mdi:account-supervisor-circle","mdi:account-supervisor-circle-outline","mdi:account-supervisor-outline","mdi:account-switch","mdi:account-switch-outline","mdi:account-sync","mdi:account-sync-outline","mdi:account-tag","mdi:account-tag-outline","mdi:account-tie","mdi:account-tie-hat","mdi:account-tie-hat-outline","mdi:account-tie-outline","mdi:account-tie-voice","mdi:account-tie-voice-off","mdi:account-tie-voice-off-outline","mdi:account-tie-voice-outline","mdi:account-tie-woman","mdi:account-voice","mdi:account-voice-off","mdi:account-wrench","mdi:account-wrench-outline","mdi:adjust","mdi:advertisements","mdi:advertisements-off","mdi:air-conditioner","mdi:air-filter","mdi:air-horn","mdi:air-humidifier","mdi:air-humidifier-off","mdi:air-purifier","mdi:air-purifier-off","mdi:airbag","mdi:airballoon","mdi:airballoon-outline","mdi:airplane","mdi:airplane-alert","mdi:airplane-check","mdi:airplane-clock","mdi:airplane-cog","mdi:airplane-edit","mdi:airplane-landing","mdi:airplane-marker","mdi:airplane-minus","mdi:airplane-off","mdi:airplane-plus","mdi:airplane-remove","mdi:airplane-search","mdi:airplane-settings","mdi:airplane-takeoff","mdi:airport","mdi:alarm","mdi:alarm-bell","mdi:alarm-check","mdi:alarm-light","mdi:alarm-light-off","mdi:alarm-light-off-outline","mdi:alarm-light-outline","mdi:alarm-multiple","mdi:alarm-note","mdi:alarm-note-off","mdi:alarm-off","mdi:alarm-panel","mdi:alarm-panel-outline","mdi:alarm-plus","mdi:alarm-snooze","mdi:album","mdi:alert","mdi:alert-box","mdi:alert-box-outline","mdi:alert-circle","mdi:alert-circle-check","mdi:alert-circle-check-outline","mdi:alert-circle-outline","mdi:alert-decagram","mdi:alert-decagram-outline","mdi:alert-minus","mdi:alert-minus-outline","mdi:alert-octagon","mdi:alert-octagon-outline","mdi:alert-octagram","mdi:alert-octagram-outline","mdi:alert-outline","mdi:alert-plus","mdi:alert-plus-outline","mdi:alert-remove","mdi:alert-remove-outline","mdi:alert-rhombus","mdi:alert-rhombus-outline","mdi:alien","mdi:alien-outline","mdi:align-horizontal-center","mdi:align-horizontal-distribute","mdi:align-horizontal-left","mdi:align-horizontal-right","mdi:align-vertical-bottom","mdi:align-vertical-center","mdi:align-vertical-distribute","mdi:align-vertical-top","mdi:all-inclusive","mdi:all-inclusive-box","mdi:all-inclusive-box-outline","mdi:allergy","mdi:alpha","mdi:alpha-a","mdi:alpha-abox","mdi:alpha-abox-outline","mdi:alpha-acircle","mdi:alpha-acircle-outline","mdi:alpha-b","mdi:alpha-bbox","mdi:alpha-bbox-outline","mdi:alpha-bcircle","mdi:alpha-bcircle-outline","mdi:alpha-c","mdi:alpha-cbox","mdi:alpha-cbox-outline","mdi:alpha-ccircle","mdi:alpha-ccircle-outline","mdi:alpha-d","mdi:alpha-dbox","mdi:alpha-dbox-outline","mdi:alpha-dcircle","mdi:alpha-dcircle-outline","mdi:alpha-e","mdi:alpha-ebox","mdi:alpha-ebox-outline","mdi:alpha-ecircle","mdi:alpha-ecircle-outline","mdi:alpha-f","mdi:alpha-fbox","mdi:alpha-fbox-outline","mdi:alpha-fcircle","mdi:alpha-fcircle-outline","mdi:alpha-g","mdi:alpha-gbox","mdi:alpha-gbox-outline","mdi:alpha-gcircle","mdi:alpha-gcircle-outline","mdi:alpha-h","mdi:alpha-hbox","mdi:alpha-hbox-outline","mdi:alpha-hcircle","mdi:alpha-hcircle-outline","mdi:alpha-i","mdi:alpha-ibox","mdi:alpha-ibox-outline","mdi:alpha-icircle","mdi:alpha-icircle-outline","mdi:alpha-j","mdi:alpha-jbox","mdi:alpha-jbox-outline","mdi:alpha-jcircle","mdi:alpha-jcircle-outline","mdi:alpha-k","mdi:alpha-kbox","mdi:alpha-kbox-outline","mdi:alpha-kcircle","mdi:alpha-kcircle-outline","mdi:alpha-l","mdi:alpha-lbox","mdi:alpha-lbox-outline","mdi:alpha-lcircle","mdi:alpha-lcircle-outline","mdi:alpha-m","mdi:alpha-mbox","mdi:alpha-mbox-outline","mdi:alpha-mcircle","mdi:alpha-mcircle-outline","mdi:alpha-n","mdi:alpha-nbox","mdi:alpha-nbox-outline","mdi:alpha-ncircle","mdi:alpha-ncircle-outline","mdi:alpha-o","mdi:alpha-obox","mdi:alpha-obox-outline","mdi:alpha-ocircle","mdi:alpha-ocircle-outline","mdi:alpha-p","mdi:alpha-pbox","mdi:alpha-pbox-outline","mdi:alpha-pcircle","mdi:alpha-pcircle-outline","mdi:alpha-q","mdi:alpha-qbox","mdi:alpha-qbox-outline","mdi:alpha-qcircle","mdi:alpha-qcircle-outline","mdi:alpha-r","mdi:alpha-rbox","mdi:alpha-rbox-outline","mdi:alpha-rcircle","mdi:alpha-rcircle-outline","mdi:alpha-s","mdi:alpha-sbox","mdi:alpha-sbox-outline","mdi:alpha-scircle","mdi:alpha-scircle-outline","mdi:alpha-t","mdi:alpha-tbox","mdi:alpha-tbox-outline","mdi:alpha-tcircle","mdi:alpha-tcircle-outline","mdi:alpha-u","mdi:alpha-ubox","mdi:alpha-ubox-outline","mdi:alpha-ucircle","mdi:alpha-ucircle-outline","mdi:alpha-v","mdi:alpha-vbox","mdi:alpha-vbox-outline","mdi:alpha-vcircle","mdi:alpha-vcircle-outline","mdi:alpha-w","mdi:alpha-wbox","mdi:alpha-wbox-outline","mdi:alpha-wcircle","mdi:alpha-wcircle-outline","mdi:alpha-x","mdi:alpha-xbox","mdi:alpha-xbox-outline","mdi:alpha-xcircle","mdi:alpha-xcircle-outline","mdi:alpha-y","mdi:alpha-ybox","mdi:alpha-ybox-outline","mdi:alpha-ycircle","mdi:alpha-ycircle-outline","mdi:alpha-z","mdi:alpha-zbox","mdi:alpha-zbox-outline","mdi:alpha-zcircle","mdi:alpha-zcircle-outline","mdi:alphabet-aurebesh","mdi:alphabet-cyrillic","mdi:alphabet-greek","mdi:alphabet-latin","mdi:alphabet-piqad","mdi:alphabet-tengwar","mdi:alphabetical","mdi:alphabetical-off","mdi:alphabetical-variant","mdi:alphabetical-variant-off","mdi:altimeter","mdi:ambulance","mdi:ammunition","mdi:ampersand","mdi:amplifier","mdi:amplifier-off","mdi:anchor","mdi:android","mdi:android-studio","mdi:angle-acute","mdi:angle-obtuse","mdi:angle-right","mdi:angular","mdi:angularjs","mdi:animation","mdi:animation-outline","mdi:animation-play","mdi:animation-play-outline","mdi:ansible","mdi:antenna","mdi:anvil","mdi:apache-kafka","mdi:api","mdi:api-off","mdi:apple","mdi:apple-finder","mdi:apple-icloud","mdi:apple-ios","mdi:apple-keyboard-caps","mdi:apple-keyboard-command","mdi:apple-keyboard-control","mdi:apple-keyboard-option","mdi:apple-keyboard-shift","mdi:apple-safari","mdi:application","mdi:application-array","mdi:application-array-outline","mdi:application-braces","mdi:application-braces-outline","mdi:application-brackets","mdi:application-brackets-outline","mdi:application-cog","mdi:application-cog-outline","mdi:application-edit","mdi:application-edit-outline","mdi:application-export","mdi:application-import","mdi:application-outline","mdi:application-parentheses","mdi:application-parentheses-outline","mdi:application-settings","mdi:application-settings-outline","mdi:application-variable","mdi:application-variable-outline","mdi:approximately-equal","mdi:approximately-equal-box","mdi:apps","mdi:apps-box","mdi:arch","mdi:archive","mdi:archive-alert","mdi:archive-alert-outline","mdi:archive-arrow-down","mdi:archive-arrow-down-outline","mdi:archive-arrow-up","mdi:archive-arrow-up-outline","mdi:archive-cancel","mdi:archive-cancel-outline","mdi:archive-check","mdi:archive-check-outline","mdi:archive-clock","mdi:archive-clock-outline","mdi:archive-cog","mdi:archive-cog-outline","mdi:archive-edit","mdi:archive-edit-outline","mdi:archive-eye","mdi:archive-eye-outline","mdi:archive-lock","mdi:archive-lock-open","mdi:archive-lock-open-outline","mdi:archive-lock-outline","mdi:archive-marker","mdi:archive-marker-outline","mdi:archive-minus","mdi:archive-minus-outline","mdi:archive-music","mdi:archive-music-outline","mdi:archive-off","mdi:archive-off-outline","mdi:archive-outline","mdi:archive-plus","mdi:archive-plus-outline","mdi:archive-refresh","mdi:archive-refresh-outline","mdi:archive-remove","mdi:archive-remove-outline","mdi:archive-search","mdi:archive-search-outline","mdi:archive-settings","mdi:archive-settings-outline","mdi:archive-star","mdi:archive-star-outline","mdi:archive-sync","mdi:archive-sync-outline","mdi:arm-flex","mdi:arm-flex-outline","mdi:arrange-bring-forward","mdi:arrange-bring-to-front","mdi:arrange-send-backward","mdi:arrange-send-to-back","mdi:arrow-all","mdi:arrow-bottom-left","mdi:arrow-bottom-left-bold-box","mdi:arrow-bottom-left-bold-box-outline","mdi:arrow-bottom-left-bold-outline","mdi:arrow-bottom-left-thick","mdi:arrow-bottom-left-thin","mdi:arrow-bottom-left-thin-circle-outline","mdi:arrow-bottom-right","mdi:arrow-bottom-right-bold-box","mdi:arrow-bottom-right-bold-box-outline","mdi:arrow-bottom-right-bold-outline","mdi:arrow-bottom-right-thick","mdi:arrow-bottom-right-thin","mdi:arrow-bottom-right-thin-circle-outline","mdi:arrow-collapse","mdi:arrow-collapse-all","mdi:arrow-collapse-down","mdi:arrow-collapse-horizontal","mdi:arrow-collapse-left","mdi:arrow-collapse-right","mdi:arrow-collapse-up","mdi:arrow-collapse-vertical","mdi:arrow-decision","mdi:arrow-decision-auto","mdi:arrow-decision-auto-outline","mdi:arrow-decision-outline","mdi:arrow-down","mdi:arrow-down-bold","mdi:arrow-down-bold-box","mdi:arrow-down-bold-box-outline","mdi:arrow-down-bold-circle","mdi:arrow-down-bold-circle-outline","mdi:arrow-down-bold-hexagon-outline","mdi:arrow-down-bold-outline","mdi:arrow-down-box","mdi:arrow-down-circle","mdi:arrow-down-circle-outline","mdi:arrow-down-drop-circle","mdi:arrow-down-drop-circle-outline","mdi:arrow-down-left","mdi:arrow-down-left-bold","mdi:arrow-down-right","mdi:arrow-down-right-bold","mdi:arrow-down-thick","mdi:arrow-down-thin","mdi:arrow-down-thin-circle-outline","mdi:arrow-expand","mdi:arrow-expand-all","mdi:arrow-expand-down","mdi:arrow-expand-horizontal","mdi:arrow-expand-left","mdi:arrow-expand-right","mdi:arrow-expand-up","mdi:arrow-expand-vertical","mdi:arrow-horizontal-lock","mdi:arrow-left","mdi:arrow-left-bold","mdi:arrow-left-bold-box","mdi:arrow-left-bold-box-outline","mdi:arrow-left-bold-circle","mdi:arrow-left-bold-circle-outline","mdi:arrow-left-bold-hexagon-outline","mdi:arrow-left-bold-outline","mdi:arrow-left-bottom","mdi:arrow-left-bottom-bold","mdi:arrow-left-box","mdi:arrow-left-circle","mdi:arrow-left-circle-outline","mdi:arrow-left-drop-circle","mdi:arrow-left-drop-circle-outline","mdi:arrow-left-right","mdi:arrow-left-right-bold","mdi:arrow-left-right-bold-outline","mdi:arrow-left-thick","mdi:arrow-left-thin","mdi:arrow-left-thin-circle-outline","mdi:arrow-left-top","mdi:arrow-left-top-bold","mdi:arrow-oscillating","mdi:arrow-oscillating-off","mdi:arrow-projectile","mdi:arrow-projectile-multiple","mdi:arrow-right","mdi:arrow-right-bold","mdi:arrow-right-bold-box","mdi:arrow-right-bold-box-outline","mdi:arrow-right-bold-circle","mdi:arrow-right-bold-circle-outline","mdi:arrow-right-bold-hexagon-outline","mdi:arrow-right-bold-outline","mdi:arrow-right-bottom","mdi:arrow-right-bottom-bold","mdi:arrow-right-box","mdi:arrow-right-circle","mdi:arrow-right-circle-outline","mdi:arrow-right-drop-circle","mdi:arrow-right-drop-circle-outline","mdi:arrow-right-thick","mdi:arrow-right-thin","mdi:arrow-right-thin-circle-outline","mdi:arrow-right-top","mdi:arrow-right-top-bold","mdi:arrow-split-horizontal","mdi:arrow-split-vertical","mdi:arrow-top-left","mdi:arrow-top-left-bold-box","mdi:arrow-top-left-bold-box-outline","mdi:arrow-top-left-bold-outline","mdi:arrow-top-left-bottom-right","mdi:arrow-top-left-bottom-right-bold","mdi:arrow-top-left-thick","mdi:arrow-top-left-thin","mdi:arrow-top-left-thin-circle-outline","mdi:arrow-top-right","mdi:arrow-top-right-bold-box","mdi:arrow-top-right-bold-box-outline","mdi:arrow-top-right-bold-outline","mdi:arrow-top-right-bottom-left","mdi:arrow-top-right-bottom-left-bold","mdi:arrow-top-right-thick","mdi:arrow-top-right-thin","mdi:arrow-top-right-thin-circle-outline","mdi:arrow-udown-left","mdi:arrow-udown-left-bold","mdi:arrow-udown-right","mdi:arrow-udown-right-bold","mdi:arrow-uleft-bottom","mdi:arrow-uleft-bottom-bold","mdi:arrow-uleft-top","mdi:arrow-uleft-top-bold","mdi:arrow-up","mdi:arrow-up-bold","mdi:arrow-up-bold-box","mdi:arrow-up-bold-box-outline","mdi:arrow-up-bold-circle","mdi:arrow-up-bold-circle-outline","mdi:arrow-up-bold-hexagon-outline","mdi:arrow-up-bold-outline","mdi:arrow-up-box","mdi:arrow-up-circle","mdi:arrow-up-circle-outline","mdi:arrow-up-down","mdi:arrow-up-down-bold","mdi:arrow-up-down-bold-outline","mdi:arrow-up-drop-circle","mdi:arrow-up-drop-circle-outline","mdi:arrow-up-left","mdi:arrow-up-left-bold","mdi:arrow-up-right","mdi:arrow-up-right-bold","mdi:arrow-up-thick","mdi:arrow-up-thin","mdi:arrow-up-thin-circle-outline","mdi:arrow-uright-bottom","mdi:arrow-uright-bottom-bold","mdi:arrow-uright-top","mdi:arrow-uright-top-bold","mdi:arrow-uup-left","mdi:arrow-uup-left-bold","mdi:arrow-uup-right","mdi:arrow-uup-right-bold","mdi:arrow-vertical-lock","mdi:artboard","mdi:artstation","mdi:aspect-ratio","mdi:assistant","mdi:asterisk","mdi:asterisk-circle-outline","mdi:at","mdi:atlassian","mdi:atm","mdi:atom","mdi:atom-variant","mdi:attachment","mdi:attachment-check","mdi:attachment-lock","mdi:attachment-minus","mdi:attachment-off","mdi:attachment-plus","mdi:attachment-remove","mdi:atv","mdi:audio-input-rca","mdi:audio-input-stereo-minijack","mdi:audio-input-xlr","mdi:audio-video","mdi:audio-video-off","mdi:augmented-reality","mdi:aurora","mdi:auto-download","mdi:auto-fix","mdi:auto-mode","mdi:auto-upload","mdi:autorenew","mdi:autorenew-off","mdi:av-timer","mdi:awning","mdi:awning-outline","mdi:aws","mdi:axe","mdi:axe-battle","mdi:axis","mdi:axis-arrow","mdi:axis-arrow-info","mdi:axis-arrow-lock","mdi:axis-lock","mdi:axis-xarrow","mdi:axis-xarrow-lock","mdi:axis-xrotate-clockwise","mdi:axis-xrotate-counterclockwise","mdi:axis-xyarrow-lock","mdi:axis-yarrow","mdi:axis-yarrow-lock","mdi:axis-yrotate-clockwise","mdi:axis-yrotate-counterclockwise","mdi:axis-zarrow","mdi:axis-zarrow-lock","mdi:axis-zrotate-clockwise","mdi:axis-zrotate-counterclockwise","mdi:babel","mdi:baby","mdi:baby-bottle","mdi:baby-bottle-outline","mdi:baby-buggy","mdi:baby-buggy-off","mdi:baby-carriage","mdi:baby-carriage-off","mdi:baby-face","mdi:baby-face-outline","mdi:backburger","mdi:backspace","mdi:backspace-outline","mdi:backspace-reverse","mdi:backspace-reverse-outline","mdi:backup-restore","mdi:bacteria","mdi:bacteria-outline","mdi:badge-account","mdi:badge-account-alert","mdi:badge-account-alert-outline","mdi:badge-account-horizontal","mdi:badge-account-horizontal-outline","mdi:badge-account-outline","mdi:badminton","mdi:bag-carry-on","mdi:bag-carry-on-check","mdi:bag-carry-on-off","mdi:bag-checked","mdi:bag-personal","mdi:bag-personal-off","mdi:bag-personal-off-outline","mdi:bag-personal-outline","mdi:bag-personal-plus","mdi:bag-personal-plus-outline","mdi:bag-personal-tag","mdi:bag-personal-tag-outline","mdi:bag-suitcase","mdi:bag-suitcase-off","mdi:bag-suitcase-off-outline","mdi:bag-suitcase-outline","mdi:baguette","mdi:balcony","mdi:balloon","mdi:ballot","mdi:ballot-outline","mdi:ballot-recount","mdi:ballot-recount-outline","mdi:bandage","mdi:bank","mdi:bank-check","mdi:bank-circle","mdi:bank-circle-outline","mdi:bank-minus","mdi:bank-off","mdi:bank-off-outline","mdi:bank-outline","mdi:bank-plus","mdi:bank-remove","mdi:bank-transfer","mdi:bank-transfer-in","mdi:bank-transfer-out","mdi:barcode","mdi:barcode-off","mdi:barcode-scan","mdi:barley","mdi:barley-off","mdi:barn","mdi:barrel","mdi:barrel-outline","mdi:baseball","mdi:baseball-bat","mdi:baseball-diamond","mdi:baseball-diamond-outline","mdi:baseball-outline","mdi:bash","mdi:basket","mdi:basket-check","mdi:basket-check-outline","mdi:basket-fill","mdi:basket-minus","mdi:basket-minus-outline","mdi:basket-off","mdi:basket-off-outline","mdi:basket-outline","mdi:basket-plus","mdi:basket-plus-outline","mdi:basket-remove","mdi:basket-remove-outline","mdi:basket-unfill","mdi:basketball","mdi:basketball-hoop","mdi:basketball-hoop-outline","mdi:bat","mdi:bathtub","mdi:bathtub-outline","mdi:battery","mdi:battery-10","mdi:battery-10-bluetooth","mdi:battery-20","mdi:battery-20-bluetooth","mdi:battery-30","mdi:battery-30-bluetooth","mdi:battery-40","mdi:battery-40-bluetooth","mdi:battery-50","mdi:battery-50-bluetooth","mdi:battery-60","mdi:battery-60-bluetooth","mdi:battery-70","mdi:battery-70-bluetooth","mdi:battery-80","mdi:battery-80-bluetooth","mdi:battery-90","mdi:battery-90-bluetooth","mdi:battery-alert","mdi:battery-alert-bluetooth","mdi:battery-alert-variant","mdi:battery-alert-variant-outline","mdi:battery-arrow-down","mdi:battery-arrow-down-outline","mdi:battery-arrow-up","mdi:battery-arrow-up-outline","mdi:battery-bluetooth","mdi:battery-bluetooth-variant","mdi:battery-charging","mdi:battery-charging-10","mdi:battery-charging-100","mdi:battery-charging-20","mdi:battery-charging-30","mdi:battery-charging-40","mdi:battery-charging-50","mdi:battery-charging-60","mdi:battery-charging-70","mdi:battery-charging-80","mdi:battery-charging-90","mdi:battery-charging-high","mdi:battery-charging-low","mdi:battery-charging-medium","mdi:battery-charging-outline","mdi:battery-charging-wireless","mdi:battery-charging-wireless-10","mdi:battery-charging-wireless-20","mdi:battery-charging-wireless-30","mdi:battery-charging-wireless-40","mdi:battery-charging-wireless-50","mdi:battery-charging-wireless-60","mdi:battery-charging-wireless-70","mdi:battery-charging-wireless-80","mdi:battery-charging-wireless-90","mdi:battery-charging-wireless-alert","mdi:battery-charging-wireless-outline","mdi:battery-check","mdi:battery-check-outline","mdi:battery-clock","mdi:battery-clock-outline","mdi:battery-heart","mdi:battery-heart-outline","mdi:battery-heart-variant","mdi:battery-high","mdi:battery-lock","mdi:battery-lock-open","mdi:battery-low","mdi:battery-medium","mdi:battery-minus","mdi:battery-minus-outline","mdi:battery-minus-variant","mdi:battery-negative","mdi:battery-off","mdi:battery-off-outline","mdi:battery-outline","mdi:battery-plus","mdi:battery-plus-outline","mdi:battery-plus-variant","mdi:battery-positive","mdi:battery-remove","mdi:battery-remove-outline","mdi:battery-sync","mdi:battery-sync-outline","mdi:battery-unknown","mdi:battery-unknown-bluetooth","mdi:beach","mdi:beaker","mdi:beaker-alert","mdi:beaker-alert-outline","mdi:beaker-check","mdi:beaker-check-outline","mdi:beaker-minus","mdi:beaker-minus-outline","mdi:beaker-outline","mdi:beaker-plus","mdi:beaker-plus-outline","mdi:beaker-question","mdi:beaker-question-outline","mdi:beaker-remove","mdi:beaker-remove-outline","mdi:bed","mdi:bed-clock","mdi:bed-double","mdi:bed-double-outline","mdi:bed-empty","mdi:bed-king","mdi:bed-king-outline","mdi:bed-outline","mdi:bed-queen","mdi:bed-queen-outline","mdi:bed-single","mdi:bed-single-outline","mdi:bee","mdi:bee-flower","mdi:beehive-off-outline","mdi:beehive-outline","mdi:beekeeper","mdi:beer","mdi:beer-outline","mdi:bell","mdi:bell-alert","mdi:bell-alert-outline","mdi:bell-badge","mdi:bell-badge-outline","mdi:bell-cancel","mdi:bell-cancel-outline","mdi:bell-check","mdi:bell-check-outline","mdi:bell-circle","mdi:bell-circle-outline","mdi:bell-cog","mdi:bell-cog-outline","mdi:bell-minus","mdi:bell-minus-outline","mdi:bell-off","mdi:bell-off-outline","mdi:bell-outline","mdi:bell-plus","mdi:bell-plus-outline","mdi:bell-remove","mdi:bell-remove-outline","mdi:bell-ring","mdi:bell-ring-outline","mdi:bell-sleep","mdi:bell-sleep-outline","mdi:bench","mdi:bench-back","mdi:beta","mdi:betamax","mdi:biathlon","mdi:bicycle","mdi:bicycle-basket","mdi:bicycle-cargo","mdi:bicycle-electric","mdi:bicycle-penny-farthing","mdi:bike","mdi:bike-fast","mdi:bike-pedal","mdi:bike-pedal-clipless","mdi:bike-pedal-mountain","mdi:billboard","mdi:billiards","mdi:billiards-rack","mdi:binoculars","mdi:bio","mdi:biohazard","mdi:bird","mdi:bitbucket","mdi:bitcoin","mdi:black-mesa","mdi:blender","mdi:blender-outline","mdi:blender-software","mdi:blinds","mdi:blinds-horizontal","mdi:blinds-horizontal-closed","mdi:blinds-open","mdi:blinds-vertical","mdi:blinds-vertical-closed","mdi:block-helper","mdi:blood-bag","mdi:bluetooth","mdi:bluetooth-audio","mdi:bluetooth-connect","mdi:bluetooth-off","mdi:bluetooth-settings","mdi:bluetooth-transfer","mdi:blur","mdi:blur-linear","mdi:blur-off","mdi:blur-radial","mdi:bolt","mdi:bomb","mdi:bomb-off","mdi:bone","mdi:bone-off","mdi:book","mdi:book-account","mdi:book-account-outline","mdi:book-alert","mdi:book-alert-outline","mdi:book-alphabet","mdi:book-arrow-down","mdi:book-arrow-down-outline","mdi:book-arrow-left","mdi:book-arrow-left-outline","mdi:book-arrow-right","mdi:book-arrow-right-outline","mdi:book-arrow-up","mdi:book-arrow-up-outline","mdi:book-cancel","mdi:book-cancel-outline","mdi:book-check","mdi:book-check-outline","mdi:book-clock","mdi:book-clock-outline","mdi:book-cog","mdi:book-cog-outline","mdi:book-cross","mdi:book-edit","mdi:book-edit-outline","mdi:book-education","mdi:book-education-outline","mdi:book-heart","mdi:book-heart-outline","mdi:book-information-variant","mdi:book-lock","mdi:book-lock-open","mdi:book-lock-open-outline","mdi:book-lock-outline","mdi:book-marker","mdi:book-marker-outline","mdi:book-minus","mdi:book-minus-multiple","mdi:book-minus-multiple-outline","mdi:book-minus-outline","mdi:book-multiple","mdi:book-multiple-outline","mdi:book-music","mdi:book-music-outline","mdi:book-off","mdi:book-off-outline","mdi:book-open","mdi:book-open-blank-variant","mdi:book-open-blank-variant-outline","mdi:book-open-outline","mdi:book-open-page-variant","mdi:book-open-page-variant-outline","mdi:book-open-variant","mdi:book-open-variant-outline","mdi:book-outline","mdi:book-play","mdi:book-play-outline","mdi:book-plus","mdi:book-plus-multiple","mdi:book-plus-multiple-outline","mdi:book-plus-outline","mdi:book-refresh","mdi:book-refresh-outline","mdi:book-remove","mdi:book-remove-multiple","mdi:book-remove-multiple-outline","mdi:book-remove-outline","mdi:book-search","mdi:book-search-outline","mdi:book-settings","mdi:book-settings-outline","mdi:book-sync","mdi:book-sync-outline","mdi:book-variant","mdi:bookmark","mdi:bookmark-box","mdi:bookmark-box-multiple","mdi:bookmark-box-multiple-outline","mdi:bookmark-box-outline","mdi:bookmark-check","mdi:bookmark-check-outline","mdi:bookmark-minus","mdi:bookmark-minus-outline","mdi:bookmark-multiple","mdi:bookmark-multiple-outline","mdi:bookmark-music","mdi:bookmark-music-outline","mdi:bookmark-off","mdi:bookmark-off-outline","mdi:bookmark-outline","mdi:bookmark-plus","mdi:bookmark-plus-outline","mdi:bookmark-remove","mdi:bookmark-remove-outline","mdi:bookshelf","mdi:boom-gate","mdi:boom-gate-alert","mdi:boom-gate-alert-outline","mdi:boom-gate-arrow-down","mdi:boom-gate-arrow-down-outline","mdi:boom-gate-arrow-up","mdi:boom-gate-arrow-up-outline","mdi:boom-gate-outline","mdi:boom-gate-up","mdi:boom-gate-up-outline","mdi:boombox","mdi:boomerang","mdi:bootstrap","mdi:border-all","mdi:border-all-variant","mdi:border-bottom","mdi:border-bottom-variant","mdi:border-color","mdi:border-horizontal","mdi:border-inside","mdi:border-left","mdi:border-left-variant","mdi:border-none","mdi:border-none-variant","mdi:border-outside","mdi:border-radius","mdi:border-right","mdi:border-right-variant","mdi:border-style","mdi:border-top","mdi:border-top-variant","mdi:border-vertical","mdi:bottle-soda","mdi:bottle-soda-classic","mdi:bottle-soda-classic-outline","mdi:bottle-soda-outline","mdi:bottle-tonic","mdi:bottle-tonic-outline","mdi:bottle-tonic-plus","mdi:bottle-tonic-plus-outline","mdi:bottle-tonic-skull","mdi:bottle-tonic-skull-outline","mdi:bottle-wine","mdi:bottle-wine-outline","mdi:bow-arrow","mdi:bow-tie","mdi:bowl","mdi:bowl-mix","mdi:bowl-mix-outline","mdi:bowl-outline","mdi:bowling","mdi:box","mdi:box-cutter","mdi:box-cutter-off","mdi:box-shadow","mdi:boxing-glove","mdi:braille","mdi:brain","mdi:bread-slice","mdi:bread-slice-outline","mdi:bridge","mdi:briefcase","mdi:briefcase-account","mdi:briefcase-account-outline","mdi:briefcase-arrow-left-right","mdi:briefcase-arrow-left-right-outline","mdi:briefcase-arrow-up-down","mdi:briefcase-arrow-up-down-outline","mdi:briefcase-check","mdi:briefcase-check-outline","mdi:briefcase-clock","mdi:briefcase-clock-outline","mdi:briefcase-download","mdi:briefcase-download-outline","mdi:briefcase-edit","mdi:briefcase-edit-outline","mdi:briefcase-eye","mdi:briefcase-eye-outline","mdi:briefcase-minus","mdi:briefcase-minus-outline","mdi:briefcase-off","mdi:briefcase-off-outline","mdi:briefcase-outline","mdi:briefcase-plus","mdi:briefcase-plus-outline","mdi:briefcase-remove","mdi:briefcase-remove-outline","mdi:briefcase-search","mdi:briefcase-search-outline","mdi:briefcase-upload","mdi:briefcase-upload-outline","mdi:briefcase-variant","mdi:briefcase-variant-off","mdi:briefcase-variant-off-outline","mdi:briefcase-variant-outline","mdi:brightness-1","mdi:brightness-2","mdi:brightness-3","mdi:brightness-4","mdi:brightness-5","mdi:brightness-6","mdi:brightness-7","mdi:brightness-auto","mdi:brightness-percent","mdi:broadcast","mdi:broadcast-off","mdi:broom","mdi:brush","mdi:brush-off","mdi:brush-outline","mdi:brush-variant","mdi:bucket","mdi:bucket-outline","mdi:buffet","mdi:bug","mdi:bug-check","mdi:bug-check-outline","mdi:bug-outline","mdi:bug-pause","mdi:bug-pause-outline","mdi:bug-play","mdi:bug-play-outline","mdi:bug-stop","mdi:bug-stop-outline","mdi:bugle","mdi:bulkhead-light","mdi:bulldozer","mdi:bullet","mdi:bulletin-board","mdi:bullhorn","mdi:bullhorn-outline","mdi:bullhorn-variant","mdi:bullhorn-variant-outline","mdi:bullseye","mdi:bullseye-arrow","mdi:bulma","mdi:bunk-bed","mdi:bunk-bed-outline","mdi:bus","mdi:bus-alert","mdi:bus-articulated-end","mdi:bus-articulated-front","mdi:bus-clock","mdi:bus-double-decker","mdi:bus-electric","mdi:bus-marker","mdi:bus-multiple","mdi:bus-school","mdi:bus-side","mdi:bus-sign","mdi:bus-stop","mdi:bus-stop-covered","mdi:bus-stop-uncovered","mdi:bus-wrench","mdi:butterfly","mdi:butterfly-outline","mdi:button-cursor","mdi:button-pointer","mdi:cabin-aframe","mdi:cable-data","mdi:cached","mdi:cactus","mdi:cake","mdi:cake-layered","mdi:cake-variant","mdi:cake-variant-outline","mdi:calculator","mdi:calculator-variant","mdi:calculator-variant-outline","mdi:calendar","mdi:calendar-account","mdi:calendar-account-outline","mdi:calendar-alert","mdi:calendar-alert-outline","mdi:calendar-arrow-left","mdi:calendar-arrow-right","mdi:calendar-badge","mdi:calendar-badge-outline","mdi:calendar-blank","mdi:calendar-blank-multiple","mdi:calendar-blank-outline","mdi:calendar-check","mdi:calendar-check-outline","mdi:calendar-clock","mdi:calendar-clock-outline","mdi:calendar-collapse-horizontal","mdi:calendar-collapse-horizontal-outline","mdi:calendar-cursor","mdi:calendar-cursor-outline","mdi:calendar-edit","mdi:calendar-edit-outline","mdi:calendar-end","mdi:calendar-end-outline","mdi:calendar-expand-horizontal","mdi:calendar-expand-horizontal-outline","mdi:calendar-export","mdi:calendar-export-outline","mdi:calendar-filter","mdi:calendar-filter-outline","mdi:calendar-heart","mdi:calendar-heart-outline","mdi:calendar-import","mdi:calendar-import-outline","mdi:calendar-lock","mdi:calendar-lock-open","mdi:calendar-lock-open-outline","mdi:calendar-lock-outline","mdi:calendar-minus","mdi:calendar-minus-outline","mdi:calendar-month","mdi:calendar-month-outline","mdi:calendar-multiple","mdi:calendar-multiple-check","mdi:calendar-multiselect","mdi:calendar-multiselect-outline","mdi:calendar-outline","mdi:calendar-plus","mdi:calendar-plus-outline","mdi:calendar-question","mdi:calendar-question-outline","mdi:calendar-range","mdi:calendar-range-outline","mdi:calendar-refresh","mdi:calendar-refresh-outline","mdi:calendar-remove","mdi:calendar-remove-outline","mdi:calendar-search","mdi:calendar-search-outline","mdi:calendar-star","mdi:calendar-star-four-points","mdi:calendar-star-outline","mdi:calendar-start","mdi:calendar-start-outline","mdi:calendar-sync","mdi:calendar-sync-outline","mdi:calendar-text","mdi:calendar-text-outline","mdi:calendar-today","mdi:calendar-today-outline","mdi:calendar-week","mdi:calendar-week-begin","mdi:calendar-week-begin-outline","mdi:calendar-week-outline","mdi:calendar-weekend","mdi:calendar-weekend-outline","mdi:call-made","mdi:call-merge","mdi:call-missed","mdi:call-received","mdi:call-split","mdi:camcorder","mdi:camcorder-off","mdi:camera","mdi:camera-account","mdi:camera-burst","mdi:camera-control","mdi:camera-document","mdi:camera-document-off","mdi:camera-enhance","mdi:camera-enhance-outline","mdi:camera-flip","mdi:camera-flip-outline","mdi:camera-front","mdi:camera-front-variant","mdi:camera-gopro","mdi:camera-image","mdi:camera-iris","mdi:camera-lock","mdi:camera-lock-open","mdi:camera-lock-open-outline","mdi:camera-lock-outline","mdi:camera-marker","mdi:camera-marker-outline","mdi:camera-metering-center","mdi:camera-metering-matrix","mdi:camera-metering-partial","mdi:camera-metering-spot","mdi:camera-off","mdi:camera-off-outline","mdi:camera-outline","mdi:camera-party-mode","mdi:camera-plus","mdi:camera-plus-outline","mdi:camera-rear","mdi:camera-rear-variant","mdi:camera-retake","mdi:camera-retake-outline","mdi:camera-switch","mdi:camera-switch-outline","mdi:camera-timer","mdi:camera-wireless","mdi:camera-wireless-outline","mdi:campfire","mdi:cancel","mdi:candelabra","mdi:candelabra-fire","mdi:candle","mdi:candy","mdi:candy-off","mdi:candy-off-outline","mdi:candy-outline","mdi:candycane","mdi:cannabis","mdi:cannabis-off","mdi:caps-lock","mdi:car","mdi:car-2-plus","mdi:car-3-plus","mdi:car-arrow-left","mdi:car-arrow-right","mdi:car-back","mdi:car-battery","mdi:car-brake-abs","mdi:car-brake-alert","mdi:car-brake-fluid-level","mdi:car-brake-hold","mdi:car-brake-low-pressure","mdi:car-brake-parking","mdi:car-brake-retarder","mdi:car-brake-temperature","mdi:car-brake-worn-linings","mdi:car-child-seat","mdi:car-clock","mdi:car-clutch","mdi:car-cog","mdi:car-connected","mdi:car-convertible","mdi:car-coolant-level","mdi:car-cruise-control","mdi:car-defrost-front","mdi:car-defrost-rear","mdi:car-door","mdi:car-door-lock","mdi:car-door-lock-open","mdi:car-electric","mdi:car-electric-outline","mdi:car-emergency","mdi:car-esp","mdi:car-estate","mdi:car-hatchback","mdi:car-info","mdi:car-key","mdi:car-lifted-pickup","mdi:car-light-alert","mdi:car-light-dimmed","mdi:car-light-fog","mdi:car-light-high","mdi:car-limousine","mdi:car-multiple","mdi:car-off","mdi:car-outline","mdi:car-parking-lights","mdi:car-pickup","mdi:car-search","mdi:car-search-outline","mdi:car-seat","mdi:car-seat-cooler","mdi:car-seat-heater","mdi:car-select","mdi:car-settings","mdi:car-shift-pattern","mdi:car-side","mdi:car-speed-limiter","mdi:car-sports","mdi:car-tire-alert","mdi:car-traction-control","mdi:car-turbocharger","mdi:car-wash","mdi:car-windshield","mdi:car-windshield-outline","mdi:car-wireless","mdi:car-wrench","mdi:carabiner","mdi:caravan","mdi:card","mdi:card-account-details","mdi:card-account-details-outline","mdi:card-account-details-star","mdi:card-account-details-star-outline","mdi:card-account-mail","mdi:card-account-mail-outline","mdi:card-account-phone","mdi:card-account-phone-outline","mdi:card-bulleted","mdi:card-bulleted-off","mdi:card-bulleted-off-outline","mdi:card-bulleted-outline","mdi:card-bulleted-settings","mdi:card-bulleted-settings-outline","mdi:card-minus","mdi:card-minus-outline","mdi:card-multiple","mdi:card-multiple-outline","mdi:card-off","mdi:card-off-outline","mdi:card-outline","mdi:card-plus","mdi:card-plus-outline","mdi:card-remove","mdi:card-remove-outline","mdi:card-search","mdi:card-search-outline","mdi:card-text","mdi:card-text-outline","mdi:cards","mdi:cards-club","mdi:cards-club-outline","mdi:cards-diamond","mdi:cards-diamond-outline","mdi:cards-heart","mdi:cards-heart-outline","mdi:cards-outline","mdi:cards-playing","mdi:cards-playing-club","mdi:cards-playing-club-multiple","mdi:cards-playing-club-multiple-outline","mdi:cards-playing-club-outline","mdi:cards-playing-diamond","mdi:cards-playing-diamond-multiple","mdi:cards-playing-diamond-multiple-outline","mdi:cards-playing-diamond-outline","mdi:cards-playing-heart","mdi:cards-playing-heart-multiple","mdi:cards-playing-heart-multiple-outline","mdi:cards-playing-heart-outline","mdi:cards-playing-outline","mdi:cards-playing-spade","mdi:cards-playing-spade-multiple","mdi:cards-playing-spade-multiple-outline","mdi:cards-playing-spade-outline","mdi:cards-spade","mdi:cards-spade-outline","mdi:cards-variant","mdi:carrot","mdi:cart","mdi:cart-arrow-down","mdi:cart-arrow-right","mdi:cart-arrow-up","mdi:cart-check","mdi:cart-heart","mdi:cart-minus","mdi:cart-off","mdi:cart-outline","mdi:cart-percent","mdi:cart-plus","mdi:cart-remove","mdi:cart-variant","mdi:case-sensitive-alt","mdi:cash","mdi:cash-100","mdi:cash-check","mdi:cash-clock","mdi:cash-edit","mdi:cash-fast","mdi:cash-lock","mdi:cash-lock-open","mdi:cash-marker","mdi:cash-minus","mdi:cash-multiple","mdi:cash-off","mdi:cash-plus","mdi:cash-refund","mdi:cash-register","mdi:cash-remove","mdi:cash-sync","mdi:cassette","mdi:cast","mdi:cast-audio","mdi:cast-audio-variant","mdi:cast-connected","mdi:cast-education","mdi:cast-off","mdi:cast-variant","mdi:castle","mdi:cat","mdi:cctv","mdi:cctv-off","mdi:ceiling-fan","mdi:ceiling-fan-light","mdi:ceiling-light","mdi:ceiling-light-multiple","mdi:ceiling-light-multiple-outline","mdi:ceiling-light-outline","mdi:cellphone","mdi:cellphone-arrow-down","mdi:cellphone-arrow-down-variant","mdi:cellphone-basic","mdi:cellphone-charging","mdi:cellphone-check","mdi:cellphone-cog","mdi:cellphone-dock","mdi:cellphone-information","mdi:cellphone-key","mdi:cellphone-link","mdi:cellphone-link-off","mdi:cellphone-lock","mdi:cellphone-marker","mdi:cellphone-message","mdi:cellphone-message-off","mdi:cellphone-nfc","mdi:cellphone-nfc-off","mdi:cellphone-off","mdi:cellphone-play","mdi:cellphone-remove","mdi:cellphone-screenshot","mdi:cellphone-settings","mdi:cellphone-sound","mdi:cellphone-text","mdi:cellphone-wireless","mdi:centos","mdi:certificate","mdi:certificate-outline","mdi:chair-rolling","mdi:chair-school","mdi:chandelier","mdi:charity","mdi:charity-search","mdi:chart-arc","mdi:chart-areaspline","mdi:chart-areaspline-variant","mdi:chart-bar","mdi:chart-bar-stacked","mdi:chart-bell-curve","mdi:chart-bell-curve-cumulative","mdi:chart-box","mdi:chart-box-multiple","mdi:chart-box-multiple-outline","mdi:chart-box-outline","mdi:chart-box-plus-outline","mdi:chart-bubble","mdi:chart-donut","mdi:chart-donut-variant","mdi:chart-gantt","mdi:chart-histogram","mdi:chart-line","mdi:chart-line-stacked","mdi:chart-line-variant","mdi:chart-multiline","mdi:chart-multiple","mdi:chart-pie","mdi:chart-pie-outline","mdi:chart-ppf","mdi:chart-sankey","mdi:chart-sankey-variant","mdi:chart-scatter-plot","mdi:chart-scatter-plot-hexbin","mdi:chart-timeline","mdi:chart-timeline-variant","mdi:chart-timeline-variant-shimmer","mdi:chart-tree","mdi:chart-waterfall","mdi:chat","mdi:chat-alert","mdi:chat-alert-outline","mdi:chat-minus","mdi:chat-minus-outline","mdi:chat-outline","mdi:chat-plus","mdi:chat-plus-outline","mdi:chat-processing","mdi:chat-processing-outline","mdi:chat-question","mdi:chat-question-outline","mdi:chat-remove","mdi:chat-remove-outline","mdi:chat-sleep","mdi:chat-sleep-outline","mdi:check","mdi:check-all","mdi:check-bold","mdi:check-circle","mdi:check-circle-outline","mdi:check-decagram","mdi:check-decagram-outline","mdi:check-network","mdi:check-network-outline","mdi:check-outline","mdi:check-underline","mdi:check-underline-circle","mdi:check-underline-circle-outline","mdi:checkbook","mdi:checkbook-arrow-left","mdi:checkbook-arrow-right","mdi:checkbox-blank","mdi:checkbox-blank-badge","mdi:checkbox-blank-badge-outline","mdi:checkbox-blank-circle","mdi:checkbox-blank-circle-outline","mdi:checkbox-blank-off","mdi:checkbox-blank-off-outline","mdi:checkbox-blank-outline","mdi:checkbox-intermediate","mdi:checkbox-intermediate-variant","mdi:checkbox-marked","mdi:checkbox-marked-circle","mdi:checkbox-marked-circle-auto-outline","mdi:checkbox-marked-circle-minus-outline","mdi:checkbox-marked-circle-outline","mdi:checkbox-marked-circle-plus-outline","mdi:checkbox-marked-outline","mdi:checkbox-multiple-blank","mdi:checkbox-multiple-blank-circle","mdi:checkbox-multiple-blank-circle-outline","mdi:checkbox-multiple-blank-outline","mdi:checkbox-multiple-marked","mdi:checkbox-multiple-marked-circle","mdi:checkbox-multiple-marked-circle-outline","mdi:checkbox-multiple-marked-outline","mdi:checkbox-multiple-outline","mdi:checkbox-outline","mdi:checkerboard","mdi:checkerboard-minus","mdi:checkerboard-plus","mdi:checkerboard-remove","mdi:cheese","mdi:cheese-off","mdi:chef-hat","mdi:chemical-weapon","mdi:chess-bishop","mdi:chess-king","mdi:chess-knight","mdi:chess-pawn","mdi:chess-queen","mdi:chess-rook","mdi:chevron-double-down","mdi:chevron-double-left","mdi:chevron-double-right","mdi:chevron-double-up","mdi:chevron-down","mdi:chevron-down-box","mdi:chevron-down-box-outline","mdi:chevron-down-circle","mdi:chevron-down-circle-outline","mdi:chevron-left","mdi:chevron-left-box","mdi:chevron-left-box-outline","mdi:chevron-left-circle","mdi:chevron-left-circle-outline","mdi:chevron-right","mdi:chevron-right-box","mdi:chevron-right-box-outline","mdi:chevron-right-circle","mdi:chevron-right-circle-outline","mdi:chevron-triple-down","mdi:chevron-triple-left","mdi:chevron-triple-right","mdi:chevron-triple-up","mdi:chevron-up","mdi:chevron-up-box","mdi:chevron-up-box-outline","mdi:chevron-up-circle","mdi:chevron-up-circle-outline","mdi:chili-alert","mdi:chili-alert-outline","mdi:chili-hot","mdi:chili-hot-outline","mdi:chili-medium","mdi:chili-medium-outline","mdi:chili-mild","mdi:chili-mild-outline","mdi:chili-off","mdi:chili-off-outline","mdi:chip","mdi:church","mdi:church-outline","mdi:cigar","mdi:cigar-off","mdi:circle","mdi:circle-box","mdi:circle-box-outline","mdi:circle-double","mdi:circle-edit-outline","mdi:circle-expand","mdi:circle-half","mdi:circle-half-full","mdi:circle-medium","mdi:circle-multiple","mdi:circle-multiple-outline","mdi:circle-off-outline","mdi:circle-opacity","mdi:circle-outline","mdi:circle-slice-1","mdi:circle-slice-2","mdi:circle-slice-3","mdi:circle-slice-4","mdi:circle-slice-5","mdi:circle-slice-6","mdi:circle-slice-7","mdi:circle-slice-8","mdi:circle-small","mdi:circular-saw","mdi:city","mdi:city-switch","mdi:city-variant","mdi:city-variant-outline","mdi:clipboard","mdi:clipboard-account","mdi:clipboard-account-outline","mdi:clipboard-alert","mdi:clipboard-alert-outline","mdi:clipboard-arrow-down","mdi:clipboard-arrow-down-outline","mdi:clipboard-arrow-left","mdi:clipboard-arrow-left-outline","mdi:clipboard-arrow-right","mdi:clipboard-arrow-right-outline","mdi:clipboard-arrow-up","mdi:clipboard-arrow-up-outline","mdi:clipboard-check","mdi:clipboard-check-multiple","mdi:clipboard-check-multiple-outline","mdi:clipboard-check-outline","mdi:clipboard-clock","mdi:clipboard-clock-outline","mdi:clipboard-edit","mdi:clipboard-edit-outline","mdi:clipboard-file","mdi:clipboard-file-outline","mdi:clipboard-flow","mdi:clipboard-flow-outline","mdi:clipboard-list","mdi:clipboard-list-outline","mdi:clipboard-minus","mdi:clipboard-minus-outline","mdi:clipboard-multiple","mdi:clipboard-multiple-outline","mdi:clipboard-off","mdi:clipboard-off-outline","mdi:clipboard-outline","mdi:clipboard-play","mdi:clipboard-play-multiple","mdi:clipboard-play-multiple-outline","mdi:clipboard-play-outline","mdi:clipboard-plus","mdi:clipboard-plus-outline","mdi:clipboard-pulse","mdi:clipboard-pulse-outline","mdi:clipboard-remove","mdi:clipboard-remove-outline","mdi:clipboard-search","mdi:clipboard-search-outline","mdi:clipboard-text","mdi:clipboard-text-clock","mdi:clipboard-text-clock-outline","mdi:clipboard-text-multiple","mdi:clipboard-text-multiple-outline","mdi:clipboard-text-off","mdi:clipboard-text-off-outline","mdi:clipboard-text-outline","mdi:clipboard-text-play","mdi:clipboard-text-play-outline","mdi:clipboard-text-search","mdi:clipboard-text-search-outline","mdi:clippy","mdi:clock","mdi:clock-alert","mdi:clock-alert-outline","mdi:clock-check","mdi:clock-check-outline","mdi:clock-digital","mdi:clock-edit","mdi:clock-edit-outline","mdi:clock-end","mdi:clock-fast","mdi:clock-in","mdi:clock-minus","mdi:clock-minus-outline","mdi:clock-out","mdi:clock-outline","mdi:clock-plus","mdi:clock-plus-outline","mdi:clock-remove","mdi:clock-remove-outline","mdi:clock-star-four-points","mdi:clock-star-four-points-outline","mdi:clock-start","mdi:clock-time-eight","mdi:clock-time-eight-outline","mdi:clock-time-eleven","mdi:clock-time-eleven-outline","mdi:clock-time-five","mdi:clock-time-five-outline","mdi:clock-time-four","mdi:clock-time-four-outline","mdi:clock-time-nine","mdi:clock-time-nine-outline","mdi:clock-time-one","mdi:clock-time-one-outline","mdi:clock-time-seven","mdi:clock-time-seven-outline","mdi:clock-time-six","mdi:clock-time-six-outline","mdi:clock-time-ten","mdi:clock-time-ten-outline","mdi:clock-time-three","mdi:clock-time-three-outline","mdi:clock-time-twelve","mdi:clock-time-twelve-outline","mdi:clock-time-two","mdi:clock-time-two-outline","mdi:close","mdi:close-box","mdi:close-box-multiple","mdi:close-box-multiple-outline","mdi:close-box-outline","mdi:close-circle","mdi:close-circle-multiple","mdi:close-circle-multiple-outline","mdi:close-circle-outline","mdi:close-network","mdi:close-network-outline","mdi:close-octagon","mdi:close-octagon-outline","mdi:close-outline","mdi:close-thick","mdi:closed-caption","mdi:closed-caption-outline","mdi:cloud","mdi:cloud-alert","mdi:cloud-alert-outline","mdi:cloud-arrow-down","mdi:cloud-arrow-down-outline","mdi:cloud-arrow-left","mdi:cloud-arrow-left-outline","mdi:cloud-arrow-right","mdi:cloud-arrow-right-outline","mdi:cloud-arrow-up","mdi:cloud-arrow-up-outline","mdi:cloud-braces","mdi:cloud-cancel","mdi:cloud-cancel-outline","mdi:cloud-check","mdi:cloud-check-outline","mdi:cloud-check-variant","mdi:cloud-check-variant-outline","mdi:cloud-circle","mdi:cloud-circle-outline","mdi:cloud-clock","mdi:cloud-clock-outline","mdi:cloud-cog","mdi:cloud-cog-outline","mdi:cloud-download","mdi:cloud-download-outline","mdi:cloud-key","mdi:cloud-key-outline","mdi:cloud-lock","mdi:cloud-lock-open","mdi:cloud-lock-open-outline","mdi:cloud-lock-outline","mdi:cloud-minus","mdi:cloud-minus-outline","mdi:cloud-off","mdi:cloud-off-outline","mdi:cloud-outline","mdi:cloud-percent","mdi:cloud-percent-outline","mdi:cloud-plus","mdi:cloud-plus-outline","mdi:cloud-print","mdi:cloud-print-outline","mdi:cloud-question","mdi:cloud-question-outline","mdi:cloud-refresh","mdi:cloud-refresh-outline","mdi:cloud-refresh-variant","mdi:cloud-refresh-variant-outline","mdi:cloud-remove","mdi:cloud-remove-outline","mdi:cloud-search","mdi:cloud-search-outline","mdi:cloud-sync","mdi:cloud-sync-outline","mdi:cloud-tags","mdi:cloud-upload","mdi:cloud-upload-outline","mdi:clouds","mdi:clover","mdi:clover-outline","mdi:coach-lamp","mdi:coach-lamp-variant","mdi:coat-rack","mdi:code-array","mdi:code-block-braces","mdi:code-block-brackets","mdi:code-block-parentheses","mdi:code-block-tags","mdi:code-braces","mdi:code-braces-box","mdi:code-brackets","mdi:code-equal","mdi:code-greater-than","mdi:code-greater-than-or-equal","mdi:code-json","mdi:code-less-than","mdi:code-less-than-or-equal","mdi:code-not-equal","mdi:code-not-equal-variant","mdi:code-parentheses","mdi:code-parentheses-box","mdi:code-string","mdi:code-tags","mdi:code-tags-check","mdi:codepen","mdi:coffee","mdi:coffee-maker","mdi:coffee-maker-check","mdi:coffee-maker-check-outline","mdi:coffee-maker-outline","mdi:coffee-off","mdi:coffee-off-outline","mdi:coffee-outline","mdi:coffee-to-go","mdi:coffee-to-go-outline","mdi:coffin","mdi:cog","mdi:cog-box","mdi:cog-clockwise","mdi:cog-counterclockwise","mdi:cog-off","mdi:cog-off-outline","mdi:cog-outline","mdi:cog-pause","mdi:cog-pause-outline","mdi:cog-play","mdi:cog-play-outline","mdi:cog-refresh","mdi:cog-refresh-outline","mdi:cog-stop","mdi:cog-stop-outline","mdi:cog-sync","mdi:cog-sync-outline","mdi:cog-transfer","mdi:cog-transfer-outline","mdi:cogs","mdi:collage","mdi:collapse-all","mdi:collapse-all-outline","mdi:color-helper","mdi:comma","mdi:comma-box","mdi:comma-box-outline","mdi:comma-circle","mdi:comma-circle-outline","mdi:comment","mdi:comment-account","mdi:comment-account-outline","mdi:comment-alert","mdi:comment-alert-outline","mdi:comment-arrow-left","mdi:comment-arrow-left-outline","mdi:comment-arrow-right","mdi:comment-arrow-right-outline","mdi:comment-bookmark","mdi:comment-bookmark-outline","mdi:comment-check","mdi:comment-check-outline","mdi:comment-edit","mdi:comment-edit-outline","mdi:comment-eye","mdi:comment-eye-outline","mdi:comment-flash","mdi:comment-flash-outline","mdi:comment-minus","mdi:comment-minus-outline","mdi:comment-multiple","mdi:comment-multiple-outline","mdi:comment-off","mdi:comment-off-outline","mdi:comment-outline","mdi:comment-plus","mdi:comment-plus-outline","mdi:comment-processing","mdi:comment-processing-outline","mdi:comment-question","mdi:comment-question-outline","mdi:comment-quote","mdi:comment-quote-outline","mdi:comment-remove","mdi:comment-remove-outline","mdi:comment-search","mdi:comment-search-outline","mdi:comment-text","mdi:comment-text-multiple","mdi:comment-text-multiple-outline","mdi:comment-text-outline","mdi:compare","mdi:compare-horizontal","mdi:compare-remove","mdi:compare-vertical","mdi:compass","mdi:compass-off","mdi:compass-off-outline","mdi:compass-outline","mdi:compass-rose","mdi:compost","mdi:cone","mdi:cone-off","mdi:connection","mdi:console","mdi:console-line","mdi:console-network","mdi:console-network-outline","mdi:consolidate","mdi:contactless-payment","mdi:contactless-payment-circle","mdi:contactless-payment-circle-outline","mdi:contacts","mdi:contacts-outline","mdi:contain","mdi:contain-end","mdi:contain-start","mdi:content-copy","mdi:content-cut","mdi:content-duplicate","mdi:content-paste","mdi:content-save","mdi:content-save-alert","mdi:content-save-alert-outline","mdi:content-save-all","mdi:content-save-all-outline","mdi:content-save-check","mdi:content-save-check-outline","mdi:content-save-cog","mdi:content-save-cog-outline","mdi:content-save-edit","mdi:content-save-edit-outline","mdi:content-save-minus","mdi:content-save-minus-outline","mdi:content-save-move","mdi:content-save-move-outline","mdi:content-save-off","mdi:content-save-off-outline","mdi:content-save-outline","mdi:content-save-plus","mdi:content-save-plus-outline","mdi:content-save-settings","mdi:content-save-settings-outline","mdi:contrast","mdi:contrast-box","mdi:contrast-circle","mdi:controller","mdi:controller-classic","mdi:controller-classic-outline","mdi:controller-off","mdi:cookie","mdi:cookie-alert","mdi:cookie-alert-outline","mdi:cookie-check","mdi:cookie-check-outline","mdi:cookie-clock","mdi:cookie-clock-outline","mdi:cookie-cog","mdi:cookie-cog-outline","mdi:cookie-edit","mdi:cookie-edit-outline","mdi:cookie-lock","mdi:cookie-lock-outline","mdi:cookie-minus","mdi:cookie-minus-outline","mdi:cookie-off","mdi:cookie-off-outline","mdi:cookie-outline","mdi:cookie-plus","mdi:cookie-plus-outline","mdi:cookie-refresh","mdi:cookie-refresh-outline","mdi:cookie-remove","mdi:cookie-remove-outline","mdi:cookie-settings","mdi:cookie-settings-outline","mdi:coolant-temperature","mdi:copyleft","mdi:copyright","mdi:cordova","mdi:corn","mdi:corn-off","mdi:cosine-wave","mdi:counter","mdi:countertop","mdi:countertop-outline","mdi:cow","mdi:cow-off","mdi:cpu-32-bit","mdi:cpu-64-bit","mdi:cradle","mdi:cradle-outline","mdi:crane","mdi:creation","mdi:creation-outline","mdi:creative-commons","mdi:credit-card","mdi:credit-card-check","mdi:credit-card-check-outline","mdi:credit-card-chip","mdi:credit-card-chip-outline","mdi:credit-card-clock","mdi:credit-card-clock-outline","mdi:credit-card-edit","mdi:credit-card-edit-outline","mdi:credit-card-fast","mdi:credit-card-fast-outline","mdi:credit-card-lock","mdi:credit-card-lock-outline","mdi:credit-card-marker","mdi:credit-card-marker-outline","mdi:credit-card-minus","mdi:credit-card-minus-outline","mdi:credit-card-multiple","mdi:credit-card-multiple-outline","mdi:credit-card-off","mdi:credit-card-off-outline","mdi:credit-card-outline","mdi:credit-card-plus","mdi:credit-card-plus-outline","mdi:credit-card-refresh","mdi:credit-card-refresh-outline","mdi:credit-card-refund","mdi:credit-card-refund-outline","mdi:credit-card-remove","mdi:credit-card-remove-outline","mdi:credit-card-scan","mdi:credit-card-scan-outline","mdi:credit-card-search","mdi:credit-card-search-outline","mdi:credit-card-settings","mdi:credit-card-settings-outline","mdi:credit-card-sync","mdi:credit-card-sync-outline","mdi:credit-card-wireless","mdi:credit-card-wireless-off","mdi:credit-card-wireless-off-outline","mdi:credit-card-wireless-outline","mdi:cricket","mdi:crop","mdi:crop-free","mdi:crop-landscape","mdi:crop-portrait","mdi:crop-rotate","mdi:crop-square","mdi:cross","mdi:cross-bolnisi","mdi:cross-celtic","mdi:cross-outline","mdi:crosshairs","mdi:crosshairs-gps","mdi:crosshairs-off","mdi:crosshairs-question","mdi:crowd","mdi:crown","mdi:crown-circle","mdi:crown-circle-outline","mdi:crown-outline","mdi:cryengine","mdi:crystal-ball","mdi:cube","mdi:cube-off","mdi:cube-off-outline","mdi:cube-outline","mdi:cube-scan","mdi:cube-send","mdi:cube-unfolded","mdi:cup","mdi:cup-off","mdi:cup-off-outline","mdi:cup-outline","mdi:cup-water","mdi:cupboard","mdi:cupboard-outline","mdi:cupcake","mdi:curling","mdi:currency-bdt","mdi:currency-brl","mdi:currency-btc","mdi:currency-cny","mdi:currency-eth","mdi:currency-eur","mdi:currency-eur-off","mdi:currency-fra","mdi:currency-gbp","mdi:currency-ils","mdi:currency-inr","mdi:currency-jpy","mdi:currency-krw","mdi:currency-kzt","mdi:currency-mnt","mdi:currency-ngn","mdi:currency-php","mdi:currency-rial","mdi:currency-rub","mdi:currency-rupee","mdi:currency-sign","mdi:currency-thb","mdi:currency-try","mdi:currency-twd","mdi:currency-uah","mdi:currency-usd","mdi:currency-usd-off","mdi:current-ac","mdi:current-dc","mdi:cursor-default","mdi:cursor-default-click","mdi:cursor-default-click-outline","mdi:cursor-default-gesture","mdi:cursor-default-gesture-outline","mdi:cursor-default-outline","mdi:cursor-move","mdi:cursor-pointer","mdi:cursor-text","mdi:curtains","mdi:curtains-closed","mdi:cylinder","mdi:cylinder-off","mdi:dance-ballroom","mdi:dance-pole","mdi:data-matrix","mdi:data-matrix-edit","mdi:data-matrix-minus","mdi:data-matrix-plus","mdi:data-matrix-remove","mdi:data-matrix-scan","mdi:database","mdi:database-alert","mdi:database-alert-outline","mdi:database-arrow-down","mdi:database-arrow-down-outline","mdi:database-arrow-left","mdi:database-arrow-left-outline","mdi:database-arrow-right","mdi:database-arrow-right-outline","mdi:database-arrow-up","mdi:database-arrow-up-outline","mdi:database-check","mdi:database-check-outline","mdi:database-clock","mdi:database-clock-outline","mdi:database-cog","mdi:database-cog-outline","mdi:database-edit","mdi:database-edit-outline","mdi:database-export","mdi:database-export-outline","mdi:database-eye","mdi:database-eye-off","mdi:database-eye-off-outline","mdi:database-eye-outline","mdi:database-import","mdi:database-import-outline","mdi:database-lock","mdi:database-lock-outline","mdi:database-marker","mdi:database-marker-outline","mdi:database-minus","mdi:database-minus-outline","mdi:database-off","mdi:database-off-outline","mdi:database-outline","mdi:database-plus","mdi:database-plus-outline","mdi:database-refresh","mdi:database-refresh-outline","mdi:database-remove","mdi:database-remove-outline","mdi:database-search","mdi:database-search-outline","mdi:database-settings","mdi:database-settings-outline","mdi:database-sync","mdi:database-sync-outline","mdi:death-star","mdi:death-star-variant","mdi:deathly-hallows","mdi:debian","mdi:debug-step-into","mdi:debug-step-out","mdi:debug-step-over","mdi:decagram","mdi:decagram-outline","mdi:decimal","mdi:decimal-comma","mdi:decimal-comma-decrease","mdi:decimal-comma-increase","mdi:decimal-decrease","mdi:decimal-increase","mdi:delete","mdi:delete-alert","mdi:delete-alert-outline","mdi:delete-circle","mdi:delete-circle-outline","mdi:delete-clock","mdi:delete-clock-outline","mdi:delete-empty","mdi:delete-empty-outline","mdi:delete-forever","mdi:delete-forever-outline","mdi:delete-off","mdi:delete-off-outline","mdi:delete-outline","mdi:delete-restore","mdi:delete-sweep","mdi:delete-sweep-outline","mdi:delete-variant","mdi:delta","mdi:desk","mdi:desk-lamp","mdi:desk-lamp-off","mdi:desk-lamp-on","mdi:deskphone","mdi:desktop-classic","mdi:desktop-tower","mdi:desktop-tower-monitor","mdi:details","mdi:dev-to","mdi:developer-board","mdi:deviantart","mdi:devices","mdi:dharmachakra","mdi:diabetes","mdi:dialpad","mdi:diameter","mdi:diameter-outline","mdi:diameter-variant","mdi:diamond","mdi:diamond-outline","mdi:diamond-stone","mdi:diaper-outline","mdi:dice-1","mdi:dice-1-outline","mdi:dice-2","mdi:dice-2-outline","mdi:dice-3","mdi:dice-3-outline","mdi:dice-4","mdi:dice-4-outline","mdi:dice-5","mdi:dice-5-outline","mdi:dice-6","mdi:dice-6-outline","mdi:dice-d-10","mdi:dice-d-10-outline","mdi:dice-d-12","mdi:dice-d-12-outline","mdi:dice-d-20","mdi:dice-d-20-outline","mdi:dice-d-4","mdi:dice-d-4-outline","mdi:dice-d-6","mdi:dice-d-6-outline","mdi:dice-d-8","mdi:dice-d-8-outline","mdi:dice-multiple","mdi:dice-multiple-outline","mdi:digital-ocean","mdi:dip-switch","mdi:directions","mdi:directions-fork","mdi:disc","mdi:disc-alert","mdi:disc-player","mdi:dishwasher","mdi:dishwasher-alert","mdi:dishwasher-off","mdi:disqus","mdi:distribute-horizontal-center","mdi:distribute-horizontal-left","mdi:distribute-horizontal-right","mdi:distribute-vertical-bottom","mdi:distribute-vertical-center","mdi:distribute-vertical-top","mdi:diversify","mdi:diving","mdi:diving-flippers","mdi:diving-helmet","mdi:diving-scuba","mdi:diving-scuba-flag","mdi:diving-scuba-mask","mdi:diving-scuba-tank","mdi:diving-scuba-tank-multiple","mdi:diving-snorkel","mdi:division","mdi:division-box","mdi:dlna","mdi:dna","mdi:dns","mdi:dns-outline","mdi:dock-bottom","mdi:dock-left","mdi:dock-right","mdi:dock-top","mdi:dock-window","mdi:docker","mdi:doctor","mdi:dog","mdi:dog-service","mdi:dog-side","mdi:dog-side-off","mdi:dolby","mdi:dolly","mdi:dolphin","mdi:domain","mdi:domain-off","mdi:domain-plus","mdi:domain-remove","mdi:domain-switch","mdi:dome-light","mdi:domino-mask","mdi:donkey","mdi:door","mdi:door-closed","mdi:door-closed-cancel","mdi:door-closed-lock","mdi:door-open","mdi:door-sliding","mdi:door-sliding-lock","mdi:door-sliding-open","mdi:doorbell","mdi:doorbell-video","mdi:dot-net","mdi:dots-circle","mdi:dots-grid","mdi:dots-hexagon","mdi:dots-horizontal","mdi:dots-horizontal-circle","mdi:dots-horizontal-circle-outline","mdi:dots-square","mdi:dots-triangle","mdi:dots-vertical","mdi:dots-vertical-circle","mdi:dots-vertical-circle-outline","mdi:download","mdi:download-box","mdi:download-box-outline","mdi:download-circle","mdi:download-circle-outline","mdi:download-lock","mdi:download-lock-outline","mdi:download-multiple","mdi:download-multiple-outline","mdi:download-network","mdi:download-network-outline","mdi:download-off","mdi:download-off-outline","mdi:download-outline","mdi:drag","mdi:drag-horizontal","mdi:drag-horizontal-variant","mdi:drag-variant","mdi:drag-vertical","mdi:drag-vertical-variant","mdi:drama-masks","mdi:draw","mdi:draw-pen","mdi:drawing","mdi:drawing-box","mdi:dresser","mdi:dresser-outline","mdi:drone","mdi:dropbox","mdi:drupal","mdi:duck","mdi:dumbbell","mdi:dump-truck","mdi:ear-hearing","mdi:ear-hearing-loop","mdi:ear-hearing-off","mdi:earbuds","mdi:earbuds-off","mdi:earbuds-off-outline","mdi:earbuds-outline","mdi:earth","mdi:earth-arrow-down","mdi:earth-arrow-left","mdi:earth-arrow-right","mdi:earth-arrow-up","mdi:earth-box","mdi:earth-box-minus","mdi:earth-box-off","mdi:earth-box-plus","mdi:earth-box-remove","mdi:earth-minus","mdi:earth-off","mdi:earth-plus","mdi:earth-remove","mdi:egg","mdi:egg-easter","mdi:egg-fried","mdi:egg-off","mdi:egg-off-outline","mdi:egg-outline","mdi:eiffel-tower","mdi:eight-track","mdi:eject","mdi:eject-circle","mdi:eject-circle-outline","mdi:eject-outline","mdi:electric-switch","mdi:electric-switch-closed","mdi:electron-framework","mdi:elephant","mdi:elevation-decline","mdi:elevation-rise","mdi:elevator","mdi:elevator-down","mdi:elevator-passenger","mdi:elevator-passenger-off","mdi:elevator-passenger-off-outline","mdi:elevator-passenger-outline","mdi:elevator-up","mdi:ellipse","mdi:ellipse-outline","mdi:email","mdi:email-alert","mdi:email-alert-outline","mdi:email-arrow-left","mdi:email-arrow-left-outline","mdi:email-arrow-right","mdi:email-arrow-right-outline","mdi:email-box","mdi:email-check","mdi:email-check-outline","mdi:email-edit","mdi:email-edit-outline","mdi:email-fast","mdi:email-fast-outline","mdi:email-heart-outline","mdi:email-lock","mdi:email-lock-outline","mdi:email-mark-as-unread","mdi:email-minus","mdi:email-minus-outline","mdi:email-multiple","mdi:email-multiple-outline","mdi:email-newsletter","mdi:email-off","mdi:email-off-outline","mdi:email-open","mdi:email-open-heart-outline","mdi:email-open-multiple","mdi:email-open-multiple-outline","mdi:email-open-outline","mdi:email-outline","mdi:email-plus","mdi:email-plus-outline","mdi:email-remove","mdi:email-remove-outline","mdi:email-seal","mdi:email-seal-outline","mdi:email-search","mdi:email-search-outline","mdi:email-sync","mdi:email-sync-outline","mdi:email-variant","mdi:ember","mdi:emby","mdi:emoticon","mdi:emoticon-angry","mdi:emoticon-angry-outline","mdi:emoticon-confused","mdi:emoticon-confused-outline","mdi:emoticon-cool","mdi:emoticon-cool-outline","mdi:emoticon-cry","mdi:emoticon-cry-outline","mdi:emoticon-dead","mdi:emoticon-dead-outline","mdi:emoticon-devil","mdi:emoticon-devil-outline","mdi:emoticon-excited","mdi:emoticon-excited-outline","mdi:emoticon-frown","mdi:emoticon-frown-outline","mdi:emoticon-happy","mdi:emoticon-happy-outline","mdi:emoticon-kiss","mdi:emoticon-kiss-outline","mdi:emoticon-lol","mdi:emoticon-lol-outline","mdi:emoticon-minus","mdi:emoticon-minus-outline","mdi:emoticon-neutral","mdi:emoticon-neutral-outline","mdi:emoticon-outline","mdi:emoticon-plus","mdi:emoticon-plus-outline","mdi:emoticon-poop","mdi:emoticon-poop-outline","mdi:emoticon-remove","mdi:emoticon-remove-outline","mdi:emoticon-sad","mdi:emoticon-sad-outline","mdi:emoticon-sick","mdi:emoticon-sick-outline","mdi:emoticon-tongue","mdi:emoticon-tongue-outline","mdi:emoticon-wink","mdi:emoticon-wink-outline","mdi:engine","mdi:engine-off","mdi:engine-off-outline","mdi:engine-outline","mdi:epsilon","mdi:equal","mdi:equal-box","mdi:equalizer","mdi:equalizer-outline","mdi:eraser","mdi:eraser-variant","mdi:escalator","mdi:escalator-box","mdi:escalator-down","mdi:escalator-up","mdi:eslint","mdi:et","mdi:ethereum","mdi:ethernet","mdi:ethernet-cable","mdi:ethernet-cable-off","mdi:ethernet-off","mdi:ev-plug-ccs-1","mdi:ev-plug-ccs-2","mdi:ev-plug-chademo","mdi:ev-plug-tesla","mdi:ev-plug-type-1","mdi:ev-plug-type-2","mdi:ev-station","mdi:evernote","mdi:excavator","mdi:exclamation","mdi:exclamation-thick","mdi:exit-run","mdi:exit-to-app","mdi:expand-all","mdi:expand-all-outline","mdi:expansion-card","mdi:expansion-card-variant","mdi:exponent","mdi:exponent-box","mdi:export","mdi:export-variant","mdi:eye","mdi:eye-arrow-left","mdi:eye-arrow-left-outline","mdi:eye-arrow-right","mdi:eye-arrow-right-outline","mdi:eye-check","mdi:eye-check-outline","mdi:eye-circle","mdi:eye-circle-outline","mdi:eye-closed","mdi:eye-lock","mdi:eye-lock-open","mdi:eye-lock-open-outline","mdi:eye-lock-outline","mdi:eye-minus","mdi:eye-minus-outline","mdi:eye-off","mdi:eye-off-outline","mdi:eye-outline","mdi:eye-plus","mdi:eye-plus-outline","mdi:eye-refresh","mdi:eye-refresh-outline","mdi:eye-remove","mdi:eye-remove-outline","mdi:eye-settings","mdi:eye-settings-outline","mdi:eyedropper","mdi:eyedropper-minus","mdi:eyedropper-off","mdi:eyedropper-plus","mdi:eyedropper-remove","mdi:eyedropper-variant","mdi:face-agent","mdi:face-man","mdi:face-man-outline","mdi:face-man-profile","mdi:face-man-shimmer","mdi:face-man-shimmer-outline","mdi:face-mask","mdi:face-mask-outline","mdi:face-recognition","mdi:face-woman","mdi:face-woman-outline","mdi:face-woman-profile","mdi:face-woman-shimmer","mdi:face-woman-shimmer-outline","mdi:facebook","mdi:facebook-gaming","mdi:facebook-messenger","mdi:facebook-workplace","mdi:factory","mdi:family-tree","mdi:fan","mdi:fan-alert","mdi:fan-auto","mdi:fan-chevron-down","mdi:fan-chevron-up","mdi:fan-clock","mdi:fan-minus","mdi:fan-off","mdi:fan-plus","mdi:fan-remove","mdi:fan-speed-1","mdi:fan-speed-2","mdi:fan-speed-3","mdi:fast-forward","mdi:fast-forward-10","mdi:fast-forward-15","mdi:fast-forward-30","mdi:fast-forward-45","mdi:fast-forward-5","mdi:fast-forward-60","mdi:fast-forward-outline","mdi:faucet","mdi:faucet-variant","mdi:fax","mdi:feather","mdi:feature-search","mdi:feature-search-outline","mdi:fedora","mdi:fence","mdi:fence-electric","mdi:fencing","mdi:ferris-wheel","mdi:ferry","mdi:file","mdi:file-account","mdi:file-account-outline","mdi:file-alert","mdi:file-alert-outline","mdi:file-arrow-left-right","mdi:file-arrow-left-right-outline","mdi:file-arrow-up-down","mdi:file-arrow-up-down-outline","mdi:file-cabinet","mdi:file-cad","mdi:file-cad-box","mdi:file-cancel","mdi:file-cancel-outline","mdi:file-certificate","mdi:file-certificate-outline","mdi:file-chart","mdi:file-chart-check","mdi:file-chart-check-outline","mdi:file-chart-outline","mdi:file-check","mdi:file-check-outline","mdi:file-clock","mdi:file-clock-outline","mdi:file-cloud","mdi:file-cloud-outline","mdi:file-code","mdi:file-code-outline","mdi:file-cog","mdi:file-cog-outline","mdi:file-compare","mdi:file-delimited","mdi:file-delimited-outline","mdi:file-document","mdi:file-document-alert","mdi:file-document-alert-outline","mdi:file-document-arrow-right","mdi:file-document-arrow-right-outline","mdi:file-document-check","mdi:file-document-check-outline","mdi:file-document-edit","mdi:file-document-edit-outline","mdi:file-document-minus","mdi:file-document-minus-outline","mdi:file-document-multiple","mdi:file-document-multiple-outline","mdi:file-document-outline","mdi:file-document-plus","mdi:file-document-plus-outline","mdi:file-document-refresh","mdi:file-document-refresh-outline","mdi:file-document-remove","mdi:file-document-remove-outline","mdi:file-download","mdi:file-download-outline","mdi:file-edit","mdi:file-edit-outline","mdi:file-excel","mdi:file-excel-box","mdi:file-excel-box-outline","mdi:file-excel-outline","mdi:file-export","mdi:file-export-outline","mdi:file-eye","mdi:file-eye-outline","mdi:file-find","mdi:file-find-outline","mdi:file-gif-box","mdi:file-hidden","mdi:file-image","mdi:file-image-marker","mdi:file-image-marker-outline","mdi:file-image-minus","mdi:file-image-minus-outline","mdi:file-image-outline","mdi:file-image-plus","mdi:file-image-plus-outline","mdi:file-image-remove","mdi:file-image-remove-outline","mdi:file-import","mdi:file-import-outline","mdi:file-jpg-box","mdi:file-key","mdi:file-key-outline","mdi:file-link","mdi:file-link-outline","mdi:file-lock","mdi:file-lock-open","mdi:file-lock-open-outline","mdi:file-lock-outline","mdi:file-marker","mdi:file-marker-outline","mdi:file-minus","mdi:file-minus-outline","mdi:file-move","mdi:file-move-outline","mdi:file-multiple","mdi:file-multiple-outline","mdi:file-music","mdi:file-music-outline","mdi:file-outline","mdi:file-pdf-box","mdi:file-percent","mdi:file-percent-outline","mdi:file-phone","mdi:file-phone-outline","mdi:file-plus","mdi:file-plus-outline","mdi:file-png-box","mdi:file-powerpoint","mdi:file-powerpoint-box","mdi:file-powerpoint-box-outline","mdi:file-powerpoint-outline","mdi:file-presentation-box","mdi:file-question","mdi:file-question-outline","mdi:file-refresh","mdi:file-refresh-outline","mdi:file-remove","mdi:file-remove-outline","mdi:file-replace","mdi:file-replace-outline","mdi:file-restore","mdi:file-restore-outline","mdi:file-rotate-left","mdi:file-rotate-left-outline","mdi:file-rotate-right","mdi:file-rotate-right-outline","mdi:file-search","mdi:file-search-outline","mdi:file-send","mdi:file-send-outline","mdi:file-settings","mdi:file-settings-outline","mdi:file-sign","mdi:file-star","mdi:file-star-four-points","mdi:file-star-four-points-outline","mdi:file-star-outline","mdi:file-swap","mdi:file-swap-outline","mdi:file-sync","mdi:file-sync-outline","mdi:file-table","mdi:file-table-box","mdi:file-table-box-multiple","mdi:file-table-box-multiple-outline","mdi:file-table-box-outline","mdi:file-table-outline","mdi:file-tree","mdi:file-tree-outline","mdi:file-undo","mdi:file-undo-outline","mdi:file-upload","mdi:file-upload-outline","mdi:file-video","mdi:file-video-outline","mdi:file-word","mdi:file-word-box","mdi:file-word-box-outline","mdi:file-word-outline","mdi:file-xml-box","mdi:film","mdi:filmstrip","mdi:filmstrip-box","mdi:filmstrip-box-multiple","mdi:filmstrip-off","mdi:filter","mdi:filter-check","mdi:filter-check-outline","mdi:filter-cog","mdi:filter-cog-outline","mdi:filter-menu","mdi:filter-menu-outline","mdi:filter-minus","mdi:filter-minus-outline","mdi:filter-multiple","mdi:filter-multiple-outline","mdi:filter-off","mdi:filter-off-outline","mdi:filter-outline","mdi:filter-plus","mdi:filter-plus-outline","mdi:filter-remove","mdi:filter-remove-outline","mdi:filter-settings","mdi:filter-settings-outline","mdi:filter-variant","mdi:filter-variant-minus","mdi:filter-variant-plus","mdi:filter-variant-remove","mdi:finance","mdi:find-replace","mdi:fingerprint","mdi:fingerprint-off","mdi:fire","mdi:fire-alert","mdi:fire-circle","mdi:fire-extinguisher","mdi:fire-hydrant","mdi:fire-hydrant-alert","mdi:fire-hydrant-off","mdi:fire-off","mdi:fire-station","mdi:fire-truck","mdi:firebase","mdi:firefox","mdi:fireplace","mdi:fireplace-off","mdi:firewire","mdi:firework","mdi:firework-off","mdi:fish","mdi:fish-off","mdi:fishbowl","mdi:fishbowl-outline","mdi:fit-to-page","mdi:fit-to-page-outline","mdi:fit-to-screen","mdi:fit-to-screen-outline","mdi:flag","mdi:flag-checkered","mdi:flag-minus","mdi:flag-minus-outline","mdi:flag-off","mdi:flag-off-outline","mdi:flag-outline","mdi:flag-plus","mdi:flag-plus-outline","mdi:flag-remove","mdi:flag-remove-outline","mdi:flag-triangle","mdi:flag-variant","mdi:flag-variant-minus","mdi:flag-variant-minus-outline","mdi:flag-variant-off","mdi:flag-variant-off-outline","mdi:flag-variant-outline","mdi:flag-variant-plus","mdi:flag-variant-plus-outline","mdi:flag-variant-remove","mdi:flag-variant-remove-outline","mdi:flare","mdi:flash","mdi:flash-alert","mdi:flash-alert-outline","mdi:flash-auto","mdi:flash-off","mdi:flash-off-outline","mdi:flash-outline","mdi:flash-red-eye","mdi:flash-triangle","mdi:flash-triangle-outline","mdi:flashlight","mdi:flashlight-off","mdi:flask","mdi:flask-empty","mdi:flask-empty-minus","mdi:flask-empty-minus-outline","mdi:flask-empty-off","mdi:flask-empty-off-outline","mdi:flask-empty-outline","mdi:flask-empty-plus","mdi:flask-empty-plus-outline","mdi:flask-empty-remove","mdi:flask-empty-remove-outline","mdi:flask-minus","mdi:flask-minus-outline","mdi:flask-off","mdi:flask-off-outline","mdi:flask-outline","mdi:flask-plus","mdi:flask-plus-outline","mdi:flask-remove","mdi:flask-remove-outline","mdi:flask-round-bottom","mdi:flask-round-bottom-empty","mdi:flask-round-bottom-empty-outline","mdi:flask-round-bottom-outline","mdi:fleur-de-lis","mdi:flip-horizontal","mdi:flip-to-back","mdi:flip-to-front","mdi:flip-vertical","mdi:floor-lamp","mdi:floor-lamp-dual","mdi:floor-lamp-dual-outline","mdi:floor-lamp-outline","mdi:floor-lamp-torchiere","mdi:floor-lamp-torchiere-outline","mdi:floor-lamp-torchiere-variant","mdi:floor-lamp-torchiere-variant-outline","mdi:floor-plan","mdi:floppy","mdi:floppy-variant","mdi:flower","mdi:flower-outline","mdi:flower-pollen","mdi:flower-pollen-outline","mdi:flower-poppy","mdi:flower-tulip","mdi:flower-tulip-outline","mdi:focus-auto","mdi:focus-field","mdi:focus-field-horizontal","mdi:focus-field-vertical","mdi:folder","mdi:folder-account","mdi:folder-account-outline","mdi:folder-alert","mdi:folder-alert-outline","mdi:folder-arrow-down","mdi:folder-arrow-down-outline","mdi:folder-arrow-left","mdi:folder-arrow-left-outline","mdi:folder-arrow-left-right","mdi:folder-arrow-left-right-outline","mdi:folder-arrow-right","mdi:folder-arrow-right-outline","mdi:folder-arrow-up","mdi:folder-arrow-up-down","mdi:folder-arrow-up-down-outline","mdi:folder-arrow-up-outline","mdi:folder-cancel","mdi:folder-cancel-outline","mdi:folder-check","mdi:folder-check-outline","mdi:folder-clock","mdi:folder-clock-outline","mdi:folder-cog","mdi:folder-cog-outline","mdi:folder-download","mdi:folder-download-outline","mdi:folder-edit","mdi:folder-edit-outline","mdi:folder-eye","mdi:folder-eye-outline","mdi:folder-file","mdi:folder-file-outline","mdi:folder-google-drive","mdi:folder-heart","mdi:folder-heart-outline","mdi:folder-hidden","mdi:folder-home","mdi:folder-home-outline","mdi:folder-image","mdi:folder-information","mdi:folder-information-outline","mdi:folder-key","mdi:folder-key-network","mdi:folder-key-network-outline","mdi:folder-key-outline","mdi:folder-lock","mdi:folder-lock-open","mdi:folder-lock-open-outline","mdi:folder-lock-outline","mdi:folder-marker","mdi:folder-marker-outline","mdi:folder-minus","mdi:folder-minus-outline","mdi:folder-move","mdi:folder-move-outline","mdi:folder-multiple","mdi:folder-multiple-image","mdi:folder-multiple-outline","mdi:folder-multiple-plus","mdi:folder-multiple-plus-outline","mdi:folder-music","mdi:folder-music-outline","mdi:folder-network","mdi:folder-network-outline","mdi:folder-off","mdi:folder-off-outline","mdi:folder-open","mdi:folder-open-outline","mdi:folder-outline","mdi:folder-play","mdi:folder-play-outline","mdi:folder-plus","mdi:folder-plus-outline","mdi:folder-pound","mdi:folder-pound-outline","mdi:folder-question","mdi:folder-question-outline","mdi:folder-refresh","mdi:folder-refresh-outline","mdi:folder-remove","mdi:folder-remove-outline","mdi:folder-search","mdi:folder-search-outline","mdi:folder-settings","mdi:folder-settings-outline","mdi:folder-star","mdi:folder-star-multiple","mdi:folder-star-multiple-outline","mdi:folder-star-outline","mdi:folder-swap","mdi:folder-swap-outline","mdi:folder-sync","mdi:folder-sync-outline","mdi:folder-table","mdi:folder-table-outline","mdi:folder-text","mdi:folder-text-outline","mdi:folder-upload","mdi:folder-upload-outline","mdi:folder-wrench","mdi:folder-wrench-outline","mdi:folder-zip","mdi:folder-zip-outline","mdi:font-awesome","mdi:food","mdi:food-apple","mdi:food-apple-outline","mdi:food-croissant","mdi:food-drumstick","mdi:food-drumstick-off","mdi:food-drumstick-off-outline","mdi:food-drumstick-outline","mdi:food-fork-drink","mdi:food-halal","mdi:food-hot-dog","mdi:food-kosher","mdi:food-off","mdi:food-off-outline","mdi:food-outline","mdi:food-steak","mdi:food-steak-off","mdi:food-takeout-box","mdi:food-takeout-box-outline","mdi:food-turkey","mdi:food-variant","mdi:food-variant-off","mdi:foot-print","mdi:football","mdi:football-australian","mdi:football-helmet","mdi:forest","mdi:forest-outline","mdi:forklift","mdi:form-dropdown","mdi:form-select","mdi:form-textarea","mdi:form-textbox","mdi:form-textbox-lock","mdi:form-textbox-password","mdi:format-align-bottom","mdi:format-align-center","mdi:format-align-justify","mdi:format-align-left","mdi:format-align-middle","mdi:format-align-right","mdi:format-align-top","mdi:format-annotation-minus","mdi:format-annotation-plus","mdi:format-bold","mdi:format-clear","mdi:format-color-fill","mdi:format-color-highlight","mdi:format-color-marker-cancel","mdi:format-color-text","mdi:format-columns","mdi:format-float-center","mdi:format-float-left","mdi:format-float-none","mdi:format-float-right","mdi:format-font","mdi:format-font-size-decrease","mdi:format-font-size-increase","mdi:format-header-1","mdi:format-header-2","mdi:format-header-3","mdi:format-header-4","mdi:format-header-5","mdi:format-header-6","mdi:format-header-decrease","mdi:format-header-equal","mdi:format-header-increase","mdi:format-header-pound","mdi:format-horizontal-align-center","mdi:format-horizontal-align-left","mdi:format-horizontal-align-right","mdi:format-indent-decrease","mdi:format-indent-increase","mdi:format-italic","mdi:format-letter-case","mdi:format-letter-case-lower","mdi:format-letter-case-upper","mdi:format-letter-ends-with","mdi:format-letter-matches","mdi:format-letter-spacing","mdi:format-letter-spacing-variant","mdi:format-letter-starts-with","mdi:format-line-height","mdi:format-line-spacing","mdi:format-line-style","mdi:format-line-weight","mdi:format-list-bulleted","mdi:format-list-bulleted-square","mdi:format-list-bulleted-triangle","mdi:format-list-bulleted-type","mdi:format-list-checkbox","mdi:format-list-checks","mdi:format-list-group","mdi:format-list-group-plus","mdi:format-list-numbered","mdi:format-list-numbered-rtl","mdi:format-list-text","mdi:format-overline","mdi:format-page-break","mdi:format-page-split","mdi:format-paint","mdi:format-paragraph","mdi:format-paragraph-spacing","mdi:format-pilcrow","mdi:format-pilcrow-arrow-left","mdi:format-pilcrow-arrow-right","mdi:format-quote-close","mdi:format-quote-close-outline","mdi:format-quote-open","mdi:format-quote-open-outline","mdi:format-rotate-90","mdi:format-section","mdi:format-size","mdi:format-strikethrough","mdi:format-strikethrough-variant","mdi:format-subscript","mdi:format-superscript","mdi:format-text","mdi:format-text-rotation-angle-down","mdi:format-text-rotation-angle-up","mdi:format-text-rotation-down","mdi:format-text-rotation-down-vertical","mdi:format-text-rotation-none","mdi:format-text-rotation-up","mdi:format-text-rotation-vertical","mdi:format-text-variant","mdi:format-text-variant-outline","mdi:format-text-wrapping-clip","mdi:format-text-wrapping-overflow","mdi:format-text-wrapping-wrap","mdi:format-textbox","mdi:format-title","mdi:format-underline","mdi:format-underline-wavy","mdi:format-vertical-align-bottom","mdi:format-vertical-align-center","mdi:format-vertical-align-top","mdi:format-wrap-inline","mdi:format-wrap-square","mdi:format-wrap-tight","mdi:format-wrap-top-bottom","mdi:forum","mdi:forum-minus","mdi:forum-minus-outline","mdi:forum-outline","mdi:forum-plus","mdi:forum-plus-outline","mdi:forum-remove","mdi:forum-remove-outline","mdi:forward","mdi:forwardburger","mdi:fountain","mdi:fountain-pen","mdi:fountain-pen-tip","mdi:fraction-one-half","mdi:freebsd","mdi:french-fries","mdi:frequently-asked-questions","mdi:fridge","mdi:fridge-alert","mdi:fridge-alert-outline","mdi:fridge-bottom","mdi:fridge-industrial","mdi:fridge-industrial-alert","mdi:fridge-industrial-alert-outline","mdi:fridge-industrial-off","mdi:fridge-industrial-off-outline","mdi:fridge-industrial-outline","mdi:fridge-off","mdi:fridge-off-outline","mdi:fridge-outline","mdi:fridge-top","mdi:fridge-variant","mdi:fridge-variant-alert","mdi:fridge-variant-alert-outline","mdi:fridge-variant-off","mdi:fridge-variant-off-outline","mdi:fridge-variant-outline","mdi:fruit-cherries","mdi:fruit-cherries-off","mdi:fruit-citrus","mdi:fruit-citrus-off","mdi:fruit-grapes","mdi:fruit-grapes-outline","mdi:fruit-pear","mdi:fruit-pineapple","mdi:fruit-watermelon","mdi:fuel","mdi:fuel-cell","mdi:fullscreen","mdi:fullscreen-exit","mdi:function","mdi:function-variant","mdi:furigana-horizontal","mdi:furigana-vertical","mdi:fuse","mdi:fuse-alert","mdi:fuse-blade","mdi:fuse-off","mdi:gamepad","mdi:gamepad-circle","mdi:gamepad-circle-down","mdi:gamepad-circle-left","mdi:gamepad-circle-outline","mdi:gamepad-circle-right","mdi:gamepad-circle-up","mdi:gamepad-down","mdi:gamepad-left","mdi:gamepad-outline","mdi:gamepad-right","mdi:gamepad-round","mdi:gamepad-round-down","mdi:gamepad-round-left","mdi:gamepad-round-outline","mdi:gamepad-round-right","mdi:gamepad-round-up","mdi:gamepad-square","mdi:gamepad-square-outline","mdi:gamepad-up","mdi:gamepad-variant","mdi:gamepad-variant-outline","mdi:gamma","mdi:gantry-crane","mdi:garage","mdi:garage-alert","mdi:garage-alert-variant","mdi:garage-lock","mdi:garage-open","mdi:garage-open-variant","mdi:garage-variant","mdi:garage-variant-lock","mdi:gas-burner","mdi:gas-cylinder","mdi:gas-station","mdi:gas-station-in-use","mdi:gas-station-in-use-outline","mdi:gas-station-off","mdi:gas-station-off-outline","mdi:gas-station-outline","mdi:gate","mdi:gate-alert","mdi:gate-and","mdi:gate-arrow-left","mdi:gate-arrow-right","mdi:gate-buffer","mdi:gate-nand","mdi:gate-nor","mdi:gate-not","mdi:gate-open","mdi:gate-or","mdi:gate-xnor","mdi:gate-xor","mdi:gatsby","mdi:gauge","mdi:gauge-empty","mdi:gauge-full","mdi:gauge-low","mdi:gavel","mdi:gender-female","mdi:gender-male","mdi:gender-male-female","mdi:gender-male-female-variant","mdi:gender-non-binary","mdi:gender-transgender","mdi:generator-mobile","mdi:generator-portable","mdi:generator-stationary","mdi:gentoo","mdi:gesture","mdi:gesture-double-tap","mdi:gesture-pinch","mdi:gesture-spread","mdi:gesture-swipe","mdi:gesture-swipe-down","mdi:gesture-swipe-horizontal","mdi:gesture-swipe-left","mdi:gesture-swipe-right","mdi:gesture-swipe-up","mdi:gesture-swipe-vertical","mdi:gesture-tap","mdi:gesture-tap-box","mdi:gesture-tap-button","mdi:gesture-tap-hold","mdi:gesture-two-double-tap","mdi:gesture-two-tap","mdi:ghost","mdi:ghost-off","mdi:ghost-off-outline","mdi:ghost-outline","mdi:gift","mdi:gift-off","mdi:gift-off-outline","mdi:gift-open","mdi:gift-open-outline","mdi:gift-outline","mdi:git","mdi:github","mdi:gitlab","mdi:glass-cocktail","mdi:glass-cocktail-off","mdi:glass-flute","mdi:glass-fragile","mdi:glass-mug","mdi:glass-mug-off","mdi:glass-mug-variant","mdi:glass-mug-variant-off","mdi:glass-pint-outline","mdi:glass-stange","mdi:glass-tulip","mdi:glass-wine","mdi:glasses","mdi:globe-light","mdi:globe-light-outline","mdi:globe-model","mdi:gmail","mdi:gnome","mdi:go-kart","mdi:go-kart-track","mdi:gog","mdi:gold","mdi:golf","mdi:golf-cart","mdi:golf-tee","mdi:gondola","mdi:goodreads","mdi:google","mdi:google-ads","mdi:google-analytics","mdi:google-assistant","mdi:google-cardboard","mdi:google-chrome","mdi:google-circles","mdi:google-circles-communities","mdi:google-circles-extended","mdi:google-circles-group","mdi:google-classroom","mdi:google-cloud","mdi:google-downasaur","mdi:google-drive","mdi:google-earth","mdi:google-fit","mdi:google-glass","mdi:google-hangouts","mdi:google-keep","mdi:google-lens","mdi:google-maps","mdi:google-my-business","mdi:google-nearby","mdi:google-play","mdi:google-plus","mdi:google-podcast","mdi:google-spreadsheet","mdi:google-street-view","mdi:google-translate","mdi:gradient-horizontal","mdi:gradient-vertical","mdi:grain","mdi:graph","mdi:graph-outline","mdi:graphql","mdi:grass","mdi:grave-stone","mdi:grease-pencil","mdi:greater-than","mdi:greater-than-or-equal","mdi:greenhouse","mdi:grid","mdi:grid-large","mdi:grid-off","mdi:grill","mdi:grill-outline","mdi:group","mdi:guitar-acoustic","mdi:guitar-electric","mdi:guitar-pick","mdi:guitar-pick-outline","mdi:guy-fawkes-mask","mdi:gymnastics","mdi:hail","mdi:hair-dryer","mdi:hair-dryer-outline","mdi:halloween","mdi:hamburger","mdi:hamburger-check","mdi:hamburger-minus","mdi:hamburger-off","mdi:hamburger-plus","mdi:hamburger-remove","mdi:hammer","mdi:hammer-screwdriver","mdi:hammer-sickle","mdi:hammer-wrench","mdi:hand-back-left","mdi:hand-back-left-off","mdi:hand-back-left-off-outline","mdi:hand-back-left-outline","mdi:hand-back-right","mdi:hand-back-right-off","mdi:hand-back-right-off-outline","mdi:hand-back-right-outline","mdi:hand-clap","mdi:hand-clap-off","mdi:hand-coin","mdi:hand-coin-outline","mdi:hand-cycle","mdi:hand-extended","mdi:hand-extended-outline","mdi:hand-front-left","mdi:hand-front-left-outline","mdi:hand-front-right","mdi:hand-front-right-outline","mdi:hand-heart","mdi:hand-heart-outline","mdi:hand-okay","mdi:hand-peace","mdi:hand-peace-variant","mdi:hand-pointing-down","mdi:hand-pointing-left","mdi:hand-pointing-right","mdi:hand-pointing-up","mdi:hand-saw","mdi:hand-wash","mdi:hand-wash-outline","mdi:hand-water","mdi:hand-wave","mdi:hand-wave-outline","mdi:handball","mdi:handcuffs","mdi:hands-pray","mdi:handshake","mdi:handshake-outline","mdi:hanger","mdi:hard-hat","mdi:harddisk","mdi:harddisk-plus","mdi:harddisk-remove","mdi:hat-fedora","mdi:hazard-lights","mdi:hdmi-port","mdi:hdr","mdi:hdr-off","mdi:head","mdi:head-alert","mdi:head-alert-outline","mdi:head-check","mdi:head-check-outline","mdi:head-cog","mdi:head-cog-outline","mdi:head-dots-horizontal","mdi:head-dots-horizontal-outline","mdi:head-flash","mdi:head-flash-outline","mdi:head-heart","mdi:head-heart-outline","mdi:head-lightbulb","mdi:head-lightbulb-outline","mdi:head-minus","mdi:head-minus-outline","mdi:head-outline","mdi:head-plus","mdi:head-plus-outline","mdi:head-question","mdi:head-question-outline","mdi:head-remove","mdi:head-remove-outline","mdi:head-snowflake","mdi:head-snowflake-outline","mdi:head-sync","mdi:head-sync-outline","mdi:headphones","mdi:headphones-bluetooth","mdi:headphones-box","mdi:headphones-off","mdi:headphones-settings","mdi:headset","mdi:headset-dock","mdi:headset-off","mdi:heart","mdi:heart-box","mdi:heart-box-outline","mdi:heart-broken","mdi:heart-broken-outline","mdi:heart-circle","mdi:heart-circle-outline","mdi:heart-cog","mdi:heart-cog-outline","mdi:heart-flash","mdi:heart-half","mdi:heart-half-full","mdi:heart-half-outline","mdi:heart-minus","mdi:heart-minus-outline","mdi:heart-multiple","mdi:heart-multiple-outline","mdi:heart-off","mdi:heart-off-outline","mdi:heart-outline","mdi:heart-plus","mdi:heart-plus-outline","mdi:heart-pulse","mdi:heart-remove","mdi:heart-remove-outline","mdi:heart-search","mdi:heart-settings","mdi:heart-settings-outline","mdi:heat-pump","mdi:heat-pump-outline","mdi:heat-wave","mdi:heating-coil","mdi:helicopter","mdi:help","mdi:help-box","mdi:help-box-multiple","mdi:help-box-multiple-outline","mdi:help-box-outline","mdi:help-circle","mdi:help-circle-outline","mdi:help-network","mdi:help-network-outline","mdi:help-rhombus","mdi:help-rhombus-outline","mdi:hexadecimal","mdi:hexagon","mdi:hexagon-multiple","mdi:hexagon-multiple-outline","mdi:hexagon-outline","mdi:hexagon-slice-1","mdi:hexagon-slice-2","mdi:hexagon-slice-3","mdi:hexagon-slice-4","mdi:hexagon-slice-5","mdi:hexagon-slice-6","mdi:hexagram","mdi:hexagram-outline","mdi:high-definition","mdi:high-definition-box","mdi:highway","mdi:hiking","mdi:history","mdi:hockey-puck","mdi:hockey-sticks","mdi:hololens","mdi:home","mdi:home-account","mdi:home-alert","mdi:home-alert-outline","mdi:home-analytics","mdi:home-assistant","mdi:home-automation","mdi:home-battery","mdi:home-battery-outline","mdi:home-circle","mdi:home-circle-outline","mdi:home-city","mdi:home-city-outline","mdi:home-clock","mdi:home-clock-outline","mdi:home-edit","mdi:home-edit-outline","mdi:home-export-outline","mdi:home-flood","mdi:home-floor-0","mdi:home-floor-1","mdi:home-floor-2","mdi:home-floor-3","mdi:home-floor-a","mdi:home-floor-b","mdi:home-floor-g","mdi:home-floor-l","mdi:home-floor-negative-1","mdi:home-group","mdi:home-group-minus","mdi:home-group-plus","mdi:home-group-remove","mdi:home-heart","mdi:home-import-outline","mdi:home-lightbulb","mdi:home-lightbulb-outline","mdi:home-lightning-bolt","mdi:home-lightning-bolt-outline","mdi:home-lock","mdi:home-lock-open","mdi:home-map-marker","mdi:home-minus","mdi:home-minus-outline","mdi:home-modern","mdi:home-off","mdi:home-off-outline","mdi:home-outline","mdi:home-percent","mdi:home-percent-outline","mdi:home-plus","mdi:home-plus-outline","mdi:home-remove","mdi:home-remove-outline","mdi:home-roof","mdi:home-search","mdi:home-search-outline","mdi:home-silo","mdi:home-silo-outline","mdi:home-sound-in","mdi:home-sound-in-outline","mdi:home-sound-out","mdi:home-sound-out-outline","mdi:home-switch","mdi:home-switch-outline","mdi:home-thermometer","mdi:home-thermometer-outline","mdi:home-variant","mdi:home-variant-outline","mdi:hook","mdi:hook-off","mdi:hoop-house","mdi:hops","mdi:horizontal-rotate-clockwise","mdi:horizontal-rotate-counterclockwise","mdi:horse","mdi:horse-human","mdi:horse-variant","mdi:horse-variant-fast","mdi:horseshoe","mdi:hospital","mdi:hospital-box","mdi:hospital-box-outline","mdi:hospital-building","mdi:hospital-marker","mdi:hot-tub","mdi:hours-12","mdi:hours-24","mdi:hub","mdi:hub-outline","mdi:hubspot","mdi:hulu","mdi:human","mdi:human-baby-changing-table","mdi:human-cane","mdi:human-capacity-decrease","mdi:human-capacity-increase","mdi:human-child","mdi:human-dolly","mdi:human-edit","mdi:human-female","mdi:human-female-boy","mdi:human-female-dance","mdi:human-female-female","mdi:human-female-female-child","mdi:human-female-girl","mdi:human-greeting","mdi:human-greeting-proximity","mdi:human-greeting-variant","mdi:human-handsdown","mdi:human-handsup","mdi:human-male","mdi:human-male-board","mdi:human-male-board-poll","mdi:human-male-boy","mdi:human-male-child","mdi:human-male-female","mdi:human-male-female-child","mdi:human-male-girl","mdi:human-male-height","mdi:human-male-height-variant","mdi:human-male-male","mdi:human-male-male-child","mdi:human-non-binary","mdi:human-pregnant","mdi:human-queue","mdi:human-scooter","mdi:human-walker","mdi:human-wheelchair","mdi:human-white-cane","mdi:humble-bundle","mdi:hvac","mdi:hvac-off","mdi:hydraulic-oil-level","mdi:hydraulic-oil-temperature","mdi:hydro-power","mdi:hydrogen-station","mdi:ice-cream","mdi:ice-cream-off","mdi:ice-pop","mdi:id-card","mdi:identifier","mdi:ideogram-cjk","mdi:ideogram-cjk-variant","mdi:image","mdi:image-album","mdi:image-area","mdi:image-area-close","mdi:image-auto-adjust","mdi:image-broken","mdi:image-broken-variant","mdi:image-check","mdi:image-check-outline","mdi:image-edit","mdi:image-edit-outline","mdi:image-filter-black-white","mdi:image-filter-center-focus","mdi:image-filter-center-focus-strong","mdi:image-filter-center-focus-strong-outline","mdi:image-filter-center-focus-weak","mdi:image-filter-drama","mdi:image-filter-drama-outline","mdi:image-filter-frames","mdi:image-filter-hdr","mdi:image-filter-hdr-outline","mdi:image-filter-none","mdi:image-filter-tilt-shift","mdi:image-filter-vintage","mdi:image-frame","mdi:image-lock","mdi:image-lock-outline","mdi:image-marker","mdi:image-marker-outline","mdi:image-minus","mdi:image-minus-outline","mdi:image-move","mdi:image-multiple","mdi:image-multiple-outline","mdi:image-off","mdi:image-off-outline","mdi:image-outline","mdi:image-plus","mdi:image-plus-outline","mdi:image-refresh","mdi:image-refresh-outline","mdi:image-remove","mdi:image-remove-outline","mdi:image-search","mdi:image-search-outline","mdi:image-size-select-actual","mdi:image-size-select-large","mdi:image-size-select-small","mdi:image-sync","mdi:image-sync-outline","mdi:image-text","mdi:import","mdi:inbox","mdi:inbox-arrow-down","mdi:inbox-arrow-down-outline","mdi:inbox-arrow-up","mdi:inbox-arrow-up-outline","mdi:inbox-full","mdi:inbox-full-outline","mdi:inbox-multiple","mdi:inbox-multiple-outline","mdi:inbox-outline","mdi:inbox-remove","mdi:inbox-remove-outline","mdi:incognito","mdi:incognito-circle","mdi:incognito-circle-off","mdi:incognito-off","mdi:induction","mdi:infinity","mdi:information","mdi:information-box","mdi:information-box-outline","mdi:information-off","mdi:information-off-outline","mdi:information-outline","mdi:information-slab-box","mdi:information-slab-box-outline","mdi:information-slab-circle","mdi:information-slab-circle-outline","mdi:information-slab-symbol","mdi:information-symbol","mdi:information-variant","mdi:information-variant-box","mdi:information-variant-box-outline","mdi:information-variant-circle","mdi:information-variant-circle-outline","mdi:instagram","mdi:instrument-triangle","mdi:integrated-circuit-chip","mdi:invert-colors","mdi:invert-colors-off","mdi:invoice","mdi:invoice-arrow-left","mdi:invoice-arrow-left-outline","mdi:invoice-arrow-right","mdi:invoice-arrow-right-outline","mdi:invoice-check","mdi:invoice-check-outline","mdi:invoice-clock","mdi:invoice-clock-outline","mdi:invoice-edit","mdi:invoice-edit-outline","mdi:invoice-export-outline","mdi:invoice-fast","mdi:invoice-fast-outline","mdi:invoice-import","mdi:invoice-import-outline","mdi:invoice-list","mdi:invoice-list-outline","mdi:invoice-minus","mdi:invoice-minus-outline","mdi:invoice-multiple","mdi:invoice-multiple-outline","mdi:invoice-outline","mdi:invoice-plus","mdi:invoice-plus-outline","mdi:invoice-remove","mdi:invoice-remove-outline","mdi:invoice-send","mdi:invoice-send-outline","mdi:invoice-text","mdi:invoice-text-arrow-left","mdi:invoice-text-arrow-left-outline","mdi:invoice-text-arrow-right","mdi:invoice-text-arrow-right-outline","mdi:invoice-text-check","mdi:invoice-text-check-outline","mdi:invoice-text-clock","mdi:invoice-text-clock-outline","mdi:invoice-text-edit","mdi:invoice-text-edit-outline","mdi:invoice-text-fast","mdi:invoice-text-fast-outline","mdi:invoice-text-minus","mdi:invoice-text-minus-outline","mdi:invoice-text-multiple","mdi:invoice-text-multiple-outline","mdi:invoice-text-outline","mdi:invoice-text-plus","mdi:invoice-text-plus-outline","mdi:invoice-text-remove","mdi:invoice-text-remove-outline","mdi:invoice-text-send","mdi:invoice-text-send-outline","mdi:iobroker","mdi:ip","mdi:ip-network","mdi:ip-network-outline","mdi:ip-outline","mdi:ipod","mdi:iron","mdi:iron-board","mdi:iron-outline","mdi:island","mdi:island-variant","mdi:iv-bag","mdi:jabber","mdi:jeepney","mdi:jellyfish","mdi:jellyfish-outline","mdi:jira","mdi:jquery","mdi:jsfiddle","mdi:jump-rope","mdi:kabaddi","mdi:kangaroo","mdi:karate","mdi:kayaking","mdi:keg","mdi:kettle","mdi:kettle-alert","mdi:kettle-alert-outline","mdi:kettle-off","mdi:kettle-off-outline","mdi:kettle-outline","mdi:kettle-pour-over","mdi:kettle-steam","mdi:kettle-steam-outline","mdi:kettlebell","mdi:key","mdi:key-alert","mdi:key-alert-outline","mdi:key-arrow-right","mdi:key-chain","mdi:key-chain-variant","mdi:key-change","mdi:key-link","mdi:key-minus","mdi:key-outline","mdi:key-plus","mdi:key-remove","mdi:key-star","mdi:key-variant","mdi:key-wireless","mdi:keyboard","mdi:keyboard-backspace","mdi:keyboard-caps","mdi:keyboard-close","mdi:keyboard-close-outline","mdi:keyboard-esc","mdi:keyboard-f-1","mdi:keyboard-f-10","mdi:keyboard-f-11","mdi:keyboard-f-12","mdi:keyboard-f-2","mdi:keyboard-f-3","mdi:keyboard-f-4","mdi:keyboard-f-5","mdi:keyboard-f-6","mdi:keyboard-f-7","mdi:keyboard-f-8","mdi:keyboard-f-9","mdi:keyboard-off","mdi:keyboard-off-outline","mdi:keyboard-outline","mdi:keyboard-return","mdi:keyboard-settings","mdi:keyboard-settings-outline","mdi:keyboard-space","mdi:keyboard-tab","mdi:keyboard-tab-reverse","mdi:keyboard-variant","mdi:khanda","mdi:kickstarter","mdi:kite","mdi:kite-outline","mdi:kitesurfing","mdi:klingon","mdi:knife","mdi:knife-military","mdi:knob","mdi:koala","mdi:kodi","mdi:kubernetes","mdi:label","mdi:label-multiple","mdi:label-multiple-outline","mdi:label-off","mdi:label-off-outline","mdi:label-outline","mdi:label-percent","mdi:label-percent-outline","mdi:label-variant","mdi:label-variant-outline","mdi:ladder","mdi:ladybug","mdi:lambda","mdi:lamp","mdi:lamp-outline","mdi:lamps","mdi:lamps-outline","mdi:lan","mdi:lan-check","mdi:lan-connect","mdi:lan-disconnect","mdi:lan-pending","mdi:land-fields","mdi:land-plots","mdi:land-plots-circle","mdi:land-plots-circle-variant","mdi:land-plots-marker","mdi:land-rows-horizontal","mdi:land-rows-vertical","mdi:landslide","mdi:landslide-outline","mdi:language-c","mdi:language-cpp","mdi:language-csharp","mdi:language-css-3","mdi:language-fortran","mdi:language-go","mdi:language-haskell","mdi:language-html-5","mdi:language-java","mdi:language-javascript","mdi:language-kotlin","mdi:language-lua","mdi:language-markdown","mdi:language-markdown-outline","mdi:language-php","mdi:language-python","mdi:language-r","mdi:language-ruby","mdi:language-ruby-on-rails","mdi:language-rust","mdi:language-swift","mdi:language-typescript","mdi:language-xaml","mdi:laptop","mdi:laptop-account","mdi:laptop-off","mdi:laravel","mdi:laser-pointer","mdi:lasso","mdi:lastpass","mdi:latitude","mdi:launch","mdi:lava-lamp","mdi:layers","mdi:layers-edit","mdi:layers-minus","mdi:layers-off","mdi:layers-off-outline","mdi:layers-outline","mdi:layers-plus","mdi:layers-remove","mdi:layers-search","mdi:layers-search-outline","mdi:layers-triple","mdi:layers-triple-outline","mdi:lead-pencil","mdi:leaf","mdi:leaf-circle","mdi:leaf-circle-outline","mdi:leaf-maple","mdi:leaf-maple-off","mdi:leaf-off","mdi:leak","mdi:leak-off","mdi:lectern","mdi:led-off","mdi:led-on","mdi:led-outline","mdi:led-strip","mdi:led-strip-variant","mdi:led-strip-variant-off","mdi:led-variant-off","mdi:led-variant-on","mdi:led-variant-outline","mdi:leek","mdi:less-than","mdi:less-than-or-equal","mdi:library","mdi:library-outline","mdi:library-shelves","mdi:license","mdi:lifebuoy","mdi:light-flood-down","mdi:light-flood-up","mdi:light-recessed","mdi:light-switch","mdi:light-switch-off","mdi:lightbulb","mdi:lightbulb-alert","mdi:lightbulb-alert-outline","mdi:lightbulb-auto","mdi:lightbulb-auto-outline","mdi:lightbulb-cfl","mdi:lightbulb-cfl-off","mdi:lightbulb-cfl-spiral","mdi:lightbulb-cfl-spiral-off","mdi:lightbulb-fluorescent-tube","mdi:lightbulb-fluorescent-tube-outline","mdi:lightbulb-group","mdi:lightbulb-group-off","mdi:lightbulb-group-off-outline","mdi:lightbulb-group-outline","mdi:lightbulb-multiple","mdi:lightbulb-multiple-off","mdi:lightbulb-multiple-off-outline","mdi:lightbulb-multiple-outline","mdi:lightbulb-night","mdi:lightbulb-night-outline","mdi:lightbulb-off","mdi:lightbulb-off-outline","mdi:lightbulb-on","mdi:lightbulb-on-10","mdi:lightbulb-on-20","mdi:lightbulb-on-30","mdi:lightbulb-on-40","mdi:lightbulb-on-50","mdi:lightbulb-on-60","mdi:lightbulb-on-70","mdi:lightbulb-on-80","mdi:lightbulb-on-90","mdi:lightbulb-on-outline","mdi:lightbulb-outline","mdi:lightbulb-question","mdi:lightbulb-question-outline","mdi:lightbulb-spot","mdi:lightbulb-spot-off","mdi:lightbulb-variant","mdi:lightbulb-variant-outline","mdi:lighthouse","mdi:lighthouse-on","mdi:lightning-bolt","mdi:lightning-bolt-circle","mdi:lightning-bolt-outline","mdi:line-scan","mdi:lingerie","mdi:link","mdi:link-box","mdi:link-box-outline","mdi:link-box-variant","mdi:link-box-variant-outline","mdi:link-circle","mdi:link-circle-outline","mdi:link-edit","mdi:link-lock","mdi:link-off","mdi:link-plus","mdi:link-variant","mdi:link-variant-minus","mdi:link-variant-off","mdi:link-variant-plus","mdi:link-variant-remove","mdi:linkedin","mdi:linux","mdi:linux-mint","mdi:lipstick","mdi:liquid-spot","mdi:liquor","mdi:list-box","mdi:list-box-outline","mdi:list-status","mdi:litecoin","mdi:loading","mdi:location-enter","mdi:location-exit","mdi:lock","mdi:lock-alert","mdi:lock-alert-outline","mdi:lock-check","mdi:lock-check-outline","mdi:lock-clock","mdi:lock-minus","mdi:lock-minus-outline","mdi:lock-off","mdi:lock-off-outline","mdi:lock-open","mdi:lock-open-alert","mdi:lock-open-alert-outline","mdi:lock-open-check","mdi:lock-open-check-outline","mdi:lock-open-minus","mdi:lock-open-minus-outline","mdi:lock-open-outline","mdi:lock-open-plus","mdi:lock-open-plus-outline","mdi:lock-open-remove","mdi:lock-open-remove-outline","mdi:lock-open-variant","mdi:lock-open-variant-outline","mdi:lock-outline","mdi:lock-pattern","mdi:lock-percent","mdi:lock-percent-open","mdi:lock-percent-open-outline","mdi:lock-percent-open-variant","mdi:lock-percent-open-variant-outline","mdi:lock-percent-outline","mdi:lock-plus","mdi:lock-plus-outline","mdi:lock-question","mdi:lock-remove","mdi:lock-remove-outline","mdi:lock-reset","mdi:lock-smart","mdi:locker","mdi:locker-multiple","mdi:login","mdi:login-variant","mdi:logout","mdi:logout-variant","mdi:longitude","mdi:looks","mdi:lotion","mdi:lotion-outline","mdi:lotion-plus","mdi:lotion-plus-outline","mdi:loupe","mdi:lumx","mdi:lungs","mdi:mace","mdi:magazine-pistol","mdi:magazine-rifle","mdi:magic-staff","mdi:magnet","mdi:magnet-on","mdi:magnify","mdi:magnify-close","mdi:magnify-expand","mdi:magnify-minus","mdi:magnify-minus-cursor","mdi:magnify-minus-outline","mdi:magnify-plus","mdi:magnify-plus-cursor","mdi:magnify-plus-outline","mdi:magnify-remove-cursor","mdi:magnify-remove-outline","mdi:magnify-scan","mdi:mail","mdi:mailbox","mdi:mailbox-open","mdi:mailbox-open-outline","mdi:mailbox-open-up","mdi:mailbox-open-up-outline","mdi:mailbox-outline","mdi:mailbox-up","mdi:mailbox-up-outline","mdi:manjaro","mdi:map","mdi:map-check","mdi:map-check-outline","mdi:map-clock","mdi:map-clock-outline","mdi:map-legend","mdi:map-marker","mdi:map-marker-account","mdi:map-marker-account-outline","mdi:map-marker-alert","mdi:map-marker-alert-outline","mdi:map-marker-check","mdi:map-marker-check-outline","mdi:map-marker-circle","mdi:map-marker-distance","mdi:map-marker-down","mdi:map-marker-left","mdi:map-marker-left-outline","mdi:map-marker-minus","mdi:map-marker-minus-outline","mdi:map-marker-multiple","mdi:map-marker-multiple-outline","mdi:map-marker-off","mdi:map-marker-off-outline","mdi:map-marker-outline","mdi:map-marker-path","mdi:map-marker-plus","mdi:map-marker-plus-outline","mdi:map-marker-question","mdi:map-marker-question-outline","mdi:map-marker-radius","mdi:map-marker-radius-outline","mdi:map-marker-remove","mdi:map-marker-remove-outline","mdi:map-marker-remove-variant","mdi:map-marker-right","mdi:map-marker-right-outline","mdi:map-marker-star","mdi:map-marker-star-outline","mdi:map-marker-up","mdi:map-minus","mdi:map-outline","mdi:map-plus","mdi:map-search","mdi:map-search-outline","mdi:mapbox","mdi:margin","mdi:marker","mdi:marker-cancel","mdi:marker-check","mdi:mastodon","mdi:material-design","mdi:material-ui","mdi:math-compass","mdi:math-cos","mdi:math-integral","mdi:math-integral-box","mdi:math-log","mdi:math-norm","mdi:math-norm-box","mdi:math-sin","mdi:math-tan","mdi:matrix","mdi:medal","mdi:medal-outline","mdi:medical-bag","mdi:medical-cotton-swab","mdi:medication","mdi:medication-outline","mdi:meditation","mdi:memory","mdi:memory-arrow-down","mdi:menorah","mdi:menorah-fire","mdi:menu","mdi:menu-close","mdi:menu-down","mdi:menu-down-outline","mdi:menu-left","mdi:menu-left-outline","mdi:menu-open","mdi:menu-right","mdi:menu-right-outline","mdi:menu-swap","mdi:menu-swap-outline","mdi:menu-up","mdi:menu-up-outline","mdi:merge","mdi:message","mdi:message-alert","mdi:message-alert-outline","mdi:message-arrow-left","mdi:message-arrow-left-outline","mdi:message-arrow-right","mdi:message-arrow-right-outline","mdi:message-badge","mdi:message-badge-outline","mdi:message-bookmark","mdi:message-bookmark-outline","mdi:message-bulleted","mdi:message-bulleted-off","mdi:message-check","mdi:message-check-outline","mdi:message-cog","mdi:message-cog-outline","mdi:message-draw","mdi:message-fast","mdi:message-fast-outline","mdi:message-flash","mdi:message-flash-outline","mdi:message-image","mdi:message-image-outline","mdi:message-lock","mdi:message-lock-outline","mdi:message-minus","mdi:message-minus-outline","mdi:message-off","mdi:message-off-outline","mdi:message-outline","mdi:message-plus","mdi:message-plus-outline","mdi:message-processing","mdi:message-processing-outline","mdi:message-question","mdi:message-question-outline","mdi:message-reply","mdi:message-reply-outline","mdi:message-reply-text","mdi:message-reply-text-outline","mdi:message-settings","mdi:message-settings-outline","mdi:message-star","mdi:message-star-outline","mdi:message-text","mdi:message-text-clock","mdi:message-text-clock-outline","mdi:message-text-fast","mdi:message-text-fast-outline","mdi:message-text-lock","mdi:message-text-lock-outline","mdi:message-text-outline","mdi:message-video","mdi:meteor","mdi:meter-electric","mdi:meter-electric-outline","mdi:meter-gas","mdi:meter-gas-outline","mdi:metronome","mdi:metronome-tick","mdi:micro-sd","mdi:microphone","mdi:microphone-message","mdi:microphone-message-off","mdi:microphone-minus","mdi:microphone-off","mdi:microphone-outline","mdi:microphone-plus","mdi:microphone-question","mdi:microphone-question-outline","mdi:microphone-settings","mdi:microphone-variant","mdi:microphone-variant-off","mdi:microscope","mdi:microsoft","mdi:microsoft-access","mdi:microsoft-azure","mdi:microsoft-azure-devops","mdi:microsoft-bing","mdi:microsoft-dynamics-365","mdi:microsoft-edge","mdi:microsoft-excel","mdi:microsoft-internet-explorer","mdi:microsoft-office","mdi:microsoft-onedrive","mdi:microsoft-onenote","mdi:microsoft-outlook","mdi:microsoft-powerpoint","mdi:microsoft-sharepoint","mdi:microsoft-teams","mdi:microsoft-visual-studio","mdi:microsoft-visual-studio-code","mdi:microsoft-windows","mdi:microsoft-windows-classic","mdi:microsoft-word","mdi:microsoft-xbox","mdi:microsoft-xbox-controller","mdi:microsoft-xbox-controller-battery-alert","mdi:microsoft-xbox-controller-battery-charging","mdi:microsoft-xbox-controller-battery-empty","mdi:microsoft-xbox-controller-battery-full","mdi:microsoft-xbox-controller-battery-low","mdi:microsoft-xbox-controller-battery-medium","mdi:microsoft-xbox-controller-battery-unknown","mdi:microsoft-xbox-controller-menu","mdi:microsoft-xbox-controller-off","mdi:microsoft-xbox-controller-view","mdi:microwave","mdi:microwave-off","mdi:middleware","mdi:middleware-outline","mdi:midi","mdi:midi-port","mdi:mine","mdi:minecraft","mdi:mini-sd","mdi:minidisc","mdi:minus","mdi:minus-box","mdi:minus-box-multiple","mdi:minus-box-multiple-outline","mdi:minus-box-outline","mdi:minus-circle","mdi:minus-circle-multiple","mdi:minus-circle-multiple-outline","mdi:minus-circle-off","mdi:minus-circle-off-outline","mdi:minus-circle-outline","mdi:minus-network","mdi:minus-network-outline","mdi:minus-thick","mdi:mirror","mdi:mirror-rectangle","mdi:mirror-variant","mdi:mixed-martial-arts","mdi:mixed-reality","mdi:molecule","mdi:molecule-co","mdi:molecule-co-2","mdi:monitor","mdi:monitor-account","mdi:monitor-arrow-down","mdi:monitor-arrow-down-variant","mdi:monitor-cellphone","mdi:monitor-cellphone-star","mdi:monitor-dashboard","mdi:monitor-edit","mdi:monitor-eye","mdi:monitor-lock","mdi:monitor-multiple","mdi:monitor-off","mdi:monitor-screenshot","mdi:monitor-share","mdi:monitor-shimmer","mdi:monitor-small","mdi:monitor-speaker","mdi:monitor-speaker-off","mdi:monitor-star","mdi:monitor-vertical","mdi:moon-first-quarter","mdi:moon-full","mdi:moon-last-quarter","mdi:moon-new","mdi:moon-waning-crescent","mdi:moon-waning-gibbous","mdi:moon-waxing-crescent","mdi:moon-waxing-gibbous","mdi:moped","mdi:moped-electric","mdi:moped-electric-outline","mdi:moped-outline","mdi:more","mdi:mortar-pestle","mdi:mortar-pestle-plus","mdi:mosque","mdi:mosque-outline","mdi:mother-heart","mdi:mother-nurse","mdi:motion","mdi:motion-outline","mdi:motion-pause","mdi:motion-pause-outline","mdi:motion-play","mdi:motion-play-outline","mdi:motion-sensor","mdi:motion-sensor-off","mdi:motorbike","mdi:motorbike-electric","mdi:motorbike-off","mdi:mouse","mdi:mouse-bluetooth","mdi:mouse-left-click","mdi:mouse-left-click-outline","mdi:mouse-move-down","mdi:mouse-move-up","mdi:mouse-move-vertical","mdi:mouse-off","mdi:mouse-outline","mdi:mouse-right-click","mdi:mouse-right-click-outline","mdi:mouse-scroll-wheel","mdi:mouse-variant","mdi:mouse-variant-off","mdi:move-resize","mdi:move-resize-variant","mdi:movie","mdi:movie-check","mdi:movie-check-outline","mdi:movie-cog","mdi:movie-cog-outline","mdi:movie-edit","mdi:movie-edit-outline","mdi:movie-filter","mdi:movie-filter-outline","mdi:movie-minus","mdi:movie-minus-outline","mdi:movie-off","mdi:movie-off-outline","mdi:movie-open","mdi:movie-open-check","mdi:movie-open-check-outline","mdi:movie-open-cog","mdi:movie-open-cog-outline","mdi:movie-open-edit","mdi:movie-open-edit-outline","mdi:movie-open-minus","mdi:movie-open-minus-outline","mdi:movie-open-off","mdi:movie-open-off-outline","mdi:movie-open-outline","mdi:movie-open-play","mdi:movie-open-play-outline","mdi:movie-open-plus","mdi:movie-open-plus-outline","mdi:movie-open-remove","mdi:movie-open-remove-outline","mdi:movie-open-settings","mdi:movie-open-settings-outline","mdi:movie-open-star","mdi:movie-open-star-outline","mdi:movie-outline","mdi:movie-play","mdi:movie-play-outline","mdi:movie-plus","mdi:movie-plus-outline","mdi:movie-remove","mdi:movie-remove-outline","mdi:movie-roll","mdi:movie-search","mdi:movie-search-outline","mdi:movie-settings","mdi:movie-settings-outline","mdi:movie-star","mdi:movie-star-outline","mdi:mower","mdi:mower-bag","mdi:mower-bag-on","mdi:mower-on","mdi:muffin","mdi:multicast","mdi:multimedia","mdi:multiplication","mdi:multiplication-box","mdi:mushroom","mdi:mushroom-off","mdi:mushroom-off-outline","mdi:mushroom-outline","mdi:music","mdi:music-accidental-double-flat","mdi:music-accidental-double-sharp","mdi:music-accidental-flat","mdi:music-accidental-natural","mdi:music-accidental-sharp","mdi:music-box","mdi:music-box-multiple","mdi:music-box-multiple-outline","mdi:music-box-outline","mdi:music-circle","mdi:music-circle-outline","mdi:music-clef-alto","mdi:music-clef-bass","mdi:music-clef-treble","mdi:music-note","mdi:music-note-bluetooth","mdi:music-note-bluetooth-off","mdi:music-note-eighth","mdi:music-note-eighth-dotted","mdi:music-note-half","mdi:music-note-half-dotted","mdi:music-note-minus","mdi:music-note-off","mdi:music-note-off-outline","mdi:music-note-outline","mdi:music-note-plus","mdi:music-note-quarter","mdi:music-note-quarter-dotted","mdi:music-note-sixteenth","mdi:music-note-sixteenth-dotted","mdi:music-note-whole","mdi:music-note-whole-dotted","mdi:music-off","mdi:music-rest-eighth","mdi:music-rest-half","mdi:music-rest-quarter","mdi:music-rest-sixteenth","mdi:music-rest-whole","mdi:mustache","mdi:nail","mdi:nas","mdi:nativescript","mdi:nature","mdi:nature-outline","mdi:nature-people","mdi:nature-people-outline","mdi:navigation","mdi:navigation-outline","mdi:navigation-variant","mdi:navigation-variant-outline","mdi:near-me","mdi:necklace","mdi:needle","mdi:needle-off","mdi:netflix","mdi:network","mdi:network-off","mdi:network-off-outline","mdi:network-outline","mdi:network-pos","mdi:network-strength-1","mdi:network-strength-1-alert","mdi:network-strength-2","mdi:network-strength-2-alert","mdi:network-strength-3","mdi:network-strength-3-alert","mdi:network-strength-4","mdi:network-strength-4-alert","mdi:network-strength-4-cog","mdi:network-strength-off","mdi:network-strength-off-outline","mdi:network-strength-outline","mdi:new-box","mdi:newspaper","mdi:newspaper-check","mdi:newspaper-minus","mdi:newspaper-plus","mdi:newspaper-remove","mdi:newspaper-variant","mdi:newspaper-variant-multiple","mdi:newspaper-variant-multiple-outline","mdi:newspaper-variant-outline","mdi:nfc","mdi:nfc-search-variant","mdi:nfc-tap","mdi:nfc-variant","mdi:nfc-variant-off","mdi:ninja","mdi:nintendo-game-boy","mdi:nintendo-switch","mdi:nintendo-wii","mdi:nintendo-wiiu","mdi:nix","mdi:nodejs","mdi:noodles","mdi:not-equal","mdi:not-equal-variant","mdi:note","mdi:note-alert","mdi:note-alert-outline","mdi:note-check","mdi:note-check-outline","mdi:note-edit","mdi:note-edit-outline","mdi:note-minus","mdi:note-minus-outline","mdi:note-multiple","mdi:note-multiple-outline","mdi:note-off","mdi:note-off-outline","mdi:note-outline","mdi:note-plus","mdi:note-plus-outline","mdi:note-remove","mdi:note-remove-outline","mdi:note-search","mdi:note-search-outline","mdi:note-text","mdi:note-text-outline","mdi:notebook","mdi:notebook-check","mdi:notebook-check-outline","mdi:notebook-edit","mdi:notebook-edit-outline","mdi:notebook-heart","mdi:notebook-heart-outline","mdi:notebook-minus","mdi:notebook-minus-outline","mdi:notebook-multiple","mdi:notebook-outline","mdi:notebook-plus","mdi:notebook-plus-outline","mdi:notebook-remove","mdi:notebook-remove-outline","mdi:notification-clear-all","mdi:npm","mdi:nuke","mdi:null","mdi:numeric","mdi:numeric-0","mdi:numeric-0-box","mdi:numeric-0-box-multiple","mdi:numeric-0-box-multiple-outline","mdi:numeric-0-box-outline","mdi:numeric-0-circle","mdi:numeric-0-circle-outline","mdi:numeric-1","mdi:numeric-1-box","mdi:numeric-1-box-multiple","mdi:numeric-1-box-multiple-outline","mdi:numeric-1-box-outline","mdi:numeric-1-circle","mdi:numeric-1-circle-outline","mdi:numeric-10","mdi:numeric-10-box","mdi:numeric-10-box-multiple","mdi:numeric-10-box-multiple-outline","mdi:numeric-10-box-outline","mdi:numeric-10-circle","mdi:numeric-10-circle-outline","mdi:numeric-2","mdi:numeric-2-box","mdi:numeric-2-box-multiple","mdi:numeric-2-box-multiple-outline","mdi:numeric-2-box-outline","mdi:numeric-2-circle","mdi:numeric-2-circle-outline","mdi:numeric-3","mdi:numeric-3-box","mdi:numeric-3-box-multiple","mdi:numeric-3-box-multiple-outline","mdi:numeric-3-box-outline","mdi:numeric-3-circle","mdi:numeric-3-circle-outline","mdi:numeric-4","mdi:numeric-4-box","mdi:numeric-4-box-multiple","mdi:numeric-4-box-multiple-outline","mdi:numeric-4-box-outline","mdi:numeric-4-circle","mdi:numeric-4-circle-outline","mdi:numeric-5","mdi:numeric-5-box","mdi:numeric-5-box-multiple","mdi:numeric-5-box-multiple-outline","mdi:numeric-5-box-outline","mdi:numeric-5-circle","mdi:numeric-5-circle-outline","mdi:numeric-6","mdi:numeric-6-box","mdi:numeric-6-box-multiple","mdi:numeric-6-box-multiple-outline","mdi:numeric-6-box-outline","mdi:numeric-6-circle","mdi:numeric-6-circle-outline","mdi:numeric-7","mdi:numeric-7-box","mdi:numeric-7-box-multiple","mdi:numeric-7-box-multiple-outline","mdi:numeric-7-box-outline","mdi:numeric-7-circle","mdi:numeric-7-circle-outline","mdi:numeric-8","mdi:numeric-8-box","mdi:numeric-8-box-multiple","mdi:numeric-8-box-multiple-outline","mdi:numeric-8-box-outline","mdi:numeric-8-circle","mdi:numeric-8-circle-outline","mdi:numeric-9","mdi:numeric-9-box","mdi:numeric-9-box-multiple","mdi:numeric-9-box-multiple-outline","mdi:numeric-9-box-outline","mdi:numeric-9-circle","mdi:numeric-9-circle-outline","mdi:numeric-9-plus","mdi:numeric-9-plus-box","mdi:numeric-9-plus-box-multiple","mdi:numeric-9-plus-box-multiple-outline","mdi:numeric-9-plus-box-outline","mdi:numeric-9-plus-circle","mdi:numeric-9-plus-circle-outline","mdi:numeric-negative-1","mdi:numeric-off","mdi:numeric-positive-1","mdi:nut","mdi:nutrition","mdi:nuxt","mdi:oar","mdi:ocarina","mdi:oci","mdi:ocr","mdi:octagon","mdi:octagon-outline","mdi:octagram","mdi:octagram-edit","mdi:octagram-edit-outline","mdi:octagram-minus","mdi:octagram-minus-outline","mdi:octagram-outline","mdi:octagram-plus","mdi:octagram-plus-outline","mdi:octahedron","mdi:octahedron-off","mdi:odnoklassniki","mdi:offer","mdi:office-building","mdi:office-building-cog","mdi:office-building-cog-outline","mdi:office-building-marker","mdi:office-building-marker-outline","mdi:office-building-minus","mdi:office-building-minus-outline","mdi:office-building-outline","mdi:office-building-plus","mdi:office-building-plus-outline","mdi:office-building-remove","mdi:office-building-remove-outline","mdi:oil","mdi:oil-lamp","mdi:oil-level","mdi:oil-temperature","mdi:om","mdi:omega","mdi:one-up","mdi:onepassword","mdi:opacity","mdi:open-in-app","mdi:open-in-new","mdi:open-source-initiative","mdi:openid","mdi:opera","mdi:orbit","mdi:orbit-variant","mdi:order-alphabetical-ascending","mdi:order-alphabetical-descending","mdi:order-bool-ascending","mdi:order-bool-ascending-variant","mdi:order-bool-descending","mdi:order-bool-descending-variant","mdi:order-numeric-ascending","mdi:order-numeric-descending","mdi:origin","mdi:ornament","mdi:ornament-variant","mdi:outdoor-lamp","mdi:overscan","mdi:owl","mdi:pac-man","mdi:package","mdi:package-check","mdi:package-down","mdi:package-up","mdi:package-variant","mdi:package-variant-closed","mdi:package-variant-closed-check","mdi:package-variant-closed-minus","mdi:package-variant-closed-plus","mdi:package-variant-closed-remove","mdi:package-variant-minus","mdi:package-variant-plus","mdi:package-variant-remove","mdi:page-first","mdi:page-last","mdi:page-layout-body","mdi:page-layout-footer","mdi:page-layout-header","mdi:page-layout-header-footer","mdi:page-layout-sidebar-left","mdi:page-layout-sidebar-right","mdi:page-next","mdi:page-next-outline","mdi:page-previous","mdi:page-previous-outline","mdi:pail","mdi:pail-minus","mdi:pail-minus-outline","mdi:pail-off","mdi:pail-off-outline","mdi:pail-outline","mdi:pail-plus","mdi:pail-plus-outline","mdi:pail-remove","mdi:pail-remove-outline","mdi:palette","mdi:palette-advanced","mdi:palette-outline","mdi:palette-swatch","mdi:palette-swatch-outline","mdi:palette-swatch-variant","mdi:palm-tree","mdi:pan","mdi:pan-bottom-left","mdi:pan-bottom-right","mdi:pan-down","mdi:pan-horizontal","mdi:pan-left","mdi:pan-right","mdi:pan-top-left","mdi:pan-top-right","mdi:pan-up","mdi:pan-vertical","mdi:panda","mdi:pandora","mdi:panorama","mdi:panorama-fisheye","mdi:panorama-horizontal","mdi:panorama-horizontal-outline","mdi:panorama-outline","mdi:panorama-sphere","mdi:panorama-sphere-outline","mdi:panorama-variant","mdi:panorama-variant-outline","mdi:panorama-vertical","mdi:panorama-vertical-outline","mdi:panorama-wide-angle","mdi:panorama-wide-angle-outline","mdi:paper-cut-vertical","mdi:paper-roll","mdi:paper-roll-outline","mdi:paperclip","mdi:paperclip-check","mdi:paperclip-lock","mdi:paperclip-minus","mdi:paperclip-off","mdi:paperclip-plus","mdi:paperclip-remove","mdi:parachute","mdi:parachute-outline","mdi:paragliding","mdi:parking","mdi:party-popper","mdi:passport","mdi:passport-alert","mdi:passport-biometric","mdi:passport-cancel","mdi:passport-check","mdi:passport-minus","mdi:passport-plus","mdi:passport-remove","mdi:pasta","mdi:patio-heater","mdi:patreon","mdi:pause","mdi:pause-box","mdi:pause-box-outline","mdi:pause-circle","mdi:pause-circle-outline","mdi:pause-octagon","mdi:pause-octagon-outline","mdi:paw","mdi:paw-off","mdi:paw-off-outline","mdi:paw-outline","mdi:peace","mdi:peanut","mdi:peanut-off","mdi:peanut-off-outline","mdi:peanut-outline","mdi:pen","mdi:pen-lock","mdi:pen-minus","mdi:pen-off","mdi:pen-plus","mdi:pen-remove","mdi:pencil","mdi:pencil-box","mdi:pencil-box-multiple","mdi:pencil-box-multiple-outline","mdi:pencil-box-outline","mdi:pencil-circle","mdi:pencil-circle-outline","mdi:pencil-lock","mdi:pencil-lock-outline","mdi:pencil-minus","mdi:pencil-minus-outline","mdi:pencil-off","mdi:pencil-off-outline","mdi:pencil-outline","mdi:pencil-plus","mdi:pencil-plus-outline","mdi:pencil-remove","mdi:pencil-remove-outline","mdi:pencil-ruler","mdi:pencil-ruler-outline","mdi:penguin","mdi:pentagon","mdi:pentagon-outline","mdi:pentagram","mdi:percent","mdi:percent-box","mdi:percent-box-outline","mdi:percent-circle","mdi:percent-circle-outline","mdi:percent-outline","mdi:periodic-table","mdi:perspective-less","mdi:perspective-more","mdi:ph","mdi:phone","mdi:phone-alert","mdi:phone-alert-outline","mdi:phone-bluetooth","mdi:phone-bluetooth-outline","mdi:phone-cancel","mdi:phone-cancel-outline","mdi:phone-check","mdi:phone-check-outline","mdi:phone-classic","mdi:phone-classic-off","mdi:phone-clock","mdi:phone-dial","mdi:phone-dial-outline","mdi:phone-forward","mdi:phone-forward-outline","mdi:phone-hangup","mdi:phone-hangup-outline","mdi:phone-in-talk","mdi:phone-in-talk-outline","mdi:phone-incoming","mdi:phone-incoming-outgoing","mdi:phone-incoming-outgoing-outline","mdi:phone-incoming-outline","mdi:phone-lock","mdi:phone-lock-outline","mdi:phone-log","mdi:phone-log-outline","mdi:phone-message","mdi:phone-message-outline","mdi:phone-minus","mdi:phone-minus-outline","mdi:phone-missed","mdi:phone-missed-outline","mdi:phone-off","mdi:phone-off-outline","mdi:phone-outgoing","mdi:phone-outgoing-outline","mdi:phone-outline","mdi:phone-paused","mdi:phone-paused-outline","mdi:phone-plus","mdi:phone-plus-outline","mdi:phone-refresh","mdi:phone-refresh-outline","mdi:phone-remove","mdi:phone-remove-outline","mdi:phone-return","mdi:phone-return-outline","mdi:phone-ring","mdi:phone-ring-outline","mdi:phone-rotate-landscape","mdi:phone-rotate-portrait","mdi:phone-settings","mdi:phone-settings-outline","mdi:phone-sync","mdi:phone-sync-outline","mdi:phone-voip","mdi:pi","mdi:pi-box","mdi:pi-hole","mdi:piano","mdi:piano-off","mdi:pickaxe","mdi:picture-in-picture-bottom-right","mdi:picture-in-picture-bottom-right-outline","mdi:picture-in-picture-top-right","mdi:picture-in-picture-top-right-outline","mdi:pier","mdi:pier-crane","mdi:pig","mdi:pig-variant","mdi:pig-variant-outline","mdi:piggy-bank","mdi:piggy-bank-outline","mdi:pill","mdi:pill-multiple","mdi:pill-off","mdi:pillar","mdi:pin","mdi:pin-off","mdi:pin-off-outline","mdi:pin-outline","mdi:pine-tree","mdi:pine-tree-box","mdi:pine-tree-fire","mdi:pine-tree-variant","mdi:pine-tree-variant-outline","mdi:pinterest","mdi:pinwheel","mdi:pinwheel-outline","mdi:pipe","mdi:pipe-disconnected","mdi:pipe-leak","mdi:pipe-valve","mdi:pipe-wrench","mdi:pirate","mdi:pistol","mdi:piston","mdi:pitchfork","mdi:pizza","mdi:plane-car","mdi:plane-train","mdi:play","mdi:play-box","mdi:play-box-edit-outline","mdi:play-box-lock","mdi:play-box-lock-open","mdi:play-box-lock-open-outline","mdi:play-box-lock-outline","mdi:play-box-multiple","mdi:play-box-multiple-outline","mdi:play-box-outline","mdi:play-circle","mdi:play-circle-outline","mdi:play-network","mdi:play-network-outline","mdi:play-outline","mdi:play-pause","mdi:play-protected-content","mdi:play-speed","mdi:playlist-check","mdi:playlist-edit","mdi:playlist-minus","mdi:playlist-music","mdi:playlist-music-outline","mdi:playlist-play","mdi:playlist-plus","mdi:playlist-remove","mdi:playlist-star","mdi:plex","mdi:pliers","mdi:plus","mdi:plus-box","mdi:plus-box-multiple","mdi:plus-box-multiple-outline","mdi:plus-box-outline","mdi:plus-circle","mdi:plus-circle-multiple","mdi:plus-circle-multiple-outline","mdi:plus-circle-outline","mdi:plus-lock","mdi:plus-lock-open","mdi:plus-minus","mdi:plus-minus-box","mdi:plus-minus-variant","mdi:plus-network","mdi:plus-network-outline","mdi:plus-outline","mdi:plus-thick","mdi:pocket","mdi:podcast","mdi:podium","mdi:podium-bronze","mdi:podium-gold","mdi:podium-silver","mdi:point-of-sale","mdi:pokeball","mdi:pokemon-go","mdi:poker-chip","mdi:polaroid","mdi:police-badge","mdi:police-badge-outline","mdi:police-station","mdi:poll","mdi:polo","mdi:polymer","mdi:pool","mdi:pool-thermometer","mdi:popcorn","mdi:post","mdi:post-lamp","mdi:post-outline","mdi:postage-stamp","mdi:pot","mdi:pot-mix","mdi:pot-mix-outline","mdi:pot-outline","mdi:pot-steam","mdi:pot-steam-outline","mdi:pound","mdi:pound-box","mdi:pound-box-outline","mdi:power","mdi:power-cycle","mdi:power-off","mdi:power-on","mdi:power-plug","mdi:power-plug-battery","mdi:power-plug-battery-outline","mdi:power-plug-off","mdi:power-plug-off-outline","mdi:power-plug-outline","mdi:power-settings","mdi:power-sleep","mdi:power-socket","mdi:power-socket-au","mdi:power-socket-ch","mdi:power-socket-de","mdi:power-socket-eu","mdi:power-socket-fr","mdi:power-socket-it","mdi:power-socket-jp","mdi:power-socket-uk","mdi:power-socket-us","mdi:power-standby","mdi:powershell","mdi:prescription","mdi:presentation","mdi:presentation-play","mdi:pretzel","mdi:printer","mdi:printer-3-d","mdi:printer-3-d-nozzle","mdi:printer-3-d-nozzle-alert","mdi:printer-3-d-nozzle-alert-outline","mdi:printer-3-d-nozzle-heat","mdi:printer-3-d-nozzle-heat-outline","mdi:printer-3-d-nozzle-off","mdi:printer-3-d-nozzle-off-outline","mdi:printer-3-d-nozzle-outline","mdi:printer-3-d-off","mdi:printer-alert","mdi:printer-check","mdi:printer-eye","mdi:printer-off","mdi:printer-off-outline","mdi:printer-outline","mdi:printer-pos","mdi:printer-pos-alert","mdi:printer-pos-alert-outline","mdi:printer-pos-cancel","mdi:printer-pos-cancel-outline","mdi:printer-pos-check","mdi:printer-pos-check-outline","mdi:printer-pos-cog","mdi:printer-pos-cog-outline","mdi:printer-pos-edit","mdi:printer-pos-edit-outline","mdi:printer-pos-minus","mdi:printer-pos-minus-outline","mdi:printer-pos-network","mdi:printer-pos-network-outline","mdi:printer-pos-off","mdi:printer-pos-off-outline","mdi:printer-pos-outline","mdi:printer-pos-pause","mdi:printer-pos-pause-outline","mdi:printer-pos-play","mdi:printer-pos-play-outline","mdi:printer-pos-plus","mdi:printer-pos-plus-outline","mdi:printer-pos-refresh","mdi:printer-pos-refresh-outline","mdi:printer-pos-remove","mdi:printer-pos-remove-outline","mdi:printer-pos-star","mdi:printer-pos-star-outline","mdi:printer-pos-stop","mdi:printer-pos-stop-outline","mdi:printer-pos-sync","mdi:printer-pos-sync-outline","mdi:printer-pos-wrench","mdi:printer-pos-wrench-outline","mdi:printer-search","mdi:printer-settings","mdi:printer-wireless","mdi:priority-high","mdi:priority-low","mdi:professional-hexagon","mdi:progress-alert","mdi:progress-check","mdi:progress-clock","mdi:progress-close","mdi:progress-download","mdi:progress-helper","mdi:progress-pencil","mdi:progress-question","mdi:progress-star","mdi:progress-star-four-points","mdi:progress-tag","mdi:progress-upload","mdi:progress-wrench","mdi:projector","mdi:projector-off","mdi:projector-screen","mdi:projector-screen-off","mdi:projector-screen-off-outline","mdi:projector-screen-outline","mdi:projector-screen-variant","mdi:projector-screen-variant-off","mdi:projector-screen-variant-off-outline","mdi:projector-screen-variant-outline","mdi:propane-tank","mdi:propane-tank-outline","mdi:protocol","mdi:publish","mdi:publish-off","mdi:pulse","mdi:pump","mdi:pump-off","mdi:pumpkin","mdi:purse","mdi:purse-outline","mdi:puzzle","mdi:puzzle-check","mdi:puzzle-check-outline","mdi:puzzle-edit","mdi:puzzle-edit-outline","mdi:puzzle-heart","mdi:puzzle-heart-outline","mdi:puzzle-minus","mdi:puzzle-minus-outline","mdi:puzzle-outline","mdi:puzzle-plus","mdi:puzzle-plus-outline","mdi:puzzle-remove","mdi:puzzle-remove-outline","mdi:puzzle-star","mdi:puzzle-star-outline","mdi:pyramid","mdi:pyramid-off","mdi:qi","mdi:qqchat","mdi:qrcode","mdi:qrcode-edit","mdi:qrcode-minus","mdi:qrcode-plus","mdi:qrcode-remove","mdi:qrcode-scan","mdi:quadcopter","mdi:quality-high","mdi:quality-low","mdi:quality-medium","mdi:queue-first-in-last-out","mdi:quora","mdi:rabbit","mdi:rabbit-variant","mdi:rabbit-variant-outline","mdi:racing-helmet","mdi:racquetball","mdi:radar","mdi:radiator","mdi:radiator-disabled","mdi:radiator-off","mdi:radio","mdi:radio-am","mdi:radio-fm","mdi:radio-handheld","mdi:radio-off","mdi:radio-tower","mdi:radioactive","mdi:radioactive-circle","mdi:radioactive-circle-outline","mdi:radioactive-off","mdi:radiobox-blank","mdi:radiobox-indeterminate-variant","mdi:radiobox-marked","mdi:radiology-box","mdi:radiology-box-outline","mdi:radius","mdi:radius-outline","mdi:railroad-light","mdi:rake","mdi:raspberry-pi","mdi:raw","mdi:raw-off","mdi:ray-end","mdi:ray-end-arrow","mdi:ray-start","mdi:ray-start-arrow","mdi:ray-start-end","mdi:ray-start-vertex-end","mdi:ray-vertex","mdi:razor-double-edge","mdi:razor-single-edge","mdi:react","mdi:read","mdi:receipt","mdi:receipt-clock","mdi:receipt-clock-outline","mdi:receipt-outline","mdi:receipt-send","mdi:receipt-send-outline","mdi:receipt-text","mdi:receipt-text-arrow-left","mdi:receipt-text-arrow-left-outline","mdi:receipt-text-arrow-right","mdi:receipt-text-arrow-right-outline","mdi:receipt-text-check","mdi:receipt-text-check-outline","mdi:receipt-text-clock","mdi:receipt-text-clock-outline","mdi:receipt-text-edit","mdi:receipt-text-edit-outline","mdi:receipt-text-minus","mdi:receipt-text-minus-outline","mdi:receipt-text-outline","mdi:receipt-text-plus","mdi:receipt-text-plus-outline","mdi:receipt-text-remove","mdi:receipt-text-remove-outline","mdi:receipt-text-send","mdi:receipt-text-send-outline","mdi:record","mdi:record-circle","mdi:record-circle-outline","mdi:record-player","mdi:record-rec","mdi:rectangle","mdi:rectangle-outline","mdi:recycle","mdi:recycle-variant","mdi:reddit","mdi:redhat","mdi:redo","mdi:redo-variant","mdi:reflect-horizontal","mdi:reflect-vertical","mdi:refresh","mdi:refresh-auto","mdi:refresh-circle","mdi:regex","mdi:registered-trademark","mdi:reiterate","mdi:relation-many-to-many","mdi:relation-many-to-one","mdi:relation-many-to-one-or-many","mdi:relation-many-to-only-one","mdi:relation-many-to-zero-or-many","mdi:relation-many-to-zero-or-one","mdi:relation-one-or-many-to-many","mdi:relation-one-or-many-to-one","mdi:relation-one-or-many-to-one-or-many","mdi:relation-one-or-many-to-only-one","mdi:relation-one-or-many-to-zero-or-many","mdi:relation-one-or-many-to-zero-or-one","mdi:relation-one-to-many","mdi:relation-one-to-one","mdi:relation-one-to-one-or-many","mdi:relation-one-to-only-one","mdi:relation-one-to-zero-or-many","mdi:relation-one-to-zero-or-one","mdi:relation-only-one-to-many","mdi:relation-only-one-to-one","mdi:relation-only-one-to-one-or-many","mdi:relation-only-one-to-only-one","mdi:relation-only-one-to-zero-or-many","mdi:relation-only-one-to-zero-or-one","mdi:relation-zero-or-many-to-many","mdi:relation-zero-or-many-to-one","mdi:relation-zero-or-many-to-one-or-many","mdi:relation-zero-or-many-to-only-one","mdi:relation-zero-or-many-to-zero-or-many","mdi:relation-zero-or-many-to-zero-or-one","mdi:relation-zero-or-one-to-many","mdi:relation-zero-or-one-to-one","mdi:relation-zero-or-one-to-one-or-many","mdi:relation-zero-or-one-to-only-one","mdi:relation-zero-or-one-to-zero-or-many","mdi:relation-zero-or-one-to-zero-or-one","mdi:relative-scale","mdi:reload","mdi:reload-alert","mdi:reminder","mdi:remote","mdi:remote-desktop","mdi:remote-off","mdi:remote-tv","mdi:remote-tv-off","mdi:rename","mdi:rename-box","mdi:rename-box-outline","mdi:rename-outline","mdi:reorder-horizontal","mdi:reorder-vertical","mdi:repeat","mdi:repeat-off","mdi:repeat-once","mdi:repeat-variant","mdi:replay","mdi:reply","mdi:reply-all","mdi:reply-all-outline","mdi:reply-circle","mdi:reply-outline","mdi:reproduction","mdi:resistor","mdi:resistor-nodes","mdi:resize","mdi:resize-bottom-right","mdi:responsive","mdi:restart","mdi:restart-alert","mdi:restart-off","mdi:restore","mdi:restore-alert","mdi:rewind","mdi:rewind-10","mdi:rewind-15","mdi:rewind-30","mdi:rewind-45","mdi:rewind-5","mdi:rewind-60","mdi:rewind-outline","mdi:rhombus","mdi:rhombus-medium","mdi:rhombus-medium-outline","mdi:rhombus-outline","mdi:rhombus-split","mdi:rhombus-split-outline","mdi:ribbon","mdi:rice","mdi:rickshaw","mdi:rickshaw-electric","mdi:ring","mdi:rivet","mdi:road","mdi:road-variant","mdi:robber","mdi:robot","mdi:robot-angry","mdi:robot-angry-outline","mdi:robot-confused","mdi:robot-confused-outline","mdi:robot-dead","mdi:robot-dead-outline","mdi:robot-excited","mdi:robot-excited-outline","mdi:robot-happy","mdi:robot-happy-outline","mdi:robot-industrial","mdi:robot-industrial-outline","mdi:robot-love","mdi:robot-love-outline","mdi:robot-mower","mdi:robot-mower-outline","mdi:robot-off","mdi:robot-off-outline","mdi:robot-outline","mdi:robot-vacuum","mdi:robot-vacuum-alert","mdi:robot-vacuum-off","mdi:robot-vacuum-variant","mdi:robot-vacuum-variant-alert","mdi:robot-vacuum-variant-off","mdi:rocket","mdi:rocket-launch","mdi:rocket-launch-outline","mdi:rocket-outline","mdi:rodent","mdi:roller-shade","mdi:roller-shade-closed","mdi:roller-skate","mdi:roller-skate-off","mdi:rollerblade","mdi:rollerblade-off","mdi:rollupjs","mdi:rolodex","mdi:rolodex-outline","mdi:roman-numeral-1","mdi:roman-numeral-10","mdi:roman-numeral-2","mdi:roman-numeral-3","mdi:roman-numeral-4","mdi:roman-numeral-5","mdi:roman-numeral-6","mdi:roman-numeral-7","mdi:roman-numeral-8","mdi:roman-numeral-9","mdi:room-service","mdi:room-service-outline","mdi:rotate-3-d","mdi:rotate-3-d-variant","mdi:rotate-360","mdi:rotate-left","mdi:rotate-left-variant","mdi:rotate-orbit","mdi:rotate-right","mdi:rotate-right-variant","mdi:rounded-corner","mdi:router","mdi:router-network","mdi:router-network-wireless","mdi:router-wireless","mdi:router-wireless-off","mdi:router-wireless-settings","mdi:routes","mdi:routes-clock","mdi:rowing","mdi:rss","mdi:rss-box","mdi:rss-off","mdi:rug","mdi:rugby","mdi:ruler","mdi:ruler-square","mdi:ruler-square-compass","mdi:run","mdi:run-fast","mdi:rv-truck","mdi:sack","mdi:sack-outline","mdi:sack-percent","mdi:safe","mdi:safe-square","mdi:safe-square-outline","mdi:safety-goggles","mdi:sail-boat","mdi:sail-boat-sink","mdi:sale","mdi:sale-outline","mdi:salesforce","mdi:sass","mdi:satellite","mdi:satellite-uplink","mdi:satellite-variant","mdi:sausage","mdi:sausage-off","mdi:saw-blade","mdi:sawtooth-wave","mdi:saxophone","mdi:scale","mdi:scale-balance","mdi:scale-bathroom","mdi:scale-off","mdi:scale-unbalanced","mdi:scan-helper","mdi:scanner","mdi:scanner-off","mdi:scatter-plot","mdi:scatter-plot-outline","mdi:scent","mdi:scent-off","mdi:school","mdi:school-outline","mdi:scissors-cutting","mdi:scooter","mdi:scooter-electric","mdi:scoreboard","mdi:scoreboard-outline","mdi:screen-rotation","mdi:screen-rotation-lock","mdi:screw-flat-top","mdi:screw-lag","mdi:screw-machine-flat-top","mdi:screw-machine-round-top","mdi:screw-round-top","mdi:screwdriver","mdi:script","mdi:script-outline","mdi:script-text","mdi:script-text-key","mdi:script-text-key-outline","mdi:script-text-outline","mdi:script-text-play","mdi:script-text-play-outline","mdi:sd","mdi:seal","mdi:seal-variant","mdi:search-web","mdi:seat","mdi:seat-flat","mdi:seat-flat-angled","mdi:seat-individual-suite","mdi:seat-legroom-extra","mdi:seat-legroom-normal","mdi:seat-legroom-reduced","mdi:seat-outline","mdi:seat-passenger","mdi:seat-recline-extra","mdi:seat-recline-normal","mdi:seatbelt","mdi:security","mdi:security-network","mdi:seed","mdi:seed-off","mdi:seed-off-outline","mdi:seed-outline","mdi:seed-plus","mdi:seed-plus-outline","mdi:seesaw","mdi:segment","mdi:select","mdi:select-all","mdi:select-arrow-down","mdi:select-arrow-up","mdi:select-color","mdi:select-compare","mdi:select-drag","mdi:select-group","mdi:select-inverse","mdi:select-marker","mdi:select-multiple","mdi:select-multiple-marker","mdi:select-off","mdi:select-place","mdi:select-remove","mdi:select-search","mdi:selection","mdi:selection-drag","mdi:selection-ellipse","mdi:selection-ellipse-arrow-inside","mdi:selection-ellipse-remove","mdi:selection-marker","mdi:selection-multiple","mdi:selection-multiple-marker","mdi:selection-off","mdi:selection-remove","mdi:selection-search","mdi:semantic-web","mdi:send","mdi:send-check","mdi:send-check-outline","mdi:send-circle","mdi:send-circle-outline","mdi:send-clock","mdi:send-clock-outline","mdi:send-lock","mdi:send-lock-outline","mdi:send-outline","mdi:send-variant","mdi:send-variant-clock","mdi:send-variant-clock-outline","mdi:send-variant-outline","mdi:serial-port","mdi:server","mdi:server-minus","mdi:server-minus-outline","mdi:server-network","mdi:server-network-off","mdi:server-network-outline","mdi:server-off","mdi:server-outline","mdi:server-plus","mdi:server-plus-outline","mdi:server-remove","mdi:server-security","mdi:set-all","mdi:set-center","mdi:set-center-right","mdi:set-left","mdi:set-left-center","mdi:set-left-right","mdi:set-merge","mdi:set-none","mdi:set-right","mdi:set-split","mdi:set-square","mdi:set-top-box","mdi:settings-helper","mdi:shaker","mdi:shaker-outline","mdi:shape","mdi:shape-circle-plus","mdi:shape-outline","mdi:shape-oval-plus","mdi:shape-plus","mdi:shape-plus-outline","mdi:shape-polygon-plus","mdi:shape-rectangle-plus","mdi:shape-square-plus","mdi:shape-square-rounded-plus","mdi:share","mdi:share-all","mdi:share-all-outline","mdi:share-circle","mdi:share-off","mdi:share-off-outline","mdi:share-outline","mdi:share-variant","mdi:share-variant-outline","mdi:shark","mdi:shark-fin","mdi:shark-fin-outline","mdi:shark-off","mdi:sheep","mdi:shield","mdi:shield-account","mdi:shield-account-outline","mdi:shield-account-variant","mdi:shield-account-variant-outline","mdi:shield-airplane","mdi:shield-airplane-outline","mdi:shield-alert","mdi:shield-alert-outline","mdi:shield-bug","mdi:shield-bug-outline","mdi:shield-car","mdi:shield-check","mdi:shield-check-outline","mdi:shield-cross","mdi:shield-cross-outline","mdi:shield-crown","mdi:shield-crown-outline","mdi:shield-edit","mdi:shield-edit-outline","mdi:shield-half","mdi:shield-half-full","mdi:shield-home","mdi:shield-home-outline","mdi:shield-key","mdi:shield-key-outline","mdi:shield-link-variant","mdi:shield-link-variant-outline","mdi:shield-lock","mdi:shield-lock-open","mdi:shield-lock-open-outline","mdi:shield-lock-outline","mdi:shield-moon","mdi:shield-moon-outline","mdi:shield-off","mdi:shield-off-outline","mdi:shield-outline","mdi:shield-plus","mdi:shield-plus-outline","mdi:shield-refresh","mdi:shield-refresh-outline","mdi:shield-remove","mdi:shield-remove-outline","mdi:shield-search","mdi:shield-star","mdi:shield-star-outline","mdi:shield-sun","mdi:shield-sun-outline","mdi:shield-sword","mdi:shield-sword-outline","mdi:shield-sync","mdi:shield-sync-outline","mdi:shimmer","mdi:ship-wheel","mdi:shipping-pallet","mdi:shoe-ballet","mdi:shoe-cleat","mdi:shoe-formal","mdi:shoe-heel","mdi:shoe-print","mdi:shoe-sneaker","mdi:shopping","mdi:shopping-music","mdi:shopping-outline","mdi:shopping-search","mdi:shopping-search-outline","mdi:shore","mdi:shovel","mdi:shovel-off","mdi:shower","mdi:shower-head","mdi:shredder","mdi:shuffle","mdi:shuffle-disabled","mdi:shuffle-variant","mdi:shuriken","mdi:sickle","mdi:sigma","mdi:sigma-lower","mdi:sign-caution","mdi:sign-direction","mdi:sign-direction-minus","mdi:sign-direction-plus","mdi:sign-direction-remove","mdi:sign-language","mdi:sign-language-outline","mdi:sign-pole","mdi:sign-real-estate","mdi:sign-text","mdi:sign-yield","mdi:signal","mdi:signal-2-g","mdi:signal-3-g","mdi:signal-4-g","mdi:signal-5-g","mdi:signal-cellular-1","mdi:signal-cellular-2","mdi:signal-cellular-3","mdi:signal-cellular-outline","mdi:signal-distance-variant","mdi:signal-hspa","mdi:signal-hspa-plus","mdi:signal-off","mdi:signal-variant","mdi:signature","mdi:signature-freehand","mdi:signature-image","mdi:signature-text","mdi:silo","mdi:silo-outline","mdi:silverware","mdi:silverware-clean","mdi:silverware-fork","mdi:silverware-fork-knife","mdi:silverware-spoon","mdi:silverware-variant","mdi:sim","mdi:sim-alert","mdi:sim-alert-outline","mdi:sim-off","mdi:sim-off-outline","mdi:sim-outline","mdi:simple-icons","mdi:sina-weibo","mdi:sine-wave","mdi:sitemap","mdi:sitemap-outline","mdi:size-l","mdi:size-m","mdi:size-s","mdi:size-xl","mdi:size-xs","mdi:size-xxl","mdi:size-xxs","mdi:size-xxxl","mdi:skate","mdi:skate-off","mdi:skateboard","mdi:skateboarding","mdi:skew-less","mdi:skew-more","mdi:ski","mdi:ski-cross-country","mdi:ski-water","mdi:skip-backward","mdi:skip-backward-outline","mdi:skip-forward","mdi:skip-forward-outline","mdi:skip-next","mdi:skip-next-circle","mdi:skip-next-circle-outline","mdi:skip-next-outline","mdi:skip-previous","mdi:skip-previous-circle","mdi:skip-previous-circle-outline","mdi:skip-previous-outline","mdi:skull","mdi:skull-crossbones","mdi:skull-crossbones-outline","mdi:skull-outline","mdi:skull-scan","mdi:skull-scan-outline","mdi:skype","mdi:skype-business","mdi:slack","mdi:slash-forward","mdi:slash-forward-box","mdi:sledding","mdi:sleep","mdi:sleep-off","mdi:slide","mdi:slope-downhill","mdi:slope-uphill","mdi:slot-machine","mdi:slot-machine-outline","mdi:smart-card","mdi:smart-card-off","mdi:smart-card-off-outline","mdi:smart-card-outline","mdi:smart-card-reader","mdi:smart-card-reader-outline","mdi:smog","mdi:smoke","mdi:smoke-detector","mdi:smoke-detector-alert","mdi:smoke-detector-alert-outline","mdi:smoke-detector-off","mdi:smoke-detector-off-outline","mdi:smoke-detector-outline","mdi:smoke-detector-variant","mdi:smoke-detector-variant-alert","mdi:smoke-detector-variant-off","mdi:smoking","mdi:smoking-off","mdi:smoking-pipe","mdi:smoking-pipe-off","mdi:snail","mdi:snake","mdi:snapchat","mdi:snowboard","mdi:snowflake","mdi:snowflake-alert","mdi:snowflake-check","mdi:snowflake-melt","mdi:snowflake-off","mdi:snowflake-thermometer","mdi:snowflake-variant","mdi:snowman","mdi:snowmobile","mdi:snowshoeing","mdi:soccer","mdi:soccer-field","mdi:social-distance-2-meters","mdi:social-distance-6-feet","mdi:sofa","mdi:sofa-outline","mdi:sofa-single","mdi:sofa-single-outline","mdi:solar-panel","mdi:solar-panel-large","mdi:solar-power","mdi:solar-power-variant","mdi:solar-power-variant-outline","mdi:soldering-iron","mdi:solid","mdi:sony-playstation","mdi:sort","mdi:sort-alphabetical-ascending","mdi:sort-alphabetical-ascending-variant","mdi:sort-alphabetical-descending","mdi:sort-alphabetical-descending-variant","mdi:sort-alphabetical-variant","mdi:sort-ascending","mdi:sort-bool-ascending","mdi:sort-bool-ascending-variant","mdi:sort-bool-descending","mdi:sort-bool-descending-variant","mdi:sort-calendar-ascending","mdi:sort-calendar-descending","mdi:sort-clock-ascending","mdi:sort-clock-ascending-outline","mdi:sort-clock-descending","mdi:sort-clock-descending-outline","mdi:sort-descending","mdi:sort-numeric-ascending","mdi:sort-numeric-ascending-variant","mdi:sort-numeric-descending","mdi:sort-numeric-descending-variant","mdi:sort-numeric-variant","mdi:sort-reverse-variant","mdi:sort-variant","mdi:sort-variant-lock","mdi:sort-variant-lock-open","mdi:sort-variant-off","mdi:sort-variant-remove","mdi:soundbar","mdi:soundcloud","mdi:source-branch","mdi:source-branch-check","mdi:source-branch-minus","mdi:source-branch-plus","mdi:source-branch-refresh","mdi:source-branch-remove","mdi:source-branch-sync","mdi:source-commit","mdi:source-commit-end","mdi:source-commit-end-local","mdi:source-commit-local","mdi:source-commit-next-local","mdi:source-commit-start","mdi:source-commit-start-next-local","mdi:source-fork","mdi:source-merge","mdi:source-pull","mdi:source-repository","mdi:source-repository-multiple","mdi:soy-sauce","mdi:soy-sauce-off","mdi:spa","mdi:spa-outline","mdi:space-invaders","mdi:space-station","mdi:spade","mdi:speaker","mdi:speaker-bluetooth","mdi:speaker-message","mdi:speaker-multiple","mdi:speaker-off","mdi:speaker-pause","mdi:speaker-play","mdi:speaker-stop","mdi:speaker-wireless","mdi:spear","mdi:speedometer","mdi:speedometer-medium","mdi:speedometer-slow","mdi:spellcheck","mdi:sphere","mdi:sphere-off","mdi:spider","mdi:spider-outline","mdi:spider-thread","mdi:spider-web","mdi:spirit-level","mdi:spoon-sugar","mdi:spotify","mdi:spotlight","mdi:spotlight-beam","mdi:spray","mdi:spray-bottle","mdi:sprinkler","mdi:sprinkler-fire","mdi:sprinkler-variant","mdi:sprout","mdi:sprout-outline","mdi:square","mdi:square-circle","mdi:square-circle-outline","mdi:square-edit-outline","mdi:square-medium","mdi:square-medium-outline","mdi:square-off","mdi:square-off-outline","mdi:square-opacity","mdi:square-outline","mdi:square-root","mdi:square-root-box","mdi:square-rounded","mdi:square-rounded-badge","mdi:square-rounded-badge-outline","mdi:square-rounded-outline","mdi:square-small","mdi:square-wave","mdi:squeegee","mdi:ssh","mdi:stack-exchange","mdi:stack-overflow","mdi:stackpath","mdi:stadium","mdi:stadium-outline","mdi:stadium-variant","mdi:stairs","mdi:stairs-box","mdi:stairs-down","mdi:stairs-up","mdi:stamper","mdi:standard-definition","mdi:star","mdi:star-box","mdi:star-box-multiple","mdi:star-box-multiple-outline","mdi:star-box-outline","mdi:star-check","mdi:star-check-outline","mdi:star-circle","mdi:star-circle-outline","mdi:star-cog","mdi:star-cog-outline","mdi:star-crescent","mdi:star-david","mdi:star-face","mdi:star-four-points","mdi:star-four-points-box","mdi:star-four-points-box-outline","mdi:star-four-points-circle","mdi:star-four-points-circle-outline","mdi:star-four-points-outline","mdi:star-four-points-small","mdi:star-half","mdi:star-half-full","mdi:star-minus","mdi:star-minus-outline","mdi:star-off","mdi:star-off-outline","mdi:star-outline","mdi:star-plus","mdi:star-plus-outline","mdi:star-remove","mdi:star-remove-outline","mdi:star-settings","mdi:star-settings-outline","mdi:star-shooting","mdi:star-shooting-outline","mdi:star-three-points","mdi:star-three-points-outline","mdi:state-machine","mdi:steam","mdi:steering","mdi:steering-off","mdi:step-backward","mdi:step-backward-2","mdi:step-forward","mdi:step-forward-2","mdi:stethoscope","mdi:sticker","mdi:sticker-alert","mdi:sticker-alert-outline","mdi:sticker-check","mdi:sticker-check-outline","mdi:sticker-circle-outline","mdi:sticker-emoji","mdi:sticker-minus","mdi:sticker-minus-outline","mdi:sticker-outline","mdi:sticker-plus","mdi:sticker-plus-outline","mdi:sticker-remove","mdi:sticker-remove-outline","mdi:sticker-text","mdi:sticker-text-outline","mdi:stocking","mdi:stomach","mdi:stool","mdi:stool-outline","mdi:stop","mdi:stop-circle","mdi:stop-circle-outline","mdi:storage-tank","mdi:storage-tank-outline","mdi:store","mdi:store-24-hour","mdi:store-alert","mdi:store-alert-outline","mdi:store-check","mdi:store-check-outline","mdi:store-clock","mdi:store-clock-outline","mdi:store-cog","mdi:store-cog-outline","mdi:store-edit","mdi:store-edit-outline","mdi:store-marker","mdi:store-marker-outline","mdi:store-minus","mdi:store-minus-outline","mdi:store-off","mdi:store-off-outline","mdi:store-outline","mdi:store-plus","mdi:store-plus-outline","mdi:store-remove","mdi:store-remove-outline","mdi:store-search","mdi:store-search-outline","mdi:store-settings","mdi:store-settings-outline","mdi:storefront","mdi:storefront-check","mdi:storefront-check-outline","mdi:storefront-edit","mdi:storefront-edit-outline","mdi:storefront-minus","mdi:storefront-minus-outline","mdi:storefront-outline","mdi:storefront-plus","mdi:storefront-plus-outline","mdi:storefront-remove","mdi:storefront-remove-outline","mdi:stove","mdi:strategy","mdi:stretch-to-page","mdi:stretch-to-page-outline","mdi:string-lights","mdi:string-lights-off","mdi:subdirectory-arrow-left","mdi:subdirectory-arrow-right","mdi:submarine","mdi:subtitles","mdi:subtitles-outline","mdi:subway","mdi:subway-alert-variant","mdi:subway-variant","mdi:summit","mdi:sun-angle","mdi:sun-angle-outline","mdi:sun-clock","mdi:sun-clock-outline","mdi:sun-compass","mdi:sun-snowflake","mdi:sun-snowflake-variant","mdi:sun-thermometer","mdi:sun-thermometer-outline","mdi:sun-wireless","mdi:sun-wireless-outline","mdi:sunglasses","mdi:surfing","mdi:surround-sound","mdi:surround-sound-20","mdi:surround-sound-21","mdi:surround-sound-31","mdi:surround-sound-51","mdi:surround-sound-512","mdi:surround-sound-71","mdi:svg","mdi:swap-horizontal","mdi:swap-horizontal-bold","mdi:swap-horizontal-circle","mdi:swap-horizontal-circle-outline","mdi:swap-horizontal-hidden","mdi:swap-horizontal-variant","mdi:swap-vertical","mdi:swap-vertical-bold","mdi:swap-vertical-circle","mdi:swap-vertical-circle-outline","mdi:swap-vertical-variant","mdi:swim","mdi:switch","mdi:sword","mdi:sword-cross","mdi:syllabary-hangul","mdi:syllabary-hiragana","mdi:syllabary-katakana","mdi:syllabary-katakana-halfwidth","mdi:symbol","mdi:symfony","mdi:synagogue","mdi:synagogue-outline","mdi:sync","mdi:sync-alert","mdi:sync-circle","mdi:sync-off","mdi:tab","mdi:tab-minus","mdi:tab-plus","mdi:tab-remove","mdi:tab-search","mdi:tab-unselected","mdi:table","mdi:table-account","mdi:table-alert","mdi:table-arrow-down","mdi:table-arrow-left","mdi:table-arrow-right","mdi:table-arrow-up","mdi:table-border","mdi:table-cancel","mdi:table-chair","mdi:table-check","mdi:table-clock","mdi:table-cog","mdi:table-column","mdi:table-column-plus-after","mdi:table-column-plus-before","mdi:table-column-remove","mdi:table-column-width","mdi:table-edit","mdi:table-eye","mdi:table-eye-off","mdi:table-filter","mdi:table-furniture","mdi:table-headers-eye","mdi:table-headers-eye-off","mdi:table-heart","mdi:table-key","mdi:table-large","mdi:table-large-plus","mdi:table-large-remove","mdi:table-lock","mdi:table-merge-cells","mdi:table-minus","mdi:table-multiple","mdi:table-network","mdi:table-of-contents","mdi:table-off","mdi:table-picnic","mdi:table-pivot","mdi:table-plus","mdi:table-question","mdi:table-refresh","mdi:table-remove","mdi:table-row","mdi:table-row-height","mdi:table-row-plus-after","mdi:table-row-plus-before","mdi:table-row-remove","mdi:table-search","mdi:table-settings","mdi:table-split-cell","mdi:table-star","mdi:table-sync","mdi:table-tennis","mdi:tablet","mdi:tablet-cellphone","mdi:tablet-dashboard","mdi:taco","mdi:tag","mdi:tag-arrow-down","mdi:tag-arrow-down-outline","mdi:tag-arrow-left","mdi:tag-arrow-left-outline","mdi:tag-arrow-right","mdi:tag-arrow-right-outline","mdi:tag-arrow-up","mdi:tag-arrow-up-outline","mdi:tag-check","mdi:tag-check-outline","mdi:tag-edit","mdi:tag-edit-outline","mdi:tag-faces","mdi:tag-heart","mdi:tag-heart-outline","mdi:tag-hidden","mdi:tag-minus","mdi:tag-minus-outline","mdi:tag-multiple","mdi:tag-multiple-outline","mdi:tag-off","mdi:tag-off-outline","mdi:tag-outline","mdi:tag-plus","mdi:tag-plus-outline","mdi:tag-remove","mdi:tag-remove-outline","mdi:tag-search","mdi:tag-search-outline","mdi:tag-text","mdi:tag-text-outline","mdi:tailwind","mdi:tally-mark-1","mdi:tally-mark-2","mdi:tally-mark-3","mdi:tally-mark-4","mdi:tally-mark-5","mdi:tangram","mdi:tank","mdi:tanker-truck","mdi:tape-drive","mdi:tape-measure","mdi:target","mdi:target-account","mdi:target-variant","mdi:taxi","mdi:tea","mdi:tea-outline","mdi:teamviewer","mdi:teddy-bear","mdi:telescope","mdi:television","mdi:television-ambient-light","mdi:television-box","mdi:television-classic","mdi:television-classic-off","mdi:television-guide","mdi:television-off","mdi:television-pause","mdi:television-play","mdi:television-shimmer","mdi:television-speaker","mdi:television-speaker-off","mdi:television-stop","mdi:temperature-celsius","mdi:temperature-fahrenheit","mdi:temperature-kelvin","mdi:temple-buddhist","mdi:temple-buddhist-outline","mdi:temple-hindu","mdi:temple-hindu-outline","mdi:tennis","mdi:tennis-ball","mdi:tennis-ball-outline","mdi:tent","mdi:terraform","mdi:terrain","mdi:test-tube","mdi:test-tube-empty","mdi:test-tube-off","mdi:text","mdi:text-account","mdi:text-box","mdi:text-box-check","mdi:text-box-check-outline","mdi:text-box-edit","mdi:text-box-edit-outline","mdi:text-box-minus","mdi:text-box-minus-outline","mdi:text-box-multiple","mdi:text-box-multiple-outline","mdi:text-box-outline","mdi:text-box-plus","mdi:text-box-plus-outline","mdi:text-box-remove","mdi:text-box-remove-outline","mdi:text-box-search","mdi:text-box-search-outline","mdi:text-long","mdi:text-recognition","mdi:text-search","mdi:text-search-variant","mdi:text-shadow","mdi:text-short","mdi:texture","mdi:texture-box","mdi:theater","mdi:theme-light-dark","mdi:thermometer","mdi:thermometer-alert","mdi:thermometer-auto","mdi:thermometer-bluetooth","mdi:thermometer-check","mdi:thermometer-chevron-down","mdi:thermometer-chevron-up","mdi:thermometer-high","mdi:thermometer-lines","mdi:thermometer-low","mdi:thermometer-minus","mdi:thermometer-off","mdi:thermometer-plus","mdi:thermometer-probe","mdi:thermometer-probe-off","mdi:thermometer-water","mdi:thermostat","mdi:thermostat-auto","mdi:thermostat-box","mdi:thermostat-box-auto","mdi:thermostat-cog","mdi:thought-bubble","mdi:thought-bubble-outline","mdi:thumb-down","mdi:thumb-down-outline","mdi:thumb-up","mdi:thumb-up-outline","mdi:thumbs-up-down","mdi:thumbs-up-down-outline","mdi:ticket","mdi:ticket-account","mdi:ticket-confirmation","mdi:ticket-confirmation-outline","mdi:ticket-outline","mdi:ticket-percent","mdi:ticket-percent-outline","mdi:tie","mdi:tilde","mdi:tilde-off","mdi:timelapse","mdi:timeline","mdi:timeline-alert","mdi:timeline-alert-outline","mdi:timeline-check","mdi:timeline-check-outline","mdi:timeline-clock","mdi:timeline-clock-outline","mdi:timeline-minus","mdi:timeline-minus-outline","mdi:timeline-outline","mdi:timeline-plus","mdi:timeline-plus-outline","mdi:timeline-question","mdi:timeline-question-outline","mdi:timeline-remove","mdi:timeline-remove-outline","mdi:timeline-text","mdi:timeline-text-outline","mdi:timer","mdi:timer-10","mdi:timer-3","mdi:timer-alert","mdi:timer-alert-outline","mdi:timer-cancel","mdi:timer-cancel-outline","mdi:timer-check","mdi:timer-check-outline","mdi:timer-cog","mdi:timer-cog-outline","mdi:timer-edit","mdi:timer-edit-outline","mdi:timer-lock","mdi:timer-lock-open","mdi:timer-lock-open-outline","mdi:timer-lock-outline","mdi:timer-marker","mdi:timer-marker-outline","mdi:timer-minus","mdi:timer-minus-outline","mdi:timer-music","mdi:timer-music-outline","mdi:timer-off","mdi:timer-off-outline","mdi:timer-outline","mdi:timer-pause","mdi:timer-pause-outline","mdi:timer-play","mdi:timer-play-outline","mdi:timer-plus","mdi:timer-plus-outline","mdi:timer-refresh","mdi:timer-refresh-outline","mdi:timer-remove","mdi:timer-remove-outline","mdi:timer-sand","mdi:timer-sand-complete","mdi:timer-sand-empty","mdi:timer-sand-full","mdi:timer-sand-paused","mdi:timer-settings","mdi:timer-settings-outline","mdi:timer-star","mdi:timer-star-outline","mdi:timer-stop","mdi:timer-stop-outline","mdi:timer-sync","mdi:timer-sync-outline","mdi:timetable","mdi:tire","mdi:toaster","mdi:toaster-off","mdi:toaster-oven","mdi:toggle-switch","mdi:toggle-switch-off","mdi:toggle-switch-off-outline","mdi:toggle-switch-outline","mdi:toggle-switch-variant","mdi:toggle-switch-variant-off","mdi:toilet","mdi:toolbox","mdi:toolbox-outline","mdi:tools","mdi:tooltip","mdi:tooltip-account","mdi:tooltip-cellphone","mdi:tooltip-check","mdi:tooltip-check-outline","mdi:tooltip-edit","mdi:tooltip-edit-outline","mdi:tooltip-image","mdi:tooltip-image-outline","mdi:tooltip-minus","mdi:tooltip-minus-outline","mdi:tooltip-outline","mdi:tooltip-plus","mdi:tooltip-plus-outline","mdi:tooltip-question","mdi:tooltip-question-outline","mdi:tooltip-remove","mdi:tooltip-remove-outline","mdi:tooltip-text","mdi:tooltip-text-outline","mdi:tooth","mdi:tooth-outline","mdi:toothbrush","mdi:toothbrush-electric","mdi:toothbrush-paste","mdi:torch","mdi:tortoise","mdi:toslink","mdi:touch-text-outline","mdi:tournament","mdi:tow-truck","mdi:tower-beach","mdi:tower-fire","mdi:town-hall","mdi:toy-brick","mdi:toy-brick-marker","mdi:toy-brick-marker-outline","mdi:toy-brick-minus","mdi:toy-brick-minus-outline","mdi:toy-brick-outline","mdi:toy-brick-plus","mdi:toy-brick-plus-outline","mdi:toy-brick-remove","mdi:toy-brick-remove-outline","mdi:toy-brick-search","mdi:toy-brick-search-outline","mdi:track-light","mdi:track-light-off","mdi:trackpad","mdi:trackpad-lock","mdi:tractor","mdi:tractor-variant","mdi:trademark","mdi:traffic-cone","mdi:traffic-light","mdi:traffic-light-outline","mdi:train","mdi:train-bus","mdi:train-car","mdi:train-car-autorack","mdi:train-car-box","mdi:train-car-box-full","mdi:train-car-box-open","mdi:train-car-caboose","mdi:train-car-centerbeam","mdi:train-car-centerbeam-full","mdi:train-car-container","mdi:train-car-flatbed","mdi:train-car-flatbed-car","mdi:train-car-flatbed-tank","mdi:train-car-gondola","mdi:train-car-gondola-full","mdi:train-car-hopper","mdi:train-car-hopper-covered","mdi:train-car-hopper-full","mdi:train-car-intermodal","mdi:train-car-passenger","mdi:train-car-passenger-door","mdi:train-car-passenger-door-open","mdi:train-car-passenger-variant","mdi:train-car-tank","mdi:train-variant","mdi:tram","mdi:tram-side","mdi:transcribe","mdi:transcribe-close","mdi:transfer","mdi:transfer-down","mdi:transfer-left","mdi:transfer-right","mdi:transfer-up","mdi:transit-connection","mdi:transit-connection-horizontal","mdi:transit-connection-variant","mdi:transit-detour","mdi:transit-skip","mdi:transit-transfer","mdi:transition","mdi:transition-masked","mdi:translate","mdi:translate-off","mdi:translate-variant","mdi:transmission-tower","mdi:transmission-tower-export","mdi:transmission-tower-import","mdi:transmission-tower-off","mdi:trash-can","mdi:trash-can-outline","mdi:tray","mdi:tray-alert","mdi:tray-arrow-down","mdi:tray-arrow-up","mdi:tray-full","mdi:tray-minus","mdi:tray-plus","mdi:tray-remove","mdi:treasure-chest","mdi:treasure-chest-outline","mdi:tree","mdi:tree-outline","mdi:trello","mdi:trending-down","mdi:trending-neutral","mdi:trending-up","mdi:triangle","mdi:triangle-down","mdi:triangle-down-outline","mdi:triangle-outline","mdi:triangle-small-down","mdi:triangle-small-up","mdi:triangle-wave","mdi:triforce","mdi:trophy","mdi:trophy-award","mdi:trophy-broken","mdi:trophy-outline","mdi:trophy-variant","mdi:trophy-variant-outline","mdi:truck","mdi:truck-alert","mdi:truck-alert-outline","mdi:truck-cargo-container","mdi:truck-check","mdi:truck-check-outline","mdi:truck-delivery","mdi:truck-delivery-outline","mdi:truck-fast","mdi:truck-fast-outline","mdi:truck-flatbed","mdi:truck-minus","mdi:truck-minus-outline","mdi:truck-off-road","mdi:truck-off-road-off","mdi:truck-outline","mdi:truck-plus","mdi:truck-plus-outline","mdi:truck-remove","mdi:truck-remove-outline","mdi:truck-snowflake","mdi:truck-trailer","mdi:trumpet","mdi:tshirt-crew","mdi:tshirt-crew-outline","mdi:tshirt-v","mdi:tshirt-voutline","mdi:tsunami","mdi:tumble-dryer","mdi:tumble-dryer-alert","mdi:tumble-dryer-off","mdi:tune","mdi:tune-variant","mdi:tune-vertical","mdi:tune-vertical-variant","mdi:tunnel","mdi:tunnel-outline","mdi:turbine","mdi:turkey","mdi:turnstile","mdi:turnstile-outline","mdi:turtle","mdi:twitch","mdi:twitter","mdi:two-factor-authentication","mdi:typewriter","mdi:ubisoft","mdi:ubuntu","mdi:ufo","mdi:ufo-outline","mdi:ultra-high-definition","mdi:umbraco","mdi:umbrella","mdi:umbrella-beach","mdi:umbrella-beach-outline","mdi:umbrella-closed","mdi:umbrella-closed-outline","mdi:umbrella-closed-variant","mdi:umbrella-outline","mdi:underwear-outline","mdi:undo","mdi:undo-variant","mdi:unfold-less-horizontal","mdi:unfold-less-vertical","mdi:unfold-more-horizontal","mdi:unfold-more-vertical","mdi:ungroup","mdi:unicode","mdi:unicorn","mdi:unicorn-variant","mdi:unicycle","mdi:unity","mdi:unreal","mdi:update","mdi:upload","mdi:upload-box","mdi:upload-box-outline","mdi:upload-circle","mdi:upload-circle-outline","mdi:upload-lock","mdi:upload-lock-outline","mdi:upload-multiple","mdi:upload-multiple-outline","mdi:upload-network","mdi:upload-network-outline","mdi:upload-off","mdi:upload-off-outline","mdi:upload-outline","mdi:usb","mdi:usb-cport","mdi:usb-flash-drive","mdi:usb-flash-drive-outline","mdi:usb-port","mdi:vacuum","mdi:vacuum-outline","mdi:valve","mdi:valve-closed","mdi:valve-open","mdi:van-passenger","mdi:van-utility","mdi:vanish","mdi:vanish-quarter","mdi:vanity-light","mdi:variable","mdi:variable-box","mdi:vector-arrange-above","mdi:vector-arrange-below","mdi:vector-bezier","mdi:vector-circle","mdi:vector-circle-variant","mdi:vector-combine","mdi:vector-curve","mdi:vector-difference","mdi:vector-difference-ab","mdi:vector-difference-ba","mdi:vector-ellipse","mdi:vector-intersection","mdi:vector-line","mdi:vector-link","mdi:vector-point","mdi:vector-point-edit","mdi:vector-point-minus","mdi:vector-point-plus","mdi:vector-point-select","mdi:vector-polygon","mdi:vector-polygon-variant","mdi:vector-polyline","mdi:vector-polyline-edit","mdi:vector-polyline-minus","mdi:vector-polyline-plus","mdi:vector-polyline-remove","mdi:vector-radius","mdi:vector-rectangle","mdi:vector-selection","mdi:vector-square","mdi:vector-square-close","mdi:vector-square-edit","mdi:vector-square-minus","mdi:vector-square-open","mdi:vector-square-plus","mdi:vector-square-remove","mdi:vector-triangle","mdi:vector-union","mdi:vhs","mdi:vibrate","mdi:vibrate-off","mdi:video","mdi:video-2-d","mdi:video-3-d","mdi:video-3-d-off","mdi:video-3-d-variant","mdi:video-4-k-box","mdi:video-account","mdi:video-box","mdi:video-box-off","mdi:video-check","mdi:video-check-outline","mdi:video-high-definition","mdi:video-image","mdi:video-input-antenna","mdi:video-input-component","mdi:video-input-hdmi","mdi:video-input-scart","mdi:video-input-svideo","mdi:video-marker","mdi:video-marker-outline","mdi:video-minus","mdi:video-minus-outline","mdi:video-off","mdi:video-off-outline","mdi:video-outline","mdi:video-plus","mdi:video-plus-outline","mdi:video-stabilization","mdi:video-standard-definition","mdi:video-switch","mdi:video-switch-outline","mdi:video-vintage","mdi:video-wireless","mdi:video-wireless-outline","mdi:view-agenda","mdi:view-agenda-outline","mdi:view-array","mdi:view-array-outline","mdi:view-carousel","mdi:view-carousel-outline","mdi:view-column","mdi:view-column-outline","mdi:view-comfy","mdi:view-comfy-outline","mdi:view-compact","mdi:view-compact-outline","mdi:view-dashboard","mdi:view-dashboard-edit","mdi:view-dashboard-edit-outline","mdi:view-dashboard-outline","mdi:view-dashboard-variant","mdi:view-dashboard-variant-outline","mdi:view-day","mdi:view-day-outline","mdi:view-gallery","mdi:view-gallery-outline","mdi:view-grid","mdi:view-grid-compact","mdi:view-grid-outline","mdi:view-grid-plus","mdi:view-grid-plus-outline","mdi:view-headline","mdi:view-list","mdi:view-list-outline","mdi:view-module","mdi:view-module-outline","mdi:view-parallel","mdi:view-parallel-outline","mdi:view-quilt","mdi:view-quilt-outline","mdi:view-sequential","mdi:view-sequential-outline","mdi:view-split-horizontal","mdi:view-split-vertical","mdi:view-stream","mdi:view-stream-outline","mdi:view-week","mdi:view-week-outline","mdi:vimeo","mdi:violin","mdi:virtual-reality","mdi:virus","mdi:virus-off","mdi:virus-off-outline","mdi:virus-outline","mdi:vlc","mdi:voicemail","mdi:volcano","mdi:volcano-outline","mdi:volleyball","mdi:volume-equal","mdi:volume-high","mdi:volume-low","mdi:volume-medium","mdi:volume-minus","mdi:volume-mute","mdi:volume-off","mdi:volume-plus","mdi:volume-source","mdi:volume-variant-off","mdi:volume-vibrate","mdi:vote","mdi:vote-outline","mdi:vpn","mdi:vuejs","mdi:vuetify","mdi:walk","mdi:wall","mdi:wall-fire","mdi:wall-sconce","mdi:wall-sconce-flat","mdi:wall-sconce-flat-outline","mdi:wall-sconce-flat-variant","mdi:wall-sconce-flat-variant-outline","mdi:wall-sconce-outline","mdi:wall-sconce-round","mdi:wall-sconce-round-outline","mdi:wall-sconce-round-variant","mdi:wall-sconce-round-variant-outline","mdi:wallet","mdi:wallet-bifold","mdi:wallet-bifold-outline","mdi:wallet-giftcard","mdi:wallet-membership","mdi:wallet-outline","mdi:wallet-plus","mdi:wallet-plus-outline","mdi:wallet-travel","mdi:wallpaper","mdi:wan","mdi:wardrobe","mdi:wardrobe-outline","mdi:warehouse","mdi:washing-machine","mdi:washing-machine-alert","mdi:washing-machine-off","mdi:watch","mdi:watch-export","mdi:watch-export-variant","mdi:watch-import","mdi:watch-import-variant","mdi:watch-variant","mdi:watch-vibrate","mdi:watch-vibrate-off","mdi:water","mdi:water-alert","mdi:water-alert-outline","mdi:water-boiler","mdi:water-boiler-alert","mdi:water-boiler-auto","mdi:water-boiler-off","mdi:water-check","mdi:water-check-outline","mdi:water-circle","mdi:water-minus","mdi:water-minus-outline","mdi:water-off","mdi:water-off-outline","mdi:water-opacity","mdi:water-outline","mdi:water-percent","mdi:water-percent-alert","mdi:water-plus","mdi:water-plus-outline","mdi:water-polo","mdi:water-pump","mdi:water-pump-off","mdi:water-remove","mdi:water-remove-outline","mdi:water-sync","mdi:water-thermometer","mdi:water-thermometer-outline","mdi:water-well","mdi:water-well-outline","mdi:waterfall","mdi:watering-can","mdi:watering-can-outline","mdi:watermark","mdi:wave","mdi:wave-arrow-down","mdi:wave-arrow-up","mdi:wave-undercurrent","mdi:waveform","mdi:waves","mdi:waves-arrow-left","mdi:waves-arrow-right","mdi:waves-arrow-up","mdi:waze","mdi:weather-cloudy","mdi:weather-cloudy-alert","mdi:weather-cloudy-arrow-right","mdi:weather-cloudy-clock","mdi:weather-dust","mdi:weather-fog","mdi:weather-hail","mdi:weather-hazy","mdi:weather-hurricane","mdi:weather-hurricane-outline","mdi:weather-lightning","mdi:weather-lightning-rainy","mdi:weather-moonset","mdi:weather-moonset-down","mdi:weather-moonset-up","mdi:weather-night","mdi:weather-night-partly-cloudy","mdi:weather-partly-cloudy","mdi:weather-partly-lightning","mdi:weather-partly-rainy","mdi:weather-partly-snowy","mdi:weather-partly-snowy-rainy","mdi:weather-pouring","mdi:weather-rainy","mdi:weather-snowy","mdi:weather-snowy-heavy","mdi:weather-snowy-rainy","mdi:weather-sunny","mdi:weather-sunny-alert","mdi:weather-sunny-off","mdi:weather-sunset","mdi:weather-sunset-down","mdi:weather-sunset-up","mdi:weather-tornado","mdi:weather-windy","mdi:weather-windy-variant","mdi:web","mdi:web-box","mdi:web-cancel","mdi:web-check","mdi:web-clock","mdi:web-minus","mdi:web-off","mdi:web-plus","mdi:web-refresh","mdi:web-remove","mdi:web-sync","mdi:webcam","mdi:webcam-off","mdi:webhook","mdi:webpack","mdi:webrtc","mdi:wechat","mdi:weight","mdi:weight-gram","mdi:weight-kilogram","mdi:weight-lifter","mdi:weight-pound","mdi:whatsapp","mdi:wheel-barrow","mdi:wheelchair","mdi:wheelchair-accessibility","mdi:whistle","mdi:whistle-outline","mdi:white-balance-auto","mdi:white-balance-incandescent","mdi:white-balance-iridescent","mdi:white-balance-sunny","mdi:widgets","mdi:widgets-outline","mdi:wifi","mdi:wifi-alert","mdi:wifi-arrow-down","mdi:wifi-arrow-left","mdi:wifi-arrow-left-right","mdi:wifi-arrow-right","mdi:wifi-arrow-up","mdi:wifi-arrow-up-down","mdi:wifi-cancel","mdi:wifi-check","mdi:wifi-cog","mdi:wifi-lock","mdi:wifi-lock-open","mdi:wifi-marker","mdi:wifi-minus","mdi:wifi-off","mdi:wifi-plus","mdi:wifi-refresh","mdi:wifi-remove","mdi:wifi-settings","mdi:wifi-star","mdi:wifi-strength-1","mdi:wifi-strength-1-alert","mdi:wifi-strength-1-lock","mdi:wifi-strength-1-lock-open","mdi:wifi-strength-2","mdi:wifi-strength-2-alert","mdi:wifi-strength-2-lock","mdi:wifi-strength-2-lock-open","mdi:wifi-strength-3","mdi:wifi-strength-3-alert","mdi:wifi-strength-3-lock","mdi:wifi-strength-3-lock-open","mdi:wifi-strength-4","mdi:wifi-strength-4-alert","mdi:wifi-strength-4-lock","mdi:wifi-strength-4-lock-open","mdi:wifi-strength-alert-outline","mdi:wifi-strength-lock-open-outline","mdi:wifi-strength-lock-outline","mdi:wifi-strength-off","mdi:wifi-strength-off-outline","mdi:wifi-strength-outline","mdi:wifi-sync","mdi:wikipedia","mdi:wind-power","mdi:wind-power-outline","mdi:wind-turbine","mdi:wind-turbine-alert","mdi:wind-turbine-check","mdi:window-close","mdi:window-closed","mdi:window-closed-variant","mdi:window-maximize","mdi:window-minimize","mdi:window-open","mdi:window-open-variant","mdi:window-restore","mdi:window-shutter","mdi:window-shutter-alert","mdi:window-shutter-auto","mdi:window-shutter-cog","mdi:window-shutter-open","mdi:window-shutter-settings","mdi:windsock","mdi:wiper","mdi:wiper-wash","mdi:wiper-wash-alert","mdi:wizard-hat","mdi:wordpress","mdi:wrap","mdi:wrap-disabled","mdi:wrench","mdi:wrench-check","mdi:wrench-check-outline","mdi:wrench-clock","mdi:wrench-clock-outline","mdi:wrench-cog","mdi:wrench-cog-outline","mdi:wrench-outline","mdi:xamarin","mdi:xml","mdi:xmpp","mdi:yahoo","mdi:yeast","mdi:yin-yang","mdi:yoga","mdi:youtube","mdi:youtube-gaming","mdi:youtube-studio","mdi:youtube-subscription","mdi:youtube-tv","mdi:yurt","mdi:zend","mdi:zigbee","mdi:zip-box","mdi:zip-box-outline","mdi:zip-disk","mdi:zodiac-aquarius","mdi:zodiac-aries","mdi:zodiac-cancer","mdi:zodiac-capricorn","mdi:zodiac-gemini","mdi:zodiac-leo","mdi:zodiac-libra","mdi:zodiac-pisces","mdi:zodiac-sagittarius","mdi:zodiac-scorpio","mdi:zodiac-taurus","mdi:zodiac-virgo","mdi:zwave"].map(e=>({value:e,label:e}));let _i=class extends le{constructor(){super(...arguments),this._pendingDirectionFix=!1,this._computeLabel=e=>function(e,i){const t=`ui.panel.lovelace.editor.card.generic.${e.name}`,o=i.hass?.localize?.(t);if(o)return o;const r=i.et(e.name);if(r!==`${i.editorNamespace}.${e.name}`&&r!==e.name)return r;if(i.cardLookup&&i.cardNamespace){const t=i.cardLookup(e.name);if(t!==`${i.cardNamespace}.${e.name}`&&t!==e.name)return t}return e.name}(e,{hass:this.hass,et:e=>this._et(e),editorNamespace:"retro.editor",cardLookup:e=>this._t(e),cardNamespace:"retro"}),this._computeHelper=e=>function(e,i){const t=`${e.name}_helper`,o=i.et(t);if(o!==`${i.editorNamespace}.${t}`&&o!==t)return o}(e,{et:e=>this._et(e),editorNamespace:"retro.editor"}),this._onFormChanged=e=>{if(!this._config)return;const i=this._config.entity,t=e.detail.value,o=ei({...this._config,...t});if(o.entity!==i){const e=this._availableDirections(o.entity);1===e.size&&(o.direction=e.has("H")?"H":"R");const i=oi(this._attrs(o.entity),o.direction);o.line=i[0]}this._commit(o)}}setConfig(e){this._config=ei(e)}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config"))return!0;const i=e.get("hass");if(!i||!this.hass)return!0;const t=this._config.entity;return!t||i.states[t]!==this.hass.states[t]}willUpdate(e){(e.has("_config")||e.has("hass"))&&this._scheduleDirectionAutocorrect()}_t(e){return je(`retro.${e}`,{hassLanguage:this.hass?.language})}_et(e){return je(`retro.editor.${e}`,{hassLanguage:this.hass?.language})}_attrs(e){return e?this.hass?.states?.[e]?.attributes:void 0}_linesForCurrent(){return this._config?oi(this._attrs(this._config.entity),this._config.direction):[]}_terminiForDirection(e){const i=this._attrs(this._config?.entity);if(!i)return[];const t=this._config?.line,o=new Set;for(const r of i.departures??[])r.direction===e&&r.towards&&(t&&r.line!==t||o.add(r.towards));return[...o].sort()}_directionLabel(e){return function(e,i){if(!e.length)return i.full;const t=e.slice(0,3).join(" / "),o=e.length>3?" +"+(e.length-3):"";return`${i.short}: ${t}${o}`}(this._terminiForDirection(e),{full:this._t("H"===e?"dir_h":"dir_r"),short:this._t("H"===e?"dir_h_short":"dir_r_short")})}_availableDirections(e=this._config?.entity){const i=this._attrs(e),t=new Set;if(i?.tracked_line_keys?.length){for(const e of i.tracked_line_keys){const[,i]=e.split("|",2);"H"!==i&&"R"!==i||t.add(i)}if(t.size>0)return t}for(const e of i?.departures??[])"H"!==e.direction&&"R"!==e.direction||t.add(e.direction);return t}_exitOptions(){return[...[{value:"none",label:this._et("header_exit_none")},{value:"regular",label:this._et("header_exit_regular")},{value:"accessible",label:this._et("header_exit_accessible")}],...Ue.map(e=>({value:e,label:this._et(Fe[e].labelKey)}))]}_schema(){const e=this._linesForCurrent(),i=this._config?.line,t=(i&&!e.includes(i)?[i,...e]:e).map(e=>({value:e,label:e})),o=this._availableDirections(),r=[];return(0===o.size||o.has("H"))&&r.push({value:"H",label:this._directionLabel("H")}),(0===o.size||o.has("R"))&&r.push({value:"R",label:this._directionLabel("R")}),[{name:"entity",required:!0,selector:{entity:{filter:{domain:"sensor",integration:"wiener_linien_austria"}}}},{name:"direction",selector:{select:{mode:"dropdown",options:r}}},{name:"line",selector:{select:{mode:"dropdown",custom_value:!0,options:t}}},{type:"expandable",name:"header",title:this._et("section_header"),flatten:!0,schema:[{name:"show_header",selector:{boolean:{}}},{type:"expandable",name:"header_left",title:this._et("header_left"),flatten:!1,schema:[{name:"exit",selector:{select:{mode:"dropdown",options:this._exitOptions()}}},{name:"text",selector:{text:{}}},{name:"show_wc",selector:{boolean:{}}},{name:"show_escalator",selector:{boolean:{}}},{name:"show_elevator",selector:{boolean:{}}},{name:"show_clock",selector:{boolean:{}}},{name:"show_date",selector:{boolean:{}}},...this._config?.header_left?.show_date?[{name:"date_format",selector:{text:{}}}]:[],{name:"extra_icons",selector:{select:{multiple:!0,custom_value:!0,options:vi}}},{name:"chips",selector:{select:{multiple:!0,custom_value:!0,options:[]}}}]},{type:"expandable",name:"header_right",title:this._et("header_right"),flatten:!1,schema:[{name:"exit",selector:{select:{mode:"dropdown",options:this._exitOptions()}}},{name:"text",selector:{text:{}}},{name:"show_wc",selector:{boolean:{}}},{name:"show_escalator",selector:{boolean:{}}},{name:"show_elevator",selector:{boolean:{}}},{name:"show_clock",selector:{boolean:{}}},{name:"show_date",selector:{boolean:{}}},...this._config?.header_right?.show_date?[{name:"date_format",selector:{text:{}}}]:[],{name:"extra_icons",selector:{select:{multiple:!0,custom_value:!0,options:vi}}},{name:"chips",selector:{select:{multiple:!0,custom_value:!0,options:[]}}}]}]},{type:"expandable",name:"station",title:this._et("section_station"),flatten:!0,schema:[{name:"show_station_name",selector:{boolean:{}}},{name:"station_bg",selector:{select:{mode:"list",options:[{value:"default",label:this._et("station_bg_default")},{value:"white",label:this._et("station_bg_white")},{value:"black",label:this._et("station_bg_black")}]}}}]},{type:"expandable",name:"display",title:this._et("section_display"),flatten:!0,schema:[{name:"show_platform",selector:{boolean:{}}},{name:"platform_side",selector:{select:{mode:"dropdown",options:[{value:"auto",label:this._et("platform_side_auto")},{value:"left",label:this._et("platform_side_left")},{value:"right",label:this._et("platform_side_right")}]}}},{name:"accessibility_only",selector:{boolean:{}}},{name:"flicker",selector:{boolean:{}}},{name:"wheelchair_race",selector:{boolean:{}}},{name:"message_ticker",selector:{boolean:{}}},...this._config?.message_ticker?[{name:"message_text",selector:{text:{}}}]:[],{type:"grid",name:"",schema:[{name:"size",selector:{select:{mode:"list",options:[{value:"small",label:this._et("size_small")},{value:"medium",label:this._et("size_medium")},{value:"regular",label:this._et("size_regular")}]}}},{name:"style",selector:{select:{mode:"list",options:[{value:"classic",label:this._et("style_classic")},{value:"warm",label:this._et("style_warm")},{value:"pixel",label:this._et("style_pixel")}]}}}]}]},{type:"expandable",name:"tweaks",title:this._et("section_tweaks"),flatten:!0,schema:[{name:"show_unit",selector:{boolean:{}}},{name:"line_pill",selector:{boolean:{}}},{name:"line_stripe",selector:{boolean:{}}},{name:"housing",selector:{boolean:{}}}]}]}_formData(){return this._config?{...this._config}:{}}_commit(e){var i,t;this._config=e,i="config-changed",t={config:e},this.dispatchEvent(new CustomEvent(i,{detail:t,bubbles:!0,composed:!0}))}_setWalkTime(e,i){if(!this._config)return;const t=function(e,i){const t=e.trim(),o=""===t?NaN:Number(t);return""===t||Number.isFinite(o)||console.warn(`[wiener-linien-austria] walk-time "${e}" for ${i} is not a number — clearing`),Number.isFinite(o)&&o>0?Math.min(120,Math.round(o)):null}(i,e),o={...this._config.walk_times??{}};null===t?delete o[e]:o[e]=t;const r={...this._config};Object.keys(o).length?r.walk_times=o:delete r.walk_times,this._commit(r)}render(){if(!this._config)return V;const e=this._config,i=!!e.entity&&!this.hass?.states?.[e.entity];return F`
-      <div class="editor">
-        <ha-form
-          .hass=${this.hass}
-          .data=${this._formData()}
-          .schema=${this._schema()}
-          .computeLabel=${this._computeLabel}
-          .computeHelper=${this._computeHelper}
-          @value-changed=${this._onFormChanged}
-        ></ha-form>
-        ${i?F`
-              <ha-alert alert-type="warning">
-                ${this._t("entity_missing").replace("{entity}",e.entity)}
-              </ha-alert>
-            `:V}
-        ${this._renderWalkTimeSection()}
-      </div>
-    `}_scheduleDirectionAutocorrect(){if(!this._config||this._pendingDirectionFix)return;const e=this._availableDirections();if(1!==e.size)return;const i=e.has("H")?"H":"R";this._config.direction!==i&&(this._pendingDirectionFix=!0,Promise.resolve().then(()=>{try{if(!this._config)return;const e=this._availableDirections();if(1!==e.size)return;const i=e.has("H")?"H":"R";if(this._config.direction===i)return;const t={...this._config,direction:i},o=oi(this._attrs(t.entity),i);t.line&&o.includes(t.line)||(t.line=o[0]),console.info(`[wiener-linien-austria-retro-card-editor] direction autocorrected to "${i}" for entity "${t.entity??""}" — only one direction has live data`),this._commit(t)}finally{this._pendingDirectionFix=!1}}))}_renderWalkTimeSection(){const e=this._config,i=this._attrs(e.entity),t=e.entity?function(e){const i=new Map;for(const t of e?.departures??[]){const e=String(t.direction??""),o=ti(t.line,e);let r=i.get(o);r||(r={line:t.line,direction:e,type:t.type,termini:[]},i.set(o,r)),t.towards&&!r.termini.includes(t.towards)&&r.termini.push(t.towards)}const t=Array.from(i.values());return t.sort((e,i)=>e.line===i.line?e.direction.localeCompare(i.direction):e.line.localeCompare(i.line)),t}(i).filter(i=>i.direction===e.direction):[],o=e.walk_times??{};return F`
-      <div class="editor-section">
-        <div class="section-header">${this._et("section_walk_time")}</div>
-        <div class="editor-hint">${this._et("walk_time_hint")}</div>
-        <div class="walk-time-list">
-          ${t.length?t.map(e=>{const i=ti(e.line,e.direction),t=o[i],r=e.termini.join(" / "),d=e.termini.length>1?this._et("walk_time_branching_hint"):"";return F`
-                  <div class="walk-time-row">
-                    <span class="walk-time-badge">${e.line}</span>
-                    <span
-                      class="walk-time-towards"
-                      title=${d||r}
-                    >→ ${r}</span>
-                    <input
-                      type="number"
-                      class="walk-time-input"
-                      min="0"
-                      max="120"
-                      step="1"
-                      inputmode="numeric"
-                      placeholder=${this._et("walk_time_placeholder")}
-                      aria-label=${this._et("walk_time_aria").replace("{line}",e.line).replace("{towards}",r)}
-                      .value=${bi(void 0!==t?String(t):"")}
-                      @keydown=${ki}
-                      @keyup=${ki}
-                      @keypress=${ki}
-                      @change=${e=>this._setWalkTime(i,e.target.value)}
-                    />
-                  </div>
-                `}):F`<div class="editor-hint">${this._et("walk_time_no_data")}</div>`}
-        </div>
-      </div>
-    `}static{this.styles=[wi]}};e([pe({attribute:!1})],_i.prototype,"hass",void 0),e([fe()],_i.prototype,"_config",void 0),_i=e([ce("wiener-linien-austria-retro-card-editor")],_i);const yi=800,xi=3e5;{const e=window;e.customCards=e.customCards??[],e.customCards.some(e=>"wiener-linien-austria-retro-card"===e.type)||e.customCards.push({type:"wiener-linien-austria-retro-card",name:"Wiener Linien Austria — Retro",description:"LED-Anzeige im Stil der Wiener-Linien-Stationen",preview:!0,getEntitySuggestion:(e,i)=>i.startsWith("sensor.")?"wiener_linien_austria"!==e?.entities?.[i]?.platform?null:{config:{type:"custom:wiener-linien-austria-retro-card",entity:i}}:null})}let zi=class extends le{constructor(){super(...arguments),this._versionMismatch=null,this._raceState="idle",this._countdownDigit=null,this._raceWinner=null,this._tickerActive=!1,this._tickerTimer=null,this._viaPhase="towards",this._viaTimer=null,this._anyViaInRows=!1,this._versionCheckDone=!1,this._fallbackWarned=!1,this._cachedEid=null,this._raceTimers=new Set,this._countdownStartAt=null,this._raceEndAt=null,this._freezeEndAt=null,this._victoryEndAt=null,this._handleCardClick=()=>{if(this._tickerActive)return this._tickerActive=!1,void this._scheduleTicker(xi);this._config?.wheelchair_race&&"idle"===this._raceState&&("undefined"!=typeof window&&window.matchMedia?.("(prefers-reduced-motion: reduce)").matches||(this._clearRaceTimers(),this._startRace()))},this._handleCardKeydown=e=>{"Enter"!==e.key&&" "!==e.key||(e.preventDefault(),this._handleCardClick())},this._onTickerDone=()=>{this._tickerActive=!1,this._scheduleTicker(xi)}}setConfig(e){if(!e||"object"!=typeof e)throw new Error("wiener-linien-austria-retro-card: config must be an object");if(void 0!==e.entity&&"string"!=typeof e.entity)throw new Error("wiener-linien-austria-retro-card: 'entity' must be a string");this._config=ei(e),this._clearRaceTimers(),this._clearTickerTimer(),this._clearViaTimer(),this._raceState="idle",this._countdownDigit=null,this._countdownStartAt=null,this._raceEndAt=null,this._freezeEndAt=null,this._victoryEndAt=null,this._raceWinner=null,this._tickerActive=!1,this._fallbackWarned=!1,this._cachedEid=null}getCardSize(){return 2}getGridOptions(){return{columns:12,rows:"auto",min_columns:4,min_rows:2}}static getConfigElement(){return document.createElement("wiener-linien-austria-retro-card-editor")}static getStubConfig(e){const i=di(e)[0]||"";let t="H";const o=e?.states?.[i]?.attributes?.departures;if(Array.isArray(o)){const e=o.some(e=>"H"===e.direction),i=o.some(e=>"R"===e.direction);!e&&i&&(t="R")}return{entity:i,direction:t,size:"small"}}connectedCallback(){super.connectedCallback(),function(){if("undefined"==typeof document)return;if(document.getElementById(ai))return;const e=document.createElement("style");e.id=ai,e.textContent='\n@font-face {\n  font-family: "WL Sans";\n  src: url("/wiener-linien-austria/fonts/wl-sans-regular.woff2") format("woff2");\n  font-weight: 400;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Sans";\n  src: url("/wiener-linien-austria/fonts/wl-sans-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Sans Condensed";\n  src: url("/wiener-linien-austria/fonts/wl-sans-condensed-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Mono";\n  src: url("/wiener-linien-austria/fonts/wl-mono-regular.woff2") format("woff2");\n  font-weight: 400;\n  font-style: normal;\n  font-display: swap;\n}\n@font-face {\n  font-family: "WL Mono";\n  src: url("/wiener-linien-austria/fonts/wl-mono-bold.woff2") format("woff2");\n  font-weight: 700;\n  font-style: normal;\n  font-display: swap;\n}\n',document.head.appendChild(e)}(),"undefined"!=typeof document&&document.fonts?.ready&&document.fonts.ready.then(()=>{document.fonts.check('700 16px "WL Mono"')||console.warn('[wiener-linien-austria-retro-card] "WL Mono" 700 not loaded — falling back to Courier New (less authentic). Check /wiener-linien-austria/fonts/ is served by the integration.')}).catch(e=>{console.warn("[wiener-linien-austria-retro-card] document.fonts.ready rejected",e)}),!this._versionCheckDone&&this.hass?.callWS&&(this._versionCheckDone=!0,this._checkCardVersion()),"idle"!==this._raceState&&(this._config?.wheelchair_race?this._armStateTransitions():(this._raceState="idle",this._clearRaceTimers())),this._config?.message_ticker&&this._config?.message_text&&this._scheduleTicker(xi)}disconnectedCallback(){super.disconnectedCallback(),this._clearRaceTimers(),this._clearTickerTimer(),this._clearViaTimer()}shouldUpdate(e){if(!this._config)return!1;if(e.has("_config")||e.has("_versionMismatch")||e.has("_raceState")||e.has("_countdownDigit")||e.has("_raceWinner")||e.has("_tickerActive")||e.has("_viaPhase"))return!0;const i=e.get("hass");if(!i||!this.hass)return!0;const t=this._resolveEntity();return!!t&&i.states[t]!==this.hass.states[t]}updated(e){super.updated(e),this._anyViaInRows?this._armViaTimer():null!==this._viaTimer&&this._clearViaTimer()}willUpdate(e){if(!e.has("_config"))return;const i=e.get("_config"),t=!0===i?.wheelchair_race,o=!0===this._config?.wheelchair_race;o&&!t?(this._clearRaceTimers(),this._startRace()):!o&&t&&(this._clearRaceTimers(),this._raceState="idle",this._countdownStartAt=null,this._countdownDigit=null,this._raceEndAt=null,this._freezeEndAt=null,this._victoryEndAt=null,this._raceWinner=null);const r=!0===i?.message_ticker&&!!i?.message_text,d=!0===this._config?.message_ticker&&!!this._config?.message_text,a=i?.message_text!==this._config?.message_text;!d||r&&!a?!d&&r&&(this._clearTickerTimer(),this._tickerActive=!1):(this._tickerActive=!1,this._scheduleTicker(1500))}_t(e,i){return je(`retro.${e}`,{hassLanguage:this.hass?.language},i)}async _checkCardVersion(){try{this._versionMismatch=await async function(e,i,t){if(!e?.callWS)return null;try{const o=await e.callWS({type:i});if(o?.version&&o.version!==t)return o.version}catch{}return null}(this.hass,"wiener_linien_austria/retro_card_version","1.8.1")}catch(e){console.warn("[wiener-linien-austria-retro-card] version probe failed",e)}}_resolveEntity(){const e=this._config?.entity;if(e&&this.hass?.states?.[e])return this._cachedEid=e,e;if(this._cachedEid&&this.hass?.states?.[this._cachedEid])return this._cachedEid;const i=di(this.hass)[0]??null;return i&&e&&!this._fallbackWarned&&(this._fallbackWarned=!0,console.warn(`[wiener-linien-austria-retro-card] configured entity "${e}" not in hass.states; falling back to "${i}"`)),this._cachedEid=i,i}_clearRaceTimers(){for(const e of this._raceTimers)clearTimeout(e);this._raceTimers.clear()}_scheduleRaceTimer(e,i){const t=setTimeout(()=>{this._raceTimers.delete(t),e()},i);this._raceTimers.add(t)}_scheduleRace(e){this._scheduleRaceTimer(()=>this._startRace(),e)}_clearTickerTimer(){null!==this._tickerTimer&&(clearTimeout(this._tickerTimer),this._tickerTimer=null)}_scheduleTicker(e){this._clearTickerTimer(),this._tickerTimer=setTimeout(()=>{this._tickerTimer=null,this._runTicker()},e)}_runTicker(){this._config?.message_ticker&&this._config?.message_text&&("idle"===this._raceState?"undefined"!=typeof window&&window.matchMedia?.("(prefers-reduced-motion: reduce)").matches?this._scheduleTicker(xi):this._tickerActive=!0:this._scheduleTicker(2e4))}_tickerDurationSeconds(e){return Math.min(40,Math.max(8,5+.18*e.length))}_armViaTimer(){null===this._viaTimer&&(this._viaTimer=setInterval(()=>{this._viaPhase="towards"===this._viaPhase?"via":"towards"},4e3))}_clearViaTimer(){null!==this._viaTimer&&(clearInterval(this._viaTimer),this._viaTimer=null),this._viaPhase="towards"}_startRace(){if(!this._config?.wheelchair_race)return;if("undefined"!=typeof window&&window.matchMedia?.("(prefers-reduced-motion: reduce)").matches)return void this._scheduleRace(this._nextRaceDelay());if(this._currentBarrierFreeCount()<2)return void this._scheduleRace(this._nextRaceDelay());if(this._tickerActive)return void this._scheduleRace(this._nextRaceDelay());const{winnerCrossT:e}=this._randomizeRaceParams(),i=Date.now();this._raceState="countdown",this._countdownStartAt=i,this._countdownDigit=3,this._raceEndAt=i+2400+e+150,this._freezeEndAt=this._raceEndAt+1500,this._victoryEndAt=this._freezeEndAt+4e3,this._scheduleCountdownTick()}_scheduleCountdownTick(){if("countdown"!==this._raceState||null===this._countdownStartAt)return;const e=Date.now(),i=e-this._countdownStartAt;if(i>=2400)return void this._beginRacing();const t=Math.max(1,Math.min(3,3-Math.floor(i/yi)));this._countdownDigit!==t&&(this._countdownDigit=t);const o=this._countdownStartAt+(Math.floor(i/yi)+1)*yi,r=Math.max(50,o-e);this._scheduleRaceTimer(()=>this._scheduleCountdownTick(),r)}_beginRacing(){this._raceState="racing",this._countdownDigit=null,this._countdownStartAt=null,this._armStateTransitions()}_measureRaceStartPositions(){const e=this.shadowRoot?.querySelector(".retro");if(!e)return null;const i=e.getBoundingClientRect();if(i.width<=0)return null;const t=this.shadowRoot?.querySelectorAll(".retro-row .retro-wheelchair");if(!t||t.length<2)return null;const o=t[0],r=t[1];if(!o||!r)return null;const d=o.getBoundingClientRect(),a=r.getBoundingClientRect(),n=d.left-i.left,m=a.left-i.left,l=100-("small"===this._config?.size?10:14)/i.width*100-d.width/i.width*100;return{a:n/i.width*100,b:m/i.width*100,finishCqw:l}}_randomizeRaceParams(){const e=this._measureRaceStartPositions(),i=gi({a:e?.a??0,b:e?.b??0,finishCqw:e?.finishCqw??96});this._raceWinner=i.winner;for(const[e,t]of Object.entries(i.cssVars))this.style.setProperty(e,t);return{winnerCrossT:i.winnerCrossT}}_armStateTransitions(){this._clearRaceTimers();const e=Date.now();switch(this._raceState){case"idle":return;case"countdown":return void(null!==this._countdownStartAt&&this._scheduleCountdownTick());case"racing":return void(null!==this._raceEndAt&&this._scheduleRaceTimer(()=>{this._raceState="freeze",this._raceEndAt=null,this._armStateTransitions()},Math.max(0,this._raceEndAt-e)));case"freeze":return void(null!==this._freezeEndAt&&this._scheduleRaceTimer(()=>{this._raceState="victory",this._freezeEndAt=null,this._armStateTransitions()},Math.max(0,this._freezeEndAt-e)));case"victory":return void(null!==this._victoryEndAt&&this._scheduleRaceTimer(()=>{this._raceState="idle",this._victoryEndAt=null,this._config?.wheelchair_race&&this._scheduleRace(this._nextRaceDelay())},Math.max(0,this._victoryEndAt-e)));default:{const e=this._raceState;throw new Error(`unhandled race state: ${String(e)}`)}}}_nextRaceDelay(){return 6e4+12e4*Math.random()}_currentBarrierFreeCount(){if(!this._config)return 0;const e=this._resolveEntity();if(!e||!this.hass)return 0;const i=this.hass.states[e]?.attributes??{};return ri(Array.isArray(i.departures)?i.departures:[],{direction:this._config.direction,lines:this._config.line?[this._config.line]:void 0,walk_times:this._config.walk_times,accessibility_only:this._config.accessibility_only}).slice(0,2).filter(e=>e.barrier_free).length}render(){if(!this._config)return V;const e=this._config,i=this._resolveEntity(),t=i?this.hass?.states?.[i]?.attributes??{}:{},o=Array.isArray(t.departures)?t.departures:[],r=ri(o,{direction:e.direction,lines:e.line?[e.line]:void 0,walk_times:e.walk_times,accessibility_only:e.accessibility_only}),d=r.slice(0,2),a=d.find(e=>e.platform)?.platform??null,n=e.show_platform?a:null;let m;switch(e.platform_side){case"left":m=!0;break;case"right":m=!1;break;default:m="2"===n}const l="ptMetro"===(d[0]?.type??""),s=this._t(l?"gleis":"steig"),c=t.stop_name||t.friendly_name||"",u=e.show_station_name&&!!c?this._renderStationName(c,r,o,e.station_bg,t.line_colors??{},e.line):V,h=e.show_header?function(e){const{left:i,right:t,serverTime:o,t:r,lang:d}=e;return i||t?F`
+        >${_}</span
+      >`:L;return t===`left`?F`${a}${o}${u}${l}${c}${d}${p}${v}${g}`:F`${g}${v}${m}${f}${c}${l}${u}${o}${a}`}function ln(e){let{left:t,right:n,serverTime:r,t:i,lang:a}=e;return!t&&!n?L:F`
     <div class="retro-station-header" role="group">
       <div class="retro-station-header__side retro-station-header__side--left">
-        ${i?li(i,"left",o,r,d):V}
+        ${t?cn(t,`left`,r,i,a):L}
       </div>
       <div class="retro-station-header__side retro-station-header__side--right">
-        ${t?li(t,"right",o,r,d):V}
+        ${n?cn(n,`right`,r,i,a):L}
       </div>
     </div>
-  `:V}({left:e.header_left,right:e.header_right,serverTime:t.server_time,t:e=>this._t(e),lang:this.hass?.language}):V,p=e.wheelchair_race&&"countdown"===this._raceState,f=e.wheelchair_race&&"racing"===this._raceState,g=e.wheelchair_race&&"freeze"===this._raceState,b=e.wheelchair_race&&"victory"===this._raceState,w=e.wheelchair_race&&"idle"===this._raceState||this._tickerActive,k="A"===this._raceWinner?1:"B"===this._raceWinner?2:null;this._anyViaInRows=d.some(e=>!!e.via);const v={retro:!0,"retro--gleis-left":!!n&&m,"retro--gleis-right":!!n&&!m,"retro--no-gleis":!n,[`retro--size-${e.size}`]:"regular"!==e.size,[`retro--style-${e.style}`]:"classic"!==e.style,"retro--flicker":e.flicker,"retro--race-countdown":p,"retro--race-active":f,"retro--race-freeze":g,"retro--race-victory":b,"retro--clickable":w,"retro--line-pill":e.line_pill,"retro--line-stripe":e.line_stripe,"retro--housing":e.housing},_=w?{role:"button",tabindex:"0","aria-label":this._tickerActive?this._t("aria_dismiss_message"):this._t("aria_start_race")}:{};return F`
+  `}const un=[[`A`,`A`,`B`],[`B`,`B`,`A`],[`A`,`B`,`B`],[`B`,`A`,`A`],[`A`,`B`,`A`],[`B`,`A`,`B`]],dn=1.08,fn=1.15,pn=[100,250],mn=[200,500],hn=[500,900],gn=[.25,.5,.75],_n=[3,2.5,2.5];function vn(e){let t=(e,t)=>e+Math.random()*(t-e),n=(e,t)=>e+(Math.random()*2-1)*t,r=Math.random()<.5?`A`:`B`,i=Math.random()<.3?r===`A`?`B`:`A`:r,a=un.filter(e=>e[2]===i),o=a[Math.floor(Math.random()*a.length)],s=Math.random(),c=s<.4?t(pn[0],pn[1]):s<.75?t(mn[0],mn[1]):t(hn[0],hn[1]),l=t(2400,2700),u=l+c,d=l*t(dn,fn),f=u*t(dn,fn),p=r===`A`?d:f,m=r===`B`?d:f,h=r===`A`?l:u,g=r===`B`?l:u,_=e.a,v=e.b,y=e.finishCqw,b=Math.max(_,v),x=Math.max(20,92-b),S=(e,t)=>{let r=b+gn[t]*x,i=o[t]===e,a=_n[t];return n(r+(i?a:-a),.6)},C=S(`A`,0),ee=S(`A`,1),w=S(`A`,2),T=S(`B`,0),te=S(`B`,1),E=S(`B`,2),ne=(e,t,n)=>{let r=y-n,i=e-.75*t;if(r<=0||i<=1)return Math.max(n+5,102);let a=n+r*.25*t/i;return Math.max(102,Math.min(135,a))},D=ne(h,p,w),O=ne(g,m,E),k=(e,t,n,r,i,a)=>{let o=[[0,.25,e,t],[.25,.5,t,n],[.5,.75,n,r],[.75,1,r,i]];for(let[e,t,n,r]of o){if(n>=y)return e*a;if(r>=y)return(e+(y-n)/(r-n)*(t-e))*a}return 1/0},re=k(_,C,ee,w,D,p),A=k(v,T,te,E,O,m);return{winner:re<=A?`A`:`B`,winnerCrossT:Math.min(re,A),cssVars:{"--race-a-duration":`${p}ms`,"--race-b-duration":`${m}ms`,"--race-a-end":`${D-_}cqw`,"--race-b-end":`${O-v}cqw`,"--race-a-x-25":`${C-_}cqw`,"--race-a-x-50":`${ee-_}cqw`,"--race-a-x-75":`${w-_}cqw`,"--race-b-x-25":`${T-v}cqw`,"--race-b-x-50":`${te-v}cqw`,"--race-b-x-75":`${E-v}cqw`}}}const yn=c`:host {
+display: block;
+}
+.wl-editor {
+display: flex;
+flex-direction: column;
+}
+.wl-tabs {
+display: flex;
+gap: 2px;
+padding: 0 8px;
+background: var(--card-background-color);
+border-bottom: 1px solid var(--divider-color);
+position: sticky;
+top: 0;
+z-index: 3;
+}
+.wl-tab {
+flex: 1;
+min-width: 0;
+border: 0;
+background: transparent;
+cursor: pointer;
+padding: 12px 8px 0;
+font-size: 0.78125rem;
+font-weight: 500;
+line-height: 1.2;
+letter-spacing: 0.02em;
+text-transform: uppercase;
+color: var(--secondary-text-color);
+}
+.wl-tab[aria-selected="true"] {
+color: var(--primary-color);
+}
+.wl-tab-label {
+display: block;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+}
+.wl-tab-underline {
+display: block;
+height: 2px;
+margin: 7px -8px -1px;
+border-radius: 2px 2px 0 0;
+background: transparent;
+}
+.wl-tab[aria-selected="true"] .wl-tab-underline {
+background: var(--primary-color);
+}
+.wl-tab:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: -2px;
+}
+.wl-panel {
+padding: 14px 16px 22px;
+display: flex;
+flex-direction: column;
+gap: 16px;
+}
+.wl-panel--stops {
+gap: 14px;
+}
+.wl-section {
+border: 1px solid var(--divider-color);
+border-radius: 10px;
+background: var(--card-background-color);
+overflow: hidden;
+}
+.wl-section-header {
+display: flex;
+align-items: center;
+gap: 8px;
+padding: 10px 12px;
+background: var(--secondary-background-color);
+border-bottom: 1px solid var(--divider-color);
+}
+.wl-section-title {
+flex: 1;
+min-width: 0;
+font-size: 0.875rem;
+font-weight: 500;
+line-height: 1.35;
+color: var(--primary-text-color);
+overflow-wrap: anywhere;
+}
+.wl-section-hint {
+font-size: 0.71875rem;
+font-weight: 400;
+line-height: 1.35;
+color: var(--secondary-text-color);
+text-align: right;
+}
+.wl-section-body {
+padding: 6px 12px 12px;
+display: flex;
+flex-direction: column;
+}
+.wl-section-body ha-form {
+display: block;
+}
+.wl-group {
+display: flex;
+flex-direction: column;
+gap: 7px;
+}
+.wl-group-head {
+display: flex;
+align-items: baseline;
+gap: 8px;
+}
+.wl-label {
+font-size: 0.75rem;
+font-weight: 400;
+line-height: 1.4;
+color: var(--secondary-text-color);
+}
+.wl-label--grow {
+flex: 1;
+min-width: 0;
+}
+.wl-note {
+font-size: 0.71875rem;
+font-weight: 400;
+line-height: 1.5;
+color: var(--secondary-text-color);
+}
+.wl-divide {
+padding-top: 12px;
+border-top: 1px solid var(--divider-color);
+}
+.wl-chips {
+display: flex;
+flex-wrap: wrap;
+gap: 7px;
+}
+.wl-chip {
+--wl-chip-color: var(--primary-color);
+--wl-chip-text: var(--primary-text-color);
+--wl-chip-ink: #fff;
+position: relative;
+display: flex;
+align-items: center;
+gap: 5px;
+height: 34px;
+padding: 0 10px;
+border-radius: 5px;
+border: 2px solid var(--wl-chip-text);
+background: transparent;
+color: var(--wl-chip-text);
+font-size: 0.8125rem;
+font-weight: 700;
+line-height: 1;
+white-space: nowrap;
+cursor: pointer;
+forced-color-adjust: none;
+}
+.wl-chip::before {
+content: "";
+position: absolute;
+left: 0;
+right: 0;
+top: -5px;
+bottom: -5px;
+}
+.wl-chip[aria-pressed="true"] {
+background: var(--wl-chip-color);
+border-color: var(--wl-chip-color);
+color: var(--wl-chip-ink);
+}
+.wl-chip:hover {
+background: color-mix(in srgb, var(--wl-chip-color) 16%, transparent);
+}
+.wl-chip[aria-pressed="true"]:hover {
+background: color-mix(in srgb, var(--wl-chip-color) 88%, #000);
+}
+.wl-chip:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-chip-mode {
+font-size: 0.6875rem;
+font-weight: 700;
+line-height: 1;
+opacity: 0.85;
+}
+.wl-chip-mode ha-icon {
+--mdc-icon-size: 14px;
+display: block;
+}
+.wl-badge {
+--wl-chip-ink: #fff;
+flex: none;
+min-width: 34px;
+height: 24px;
+padding: 0 7px;
+box-sizing: border-box;
+border-radius: 5px;
+color: var(--wl-chip-ink);
+font-size: 0.75rem;
+font-weight: 700;
+line-height: 24px;
+text-align: center;
+forced-color-adjust: none;
+}
+.wl-dirs {
+display: flex;
+gap: 6px;
+flex-wrap: wrap;
+}
+.wl-dir {
+flex: 1;
+min-width: 0;
+min-height: 34px;
+padding: 4px 9px;
+border-radius: 6px;
+border: 1px solid var(--divider-color);
+background: var(--card-background-color);
+color: var(--primary-text-color);
+font-size: 0.78125rem;
+font-weight: 500;
+line-height: 1.3;
+text-align: center;
+overflow-wrap: anywhere;
+cursor: pointer;
+}
+.wl-dir[aria-pressed="true"] {
+border-color: var(--primary-color);
+background: var(--wl-ripple);
+color: var(--primary-color);
+}
+.wl-dir:hover:not([aria-disabled="true"]) {
+background: var(--wl-hover);
+}
+.wl-dir[aria-disabled="true"] {
+border-style: dashed;
+background: transparent;
+color: var(--secondary-text-color);
+opacity: 0.65;
+cursor: not-allowed;
+}
+.wl-dir:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-dir--compact {
+flex: 1 1 0;
+min-width: 44px;
+}
+.wl-dir--compact ha-icon {
+--mdc-icon-size: 16px;
+}
+.wl-override-row {
+display: flex;
+align-items: center;
+gap: 8px;
+flex-wrap: wrap;
+}
+.wl-override-row .wl-dirs {
+flex: 1;
+min-width: 0;
+gap: 5px;
+}
+.wl-walk-list {
+display: flex;
+flex-direction: column;
+gap: 6px;
+}
+.wl-walk-row {
+display: flex;
+align-items: center;
+gap: 8px;
+min-height: 44px;
+}
+.wl-walk-dest {
+flex: 1;
+min-width: 0;
+font-size: 0.8125rem;
+font-weight: 400;
+line-height: 1.35;
+color: var(--primary-text-color);
+overflow-wrap: anywhere;
+}
+.wl-stepper {
+display: flex;
+align-items: center;
+flex: none;
+border: 1px solid var(--divider-color);
+border-radius: 6px;
+overflow: hidden;
+background: var(--card-background-color);
+}
+.wl-step-btn {
+width: 34px;
+height: 36px;
+display: flex;
+align-items: center;
+justify-content: center;
+border: 0;
+background: transparent;
+color: var(--secondary-text-color);
+cursor: pointer;
+}
+.wl-step-btn ha-icon {
+--mdc-icon-size: 18px;
+}
+.wl-step-btn:hover:not(:disabled) {
+background: var(--wl-hover);
+}
+.wl-step-btn:disabled {
+opacity: 0.4;
+cursor: not-allowed;
+}
+.wl-step-btn:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: -2px;
+}
+.wl-step-value {
+width: 38px;
+box-sizing: border-box;
+padding: 0 2px;
+border: 0;
+border-left: 1px solid var(--divider-color);
+border-right: 1px solid var(--divider-color);
+background: transparent;
+color: var(--primary-text-color);
+font-size: 0.84375rem;
+font-weight: 500;
+line-height: 36px;
+text-align: center;
+font-variant-numeric: tabular-nums;
+-moz-appearance: textfield;
+appearance: textfield;
+}
+.wl-step-value::-webkit-outer-spin-button,
+.wl-step-value::-webkit-inner-spin-button {
+-webkit-appearance: none;
+margin: 0;
+}
+.wl-step-value:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: -2px;
+}
+.wl-color-row {
+display: flex;
+align-items: center;
+gap: 8px;
+width: 100%;
+}
+.wl-color-field {
+position: relative;
+flex: 1;
+display: flex;
+align-items: center;
+gap: 8px;
+min-height: 44px;
+padding: 0 10px;
+border: 1px solid var(--divider-color);
+border-radius: 8px;
+background: var(--card-background-color);
+cursor: pointer;
+}
+.wl-swatch {
+width: 22px;
+height: 22px;
+border-radius: 5px;
+border: 1px solid var(--divider-color);
+forced-color-adjust: none;
+}
+.wl-color-hex {
+font-size: 0.78125rem;
+line-height: 1;
+font-family: ui-monospace, Menlo, monospace;
+color: var(--primary-text-color);
+}
+.wl-color-input {
+position: absolute;
+inset: 0;
+opacity: 0;
+cursor: pointer;
+}
+.wl-color-field:focus-within {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-icon-btn {
+flex: none;
+width: 44px;
+height: 44px;
+display: flex;
+align-items: center;
+justify-content: center;
+border: 1px solid var(--divider-color);
+border-radius: 8px;
+background: var(--card-background-color);
+color: var(--secondary-text-color);
+cursor: pointer;
+}
+.wl-icon-btn:hover:not(:disabled) {
+background: var(--wl-hover);
+}
+.wl-icon-btn:disabled {
+opacity: 0.45;
+cursor: not-allowed;
+}
+.wl-icon-btn:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-stop-body {
+padding: 12px;
+display: flex;
+flex-direction: column;
+gap: 14px;
+}
+.wl-index {
+flex: none;
+width: 22px;
+height: 22px;
+box-sizing: border-box;
+border-radius: 11px;
+background: var(--card-background-color);
+border: 1px solid var(--divider-color);
+color: var(--secondary-text-color);
+font-size: 0.6875rem;
+font-weight: 600;
+line-height: 20px;
+text-align: center;
+}
+.wl-empty {
+display: flex;
+flex-direction: column;
+gap: 4px;
+align-items: center;
+text-align: center;
+padding: 18px 14px;
+border: 1px dashed var(--divider-color);
+border-radius: 8px;
+background: var(--wl-sunken);
+}
+.wl-empty-title {
+font-size: 0.8125rem;
+font-weight: 500;
+line-height: 1.4;
+color: var(--primary-text-color);
+}
+.wl-add {
+display: flex;
+align-items: center;
+justify-content: center;
+gap: 8px;
+min-height: 44px;
+border: 1px dashed var(--divider-color);
+border-radius: 10px;
+background: transparent;
+color: var(--primary-color);
+font-size: 0.84375rem;
+font-weight: 500;
+line-height: 1;
+cursor: pointer;
+}
+.wl-add:hover {
+background: var(--wl-hover);
+}
+.wl-add:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+@media (forced-colors: active) {
+.wl-chip,
+.wl-badge,
+.wl-swatch {
+outline: 1px solid CanvasText;
+}
+.wl-chip[aria-pressed="true"]:not(:focus-visible),
+.wl-dir[aria-pressed="true"]:not(:focus-visible) {
+outline: 2px solid Highlight;
+outline-offset: -2px;
+}
+}`,bn=c`:host {
+--wl-sunken: color-mix(in srgb, var(--primary-text-color) 3%, var(--card-background-color));
+--wl-hover: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+--wl-ripple: color-mix(in srgb, var(--primary-color) 14%, transparent);
+}`,xn=c`:host {
+--wl-signage-housing: #0d0d0d;
+--wl-signage-selected: #171717;
+--wl-signage-outline: #3a3a3a;
+--wl-signage-chip: #2a2a2a;
+--wl-signage-ink: #f2f2f2;
+}
+.wl-strip {
+display: flex;
+flex-direction: column;
+gap: 10px;
+padding: 8px 0 4px;
+}
+.wl-strip-bar {
+display: flex;
+gap: 6px;
+padding: 8px;
+border-radius: 10px;
+background: var(--wl-signage-housing);
+border: 1px solid var(--divider-color);
+}
+.wl-zone {
+flex: 1;
+min-width: 0;
+display: flex;
+align-items: center;
+min-height: 44px;
+padding: 6px 8px;
+border-radius: 6px;
+border: 1px dashed var(--wl-signage-outline);
+background: transparent;
+cursor: pointer;
+}
+.wl-zone--selected {
+border: 2px solid var(--primary-color);
+background: var(--wl-signage-selected);
+}
+.wl-zone:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-zone-tokens {
+display: flex;
+flex-wrap: wrap;
+gap: 5px;
+align-items: center;
+width: 100%;
+}
+.wl-zone--right .wl-zone-tokens {
+justify-content: flex-end;
+}
+.wl-token {
+display: flex;
+align-items: center;
+height: 22px;
+padding: 0 6px;
+border-radius: 3px;
+color: var(--wl-signage-ink);
+font-size: 0.6875rem;
+font-weight: 400;
+line-height: 1;
+white-space: nowrap;
+forced-color-adjust: none;
+}
+.wl-token ha-icon {
+--mdc-icon-size: 16px;
+}
+.wl-token--chip {
+background: var(--wl-signage-chip);
+}
+.wl-strip-switch {
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.wl-seg {
+display: flex;
+gap: 4px;
+padding: 3px;
+background: var(--secondary-background-color);
+border-radius: 8px;
+}
+.wl-seg-btn {
+border: 0;
+cursor: pointer;
+padding: 8px 12px;
+min-height: 34px;
+border-radius: 6px;
+background: transparent;
+color: var(--secondary-text-color);
+font-size: 0.78125rem;
+font-weight: 500;
+line-height: 1.2;
+}
+.wl-seg-btn[aria-pressed="true"] {
+background: var(--card-background-color);
+color: var(--primary-color);
+box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14);
+}
+.wl-seg-btn:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-slot {
+display: flex;
+flex-direction: column;
+gap: 12px;
+padding: 12px;
+border: 1px solid var(--primary-color);
+border-radius: 10px;
+background: var(--wl-sunken);
+}
+.wl-pict-grid,
+.wl-tray {
+display: flex;
+flex-wrap: wrap;
+gap: 6px;
+}
+.wl-pict {
+width: 44px;
+height: 44px;
+display: flex;
+align-items: center;
+justify-content: center;
+border: 1px solid var(--divider-color);
+border-radius: 8px;
+background: var(--card-background-color);
+color: var(--primary-text-color);
+cursor: pointer;
+}
+.wl-pict ha-icon,
+.wl-tray-btn ha-icon,
+.wl-pill ha-icon {
+--mdc-icon-size: 18px;
+}
+.wl-pict[aria-pressed="true"],
+.wl-tray-btn[aria-pressed="true"] {
+border-color: var(--primary-color);
+background: var(--wl-ripple);
+color: var(--primary-color);
+}
+.wl-pict:hover,
+.wl-tray-btn:hover {
+background: var(--wl-hover);
+}
+.wl-pict:focus-visible,
+.wl-tray-btn:focus-visible,
+.wl-pill-x:focus-visible,
+.wl-text:focus-visible {
+outline: 2px solid var(--primary-color);
+outline-offset: 2px;
+}
+.wl-tray-btn {
+display: flex;
+align-items: center;
+gap: 6px;
+min-height: 44px;
+padding: 0 12px;
+border: 1px solid var(--divider-color);
+border-radius: 8px;
+background: var(--card-background-color);
+color: var(--primary-text-color);
+font-size: 0.78125rem;
+font-weight: 500;
+line-height: 1;
+cursor: pointer;
+}
+.wl-text {
+width: 100%;
+box-sizing: border-box;
+min-height: 44px;
+padding: 0 12px;
+border: 1px solid var(--divider-color);
+border-radius: 8px;
+background: var(--card-background-color);
+color: var(--primary-text-color);
+font-size: 0.8125rem;
+line-height: 1.4;
+}
+.wl-pill {
+display: flex;
+align-items: center;
+gap: 6px;
+min-height: 36px;
+padding: 0 6px 0 11px;
+border: 1px solid var(--divider-color);
+border-radius: 18px;
+background: var(--card-background-color);
+color: var(--primary-text-color);
+font-size: 0.78125rem;
+line-height: 1;
+}
+.wl-pill-x {
+width: 24px;
+height: 24px;
+display: flex;
+align-items: center;
+justify-content: center;
+border: 0;
+border-radius: 12px;
+background: var(--wl-hover);
+color: var(--secondary-text-color);
+cursor: pointer;
+}
+.wl-pill-x ha-icon {
+--mdc-icon-size: 14px;
+}
+@media (forced-colors: active) {
+.wl-strip-bar,
+.wl-zone {
+forced-color-adjust: none;
+}
+.wl-strip-bar {
+outline: 1px solid CanvasText;
+}
+.wl-seg-btn[aria-pressed="true"]:not(:focus-visible),
+.wl-pict[aria-pressed="true"]:not(:focus-visible),
+.wl-tray-btn[aria-pressed="true"]:not(:focus-visible) {
+outline: 2px solid Highlight;
+outline-offset: -2px;
+}
+}`;function Sn(e,t){let n={hassLanguage:t};return{t:t=>at(`${e}.${t}`,n),et:t=>{let r=`${e}.editor.${t}`,i=at(r,n);if(i!==r)return i;let a=`common.editor.${t}`,o=at(a,n);return o===a?t:o}}}function Cn(e,t,n){let r=(t,r)=>{let i=t.key===`ArrowRight`?1:t.key===`ArrowLeft`?-1:0;if(!i)return;t.preventDefault();let a=(r+i+e.length)%e.length,o=e[a];if(!o)return;n(o.key);let s=t.currentTarget.parentElement?.children[a];s instanceof HTMLElement&&s.focus()};return F`
+    <div class="wl-tabs" role="tablist">
+      ${e.map((e,i)=>F`<button
+          type="button"
+          class="wl-tab"
+          role="tab"
+          id=${`wl-tab-${e.key}`}
+          aria-selected=${t===e.key?`true`:`false`}
+          aria-controls=${t===e.key?`wl-panel-${e.key}`:L}
+          tabindex=${t===e.key?`0`:`-1`}
+          @click=${()=>n(e.key)}
+          @keydown=${e=>r(e,i)}
+        >
+          <span class="wl-tab-label">${e.label}</span>
+          <span class="wl-tab-underline" aria-hidden="true"></span>
+        </button>`)}
+    </div>
+  `}function wn(e,t){return F`
+    <div
+      class=${e===`stops`?`wl-panel wl-panel--stops`:`wl-panel`}
+      role="tabpanel"
+      id=${`wl-panel-${e}`}
+      aria-labelledby=${`wl-tab-${e}`}
+    >
+      ${t}
+    </div>
+  `}function Tn(e,t){return F`
+    <section class="wl-section">
+      <header class="wl-section-header">
+        <span class="wl-section-title">${e.title}</span>
+        ${e.hint?F`<span class="wl-section-hint">${e.hint}</span>`:L}
+      </header>
+      <div class="wl-section-body">${t}</div>
+    </section>
+  `}function En(e){return Tn(e,F`<ha-form
+      .hass=${e.hass}
+      .data=${e.data}
+      .schema=${e.schema}
+      .computeLabel=${e.computeLabel}
+      .computeHelper=${e.computeHelper}
+      @value-changed=${t=>{t.stopPropagation(),e.onChange(t.detail.value)}}
+    ></ha-form>`)}
+/**
+* @license
+* Copyright 2020 Google LLC
+* SPDX-License-Identifier: BSD-3-Clause
+*/const Dn=Ne(class extends Pe{constructor(e){if(super(e),e.type!==U.PROPERTY&&e.type!==U.ATTRIBUTE&&e.type!==U.BOOLEAN_ATTRIBUTE)throw Error("The `live` directive is not allowed on child or event bindings");if(!Ie(e))throw Error("`live` bindings can only contain a single expression")}render(e){return e}update(e,[t]){if(t===I||t===L)return t;let n=e.element,r=e.name;if(e.type===U.PROPERTY){if(t===n[r])return I}else if(e.type===U.BOOLEAN_ATTRIBUTE){if(!!t===n.hasAttribute(r))return I}else if(e.type===U.ATTRIBUTE&&n.getAttribute(r)===t+``)return I;return Re(e),t}});function Y(e){e.key!==`Escape`&&e.key!==`Tab`&&e.stopPropagation()}function On(e,t){let n=e.trim(),r=n===``?NaN:Number(n);return n!==``&&!Number.isFinite(r)&&console.warn(`[wiener-linien-austria] walk-time "${e}" for ${t} is not a number — clearing`),Number.isFinite(r)&&r>0?Math.min(120,Math.round(r)):null}const kn=[{key:`show_wc`,icon:`mdi:human-male-female`,labelKey:`show_wc_short`},{key:`show_escalator`,icon:`mdi:escalator`,labelKey:`show_escalator_short`},{key:`show_elevator`,icon:`mdi:elevator`,labelKey:`show_elevator_short`},{key:`show_clock`,icon:`mdi:clock-outline`,labelKey:`show_clock_short`},{key:`show_date`,icon:`mdi:calendar`,labelKey:`show_date_short`}],An=[{value:`regular`,icon:`mdi:exit-run`,labelKey:`header_exit_regular`},{value:`accessible`,icon:`mdi:wheelchair-accessibility`,labelKey:`header_exit_accessible`},...bt.map(e=>({value:e,icon:e,labelKey:xt[e].labelKey})),{value:`none`,icon:`mdi:close-circle-outline`,labelKey:`header_exit_none`}];function jn(e,t,n){let r=[];if(!e)return[{label:t,kind:`text`,name:t}];if(e.exit&&e.exit!==`none`){let t=An.find(t=>t.value===e.exit);r.push({label:``,icon:t?.icon??e.exit,kind:`icon`,name:t?n(t.labelKey):e.exit})}e.text&&r.push({label:e.text,kind:`text`,name:e.text});for(let t of kn)e[t.key]&&r.push({label:``,icon:t.icon,kind:`icon`,name:n(t.labelKey)});for(let t of e.extra_icons??[])r.push({label:``,icon:t,kind:`icon`,name:t});for(let t of e.chips??[])r.push({label:t,kind:`chip`,name:t});return r.length||r.push({label:t,kind:`text`,name:t}),r}function Mn(e,t){let n=(e.selected===`header_left`?e.left:e.right)??{},r=e.et(`header_slot_empty`),i=(n,r)=>t.patch(e.selected,n,r);return F`
+    <div class="wl-strip">
+      <div class="wl-strip-bar" role="group" aria-label=${e.et(`header_bar_aria`)}>
+        ${Nn(`header_left`,e,t,r)}
+        ${Nn(`header_right`,e,t,r)}
+      </div>
+
+      <div class="wl-strip-switch">
+        <span class="wl-note wl-label--grow">${e.et(`header_pick_side_hint`)}</span>
+        <div class="wl-seg" role="group" aria-label=${e.et(`header_side_aria`)}>
+          ${[`header_left`,`header_right`].map(n=>F`<button
+              type="button"
+              class="wl-seg-btn"
+              aria-pressed=${e.selected===n?`true`:`false`}
+              @click=${()=>t.selectSide(n)}
+            >
+              ${e.et(n===`header_left`?`header_left`:`header_right`)}
+            </button>`)}
+        </div>
+      </div>
+
+      <div class="wl-slot">
+        <div class="wl-group">
+          <span class="wl-label">${e.et(`exit`)}</span>
+          <div class="wl-pict-grid">
+            ${An.map(t=>{let r=(n.exit??`none`)===t.value,a=e.et(t.labelKey);return F`<button
+                type="button"
+                class="wl-pict"
+                aria-pressed=${r?`true`:`false`}
+                aria-label=${a}
+                title=${a}
+                @click=${()=>i(`exit`,t.value)}
+              >
+                <ha-icon icon=${t.icon} aria-hidden="true"></ha-icon>
+              </button>`})}
+          </div>
+        </div>
+
+        <div class="wl-group">
+          <span class="wl-label">${e.et(`text`)}</span>
+          <input
+            type="text"
+            class="wl-text"
+            maxlength=${64}
+            .value=${n.text??``}
+            aria-label=${e.et(`text`)}
+            placeholder=${e.et(`text_placeholder`)}
+            @keydown=${Y}
+            @keyup=${Y}
+            @keypress=${Y}
+            @change=${e=>i(`text`,e.target.value.trim()||void 0)}
+          />
+        </div>
+
+        <div class="wl-group">
+          <span class="wl-label">${e.et(`header_amenities`)}</span>
+          <div class="wl-tray">
+            ${kn.map(t=>{let r=!!n[t.key],a=e.et(t.labelKey);return F`<button
+                type="button"
+                class="wl-tray-btn"
+                aria-pressed=${r?`true`:`false`}
+                aria-label=${a}
+                @click=${()=>i(t.key,!r)}
+              >
+                <ha-icon icon=${t.icon} aria-hidden="true"></ha-icon>
+                ${a}
+              </button>`})}
+          </div>
+          ${n.show_date?F`<input
+                type="text"
+                class="wl-text"
+                maxlength=${32}
+                .value=${n.date_format??``}
+                aria-label=${e.et(`date_format`)}
+                placeholder=${e.et(`date_format_placeholder`)}
+                @keydown=${Y}
+                @keyup=${Y}
+                @keypress=${Y}
+                @change=${e=>i(`date_format`,e.target.value.trim()||void 0)}
+              />`:L}
+        </div>
+
+        ${Pn(n,e,i)}
+      </div>
+    </div>
+  `}function Nn(e,t,n,r){let i=e===`header_left`?t.left:t.right,a=t.selected===e,o=jn(i,r,t.et),s=t.et(e===`header_left`?`header_left`:`header_right`);return F`<button
+    type="button"
+    class=${W({"wl-zone":!0,"wl-zone--selected":a,"wl-zone--right":e===`header_right`})}
+    aria-pressed=${a?`true`:`false`}
+    aria-label=${`${s}: ${o.map(e=>e.name).join(`, `)}`}
+    @click=${()=>n.selectSide(e)}
+  >
+    <span class="wl-zone-tokens">
+      ${o.map(e=>F`<span
+          class=${W({"wl-token":!0,"wl-token--chip":e.kind===`chip`})}
+          >${e.icon?F`<ha-icon icon=${e.icon} aria-hidden="true"></ha-icon>`:e.label}</span
+        >`)}
+    </span>
+  </button>`}function Pn(e,t,n){let r=e.chips??[],i=e.extra_icons??[];return F`
+    <div class="wl-group">
+      <span class="wl-label"
+        >${t.et(`header_chips_and_icons`).replace(`{chips}`,`6`).replace(`{icons}`,`3`)}</span
+      >
+      <div class="wl-tray">
+        ${i.map((e,r)=>F`<span class="wl-pill">
+            <ha-icon icon=${e} aria-hidden="true"></ha-icon>
+            <button
+              type="button"
+              class="wl-pill-x"
+              aria-label=${t.et(`remove_icon_aria`).replace(`{icon}`,e)}
+              @click=${()=>n(`extra_icons`,Fn(i,r))}
+            >
+              <ha-icon icon="mdi:close" aria-hidden="true"></ha-icon>
+            </button>
+          </span>`)}
+        ${r.map((e,i)=>F`<span class="wl-pill">
+            ${e}
+            <button
+              type="button"
+              class="wl-pill-x"
+              aria-label=${t.et(`remove_chip_aria`).replace(`{chip}`,e)}
+              @click=${()=>n(`chips`,Fn(r,i))}
+            >
+              <ha-icon icon="mdi:close" aria-hidden="true"></ha-icon>
+            </button>
+          </span>`)}
+      </div>
+
+      ${i.length<3?F`<ha-icon-picker
+            .value=${Dn(``)}
+            .label=${t.et(`add_icon`)}
+            @value-changed=${e=>{let t=e.detail?.value;t&&n(`extra_icons`,[...i,t].slice(0,3))}}
+          ></ha-icon-picker>`:L}
+      ${r.length<6?F`<input
+            type="text"
+            class="wl-text"
+            maxlength=${16}
+            aria-label=${t.et(`add_chip`)}
+            placeholder=${t.et(`add_chip`)}
+            @keydown=${e=>{if(Y(e),e.key!==`Enter`)return;let t=e.target,i=t.value.trim();i&&(n(`chips`,[...r,i].slice(0,6)),t.value=``)}}
+            @keyup=${Y}
+            @keypress=${Y}
+          />`:L}
+    </div>
+  `}function Fn(e,t){let n=e.filter((e,n)=>n!==t);return n.length?n:void 0}function In(e){return{"--wl-chip-color":e.fill,...e.text?{"--wl-chip-text":e.text}:{},...e.ink?{"--wl-chip-ink":e.ink}:{}}}function Ln(e){return{background:e.fill,...e.ink?{"--wl-chip-ink":e.ink}:{}}}function Rn(e,t){return e?.states?.[t]?.attributes}function zn(e,t,n){let r=new Set;for(let i of e)i.direction===t&&(n&&i.line!==n||i.towards&&r.add(i.towards));return[...r].sort()}function Bn(e,t){return!e.singleLine&&Jt(t.lines,t.picked).length>=2}function Vn(e,t,n,r){let i=Rn(e,t.entity),a=!i,o=i?.stop_name||t.entity,s=i?.line_colors??{},c=ut(e),l=e=>Vt(e,n.lineColorOverrides,s,c,`#5b6470`),u=new Set(t.lines??[]),d=Yt(i),f=u.size?[...new Set([...d,...u])].sort():d,p=Ut(i),m=new Map;for(let e of i?.departures??[])e.line&&e.type&&!m.has(e.line)&&m.set(e.line,e.type);let h=e=>({full:n.t(e===`H`?`dir_h`:`dir_r`),short:n.t(e===`H`?`dir_h_short`:`dir_r_short`)});return F`
+    <section class="wl-section">
+      <header class="wl-section-header">
+        ${n.total>1?F`<span class="wl-index" aria-hidden="true">${n.index}</span>`:L}
+        <span class="wl-section-title">${o}</span>
+      </header>
+      <div class="wl-stop-body">
+        ${a?Hn(t,n,r):L}
+        ${Un(t,n,r,{lines:f,picked:u,colorOf:l,typeByLine:m})}
+        ${!a&&f.length?Bn(n,{lines:f,picked:u})?Gn(t,n,r,{attrs:i,triplets:p,picked:u,lines:f,colorOf:l,dirStrings:h}):Wn(t,n,r,{attrs:i,triplets:p,picked:u,lines:f,dirStrings:h}):L}
+        ${a?L:Kn(t,n,r,{attrs:i,picked:u,colorOf:l,lines:f,dirStrings:h})}
+      </div>
+    </section>
+  `}function Hn(e,t,n){return F`
+    <ha-alert alert-type="error">
+      ${t.t(`entity_missing`).replace(`{entity}`,e.entity)}
+      ${n.remove?F`<button
+            type="button"
+            slot="action"
+            class="wl-add"
+            @click=${()=>n.remove?.(e.entity)}
+          >
+            ${t.et(`remove_stop`)}
+          </button>`:L}
+    </ha-alert>
+  `}function Un(e,t,n,r){let{lines:i,picked:a,colorOf:o,typeByLine:s}=r,c=a.size?t.et(`lines_selected`).replace(`{n}`,String(a.size)).replace(`{total}`,String(i.length)):t.et(`lines_empty_means_all`);return F`
+    <div class="wl-group">
+      <div class="wl-group-head">
+        <span class="wl-label wl-label--grow">${t.et(`lines_label`)}</span>
+        ${i.length?F`<span class="wl-note">${c}</span>`:L}
+      </div>
+      ${i.length?F`<div class="wl-chips">
+            ${i.map(r=>{let i=t.singleLine?a.has(r):a.size===0||a.has(r),c=$t(s.get(r));return F`<button
+                type="button"
+                class="wl-chip"
+                style=${G(In(o(r)))}
+                aria-pressed=${i?`true`:`false`}
+                aria-label=${t.et(i?`line_active_aria`:`line_inactive_aria`).replace(`{line}`,r)}
+                @click=${()=>n.toggleLine(e.entity,r)}
+              >
+                ${c?F`<span class="wl-chip-mode"
+                      ><ha-icon icon=${c} aria-hidden="true"></ha-icon
+                    ></span>`:L}
+                ${r}
+              </button>`})}
+          </div>`:F`<div class="wl-empty">
+            <span class="wl-empty-title">${t.et(`no_lines_title`)}</span>
+            <span class="wl-note">${t.et(`no_lines_hint`)}</span>
+          </div>`}
+    </div>
+  `}function Wn(e,t,n,r){let{attrs:i,triplets:a,picked:o,lines:s,dirStrings:c}=r,l=Jt(s,o),u=l.length===1?l[0]:void 0,d=e.direction??null,f=qt(i,u),p=f.available.has(`H`),m=f.available.has(`R`),h=f.oneWay!==null,g=d===`H`||d===null&&f.oneWay===`H`,_=d===`R`||d===null&&f.oneWay===`R`,v=d===null&&!h,y=t=>{let r={};for(let[t,n]of Object.entries(e.line_directions??{}))l.includes(t)||(r[t]=n);n.setDirections(e.entity,{direction:t,lineDirections:r})},b=e=>f.unknown||f.available.has(e)?Gt(zn(a,e,u),c(e)):`${c(e).short}: ${t.et(`direction_not_served`)}`,x=f.oneWay!==null&&l.length===1?t.et(`direction_note_one_way`).replace(`{line}`,l[0]??``):``;return F`
+    <div class="wl-group">
+      <span class="wl-label">${t.et(`direction_label`)}</span>
+      <div class="wl-dirs">
+        ${X({label:b(`H`),active:g,disabled:!f.unknown&&!p,title:p||f.unknown?t.t(`dir_h`):t.et(`direction_unavailable`),onClick:()=>y(`H`)})}
+        ${X({label:b(`R`),active:_,disabled:!f.unknown&&!m,title:m||f.unknown?t.t(`dir_r`):t.et(`direction_unavailable`),onClick:()=>y(`R`)})}
+        ${t.singleLine?L:X({label:t.t(`dir_both`),active:v,disabled:h,title:h?t.et(`direction_unavailable`):t.t(`dir_both`),onClick:()=>y(null)})}
+      </div>
+      ${x?F`<span class="wl-note">${x}</span>`:L}
+    </div>
+  `}function X(e){return F`<button
+    type="button"
+    class=${W({"wl-dir":!0,"wl-dir--compact":!!e.compact})}
+    aria-pressed=${e.active?`true`:`false`}
+    aria-disabled=${e.disabled?`true`:`false`}
+    aria-label=${e.ariaLabel??e.label}
+    title=${e.title}
+    @click=${t=>{if(e.disabled){t.preventDefault();return}e.onClick()}}
+  >
+    ${e.icon?F`<ha-icon icon=${e.icon} aria-hidden="true"></ha-icon>`:e.label}
+  </button>`}function Gn(e,t,n,r){let{attrs:i,triplets:a,picked:o,lines:s,colorOf:c,dirStrings:l}=r,u=Jt(s,o),d=e.line_directions??{},f=e.direction??null,p=e=>d[e]??f,m=(t,r)=>{let i={};for(let e of u){let n=e===t?r:p(e);n&&(i[e]=n)}for(let[e,t]of Object.entries(d))u.includes(e)||(i[e]=t);n.setDirections(e.entity,{direction:null,lineDirections:i})};return F`
+    <div class="wl-group">
+      <span class="wl-label">${t.et(`direction_label`)}</span>
+      ${u.map(e=>{let n=qt(i,e),r=p(e),o=n.available.has(`H`),s=n.available.has(`R`),u=n.oneWay!==null,d=n.unknown,f=n=>t.et(`per_line_direction_aria`).replace(`{line}`,e).replace(`{direction}`,n===null?t.t(`dir_both`):Gt(zn(a,n,e),l(n)));return F`
+          <div class="wl-override-row">
+            <span class="wl-badge" style=${G(Ln(c(e)))}
+              >${e}</span
+            >
+            <div class="wl-dirs">
+              ${X({label:l(`H`).short,active:r===`H`||r===null&&n.oneWay===`H`,disabled:!d&&!o,compact:!0,title:zn(a,`H`,e).join(` / `)||t.t(`dir_h`),ariaLabel:f(`H`),onClick:()=>m(e,`H`)})}
+              ${X({label:l(`R`).short,active:r===`R`||r===null&&n.oneWay===`R`,disabled:!d&&!s,compact:!0,title:zn(a,`R`,e).join(` / `)||t.t(`dir_r`),ariaLabel:f(`R`),onClick:()=>m(e,`R`)})}
+              ${X({label:``,icon:`mdi:swap-horizontal`,active:r===null&&!u,disabled:u,compact:!0,title:t.t(`dir_both`),ariaLabel:f(null),onClick:()=>m(e,null)})}
+            </div>
+          </div>
+        `})}
+    </div>
+  `}function Kn(e,t,n,r){let{attrs:i,picked:a,colorOf:o,lines:s,dirStrings:c}=r,l=Zt(i,{lines:s,picked:a,lineDirections:e.line_directions??{},stopDirection:e.direction??null});return l.length?F`
+    <div class="wl-group wl-divide">
+      <div class="wl-group-head">
+        <span class="wl-label wl-label--grow">${t.et(`section_walk_time`)}</span>
+        <span class="wl-note">${t.et(`walk_time_unit`)}</span>
+      </div>
+      <span class="wl-note">${t.et(`walk_time_hint`)}</span>
+      <div class="wl-walk-list">
+        ${l.map(r=>{let i=Ht(r.line,r.direction),a=e.walk_times?.[i],s=r.termini.length?r.termini.join(` / `):r.direction===`H`||r.direction===`R`?c(r.direction).full:``,l=t.et(`walk_time_aria`).replace(`{line}`,r.line).replace(`{towards}`,s),u=t=>{let r=(a??0)+t;n.setWalkTime(e.entity,i,r<1?null:Math.min(120,r))};return F`
+            <div class="wl-walk-row">
+              <span class="wl-badge" style=${G(Ln(o(r.line)))}
+                >${r.line}</span
+              >
+              <span
+                class="wl-walk-dest"
+                title=${r.termini.length>1?t.et(`walk_time_branching_hint`):s}
+                >→ ${s}</span
+              >
+              <span class="wl-stepper">
+                <button
+                  type="button"
+                  class="wl-step-btn"
+                  ?disabled=${a===void 0}
+                  aria-label=${t.et(`walk_time_less_aria`).replace(`{line}`,r.line)}
+                  @click=${()=>u(-1)}
+                >
+                  <ha-icon icon="mdi:minus" aria-hidden="true"></ha-icon>
+                </button>
+                <input
+                  type="number"
+                  class="wl-step-value"
+                  min=${1}
+                  max=${120}
+                  step="1"
+                  inputmode="numeric"
+                  placeholder=${t.et(`walk_time_placeholder`)}
+                  aria-label=${l}
+                  .value=${Dn(a===void 0?``:String(a))}
+                  @keydown=${Y}
+                  @keyup=${Y}
+                  @keypress=${Y}
+                  @change=${t=>n.setWalkTime(e.entity,i,On(t.target.value,`${e.entity}/${i}`))}
+                />
+                <button
+                  type="button"
+                  class="wl-step-btn"
+                  ?disabled=${(a??0)>=120}
+                  aria-label=${t.et(`walk_time_more_aria`).replace(`{line}`,r.line)}
+                  @click=${()=>u(1)}
+                >
+                  <ha-icon icon="mdi:plus" aria-hidden="true"></ha-icon>
+                </button>
+              </span>
+            </div>
+          `})}
+      </div>
+    </div>
+  `:L}function qn(e,t,n){let r={...e??{},[t]:n};return n===void 0&&delete r[t],r}function Jn(e,t,n){let r=t.et(n);return r===n?e?.localize?.(`ui.panel.lovelace.editor.card.generic.${n}`)||n:r}function Yn(e,t,n){let r=n?.[t];if(r!==void 0)return r;let i=`${t}_helper`,a=e.et(i);return a===i?void 0:a}function Z(e,t,n,r){var i=arguments.length,a=i<3?t:r===null?r=Object.getOwnPropertyDescriptor(t,n):r,o;if(typeof Reflect==`object`&&typeof Reflect.decorate==`function`)a=Reflect.decorate(e,t,n,r);else for(var s=e.length-1;s>=0;s--)(o=e[s])&&(a=(i<3?o(a):i>3?o(t,n,a):o(t,n))||a);return i>3&&a&&Object.defineProperty(t,n,a),a}let Q=class extends V{constructor(...e){super(...e),this._tab=`stops`,this._headerSide=`header_left`,this._pendingDirectionFix=!1,this._onEntityChanged=e=>{if(e.stopPropagation(),!this._config)return;let t=e.detail.value.entity,n=typeof t==`string`?t:void 0;if(n===this._config.entity)return;let r={...this._config,entity:n},i=this._availableDirections(n);i.size===1&&(r.direction=i.has(`H`)?`H`:`R`),r.line=Kt(this._attrs(n),r.direction)[0],this._commit(r)},this._computeLabel=e=>Jn(this.hass,this._i18n,e.name),this._computeHelper=e=>{let{et:t}=this._i18n;return Yn(this._i18n,e.name,{...this._config?.message_ticker?{}:{message_text:t(`message_text_requires`)},...this._config?.show_platform?{}:{platform_side:t(`platform_side_requires`)}})}}setConfig(e){this._config=zt(e)}shouldUpdate(e){if(!this._config)return!1;if(e.has(`_config`)||e.has(`_tab`)||e.has(`_headerSide`))return!0;let t=e.get(`hass`);if(!t||!this.hass)return!0;let n=this._config.entity;return!n||t.states[n]!==this.hass.states[n]}willUpdate(e){(e.has(`_config`)||e.has(`hass`))&&this._scheduleDirectionAutocorrect()}get _i18n(){return Sn(`retro`,this.hass?.language)}_attrs(e){return e?this.hass?.states?.[e]?.attributes:void 0}_commit(e){this._config=e,Ve(this,`config-changed`,{config:e})}_patch(e){this._config&&this._commit(zt({...this._config,...e}))}get _stopView(){let e=this._config;return{entity:e.entity??``,lines:e.line?[e.line]:[],direction:e.direction,walk_times:e.walk_times}}get _stopCallbacks(){return{toggleLine:(e,t)=>{if(!this._config)return;let n={...this._config};n.line===t?delete n.line:n.line=t,this._commit(n)},setDirections:(e,t)=>{if(!this._config||t.direction===null)return;let n={...this._config,direction:t.direction},r=Kt(this._attrs(n.entity),t.direction);(!n.line||!r.includes(n.line))&&(n.line=r[0]),this._commit(n)},setWalkTime:(e,t,n)=>{if(!this._config)return;let r={...this._config.walk_times??{}};n===null?delete r[t]:r[t]=n;let i={...this._config};Object.keys(r).length?i.walk_times=r:delete i.walk_times,this._commit(i)}}}render(){if(!this._config)return L;let{et:e}=this._i18n;return F`
+      <div class="wl-editor">
+        ${Cn([{key:`stops`,label:e(`tab_stop`)},{key:`display`,label:e(`tab_display`)},{key:`tweaks`,label:e(`tab_tweaks`)}],this._tab,e=>{this._tab=e})}
+        ${wn(this._tab,this._renderActiveTab())}
+      </div>
+    `}_renderActiveTab(){switch(this._tab){case`stops`:return this._renderStop();case`display`:return this._renderDisplay();case`tweaks`:return this._renderTweaks()}}_renderStop(){let e=this._config,{t,et:n}=this._i18n;return F`
+      <ha-form
+        .hass=${this.hass}
+        .data=${{entity:e.entity}}
+        .schema=${[{name:`entity`,required:!0,selector:{entity:{filter:{domain:`sensor`,integration:`wiener_linien_austria`}}}}]}
+        .computeLabel=${this._computeLabel}
+        .computeHelper=${this._computeHelper}
+        @value-changed=${this._onEntityChanged}
+      ></ha-form>
+      ${e.entity?Vn(this.hass,this._stopView,{index:1,total:1,singleLine:!0,lineColorOverrides:{},t,et:n},this._stopCallbacks):L}
+    `}_renderDisplay(){let e=this._config,{et:t}=this._i18n,n={hass:this.hass,computeLabel:this._computeLabel,computeHelper:this._computeHelper,onChange:e=>this._patch(e)};return F`
+      ${Tn({title:t(`section_header`),hint:t(`section_header_hint`)},F`
+          <ha-form
+            .hass=${this.hass}
+            .data=${{show_header:e.show_header}}
+            .schema=${[{name:`show_header`,selector:{boolean:{}}}]}
+            .computeLabel=${this._computeLabel}
+            .computeHelper=${this._computeHelper}
+            @value-changed=${e=>{e.stopPropagation(),this._patch(e.detail.value)}}
+          ></ha-form>
+          ${e.show_header?Mn({left:e.header_left,right:e.header_right,selected:this._headerSide,et:t},{selectSide:e=>{this._headerSide=e},patch:(e,t,n)=>this._patchHeaderSide(e,t,n)}):L}
+        `)}
+      ${En({...n,title:t(`section_station`),data:{show_station_name:e.show_station_name,station_bg:e.station_bg},schema:[{name:`show_station_name`,selector:{boolean:{}}},{name:`station_bg`,selector:{select:{mode:`dropdown`,options:[{value:`default`,label:t(`station_bg_default`)},{value:`white`,label:t(`station_bg_white`)},{value:`black`,label:t(`station_bg_black`)}]}}}]})}
+      ${En({...n,title:t(`section_departure_row`),hint:t(`section_led_panel`),data:{show_platform:e.show_platform,platform_side:e.platform_side,accessibility_only:e.accessibility_only},schema:[{name:`show_platform`,selector:{boolean:{}}},{name:`platform_side`,disabled:!e.show_platform,selector:{select:{mode:`dropdown`,options:[{value:`auto`,label:t(`platform_side_auto`)},{value:`left`,label:t(`platform_side_left`)},{value:`right`,label:t(`platform_side_right`)}]}}},{name:`accessibility_only`,selector:{boolean:{}}}]})}
+      ${En({...n,title:t(`section_extras`),hint:t(`section_extras_hint`),data:{message_ticker:e.message_ticker,message_text:e.message_text??``,wheelchair_race:e.wheelchair_race},schema:[{name:`message_ticker`,selector:{boolean:{}}},{name:`message_text`,disabled:!e.message_ticker,selector:{text:{}}},{name:`wheelchair_race`,selector:{boolean:{}}}]})}
+    `}_renderTweaks(){let e=this._config,{et:t}=this._i18n,n={hass:this.hass,computeLabel:this._computeLabel,computeHelper:this._computeHelper,onChange:e=>this._patch(e)};return F`
+      ${En({...n,title:t(`section_led_panel`),data:{size:e.size,style:e.style,show_unit:e.show_unit,show_line_pill:e.show_line_pill,line_stripe:e.line_stripe,housing:e.housing,flicker:e.flicker},schema:[{name:`size`,selector:{select:{mode:`dropdown`,options:[{value:`small`,label:t(`size_small`)},{value:`medium`,label:t(`size_medium`)},{value:`regular`,label:t(`size_regular`)}]}}},{name:`style`,selector:{select:{mode:`dropdown`,options:[{value:`classic`,label:t(`style_classic`)},{value:`warm`,label:t(`style_warm`)},{value:`pixel`,label:t(`style_pixel`)}]}}},{name:`show_unit`,selector:{boolean:{}}},{name:`show_line_pill`,selector:{boolean:{}}},{name:`line_stripe`,selector:{boolean:{}}},{name:`housing`,selector:{boolean:{}}},{name:`flicker`,selector:{boolean:{}}}]})}
+    `}_patchHeaderSide(e,t,n){this._config&&this._patch({[e]:qn(this._config[e],t,n)})}_availableDirections(e=this._config?.entity){return qt(this._attrs(e)).available}_scheduleDirectionAutocorrect(){if(!this._config||this._pendingDirectionFix)return;let e=this._availableDirections();if(e.size!==1)return;let t=e.has(`H`)?`H`:`R`;this._config.direction!==t&&(this._pendingDirectionFix=!0,Promise.resolve().then(()=>{try{if(!this._config)return;let e=this._availableDirections();if(e.size!==1)return;let t=e.has(`H`)?`H`:`R`;if(this._config.direction===t)return;let n={...this._config,direction:t},r=Kt(this._attrs(n.entity),t);(!n.line||!r.includes(n.line))&&(n.line=r[0]),console.info(`[wiener-linien-austria-retro-card-editor] direction autocorrected to "${t}" for entity "${n.entity??``}" — only one direction has live data`),this._commit(n)}finally{this._pendingDirectionFix=!1}}))}static{this.styles=[bn,yn,xn]}};Z([Me({attribute:!1})],Q.prototype,`hass`,void 0),Z([H()],Q.prototype,`_config`,void 0),Z([H()],Q.prototype,`_tab`,void 0),Z([H()],Q.prototype,`_headerSide`,void 0),Q=Z([ke(`wiener-linien-austria-retro-card-editor`)],Q);const Xn=2400,Zn=3e5;{let e=window;e.customCards=e.customCards??[],e.customCards.some(e=>e.type===`wiener-linien-austria-retro-card`)||e.customCards.push({type:`wiener-linien-austria-retro-card`,name:`Wiener Linien Austria — Retro`,description:`LED-Anzeige im Stil der Wiener-Linien-Stationen`,preview:!0,getEntitySuggestion:(e,t)=>!t.startsWith(`sensor.`)||e?.entities?.[t]?.platform!==`wiener_linien_austria`?null:{config:{type:`custom:wiener-linien-austria-retro-card`,entity:t}}})}let $=class extends V{constructor(...e){super(...e),this._versionMismatch=null,this._raceState=`idle`,this._countdownDigit=null,this._raceWinner=null,this._tickerActive=!1,this._tickerTimer=null,this._viaPhase=`towards`,this._viaTimer=null,this._anyViaInRows=!1,this._versionCheckDone=!1,this._fallbackWarned=!1,this._cachedEid=null,this._raceTimers=new Set,this._countdownStartAt=null,this._raceEndAt=null,this._freezeEndAt=null,this._victoryEndAt=null,this._handleCardClick=()=>{if(this._tickerActive){this._tickerActive=!1,this._scheduleTicker(Zn);return}this._config?.wheelchair_race&&this._raceState===`idle`&&(typeof window<`u`&&window.matchMedia?.(`(prefers-reduced-motion: reduce)`).matches||(this._clearRaceTimers(),this._startRace()))},this._handleCardKeydown=e=>{(e.key===`Enter`||e.key===` `)&&(e.preventDefault(),this._handleCardClick())},this._onTickerDone=()=>{this._tickerActive=!1,this._scheduleTicker(Zn)}}setConfig(e){if(!e||typeof e!=`object`)throw Error(`wiener-linien-austria-retro-card: config must be an object`);if(e.entity!==void 0&&typeof e.entity!=`string`)throw Error(`wiener-linien-austria-retro-card: 'entity' must be a string`);if(typeof e.entity==`string`&&e.entity&&!e.entity.startsWith(`sensor.`))throw Error(`wiener-linien-austria-retro-card: 'entity' must be in the sensor domain (got "${e.entity}")`);this._config=zt(e),this._clearRaceTimers(),this._clearTickerTimer(),this._clearViaTimer(),this._raceState=`idle`,this._countdownDigit=null,this._countdownStartAt=null,this._raceEndAt=null,this._freezeEndAt=null,this._victoryEndAt=null,this._raceWinner=null,this._tickerActive=!1,this._fallbackWarned=!1,this._cachedEid=null}getCardSize(){return 2}getGridOptions(){return{columns:12,rows:`auto`,min_columns:4,min_rows:2}}static getConfigElement(){return document.createElement(`wiener-linien-austria-retro-card-editor`)}static getStubConfig(e){let t=tn(e)[0]||``,n=`H`,r=e?.states?.[t]?.attributes?.departures;if(Array.isArray(r)){let e=r.some(e=>e.direction===`H`),t=r.some(e=>e.direction===`R`);!e&&t&&(n=`R`)}return{entity:t,direction:n,size:`small`}}connectedCallback(){super.connectedCallback(),rn(),typeof document<`u`&&document.fonts?.ready&&document.fonts.ready.then(()=>{document.fonts.check(`700 16px "WL Mono"`)||console.warn(`[wiener-linien-austria-retro-card] "WL Mono" 700 not loaded — falling back to Courier New (less authentic). Check /wiener-linien-austria/fonts/ is served by the integration.`)}).catch(e=>{console.warn(`[wiener-linien-austria-retro-card] document.fonts.ready rejected`,e)}),!this._versionCheckDone&&this.hass?.callWS&&(this._versionCheckDone=!0,this._checkCardVersion()),this._raceState!==`idle`&&(this._config?.wheelchair_race?this._armStateTransitions():(this._raceState=`idle`,this._clearRaceTimers())),this._config?.message_ticker&&this._config?.message_text&&this._scheduleTicker(Zn)}disconnectedCallback(){super.disconnectedCallback(),this._clearRaceTimers(),this._clearTickerTimer(),this._clearViaTimer()}shouldUpdate(e){if(!this._config)return!1;if(e.has(`_config`)||e.has(`_versionMismatch`)||e.has(`_raceState`)||e.has(`_countdownDigit`)||e.has(`_raceWinner`)||e.has(`_tickerActive`)||e.has(`_viaPhase`))return!0;let t=e.get(`hass`);if(!t||!this.hass)return!0;let n=this._resolveEntity();return n?t.states[n]!==this.hass.states[n]:!1}updated(e){super.updated(e),this._anyViaInRows?this._armViaTimer():this._viaTimer!==null&&this._clearViaTimer()}willUpdate(e){if(!e.has(`_config`))return;let t=e.get(`_config`),n=t?.wheelchair_race===!0,r=this._config?.wheelchair_race===!0;r&&!n?(this._clearRaceTimers(),this._startRace()):!r&&n&&(this._clearRaceTimers(),this._raceState=`idle`,this._countdownStartAt=null,this._countdownDigit=null,this._raceEndAt=null,this._freezeEndAt=null,this._victoryEndAt=null,this._raceWinner=null);let i=t?.message_ticker===!0&&!!t?.message_text,a=this._config?.message_ticker===!0&&!!this._config?.message_text,o=t?.message_text!==this._config?.message_text;a&&(!i||o)?(this._tickerActive=!1,this._scheduleTicker(1500)):!a&&i&&(this._clearTickerTimer(),this._tickerActive=!1)}_t(e,t){return at(`retro.${e}`,{hassLanguage:this.hass?.language},t)}async _checkCardVersion(){try{this._versionMismatch=await ot(this.hass,`wiener_linien_austria/retro_card_version`,`2.0.0`)}catch(e){console.warn(`[wiener-linien-austria-retro-card] version probe failed`,e)}}_resolveEntity(){let e=this._config?.entity;if(e&&this.hass?.states?.[e])return this._cachedEid=e,e;if(this._cachedEid&&this.hass?.states?.[this._cachedEid])return this._cachedEid;let t=tn(this.hass)[0]??null;return t&&e&&!this._fallbackWarned&&(this._fallbackWarned=!0,console.warn(`[wiener-linien-austria-retro-card] configured entity "${e}" not in hass.states; falling back to "${t}"`)),this._cachedEid=t,t}_clearRaceTimers(){for(let e of this._raceTimers)clearTimeout(e);this._raceTimers.clear()}_scheduleRaceTimer(e,t){let n=setTimeout(()=>{this._raceTimers.delete(n),e()},t);this._raceTimers.add(n)}_scheduleRace(e){this._scheduleRaceTimer(()=>this._startRace(),e)}_clearTickerTimer(){this._tickerTimer!==null&&(clearTimeout(this._tickerTimer),this._tickerTimer=null)}_scheduleTicker(e){this._clearTickerTimer(),this._tickerTimer=setTimeout(()=>{this._tickerTimer=null,this._runTicker()},e)}_runTicker(){if(this._config?.message_ticker&&this._config?.message_text){if(this._raceState!==`idle`){this._scheduleTicker(2e4);return}if(typeof window<`u`&&window.matchMedia?.(`(prefers-reduced-motion: reduce)`).matches){this._scheduleTicker(Zn);return}this._tickerActive=!0}}_tickerDurationSeconds(e){return Math.min(40,Math.max(8,5+e.length*.18))}_armViaTimer(){this._viaTimer===null&&(this._viaTimer=setInterval(()=>{this._viaPhase=this._viaPhase===`towards`?`via`:`towards`},4e3))}_clearViaTimer(){this._viaTimer!==null&&(clearInterval(this._viaTimer),this._viaTimer=null),this._viaPhase=`towards`}_startRace(){if(!this._config?.wheelchair_race)return;if(typeof window<`u`&&window.matchMedia?.(`(prefers-reduced-motion: reduce)`).matches){this._scheduleRace(this._nextRaceDelay());return}if(this._currentBarrierFreeCount()<2){this._scheduleRace(this._nextRaceDelay());return}if(this._tickerActive){this._scheduleRace(this._nextRaceDelay());return}let{winnerCrossT:e}=this._randomizeRaceParams(),t=Date.now();this._raceState=`countdown`,this._countdownStartAt=t,this._countdownDigit=3,this._raceEndAt=t+Xn+e+150,this._freezeEndAt=this._raceEndAt+1500,this._victoryEndAt=this._freezeEndAt+4e3,this._scheduleCountdownTick()}_scheduleCountdownTick(){if(this._raceState!==`countdown`||this._countdownStartAt===null)return;let e=Date.now(),t=e-this._countdownStartAt;if(t>=Xn){this._beginRacing();return}let n=Math.max(1,Math.min(3,3-Math.floor(t/800)));this._countdownDigit!==n&&(this._countdownDigit=n);let r=this._countdownStartAt+(Math.floor(t/800)+1)*800,i=Math.max(50,r-e);this._scheduleRaceTimer(()=>this._scheduleCountdownTick(),i)}_beginRacing(){this._raceState=`racing`,this._countdownDigit=null,this._countdownStartAt=null,this._armStateTransitions()}_measureRaceStartPositions(){let e=this.shadowRoot?.querySelector(`.retro`);if(!e)return null;let t=e.getBoundingClientRect();if(t.width<=0)return null;let n=this.shadowRoot?.querySelectorAll(`.retro-row .retro-wheelchair`);if(!n||n.length<2)return null;let r=n[0],i=n[1];if(!r||!i)return null;let a=r.getBoundingClientRect(),o=i.getBoundingClientRect(),s=a.left-t.left,c=o.left-t.left,l=100-(this._config?.size===`small`?10:14)/t.width*100-a.width/t.width*100;return{a:s/t.width*100,b:c/t.width*100,finishCqw:l}}_randomizeRaceParams(){let e=this._measureRaceStartPositions(),t=vn({a:e?.a??0,b:e?.b??0,finishCqw:e?.finishCqw??96});this._raceWinner=t.winner;for(let[e,n]of Object.entries(t.cssVars))this.style.setProperty(e,n);return{winnerCrossT:t.winnerCrossT}}_armStateTransitions(){this._clearRaceTimers();let e=Date.now();switch(this._raceState){case`idle`:return;case`countdown`:this._countdownStartAt!==null&&this._scheduleCountdownTick();return;case`racing`:this._raceEndAt!==null&&this._scheduleRaceTimer(()=>{this._raceState=`freeze`,this._raceEndAt=null,this._armStateTransitions()},Math.max(0,this._raceEndAt-e));return;case`freeze`:this._freezeEndAt!==null&&this._scheduleRaceTimer(()=>{this._raceState=`victory`,this._freezeEndAt=null,this._armStateTransitions()},Math.max(0,this._freezeEndAt-e));return;case`victory`:this._victoryEndAt!==null&&this._scheduleRaceTimer(()=>{this._raceState=`idle`,this._victoryEndAt=null,this._config?.wheelchair_race&&this._scheduleRace(this._nextRaceDelay())},Math.max(0,this._victoryEndAt-e));return;default:{let e=this._raceState;throw Error(`unhandled race state: ${String(e)}`)}}}_nextRaceDelay(){return 6e4+Math.random()*12e4}_currentBarrierFreeCount(){if(!this._config)return 0;let e=this._resolveEntity();if(!e||!this.hass)return 0;let t=this.hass.states[e]?.attributes??{};return Xt(Array.isArray(t.departures)?t.departures:[],{direction:this._config.direction,lines:this._config.line?[this._config.line]:void 0,walk_times:this._config.walk_times,accessibility_only:this._config.accessibility_only}).slice(0,2).filter(e=>e.barrier_free).length}render(){if(!this._config)return L;let e=this._config,t=this._resolveEntity(),n=t?this.hass?.states?.[t]?.attributes??{}:{},{rows:r,matching:i,departures:a,platform:o,gleisLeft:s,platformLabelKey:c,stopName:l}=en(e,n),u=this._t(c),d=e.show_station_name&&l?this._renderStationName(l,i,a,e.station_bg,n.line_colors??{},e.line):L,f=e.show_header?ln({left:e.header_left,right:e.header_right,serverTime:n.server_time,t:e=>this._t(e),lang:this.hass?.language}):L,p=e.wheelchair_race&&this._raceState===`countdown`,m=e.wheelchair_race&&this._raceState===`racing`,h=e.wheelchair_race&&this._raceState===`freeze`,g=e.wheelchair_race&&this._raceState===`victory`,_=e.wheelchair_race&&this._raceState===`idle`||this._tickerActive,v=this._raceWinner===`A`?1:this._raceWinner===`B`?2:null;this._anyViaInRows=r.some(e=>!!e.via);let y={retro:!0,"retro--gleis-left":!!o&&s,"retro--gleis-right":!!o&&!s,"retro--no-gleis":!o,[`retro--size-${e.size}`]:e.size!==`regular`,[`retro--style-${e.style}`]:e.style!==`classic`,"retro--flicker":e.flicker,"retro--race-countdown":p,"retro--race-active":m,"retro--race-freeze":h,"retro--race-victory":g,"retro--clickable":_,"retro--line-pill":e.show_line_pill,"retro--line-stripe":e.line_stripe,"retro--housing":e.housing},b=_?{role:`button`,tabindex:`0`,"aria-label":this._tickerActive?this._t(`aria_dismiss_message`):this._t(`aria_start_race`)}:{};return F`
       <ha-card style="padding:0;overflow:hidden;">
         <div
-          class=${_e(v)}
-          role=${_.role??V}
-          tabindex=${_.tabindex??V}
-          aria-label=${_["aria-label"]??V}
+          class=${W(y)}
+          role=${b.role??L}
+          tabindex=${b.tabindex??L}
+          aria-label=${b[`aria-label`]??L}
           @click=${this._handleCardClick}
-          @keydown=${w?this._handleCardKeydown:V}>
-          ${Ne(this._versionMismatch,e=>this._t(e),"retro-banner")}
-          ${h}
-          ${u}
+          @keydown=${_?this._handleCardKeydown:L}>
+          ${lt(this._versionMismatch,e=>this._t(e),`retro-banner`)}
+          ${f}
+          ${d}
           <div class="retro-led">
-            ${this._renderMain(i,d,o,n,s,t.server_time,t.line_colors??{},"number"==typeof t.stale_departures?t.stale_departures:0)}
+            ${this._renderMain(t,r,a,o,u,n.server_time,n.line_colors??{},typeof n.stale_departures==`number`?n.stale_departures:0)}
             ${this._tickerActive&&e.message_text?F`<div class="retro-ticker" role="status" aria-live="polite">
                   <div
                     class="retro-ticker-text"
@@ -204,1326 +1261,928 @@ const vi=["mdi:ab-testing","mdi:abacus","mdi:abjad-arabic","mdi:abjad-hebrew","m
                   >
                     ${e.message_text}
                   </div>
-                </div>`:V}
-            ${p&&null!==this._countdownDigit?F`<div class="retro-countdown" role="status" aria-live="polite">
+                </div>`:L}
+            ${p&&this._countdownDigit!==null?F`<div class="retro-countdown" role="status" aria-live="polite">
                   ${ze(this._countdownDigit,F`<span class="retro-countdown-digit" aria-hidden="true">${this._countdownDigit}</span>`)}
                   <span class="retro-victory-sr">
-                    ${this._t("race_starting_in",{n:this._countdownDigit})}
+                    ${this._t(`race_starting_in`,{n:this._countdownDigit})}
                   </span>
-                </div>`:V}
-            ${p||f||g?F`<div class="retro-finish-line" aria-hidden="true"></div>`:V}
-            ${b?F`<div class="retro-victory" role="status" aria-live="polite">
+                </div>`:L}
+            ${p||m||h?F`<div class="retro-finish-line" aria-hidden="true"></div>`:L}
+            ${g?F`<div class="retro-victory" role="status" aria-live="polite">
                   <div class="retro-victory-flag" aria-hidden="true"></div>
-                  ${null!==k?F`<div class="retro-victory-winner" aria-hidden="true">
+                  ${v===null?L:F`<div class="retro-victory-winner" aria-hidden="true">
                         <ha-icon class="retro-winner-trophy" icon="mdi:trophy"></ha-icon>
-                        <span class="retro-winner-num">${k}</span>
-                      </div>`:V}
+                        <span class="retro-winner-num">${v}</span>
+                      </div>`}
                   <span class="retro-victory-sr">
-                    ${null!==k?this._t("race_winner_announce",{n:k}):this._t("race_finished")}
+                    ${v===null?this._t(`race_finished`):this._t(`race_winner_announce`,{n:v})}
                   </span>
-                </div>`:V}
+                </div>`:L}
           </div>
         </div>
       </ha-card>
-    `}_renderMain(e,i,t,o,r,d,a,n){if(!e)return F`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;if(0===i.length){const e=this._config.direction,i=this._config.line,o=t.filter(i=>i.direction===e);let r="no_data";return 0===t.length&&n>0?r="stale_feed":0===t.length&&d?r="betriebsschluss":t.length>0&&0===o.length?r="no_data_wrong_direction":i&&o.length>0&&(r="no_data_wrong_line"),F`<div class="retro-empty" role="status" aria-live="polite">${this._t(r)}</div>`}return F`
-      <ul class="retro-rows" role="list" aria-label=${this._t("departures_list")}>
-        ${i.map((e,i)=>this._renderRow(e,i,a))}
+    `}_renderMain(e,t,n,r,i,a,o,s){if(!e)return F`<div class="retro-empty" role="status" aria-live="polite">${this._t(`no_entity`)}</div>`;if(t.length===0){let e=this._config.direction,t=this._config.line,r=n.filter(t=>t.direction===e),i=`no_data`;return n.length===0&&s>0?i=`stale_feed`:n.length===0&&a?i=`betriebsschluss`:n.length>0&&r.length===0?i=`no_data_wrong_direction`:t&&r.length>0&&(i=`no_data_wrong_line`),F`<div class="retro-empty" role="status" aria-live="polite">${this._t(i)}</div>`}return F`
+      <ul class="retro-rows" role="list" aria-label=${this._t(`departures_list`)}>
+        ${t.map((e,t)=>this._renderRow(e,t,o))}
       </ul>
-      ${o?this._renderGleis(o,r):V}
-    `}_renderRow(e,i,t){const o=Number.isFinite(e.countdown)?e.countdown:null,r=null!==o&&o<=0,d=e.line||"?",a=e.towards||"",n="string"==typeof e.via&&e.via.trim()?e.via.trim():null,m=null===o?this._t("no_data"):r?this._t("at_platform"):this._t("countdown_minutes",{n:String(o)}),l=e.barrier_free?this._t("barrier_free_title"):"",s=[d,a,n?`${this._t("via_prefix")} ${n}`:"",m,l].filter(Boolean).join(" — "),c=ii(d,{},t),u="var(--primary-color)"!==c.background,h=u?c.background:"var(--led-amber)",p=c.color??(u?"#fff":"var(--led-bg)"),f=$e({"--row-i":String(i),"--retro-line-color":h,"--retro-line-fg":p}),g=!!n;return F`
-      <li class="retro-row" style=${f} aria-label=${s}>
+      ${r?this._renderGleis(r,i):L}
+    `}_renderRow(e,t,n){let r=Number.isFinite(e.countdown)?e.countdown:null,i=r!==null&&r<=0,a=e.line||`?`,o=e.towards||``,s=typeof e.via==`string`&&e.via.trim()?e.via.trim():null,c=r===null?this._t(`no_data`):i?this._t(`at_platform`):this._t(`countdown_minutes`,{n:String(r)}),l=e.barrier_free?this._t(`barrier_free_title`):``,u=[a,o,s?`${this._t(`via_prefix`)} ${s}`:``,c,l].filter(Boolean).join(` — `),d=Bt(a,{},n),f=d.background!==`var(--primary-color)`,p=f?d.background:`var(--led-amber)`,m=d.color??(f?`#fff`:`var(--led-bg)`),h=G({"--row-i":String(t),"--retro-line-color":p,"--retro-line-fg":m}),g=!!s;return F`
+      <li class="retro-row" style=${h} aria-label=${u}>
         <div class="retro-line" aria-hidden="true">
-          <span class="retro-line__label">${d}</span>
+          <span class="retro-line__label">${a}</span>
         </div>
         <div class="retro-dest" aria-hidden="true">
           <span class="retro-dest-stack">
-            <span class="retro-dest-text retro-dest-text--layout">${Ee(a)}</span>
+            <span class="retro-dest-text retro-dest-text--layout">${Be(o)}</span>
             ${g?F`
                   <span
-                    class=${_e({"retro-dest-text":!0,"retro-dest-text--absolute":!0,"retro-dest-text--visible":"towards"===this._viaPhase})}
-                  >${Ee(a)}</span>
+                    class=${W({"retro-dest-text":!0,"retro-dest-text--absolute":!0,"retro-dest-text--visible":this._viaPhase===`towards`})}
+                  >${Be(o)}</span>
                   <span
-                    class=${_e({"retro-dest-text":!0,"retro-dest-text--absolute":!0,"retro-dest-text--via":!0,"retro-dest-text--visible":"via"===this._viaPhase})}
-                  >${this._t("via_prefix")} ${Ee(n)}</span>
-                `:V}
+                    class=${W({"retro-dest-text":!0,"retro-dest-text--absolute":!0,"retro-dest-text--via":!0,"retro-dest-text--visible":this._viaPhase===`via`})}
+                  >${this._t(`via_prefix`)} ${Be(s)}</span>
+                `:L}
           </span>
           ${e.barrier_free?F`<ha-icon
                 class="retro-wheelchair"
                 icon="mdi:wheelchair-accessibility"
-                title=${this._t("barrier_free_title")}
-              ></ha-icon>`:V}
+                title=${this._t(`barrier_free_title`)}
+              ></ha-icon>`:L}
         </div>
         <div class="retro-cd" aria-hidden="true">
-          ${null===o?"--":r?F`<span class="retro-stars"><span>*</span><span>*</span></span>`:this._config?.show_unit?F`<span class="retro-cd-num">${o}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`:String(o)}
+          ${r===null?`--`:i?F`<span class="retro-stars"><span>*</span><span>*</span></span>`:this._config?.show_unit?F`<span class="retro-cd-num">${r}</span><span class="retro-cd-unit">${this._t(`unit_min`)}</span>`:String(r)}
         </div>
       </li>
-    `}_renderGleis(e,i){return F`
+    `}_renderGleis(e,t){return F`
       <div class="retro-gleis">
-        <div class="retro-gleis-label">${i}</div>
+        <div class="retro-gleis-label">${t}</div>
         <div class="retro-gleis-number">${e}</div>
       </div>
-    `}_renderStationName(e,i,t,o,r,d){let a,n;if("white"===o)a="#fff",n="#000";else if("black"===o)a="#000",n="#fff";else{const e=i.length?i:t,o=d||e[0]?.line;if(o){const e=ii(o,{},r);a=e.background,n=e.color??"#fff","var(--primary-color)"===a&&(a="#fff",n="#000")}else a="#fff",n="#000"}return F`
-      <div class="retro-station" style=${$e({background:a,color:n})}>
-        <div class="retro-station-name">${Ee(e)}</div>
+    `}_renderStationName(e,t,n,r,i,a){let o,s;if(r===`white`)o=`#fff`,s=`#000`;else if(r===`black`)o=`#000`,s=`#fff`;else{let e=t.length?t:n,r=a||e[0]?.line;if(r){let e=Bt(r,{},i);o=e.background,s=e.color??`#fff`,o===`var(--primary-color)`&&(o=`#fff`,s=`#000`)}else o=`#fff`,s=`#000`}return F`
+      <div class="retro-station" style=${G({background:o,color:s})}>
+        <div class="retro-station-name">${Be(e)}</div>
       </div>
-    `}static{this.styles=a`
-    :host {
-      display: block;
-      /* Create a stacking context on the host so the high z-indexes
-         inside (screen-door overlay z=30, victory overlay z=20,
-         winner badge z=22, etc.) only compete with other elements
-         inside this card. Without this, race overlays and the LED
-         dot pattern can render above HA's dashboard chrome. */
-      isolation: isolate;
-    }
-    .retro {
-      /* Classic defaults — swapped wholesale by .retro--style-warm below. */
-      --led-amber: #FFC700;
-      --led-bg: #000;
-      --led-substrate: #1a0d2a;
-      --led-glow-rgb: 255 199 0;
-      --led-dot-size: 0.5px;
-      --led-dot-edge: 1px;
-      --led-dot-pitch: 4px;
-
-      /* LED area inner padding. Lives on the LED element; declared here so
-         size/gleis variants can override via the .retro cascade. */
-      --retro-pad-y: 14px;
-      --retro-pad-r: 22px;
-      --retro-pad-l: 22px;
-
-      /* Establish a container so the race exit animation can translate
-         wheelchairs by 100cqw (= full card width) regardless of size. */
-      container-type: inline-size;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      /* WL Mono is the subsetted TeX Gyre Cursor face shipped with
-         this integration — Courier-metric so the Courier New stack is
-         a clean fallback during the woff2 fetch window. The bold
-         variant ships separately so weight: 700 picks up real glyphs
-         instead of faux-bold synthesis. */
-      font-family: "WL Mono", "Courier New", Courier, monospace;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      overflow: hidden;
-      min-height: 110px;
-    }
-    .retro-led {
-      /* The actual LED display area — own positioning context so the
-         race finish-line and victory overlay fill it edge-to-edge with a
-         simple inset:0, no negative-margin gymnastics. */
-      flex: 1;
-      position: relative;
-      display: flex;
-      align-items: stretch;
-      background: var(--led-bg);
-      background-image: radial-gradient(
-        circle,
-        var(--led-substrate) var(--led-dot-size),
-        transparent var(--led-dot-edge)
-      );
-      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
-      padding: var(--retro-pad-y) var(--retro-pad-r) var(--retro-pad-y) var(--retro-pad-l);
-    }
-    /* Pixel style — vintage LED-dot-matrix departure-board look. A
-       layer above all panel content is transparent at the substrate-
-       dot positions and opaque LED-bg between them, so amber text +
-       glow + race choreography (wheelchairs, finish strip, countdown
-       digit, victory flag, trophy badge) all show through *only* at
-       dot positions — aligned with the substrate dot pattern beneath.
-       Everything in the LED area becomes discrete "lit LED dots" for a
-       consistently dotty panel material.
-       Pixel inherits the warm color palette (3px dot pitch) because
-       the classic style's 4px pitch is too coarse for the screen-door
-       and small text becomes illegible. z-index 30 sits above the
-       wheelchair (4), finish strip (3), countdown (18), victory (20)
-       — and the trophy badge inside victory's isolated stacking
-       context (which appears at z=20 from .retro-led's perspective). */
-    .retro--style-pixel .retro-led::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: radial-gradient(
-        circle,
-        transparent var(--led-dot-size),
-        var(--led-bg) var(--led-dot-edge)
-      );
-      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
-      pointer-events: none;
-      z-index: 30;
-    }
-    .retro--clickable {
-      cursor: pointer;
-    }
-    .retro--style-warm,
-    .retro--style-pixel {
-      --led-amber: #FFB000;
-      --led-bg: #050302;
-      --led-substrate: #2a1805;
-      --led-glow-rgb: 255 176 0;
-      --led-dot-size: 0.9px;
-      --led-dot-edge: 1.4px;
-      --led-dot-pitch: 3px;
-    }
-    .retro--gleis-left .retro-gleis { order: -1; }
-    .retro--gleis-right { --retro-pad-r: 14px; }
-    .retro--gleis-left { --retro-pad-l: 14px; }
-    .retro-rows {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 8px;
-      color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
-      font-size: 1.9em;
-      line-height: 1;
-      /* <ul> for semantic departure list — reset UA list chrome. */
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-    .retro-row {
-      display: grid;
-      grid-template-columns: 2.5em 1fr auto;
-      /* Baseline alignment — not center. Both grid cells render the
-         same uppercase WL Mono at the same font-size, so aligning by
-         alphabetic baseline makes the cap-tops line up automatically
-         (by construction, not by tuning). Center alignment used to
-         centre the cells' BOXES, but WL Mono's uppercase glyphs sit
-         in the upper-middle of their line-box — so identical boxes
-         centred geometrically still showed mismatched visible ink.
-         Baseline alignment retires both empirical translateY hacks
-         that used to live on the pill and its inner label. */
-      align-items: baseline;
-      gap: 12px;
-      white-space: nowrap;
-      /* Position context for the line-stripe ::before Tweak and the
-         absolute via-cross-fade pair inside .retro-dest. */
-      position: relative;
-    }
-    .retro-line {
-      /* Default (no Tweak): plain amber text, left-aligned. The pill
-         layout below kicks in only under .retro--line-pill so the
-         pre-Tweak look is byte-identical. Center alignment matches
-         the row's align-items: center so the line cell vertically
-         lines up with the destination text and countdown digits. */
-      font-weight: 400;
-      text-align: left;
-      transition: opacity 0.15s ease-out;
-    }
-    /* Line-pill Tweak — render the line code inside a filled rounded
-       rectangle using --retro-line-color (resolved per row in JS).
-       Structural decisions (NOT empirical magic numbers — see below
-       for the history):
-       1. align-items: baseline (inherited from .retro-row). Pill text
-          shares its baseline with the destination text in the next
-          grid cell; same font + same size means cap-tops line up by
-          construction. No translateY needed.
-       2. NO fixed height. Pill grows from symmetric em padding
-          around its inner label, so the visual capsule is always
-          centred top-to-bottom on the text. Previous height: 1em
-          made the pill BOX drift relative to its visible glyph,
-          which every per-em translateY hack was empirically fighting.
-       3. NO transform optical-nudge. Earlier passes tried -0.05em,
-          0, +0.03em on the pill and -0.04em, 0, +0.08em on the
-          label; baseline alignment retires all of them.
-       Padding 0.08em block / 0.4em inline is the design spec; em
-       sizing lets medium / small variants inherit proportions
-       automatically. */
-    .retro--line-pill .retro-line {
-      display: inline-flex;
-      align-items: baseline;
-      justify-content: center;
-      box-sizing: border-box;
-      font-weight: 700;
-      text-align: center;
-      min-width: 2em;
-      padding: 0.08em 0.4em;
-      border-radius: 0.18em;
-      background: var(--retro-line-color, transparent);
-      color: var(--retro-line-fg, var(--led-amber));
-      text-shadow: none;
-      box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
-    }
-    .retro--line-pill .retro-line__label {
-      /* Kept as a render-time wrapper so the markup stays uniform
-         across pill and non-pill modes (the renderer always emits
-         the span — keying off it from --race-victory or future
-         tweaks stays cheap). inline-block makes the span a valid
-         transform target if a future tweak needs one; currently no
-         transform is applied because baseline alignment on the
-         grid row handles centring structurally. */
-      display: inline-block;
-    }
-    .retro-dest {
-      display: flex;
-      align-items: center;
-      gap: 0.35em;
-      /* No overflow: hidden on the flex container itself — the
-         destination-text stack carries its own overflow:hidden /
-         text-overflow:ellipsis, and clipping at this level would
-         shave the bottom off the wheelchair icon at the row's
-         right edge. Keeping overflow visible lets the icon render
-         in full while the text inside still ellipsises. */
-      text-transform: uppercase;
-      min-width: 0;
-      transition: opacity 0.15s ease-out;
-    }
-    /* Stack the towards / via labels on top of each other. The
-       --layout span occupies the row height (so the row never
-       collapses on cross-fade); the two --absolute spans sit on top
-       and swap visibility via --visible. Rows with no via payload
-       skip the absolute pair entirely and render only the layout span,
-       so existing dashboards are unaffected. */
-    .retro-dest-stack {
-      position: relative;
-      display: inline-block;
-      overflow: hidden;
-      flex: 0 1 auto;
-      min-width: 0;
-      max-width: 100%;
-    }
-    .retro-dest-text {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      min-width: 0;
-      max-width: 100%;
-      display: block;
-    }
-    .retro-dest-text--layout {
-      /* Sized but invisible while via-cross-fade is mounted — the two
-         absolute siblings carry the painted text. A row without a via
-         payload omits the absolute pair, so the layout span stays
-         visible and renders the towards text directly. */
-      visibility: visible;
-    }
-    .retro-dest-stack:has(.retro-dest-text--absolute) .retro-dest-text--layout {
-      visibility: hidden;
-    }
-    .retro-dest-text--absolute {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      transition: opacity 0.4s ease-in-out;
-      will-change: opacity;
-    }
-    .retro-dest-text--visible {
-      opacity: 1;
-    }
-    .retro-wheelchair {
-      flex: 0 0 auto;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      /* Sized slightly smaller than 1em so the icon sits comfortably
-         inside the row's line-height: 1 box with the row centred —
-         a full-em icon was clipping at the bottom under the previous
-         overflow:hidden + baseline-translate combo on smaller sizes. */
-      --mdc-icon-size: 0.9em;
-      width: 0.9em;
-      height: 0.9em;
-      color: inherit;
-      filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
-      /* Optical-centre correction. WL Mono is a Courier-derived face
-         with a tall ascender / shallow descender, so uppercase glyphs
-         (SIMMERING) sit in the upper-middle of their line-box. An
-         icon centred in the line-box geometrically ends up visibly
-         above the cap-height of the text next to it. Nudging the
-         icon down ~0.12em lands its visual centre on the cap-height
-         centre of the adjacent SIMMERING glyphs. */
-      transform: translateY(0.12em);
-    }
-    .retro-cd {
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-      min-width: 2.5em;
-      transition: opacity 0.4s ease-out;
-      display: inline-flex;
-      align-items: baseline;
-      justify-content: flex-end;
-      gap: 0.25em;
-    }
-    .retro-cd-num {
-      /* Holds the tabular-nums alignment for the digit while letting
-         the unit sit at a smaller size next to it without throwing off
-         the right-edge alignment of the column. */
-      display: inline-block;
-    }
-    .retro-cd-unit {
-      /* Small amber-caps unit ("min") trailing the countdown number.
-         Tied to em so it tracks the row's font-size token. Hidden at
-         narrow widths via a container query below — the row prefers
-         to surrender the unit over the destination text when room is
-         tight. The text-shadow inherited from .retro-rows is already
-         the right glow, so no overrides here. */
-      display: inline-block;
-      font-size: 0.5em;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      opacity: 0.85;
-      transform: translateY(-0.05em);
-    }
-    @container (inline-size < 360px) {
-      .retro-cd-unit { display: none; }
-    }
-    .retro-stars {
-      display: inline-flex;
-      gap: 0.08em;
-      justify-content: flex-end;
-    }
-    .retro-stars > span {
-      animation: retroStarBlink 1s infinite;
-    }
-    .retro-stars > span:nth-child(2) {
-      animation-delay: 0.5s;
-    }
-    @keyframes retroStarBlink {
-      0%, 49.99% { opacity: 1; }
-      50%, 100%  { opacity: 0; }
-    }
-    /* Irregular, mostly-on flicker — brief dips and rare blackouts on the
-       line badge. Keeps full opacity ~95% of the loop so it reads as a
-       struggling bulb rather than a blinking sign. */
-    @keyframes retroLineFlicker {
-      0%, 6.9%   { opacity: 1; }
-      7.1%       { opacity: 0.38; }
-      7.5%       { opacity: 1; }
-      22.9%      { opacity: 1; }
-      23.1%      { opacity: 0.08; }
-      23.35%     { opacity: 1; }
-      23.7%      { opacity: 0.55; }
-      24%        { opacity: 1; }
-      51.9%      { opacity: 1; }
-      52.15%     { opacity: 0.45; }
-      52.4%      { opacity: 1; }
-      75.9%      { opacity: 1; }
-      76.1%      { opacity: 0.15; }
-      76.35%     { opacity: 1; }
-      77%        { opacity: 0.6; }
-      77.3%      { opacity: 1; }
-      100%       { opacity: 1; }
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      .retro--flicker .retro-line {
-        animation: retroLineFlicker 7.3s infinite;
-        will-change: opacity;
-      }
-      /* Offset the second row so the two badges don't flicker in lockstep. */
-      .retro--flicker .retro-row:nth-child(2) .retro-line {
-        animation-duration: 8.1s;
-        animation-delay: -2.4s;
-      }
-    }
-    /* Wheelchair race — per-race pattern encodes who's ahead at 25/50/
-       75%, so each run has at least one overtake. Per-racer waypoints
-       (--race-x-25/50/75), end offset, and duration come from CSS
-       custom properties that JS sets at race start. Keyframe preserves
-       the 0.18em baseline offset so the icon doesn't jump vertically.
-       Per-keyframe timing-functions: ease-out for the launch (burst
-       out of the gate) and a symmetric cubic-bezier for every middle
-       segment. The cubic-bezier (0.4, 0.2, 0.6, 0.8) has endpoint
-       slopes of ~0.5× the segment's average velocity, peaking ~1.5×
-       in the middle — so when the swap pattern flips lead/trail at a
-       checkpoint, the velocity transition reads as a smooth ease
-       instead of an abrupt lurch. */
-    @keyframes retroWheelExit {
-      0%   { transform: translate(0, 0.18em); animation-timing-function: ease-out; }
-      25%  { transform: translate(var(--race-x-25, 25cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
-      50%  { transform: translate(var(--race-x-50, 50cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
-      75%  { transform: translate(var(--race-x-75, 75cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
-      100% { transform: translate(var(--race-end, 110cqw), 0.18em); }
-    }
-    @media (prefers-reduced-motion: no-preference) {
-      /* LED prep: countdown, racing, and the photo-finish freeze all
-         share the same row-clearing + overflow-visible setup. */
-      .retro--race-countdown .retro-dest,
-      .retro--race-active .retro-dest,
-      .retro--race-freeze .retro-dest {
-        overflow: visible;
-      }
-      .retro--race-countdown .retro-cd,
-      .retro--race-active .retro-cd,
-      .retro--race-freeze .retro-cd {
-        opacity: 0;
-      }
-      /* Only fade Gleis/Steig during the prep when it's on the right —
-         that's the wheelchairs' path. Left-side Gleis stays lit. */
-      .retro--race-countdown.retro--gleis-right .retro-gleis,
-      .retro--race-active.retro--gleis-right .retro-gleis,
-      .retro--race-freeze.retro--gleis-right .retro-gleis {
-        opacity: 0;
-      }
-      /* Animation declarations apply during both active and freeze so
-         the in-flight animation keeps its identity across the state
-         flip — animation-play-state: paused below freezes the frame
-         instead of restarting from 0%. */
-      .retro--race-active .retro-row:nth-child(1) .retro-wheelchair,
-      .retro--race-freeze .retro-row:nth-child(1) .retro-wheelchair {
-        --race-end: var(--race-a-end, 110cqw);
-        --race-x-25: var(--race-a-x-25, 25cqw);
-        --race-x-50: var(--race-a-x-50, 50cqw);
-        --race-x-75: var(--race-a-x-75, 75cqw);
-        animation: retroWheelExit var(--race-a-duration, 3.3s) linear forwards;
-      }
-      .retro--race-active .retro-row:nth-child(2) .retro-wheelchair,
-      .retro--race-freeze .retro-row:nth-child(2) .retro-wheelchair {
-        --race-end: var(--race-b-end, 110cqw);
-        --race-x-25: var(--race-b-x-25, 25cqw);
-        --race-x-50: var(--race-b-x-50, 50cqw);
-        --race-x-75: var(--race-b-x-75, 75cqw);
-        animation: retroWheelExit var(--race-b-duration, 3.3s) linear forwards;
-      }
-      /* Photo-finish freeze: pauses both wheelchair animations at
-         the moment shortly after the winner crosses the finish line.
-         The viewer gets a clear still frame — winner at the strip,
-         loser caught a step behind — before the trophy appears. */
-      .retro--race-freeze .retro-wheelchair {
-        animation-play-state: paused;
-      }
-      /* Pass wheelchairs in front of the finish-line strip so the
-         crossing reads as "through" rather than "behind the barrier". */
-      .retro--race-active .retro-wheelchair,
-      .retro--race-freeze .retro-wheelchair {
-        position: relative;
-        z-index: 4;
-      }
-      /* Victory holds the racers off-screen until the idle reset. */
-      .retro--race-victory .retro-wheelchair {
-        opacity: 0;
-      }
-    }
-    /* Hide all row text during victory so nothing bleeds through the
-       (slightly transparent) checker flag. */
-    .retro--race-victory .retro-line,
-    .retro--race-victory .retro-dest,
-    .retro--race-victory .retro-cd,
-    .retro--race-victory .retro-gleis {
-      opacity: 0;
-    }
-    /* Flicker keyframes set their own opacity values, which win over
-       the static opacity:0 above while the animation is running.
-       Disable the flicker entirely during victory so the line badge
-       hides cleanly with the rest of the row text. */
-    .retro--race-victory.retro--flicker .retro-line {
-      animation: none;
-    }
-    /* Message-ticker overlay — when \`message_ticker\` is on, this fills
-       the LED panel every few minutes and scrolls \`message_text\`
-       across once as a marquee, then removes itself (animationend → a
-       JS handler clears _tickerActive). Opaque --led-bg plus the same
-       substrate dot-pattern as .retro-led so the departures vanish
-       cleanly and the panel material stays consistent. z-index 16
-       keeps it below the countdown (18) / victory (20) AND below the
-       pixel screen-door ::after (30), so in pixel style the scrolling
-       text is dotted like the rest of the board. */
-    .retro-ticker {
-      position: absolute;
-      inset: 0;
-      z-index: 16;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      pointer-events: none;
-      background: var(--led-bg);
-      background-image: radial-gradient(
-        circle,
-        var(--led-substrate) var(--led-dot-size),
-        transparent var(--led-dot-edge)
-      );
-      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
-      border-radius: inherit;
-      /* Query container so the scroll keyframes can start the text one
-         full panel-width off the right edge via 100cqw. */
-      container-type: inline-size;
-    }
-    .retro-ticker-text {
-      /* flex: none keeps the text's natural (over-wide) width — the
-         parent's overflow:hidden clips it. The parent's align-items:
-         center handles vertical centring, so the keyframes touch only
-         translateX and never fight a translateY. */
-      flex: none;
-      white-space: nowrap;
-      /* Match the departure rows: same amber, glow, size and uppercase
-         board lettering. Font, weight and tracking inherit from .retro. */
-      font-size: 1.9em;
-      line-height: 1;
-      color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
-      text-transform: uppercase;
-      will-change: transform;
-      animation-name: retroTickerScroll;
-      animation-timing-function: linear;
-      animation-iteration-count: 1;
-      /* both → text waits off-screen-right before the run and rests
-         off-screen-left after it, with no flash at the layout origin.
-         animation-duration is set inline, scaled to message length. */
-      animation-fill-mode: both;
-    }
-    @keyframes retroTickerScroll {
-      /* Start one full panel-width off the right (100cqw), end one
-         full text-width off the left (-100%). */
-      from { transform: translateX(100cqw); }
-      to   { transform: translateX(-100%); }
-    }
-    /* Pixelated finish-line strip on the right edge during the race.
-       Same conic-gradient checker technique as the victory flag, but
-       as a narrow 14px column so ~2 squares wide read as chunky "8-bit
-       goal posts". Clipped by the card's border-radius via overflow. */
-    .retro-finish-line {
-      position: absolute;
-      top: 0;
-      right: 0;
-      bottom: 0;
-      width: 14px;
-      z-index: 3;
-      pointer-events: none;
-      background-image: conic-gradient(
-        transparent 0deg 90deg,
-        var(--led-amber) 90deg 180deg,
-        transparent 180deg 270deg,
-        var(--led-amber) 270deg 360deg
-      );
-      background-size: 14px 14px;
-      filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.7));
-      animation: retroFinishLineAppear 0.3s ease-out both;
-    }
-    @keyframes retroFinishLineAppear {
-      0%   { opacity: 0; transform: scaleX(0.2); transform-origin: right; }
-      100% { opacity: 1; transform: scaleX(1); }
-    }
-    /* Smaller strip on the small variant so it doesn't dominate. */
-    .retro--size-small .retro-finish-line {
-      width: 10px;
-      background-size: 10px 10px;
-    }
-    /* Victory overlay: 90s-racing-sim checkered flag scrolling horizontally
-       with a pulsing trophy centered on top. */
-    .retro-victory {
-      position: absolute;
-      inset: 0;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      overflow: hidden;
-      border-radius: inherit;
-      opacity: 1;
-      isolation: isolate;
-      /* Size container so the flag can query card height via cqh and
-         keep its checker squares actually square regardless of size. */
-      container-type: size;
-      animation: retroVictoryAppear 0.22s ease-out both;
-    }
-    /* Screen-reader-only label inside the victory overlay. The overlay
-       is purely visual (checkered flag animation) so we ship a hidden
-       text announcement in a role="status"/aria-live region — screen
-       readers speak it when the race finishes, sighted users see the
-       animation. */
-    .retro-victory-sr {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-    .retro-victory-flag {
-      position: absolute;
-      inset: 0;
-      /* Transparent "dark" tiles let the LED substrate dot pattern of the
-         card show through; only the amber rectangles are painted, then the
-         drop-shadow filter gives each one the same glow as the row text. */
-      background-image: conic-gradient(
-        transparent 0deg 90deg,
-        var(--led-amber) 90deg 180deg,
-        transparent 180deg 270deg,
-        var(--led-amber) 270deg 360deg
-      );
-      /* Tile = 50cqh × 50cqh — square, so height divides the card into
-         2 tile rows (= 4 rectangle rows) and the individual rectangles
-         stay square at every card size. */
-      background-size: 50cqh 50cqh;
-      filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
-      animation: retroVictoryFlag 0.4s linear infinite;
-    }
-    @keyframes retroVictoryAppear {
-      0%   { opacity: 0; }
-      100% { opacity: 1; }
-    }
-    @keyframes retroVictoryFlag {
-      0%   { background-position: 0 0; }
-      100% { background-position: 100cqh 0; }
-    }
-
-    /* Pre-race countdown overlay — "3, 2, 1" punch-in over the LED
-       panel before the racers leave the gate. Single big chunky
-       monospace numeral in LED-amber, glowing, with a punch-scale
-       animation per digit (Lit re-mounts the <span> via keyed() so
-       the keyframe re-fires each tick). The overlay dims the LED
-       behind it slightly so the digit reads cleanly. */
-    .retro-countdown {
-      position: absolute;
-      inset: 0;
-      z-index: 18;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      background: rgba(0, 0, 0, 0.6);
-      border-radius: inherit;
-      overflow: hidden;
-      isolation: isolate;
-      container-type: size;
-      animation: retroCountdownAppear 0.18s ease-out both;
-    }
-    @keyframes retroCountdownAppear {
-      0%   { opacity: 0; }
-      100% { opacity: 1; }
-    }
-    .retro-countdown-digit {
-      display: block;
-      font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
-      font-weight: 900;
-      font-size: 60cqh;
-      line-height: 1;
-      color: var(--led-amber);
-      letter-spacing: -0.04em;
-      text-shadow:
-        0 0 10px rgb(var(--led-glow-rgb) / 0.9),
-        0 0 24px rgb(var(--led-glow-rgb) / 0.7),
-        0 0 40px rgb(var(--led-glow-rgb) / 0.4);
-      animation: retroCountdownPunch 0.8s ease-out both;
-      will-change: transform, opacity;
-    }
-    @keyframes retroCountdownPunch {
-      0%   { opacity: 0; transform: scale(0.4); }
-      18%  { opacity: 1; transform: scale(1.18); }
-      30%  {              transform: scale(1); }
-      72%  { opacity: 1; transform: scale(1); }
-      100% { opacity: 0; transform: scale(0.85); }
-    }
-
-    /* Winner badge — circular cut-out centered on the victory checker
-       flag. Background = the card's LED substrate (--led-bg, black in
-       classic, dark warm-amber in warm mode) so the badge reads as
-       "punched through" the checker flag rather than sitting on top of
-       it. Amber LED ring + glow gives it the same lit-from-within
-       feel as the rest of the LED panel. mdi:trophy is the visual
-       anchor; the lane number sits on its plinth. */
-    .retro-victory-winner {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      z-index: 22;
-      /* +10% over the previous 41cqmin / 82px / 172px sizing so the
-         trophy + lane number have more breathing room inside the LED
-         ring without crowding the embossed numerals. */
-      width: 45cqmin;
-      height: 45cqmin;
-      min-width: 90px;
-      min-height: 90px;
-      max-width: 190px;
-      max-height: 190px;
-      border-radius: 50%;
-      background-color: var(--led-bg);
-      background-image: radial-gradient(
-        circle,
-        var(--led-substrate) var(--led-dot-size),
-        transparent var(--led-dot-edge)
-      );
-      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--led-amber);
-      transform: translate(-50%, -50%) scale(0.2);
-      opacity: 0;
-      animation: retroWinnerBadgeAppear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s forwards;
-    }
-    @keyframes retroWinnerBadgeAppear {
-      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
-      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    }
-    .retro-winner-trophy {
-      --mdc-icon-size: 57cqmin;
-      color: var(--led-amber);
-      filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.85))
-              drop-shadow(0 0 10px rgb(var(--led-glow-rgb) / 0.45));
-    }
-    /* Lane number on the trophy cup. Coloured with --led-substrate (the
-       same dot colour the rest of the panel uses for unlit pixels) so
-       the digit reads as a hole punched out of the trophy's lit amber
-       — matching the dotted-board / Punktmatrix aesthetic across all
-       three style variants. No text-shadow / embossing: with the
-       substrate-tone digit, any lit-edge highlight reads as a halo
-       around a "missing pixel" hole, which is the wrong material. */
-    .retro-winner-num {
-      position: absolute;
-      top: 44%;
-      left: 0;
-      right: 0;
-      transform: translateY(-50%);
-      text-align: center;
-      font-family: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
-      font-weight: 900;
-      /* -10% from the previous 22cqmin so the digit sits inside the
-         cup bowl rather than overflowing onto the trophy stem. */
-      font-size: 20cqmin;
-      line-height: 1;
-      color: var(--led-substrate);
-      letter-spacing: -0.04em;
-      pointer-events: none;
-    }
-    /* Tighter on the small variant so trophy + number still fit. */
-    .retro--size-small .retro-winner-trophy {
-      --mdc-icon-size: 51cqmin;
-    }
-    .retro--size-small .retro-winner-num {
-      /* -10% from the previous 19cqmin, same rationale as base. */
-      font-size: 17cqmin;
-      /* On small the badge hits its 82px min-width while the trophy
-         icon scales down independently — so the cup ends up a touch
-         higher in the badge than on regular/medium. Nudge the number
-         up the same amount so it lands on the cup body, not below it. */
-      top: 37%;
-    }
-    /* Pixel mode alignment fix: drop the trophy badge's own substrate
-       gradient. The badge's gradient origin doesn't coregister with
-       the panel-wide screen-door overlay, so its dots fight the
-       overlay's dots inside the badge area. Without it, the trophy
-       circle is a clean solid LED-bg cutout from the dotted panel —
-       a dark frame around the dotted trophy icon and number. */
-    .retro--style-pixel .retro-victory-winner {
-      background-image: none;
-    }
-    /* Pixel style: add 1px of breathing room between the countdown
-       digits and the gleis indicator. The screen-door overlay can
-       make the dotted digits feel jammed against the gleis dots, so
-       a single extra pixel of separation reads cleanly. Covers
-       gleis-right (default), gleis-left (platform 2), and the small
-       size variant where the base margin starts smaller. */
-    .retro--style-pixel .retro-gleis {
-      margin-left: 13px;
-    }
-    .retro--style-pixel.retro--gleis-left .retro-gleis {
-      margin-right: 13px;
-    }
-    .retro--style-pixel.retro--size-small .retro-gleis {
-      margin-left: 9px;
-    }
-    .retro--style-pixel.retro--size-small.retro--gleis-left .retro-gleis {
-      margin-right: 9px;
-    }
-
-    .retro-gleis {
-      flex: 0 0 auto;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 0 14px 0 18px;
-      margin-left: 12px;
-      color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
-      transition: opacity 0.4s ease-out;
-      /* Position context for the dotted-divider pseudo. The previous
-         border-left: 1px hairline read as a CSS edge, not LED material.
-         A 2 px-wide column painted with the same substrate radial-
-         gradient as the panel renders the divider as missing pixels —
-         i.e. an unlit column on the dot-matrix. Pitch + dot size + dot
-         edge inherit from the same custom properties .retro-led uses
-         (4 px classic, 3 px warm / pixel) so the column always lines
-         up with the substrate behind it. */
-      position: relative;
-    }
-    .retro-gleis::before {
-      content: '';
-      position: absolute;
-      top: 8%;
-      bottom: 8%;
-      left: 0;
-      width: 2px;
-      background-image: radial-gradient(
-        circle,
-        rgb(var(--led-glow-rgb) / 0.55) var(--led-dot-size),
-        transparent var(--led-dot-edge)
-      );
-      background-size: var(--led-dot-pitch) var(--led-dot-pitch);
-      pointer-events: none;
-    }
-    .retro--gleis-left .retro-gleis {
-      padding: 0 18px 0 14px;
-      margin-left: 0;
-      margin-right: 12px;
-    }
-    .retro--gleis-left .retro-gleis::before {
-      left: auto;
-      right: 0;
-    }
-    .retro-gleis-label {
-      font-size: 0.9em;
-      letter-spacing: 2px;
-      margin-bottom: 2px;
-      opacity: 0.9;
-    }
-    .retro-gleis-number {
-      font-size: 3em;
-      line-height: 1;
-      font-weight: 400;
-    }
-
-    /* ---- size variants ---- */
-    .retro--size-medium {
-      --retro-pad-y: 11px;
-      --retro-pad-r: 18px;
-      --retro-pad-l: 18px;
-      min-height: 92px;
-    }
-    .retro--size-medium.retro--gleis-right { --retro-pad-r: 10px; }
-    .retro--size-medium.retro--gleis-left { --retro-pad-l: 10px; }
-    .retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
-    .retro--size-medium .retro-gleis { padding: 0 10px 0 14px; min-width: 48px; }
-    .retro--size-medium.retro--gleis-left .retro-gleis {
-      padding: 0 14px 0 10px;
-    }
-    .retro--size-medium .retro-gleis-number { font-size: 2.3em; }
-    .retro--size-medium .retro-gleis-label {
-      font-size: 0.8em;
-      letter-spacing: 1.5px;
-    }
-
-    .retro--size-small {
-      --retro-pad-y: 8px;
-      --retro-pad-r: 14px;
-      --retro-pad-l: 14px;
-      min-height: 72px;
-    }
-    .retro--size-small.retro--gleis-right { --retro-pad-r: 6px; }
-    .retro--size-small.retro--gleis-left { --retro-pad-l: 6px; }
-    .retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
-    .retro--size-small .retro-row {
-      grid-template-columns: 2em 1fr auto;
-      gap: 8px;
-    }
-    .retro--size-small .retro-gleis {
-      padding: 0 8px 0 10px;
-      min-width: 38px;
-      margin-left: 8px;
-    }
-    .retro--size-small.retro--gleis-left .retro-gleis {
-      padding: 0 10px 0 8px;
-      margin-left: 0;
-      margin-right: 8px;
-    }
-    .retro--size-small .retro-gleis-number { font-size: 1.75em; }
-    .retro--size-small .retro-gleis-label {
-      font-size: 0.68em;
-      letter-spacing: 1px;
-      margin-bottom: 0;
-    }
-    .retro-empty {
-      flex: 1;
-      text-align: center;
-      align-self: center;
-      color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
-      font-size: 1.4em;
-      padding: 20px 0;
-      letter-spacing: 2px;
-    }
-    .retro-station {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 11px 16px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-                   Helvetica, Arial, sans-serif;
-      font-weight: 700;
-      letter-spacing: 0.01em;
-      line-height: 1.05;
-      font-size: 1.95em;
-    }
-    .retro-station-name {
-      text-shadow: none;
-    }
-    .retro--size-medium .retro-station {
-      padding: 9px 14px;
-      font-size: 1.65em;
-    }
-    .retro--size-small .retro-station {
-      padding: 7px 10px;
-      font-size: 1.35em;
-    }
-
-    /* ----- Station header strip -----------------------------------
-       A homage to the real Wiener Linien U-Bahn station signage —
-       a black band above the orange station name with per-side
-       exit / amenity icons + a destination label. Colours are
-       hardcoded (#000 / #fff) on purpose: the original signage is
-       intentionally black-and-white, the same authenticity rule the
-       .retro-station rule above follows. Spacing flows through HA
-       Design System tokens with px fallbacks per
-       ha-portfolio-design (§ 4). */
-    .retro-station-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #000;
-      color: #fff;
-      padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
-      gap: var(--ha-space-2, 8px);
-      /* WL Sans Condensed is the subsetted TeX Gyre Heros Cn face —
-         the condensed proportion matches real Wiener Linien station
-         signage. Ships only at weight 700 (the only weight the
-         signage uses); a regular-weight request would fall through
-         to WL Sans regular, then the Apple system stack. */
-      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
-                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-                   Arial, sans-serif;
-      font-weight: 700;
-      /* 1.1em (up from 1em): more device pixels per glyph is the only
-         lever that genuinely de-steps the small condensed signage text
-         on every engine — CSS antialiasing can't. The whole strip is
-         em-based (text, chips, tiles), so this one knob scales it all
-         together. The retro--size-medium / -small variants below carry
-         their own absolute em values and are unaffected. */
-      font-size: 1.1em;
-      letter-spacing: 0.02em;
-    }
-    .retro-station-header__side {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      min-width: 0;
-      flex: 1 1 0;
-    }
-    .retro-station-header__side--right {
-      justify-content: flex-end;
-    }
-    .retro-station-header__text {
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      /* Bumped from inherited 1em — WL Sans Condensed is ~25% narrower
-         than the regular Apple-stack sans, so the sign text can scale
-         up without crowding the amenity tiles next to it. Stays
-         proportional with the retro--size-* tokens because the parent
-         .retro-station-header's font-size scales (1em / 0.9em / 0.8em),
-         and this multiplier compounds on top. */
-      font-size: 1.2em;
-      /* White-on-black signage text — render it with grayscale
-         antialiasing instead of subpixel. On a dark strip subpixel AA
-         fringes the glyph edges and blooms the condensed strokes
-         heavier than drawn; grayscale keeps them crisp. Scoped to this
-         element (NOT the strip) on purpose: the chips and WC monogram
-         are black-on-white, the opposite polarity, and keep the
-         default subpixel AA which renders dark-on-light more solidly.
-         A WebKit/Blink-on-macOS + iOS lever only — the Android System
-         WebView always uses grayscale AA, so it's a no-op there. */
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    .retro-station-header__tile {
-      /* White SQUARE tile hosting the (black) glyph — mirrors the
-         real Wiener Linien station signage where each icon sits on
-         a small white square within the black header strip. The
-         square aspect is non-negotiable per the reference photo;
-         the inner SVG fits via preserveAspectRatio=meet so portrait
-         glyphs (elevator) and landscape glyphs (exit, wc) both
-         centre cleanly inside the same square.
-         Default 0.12em padding suits the WL-traced glyphs and the
-         WC monogram — their authored paths use the full viewBox so a
-         small white margin matches the look of the real station-sign
-         photos. The --mdi modifier overrides to a tighter padding
-         (see rule below) because MDI icons carry their own viewBox
-         padding internally. */
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      color: #000;
-      flex-shrink: 0;
-      width: 1.4em;
-      height: 1.4em;
-      padding: 0.12em;
-      box-sizing: border-box;
-    }
-    .retro-station-header__tile--mdi {
-      /* MDI glyphs ship with ~10% internal viewBox padding baked
-         into the icon set, so the default tile padding stacks on top
-         and makes them look noticeably smaller than the WL-traced
-         tiles next to them. Halving the tile padding to 0.06em
-         compensates — the rendered glyph ends up the same visual
-         weight as a WL-traced glyph in a default-padded tile. */
-      padding: 0.06em;
-    }
-    .retro-station-header__icon {
-      width: 100%;
-      height: 100%;
-      display: block;
-      /* SVG default fill is black per spec, but be explicit so the
-         tile's color: #000 propagates if a future glyph adopts
-         fill=currentColor. */
-      fill: currentColor;
-    }
-    .retro-station-header__icon--flip-x {
-      transform: scaleX(-1);
-    }
-    .retro-station-header__mdi {
-      /* MDI variant sibling to .retro-station-header__icon. ha-icon
-         renders an inline SVG sized by the --mdc-icon-size token; we
-         pin it to fill the tile's content box (1.4em tile − 2 ×
-         0.06em padding = 1.28em). Color cascades from the tile's
-         color: #000 via ha-icon's currentColor fill. */
-      --mdc-icon-size: 1.28em;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: inherit;
-    }
-    .retro-station-header__mdi--flip-x {
-      transform: scaleX(-1);
-    }
-    .retro-station-header__monogram {
-      /* WC tile content. Tile is already flex-centred, so the span
-         positions itself. font-size is 0.9em — em-tied so it
-         scales with the parent header's em-scale (1em / 0.9em /
-         0.8em via retro--size-* tokens), shrunk ~10 % from the
-         original 1em so the W / C letterforms don't overpower the
-         surrounding amenity glyphs (the WL signage WC monogram
-         reads as a small, paired label, not a heavyweight chip).
-         font-family + weight are declared explicitly (rather than
-         relying on inheritance from .retro-station-header) so a
-         future header-rule rewrite can't accidentally regress the
-         letterforms back to a non-condensed face. */
-      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
-                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-                   Arial, sans-serif;
-      font-weight: 700;
-      font-size: 0.9em;
-      line-height: 1;
-    }
-    .retro-station-header__chip {
-      /* Auxiliary text label — same height as the icon tiles
-         (1.4em) but with dynamic width so short labels (platform
-         numbers, line designators) sit in a snug white box and
-         longer labels grow horizontally. Composes visually with the
-         icon tiles next to it via the same height + colour scheme.
-         Padding is horizontal-only — the flex-centred line shares
-         vertical alignment with the icon glyphs on the same row.
-         Font is WL Sans Condensed 700 — the SAME signage face as the
-         destination text and WC monogram. The strip is a signage
-         homage; one coherent typographic voice across the whole band
-         reads "station sign", whereas a regular-width or lighter face
-         reads "web UI element stuck onto a sign".
-         No explicit font-size: chip inherits the parent header's
-         em-scale (1em / 0.9em / 0.8em via retro--size-* tokens), so
-         height: 1.4em resolves to the SAME pixel value as the icon
-         tiles. Setting a different font-size here (e.g. 0.75rem)
-         would produce visibly shorter chips next to the tiles
-         because em is relative to the element's own font-size. */
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      color: #000;
-      flex-shrink: 0;
-      height: 1.4em;
-      padding: 0 0.4em;
-      box-sizing: border-box;
-      font-family: "WL Sans Condensed", "WL Sans", -apple-system,
-                   BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-                   Arial, sans-serif;
-      /* 700 — WL Sans Condensed ships only at 700, and that IS the
-         intent: chips should read as solid signage, not as a lighter
-         UI tier. Hierarchy on the strip comes from size and position
-         (the destination text is condensed 1.2em), never from mixing
-         weight or width onto the same band. */
-      font-weight: 700;
-      line-height: 1;
-      /* Reset the 0.02em letter-spacing inherited from .retro-station-header
-         — the tracked-out feel of the header text doesn't suit
-         chip-style labels where width is dynamic and longer entries
-         (Schlafzimmer, etc.) add up visibly. */
-      letter-spacing: 0;
-      white-space: nowrap;
-    }
-    /* Size-token alignment — match the .retro--size-* scale. */
-    .retro--size-medium .retro-station-header {
-      font-size: 0.9em;
-      padding: 6px var(--ha-space-2, 8px);
-    }
-    .retro--size-small .retro-station-header {
-      font-size: 0.8em;
-      padding: 5px var(--ha-space-2, 8px);
-    }
-    /* Narrow-width reflow (WCAG 1.4.10 AA) — drop the destination
-       label so the icons stay visible at a 320 px section-view
-       column. Unnamed container query — matches the nearest
-       inline-size container, which is .retro (the outer wrapper).
-       The size containers on overlays are not ancestors of the
-       header strip, so they don't interfere. */
-    @container (inline-size < 320px) {
-      .retro-station-header__text {
-        display: none;
-      }
-    }
-    .retro-banner {
-      background: #ffa000;
-      color: #000;
-      padding: 6px 10px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-family: sans-serif;
-      border-radius: 4px;
-      letter-spacing: normal;
-      font-size: 0.75em;
-    }
-    .retro-banner button {
-      background: #000;
-      color: #ffa000;
-      border: none;
-      border-radius: 3px;
-      padding: 3px 10px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: sans-serif;
-    }
-
-    /* Accessibility: visible focus ring for keyboard users. */
-    a:focus-visible,
-    button:focus-visible {
-      outline: 2px solid var(--led-amber, #ffa000);
-      outline-offset: 2px;
-      border-radius: 4px;
-    }
-
-    /* First-paint stagger — LED rows cascade in on mount via
-       per-row style="--row-i: N"; capped at 6 so long boards don't
-       take ages to settle. Collapsed to instant by the
-       prefers-reduced-motion catch-all below. */
-    @keyframes retroRowReveal {
-      from {
-        opacity: 0;
-        transform: translateY(3px);
-        filter: brightness(0.4);
-      }
-      to {
-        opacity: 1;
-        transform: none;
-        filter: brightness(1);
-      }
-    }
-    .retro-row {
-      animation: retroRowReveal 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-      animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
-    }
-
-    /* Optional clock chip inside the station-header strip. Renders
-       as a base .retro-station-header__chip (white box, black text,
-       condensed WL signage face) with a small clock glyph in front
-       of the HH:MM digits. Inherits everything else from the chip
-       rule — no font / weight / spacing override here, so it sits
-       indistinguishably next to the other chips except for the
-       leading icon. */
-    .retro-station-header__chip--clock {
-      gap: 0.25em;
-    }
-    .retro-station-header__chip-icon {
-      /* MDI icon sized to the chip's cap height so it sits centred
-         next to the digits. ha-icon ships an inline SVG controlled
-         by --mdc-icon-size; pin it to 1em and let the chip's flex
-         centring handle vertical alignment. */
-      --mdc-icon-size: 1em;
-      display: inline-flex;
-      align-items: center;
-      color: inherit;
-      flex-shrink: 0;
-    }
-
-    /* Line-stripe Tweak — 4 px coloured bar at the left edge of each
-       row in the line's resolved colour with a faint matching glow.
-       --retro-line-color is the same var the line pill paints with, so
-       the stripe always matches the pill (one source of truth). */
-    .retro--line-stripe .retro-row {
-      padding-left: 10px;
-    }
-    .retro--line-stripe .retro-row::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      width: 4px;
-      background: var(--retro-line-color, var(--led-amber));
-      filter: drop-shadow(0 0 4px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.45)));
-      pointer-events: none;
-      border-radius: 1px;
-    }
-
-    /* Housing Tweak — wrap the LED panel in an outer dark frame with
-       a soft inner highlight and a glass-reflection gradient over
-       the display. Defaults off; existing dashboards keep their
-       flush edge-to-edge look. */
-    .retro--housing {
-      padding: 6px;
-      background: #111;
-      border-radius: 10px;
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.06),
-        0 2px 8px rgba(0, 0, 0, 0.5);
-    }
-    .retro--housing .retro-led {
-      border-radius: 6px;
-    }
-    /* Glass reflection — a 30 % top gradient sitting OVER the LED
-       content (z=2). 4 % white is subtle enough to not wash out the
-       row text but reads as a real reflection on a glossy bezel. */
-    .retro--housing .retro-led::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
-      pointer-events: none;
-      z-index: 2;
-      border-radius: inherit;
-    }
-    /* Housing-on station header and station name plate also pick up
-       the inner border-radius so the bezel corners look right. */
-    .retro--housing .retro-station-header {
-      border-top-left-radius: 6px;
-      border-top-right-radius: 6px;
-    }
-    .retro--housing .retro-station:last-child,
-    .retro--housing .retro-station-header:last-child {
-      border-bottom-left-radius: 6px;
-      border-bottom-right-radius: 6px;
-    }
-
-    /* Accessibility: honour user motion preference.
-       Catch-all: nukes any animation/transition the feature-gated
-       @media (prefers-reduced-motion: no-preference) blocks above
-       don't already exclude. */
-    @media (prefers-reduced-motion: reduce) {
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-      }
-    }
-  `}};e([pe({attribute:!1})],zi.prototype,"hass",void 0),e([fe()],zi.prototype,"_config",void 0),e([fe()],zi.prototype,"_versionMismatch",void 0),e([fe()],zi.prototype,"_raceState",void 0),e([fe()],zi.prototype,"_countdownDigit",void 0),e([fe()],zi.prototype,"_raceWinner",void 0),e([fe()],zi.prototype,"_tickerActive",void 0),e([fe()],zi.prototype,"_viaPhase",void 0),zi=e([ce("wiener-linien-austria-retro-card")],zi);export{zi as WienerLinienAustriaRetroCard};
+    `}static{this.styles=c`:host {
+display: block;
+isolation: isolate;
+}
+.retro {
+--led-amber: #FFC700;
+--led-bg: #000;
+--led-substrate: #1a0d2a;
+--led-glow-rgb: 255 199 0;
+--led-dot-size: 0.5px;
+--led-dot-edge: 1px;
+--led-dot-pitch: 4px;
+--retro-pad-y: 14px;
+--retro-pad-r: 22px;
+--retro-pad-l: 22px;
+container-type: inline-size;
+position: relative;
+display: flex;
+flex-direction: column;
+font-family: "WL Mono", "Courier New", Courier, monospace;
+font-weight: 700;
+letter-spacing: 0.08em;
+overflow: hidden;
+min-height: 110px;
+}
+.retro-led {
+flex: 1;
+position: relative;
+display: flex;
+align-items: stretch;
+background: var(--led-bg);
+background-image: radial-gradient(
+circle,
+var(--led-substrate) var(--led-dot-size),
+transparent var(--led-dot-edge)
+);
+background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+padding: var(--retro-pad-y) var(--retro-pad-r) var(--retro-pad-y) var(--retro-pad-l);
+}
+.retro--style-pixel .retro-led::after {
+content: '';
+position: absolute;
+inset: 0;
+background-image: radial-gradient(
+circle,
+transparent var(--led-dot-size),
+var(--led-bg) var(--led-dot-edge)
+);
+background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+pointer-events: none;
+z-index: 30;
+}
+.retro--clickable {
+cursor: pointer;
+}
+.retro--style-warm,
+.retro--style-pixel {
+--led-amber: #FFB000;
+--led-bg: #050302;
+--led-substrate: #2a1805;
+--led-glow-rgb: 255 176 0;
+--led-dot-size: 0.9px;
+--led-dot-edge: 1.4px;
+--led-dot-pitch: 3px;
+}
+.retro--gleis-left .retro-gleis { order: -1; }
+.retro--gleis-right { --retro-pad-r: 14px; }
+.retro--gleis-left { --retro-pad-l: 14px; }
+.retro-rows {
+flex: 1;
+display: flex;
+flex-direction: column;
+justify-content: center;
+gap: 8px;
+color: var(--led-amber);
+text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+font-size: 1.9em;
+line-height: 1;
+list-style: none;
+margin: 0;
+padding: 0;
+}
+.retro-row {
+display: grid;
+grid-template-columns: 2.5em 1fr auto;
+align-items: baseline;
+gap: 12px;
+white-space: nowrap;
+position: relative;
+}
+.retro-line {
+font-weight: 400;
+text-align: left;
+transition: opacity 0.15s ease-out;
+}
+.retro--line-pill .retro-line {
+display: inline-flex;
+align-items: baseline;
+justify-content: center;
+box-sizing: border-box;
+font-weight: 700;
+text-align: center;
+min-width: 2em;
+padding: 0.08em 0.4em;
+border-radius: 0.18em;
+background: var(--retro-line-color, transparent);
+color: var(--retro-line-fg, var(--led-amber));
+text-shadow: none;
+box-shadow: 0 0 6px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.4));
+}
+.retro--line-pill .retro-line__label {
+display: inline-block;
+}
+.retro-dest {
+display: flex;
+align-items: center;
+gap: 0.35em;
+text-transform: uppercase;
+min-width: 0;
+transition: opacity 0.15s ease-out;
+}
+.retro-dest-stack {
+position: relative;
+display: inline-block;
+overflow: hidden;
+flex: 0 1 auto;
+min-width: 0;
+max-width: 100%;
+}
+.retro-dest-text {
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+min-width: 0;
+max-width: 100%;
+display: block;
+}
+.retro-dest-text--layout {
+visibility: visible;
+}
+.retro-dest-stack:has(.retro-dest-text--absolute) .retro-dest-text--layout {
+visibility: hidden;
+}
+.retro-dest-text--absolute {
+position: absolute;
+inset: 0;
+opacity: 0;
+transition: opacity 0.4s ease-in-out;
+will-change: opacity;
+}
+.retro-dest-text--visible {
+opacity: 1;
+}
+.retro-wheelchair {
+flex: 0 0 auto;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+--mdc-icon-size: 0.9em;
+width: 0.9em;
+height: 0.9em;
+color: inherit;
+filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
+transform: translateY(0.12em);
+}
+.retro-cd {
+font-variant-numeric: tabular-nums;
+text-align: right;
+min-width: 2.5em;
+transition: opacity 0.4s ease-out;
+display: inline-flex;
+align-items: baseline;
+justify-content: flex-end;
+gap: 0.25em;
+}
+.retro-cd-num {
+display: inline-block;
+}
+.retro-cd-unit {
+display: inline-block;
+font-size: 0.5em;
+text-transform: uppercase;
+letter-spacing: 0.12em;
+opacity: 0.85;
+transform: translateY(-0.05em);
+}
+@container (inline-size < 360px) {
+.retro-cd-unit { display: none; }
+}
+.retro-stars {
+display: inline-flex;
+gap: 0.08em;
+justify-content: flex-end;
+}
+.retro-stars > span {
+animation: retroStarBlink 1s infinite;
+}
+.retro-stars > span:nth-child(2) {
+animation-delay: 0.5s;
+}
+@keyframes retroStarBlink {
+0%, 49.99% { opacity: 1; }
+50%, 100%  { opacity: 0; }
+}
+@keyframes retroLineFlicker {
+0%, 6.9%   { opacity: 1; }
+7.1%       { opacity: 0.38; }
+7.5%       { opacity: 1; }
+22.9%      { opacity: 1; }
+23.1%      { opacity: 0.08; }
+23.35%     { opacity: 1; }
+23.7%      { opacity: 0.55; }
+24%        { opacity: 1; }
+51.9%      { opacity: 1; }
+52.15%     { opacity: 0.45; }
+52.4%      { opacity: 1; }
+75.9%      { opacity: 1; }
+76.1%      { opacity: 0.15; }
+76.35%     { opacity: 1; }
+77%        { opacity: 0.6; }
+77.3%      { opacity: 1; }
+100%       { opacity: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+.retro--flicker .retro-line {
+animation: retroLineFlicker 7.3s infinite;
+will-change: opacity;
+}
+.retro--flicker .retro-row:nth-child(2) .retro-line {
+animation-duration: 8.1s;
+animation-delay: -2.4s;
+}
+}
+@keyframes retroWheelExit {
+0%   { transform: translate(0, 0.18em); animation-timing-function: ease-out; }
+25%  { transform: translate(var(--race-x-25, 25cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
+50%  { transform: translate(var(--race-x-50, 50cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
+75%  { transform: translate(var(--race-x-75, 75cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
+100% { transform: translate(var(--race-end, 110cqw), 0.18em); }
+}
+@media (prefers-reduced-motion: no-preference) {
+.retro--race-countdown .retro-dest,
+.retro--race-active .retro-dest,
+.retro--race-freeze .retro-dest {
+overflow: visible;
+}
+.retro--race-countdown .retro-cd,
+.retro--race-active .retro-cd,
+.retro--race-freeze .retro-cd {
+opacity: 0;
+}
+.retro--race-countdown.retro--gleis-right .retro-gleis,
+.retro--race-active.retro--gleis-right .retro-gleis,
+.retro--race-freeze.retro--gleis-right .retro-gleis {
+opacity: 0;
+}
+.retro--race-active .retro-row:nth-child(1) .retro-wheelchair,
+.retro--race-freeze .retro-row:nth-child(1) .retro-wheelchair {
+--race-end: var(--race-a-end, 110cqw);
+--race-x-25: var(--race-a-x-25, 25cqw);
+--race-x-50: var(--race-a-x-50, 50cqw);
+--race-x-75: var(--race-a-x-75, 75cqw);
+animation: retroWheelExit var(--race-a-duration, 3.3s) linear forwards;
+}
+.retro--race-active .retro-row:nth-child(2) .retro-wheelchair,
+.retro--race-freeze .retro-row:nth-child(2) .retro-wheelchair {
+--race-end: var(--race-b-end, 110cqw);
+--race-x-25: var(--race-b-x-25, 25cqw);
+--race-x-50: var(--race-b-x-50, 50cqw);
+--race-x-75: var(--race-b-x-75, 75cqw);
+animation: retroWheelExit var(--race-b-duration, 3.3s) linear forwards;
+}
+.retro--race-freeze .retro-wheelchair {
+animation-play-state: paused;
+}
+.retro--race-active .retro-wheelchair,
+.retro--race-freeze .retro-wheelchair {
+position: relative;
+z-index: 4;
+}
+.retro--race-victory .retro-wheelchair {
+opacity: 0;
+}
+}
+.retro--race-victory .retro-line,
+.retro--race-victory .retro-dest,
+.retro--race-victory .retro-cd,
+.retro--race-victory .retro-gleis {
+opacity: 0;
+}
+.retro--race-victory.retro--flicker .retro-line {
+animation: none;
+}
+.retro-ticker {
+position: absolute;
+inset: 0;
+z-index: 16;
+overflow: hidden;
+display: flex;
+align-items: center;
+pointer-events: none;
+background: var(--led-bg);
+background-image: radial-gradient(
+circle,
+var(--led-substrate) var(--led-dot-size),
+transparent var(--led-dot-edge)
+);
+background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+border-radius: inherit;
+container-type: inline-size;
+}
+.retro-ticker-text {
+flex: none;
+white-space: nowrap;
+font-size: 1.9em;
+line-height: 1;
+color: var(--led-amber);
+text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+text-transform: uppercase;
+will-change: transform;
+animation-name: retroTickerScroll;
+animation-timing-function: linear;
+animation-iteration-count: 1;
+animation-fill-mode: both;
+}
+@keyframes retroTickerScroll {
+from { transform: translateX(100cqw); }
+to   { transform: translateX(-100%); }
+}
+.retro-finish-line {
+position: absolute;
+top: 0;
+right: 0;
+bottom: 0;
+width: 14px;
+z-index: 3;
+pointer-events: none;
+background-image: conic-gradient(
+transparent 0deg 90deg,
+var(--led-amber) 90deg 180deg,
+transparent 180deg 270deg,
+var(--led-amber) 270deg 360deg
+);
+background-size: 14px 14px;
+filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.7));
+animation: retroFinishLineAppear 0.3s ease-out both;
+}
+@keyframes retroFinishLineAppear {
+0%   { opacity: 0; transform: scaleX(0.2); transform-origin: right; }
+100% { opacity: 1; transform: scaleX(1); }
+}
+.retro--size-small .retro-finish-line {
+width: 10px;
+background-size: 10px 10px;
+}
+.retro-victory {
+position: absolute;
+inset: 0;
+z-index: 20;
+display: flex;
+align-items: center;
+justify-content: center;
+pointer-events: none;
+overflow: hidden;
+border-radius: inherit;
+opacity: 1;
+isolation: isolate;
+container-type: size;
+animation: retroVictoryAppear 0.22s ease-out both;
+}
+.retro-victory-sr {
+position: absolute;
+width: 1px;
+height: 1px;
+padding: 0;
+margin: -1px;
+overflow: hidden;
+clip: rect(0, 0, 0, 0);
+white-space: nowrap;
+border: 0;
+}
+.retro-victory-flag {
+position: absolute;
+inset: 0;
+background-image: conic-gradient(
+transparent 0deg 90deg,
+var(--led-amber) 90deg 180deg,
+transparent 180deg 270deg,
+var(--led-amber) 270deg 360deg
+);
+background-size: 50cqh 50cqh;
+filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
+animation: retroVictoryFlag 0.4s linear infinite;
+}
+@keyframes retroVictoryAppear {
+0%   { opacity: 0; }
+100% { opacity: 1; }
+}
+@keyframes retroVictoryFlag {
+0%   { background-position: 0 0; }
+100% { background-position: 100cqh 0; }
+}
+.retro-countdown {
+position: absolute;
+inset: 0;
+z-index: 18;
+display: flex;
+align-items: center;
+justify-content: center;
+pointer-events: none;
+background: rgba(0, 0, 0, 0.6);
+border-radius: inherit;
+overflow: hidden;
+isolation: isolate;
+container-type: size;
+animation: retroCountdownAppear 0.18s ease-out both;
+}
+@keyframes retroCountdownAppear {
+0%   { opacity: 0; }
+100% { opacity: 1; }
+}
+.retro-countdown-digit {
+display: block;
+font-family: ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
+font-weight: 900;
+font-size: 60cqh;
+line-height: 1;
+color: var(--led-amber);
+letter-spacing: -0.04em;
+text-shadow:
+0 0 10px rgb(var(--led-glow-rgb) / 0.9),
+0 0 24px rgb(var(--led-glow-rgb) / 0.7),
+0 0 40px rgb(var(--led-glow-rgb) / 0.4);
+animation: retroCountdownPunch 0.8s ease-out both;
+will-change: transform, opacity;
+}
+@keyframes retroCountdownPunch {
+0%   { opacity: 0; transform: scale(0.4); }
+18%  { opacity: 1; transform: scale(1.18); }
+30%  {              transform: scale(1); }
+72%  { opacity: 1; transform: scale(1); }
+100% { opacity: 0; transform: scale(0.85); }
+}
+.retro-victory-winner {
+position: absolute;
+top: 50%;
+left: 50%;
+z-index: 22;
+width: 45cqmin;
+height: 45cqmin;
+min-width: 90px;
+min-height: 90px;
+max-width: 190px;
+max-height: 190px;
+border-radius: 50%;
+background-color: var(--led-bg);
+background-image: radial-gradient(
+circle,
+var(--led-substrate) var(--led-dot-size),
+transparent var(--led-dot-edge)
+);
+background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+display: flex;
+align-items: center;
+justify-content: center;
+color: var(--led-amber);
+transform: translate(-50%, -50%) scale(0.2);
+opacity: 0;
+animation: retroWinnerBadgeAppear 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) 0.18s forwards;
+}
+@keyframes retroWinnerBadgeAppear {
+0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.retro-winner-trophy {
+--mdc-icon-size: 57cqmin;
+color: var(--led-amber);
+filter: drop-shadow(0 0 4px rgb(var(--led-glow-rgb) / 0.85))
+drop-shadow(0 0 10px rgb(var(--led-glow-rgb) / 0.45));
+}
+.retro-winner-num {
+position: absolute;
+top: 44%;
+left: 0;
+right: 0;
+transform: translateY(-50%);
+text-align: center;
+font-family: "Arial Black", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-weight: 900;
+font-size: 20cqmin;
+line-height: 1;
+color: var(--led-substrate);
+letter-spacing: -0.04em;
+pointer-events: none;
+}
+.retro--size-small .retro-winner-trophy {
+--mdc-icon-size: 51cqmin;
+}
+.retro--size-small .retro-winner-num {
+font-size: 17cqmin;
+top: 37%;
+}
+.retro--style-pixel .retro-victory-winner {
+background-image: none;
+}
+.retro--style-pixel .retro-gleis {
+margin-left: 13px;
+}
+.retro--style-pixel.retro--gleis-left .retro-gleis {
+margin-right: 13px;
+}
+.retro--style-pixel.retro--size-small .retro-gleis {
+margin-left: 9px;
+}
+.retro--style-pixel.retro--size-small.retro--gleis-left .retro-gleis {
+margin-right: 9px;
+}
+.retro-gleis {
+flex: 0 0 auto;
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 0 14px 0 18px;
+margin-left: 12px;
+color: var(--led-amber);
+text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+transition: opacity 0.4s ease-out;
+position: relative;
+}
+.retro-gleis::before {
+content: '';
+position: absolute;
+top: 8%;
+bottom: 8%;
+left: 0;
+width: 2px;
+background-image: radial-gradient(
+circle,
+rgb(var(--led-glow-rgb) / 0.55) var(--led-dot-size),
+transparent var(--led-dot-edge)
+);
+background-size: var(--led-dot-pitch) var(--led-dot-pitch);
+pointer-events: none;
+}
+.retro--gleis-left .retro-gleis {
+padding: 0 18px 0 14px;
+margin-left: 0;
+margin-right: 12px;
+}
+.retro--gleis-left .retro-gleis::before {
+left: auto;
+right: 0;
+}
+.retro-gleis-label {
+font-size: 0.9em;
+letter-spacing: 2px;
+margin-bottom: 2px;
+opacity: 0.9;
+}
+.retro-gleis-number {
+font-size: 3em;
+line-height: 1;
+font-weight: 400;
+}
+.retro--size-medium {
+--retro-pad-y: 11px;
+--retro-pad-r: 18px;
+--retro-pad-l: 18px;
+min-height: 92px;
+}
+.retro--size-medium.retro--gleis-right { --retro-pad-r: 10px; }
+.retro--size-medium.retro--gleis-left { --retro-pad-l: 10px; }
+.retro--size-medium .retro-rows { font-size: 1.55em; gap: 6px; }
+.retro--size-medium .retro-gleis { padding: 0 10px 0 14px; min-width: 48px; }
+.retro--size-medium.retro--gleis-left .retro-gleis {
+padding: 0 14px 0 10px;
+}
+.retro--size-medium .retro-gleis-number { font-size: 2.3em; }
+.retro--size-medium .retro-gleis-label {
+font-size: 0.8em;
+letter-spacing: 1.5px;
+}
+.retro--size-small {
+--retro-pad-y: 8px;
+--retro-pad-r: 14px;
+--retro-pad-l: 14px;
+min-height: 72px;
+}
+.retro--size-small.retro--gleis-right { --retro-pad-r: 6px; }
+.retro--size-small.retro--gleis-left { --retro-pad-l: 6px; }
+.retro--size-small .retro-rows { font-size: 1.25em; gap: 4px; }
+.retro--size-small .retro-row {
+grid-template-columns: 2em 1fr auto;
+gap: 8px;
+}
+.retro--size-small .retro-gleis {
+padding: 0 8px 0 10px;
+min-width: 38px;
+margin-left: 8px;
+}
+.retro--size-small.retro--gleis-left .retro-gleis {
+padding: 0 10px 0 8px;
+margin-left: 0;
+margin-right: 8px;
+}
+.retro--size-small .retro-gleis-number { font-size: 1.75em; }
+.retro--size-small .retro-gleis-label {
+font-size: 0.68em;
+letter-spacing: 1px;
+margin-bottom: 0;
+}
+.retro-empty {
+flex: 1;
+text-align: center;
+align-self: center;
+color: var(--led-amber);
+text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+font-size: 1.4em;
+padding: 20px 0;
+letter-spacing: 2px;
+}
+.retro-station {
+display: flex;
+align-items: center;
+justify-content: center;
+text-align: center;
+padding: 11px 16px;
+font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+Helvetica, Arial, sans-serif;
+font-weight: 700;
+letter-spacing: 0.01em;
+line-height: 1.05;
+font-size: 1.95em;
+}
+.retro-station-name {
+text-shadow: none;
+}
+.retro--size-medium .retro-station {
+padding: 9px 14px;
+font-size: 1.65em;
+}
+.retro--size-small .retro-station {
+padding: 7px 10px;
+font-size: 1.35em;
+}
+.retro-station-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+background: #000;
+color: #fff;
+padding: var(--ha-space-2, 8px) var(--ha-space-3, 12px);
+gap: var(--ha-space-2, 8px);
+font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+Arial, sans-serif;
+font-weight: 700;
+font-size: 1.1em;
+letter-spacing: 0.02em;
+}
+.retro-station-header__side {
+display: flex;
+align-items: center;
+gap: 5px;
+min-width: 0;
+flex: 1 1 0;
+}
+.retro-station-header__side--right {
+justify-content: flex-end;
+}
+.retro-station-header__text {
+min-width: 0;
+overflow: hidden;
+text-overflow: ellipsis;
+white-space: nowrap;
+font-size: 1.2em;
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+.retro-station-header__tile {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+background: #fff;
+color: #000;
+flex-shrink: 0;
+width: 1.4em;
+height: 1.4em;
+padding: 0.12em;
+box-sizing: border-box;
+}
+.retro-station-header__tile--mdi {
+padding: 0.06em;
+}
+.retro-station-header__icon {
+width: 100%;
+height: 100%;
+display: block;
+fill: currentColor;
+}
+.retro-station-header__icon--flip-x {
+transform: scaleX(-1);
+}
+.retro-station-header__mdi {
+--mdc-icon-size: 1.28em;
+display: inline-flex;
+align-items: center;
+justify-content: center;
+color: inherit;
+}
+.retro-station-header__mdi--flip-x {
+transform: scaleX(-1);
+}
+.retro-station-header__monogram {
+font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+Arial, sans-serif;
+font-weight: 700;
+font-size: 0.9em;
+line-height: 1;
+}
+.retro-station-header__chip {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+background: #fff;
+color: #000;
+flex-shrink: 0;
+height: 1.4em;
+padding: 0 0.4em;
+box-sizing: border-box;
+font-family: "WL Sans Condensed", "WL Sans", -apple-system,
+BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+Arial, sans-serif;
+font-weight: 700;
+line-height: 1;
+letter-spacing: 0;
+white-space: nowrap;
+}
+.retro--size-medium .retro-station-header {
+font-size: 0.9em;
+padding: 6px var(--ha-space-2, 8px);
+}
+.retro--size-small .retro-station-header {
+font-size: 0.8em;
+padding: 5px var(--ha-space-2, 8px);
+}
+@container (inline-size < 320px) {
+.retro-station-header__text {
+display: none;
+}
+}
+.retro-banner {
+background: #ffa000;
+color: #000;
+padding: 6px 10px;
+margin-bottom: 10px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+gap: 8px;
+font-family: sans-serif;
+border-radius: 4px;
+letter-spacing: normal;
+font-size: 0.75em;
+}
+.retro-banner button {
+background: #000;
+color: #ffa000;
+border: none;
+border-radius: 3px;
+padding: 3px 10px;
+font-weight: 600;
+cursor: pointer;
+font-family: sans-serif;
+}
+a:focus-visible,
+button:focus-visible {
+outline: 2px solid var(--led-amber, #ffa000);
+outline-offset: 2px;
+border-radius: 4px;
+}
+@keyframes retroRowReveal {
+from {
+opacity: 0;
+transform: translateY(3px);
+filter: brightness(0.4);
+}
+to {
+opacity: 1;
+transform: none;
+filter: brightness(1);
+}
+}
+.retro-row {
+animation: retroRowReveal 380ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+animation-delay: calc(min(var(--row-i, 0), 6) * 80ms);
+}
+.retro-station-header__chip--clock {
+gap: 0.25em;
+}
+.retro-station-header__chip-icon {
+--mdc-icon-size: 1em;
+display: inline-flex;
+align-items: center;
+color: inherit;
+flex-shrink: 0;
+}
+.retro--line-stripe .retro-row {
+padding-left: 10px;
+}
+.retro--line-stripe .retro-row::before {
+content: '';
+position: absolute;
+top: 0;
+bottom: 0;
+left: 0;
+width: 4px;
+background: var(--retro-line-color, var(--led-amber));
+filter: drop-shadow(0 0 4px var(--retro-line-color, rgb(var(--led-glow-rgb) / 0.45)));
+pointer-events: none;
+border-radius: 1px;
+}
+.retro--housing {
+padding: 6px;
+background: #111;
+border-radius: 10px;
+box-shadow:
+inset 0 1px 0 rgba(255, 255, 255, 0.06),
+0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.retro--housing .retro-led {
+border-radius: 6px;
+}
+.retro--housing .retro-led::before {
+content: '';
+position: absolute;
+inset: 0;
+background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 40%);
+pointer-events: none;
+z-index: 2;
+border-radius: inherit;
+}
+.retro--housing .retro-station-header {
+border-top-left-radius: 6px;
+border-top-right-radius: 6px;
+}
+.retro--housing .retro-station:last-child,
+.retro--housing .retro-station-header:last-child {
+border-bottom-left-radius: 6px;
+border-bottom-right-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+*,
+*::before,
+*::after {
+animation-duration: 0.01ms !important;
+animation-iteration-count: 1 !important;
+transition-duration: 0.01ms !important;
+scroll-behavior: auto !important;
+}
+}`}};Z([Me({attribute:!1})],$.prototype,`hass`,void 0),Z([H()],$.prototype,`_config`,void 0),Z([H()],$.prototype,`_versionMismatch`,void 0),Z([H()],$.prototype,`_raceState`,void 0),Z([H()],$.prototype,`_countdownDigit`,void 0),Z([H()],$.prototype,`_raceWinner`,void 0),Z([H()],$.prototype,`_tickerActive`,void 0),Z([H()],$.prototype,`_viaPhase`,void 0),$=Z([ke(`wiener-linien-austria-retro-card`)],$);export{$ as WienerLinienAustriaRetroCard};

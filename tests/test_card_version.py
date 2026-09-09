@@ -54,7 +54,7 @@ def _expected_version() -> str:
 def test_integration_version_matches_manifest() -> None:
     """`INTEGRATION_VERSION` must equal `manifest.json::version` byte-for-byte."""
     expected = _expected_version()
-    assert INTEGRATION_VERSION == expected, (
+    assert expected == INTEGRATION_VERSION, (
         f"INTEGRATION_VERSION drift: const.py={INTEGRATION_VERSION!r} vs "
         f"manifest.json={expected!r} — const.py should derive from manifest"
     )

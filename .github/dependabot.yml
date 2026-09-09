@@ -61,9 +61,6 @@ updates:
       npm-security:
         applies-to: security-updates
         patterns: ["*"]
-    ignore:
-      - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pre-commit
     directory: /

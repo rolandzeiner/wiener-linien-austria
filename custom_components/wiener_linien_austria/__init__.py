@@ -26,7 +26,6 @@ from .alerts import async_refresh_alerts
 from .batch import MonitorBatchGroup
 from .card_registration import JSModuleRegistration
 from .const import (
-    ALERT_CACHE_VALIDATORS_KEY,
     ALERTS_REFRESH_SECONDS,
     ALERTS_REFRESH_UNSUB_KEY,
     BATCH_REGISTRY_KEY,
@@ -54,7 +53,7 @@ from .static import (
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
 
 STATIC_REFRESH_UNSUB_KEY = "static_refresh_unsub"
 
@@ -336,18 +335,10 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     Cancels timer subscriptions, in-flight bg tasks, and pops every
     cache + validator key.
 
-    Note on the modern HA alternative: per-resource cleanup
-    (one timer, one listener, one lock) is better expressed via
-    `entry.async_on_unload(callable)` — HA core invokes those
-    callbacks on BOTH successful unload AND setup-failure, so no
-    explicit rollback is needed for entry-scoped resources.
-    `_teardown_domain_state` exists because the cleanup here is
-    DOMAIN-WIDE (refcount-driven, shared across entries) and
-    `async_on_unload` is per-entry — which is the wrong granularity
-    for "fire when the LAST entry removes." Keep this pattern for
-    domain-wide state; for new per-entry cleanup, prefer
-    `entry.async_on_unload`. See the portfolio-liftables reference,
-    item 6 (maintainer note; the file is not in this repo).
+    For NEW per-entry cleanup prefer `entry.async_on_unload`, which HA
+    invokes on both unload and setup-failure. This exists because the
+    cleanup here is domain-wide and refcount-driven — the wrong
+    granularity for a per-entry callback.
     """
     for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
         unsub = domain_data.pop(unsub_key, None)
@@ -368,15 +359,14 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     if isinstance(registry, dict):
         for group in registry.values():
             group.stop()
-    # Drop the rest of the domain-wide state — caches and validators
-    # are stale by definition once no entry is around to consume them.
+    # Drop the rest of the domain-wide state — the caches are stale by
+    # definition once no entry is around to consume them.
     # RESOURCES_REGISTERED_KEY pops too so the next first-entry boot
     # re-runs JSModuleRegistration.async_register — covers the user's
     # delete-last-entry + async_remove_entry-tore-down-resources case.
     for stale_key in (
         TRAFFIC_INFO_KEY,
         ELEVATOR_INFO_KEY,
-        ALERT_CACHE_VALIDATORS_KEY,
         DOMAIN_LAST_CALL_KEY,
         LOCK_KEY,
         LOCK_LOOP_KEY,

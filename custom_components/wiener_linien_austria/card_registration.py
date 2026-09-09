@@ -3,9 +3,8 @@
 Canonical pattern from the HA developer community guide:
 https://community.home-assistant.io/t/developer-guide-embedded-lovelace-card-in-a-home-assistant-integration/974909
 
-This integration ships three bundled cards (modern + retro + flap)
-registered via a single ``JSModuleRegistration`` instance — adding a
-fourth card is one row in ``JSMODULES`` below.
+This integration ships three bundled cards (modern + retro + flap),
+registered via a single ``JSModuleRegistration`` instance.
 
 ``resources`` itself is a ``ResourceYAMLCollection |
 ResourceStorageCollection`` union; the type-only import + ``cast``
@@ -139,13 +138,29 @@ class JSModuleRegistration:
             if not card_path.is_file():
                 _LOGGER.warning("Card JS not found at %s", card_path)
                 continue
-            configs.append(StaticPathConfig(url, str(card_path), False))
+            # cache_headers=True -> `Cache-Control: public, max-age=2678400`
+            # (31 days). Safe here and nowhere else in this method, because
+            # the Lovelace resource URL these files are served under carries
+            # `?v={version}` (see `_async_upsert_resource`) and the version
+            # comes from manifest.json — so a release changes the URL and the
+            # long max-age never has to be invalidated. Without it all three
+            # bundles (443 KB raw) are re-fetched on every dashboard boot.
+            #
+            # The cost is local: dev-push rsyncs a rebuilt bundle to the same
+            # URL with the same `?v=`, so card iteration now needs a hard
+            # refresh (⌘⇧R) rather than a plain reload. That is already the
+            # documented card workflow.
+            configs.append(StaticPathConfig(url, str(card_path), True))
         # Webfonts — directory-level static path so the cards' @font-face
         # URLs under /wiener-linien-austria/fonts/ all resolve. Optional:
         # missing dir just skips the registration (cards fall back to the
-        # system font stack). cache_headers=False matches the cards' own
-        # cache behaviour — a font-subset refresh on the next release
-        # reaches users without a manual cache wipe.
+        # system font stack).
+        #
+        # cache_headers stays False here, and the asymmetry with the JS above
+        # is the whole point: these URLs carry no `?v=` cache-buster, so a
+        # 31-day max-age would pin a stale font subset for a month with no way
+        # to invalidate it short of a manual cache wipe. Versioned asset gets
+        # the long cache; unversioned one does not.
         fonts_dir = Path(__file__).parent / "www" / FONTS_DIRNAME
         if fonts_dir.is_dir():
             configs.append(StaticPathConfig(FONTS_URL, str(fonts_dir), False))

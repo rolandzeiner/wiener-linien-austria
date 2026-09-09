@@ -1,7 +1,17 @@
 {
   "entity": {
+    "binary_sensor": {
+      "stale": {
+        "default": "mdi:cloud-off-outline",
+        "state": {
+          "off": "mdi:cloud-check-outline"
+        }
+      }
+    },
     "sensor": {
-      "stop": { "default": "mdi:train-variant" }
+      "stop": {
+        "default": "mdi:train-variant"
+      }
     }
   }
 }

@@ -11,9 +11,11 @@ Flow:
                         exactly (a partial name, a typo). Runs the catalogue
                         search over what was typed and offers the hits as a
                         shortlist, plus a "search again" escape hatch.
-  3. `select_lines`   — live `/monitor` call with the station's RBLs; each
-                        returned line × direction is presented as a pre-checked
-                        option. Submitting saves the entry.
+  3. `select_lines`   — the station's line × direction pairs, merged from a
+                        live `/monitor` call and the static catalogue, offered
+                        as an opt-in checklist. A new entry starts with nothing
+                        selected; reconfigure restores the saved picks.
+                        Submitting saves the entry.
 `async_step_reconfigure` re-enters `select_lines` for an existing entry,
 preserving unique_id. Options flow tweaks the scan interval only.
 
@@ -229,9 +231,9 @@ def _stop_options(
 
     HA renders a DROPDOWN SelectSelector as a combo box that filters on
     the option labels client-side, so shipping the whole catalogue in one
-    control gives type-to-filter over every stop without a round trip —
-    the user never has to know a stop's exact spelling, and there is no
-    second shortlist step.
+    control gives type-to-filter over every stop without a round trip.
+    Picking a suggestion goes straight to line selection; only free text
+    that matched no stop exactly falls through to `select_stop`.
 
     Ordering carries the useful default: the stops closest to the home
     location head the list with their distance shown, so the unfiltered
@@ -295,6 +297,18 @@ async def _probe_monitor_lines(
 
     Each dict: {key, line, towards, direction, type}. Empty list on any failure
     — caller must handle by surfacing a `cannot_connect` form error.
+
+    This is the one outbound call that deliberately does NOT take
+    `async_enforce_domain_cooldown`. Every recurring caller does (batch.py,
+    alerts.py, static.py), because they run unattended and their aggregate rate
+    is what the upstream notices. This one is user-initiated, fires at most
+    twice in an entry's lifetime (initial setup and reconfigure), and the
+    cooldown sleeps *inside* the lock — taking it would freeze the config-flow
+    dialog for up to DOMAIN_COOLDOWN_SECONDS while someone is watching it, to
+    spare a free public API a single request. Not a trade worth making.
+
+    If you are here because a linter or an audit flagged the inconsistency:
+    it is deliberate, and README's Data Updates section documents it.
     """
     session = async_get_clientsession(hass)
     url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
@@ -443,9 +457,7 @@ async def _resolve_lines_for_picker(
         return live
     live_keys = {row["key"] for row in live}
     merged = list(live)
-    for row in static:
-        if row["key"] not in live_keys:
-            merged.append(row)
+    merged.extend(row for row in static if row["key"] not in live_keys)
     merged.sort(key=lambda r: (r["line"], r["towards"]))
     return merged
 
@@ -482,7 +494,6 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         return WienerLinienAustriaOptionsFlow()
 
     # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
     # Step 1 — user: searchable dropdown over the whole catalogue
     # ------------------------------------------------------------------
 
@@ -492,7 +503,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Build (and memoise) the stop picker options for this flow.
 
         Memoised so re-rendering the form after a validation error does
-        not repeat the distance sweep and the ~2 000-entry sort.
+        not repeat the distance sweep and the ~1 800-entry sort.
         """
         if self._stop_options is None:
             self._stop_options = _stop_options(

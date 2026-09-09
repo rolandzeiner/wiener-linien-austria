@@ -13,14 +13,20 @@ from homeassistant.core import HomeAssistant
 from custom_components.wiener_linien_austria.alerts import (
     ElevatorInfo,
     TrafficInfo,
-    _fetch_info_list,
+    _fetch_info_lists,
     _FetchFailed,
+    _merge_short_duplicates,
     _parse_elevator,
     _parse_traffic,
+    _parse_traffic_short,
+    _split_by_category,
     async_refresh_alerts,
     get_alerts_for,
 )
 from custom_components.wiener_linien_austria.const import (
+    ALERT_FEED_ELEVATOR,
+    ALERT_FEED_TRAFFIC,
+    ALERT_FEED_TRAFFIC_SHORT,
     DOMAIN,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
@@ -200,65 +206,102 @@ async def test_get_alerts_for_no_lines_returns_all_traffic(hass: HomeAssistant) 
 # ---------------------------------------------------------------------------
 
 
+def _combined_body(
+    traffic: list[dict[str, Any]] | None = None,
+    elevator: list[dict[str, Any]] | None = None,
+    short: list[dict[str, Any]] | None = None,
+    *,
+    traffic_id: int = 2,
+    elevator_id: int = 1,
+    short_id: int = 3,
+) -> dict[str, Any]:
+    """Build a realistic multi-`name` /trafficInfoList payload.
+
+    Mirrors the live shape measured 2026-09-07: one flat `trafficInfos`
+    list, every entry tagged with `refTrafficInfoCategoryId`, resolved
+    through a `trafficInfoCategories` table. The default ids deliberately
+    put `aufzugsinfo` at 1 and `stoerunglang` at 2 — the reverse of the
+    order the `name=` params are sent in — because that is what upstream
+    actually returns and the routing must not depend on request order.
+    """
+    infos: list[dict[str, Any]] = []
+    categories: list[dict[str, Any]] = []
+    if elevator is not None:
+        categories.append({"id": elevator_id, "name": ALERT_FEED_ELEVATOR})
+        infos += [{**e, "refTrafficInfoCategoryId": elevator_id} for e in elevator]
+    if traffic is not None:
+        categories.append({"id": traffic_id, "name": ALERT_FEED_TRAFFIC})
+        infos += [{**t, "refTrafficInfoCategoryId": traffic_id} for t in traffic]
+    if short is not None:
+        categories.append({"id": short_id, "name": ALERT_FEED_TRAFFIC_SHORT})
+        infos += [{**t, "refTrafficInfoCategoryId": short_id} for t in short]
+    return {
+        "message": {"messageCode": 1},
+        "data": {"trafficInfos": infos, "trafficInfoCategories": categories},
+    }
+
+
+def _json_response(body: dict[str, Any]) -> MagicMock:
+    """A MagicMock response whose .json() resolves to `body`."""
+    resp = MagicMock()
+    resp.raise_for_status = MagicMock()
+    resp.json = AsyncMock(return_value=body)
+    return resp
+
+
 async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> None:
-    """One fetch for stoerunglang + one for aufzugsinfo, caches populated."""
-    traffic_body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "T1",
-                    "title": "U4: Short",
-                    "description": "x",
-                    "relatedLines": ["U4"],
-                    "status": "active",
-                    "time": {},
-                }
-            ]
-        },
-    }
-    elevator_body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "E1",
-                    "title": "Stephansplatz",
-                    "description": "U1 exit",
-                    "attributes": {
-                        "station": "Stephansplatz",
-                        "reason": "renovation",
-                        "relatedLines": ["U1"],
-                        "relatedStops": [4111],
-                        "status": "außer Betrieb",
-                    },
-                    "time": {},
-                }
-            ]
-        },
-    }
+    """ONE fetch carrying both names populates both caches.
 
-    resp_traffic = MagicMock()
-    resp_traffic.raise_for_status = MagicMock()
-    resp_traffic.json = AsyncMock(return_value=traffic_body)
-    resp_elevator = MagicMock()
-    resp_elevator.raise_for_status = MagicMock()
-    resp_elevator.json = AsyncMock(return_value=elevator_body)
-
-    def fake_get(url: str, **kwargs: object) -> MagicMock:
-        name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return make_response_cm(
-            resp_elevator if name == "aufzugsinfo" else resp_traffic
-        )
+    Also pins the request shape that makes that possible: repeated `name=`
+    params in a single GET. Two separate calls would still populate the
+    caches, so asserting the call count is the only thing that stops a
+    refactor silently reintroducing the second request — and with it the
+    15-second domain-lock stall it used to cost every cycle.
+    """
+    body = _combined_body(
+        traffic=[
+            {
+                "name": "T1",
+                "title": "U4: Short",
+                "description": "x",
+                "relatedLines": ["U4"],
+                "status": "active",
+                "time": {},
+            }
+        ],
+        elevator=[
+            {
+                "name": "E1",
+                "title": "Stephansplatz",
+                "description": "U1 exit",
+                "attributes": {
+                    "station": "Stephansplatz",
+                    "reason": "renovation",
+                    "relatedLines": ["U1"],
+                    "relatedStops": [4111],
+                    "status": "außer Betrieb",
+                },
+                "time": {},
+            }
+        ],
+    )
 
     fake_session = MagicMock()
-    fake_session.get = MagicMock(side_effect=fake_get)
+    fake_session.get = MagicMock(return_value=make_response_cm(_json_response(body)))
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
         await async_refresh_alerts(hass)
+
+    assert fake_session.get.call_count == 1, "both feeds must ride in one request"
+    params = fake_session.get.call_args.kwargs["params"]
+    assert [v for k, v in params if k == "name"] == [
+        ALERT_FEED_TRAFFIC,
+        ALERT_FEED_TRAFFIC_SHORT,
+        ALERT_FEED_ELEVATOR,
+    ]
 
     traffic = hass.data[DOMAIN][TRAFFIC_INFO_KEY]
     elevator = hass.data[DOMAIN][ELEVATOR_INFO_KEY]
@@ -269,45 +312,31 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
 
 async def test_async_refresh_drops_resolved_traffic(hass: HomeAssistant) -> None:
     """`status: resolved` entries must not reach the cache."""
-    traffic_body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "ACTIVE",
-                    "title": "U4: disrupt",
-                    "description": "x",
-                    "relatedLines": ["U4"],
-                    "status": "active",
-                    "time": {},
-                },
-                {
-                    "name": "DONE",
-                    "title": "U1: over",
-                    "description": "y",
-                    "relatedLines": ["U1"],
-                    "status": "resolved",
-                    "time": {},
-                },
-            ]
-        },
-    }
-    elevator_body = {"message": {"messageCode": 1}, "data": {"trafficInfos": []}}
-
-    def _resp(body: dict[str, Any]) -> MagicMock:
-        r = MagicMock()
-        r.raise_for_status = MagicMock()
-        r.json = AsyncMock(return_value=body)
-        return r
-
-    def fake_get(url: str, **kwargs: object) -> MagicMock:
-        name = next((v for k, v in kwargs["params"] if k == "name"), None)
-        return make_response_cm(
-            _resp(elevator_body if name == "aufzugsinfo" else traffic_body)
-        )
-
+    traffic_body = _combined_body(
+        traffic=[
+            {
+                "name": "ACTIVE",
+                "title": "U4: disrupt",
+                "description": "x",
+                "relatedLines": ["U4"],
+                "status": "active",
+                "time": {},
+            },
+            {
+                "name": "DONE",
+                "title": "U1: over",
+                "description": "y",
+                "relatedLines": ["U1"],
+                "status": "resolved",
+                "time": {},
+            },
+        ],
+        elevator=[],
+    )
     fake_session = MagicMock()
-    fake_session.get = MagicMock(side_effect=fake_get)
+    fake_session.get = MagicMock(
+        return_value=make_response_cm(_json_response(traffic_body))
+    )
 
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
@@ -336,12 +365,12 @@ async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None
     assert hass.data[DOMAIN][ELEVATOR_INFO_KEY] == []
 
 
-async def test_fetch_info_list_propagates_unexpected_errors(
+async def test_fetch_info_lists_propagates_unexpected_errors(
     hass: HomeAssistant,
 ) -> None:
     """Unexpected exceptions (programming errors) must propagate.
 
-    The except-list in `_fetch_info_list` is deliberately narrow
+    The except-list in `_fetch_info_lists` is deliberately narrow
     (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError,
     ValueError) so real bugs surface during development instead of being
     silently swallowed by the 5-min periodic refresh. HA's
@@ -357,11 +386,11 @@ async def test_fetch_info_list_propagates_unexpected_errors(
         ),
         pytest.raises(RuntimeError),
     ):
-        await _fetch_info_list(hass, "stoerunglang")
+        await _fetch_info_lists(hass)
 
 
 # ---------------------------------------------------------------------------
-# _fetch_info_list: direct tests of the per-name helper's error branches
+# _fetch_info_lists: direct tests of the combined helper's error branches
 # ---------------------------------------------------------------------------
 
 
@@ -377,7 +406,7 @@ def _mock_session(resp: MagicMock) -> MagicMock:
     return fake
 
 
-async def test_fetch_info_list_http_error_returns_failed(
+async def test_fetch_info_lists_http_error_returns_failed(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -405,7 +434,7 @@ async def test_fetch_info_list_http_error_returns_failed(
             return_value=fake_session,
         ),
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
     records = [r for r in caplog.records if r.name == ALERTS_LOGGER]
@@ -415,7 +444,7 @@ async def test_fetch_info_list_http_error_returns_failed(
     assert records[0].exc_info is None
 
 
-async def test_fetch_info_list_bad_content_type_still_warns(
+async def test_fetch_info_lists_bad_content_type_still_warns(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -438,7 +467,7 @@ async def test_fetch_info_list_bad_content_type_still_warns(
             return_value=fake_session,
         ),
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
     records = [r for r in caplog.records if r.name == ALERTS_LOGGER]
@@ -446,7 +475,7 @@ async def test_fetch_info_list_bad_content_type_still_warns(
     assert records[0].exc_info is not None
 
 
-async def test_fetch_info_list_non_ok_message_code_returns_failed(
+async def test_fetch_info_lists_non_ok_message_code_returns_failed(
     hass: HomeAssistant,
 ) -> None:
     """messageCode ≠ 1 drops the payload as _FETCH_FAILED — the cache
@@ -464,11 +493,11 @@ async def test_fetch_info_list_non_ok_message_code_returns_failed(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_non_dict_body_returns_failed(
+async def test_fetch_info_lists_non_dict_body_returns_failed(
     hass: HomeAssistant,
 ) -> None:
     """JSON that decodes to a non-object returns _FETCH_FAILED so the
@@ -482,23 +511,24 @@ async def test_fetch_info_list_non_dict_body_returns_failed(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
+        result = await _fetch_info_lists(hass)
     assert isinstance(result, _FetchFailed)
 
 
-async def test_fetch_info_list_filters_non_dict_entries(
+async def test_fetch_info_lists_filters_non_dict_entries(
     hass: HomeAssistant,
 ) -> None:
     """trafficInfos items that aren't dicts are silently filtered out."""
     body = {
         "message": {"messageCode": 1},
         "data": {
+            "trafficInfoCategories": [{"id": 2, "name": ALERT_FEED_TRAFFIC}],
             "trafficInfos": [
-                {"name": "good", "title": "y"},
+                {"name": "good", "title": "y", "refTrafficInfoCategoryId": 2},
                 "not-a-dict",
                 None,
                 42,
-            ]
+            ],
         },
     }
     resp = MagicMock()
@@ -510,8 +540,14 @@ async def test_fetch_info_list_filters_non_dict_entries(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        result = await _fetch_info_list(hass, "stoerunglang")
-    assert result == [{"name": "good", "title": "y"}]
+        result = await _fetch_info_lists(hass)
+    assert not isinstance(result, _FetchFailed)
+    assert result[ALERT_FEED_TRAFFIC] == [
+        {"name": "good", "title": "y", "refTrafficInfoCategoryId": 2}
+    ]
+    # The feed we asked for but upstream had nothing for is present and empty,
+    # never missing — the caller indexes both keys unconditionally.
+    assert result[ALERT_FEED_ELEVATOR] == []
 
 
 # ---------------------------------------------------------------------------
@@ -521,111 +557,418 @@ async def test_fetch_info_list_filters_non_dict_entries(
 
 
 # ---------------------------------------------------------------------------
-# Conditional GET — 304 Not Modified
+# stoerungkurz: parsing, duplicate merge, and stop-scoped matching
 # ---------------------------------------------------------------------------
 
 
-async def test_async_refresh_alerts_304_keeps_existing_cache(
-    hass: HomeAssistant,
-) -> None:
-    """A 304 from `/trafficInfoList` must leave the existing parsed cache alone.
+def test_parse_traffic_short_splits_title_on_newline() -> None:
+    """The category label leads, the detail follows — 15 of 19 live entries.
 
-    Regression guard for the conditional-GET path. If 304 incorrectly fell
-    through to `resp.json()` we'd either crash (304 has no body) or wipe
-    the existing cache. The fix: detect status==304 and return the
-    `_NOT_MODIFIED` sentinel, which `async_refresh_alerts` interprets as
-    "don't touch the cache".
+    Upstream sends title == description byte-for-byte, so emitting both
+    verbatim makes the card render the same sentence as its own summary
+    and again as its body.
     """
-    # Pre-seed the cache so we can assert it survives.
-    pre_existing_traffic = TrafficInfo(
-        name="PRE",
-        title="U1: prior",
-        description="x",
-        related_lines=["U1"],
-        time_start=None,
-        time_end=None,
-        status="active",
-    )
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [pre_existing_traffic]
-    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = []
-
-    resp_304 = MagicMock()
-    resp_304.status = 304
-    resp_304.headers = {"ETag": '"abc"'}
-    resp_304.raise_for_status = MagicMock()
-    resp_304.json = AsyncMock(
-        side_effect=AssertionError("must not call .json() on 304")
-    )
-
-    fake_session = MagicMock()
-    fake_session.get = MagicMock(return_value=make_response_cm(resp_304))
-
-    with patch(
-        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
-        return_value=fake_session,
-    ):
-        await async_refresh_alerts(hass)
-
-    # Cache survives 304 untouched.
-    assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == [pre_existing_traffic]
-
-
-async def test_async_refresh_alerts_sends_validators_on_subsequent_call(
-    hass: HomeAssistant,
-) -> None:
-    """After a 200 captures ETag/Last-Modified, the next call sends them back."""
-    body = {
-        "message": {"messageCode": 1},
-        "data": {
-            "trafficInfos": [
-                {
-                    "name": "T1",
-                    "title": "U1: x",
-                    "relatedLines": ["U1"],
-                    "status": "active",
-                    "time": {},
-                }
-            ]
-        },
+    raw = {
+        "name": "R318-437",
+        "title": "Bauarbeiten\nBusse halten Pasettistraße vor Hellwagstraße",
+        "description": "Bauarbeiten\nBusse halten Pasettistraße vor Hellwagstraße",
+        "relatedLines": ["37A"],
+        "relatedStops": [318],
+        "time": {"start": "2026-09-01T00:00:00.000+0200"},
     }
-    resp_first = MagicMock()
-    resp_first.status = 200
-    resp_first.headers = {
-        "ETag": '"v1"',
-        "Last-Modified": "Wed, 22 Apr 2026 10:00:00 GMT",
+    t = _parse_traffic_short(raw)
+    assert t.title == "Bauarbeiten"
+    assert t.description == "Busse halten Pasettistraße vor Hellwagstraße"
+    assert t.related_stops == [318]
+    assert t.category == ALERT_FEED_TRAFFIC_SHORT
+    # No upstream status on this feed; the long feed's active-filter would
+    # otherwise drop every entry.
+    assert t.status == "active"
+
+
+def test_parse_traffic_short_falls_back_to_sentence_split() -> None:
+    """The 4 live entries with no newline split after the first sentence."""
+    text = (
+        "Haltestelle Parlament zur Beschleunigung der Straßenbahnlinien "
+        "dauerhaft aufgelassen. Bitte auf nahegelegene Haltestellen ausweichen."
+    )
+    t = _parse_traffic_short({"name": "S16", "title": text, "relatedStops": [16]})
+    assert t.title.endswith("dauerhaft aufgelassen.")
+    assert t.description == "Bitte auf nahegelegene Haltestellen ausweichen."
+
+
+def test_parse_traffic_short_collapses_upstream_whitespace() -> None:
+    """Stray newlines upstream would render as blank paragraphs in the card.
+
+    Both shapes are live: one entry ends with three trailing newlines,
+    another breaks a street number across three lines.
+    """
+    t = _parse_traffic_short(
+        {
+            "name": "R2207-0",
+            "title": "Bauarbeiten\nZüge halten bei\nBrünnerstraße \n76 - 78",
+        }
+    )
+    assert t.description == "Züge halten bei Brünnerstraße 76 - 78"
+
+    t2 = _parse_traffic_short(
+        {
+            "name": "R1150-0",
+            "title": "Bauarbeiten\nBusse halten\nFrauenstiftgasse 7\n\n\n",
+        }
+    )
+    assert t2.description == "Busse halten Frauenstiftgasse 7"
+
+
+def test_parse_traffic_short_single_clause_has_no_body() -> None:
+    """Nothing to split on leaves the whole text as the summary."""
+    t = _parse_traffic_short({"name": "X1", "title": "Ersatzverkehr"})
+    assert t.title == "Ersatzverkehr"
+    assert t.description == ""
+
+
+def test_merge_short_duplicates_unions_lines_and_stops() -> None:
+    """One physical sign shared by two lines arrives as two entries.
+
+    Live example: R500-408 and R500-101 are both "Bhf. Hütteldorf / ÖBB-
+    Ersatzbus für <80" at RBL 500, differing only in relatedLines. The card
+    dedupes by `name`, so both would render as the same banner twice.
+    """
+    raw = {
+        "title": "Bhf. Hütteldorf\nÖBB-Ersatzbus für <80",
+        "relatedStops": [500],
     }
-    resp_first.raise_for_status = MagicMock()
-    resp_first.json = AsyncMock(return_value=body)
-
-    resp_second = MagicMock()
-    resp_second.status = 200
-    resp_second.headers = {}
-    resp_second.raise_for_status = MagicMock()
-    resp_second.json = AsyncMock(return_value=body)
-
-    fake_session = MagicMock()
-    fake_session.get = MagicMock(
-        side_effect=[
-            make_response_cm(resp_first),
-            make_response_cm(resp_first),
-            make_response_cm(resp_second),
-            make_response_cm(resp_second),
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": "R500-408", "relatedLines": ["8A"]}),
+            _parse_traffic_short({**raw, "name": "R500-101", "relatedLines": ["1"]}),
         ]
     )
+    assert len(merged) == 1
+    # First id wins so the card's expand-state key stays stable.
+    assert merged[0].name == "R500-408"
+    assert merged[0].related_lines == ["8A", "1"]
+    assert merged[0].related_stops == [500]
+    # The lookup sets must be rebuilt after the backing lists were mutated,
+    # or the matcher below silently misses the merged-in values.
+    assert merged[0].related_lines_set == frozenset({"8A", "1"})
+    assert merged[0].related_stops_set == frozenset({500})
 
+
+def test_merge_short_duplicates_keeps_unrelated_incidents_apart() -> None:
+    """Identical wording is not evidence of a shared incident.
+
+    The operator writes from a small fixed vocabulary, so "Fahrtbehinderung
+    / Falschparker" is boilerplate two unrelated incidents can both carry.
+    Live on 2026-09-09: a line-42 obstruction around Volksoper and a line-5
+    one at Westbahnhof, disjoint in both lines and platforms. Merging them
+    handed the union of RBLs to the matcher, which then surfaced the notice
+    at stops neither incident touched, and took `time_end` from whichever
+    was parsed first.
+    """
+    raw = {"title": "Fahrtbehinderung\nFalschparker"}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short(
+                {**raw, "name": "L42", "relatedLines": ["42"], "relatedStops": [1212]}
+            ),
+            _parse_traffic_short(
+                {**raw, "name": "L5", "relatedLines": ["5"], "relatedStops": [370]}
+            ),
+        ]
+    )
+    assert [(m.name, m.related_lines, m.related_stops) for m in merged] == [
+        ("L42", ["42"], [1212]),
+        ("L5", ["5"], [370]),
+    ]
+
+
+def test_merge_short_duplicates_unions_one_line_across_its_platforms() -> None:
+    """The common shape: one incident reported once per affected platform."""
+    raw = {"title": "Fahrtbehinderung\nFalschparker", "relatedLines": ["5"]}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": "a", "relatedStops": [361]}),
+            _parse_traffic_short({**raw, "name": "b", "relatedStops": [370]}),
+        ]
+    )
+    assert len(merged) == 1
+    assert merged[0].related_stops == [361, 370]
+
+
+def test_merge_short_duplicates_unions_entries_with_no_lines() -> None:
+    """Stop-wide texts leave `relatedLines` empty; equal (empty) line sets
+    still tie them together across the platforms they name."""
+    raw = {"title": "Haltestelle Parlament dauerhaft aufgelassen."}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": "a", "relatedStops": [16]}),
+            _parse_traffic_short({**raw, "name": "b", "relatedStops": [48]}),
+        ]
+    )
+    assert len(merged) == 1
+    assert merged[0].related_stops == [16, 48]
+
+
+def test_merge_short_duplicates_is_transitive() -> None:
+    """Three lines sharing platforms pairwise are one incident.
+
+    Live shape: 40/41/42 "Stromstörung / Betrieb ab Volksoper". Line 40 and
+    line 41 share no platform here, so folding each entry into whichever
+    arrived first would leave two notices; the line-42 entry bridges them.
+    """
+    raw = {"title": "Stromstörung\nBetrieb ab Volksoper"}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short(
+                {**raw, "name": "l40", "relatedLines": ["40"], "relatedStops": [188]}
+            ),
+            _parse_traffic_short(
+                {**raw, "name": "l41", "relatedLines": ["41"], "relatedStops": [1213]}
+            ),
+            _parse_traffic_short(
+                {
+                    **raw,
+                    "name": "l42",
+                    "relatedLines": ["42"],
+                    "relatedStops": [188, 1213],
+                }
+            ),
+        ]
+    )
+    assert len(merged) == 1
+    # First id wins so the card's expand-state key stays stable.
+    assert merged[0].name == "l40"
+    assert merged[0].related_lines == ["40", "41", "42"]
+    assert merged[0].related_stops == [188, 1213]
+
+
+def _seed_short(hass: HomeAssistant, *infos: TrafficInfo) -> None:
+    hass.data.setdefault(DOMAIN, {})[TRAFFIC_INFO_KEY] = list(infos)
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = []
+
+
+def _short(name: str, stops: list[int], lines: list[str]) -> TrafficInfo:
+    return _parse_traffic_short(
+        {
+            "name": name,
+            "title": f"Bauarbeiten\n{name}",
+            "relatedStops": stops,
+            "relatedLines": lines,
+        }
+    )
+
+
+async def test_get_alerts_for_short_matches_on_stop(hass: HomeAssistant) -> None:
+    """A short notice surfaces at the platform it names."""
+    _seed_short(hass, _short("A", stops=[4111], lines=["U1"]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert [t.name for t in traffic] == ["A"]
+
+
+async def test_get_alerts_for_short_never_matches_on_line_alone(
+    hass: HomeAssistant,
+) -> None:
+    """The whole point of the stop scoping.
+
+    A works notice for one platform must not appear at the other ~30 stops
+    on the same line. The user tracks U1, the notice names U1, but it is
+    attached to a stop this card does not show — so it must not surface.
+    """
+    _seed_short(hass, _short("A", stops=[9999], lines=["U1"]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert traffic == []
+
+
+async def test_get_alerts_for_short_has_no_all_traffic_fallthrough(
+    hass: HomeAssistant,
+) -> None:
+    """Long notices fall through when the sensor tracks no lines; short ones
+    must not — an unscoped card would otherwise show every works notice in
+    Vienna."""
+    _seed_short(hass, _short("A", stops=[9999], lines=[]))
+    traffic, _ = get_alerts_for(hass, set(), {4111})
+    assert traffic == []
+
+
+async def test_get_alerts_for_short_needs_a_tracked_line(
+    hass: HomeAssistant,
+) -> None:
+    """An RBL hit alone is not a filter.
+
+    `CONF_RBLS` carries every platform of the DIVA, not just the ones the
+    tracked lines call at, so at a hub the stop half admits every line the
+    station sees. Westbahnhof tracking only U3 surfaced a tram-5
+    obstruction that way (2026-09-09) while its departure list correctly
+    showed no tram 5 at all.
+    """
+    _seed_short(hass, _short("A", stops=[370], lines=["5"]))
+    traffic, _ = get_alerts_for(hass, {"U3"}, {370, 4913})
+    assert traffic == []
+
+
+async def test_get_alerts_for_short_matches_when_a_line_is_tracked(
+    hass: HomeAssistant,
+) -> None:
+    """The same notice at the same platform, for a user who tracks tram 5."""
+    _seed_short(hass, _short("A", stops=[370], lines=["5"]))
+    traffic, _ = get_alerts_for(hass, {"U3", "5"}, {370, 4913})
+    assert [t.name for t in traffic] == ["A"]
+
+
+async def test_get_alerts_for_short_without_lines_still_matches_on_stop(
+    hass: HomeAssistant,
+) -> None:
+    """Upstream leaves `relatedLines` empty for stop-wide texts
+    ("Haltestelle Parlament … aufgelassen"), which concern every line
+    calling there — so those keep matching on RBL alone."""
+    _seed_short(hass, _short("A", stops=[4111], lines=[]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert [t.name for t in traffic] == ["A"]
+
+
+async def test_get_alerts_for_mixes_both_categories(hass: HomeAssistant) -> None:
+    """Both feeds land in one list for the single card banner, each matched
+    by its own rule."""
+    long_notice = _parse_traffic(
+        {
+            "name": "LONG",
+            "title": "U1: Verspätungen",
+            "relatedLines": ["U1"],
+            "status": "active",
+            "time": {},
+        }
+    )
+    _seed_short(hass, long_notice, _short("SHORT", stops=[4111], lines=[]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert sorted(t.name for t in traffic) == ["LONG", "SHORT"]
+    assert {t.category for t in traffic} == {
+        ALERT_FEED_TRAFFIC,
+        ALERT_FEED_TRAFFIC_SHORT,
+    }
+
+
+async def test_async_refresh_alerts_populates_short_notices(
+    hass: HomeAssistant,
+) -> None:
+    """End-to-end: the short feed reaches the traffic cache, deduped."""
+    body = _combined_body(
+        traffic=[],
+        elevator=[],
+        short=[
+            {
+                "name": "R500-408",
+                "title": "Bhf. Hütteldorf\nÖBB-Ersatzbus für <80",
+                "relatedLines": ["8A"],
+                "relatedStops": [500],
+                "time": {},
+            },
+            {
+                "name": "R500-101",
+                "title": "Bhf. Hütteldorf\nÖBB-Ersatzbus für <80",
+                "relatedLines": ["1"],
+                "relatedStops": [500],
+                "time": {},
+            },
+        ],
+    )
+    fake_session = MagicMock()
+    fake_session.get = MagicMock(return_value=make_response_cm(_json_response(body)))
     with patch(
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
         await async_refresh_alerts(hass)
-        await async_refresh_alerts(hass)
 
-    # Find the third call (start of the second refresh, stoerunglang again).
-    second_pass_calls = fake_session.get.call_args_list[2:]
-    assert any(
-        c.kwargs["headers"].get("If-None-Match") == '"v1"' for c in second_pass_calls
-    ), "second refresh must echo the ETag captured on first response"
+    cached = hass.data[DOMAIN][TRAFFIC_INFO_KEY]
+    assert len(cached) == 1
+    assert cached[0].category == ALERT_FEED_TRAFFIC_SHORT
+    assert cached[0].to_dict()["related_stops"] == [500]
+
+
+# ---------------------------------------------------------------------------
+# _split_by_category: routing a combined payload back into per-feed lists
+# ---------------------------------------------------------------------------
+
+
+def test_split_by_category_ignores_request_order() -> None:
+    """Routing follows the category table, never the order names were sent.
+
+    Measured against the live API 2026-09-07: `stoerunglang` sent as the
+    FIRST `name=` param came back as category id 2, `aufzugsinfo` as id 1.
+    Anything that infers the feed from parameter position gets both feeds
+    backwards, and the failure is silent — elevator outages would render as
+    line disruptions and vice versa.
+    """
+    data = {
+        "trafficInfoCategories": [
+            {"id": 1, "name": ALERT_FEED_ELEVATOR},
+            {"id": 2, "name": ALERT_FEED_TRAFFIC},
+        ],
+        "trafficInfos": [
+            {"name": "E1", "refTrafficInfoCategoryId": 1},
+            {"name": "T1", "refTrafficInfoCategoryId": 2},
+        ],
+    }
+    out = _split_by_category(data)
+    assert [e["name"] for e in out[ALERT_FEED_ELEVATOR]] == ["E1"]
+    assert [t["name"] for t in out[ALERT_FEED_TRAFFIC]] == ["T1"]
+
+
+def test_split_by_category_absent_category_yields_empty_list() -> None:
+    """A feed with no current disruptions is absent upstream, empty here.
+
+    The docs are explicit that `trafficInfoCategories` lists a category only
+    when it has entries. That absence means "nothing active", which must
+    CLEAR the cache — returning a missing key instead would either KeyError
+    in the caller or preserve a resolved disruption forever.
+    """
+    data = {
+        "trafficInfoCategories": [{"id": 7, "name": ALERT_FEED_TRAFFIC}],
+        "trafficInfos": [{"name": "T1", "refTrafficInfoCategoryId": 7}],
+    }
+    out = _split_by_category(data)
+    assert set(out) == {
+        ALERT_FEED_TRAFFIC,
+        ALERT_FEED_TRAFFIC_SHORT,
+        ALERT_FEED_ELEVATOR,
+    }
+    assert out[ALERT_FEED_ELEVATOR] == []
+
+
+def test_split_by_category_drops_unknown_and_malformed() -> None:
+    """Entries we can't attribute to a requested feed are dropped.
+
+    Covers a fifth category appearing upstream (we only ever asked for two),
+    a non-integer category ref, and non-dict rows in either list.
+    """
+    data = {
+        "trafficInfoCategories": [
+            {"id": 1, "name": ALERT_FEED_ELEVATOR},
+            {"id": 4, "name": "fahrtreppeninfo"},
+            "not-a-dict",
+            {"id": "5", "name": ALERT_FEED_TRAFFIC},
+        ],
+        "trafficInfos": [
+            {"name": "E1", "refTrafficInfoCategoryId": 1},
+            {"name": "ESCALATOR", "refTrafficInfoCategoryId": 4},
+            {"name": "NO_REF"},
+            {"name": "BAD_REF", "refTrafficInfoCategoryId": "1"},
+            "not-a-dict",
+        ],
+    }
+    out = _split_by_category(data)
+    assert [e["name"] for e in out[ALERT_FEED_ELEVATOR]] == ["E1"]
+    assert out[ALERT_FEED_TRAFFIC] == []
+
+
+def test_split_by_category_handles_empty_payload() -> None:
+    """A `data` object with neither key still yields every feed, empty."""
+    assert _split_by_category({}) == {
+        ALERT_FEED_TRAFFIC: [],
+        ALERT_FEED_TRAFFIC_SHORT: [],
+        ALERT_FEED_ELEVATOR: [],
+    }
 
 
 async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> None:

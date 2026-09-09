@@ -1,5 +1,5 @@
 # Unified .gitignore for the *-austria HACS portfolio (6 integrations,
-# all Lit 3 + TypeScript + Rollup card + HA Python integration).
+# all Lit 3 + TypeScript + Rolldown card + HA Python integration).
 # Reviewed 2026-05-08 — composed from the union of all 6 existing files,
 # de-duplicated, with per-repo paths replaced by globbed equivalents.
 
@@ -21,8 +21,13 @@ __pycache__/
 .coverage
 .coverage.*
 coverage.xml
+coverage.json
 htmlcov/
 .tox/
+# vitest --coverage output (npm run test:coverage). Also excluded from
+# scripts/dev-push.sh — .gitignore does not filter rsync, so anything
+# dropped in the tree can otherwise ship to the live HA box.
+coverage/
 
 # Build / dist / packaging
 build/
@@ -52,7 +57,7 @@ node_modules/
 *.js.map
 
 # Bundler caches
-.rollup.cache/
+.rolldown.cache/
 .vite-cache/
 .parcel-cache/
 
@@ -132,12 +137,21 @@ config/
 
 # ───────────────────────────────────────────────────────────────────
 # Personal dev tooling — push/sync scripts targeting a dev box, scratch.
-# `scripts/*` ignores all files in scripts/ by default, then the
-# `!scripts/build-mdi-icon-names.mjs` negation re-includes the build-
-# time MDI name extractor (required for `npm run build` to succeed).
+# `scripts/*` ignores everything in scripts/ by default; anything the build
+# actually needs has to be un-ignored below, or `npm run build` fails on a
+# fresh clone and in CI while still working on the machine that wrote it.
+# (The MDI name extractor this block used to un-ignore went away with the v2
+# editor rewrite; its exception went with it.)
+#
+# The same trap caught `check_module_coverage.py`: it was written, wired into
+# `validate.yml`, documented in CONTRIBUTING and cited in quality_scale.yaml —
+# and never committed, so the per-module coverage gate passed locally and the
+# CI step failed with "can't open file". Anything a workflow step invokes has
+# to be named here, not just anything the build needs.
 # ───────────────────────────────────────────────────────────────────
 scripts/*
-!scripts/build-mdi-icon-names.mjs
+!scripts/strip-css-comments.mjs
+!scripts/check_module_coverage.py
 dev-push.sh
 dev/
 test/
@@ -154,8 +168,6 @@ private_*.py
 # ───────────────────────────────────────────────────────────────────
 custom_components/*/_dev_fixture.py
 
-# Generated at build time by scripts/build-mdi-icon-names.mjs — list of
 # MDI icon names extracted from @mdi/js so the retro editor's "Extra
 # icons" chip input can offer autocomplete. Regenerated on every
 # `npm run build` / `npm run dev`.
-src/mdi-icon-names.json

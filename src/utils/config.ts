@@ -1,4 +1,6 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
+import { accentTextColor } from "./color.js";
+import { CARD_DEFAULTS } from "./card-vocabulary.js";
 import { RETRO_HEADER_MDI_EXIT_KEYS } from "./retro-station-icons.js";
 import type {
   LineColorsMap,
@@ -40,89 +42,121 @@ const RETRO_HEADER_EXIT: ReadonlySet<RetroHeaderExit> = new Set<RetroHeaderExit>
   ...RETRO_HEADER_MDI_EXIT_KEYS,
 ]);
 
+/** Trim and bound a free-text config string. Returns undefined for a
+ *  non-string or an empty result, so callers branch on a single
+ *  `!== undefined` test. `trim: false` preserves deliberate padding —
+ *  a date format like " d.m " uses spaces as separators. */
+function boundedText(raw: unknown, max: number, trim: boolean): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const out = trim ? raw.trim().slice(0, max) : raw.slice(0, max);
+  return out.length > 0 ? out : undefined;
+}
+
+/** Clean a user-authored string array: drop non-strings, trim, optionally
+ *  truncate each entry, drop empties and anything `accept` rejects, then
+ *  cap the count. Returns undefined for an empty result so the caller can
+ *  omit the key. Tolerant by design — one bad entry in hand-written YAML
+ *  shouldn't fail the whole side. */
+function cleanStringList(
+  raw: unknown,
+  opts: {
+    maxCount: number;
+    /** Truncate each entry to this length. Omit to leave length alone. */
+    truncateTo?: number;
+    /** Drop entries failing this test (shape and/or length). */
+    accept?: (v: string) => boolean;
+  },
+): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const { maxCount, truncateTo, accept } = opts;
+  const cleaned = raw
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => (truncateTo === undefined ? v.trim() : v.trim().slice(0, truncateTo)))
+    .filter((v) => v.length > 0 && (accept === undefined || accept(v)))
+    .slice(0, maxCount);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+/** Any registered icon set, not just mdi:. The card renders these through
+ *  <ha-icon>, which resolves whatever sets the instance has installed, so
+ *  a user with a custom-icons integration can pick `hue:adore-mirror` and
+ *  it will display. The old mdi:-only rule dated from v1's free-text
+ *  input, where it guarded against garbage; v2 picks through
+ *  ha-icon-picker, which only emits icons that actually resolve, so the
+ *  shape check is all that is needed — and the narrow rule was silently
+ *  discarding valid picks on save. */
+const ICON_KEY_RE = /^[a-z0-9_-]+:[a-z0-9_-]+$/i;
+
+/** Header-strip capacity and length limits.
+ *
+ *  Single source of truth, imported by the editor's header strip. These used to
+ *  exist twice — as `MAX_HEADER_*` constants in the editor and as bare literals
+ *  here — so raising a cap in the editor let the user add a chip that this
+ *  normaliser then silently truncated away on save. Whatever the editor offers
+ *  and whatever the normaliser keeps are now the same numbers by construction. */
+export const HEADER_MAX_CHIPS = 6;
+export const HEADER_MAX_ICONS = 3;
+export const HEADER_MAX_CHIP_LEN = 16;
+export const HEADER_MAX_TEXT_LEN = 64;
+export const HEADER_MAX_DATE_FORMAT_LEN = 32;
+/** Not exported: the editor picks icons through `ha-icon-picker`, which only
+ *  emits keys that already resolve, so this bound is a normaliser-side sanity
+ *  check on hand-written YAML rather than a cap the editor has to mirror. */
+const HEADER_MAX_ICON_KEY_LEN = 64;
+
 /** Header-side normaliser. Returns `undefined` when every field is
  *  unset / falsy / `"none"`, so the card's "is this side configured
  *  at all?" check collapses to a single truthy test. Hard bounds on
  *  `text` length defensively guard against a runaway YAML config
- *  blowing out the strip width. */
-// Exported so the flap card's config normaliser can reuse the same
-// header-side validation (the two cards share `RetroHeaderSide`
-// shape: the chip / exit / amenity grammar is identical even though
-// each card paints the strip with its own palette).
+ *  blowing out the strip width.
+ *
+ *  Exported so the flap card's config normaliser can reuse the same
+ *  header-side validation: the two cards share the `RetroHeaderSide`
+ *  shape, and the chip / exit / amenity grammar is identical even
+ *  though each card paints the strip with its own palette. */
 export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const r = raw as Record<string, unknown>;
+  const out: RetroHeaderSide = {};
+
   const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
     ? (r.exit as RetroHeaderExit)
     : "none";
-  let text: string | undefined;
-  if (typeof r.text === "string") {
-    const trimmed = r.text.trim().slice(0, 64);
-    if (trimmed) text = trimmed;
-  }
-  const show_wc = r.show_wc === true;
-  const show_escalator = r.show_escalator === true;
-  const show_elevator = r.show_elevator === true;
-  const show_clock = r.show_clock === true;
-  const show_date = r.show_date === true;
-  // Bound the format string defensively (a runaway YAML config
-  // shouldn't blow out the strip width) but don't trim — the user
-  // may legitimately use leading/trailing spaces as separators
-  // (e.g. " d.m " to pad the chip).
-  let date_format: string | undefined;
-  if (typeof r.date_format === "string") {
-    const sliced = r.date_format.slice(0, 32);
-    if (sliced) date_format = sliced;
-  }
-  // Chip array: trim each entry, drop empties, cap text length and
-  // total count. Tolerant of YAML user error — non-string entries are
-  // skipped instead of failing the whole side.
-  let chips: string[] | undefined;
-  if (Array.isArray(r.chips)) {
-    const cleaned = r.chips
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim().slice(0, 16))
-      .filter((v) => v.length > 0)
-      .slice(0, 6);
-    if (cleaned.length > 0) chips = cleaned;
-  }
-  // Free-form MDI icon array — same chip-input pattern as `chips`,
-  // but with a `mdi:` prefix filter. User types/pastes keys in the
-  // editor; we drop anything that isn't a string starting with
-  // `mdi:`, length 5..64, and cap the list at 3.
-  let extra_icons: string[] | undefined;
-  if (Array.isArray(r.extra_icons)) {
-    const cleaned = r.extra_icons
-      .filter((v): v is string => typeof v === "string")
-      .map((v) => v.trim())
-      .filter((v) => v.startsWith("mdi:") && v.length >= 5 && v.length <= 64)
-      .slice(0, 3);
-    if (cleaned.length > 0) extra_icons = cleaned;
-  }
-  if (
-    exit === "none" &&
-    text === undefined &&
-    !show_wc &&
-    !show_escalator &&
-    !show_elevator &&
-    !show_clock &&
-    !show_date &&
-    chips === undefined &&
-    extra_icons === undefined
-  ) {
-    return undefined;
-  }
-  const out: RetroHeaderSide = {};
   if (exit !== "none") out.exit = exit;
+
+  const text = boundedText(r.text, HEADER_MAX_TEXT_LEN, true);
   if (text !== undefined) out.text = text;
-  if (show_wc) out.show_wc = true;
-  if (show_escalator) out.show_escalator = true;
-  if (show_elevator) out.show_elevator = true;
-  if (show_clock) out.show_clock = true;
-  if (show_date) out.show_date = true;
-  if (date_format !== undefined) out.date_format = date_format;
+
+  if (r.show_wc === true) out.show_wc = true;
+  if (r.show_escalator === true) out.show_escalator = true;
+  if (r.show_elevator === true) out.show_elevator = true;
+  if (r.show_clock === true) out.show_clock = true;
+  if (r.show_date === true) out.show_date = true;
+
+  // Chips truncate to fit the strip; icon keys are rejected rather than
+  // cut, because half a key resolves to nothing.
+  const chips = cleanStringList(r.chips, {
+    truncateTo: HEADER_MAX_CHIP_LEN,
+    maxCount: HEADER_MAX_CHIPS,
+  });
   if (chips !== undefined) out.chips = chips;
-  if (extra_icons !== undefined) out.extra_icons = extra_icons;
+
+  const extraIcons = cleanStringList(r.extra_icons, {
+    maxCount: HEADER_MAX_ICONS,
+    accept: (v) => ICON_KEY_RE.test(v) && v.length <= HEADER_MAX_ICON_KEY_LEN,
+  });
+  if (extraIcons !== undefined) out.extra_icons = extraIcons;
+
+  // Every field unset / falsy / "none" collapses the whole side, so the
+  // card's "is this side configured at all?" check stays a single truthy
+  // test. `date_format` is deliberately NOT part of this decision — it
+  // only modifies how `show_date` renders, and a side carrying nothing
+  // else would paint an empty strip.
+  if (Object.keys(out).length === 0) return undefined;
+
+  const dateFormat = boundedText(r.date_format, HEADER_MAX_DATE_FORMAT_LEN, false);
+  if (dateFormat !== undefined) out.date_format = dateFormat;
+
   return out;
 }
 
@@ -155,12 +189,9 @@ export function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
       );
       continue;
     }
-    // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the
-    // current shape is a (line, direction) pair ("U1|R") so the
-    // threshold applies to every train on that direction regardless of
-    // which terminus the API currently labels them with. Collapse any
-    // surviving triple keys to pairs and, on collision, keep the
-    // larger value (more conservative for the user).
+    // Legacy keys carry the line-towards triple ("U1|R|Oberlaa"); the current
+    // shape is a pair ("U1|R") — see lineDirKey. Collapse survivors to pairs
+    // and, on collision, keep the larger value (conservative for the user).
     const parts = k.split("|");
     const key = parts.length >= 3 ? `${parts[0]}|${parts[1]}` : k;
     const rounded = Math.round(n);
@@ -429,10 +460,15 @@ export interface NormalisedRetroConfigValidated {
   // See NormalisedModernConfig.type — HA requires `type` on every config
   // in the `config-changed` payload or it flags "Kein Typ angegeben".
   type: string;
-  // `?: T | undefined` is the dual form that lets callers EITHER omit the
-  // key (e.g. `delete next.line`) OR assign `undefined` explicitly. The
-  // bare `?:` form alone would reject explicit `undefined` under
-  // `exactOptionalPropertyTypes`, so we widen with the union.
+  // OPTIONALITY CONVENTION for the whole codebase; other declarations point
+  // here rather than restating it.
+  //   `?: T | undefined` — the DUAL form. Lets callers either omit the key
+  //     (`delete next.line`) or assign `undefined` explicitly, which the bare
+  //     form rejects under `exactOptionalPropertyTypes`. Used by every RAW
+  //     config interface, because user-authored YAML can carry either shape.
+  //   `?: T` — the bare form. Used by every NORMALISED interface: the
+  //     normalisers only ever produce absence, and absence is what the
+  //     renderers branch on.
   entity?: string | undefined;
   direction: "H" | "R";
   line?: string | undefined;
@@ -451,7 +487,9 @@ export interface NormalisedRetroConfigValidated {
   show_header: boolean;
   header_left?: RetroHeaderSide | undefined;
   header_right?: RetroHeaderSide | undefined;
-  line_pill: boolean;
+  /** v2.0.0 rename of `line_pill`; same polarity, only the name changed.
+   *  See utils/card-vocabulary.ts and the migration in `normaliseRetroConfig`. */
+  show_line_pill: boolean;
   line_stripe: boolean;
   housing: boolean;
   show_unit: boolean;
@@ -484,6 +522,10 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_header",
   "header_left",
   "header_right",
+  "show_line_pill",
+  // Legacy alias for show_line_pill — read by the normaliser for
+  // back-compat, so it must NOT leak into the passthrough and get
+  // written back into the user's saved config.
   "line_pill",
   "line_stripe",
   "housing",
@@ -492,10 +534,12 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
 
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   const direction = raw.direction === "R" ? "R" : "H";
-  const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize) ? (raw.size as RetroSize) : "regular";
+  const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize)
+    ? (raw.size as RetroSize)
+    : CARD_DEFAULTS.size.retro;
   const station_bg: RetroStationBg = RETRO_STATION_BG.has(raw.station_bg as RetroStationBg)
     ? (raw.station_bg as RetroStationBg)
-    : "default";
+    : CARD_DEFAULTS.station_bg.retro;
   const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
     ? (raw.style as RetroStyle)
     : "classic";
@@ -507,11 +551,17 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
     line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
-    show_platform: raw.show_platform ?? true,
+    // asBool, not `?? true` — YAML is untyped, and `?? ` passes a
+    // non-boolean straight through (`show_platform: 0` yielded `0`,
+    // hiding the column, where modern and flap both yield `true`).
+    show_platform: asBool(raw.show_platform, CARD_DEFAULTS.show_platform.retro),
     platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
       ? (raw.platform_side as RetroPlatformSide)
       : "auto",
-    show_station_name: raw.show_station_name ?? false,
+    show_station_name: asBool(
+      raw.show_station_name,
+      CARD_DEFAULTS.show_station_name.retro,
+    ),
     station_bg,
     size,
     style,
@@ -538,10 +588,16 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     show_header: raw.show_header === true,
     header_left: normaliseRetroHeaderSide(raw.header_left),
     header_right: normaliseRetroHeaderSide(raw.header_right),
-    line_pill: raw.line_pill === true,
+    // v2.0.0 migration: `line_pill` kept its meaning but gave up its name —
+    // see utils/card-vocabulary.ts. Polarity unchanged, so old YAML renders
+    // identically; the new key wins when both are present.
+    show_line_pill:
+      raw.show_line_pill !== undefined
+        ? raw.show_line_pill === true
+        : raw.line_pill === true,
     line_stripe: raw.line_stripe === true,
-    housing: raw.housing === true,
-    show_unit: raw.show_unit === true,
+    housing: asBool(raw.housing, CARD_DEFAULTS.housing.retro),
+    show_unit: asBool(raw.show_unit, CARD_DEFAULTS.unit_caption.retro),
   };
 }
 
@@ -550,11 +606,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
 //   1. user-config `line_colors` (per-line override) — `color` is left
 //      unset so the card's CSS default (white) applies, since we can't
 //      know what reads well on an arbitrary user colour.
-//   2. nightline category rule (`^N\d`) — wins OVER GTFS for N-prefix
-//      lines. GTFS publishes nightlines as bus navy (`0A295D`), but
-//      Wiener Linien's signage convention pairs a deeper navy with
-//      bright yellow numerals; that pairing only reads correctly when
-//      the nightline rule beats the GTFS lookup.
+//   2. nightline category rule (`^N\d`) — deliberately wins OVER GTFS for
+//      N-prefix lines; see NIGHTLINE_BG in const.ts.
 //   3. GTFS `routes.txt` from the integration's `line_colors` attribute
 //   4. neutral fallback (`var(--primary-color)`)
 //
@@ -590,4 +643,39 @@ export function colorForLine(
   fallback = "var(--primary-color)",
 ): string {
   return chipPalette(line, overrides, gtfsColors, fallback).background;
+}
+
+/**
+ * The three colours a line chip needs, off the one `chipPalette` ladder.
+ *
+ * - `fill` — the line's background colour, for surfaces that are FILLED with
+ *   it: a selected chip, a read-only badge.
+ * - `ink` — what to write on that fill. The paired foreground when the palette
+ *   publishes one (a nightline is bright yellow on deep navy, per Wiener
+ *   Linien's signage), otherwise undefined so the caller's white default
+ *   stands — matching `chipPalette`, which deliberately declines to guess a
+ *   foreground for an arbitrary user override.
+ * - `text` — the line's colour written as TEXT on the card ground, lightness-
+ *   clamped into the legible band for `scheme` by `accentTextColor`.
+ *
+ * `text` is the rung the editor used to skip. It painted `fill` as the chip's
+ * label and border, so a nightline's deep navy (#1b1464) sat on the dark
+ * editor card at roughly 1.3:1 and the chip read as an empty outline — the
+ * exact failure `accentTextColor` was written for. `undefined` when the theme
+ * polarity isn't known yet, so the caller leaves the token unset and the
+ * theme's own text colour stands.
+ */
+export function lineChipColors(
+  line: string,
+  overrides: Record<string, string>,
+  gtfsColors: LineColorsMap = {},
+  scheme?: "dark" | "light" | undefined,
+  fallback = "var(--primary-color)",
+): { fill: string; ink: string | undefined; text: string | undefined } {
+  const palette = chipPalette(line, overrides, gtfsColors, fallback);
+  return {
+    fill: palette.background,
+    ink: palette.color,
+    text: accentTextColor(palette.background, scheme) ?? undefined,
+  };
 }

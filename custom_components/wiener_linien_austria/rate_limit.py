@@ -1,10 +1,20 @@
 """Domain-wide rate limiting for Wiener Linien API calls.
 
-Both the per-entry monitor polls (coordinator.py) and the shared alerts refresh
-(alerts.py) must stay above the conventional 15-second minimum interval
-circulated for the OGD real-time endpoint, *in aggregate*. An asyncio.Lock
-serialises the check-then-update, so concurrent callers can't both observe
-the same `last_call_ts` and skip the sleep.
+Every outbound call this integration makes stays above the conventional
+15-second minimum interval circulated for the OGD real-time endpoint, *in
+aggregate*. An asyncio.Lock serialises the check-then-update, so concurrent
+callers can't both observe the same `last_call_ts` and skip the sleep.
+
+Three callers, each taking exactly one slot per cycle:
+
+- batch.py — one combined `/monitor` request per interval group per tick.
+- alerts.py — one combined `/trafficInfoList` request per 5-minute cycle
+  (both feed names ride in it as repeated `name=` params).
+- static.py — one slot for the whole weekly five-file burst, taken before
+  the `asyncio.gather` rather than per file. Per-file would serialise a
+  fail-soft background refresh into 5 x 15 s of held lock and stall every
+  `/monitor` tick behind it; one slot still keeps the burst from landing on
+  top of a monitor tick, which is the part the upstream notices.
 """
 
 from __future__ import annotations
@@ -22,19 +32,19 @@ LOCK_LOOP_KEY = "cooldown_lock_loop"
 
 
 async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
-    """Serialise outbound calls across all entries under the 15s floor.
+    """Serialise outbound calls across all callers under the 15s floor.
 
     The `asyncio.sleep` runs *inside* the lock — that's by design. Concurrent
     callers queue up and each waits its full 15s slice, so N simultaneous
     callers take ~N × 15s to drain. This is exactly the conventional
     15-second minimum interval the OGD endpoint asks for; it's not a bug.
 
-    Practical implication: at the default 60s `update_interval` the queue
-    drains comfortably for ~3 entries (3 × 15s = 45s < 60s). With more
-    entries the slowest coordinator's wait may exceed its 30s monitor
-    timeout — users with 4+ stops should bump the interval. The
-    coordinator's exponential backoff handles sustained queue overruns
-    by widening the cadence on consecutive failures.
+    Since batching landed there is at most one caller per tick, not one per
+    entry: every entry sharing a scan interval fetches through ONE combined
+    /monitor request (batch.py), and the alerts refresh runs on its own
+    5-min cadence through ONE combined /trafficInfoList request. Adding stops
+    no longer lengthens the queue — see batch.py's module docstring for why
+    that drain was worth eliminating.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
     # Loop-pin the lock — `asyncio.Lock()` lazy-binds to the running

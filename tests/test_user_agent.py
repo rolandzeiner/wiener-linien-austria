@@ -5,12 +5,14 @@ upstream log parsers break). This test guards three independent call sites
 because each one builds its own headers via base_request_headers():
 
 - the shared batch group's `/monitor` fetch (per-tick),
-- `alerts._fetch_info_list` (5-min refresh of trafficInfoList),
+- `alerts._fetch_info_lists` (5-min refresh of trafficInfoList),
 - `config_flow._probe_monitor_lines` (live probe during entry creation).
 
 Each site is exercised separately so a refactor that drops the header in
-one place can't slip past the other two. Also asserts the gzip
-Accept-Encoding header — same fan-out, same silent-failure mode.
+one place can't slip past the other two. Each also asserts that we do NOT
+pin `Accept-Encoding`: passing one replaces aiohttp's own offer
+(`gzip, deflate, zstd`) rather than adding to it, so pinning silently
+narrows what we ask the server for. Same fan-out, same silent-failure mode.
 """
 
 from __future__ import annotations
@@ -19,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import HomeAssistant
 
-from custom_components.wiener_linien_austria.alerts import _fetch_info_list
+from custom_components.wiener_linien_austria.alerts import _fetch_info_lists
 from custom_components.wiener_linien_austria.batch import MonitorBatchGroup
 from custom_components.wiener_linien_austria.config_flow import _probe_monitor_lines
 from custom_components.wiener_linien_austria.const import USER_AGENT
@@ -41,7 +43,7 @@ def _ok_response(body: object, status: int = 200) -> MagicMock:
 
 
 async def test_monitor_fetch_sends_user_agent(hass: HomeAssistant) -> None:
-    """The batch group's /monitor fetch carries the canonical User-Agent + gzip."""
+    """The batch group's /monitor fetch carries the canonical User-Agent."""
     entry = _make_entry()
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
@@ -59,18 +61,17 @@ async def test_monitor_fetch_sends_user_agent(hass: HomeAssistant) -> None:
 
     sent = mock_get.call_args.kwargs["headers"]
     assert sent["User-Agent"] == USER_AGENT
-    assert sent["Accept-Encoding"] == "gzip"
+    # Left unset on purpose so aiohttp negotiates the widest offer it can.
+    assert "Accept-Encoding" not in sent
 
 
 async def test_alerts_fetch_sends_user_agent(hass: HomeAssistant) -> None:
-    """alerts._fetch_info_list carries the canonical User-Agent + gzip."""
+    """alerts._fetch_info_lists carries the canonical User-Agent."""
     from custom_components.wiener_linien_austria.const import (
         DOMAIN,
         ENTRY_COUNT_KEY,
     )
 
-    # _fetch_info_list now bails when the domain dict is gone. Seed it
-    # so this test exercises the network path, not the bail.
     hass.data.setdefault(DOMAIN, {})[ENTRY_COUNT_KEY] = 1
     session = MagicMock()
     session.get = MagicMock(
@@ -80,15 +81,16 @@ async def test_alerts_fetch_sends_user_agent(hass: HomeAssistant) -> None:
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=session,
     ):
-        await _fetch_info_list(hass, "stoerunglang")
+        await _fetch_info_lists(hass)
 
     sent = session.get.call_args.kwargs["headers"]
     assert sent["User-Agent"] == USER_AGENT
-    assert sent["Accept-Encoding"] == "gzip"
+    # Left unset on purpose so aiohttp negotiates the widest offer it can.
+    assert "Accept-Encoding" not in sent
 
 
 async def test_config_flow_probe_sends_user_agent(hass: HomeAssistant) -> None:
-    """config_flow._probe_monitor_lines carries the canonical User-Agent + gzip."""
+    """config_flow._probe_monitor_lines carries the canonical User-Agent."""
     session = MagicMock()
     session.get = MagicMock(
         return_value=make_response_cm(
@@ -103,4 +105,5 @@ async def test_config_flow_probe_sends_user_agent(hass: HomeAssistant) -> None:
 
     sent = session.get.call_args.kwargs["headers"]
     assert sent["User-Agent"] == USER_AGENT
-    assert sent["Accept-Encoding"] == "gzip"
+    # Left unset on purpose so aiohttp negotiates the widest offer it can.
+    assert "Accept-Encoding" not in sent
