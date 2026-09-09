@@ -10,19 +10,25 @@ something to report.
 from __future__ import annotations
 
 from datetime import timedelta
+from unittest.mock import AsyncMock, patch
 
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.const import CONF_SCAN_INTERVAL, STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.common import (
+    MockConfigEntry,
+    async_fire_time_changed,
+)
 
 from custom_components.wiener_linien_austria.binary_sensor import (
     WienerLinienStaleBinarySensor,
 )
 from custom_components.wiener_linien_austria.const import (
     ATTRIBUTION,
+    BATCH_REGISTRY_KEY,
     DOMAIN,
     STALE_INTERVAL_MULTIPLIER,
 )
@@ -248,3 +254,91 @@ async def test_platform_registers_the_entity(hass: HomeAssistant, mock_fetch) ->
     ]
     assert len(matches) == 1
     assert matches[0].unique_id == f"{entry.entry_id}_stale"
+
+
+async def test_stale_flips_on_when_the_coordinator_stops_pushing(
+    hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    """The failure mode the other tests structurally cannot see.
+
+    `is_on` is a pure property and `CoordinatorEntity.should_poll` is
+    False, so HA only re-evaluates it when the coordinator pushes. Every
+    other test here reads the property directly, which asks the question
+    itself and therefore always gets a fresh answer.
+
+    A silently stopped batch-group timer produces no push at all, so
+    nothing ever re-reads the property and the entity holds its last
+    value forever — an outage detector that switches itself off during
+    the one outage it cannot otherwise detect. This test goes through
+    `hass.states` precisely so it depends on HA asking, not on us asking.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = entry.runtime_data
+    entity_id = "binary_sensor.stephansplatz_departure_data_stale"
+
+    # Land a fresh serverTime through the normal push path.
+    coordinator.apply_upstream_meta(_fresh(0), None)
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    assert hass.states.get(entity_id).state == STATE_OFF
+
+    # The batch group timer stops without the entry unloading. Nothing
+    # will call batch_apply / batch_set_error again.
+    for group in hass.data[DOMAIN][BATCH_REGISTRY_KEY].values():
+        group.stop()
+
+    threshold = int(
+        coordinator.scan_interval.total_seconds() * STALE_INTERVAL_MULTIPLIER
+    )
+    # Patch the domain alerts timer out of the way: the jump below is long
+    # enough to fire it too, and its real fetch would reach the network.
+    with patch(
+        "custom_components.wiener_linien_austria.async_refresh_alerts",
+        new=AsyncMock(),
+    ):
+        freezer.tick(timedelta(seconds=threshold + 120))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+
+    assert hass.states.get(entity_id).state == STATE_ON
+
+
+async def test_the_recheck_does_not_write_state_when_nothing_changed(
+    hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    """The independent clock must stay quiet while the board is healthy.
+
+    `seconds_since_server_time` moves on every evaluation, so writing
+    unconditionally would push a state change — and a recorder row —
+    every scan interval, forever, on an entity whose entire value is
+    being boring. That is a worse bug than the one the clock fixes,
+    because it is silent and permanent rather than conditional.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = entry.runtime_data
+    entity_id = "binary_sensor.stephansplatz_departure_data_stale"
+
+    coordinator.apply_upstream_meta(_fresh(0), None)
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    before = hass.states.get(entity_id)
+    assert before.state == STATE_OFF
+
+    # Stop the pushes, then advance by less than the staleness threshold.
+    for group in hass.data[DOMAIN][BATCH_REGISTRY_KEY].values():
+        group.stop()
+    freezer.tick(coordinator.scan_interval)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    after = hass.states.get(entity_id)
+    assert after.state == STATE_OFF
+    assert after.last_updated == before.last_updated

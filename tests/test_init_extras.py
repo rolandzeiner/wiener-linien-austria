@@ -27,6 +27,7 @@ from custom_components.wiener_linien_austria import (
     async_unload_entry,
 )
 from custom_components.wiener_linien_austria.const import (
+    BATCH_REGISTRY_KEY,
     CARD_VERSION,
     DOMAIN,
     FLAP_CARD_VERSION,
@@ -252,6 +253,25 @@ async def test_migrate_entry_rejects_future_version(hass: HomeAssistant) -> None
 # failure path staying inside the guard.
 
 
+def _stop_batch_timers(hass: HomeAssistant) -> None:
+    """Silence the shared /monitor timer for a time-advancing test.
+
+    These tests advance the clock by hours to fire the DOMAIN-level
+    refresh timers. The batch group's own 60 s timer fires too, reaches
+    the autouse-mocked aiohttp session, and calls `resp.raise_for_status()`
+    on an AsyncMock — which returns a coroutine that production code (and
+    real aiohttp) correctly never awaits, leaving four
+    `RuntimeWarning: coroutine ... was never awaited` in the suite.
+
+    Stopping the groups keeps each test's blast radius to the timer it
+    actually names. Widening the session mock instead would hide the same
+    noise everywhere rather than removing it.
+    """
+    registry = hass.data[DOMAIN].get(BATCH_REGISTRY_KEY) or {}
+    for group in registry.values():
+        group.stop()
+
+
 async def test_static_refresh_timer_publishes_the_new_catalogue(
     hass: HomeAssistant, mock_fetch, freezer
 ) -> None:
@@ -268,6 +288,7 @@ async def test_static_refresh_timer_publishes_the_new_catalogue(
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+    _stop_batch_timers(hass)
 
     sentinel = object()
     with (
@@ -310,6 +331,8 @@ async def test_static_refresh_timer_swallows_a_store_error(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
+    _stop_batch_timers(hass)
+
     with patch(
         "custom_components.wiener_linien_austria.async_refresh_catalogue",
         new=AsyncMock(side_effect=OSError("disk full")),
@@ -341,6 +364,8 @@ async def test_static_refresh_timer_ignores_a_failed_refresh(
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+
+    _stop_batch_timers(hass)
 
     with (
         patch(
@@ -374,6 +399,8 @@ async def test_alerts_refresh_timer_swallows_a_failure(
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+
+    _stop_batch_timers(hass)
 
     with patch(
         "custom_components.wiener_linien_austria.async_refresh_alerts",

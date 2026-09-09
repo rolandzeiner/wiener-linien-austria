@@ -237,3 +237,69 @@ describe("rendering", () => {
     expect(el.getCardSize()).toBeGreaterThan(0);
   });
 });
+
+describe("tab-scoped alert banner", () => {
+  const OTHER = "sensor.taubstummengasse_abfahrten";
+
+  /** Two stops, each carrying one disruption the other has nothing to do
+   *  with. The banner sits above the tab panel, so nothing but the render
+   *  scoping keeps them apart. */
+  function twoStopHass(): HomeAssistant {
+    const base = busyHass();
+    const westbahnhof = base.states[ENTITY]!;
+    westbahnhof.attributes.traffic_info = [
+      { name: "W1", title: "U3: Verspätungen", description: "", related_lines: ["U3"] },
+    ];
+    base.states[OTHER] = {
+      ...westbahnhof,
+      entity_id: OTHER,
+      attributes: {
+        ...westbahnhof.attributes,
+        stop_name: "Taubstummengasse",
+        traffic_info: [
+          { name: "T1", title: "U1: Gleisschaden", description: "", related_lines: ["U1"] },
+        ],
+      },
+    } as (typeof base.states)[string];
+    return base;
+  }
+
+  const tabsConfig = {
+    type: `custom:${MODERN}`,
+    layout: "tabs",
+    show_traffic_info: true,
+    entities: [{ entity: ENTITY }, { entity: OTHER }],
+  };
+
+  it("shows only the open tab's disruptions", async () => {
+    const el = await mount(MODERN, twoStopHass(), tabsConfig);
+    const text = shadow(el).textContent ?? "";
+    expect(text).toContain("U3: Verspätungen");
+    // The bug this pins: the banner is rendered outside the tab panel, so
+    // it used to pool traffic_info across every configured stop and
+    // announce a Taubstummengasse fault under the Westbahnhof tab.
+    expect(text).not.toContain("U1: Gleisschaden");
+  });
+
+  it("follows the tab the reader switches to", async () => {
+    const el = await mount(MODERN, twoStopHass(), tabsConfig);
+    const tabs = shadow(el).querySelectorAll<HTMLElement>('[role="tab"]');
+    expect(tabs.length).toBe(2);
+    tabs[1]!.click();
+    await el.updateComplete;
+    const text = shadow(el).textContent ?? "";
+    expect(text).toContain("U1: Gleisschaden");
+    expect(text).not.toContain("U3: Verspätungen");
+  });
+
+  it("pools every stop's disruptions in stacked layout", async () => {
+    // Stacked shows all stops at once, so one shared banner is correct.
+    const el = await mount(MODERN, twoStopHass(), {
+      ...tabsConfig,
+      layout: "stacked",
+    });
+    const text = shadow(el).textContent ?? "";
+    expect(text).toContain("U3: Verspätungen");
+    expect(text).toContain("U1: Gleisschaden");
+  });
+});

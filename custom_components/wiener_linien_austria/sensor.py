@@ -159,29 +159,55 @@ class WienerLinienStopSensor(
         # max_departures setting (≤ 20) so nothing the UI shows is lost.
         capped = [d.to_dict() for d in departures[:MAX_DEPARTURES_IN_ATTRS]]
 
-        # GTFS-derived per-line palette. Published unscoped (every line in
-        # the Wiener Linien catalogue, not just lines at this stop) because
-        # the card's stops_ahead trail can render chips for transfer lines
-        # at OTHER stops — scoping here would leave those chips colourless.
-        #
-        # Measured 2026-09-09 against the live catalogue: 7,242 bytes for
-        # 179 lines with bg+fg, i.e. ~26% of a 27.4 KB payload at a hub
-        # stop, and byte-identical for every entry in the install. (An
-        # earlier revision of this comment said "~3 KB"; it was never
-        # re-measured after `text_colors_by_line` was added.) Unrecorded
-        # below, so the cost is the live push to the frontend on every
-        # state write, not anything the recorder stores — but it is the
-        # largest single item in that push, and scoping it to
-        # `lines_at_stop` plus every line named in any `stops_ahead.lines`
-        # is the obvious win if this ever needs to shrink.
-        line_colors = self._line_colors()
-
         # Static-catalogue line list for THIS stop — every line that
         # serves the DIVA per the Wiener Linien schedule, regardless of
         # whether it has a departure inside the live `/monitor` window
         # right now. Falls back to the live-derived list when the
         # catalogue/trip-pattern index isn't loaded yet.
         lines_at_stop = self._lines_at_stop(diva)
+
+        # GTFS-derived per-line palette, scoped to the lines this entity
+        # can actually be asked to colour.
+        #
+        # It used to publish the whole Wiener Linien catalogue. Measured
+        # 2026-09-09 against the live feed: 7,242 bytes for 179 lines with
+        # bg+fg — ~26% of a 27.4 KB payload at a hub stop, and
+        # byte-identical on every entry, so a five-stop install pushed
+        # ~36 KB of the same palette on every state write. (An earlier
+        # revision of this comment claimed "~3 KB"; it was never
+        # re-measured after `text_colors_by_line` landed.)
+        #
+        # The union below is the contract, and every term is load-bearing
+        # — a label the cards render but this set omits gets the neutral
+        # fallback instead of its GTFS colour, which is silent and looks
+        # like a design choice:
+        #   * lines_at_stop  — departure chips, and the editor's colour
+        #                      picker (collectLinesInSelection reads it)
+        #   * live departures — belt-and-braces; normally a subset of the
+        #                      above, but the live feed is not bound by
+        #                      the weekly catalogue
+        #   * stops_ahead lines — transfer chips for lines at OTHER stops,
+        #                      which is why publishing unscoped was right
+        #                      until the cards learned to merge palettes
+        #   * traffic/elevator related_lines — notice badges, which name
+        #                      lines that need not serve this stop at all
+        #
+        # Cross-entity reuse is the other half. The flap board and the
+        # modern card's notice badges render lines from EVERY configured
+        # stop off one palette; they now merge across entities
+        # (`mergeLineColorsMaps`) rather than taking the first stop's map,
+        # which only worked while every map was the identical catalogue.
+        # Don't narrow this set without checking that helper's callers.
+        needed_labels: set[str] = set(lines_at_stop)
+        needed_labels.update(d.line for d in departures if d.line)
+        for row in capped:
+            for stop in row.get("stops_ahead") or []:
+                needed_labels.update(stop.get("lines") or ())
+        for traffic_alert in traffic:
+            needed_labels.update(traffic_alert.related_lines)
+        for elevator_alert in elevator:
+            needed_labels.update(elevator_alert.related_lines)
+        line_colors = self._line_colors(needed_labels)
 
         # User-tracked subset of `lines_at_stop` — the lines selected in
         # the integration's config flow (`CONF_LINES` is a list of
@@ -241,8 +267,8 @@ class WienerLinienStopSensor(
         labels = index.lines_at_diva.get(diva)
         return list(labels) if labels else []
 
-    def _line_colors(self) -> dict[str, dict[str, str]]:
-        """Return the full GTFS palette as `{label: {bg, fg}}`.
+    def _line_colors(self, labels: set[str]) -> dict[str, dict[str, str]]:
+        """Return the GTFS palette for `labels`, as `{label: {bg, fg}}`.
 
         Reads the shared catalogue ref live rather than capturing it at
         setup, so a background trip-pattern refresh (which also refreshes
@@ -259,9 +285,13 @@ class WienerLinienStopSensor(
         cadence; wrong to rely on if something ever needs the catalogue
         promptly.
 
+        A label with no GTFS entry is omitted rather than published with
+        an empty colour, and so is any label the catalogue doesn't know.
         Returns `{}` when the catalogue isn't loaded yet or the routes
         payload hasn't landed — the card has its own fallbacks
-        (nightline rule + neutral default).
+        (nightline rule + neutral default), which is also what an omitted
+        label gets. See the call site for which labels have to be in
+        `labels` and why.
         """
         domain_data = self.coordinator.hass.data.get(DOMAIN, {})
         catalogue = domain_data.get(CATALOGUE_KEY)
@@ -271,7 +301,10 @@ class WienerLinienStopSensor(
         if index is None or not index.colors_by_line:
             return {}
         out: dict[str, dict[str, str]] = {}
-        for label, bg in index.colors_by_line.items():
+        for label in labels:
+            bg = index.colors_by_line.get(label)
+            if not bg:
+                continue
             entry = {"bg": bg}
             fg = index.text_colors_by_line.get(label)
             if fg:

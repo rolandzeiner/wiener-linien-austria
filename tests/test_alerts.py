@@ -655,6 +655,94 @@ def test_merge_short_duplicates_unions_lines_and_stops() -> None:
     assert merged[0].related_stops_set == frozenset({500})
 
 
+def test_merge_short_duplicates_keeps_unrelated_incidents_apart() -> None:
+    """Identical wording is not evidence of a shared incident.
+
+    The operator writes from a small fixed vocabulary, so "Fahrtbehinderung
+    / Falschparker" is boilerplate two unrelated incidents can both carry.
+    Live on 2026-09-09: a line-42 obstruction around Volksoper and a line-5
+    one at Westbahnhof, disjoint in both lines and platforms. Merging them
+    handed the union of RBLs to the matcher, which then surfaced the notice
+    at stops neither incident touched, and took `time_end` from whichever
+    was parsed first.
+    """
+    raw = {"title": "Fahrtbehinderung\nFalschparker"}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short(
+                {**raw, "name": "L42", "relatedLines": ["42"], "relatedStops": [1212]}
+            ),
+            _parse_traffic_short(
+                {**raw, "name": "L5", "relatedLines": ["5"], "relatedStops": [370]}
+            ),
+        ]
+    )
+    assert [(m.name, m.related_lines, m.related_stops) for m in merged] == [
+        ("L42", ["42"], [1212]),
+        ("L5", ["5"], [370]),
+    ]
+
+
+def test_merge_short_duplicates_unions_one_line_across_its_platforms() -> None:
+    """The common shape: one incident reported once per affected platform."""
+    raw = {"title": "Fahrtbehinderung\nFalschparker", "relatedLines": ["5"]}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": "a", "relatedStops": [361]}),
+            _parse_traffic_short({**raw, "name": "b", "relatedStops": [370]}),
+        ]
+    )
+    assert len(merged) == 1
+    assert merged[0].related_stops == [361, 370]
+
+
+def test_merge_short_duplicates_unions_entries_with_no_lines() -> None:
+    """Stop-wide texts leave `relatedLines` empty; equal (empty) line sets
+    still tie them together across the platforms they name."""
+    raw = {"title": "Haltestelle Parlament dauerhaft aufgelassen."}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": "a", "relatedStops": [16]}),
+            _parse_traffic_short({**raw, "name": "b", "relatedStops": [48]}),
+        ]
+    )
+    assert len(merged) == 1
+    assert merged[0].related_stops == [16, 48]
+
+
+def test_merge_short_duplicates_is_transitive() -> None:
+    """Three lines sharing platforms pairwise are one incident.
+
+    Live shape: 40/41/42 "Stromstörung / Betrieb ab Volksoper". Line 40 and
+    line 41 share no platform here, so folding each entry into whichever
+    arrived first would leave two notices; the line-42 entry bridges them.
+    """
+    raw = {"title": "Stromstörung\nBetrieb ab Volksoper"}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short(
+                {**raw, "name": "l40", "relatedLines": ["40"], "relatedStops": [188]}
+            ),
+            _parse_traffic_short(
+                {**raw, "name": "l41", "relatedLines": ["41"], "relatedStops": [1213]}
+            ),
+            _parse_traffic_short(
+                {
+                    **raw,
+                    "name": "l42",
+                    "relatedLines": ["42"],
+                    "relatedStops": [188, 1213],
+                }
+            ),
+        ]
+    )
+    assert len(merged) == 1
+    # First id wins so the card's expand-state key stays stable.
+    assert merged[0].name == "l40"
+    assert merged[0].related_lines == ["40", "41", "42"]
+    assert merged[0].related_stops == [188, 1213]
+
+
 def _seed_short(hass: HomeAssistant, *infos: TrafficInfo) -> None:
     hass.data.setdefault(DOMAIN, {})[TRAFFIC_INFO_KEY] = list(infos)
     hass.data[DOMAIN][ELEVATOR_INFO_KEY] = []
@@ -701,6 +789,42 @@ async def test_get_alerts_for_short_has_no_all_traffic_fallthrough(
     _seed_short(hass, _short("A", stops=[9999], lines=[]))
     traffic, _ = get_alerts_for(hass, set(), {4111})
     assert traffic == []
+
+
+async def test_get_alerts_for_short_needs_a_tracked_line(
+    hass: HomeAssistant,
+) -> None:
+    """An RBL hit alone is not a filter.
+
+    `CONF_RBLS` carries every platform of the DIVA, not just the ones the
+    tracked lines call at, so at a hub the stop half admits every line the
+    station sees. Westbahnhof tracking only U3 surfaced a tram-5
+    obstruction that way (2026-09-09) while its departure list correctly
+    showed no tram 5 at all.
+    """
+    _seed_short(hass, _short("A", stops=[370], lines=["5"]))
+    traffic, _ = get_alerts_for(hass, {"U3"}, {370, 4913})
+    assert traffic == []
+
+
+async def test_get_alerts_for_short_matches_when_a_line_is_tracked(
+    hass: HomeAssistant,
+) -> None:
+    """The same notice at the same platform, for a user who tracks tram 5."""
+    _seed_short(hass, _short("A", stops=[370], lines=["5"]))
+    traffic, _ = get_alerts_for(hass, {"U3", "5"}, {370, 4913})
+    assert [t.name for t in traffic] == ["A"]
+
+
+async def test_get_alerts_for_short_without_lines_still_matches_on_stop(
+    hass: HomeAssistant,
+) -> None:
+    """Upstream leaves `relatedLines` empty for stop-wide texts
+    ("Haltestelle Parlament … aufgelassen"), which concern every line
+    calling there — so those keep matching on RBL alone."""
+    _seed_short(hass, _short("A", stops=[4111], lines=[]))
+    traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
+    assert [t.name for t in traffic] == ["A"]
 
 
 async def test_get_alerts_for_mixes_both_categories(hass: HomeAssistant) -> None:

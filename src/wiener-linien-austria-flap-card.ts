@@ -40,7 +40,10 @@ import type {
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
 import { filterDepartures } from "./utils/departures.js";
-import { findWienerLinienEntities } from "./utils/entities.js";
+import {
+  findWienerLinienEntities,
+  mergeLineColorsMaps,
+} from "./utils/entities.js";
 import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
@@ -564,17 +567,22 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const eids = this._resolveStopEids();
     const rows = this._gatherRows();
     // Card-wide metadata sourced from the FIRST stop: WL-orange band
-    // station name, server_time for the header chips, GTFS palette
-    // for line tiles. line_colors come from the same GTFS feed so a
-    // multi-stop board uses identical colours for shared lines.
+    // station name and server_time for the header chips.
     const firstEid = eids[0] ?? "";
     const firstAttrs = (firstEid
       ? this.hass?.states?.[firstEid]?.attributes ?? {}
       : {}) as WienerLinienAttrs;
     const stationName =
       firstAttrs.stop_name || firstAttrs.friendly_name || "";
-    const lineColors = firstAttrs.line_colors ?? {};
     const serverTime = firstAttrs.server_time;
+    // The palette is the one card-wide value that must NOT come from the
+    // first stop alone. This board renders rows from every configured
+    // stop, and as of v2.0.0 each sensor publishes only the lines it can
+    // be asked to colour — so stop #1's map does not necessarily cover
+    // stop #2's lines, and a line missing from it falls through to the
+    // neutral fallback rather than its GTFS colour. Merge across all of
+    // them.
+    const lineColors = mergeLineColorsMaps(this.hass, eids);
 
     // Per-row platform column. The column is allocated when
     // show_platform is on AND at least one visible row actually has

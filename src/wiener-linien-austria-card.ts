@@ -40,7 +40,7 @@ import {
 } from "./utils/config.js";
 import {
   findWienerLinienEntities,
-  firstLineColorsMap,
+  mergeLineColorsMaps,
   lineColorsFor,
 } from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
@@ -527,7 +527,9 @@ export class WienerLinienAustriaCard extends LitElement {
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
-          ${cfg.show_traffic_info ? this._renderTrafficBanner(stops) : nothing}
+          ${cfg.show_traffic_info
+            ? this._renderTrafficBanner(this._bannerStops(stops, useTabs))
+            : nothing}
           ${this._renderBody(stops, useTabs)}
           ${this._renderFooter(attribution)}
         </div>
@@ -546,6 +548,24 @@ export class WienerLinienAustriaCard extends LitElement {
         : nothing}
       ${dev ? this._renderDevModePanel() : nothing}
     `;
+  }
+
+  /** Which stops the alert banner speaks for.
+   *
+   *  The banner sits above the body, outside the tab panel, so in `tabs`
+   *  layout it would otherwise pool the alerts of every configured stop
+   *  and show them under whichever tab is open — a Taubstummengasse
+   *  disruption announced on the Westbahnhof tab. Scope it to the stop
+   *  the reader is actually looking at. In `stacked` layout every stop is
+   *  on screen at once, so the pooled banner is right as it stands.
+   */
+  private _bannerStops(
+    stops: NormalisedModernStop[],
+    useTabs: boolean,
+  ): NormalisedModernStop[] {
+    if (!useTabs || !stops.length) return stops;
+    // Same clamp as _renderBody — willUpdate keeps _activeTab in range.
+    return [stops[this._activeTab] ?? stops[0]!];
   }
 
   private _renderBody(stops: NormalisedModernStop[], useTabs: boolean): TemplateResult {
@@ -1055,7 +1075,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // Resolve the GTFS palette once per banner render — every sensor
     // publishes the same catalogue, so the result is identical across
     // every traffic item. Previously rebuilt per item.
-    const lineColors = firstLineColorsMap(
+    const lineColors = mergeLineColorsMaps(
       this.hass,
       this._config!.entities.map((s) => s.entity),
     );
@@ -1985,7 +2005,7 @@ export class WienerLinienAustriaCard extends LitElement {
       live: false,
     }));
     const seen = new Set(entries.map((e) => e.hex.toUpperCase()));
-    const live = firstLineColorsMap(
+    const live = mergeLineColorsMaps(
       this.hass,
       (this._config?.entities ?? []).map((s) => s.entity),
     );

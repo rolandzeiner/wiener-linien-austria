@@ -11,6 +11,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.const import (
     ATTRIBUTION,
+    CONF_DIVA,
     DOMAIN,
     MAX_DEPARTURES_IN_ATTRS,
 )
@@ -301,25 +302,40 @@ async def test_attributes_next_by_line_with_multiple_lines(hass: HomeAssistant) 
     assert next_by_line == {"U1": 2, "71": 4}
 
 
-async def test_attributes_line_colors_publishes_full_catalogue(
+async def test_line_colors_is_scoped_to_the_lines_this_stop_can_render(
     hass: HomeAssistant,
 ) -> None:
-    """`line_colors` carries every line in the GTFS catalogue.
+    """The palette carries the lines this entity can be asked to colour.
 
-    Published unscoped (not "only lines at this stop") because the card's
-    stops_ahead trail renders transfer chips for OTHER stops — a U1 row
-    at Stephansplatz can show a U2 transfer at Karlsplatz, and that U2
-    chip needs its colour. Scoping here would leave those chips
-    colourless. Trade-off: ~3 KB extra per sensor, well under recorder
-    limits.
+    It used to carry the entire GTFS catalogue — 179 lines, 7,242 bytes,
+    byte-identical on every entry in the install. The scope below is the
+    contract, and each term is here because something renders it:
+
+      * `lines_at_stop` — departure chips and the editor's colour picker
+      * live departure lines — belt-and-braces against a live feed that
+        names something the weekly catalogue doesn't
+      * `stops_ahead[].lines` — transfer chips for lines at OTHER stops,
+        which is the case that made publishing unscoped correct until
+        the cards learned to merge palettes across entities
+      * `traffic_info` / `elevator_info` `related_lines` — notice badges,
+        which routinely name lines that don't serve this stop
+
+    A label the cards render but this set omits silently falls through to
+    the neutral fallback, which looks like a design choice rather than a
+    bug — hence pinning the whole union rather than a sample of it.
     """
+    from custom_components.wiener_linien_austria.alerts import TrafficInfo
+    from custom_components.wiener_linien_austria.const import TRAFFIC_INFO_KEY
     from custom_components.wiener_linien_austria.static import (
+        CATALOGUE_KEY,
         StaticCatalogue,
         TripPatternIndex,
     )
 
     entry = _make_entry()
     entry.add_to_hass(hass)
+    diva = int(entry.data[CONF_DIVA])
+
     data = MonitorData(
         departures=[
             Departure(
@@ -333,6 +349,8 @@ async def test_attributes_line_colors_publishes_full_catalogue(
                 realtime=True,
                 barrier_free=True,
                 traffic_jam=False,
+                # A transfer chip at a stop further down the line.
+                stops_ahead=[{"name": "Karlsplatz", "lines": ["U2", "U4"]}],
             ),
         ],
         server_time=None,
@@ -340,30 +358,95 @@ async def test_attributes_line_colors_publishes_full_catalogue(
     coordinator = _make_coordinator(hass, entry, data)
 
     hass.data.setdefault(DOMAIN, {})
-    from custom_components.wiener_linien_austria.static import CATALOGUE_KEY
-
     hass.data[DOMAIN][CATALOGUE_KEY] = StaticCatalogue(
         stations_by_diva={},
         last_fetched="2026-04-30T12:00:00+00:00",
         trip_patterns=TripPatternIndex(
+            lines_at_diva={diva: ("U1", "71")},
             colors_by_line={
                 "U1": "E3000F",
                 "U2": "A862A4",
+                "U4": "07A64F",
                 "71": "C00808",
                 "13A": "0A295D",
+                "N60": "1C1C1C",
             },
             text_colors_by_line={"U1": "FFFFFF", "U2": "FFFFFF"},
         ),
     )
+    # A disruption that reaches this entity because it names U1, and whose
+    # badge row therefore also renders 13A — a line that neither serves
+    # this stop nor appears in any stops_ahead trail. `get_alerts_for`
+    # scopes which notices arrive; it does not trim `related_lines`, so
+    # the badge is rendered and needs a colour.
+    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = [
+        TrafficInfo(
+            name="stoerung-u1-13a",
+            title="Umleitung",
+            description="",
+            description_html="",
+            related_lines=["U1", "13A"],
+            related_stops=[],
+            line_types=[],
+            location="",
+            time_start=None,
+            time_end=None,
+            time_created=None,
+            time_last_update=None,
+            status="",
+            category="stoerunglang",
+        )
+    ]
 
     sensor = WienerLinienStopSensor(coordinator, entry)
     line_colors = sensor.extra_state_attributes["line_colors"]
-    # Every line in the catalogue is published — even ones not at this stop.
-    assert set(line_colors.keys()) == {"U1", "U2", "71", "13A"}
+
+    # U1 + 71 from lines_at_stop, U2 + U4 from the stops_ahead trail,
+    # 13A from the traffic notice. N60 is in the catalogue and nothing
+    # renders it, so it is not published.
+    assert set(line_colors) == {"U1", "71", "U2", "U4", "13A"}
     assert line_colors["U1"] == {"bg": "E3000F", "fg": "FFFFFF"}
     # Lines without an fg recorded omit the key (card falls through to
     # default white).
     assert line_colors["71"] == {"bg": "C00808"}
+
+
+async def test_line_colors_omits_a_label_the_catalogue_has_no_colour_for(
+    hass: HomeAssistant,
+) -> None:
+    """A rendered line with no GTFS entry is omitted, not published empty.
+
+    An entry with a blank `bg` would defeat the card's fallback ladder:
+    `chipPalette` checks whether the GTFS map HAS the line, so a present
+    key with no colour paints an empty background instead of falling
+    through to the nightline rule or the neutral default.
+    """
+    from custom_components.wiener_linien_austria.static import (
+        CATALOGUE_KEY,
+        StaticCatalogue,
+        TripPatternIndex,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    diva = int(entry.data[CONF_DIVA])
+    data = MonitorData(departures=_make_departures(), server_time=None)
+    coordinator = _make_coordinator(hass, entry, data)
+
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][CATALOGUE_KEY] = StaticCatalogue(
+        stations_by_diva={},
+        last_fetched="2026-04-30T12:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            lines_at_diva={diva: ("U1", "N60")},
+            colors_by_line={"U1": "E3000F"},
+            text_colors_by_line={},
+        ),
+    )
+
+    sensor = WienerLinienStopSensor(coordinator, entry)
+
+    assert set(sensor.extra_state_attributes["line_colors"]) == {"U1"}
 
 
 async def test_attributes_line_colors_empty_when_catalogue_missing(
@@ -736,6 +819,10 @@ async def test_line_colors_refresh_lands_on_the_next_tick_not_the_next_read(
         async_set_cached_catalogue,
     )
 
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    diva = int(entry.data[CONF_DIVA])
+
     def _catalogue(colors: dict[str, str]) -> StaticCatalogue:
         return StaticCatalogue(
             stations_by_diva={},
@@ -744,14 +831,17 @@ async def test_line_colors_refresh_lands_on_the_next_tick_not_the_next_read(
                 patterns_by_line={},
                 lines_by_label={},
                 means_by_line={},
-                lines_at_diva={},
+                # Anchored on `lines_at_stop`, not on live departures: the
+                # tick below pushes an empty board, and `line_colors` is
+                # now scoped to what the entity can render. Without this
+                # the palette would empty for that reason rather than the
+                # caching reason under test.
+                lines_at_diva={diva: ("U1",)},
                 colors_by_line=colors,
                 text_colors_by_line={},
             ),
         )
 
-    entry = _make_entry()
-    entry.add_to_hass(hass)
     data = MonitorData(
         departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
     )

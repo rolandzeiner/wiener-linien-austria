@@ -15,7 +15,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared across all three cards *(2.0.0)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
-- **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms your card shows *(2.0.0)*.
+- **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
@@ -153,7 +153,7 @@ Use it instead of the departure sensor's availability. The departure sensor stay
 | `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys. All three card editors use them to offer only directions this stop actually serves. |
 | `stale_departures` | int | Records dropped this poll because the feed stopped advancing them. |
 | `stale_since` | ISO string \| None | Newest planned time among those dropped — roughly when the feed froze. |
-| `traffic_info` | list[dict] | Service disruptions. `category` says which feed a notice came from: `stoerunglang` matches your tracked lines, `stoerungkurz` is the stop's own display text and matches only this stop's RBLs. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
+| `traffic_info` | list[dict] | Service disruptions. `category` says which feed a notice came from: `stoerunglang` matches your tracked lines, `stoerungkurz` is the stop's own display text and needs one of this stop's RBLs — plus, when the notice names its lines, one you track. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
 ### Departure shape

@@ -465,33 +465,85 @@ def _collapse_ws(text: str) -> str:
 
 
 def _merge_short_duplicates(items: list[TrafficInfo]) -> list[TrafficInfo]:
-    """Collapse short notices that carry identical text.
+    """Collapse short notices that carry identical text AND belong together.
 
     Upstream publishes one entry per (stop, line) pair, so a single
-    physical sign shared by two lines arrives twice: `R500-408` and
-    `R500-101` are both "Bhf. Hütteldorf / ÖBB-Ersatzbus für <80" at RBL
-    500, differing only in `relatedLines`. The card dedupes by `name`, so
-    both would render — the same banner twice at the same stop. Merge them
-    into one notice carrying the union of lines and stops, keeping the
-    first entry's id so the card's expand-state key stays stable.
+    incident arrives many times over: `R500-408` and `R500-101` are both
+    "Bhf. Hütteldorf / ÖBB-Ersatzbus für <80" at RBL 500, differing only
+    in `relatedLines`, and a line-5 obstruction shows up once per affected
+    platform. The card dedupes by `name`, so each of those would render as
+    its own copy of the same banner. Merge them into one notice carrying
+    the union of lines and stops, keeping the first entry's id so the
+    card's expand-state key stays stable.
+
+    Identical text alone is NOT enough to conclude "same incident", which
+    is what this used to key on. The operator writes from a small fixed
+    vocabulary — "Fahrtbehinderung / Falschparker" is boilerplate — so
+    unrelated incidents on opposite sides of the city collide on it. On
+    2026-09-09 a line-42 obstruction around Volksoper and a line-5 one at
+    Westbahnhof merged into a single notice whose union of RBLs then
+    matched stops neither incident touched, and whose `time_end` came from
+    whichever happened to be parsed first.
+
+    So two entries only merge when something ties them to the same
+    incident: the same set of lines (one line, several of its platforms),
+    or an overlapping platform (one sign, several of its lines). Merging
+    is transitive — three lines sharing two of three platforms are one
+    incident — so entries are grouped by connected component rather than
+    folded into whichever arrived first.
     """
-    merged: dict[tuple[str, str], TrafficInfo] = {}
+    # One bucket per identical text; grouping only ever happens inside a
+    # bucket, so the O(n^2) linking below runs over a handful of entries.
+    buckets: dict[tuple[str, str], list[TrafficInfo]] = {}
     for item in items:
-        key = (item.title, item.description)
-        existing = merged.get(key)
-        if existing is None:
-            merged[key] = item
-            continue
-        for line in item.related_lines:
-            if line not in existing.related_lines:
-                existing.related_lines.append(line)
-        for stop in item.related_stops:
-            if stop not in existing.related_stops:
-                existing.related_stops.append(stop)
-        # Rebuild the lookup sets after mutating the backing lists.
-        existing.related_lines_set = frozenset(existing.related_lines)
-        existing.related_stops_set = frozenset(existing.related_stops)
-    return list(merged.values())
+        buckets.setdefault((item.title, item.description), []).append(item)
+
+    out: list[TrafficInfo] = []
+    for bucket in buckets.values():
+        groups: list[TrafficInfo] = []
+        for item in bucket:
+            linked = [g for g in groups if _same_short_incident(g, item)]
+            if not linked:
+                groups.append(item)
+                continue
+            # Fold `item` and every group it links to into the earliest of
+            # them — that keeps the surviving id (and `time_end`) the one
+            # the feed listed first, and it is what makes the relation
+            # transitive: a late entry bridging two groups unites them.
+            head, *rest = linked
+            for other in (*rest, item):
+                _absorb_short(head, other)
+            absorbed = {id(g) for g in rest}
+            groups = [g for g in groups if id(g) not in absorbed]
+        out.extend(groups)
+    return out
+
+
+def _same_short_incident(a: TrafficInfo, b: TrafficInfo) -> bool:
+    """Whether two same-text short notices describe one incident.
+
+    Equal line sets covers "one line, reported per platform" (and the
+    entries carrying no lines at all, which upstream leaves empty for a
+    whole class of stop-display texts). Overlapping stops covers "one
+    platform, reported per line". Either is enough; neither means the
+    shared wording is a coincidence.
+    """
+    if a.related_lines_set == b.related_lines_set:
+        return True
+    return bool(a.related_stops_set & b.related_stops_set)
+
+
+def _absorb_short(target: TrafficInfo, other: TrafficInfo) -> None:
+    """Union `other`'s lines and stops into `target`, in first-seen order."""
+    for line in other.related_lines:
+        if line not in target.related_lines:
+            target.related_lines.append(line)
+    for stop in other.related_stops:
+        if stop not in target.related_stops:
+            target.related_stops.append(stop)
+    # Rebuild the lookup sets after mutating the backing lists.
+    target.related_lines_set = frozenset(target.related_lines)
+    target.related_stops_set = frozenset(target.related_stops)
 
 
 def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
@@ -585,12 +637,24 @@ def get_alerts_for(
 
     - Traffic (`stoerunglang`): match if any `related_lines` overlaps
       `lines`. If `lines` is empty/None, return all of them (fall-through).
-    - Traffic (`stoerungkurz`): match ONLY if any `related_stops` overlaps
-      `rbls`. No line fall-through and no all-traffic fall-through: these
-      are the texts a single platform's display shows, so a works notice
-      for one stop must never appear at the other 30 stops on that line.
-      An entry with no `related_stops` is unmatchable and therefore
-      dropped — in practice upstream sets it on every one.
+    - Traffic (`stoerungkurz`): needs an RBL hit AND, when it names its
+      lines, a line hit. No line fall-through and no all-traffic
+      fall-through: these are the texts a single platform's display
+      shows, so a works notice for one stop must never appear at the
+      other 30 stops on that line. An entry with no `related_stops` is
+      unmatchable and therefore dropped — in practice upstream sets it on
+      every one.
+
+      The RBL half alone is not the filter it looks like: `CONF_RBLS`
+      holds every platform of the DIVA, not just the ones the tracked
+      lines call at, so at a hub it lets in every line the station sees.
+      A Westbahnhof entry tracking only U3 surfaced a tram-5 obstruction
+      that way (2026-09-09), while the same stop's departure list
+      correctly showed no tram 5 at all. Hence the second half: an entry
+      that names lines must name one of ours. Entries with an empty
+      `related_lines` still match on RBL alone — upstream leaves it empty
+      for stop-wide texts ("Haltestelle Parlament … aufgelassen"), which
+      concern every line calling there.
     - Elevator: match if any `related_stops` overlaps `rbls`. If `rbls` is
       empty/None, return []. An elevator outage with no `related_stops` is
       only surfaced when it also matches on `related_lines`.
@@ -602,8 +666,11 @@ def get_alerts_for(
     matched_traffic: list[TrafficInfo] = []
     for t in all_traffic:
         if t.category == ALERT_FEED_TRAFFIC_SHORT:
-            if rbls and t.related_stops_set & rbls:
-                matched_traffic.append(t)
+            if not rbls or not t.related_stops_set & rbls:
+                continue
+            if lines and t.related_lines_set and not t.related_lines_set & lines:
+                continue
+            matched_traffic.append(t)
         elif not lines or t.related_lines_set & lines:
             matched_traffic.append(t)
 

@@ -62,7 +62,7 @@ import {
 } from "./utils/config.js";
 import { colorSchemeOf } from "./utils/color.js";
 import { collectLinesInSelection } from "./utils/departures.js";
-import { firstLineColorsMap } from "./utils/entities.js";
+import { mergeLineColorsMaps } from "./utils/entities.js";
 
 @customElement("wiener-linien-austria-card-editor")
 export class WienerLinienAustriaCardEditor
@@ -327,7 +327,7 @@ export class WienerLinienAustriaCardEditor
     const { et } = this._i18n;
     const eids = cfg.entities.map((s) => s.entity);
     const lines = collectLinesInSelection(this.hass, eids);
-    const gtfs = firstLineColorsMap(this.hass, eids);
+    const gtfs = mergeLineColorsMaps(this.hass, eids);
 
     return renderSection(
       { title: et("section_colors"), hint: et("section_colors_hint") },
