@@ -122,11 +122,16 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
 ## Sensor Attributes
 
-Each stop gets two entities. Home Assistant names them in your interface language, so the departure sensor is `sensor.<stop>_departures` on an English install and `sensor.<stop>_abfahrten` on a German one — check **Developer tools → States** if you're unsure which you have. Alongside it sits `binary_sensor.<stop>_departure_data_stale`.
+Each stop gets two entities, and Home Assistant names both in your interface language — check **Developer tools → States** if you're unsure which you have:
+
+| | English install | German install |
+|---|---|---|
+| Departure board | `sensor.<stop>_departures` | `sensor.<stop>_abfahrten` |
+| Stale-data flag | `binary_sensor.<stop>_departure_data_stale` | `binary_sensor.<stop>_abfahrtsdaten_veraltet` |
 
 ### Stale-data sensor
 
-`binary_sensor.<stop>_departure_data_stale` turns on when the board stops being refreshed — either a poll failed, or the last `serverTime` is older than three polling intervals. Its attributes show the reason: `server_time`, `seconds_since_server_time`, `stale_after_seconds` and `last_update_success`.
+The stale-data flag turns on when the board stops being refreshed — either a poll failed, or the last `serverTime` is older than three polling intervals. Its attributes show the reason: `server_time`, `seconds_since_server_time`, `stale_after_seconds` and `last_update_success`.
 
 Use it instead of the departure sensor's availability. The departure sensor stays available through a short outage on purpose, so it keeps a populated board on screen rather than blanking your cards — which also means `is_state(..., 'unavailable')` and `availability_template` never fire for it. This entity carries that signal instead.
 
@@ -189,7 +194,7 @@ Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monit
 
 > **After a Home Assistant restart**: alerts (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min. Departures fetch immediately.
 
-**Failure handling.** A single failed poll keeps the cadence and serves the last successful board. Watch `binary_sensor.<stop>_departure_data_stale` to catch that, or compare `server_time` to `now()` in a template. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 is the exception: it widens on the first failure instead, since upstream has already said the poll is too fast. It also raises a Repairs issue per entry, which clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
+**Failure handling.** A single failed poll keeps the cadence and serves the last successful board. Watch the stale-data flag ([Sensor Attributes](#sensor-attributes)) to catch that, or compare `server_time` to `now()` in a template. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 is the exception: it widens on the first failure instead, since upstream has already said the poll is too fast. It also raises a Repairs issue per entry, which clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
 
 ## Use Cases
 
