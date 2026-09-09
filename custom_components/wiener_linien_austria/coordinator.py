@@ -146,8 +146,10 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # CONF_LINES every time; caching collapses that to once per
         # coordinator tick OR alerts refresh. Invalidated by:
         #   • `_async_update_data` setting cache=None at the top, and
-        #   • sensor.py noticing `ALERTS_SEQ_KEY` advanced past
+        #   • `cached_attrs` seeing `ALERTS_SEQ_KEY` advance past
         #     `_attrs_cache_alerts_seq`.
+        # Read and written through `cached_attrs` / `store_attrs` — see
+        # those for why the pair is not two plain public attributes.
         self._attrs_cache: dict[str, Any] | None = None
         self._attrs_cache_alerts_seq: int | None = None
         diva_int = _safe_int(config.get(CONF_DIVA))
@@ -397,6 +399,32 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             data.server_time,
         )
 
+    def cached_attrs(self, alerts_seq: int) -> dict[str, Any] | None:
+        """Return the memoised attrs payload, or None if it needs rebuilding.
+
+        The cache is valid only while BOTH halves of its key still hold:
+        the coordinator hasn't ticked (which nulls the payload) and the
+        domain-wide alerts sequence hasn't advanced. Handing callers the
+        pair as two public attributes invited each of them to
+        re-implement that conjunction; this method is the only place it
+        is written down.
+
+        Returns the SAME dict object, not a copy. `extra_state_attributes`
+        is a 10 Hz read path on a busy dashboard and the payload is ~27 KB
+        at a hub stop, so a defensive copy here would cost more than the
+        memoisation saves. The contract is therefore that callers treat
+        the result as read-only; the one writer goes through
+        `store_attrs`.
+        """
+        if self._attrs_cache is not None and self._attrs_cache_alerts_seq == alerts_seq:
+            return self._attrs_cache
+        return None
+
+    def store_attrs(self, attrs: dict[str, Any], alerts_seq: int) -> None:
+        """Memoise a freshly built attrs payload against the alerts sequence."""
+        self._attrs_cache = attrs
+        self._attrs_cache_alerts_seq = alerts_seq
+
     def _invalidate_attrs_cache(self) -> None:
         """Drop the memoised extra_state_attributes payload before a state change."""
         self._attrs_cache = None
@@ -458,6 +486,12 @@ def _parse_monitor_body(
     # what the records are consistent with, so a skewed HA clock can't
     # start hiding real departures. Falls back to our clock only when the
     # response carried no usable serverTime.
+    #
+    # No naive/aware guard on the comparisons below: `_parse_iso` stamps a
+    # zone on anything the feed sends without one, and `dt_util.utcnow()` is
+    # aware, so both sides of `planned_at < stale_cutoff` are aware by
+    # construction. That invariant lives in `_parse_iso` — keep it there
+    # rather than re-guarding every comparison site.
     reference_time = _parse_iso(server_time) or dt_util.utcnow()
     stale_cutoff = reference_time - STALE_DEPARTURE_MAX_AGE
     monitors = (body.get("data") or {}).get("monitors") or []
@@ -609,19 +643,44 @@ def _parse_monitor_body(
 
 
 def _parse_iso(value: Any) -> datetime | None:
-    """Best-effort ISO-8601 parse of an upstream timestamp.
+    """Best-effort ISO-8601 parse of an upstream timestamp, always tz-aware.
 
     The /monitor feed emits `2026-08-27T06:55:30.000+0200`, which
     `datetime.fromisoformat` handles natively on every Python this
     integration supports. Returns None on anything else so callers can
     fail open rather than act on a timestamp they couldn't read.
+
+    A parsed value with no UTC offset is stamped with HA's configured
+    time zone, NOT with UTC. Both matter:
+
+    * Returning it naive is what makes `planned_at < stale_cutoff` in
+      `_parse_monitor_body` a `TypeError`, because the cutoff is derived
+      from `dt_util.utcnow()` whenever `serverTime` itself is missing or
+      unparseable — so one naive field is enough to reach it, not two.
+      On the batch timer path that raise is caught per member; on
+      `async_config_entry_first_refresh` it becomes a
+      `ConfigEntryNotReady` that retries forever.
+    * Forcing UTC instead would silently shift a naive Vienna timestamp
+      by one or two hours. Against a `STALE_DEPARTURE_MAX_AGE` cutoff a
+      shift that size starts dropping real departures, which is a worse
+      failure than the crash it fixes. Every sample the feed has ever
+      sent carries `+0100`/`+0200`, so the only sane reading of a naive
+      value is local wall-clock.
+
+    `dt_util.get_default_time_zone()` is HA's configured zone rather
+    than a hardcoded Europe/Vienna: an install whose clock is set
+    somewhere else is already interpreting every other naive timestamp
+    that way, and disagreeing with the rest of HA would be its own bug.
     """
     if not isinstance(value, str):
         return None
     try:
-        return datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt_util.get_default_time_zone())
+    return parsed
 
 
 def _safe_int(value: Any) -> int | None:

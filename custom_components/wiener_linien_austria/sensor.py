@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .alerts import get_alerts_for, line_names_from_keys
@@ -39,7 +39,7 @@ PARALLEL_UPDATES = 0
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: WienerLinienConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the single stop sensor for this entry."""
     coordinator = entry.runtime_data
@@ -118,11 +118,8 @@ class WienerLinienStopSensor(
         hass = self.hass if self.hass is not None else self.coordinator.hass
         domain_data = hass.data.get(DOMAIN, {})
         current_alerts_seq = int(domain_data.get(ALERTS_SEQ_KEY, 0))
-        cached = self.coordinator._attrs_cache
-        if (
-            cached is not None
-            and self.coordinator._attrs_cache_alerts_seq == current_alerts_seq
-        ):
+        cached = self.coordinator.cached_attrs(current_alerts_seq)
+        if cached is not None:
             return cached
 
         config = {**self._entry.data, **self._entry.options}
@@ -216,8 +213,7 @@ class WienerLinienStopSensor(
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
         }
-        self.coordinator._attrs_cache = attrs
-        self.coordinator._attrs_cache_alerts_seq = current_alerts_seq
+        self.coordinator.store_attrs(attrs, current_alerts_seq)
         return attrs
 
     def _lines_at_stop(self, diva: int) -> list[str]:

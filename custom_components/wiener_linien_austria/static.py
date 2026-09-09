@@ -132,10 +132,7 @@ def _line_sort_key(label: str, mot: str | None = None) -> tuple[int, int, str]:
     )
     # Strip the mode-letter prefix from the body so within-mode sort is
     # purely numeric: "U1" / "U6" sort by 1 / 6, not as letter-only.
-    if resolved_mot in ("ptMetro", "ptBusNight"):
-        body = label[1:]
-    else:
-        body = label
+    body = label[1:] if resolved_mot in ("ptMetro", "ptBusNight") else label
     match = _LINE_LEADING_DIGITS_RE.match(body)
     if match is None:  # never happens — re matches empty string too
         return (mot_rank, _LINE_SORT_LETTER_TIE, body)

@@ -1,7 +1,7 @@
 # Wiener Linien Austria
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
-[![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.1-blue.svg)](https://www.home-assistant.io/)
+[![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.6-blue.svg)](https://www.home-assistant.io/)
 [![Version](https://img.shields.io/github/v/release/rolandzeiner/wiener-linien-austria?label=version&color=blue)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![vibe-coded](https://img.shields.io/badge/vibe-coded-ff69b4?logo=musicbrainz&logoColor=white)](https://en.wikipedia.org/wiki/Vibe_coding)
@@ -41,7 +41,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 ## Requirements
 
-- Home Assistant **2025.1** or newer
+- Home Assistant **2025.6** or newer
 - Outbound HTTPS to `wienerlinien.at`
 - No API key (Wiener Linien OGD has been key-free since 2019)
 

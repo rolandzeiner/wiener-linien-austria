@@ -457,9 +457,7 @@ async def _resolve_lines_for_picker(
         return live
     live_keys = {row["key"] for row in live}
     merged = list(live)
-    for row in static:
-        if row["key"] not in live_keys:
-            merged.append(row)
+    merged.extend(row for row in static if row["key"] not in live_keys)
     merged.sort(key=lambda r: (r["line"], r["towards"]))
     return merged
 

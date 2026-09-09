@@ -30,7 +30,7 @@ jobs:
 
   compile-floor-python:
     # Every other job runs the CI interpreter (3.14). `hacs.json` promises
-    # Home Assistant >= 2025.1.0, which runs on Python 3.12 — so the whole
+    # Home Assistant >= 2025.6.0, which runs on Python 3.13 — so the whole
     # gate was structurally blind to syntax that parses on 3.14 and not on
     # the floor. v1.7.1 shipped PEP 758 `except A, B:` (ruff's
     # target-version was set to the CI interpreter, not the support floor)
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - name: Byte-compile the shipped package on the oldest supported Python
         run: python -m compileall -q custom_components/wiener_linien_austria
 
