@@ -23,19 +23,20 @@ than a few times an hour and aggregating across all entries keeps the
 integration's outbound request rate trivial. Each sensor filters the cached
 lists by its own (lines, RBLs) at attribute-read time.
 
-Two further categories exist and are deliberately not requested yet:
-`stoerungkurz` (stop-display short text; every live entry carries
-`relatedStops`) and `fahrtreppeninfo` (escalator outages; parses with the same
-shape as `aufzugsinfo`). Both would ride along for zero extra requests, but
-they need sensor attributes, translations and card rendering to be useful, so
-they are their own change.
+A third user-visible feed, `stoerungkurz` (the stop display's own short
+text, scoped to platforms), rides along in the same request — see
+`_parse_traffic_short`. One further category exists and is deliberately not
+requested yet: `fahrtreppeninfo` (escalator outages; parses with the same
+shape as `aufzugsinfo`). It would ride along for zero extra requests, but it
+needs sensor attributes, translations and card rendering to be useful, so it
+is its own change.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
 import aiohttp
@@ -57,6 +58,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
+from .static import CATALOGUE_KEY, StaticCatalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,6 +98,12 @@ class TrafficInfo:
     time_last_update: str | None = None  # when the alert was last edited
     category: str = ALERT_FEED_TRAFFIC
     related_stops: list[int] = field(default_factory=list)  # RBLs (short feed)
+    # Tracked lines calling at the matched platform, for a short notice that
+    # names no lines of its own. Never set on the shared cache — only on the
+    # per-sensor copy `get_alerts_for` hands out, because which lines count
+    # depends on the sensor asking. Kept apart from `related_lines` so that
+    # field stays exactly what upstream published.
+    inferred_lines: list[str] = field(default_factory=list)
     # Pre-computed frozensets — used by `get_alerts_for` for the per-sensor
     # set-intersection that runs on every state attribute read AND every
     # template fetch. Without this cache, each read built a fresh
@@ -122,6 +130,7 @@ class TrafficInfo:
             "description_html": self.description_html,
             "related_lines": list(self.related_lines),
             "related_stops": list(self.related_stops),
+            "inferred_lines": list(self.inferred_lines),
             "line_types": dict(self.line_types),
             "location": self.location,
             "time_start": self.time_start,
@@ -487,7 +496,9 @@ def _merge_short_duplicates(items: list[TrafficInfo]) -> list[TrafficInfo]:
 
     So two entries only merge when something ties them to the same
     incident: the same set of lines (one line, several of its platforms),
-    or an overlapping platform (one sign, several of its lines). Merging
+    an overlapping platform (one sign, several of its lines), or — for
+    entries naming no lines at all, where equal empty sets say nothing —
+    the same dispatch timestamp. Merging
     is transitive — three lines sharing two of three platforms are one
     incident — so entries are grouped by connected component rather than
     folded into whichever arrived first.
@@ -522,15 +533,24 @@ def _merge_short_duplicates(items: list[TrafficInfo]) -> list[TrafficInfo]:
 def _same_short_incident(a: TrafficInfo, b: TrafficInfo) -> bool:
     """Whether two same-text short notices describe one incident.
 
-    Equal line sets covers "one line, reported per platform" (and the
-    entries carrying no lines at all, which upstream leaves empty for a
-    whole class of stop-display texts). Overlapping stops covers "one
-    platform, reported per line". Either is enough; neither means the
-    shared wording is a coincidence.
+    Overlapping stops covers "one platform, reported per line". Equal line
+    sets covers "one line, reported per platform". Either is enough.
+
+    Entries naming no lines need a different tie. Two empty sets are
+    trivially equal, so the line rule would merge every line-less copy of
+    a stock phrase city-wide — "Fahrtbehinderung / wegen Rettungseinsatz"
+    is exactly as generic as the "Falschparker" collision the rule above
+    was fixed for. The operator dispatches one incident's platform texts
+    in a single batch, so they share `time.start` to the second (live
+    2026-09-10: all six "Betrieb ab Eichenstraße" platforms at 10:27:56,
+    the neighbouring "Fahrtbehinderung" batch at 10:26:56). That is the
+    tie; an entry with no start time links on shared platforms only.
     """
-    if a.related_lines_set == b.related_lines_set:
+    if a.related_stops_set & b.related_stops_set:
         return True
-    return bool(a.related_stops_set & b.related_stops_set)
+    if a.related_lines_set or b.related_lines_set:
+        return a.related_lines_set == b.related_lines_set
+    return a.time_start is not None and a.time_start == b.time_start
 
 
 def _absorb_short(target: TrafficInfo, other: TrafficInfo) -> None:
@@ -651,10 +671,24 @@ def get_alerts_for(
       A Westbahnhof entry tracking only U3 surfaced a tram-5 obstruction
       that way (2026-09-09), while the same stop's departure list
       correctly showed no tram 5 at all. Hence the second half: an entry
-      that names lines must name one of ours. Entries with an empty
-      `related_lines` still match on RBL alone — upstream leaves it empty
-      for stop-wide texts ("Haltestelle Parlament … aufgelassen"), which
-      concern every line calling there.
+      that names lines must name one of ours.
+
+      An entry with an empty `related_lines` gets the same treatment by
+      another route: the static schedule says which lines call at the
+      platform it hit, and one of them must be tracked. Upstream leaves
+      the field empty for stop-wide texts ("Haltestelle Parlament …
+      aufgelassen") but also for plain incident texts, and matching those
+      on RBL alone put a tram 6/18 "Betrieb ab Eichenstraße" on a U3-only
+      Westbahnhof card (2026-09-10) through the Gürtel tram platforms in
+      its DIVA. The tracked lines found there go out as `inferred_lines`
+      so the card can badge a notice that otherwise names nothing. When
+      the catalogue isn't loaded or doesn't know the platform, the entry
+      matches on RBL alone as before — a missing schedule must not hide
+      notices.
+
+      Every matched short entry also gets `location` set to its platform's
+      station name, since upstream publishes none for this feed. Both
+      additions land on a copy; the shared cache is never touched.
     - Elevator: match if any `related_stops` overlaps `rbls`. If `rbls` is
       empty/None, return []. An elevator outage with no `related_stops` is
       only surfaced when it also matches on `related_lines`.
@@ -662,17 +696,29 @@ def get_alerts_for(
     domain_data = hass.data.get(DOMAIN, {})
     all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
     all_elevator: list[ElevatorInfo] = domain_data.get(ELEVATOR_INFO_KEY, []) or []
+    cached = domain_data.get(CATALOGUE_KEY)
+    catalogue = cached if isinstance(cached, StaticCatalogue) else None
 
     matched_traffic: list[TrafficInfo] = []
     for t in all_traffic:
-        if t.category == ALERT_FEED_TRAFFIC_SHORT:
-            if not rbls or not t.related_stops_set & rbls:
+        if t.category != ALERT_FEED_TRAFFIC_SHORT:
+            if not lines or t.related_lines_set & lines:
+                matched_traffic.append(t)
+            continue
+        hit = t.related_stops_set & rbls if rbls else frozenset()
+        if not hit:
+            continue
+        inferred: tuple[str, ...] = ()
+        if t.related_lines_set:
+            if lines and not t.related_lines_set & lines:
                 continue
-            if lines and t.related_lines_set and not t.related_lines_set & lines:
-                continue
-            matched_traffic.append(t)
-        elif not lines or t.related_lines_set & lines:
-            matched_traffic.append(t)
+        elif lines:
+            served = _lines_at_platforms(catalogue, hit)
+            if served is not None:
+                inferred = tuple(line for line in served if line in lines)
+                if not inferred:
+                    continue
+        matched_traffic.append(_with_stop_context(t, hit, catalogue, inferred))
 
     matched_elevator: list[ElevatorInfo] = []
     if rbls:
@@ -686,3 +732,35 @@ def get_alerts_for(
                 matched_elevator.append(e)
 
     return matched_traffic, matched_elevator
+
+
+def _lines_at_platforms(
+    catalogue: StaticCatalogue | None, rbls: frozenset[int]
+) -> tuple[str, ...] | None:
+    """Scheduled lines at `rbls`, or None when the schedule can't say."""
+    if catalogue is None or catalogue.trip_patterns is None:
+        return None
+    return catalogue.trip_patterns.lines_at_rbls(rbls)
+
+
+def _with_stop_context(
+    t: TrafficInfo,
+    hit: frozenset[int],
+    catalogue: StaticCatalogue | None,
+    inferred: tuple[str, ...],
+) -> TrafficInfo:
+    """Per-sensor copy of a short notice carrying where and for whom it applies.
+
+    Returns `t` itself when there is nothing to add, so the common case
+    allocates nothing.
+    """
+    location = t.location
+    if location is None and catalogue is not None:
+        index = catalogue.index_by_rbl()
+        names = dict.fromkeys(
+            entry[1] for rbl in sorted(hit) if (entry := index.get(rbl)) is not None
+        )
+        location = ", ".join(names) or None
+    if location == t.location and not inferred:
+        return t
+    return replace(t, location=location, inferred_lines=list(inferred))

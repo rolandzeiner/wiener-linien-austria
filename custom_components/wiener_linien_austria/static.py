@@ -241,6 +241,15 @@ class TripPatternIndex:
     # stops_ahead matcher does this once per departure row) get O(1)
     # instead of an O(N) iteration over `lines_by_label.items()`.
     label_for_line: dict[int, str] = field(default_factory=dict, repr=False)
+    # RBL → labels of every line whose schedule calls at that platform, plus
+    # the label → MoT map used to sort them. Built lazily by `lines_at_rbls`:
+    # only the stop-display notice matcher reads them, so building on every
+    # construction would tax each store load for nothing. Not persisted —
+    # both derive from the fields above.
+    _labels_by_rbl: dict[int, frozenset[str]] | None = field(
+        default=None, repr=False, compare=False
+    )
+    _label_mot: dict[str, str] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Build the LineID→label reverse index at construction.
@@ -261,6 +270,47 @@ class TripPatternIndex:
     def pattern_count(self) -> int:
         """Total number of TripPattern variants across all lines."""
         return sum(len(v) for v in self.patterns_by_line.values())
+
+    def lines_at_rbls(self, rbls: Iterable[int]) -> tuple[str, ...] | None:
+        """Labels of every line whose schedule calls at any of `rbls`.
+
+        The platform-level counterpart to `lines_at_diva`. A hub DIVA holds
+        U-Bahn, tram and bus platforms alike, and a stop-display notice names
+        platforms, not lines — Westbahnhof's RBL 464 is a Gürtel tram
+        platform no U3 train ever calls at. Sorted like `lines_at_diva`.
+
+        Returns None when none of `rbls` appears in any pattern: "the
+        schedule doesn't know this platform" is not "no line calls here",
+        and callers fall back to their pre-index behaviour on it.
+        """
+        by_rbl = self._ensure_labels_by_rbl()
+        known = False
+        labels: set[str] = set()
+        for rbl in rbls:
+            hit = by_rbl.get(rbl)
+            if hit is not None:
+                known = True
+                labels.update(hit)
+        if not known:
+            return None
+        return _sort_line_labels(labels, self._label_mot)
+
+    def _ensure_labels_by_rbl(self) -> dict[int, frozenset[str]]:
+        """Build the RBL → labels index on first use."""
+        if self._labels_by_rbl is not None:
+            return self._labels_by_rbl
+        by_rbl: dict[int, set[str]] = {}
+        for line_id, patterns in self.patterns_by_line.items():
+            label = self.label_for_line.get(line_id)
+            if not label:
+                continue
+            for pattern in patterns:
+                for rbl in pattern.stops:
+                    by_rbl.setdefault(rbl, set()).add(label)
+        built = {rbl: frozenset(labels) for rbl, labels in by_rbl.items()}
+        self._label_mot = _mot_by_label(self.lines_by_label, self.means_by_line)
+        self._labels_by_rbl = built
+        return built
 
 
 @dataclass(slots=True)

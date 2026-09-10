@@ -2228,41 +2228,41 @@ if(super(e),e.type!==V.PROPERTY&&e.type!==V.ATTRIBUTE&&e.type!==V.BOOLEAN_ATTRIB
                 </div>`)}
             </dl>`:I}
       </div>
-    `}_renderTrafficItem(e,t){let n=this._config.line_colors,r=Array.isArray(e.related_lines)?e.related_lines:[],i=mn(e.description_html||e.description||``),a=i.blocks.length>0||i.facts.length>0,o=_n(e.time_end,this._lang()),s=_n(e.time_last_update,this._lang()),c=_n(e.time_created,this._lang()),l=s&&s!==c?s:``,u=!!(e.location||o||l),d=!!(a||u),f=this._expandedTraffic.has(e.name),p={alert:!0,expanded:f,"no-detail":!d},m=e.title||this._t(`traffic_label`);return P`
+    `}_renderTrafficItem(e,t){let n=this._config.line_colors,r=Array.isArray(e.related_lines)?e.related_lines:[],i=Array.isArray(e.inferred_lines)?e.inferred_lines:[],a=r.length?r:i,o=mn(e.description_html||e.description||``),s=o.blocks.length>0||o.facts.length>0,c=_n(e.time_end,this._lang()),l=_n(e.time_last_update,this._lang()),u=_n(e.time_created,this._lang()),d=l&&l!==u?l:``,f=!!(e.location||c||d),p=!!(s||f),m=this._expandedTraffic.has(e.name),h={alert:!0,expanded:m,"no-detail":!p},g=e.title||this._t(`traffic_label`);return P`
       <div
-        class=${H(p)}
-        role=${d?`button`:`group`}
-        tabindex=${d?`0`:`-1`}
-        aria-expanded=${d?f?`true`:`false`:I}
-        aria-label=${m}
-        @click=${()=>d&&this._toggleTraffic(e.name)}
-        @keydown=${t=>this._onExpanderKeydown(t,d,()=>this._toggleTraffic(e.name))}
+        class=${H(h)}
+        role=${p?`button`:`group`}
+        tabindex=${p?`0`:`-1`}
+        aria-expanded=${p?m?`true`:`false`:I}
+        aria-label=${g}
+        @click=${()=>p&&this._toggleTraffic(e.name)}
+        @keydown=${t=>this._onExpanderKeydown(t,p,()=>this._toggleTraffic(e.name))}
       >
         <ha-icon icon="mdi:alert-octagon" aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
-            ${r.length?P`<div class="alert-lines">
-                  ${r.map(e=>P`<span
+            ${a.length?P`<div class="alert-lines">
+                  ${a.map(e=>P`<span
                       class="alert-line-badge"
                       style=${U(Y(e,n,t))}
                     >${e}</span>`)}
                 </div>`:I}
             <div class="alert-title">${e.title?W(e.title):this._t(`traffic_label`)}</div>
           </div>
-          ${d?P`<div class="alert-detail">
+          ${p?P`<div class="alert-detail">
                 <div class="alert-detail-inner">
-                  ${a?this._renderTrafficNotice(i):I}
-                  ${u?P`<div class="alert-meta">
+                  ${s?this._renderTrafficNotice(o):I}
+                  ${f?P`<div class="alert-meta">
                         ${e.location?P`<span class="alert-location-chip">
                               <ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon>${W(e.location)}
                             </span>`:I}
-                        ${o?P`<span>${this._t(`traffic_until`)} ${o}</span>`:I}
-                        ${l?P`<span>${this._t(`traffic_updated`)} ${l}</span>`:I}
+                        ${c?P`<span>${this._t(`traffic_until`)} ${c}</span>`:I}
+                        ${d?P`<span>${this._t(`traffic_updated`)} ${d}</span>`:I}
                       </div>`:I}
                 </div>
               </div>`:I}
         </div>
-        ${d?P`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:I}
+        ${p?P`<ha-icon class="alert-chevron" icon="mdi:chevron-down" aria-hidden="true"></ha-icon>`:I}
       </div>
     `}_toggleTraffic(e){this._expandedTraffic=Jt(this._expandedTraffic,e)}_expandState(e,t,n){let r=Gt(this._config.show_stops_ahead,e),i=this._rowKey(e,t),a=r&&this._expandedRows.has(i),o=this._panelId(e,t,n),s=a?`stops_ahead_aria_hide`:`stops_ahead_aria_show`;return{hasStopsAhead:r,rowKey:i,expanded:a,panelId:o,ariaLabel:r?this._t(s,{line:e.line||`?`,towards:e.towards||``}):``}}_renderStopsAheadInner(e,t,n,r){let i=this._config.line_colors,a=Pt(this.hass,r);return P`
       <ol

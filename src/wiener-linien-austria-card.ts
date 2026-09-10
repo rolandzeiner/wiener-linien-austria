@@ -1134,7 +1134,12 @@ export class WienerLinienAustriaCard extends LitElement {
     lineColors: LineColorsMap,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
-    const lines = Array.isArray(t.related_lines) ? t.related_lines : [];
+    // A stop-display notice often names no line; the integration then
+    // supplies the tracked lines calling at its platform, so the badge
+    // still says which service is affected.
+    const related = Array.isArray(t.related_lines) ? t.related_lines : [];
+    const inferred = Array.isArray(t.inferred_lines) ? t.inferred_lines : [];
+    const lines = related.length ? related : inferred;
     const descSource = t.description_html || t.description || "";
     const notice = parseTrafficNotice(descSource);
     const hasNotice = notice.blocks.length > 0 || notice.facts.length > 0;

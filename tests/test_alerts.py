@@ -32,6 +32,13 @@ from custom_components.wiener_linien_austria.const import (
     ENTRY_COUNT_KEY,
     TRAFFIC_INFO_KEY,
 )
+from custom_components.wiener_linien_austria.static import (
+    CATALOGUE_KEY,
+    StaticCatalogue,
+    Station,
+    TripPattern,
+    TripPatternIndex,
+)
 from tests.conftest import make_response_cm
 
 ALERTS_LOGGER = "custom_components.wiener_linien_austria.alerts"
@@ -697,9 +704,12 @@ def test_merge_short_duplicates_unions_one_line_across_its_platforms() -> None:
 
 
 def test_merge_short_duplicates_unions_entries_with_no_lines() -> None:
-    """Stop-wide texts leave `relatedLines` empty; equal (empty) line sets
-    still tie them together across the platforms they name."""
-    raw = {"title": "Haltestelle Parlament dauerhaft aufgelassen."}
+    """Stop-wide texts leave `relatedLines` empty; one dispatch batch still
+    ties them together across the platforms they name."""
+    raw = {
+        "title": "Haltestelle Parlament dauerhaft aufgelassen.",
+        "time": {"start": "2026-09-01T04:00:00.000+0200"},
+    }
     merged = _merge_short_duplicates(
         [
             _parse_traffic_short({**raw, "name": "a", "relatedStops": [16]}),
@@ -708,6 +718,78 @@ def test_merge_short_duplicates_unions_entries_with_no_lines() -> None:
     )
     assert len(merged) == 1
     assert merged[0].related_stops == [16, 48]
+
+
+def test_merge_short_duplicates_unions_one_lineless_batch() -> None:
+    """Live 2026-09-10: one ambulance call, dispatched to six platforms as
+    separate line-less entries sharing their start second. One notice."""
+    raw = {
+        "title": "Rettungseinsatz\nBetrieb ab Eichenstraße \n\n",
+        "time": {"start": "2026-09-10T10:27:56.000+0200"},
+    }
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short({**raw, "name": f"R{rbl}-0", "relatedStops": [rbl]})
+            for rbl in (464, 482, 396)
+        ]
+    )
+    assert [(m.name, m.related_stops) for m in merged] == [("R464-0", [464, 482, 396])]
+
+
+def test_merge_short_duplicates_keeps_lineless_stock_phrases_apart() -> None:
+    """Two empty line sets are equal, which says nothing about the incident.
+
+    "Fahrtbehinderung / wegen Rettungseinsatz" is a stock phrase. Two
+    line-less copies from different dispatches, on disjoint platforms, are
+    two incidents — merging them would hand each the other's platforms.
+    """
+    raw = {"title": "Fahrtbehinderung\nwegen Rettungseinsatz"}
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short(
+                {
+                    **raw,
+                    "name": "gurtel",
+                    "relatedStops": [483],
+                    "time": {"start": "2026-09-10T10:26:56.000+0200"},
+                }
+            ),
+            _parse_traffic_short(
+                {
+                    **raw,
+                    "name": "floridsdorf",
+                    "relatedStops": [2207],
+                    "time": {"start": "2026-09-10T11:04:58.000+0200"},
+                }
+            ),
+            # No start time at all: nothing ties it to either batch.
+            _parse_traffic_short({**raw, "name": "untimed", "relatedStops": [16]}),
+        ]
+    )
+    assert [(m.name, m.related_stops) for m in merged] == [
+        ("gurtel", [483]),
+        ("floridsdorf", [2207]),
+        ("untimed", [16]),
+    ]
+
+
+def test_merge_short_duplicates_never_ties_lined_to_lineless_on_time() -> None:
+    """The timestamp tie is for line-less pairs only. A lined entry and a
+    line-less one on disjoint platforms stay apart even when dispatched in
+    the same second."""
+    raw = {
+        "title": "Fahrtbehinderung\nwegen Rettungseinsatz",
+        "time": {"start": "2026-09-10T10:26:56.000+0200"},
+    }
+    merged = _merge_short_duplicates(
+        [
+            _parse_traffic_short(
+                {**raw, "name": "lined", "relatedLines": ["6"], "relatedStops": [401]}
+            ),
+            _parse_traffic_short({**raw, "name": "lineless", "relatedStops": [483]}),
+        ]
+    )
+    assert [m.name for m in merged] == ["lined", "lineless"]
 
 
 def test_merge_short_duplicates_is_transitive() -> None:
@@ -819,12 +901,104 @@ async def test_get_alerts_for_short_matches_when_a_line_is_tracked(
 async def test_get_alerts_for_short_without_lines_still_matches_on_stop(
     hass: HomeAssistant,
 ) -> None:
-    """Upstream leaves `relatedLines` empty for stop-wide texts
-    ("Haltestelle Parlament … aufgelassen"), which concern every line
-    calling there — so those keep matching on RBL alone."""
+    """With no catalogue loaded there is no way to tell which lines call at
+    the platform, so a line-less entry falls back to matching on RBL alone
+    — a missing schedule must never hide a notice."""
     _seed_short(hass, _short("A", stops=[4111], lines=[]))
     traffic, _ = get_alerts_for(hass, {"U1"}, {4111})
     assert [t.name for t in traffic] == ["A"]
+    assert traffic[0].inferred_lines == []
+
+
+def _seed_westbahnhof_catalogue(hass: HomeAssistant) -> None:
+    """Westbahnhof as the 2026-09-10 bug saw it: one DIVA holding the U3
+    platform and two Gürtel tram platforms that only 6 and 18 call at."""
+    stations = {
+        60201468: Station(
+            diva=60201468,
+            name="Westbahnhof S U",
+            municipality="Wien",
+            longitude=16.3385,
+            latitude=48.1966,
+            rbls=[464, 483, 4913],
+        )
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            3: [TripPattern(line_id=3, pattern_id=1, direction=1, stops=(4913,))],
+            18: [TripPattern(line_id=18, pattern_id=1, direction=1, stops=(464, 483))],
+            6: [TripPattern(line_id=6, pattern_id=1, direction=1, stops=(461, 464))],
+        },
+        lines_by_label={"U3": 3, "18": 18, "6": 6},
+        means_by_line={3: "ptMetro", 18: "ptTram", 6: "ptTram"},
+    )
+    hass.data.setdefault(DOMAIN, {})[CATALOGUE_KEY] = StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+_WESTBAHNHOF_RBLS = {464, 483, 4913}
+
+
+async def test_get_alerts_for_short_without_lines_needs_a_tracked_line_there(
+    hass: HomeAssistant,
+) -> None:
+    """The screenshot bug: a tram 6/18 "Betrieb ab Eichenstraße" on a
+    U3-only Westbahnhof card. It named no lines, so the line half of the
+    filter never ran, and RBL 464 is in the DIVA — but no U3 calls there."""
+    _seed_westbahnhof_catalogue(hass)
+    _seed_short(hass, _short("R464-0", stops=[464, 482], lines=[]))
+    traffic, _ = get_alerts_for(hass, {"U3"}, _WESTBAHNHOF_RBLS)
+    assert traffic == []
+
+
+async def test_get_alerts_for_short_without_lines_badges_the_tracked_lines(
+    hass: HomeAssistant,
+) -> None:
+    """For a user who does track the trams, the notice surfaces with the
+    tracked lines calling at its platform — sorted by mode then number —
+    and the station name, on a copy that leaves the shared cache alone."""
+    _seed_westbahnhof_catalogue(hass)
+    cached = _short("R464-0", stops=[464, 482], lines=[])
+    _seed_short(hass, cached)
+
+    traffic, _ = get_alerts_for(hass, {"U3", "18", "6"}, _WESTBAHNHOF_RBLS)
+
+    assert [t.name for t in traffic] == ["R464-0"]
+    assert traffic[0].inferred_lines == ["6", "18"]
+    assert traffic[0].location == "Westbahnhof S U"
+    assert traffic[0].to_dict()["inferred_lines"] == ["6", "18"]
+    # Only tracked lines are inferred: 18 alone when 6 isn't tracked.
+    traffic, _ = get_alerts_for(hass, {"U3", "18"}, _WESTBAHNHOF_RBLS)
+    assert traffic[0].inferred_lines == ["18"]
+    # The cached object is domain-wide; another sensor must not see these.
+    assert cached.inferred_lines == []
+    assert cached.location is None
+    assert traffic[0] is not cached
+
+
+async def test_get_alerts_for_short_on_unscheduled_platform_matches_on_stop(
+    hass: HomeAssistant,
+) -> None:
+    """A platform the schedule doesn't know is "can't tell", not "no lines"."""
+    _seed_westbahnhof_catalogue(hass)
+    _seed_short(hass, _short("A", stops=[9999], lines=[]))
+    traffic, _ = get_alerts_for(hass, {"U3"}, {9999})
+    assert [t.name for t in traffic] == ["A"]
+    assert traffic[0].inferred_lines == []
+
+
+async def test_get_alerts_for_short_with_lines_gets_location_only(
+    hass: HomeAssistant,
+) -> None:
+    """An entry naming its lines already has its badges; it gains the
+    station name and nothing is inferred."""
+    _seed_westbahnhof_catalogue(hass)
+    _seed_short(hass, _short("A", stops=[483], lines=["18"]))
+    traffic, _ = get_alerts_for(hass, {"18"}, _WESTBAHNHOF_RBLS)
+    assert traffic[0].related_lines == ["18"]
+    assert traffic[0].inferred_lines == []
+    assert traffic[0].location == "Westbahnhof S U"
 
 
 async def test_get_alerts_for_mixes_both_categories(hass: HomeAssistant) -> None:

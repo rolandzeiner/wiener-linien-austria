@@ -271,6 +271,10 @@ export interface TrafficInfoAttr {
   location?: string;
   related_lines?: string[];
   related_stops?: number[];
+  // Tracked lines calling at the matched platform, set only on a
+  // "stoerungkurz" notice that names no lines itself. The badge fallback
+  // for `related_lines`, which stays exactly what upstream published.
+  inferred_lines?: string[];
   time_start?: string;
   time_end?: string;
   time_created?: string;

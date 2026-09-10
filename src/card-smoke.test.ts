@@ -292,6 +292,34 @@ describe("tab-scoped alert banner", () => {
     expect(text).not.toContain("U3: Verspätungen");
   });
 
+  it("badges a line-less stop notice with its inferred lines", async () => {
+    const hass = busyHass();
+    hass.states[ENTITY]!.attributes.traffic_info = [
+      {
+        name: "R483-0",
+        title: "Rettungseinsatz",
+        description: "Betrieb ab Eichenstraße",
+        related_lines: [],
+        inferred_lines: ["6", "18"],
+        category: "stoerungkurz",
+      },
+      {
+        name: "R401-106",
+        title: "Fahrtbehinderung",
+        description: "",
+        related_lines: ["6"],
+        inferred_lines: ["18"],
+        category: "stoerungkurz",
+      },
+    ];
+    const el = await mount(MODERN, hass, { ...tabsConfig, entities: [{ entity: ENTITY }] });
+    const badges = [...shadow(el).querySelectorAll(".alert-lines")].map((row) =>
+      [...row.querySelectorAll(".alert-line-badge")].map((b) => b.textContent),
+    );
+    // Upstream's own lines win whenever it published any.
+    expect(badges).toEqual([["6", "18"], ["6"]]);
+  });
+
   it("pools every stop's disruptions in stacked layout", async () => {
     // Stacked shows all stops at once, so one shared banner is correct.
     const el = await mount(MODERN, twoStopHass(), {

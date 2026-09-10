@@ -191,6 +191,8 @@ class WienerLinienStopSensor(
         #                      until the cards learned to merge palettes
         #   * traffic/elevator related_lines — notice badges, which name
         #                      lines that need not serve this stop at all
+        #                      (plus a short notice's inferred_lines, the
+        #                      badges it gets when it names none itself)
         #
         # Cross-entity reuse is the other half. The flap board and the
         # modern card's notice badges render lines from EVERY configured
@@ -205,6 +207,7 @@ class WienerLinienStopSensor(
                 needed_labels.update(stop.get("lines") or ())
         for traffic_alert in traffic:
             needed_labels.update(traffic_alert.related_lines)
+            needed_labels.update(traffic_alert.inferred_lines)
         for elevator_alert in elevator:
             needed_labels.update(elevator_alert.related_lines)
         line_colors = self._line_colors(needed_labels)

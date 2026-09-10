@@ -1884,3 +1884,29 @@ def test_stops_ahead_returns_empty_at_the_terminus() -> None:
     )
 
     assert stops_ahead_for_match(catalogue, "U1", [4111], "Leopoldau") == []
+
+
+def test_lines_at_rbls_unions_and_sorts_platform_lines() -> None:
+    """Platform-level line lookup for the stop-display notice matcher.
+
+    Unions across the given platforms, sorts by mode then number (so "6"
+    precedes "18" and the U-Bahn leads), skips LineIDs with no label, and
+    answers None — not () — for platforms no pattern visits.
+    """
+    index = TripPatternIndex(
+        patterns_by_line={
+            18: [TripPattern(line_id=18, pattern_id=1, direction=1, stops=(464, 483))],
+            6: [TripPattern(line_id=6, pattern_id=1, direction=1, stops=(461, 464))],
+            3: [TripPattern(line_id=3, pattern_id=1, direction=1, stops=(483,))],
+            99: [TripPattern(line_id=99, pattern_id=1, direction=1, stops=(464,))],
+        },
+        lines_by_label={"18": 18, "6": 6, "U3": 3},
+        means_by_line={18: "ptTram", 6: "ptTram", 3: "ptMetro"},
+    )
+    assert index.lines_at_rbls([464]) == ("6", "18")
+    assert index.lines_at_rbls([464, 483]) == ("U3", "6", "18")
+    assert index.lines_at_rbls([461]) == ("6",)
+    assert index.lines_at_rbls([9999]) is None
+    assert index.lines_at_rbls([]) is None
+    # One unknown platform alongside a known one still answers.
+    assert index.lines_at_rbls([9999, 461]) == ("6",)
