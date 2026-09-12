@@ -12,6 +12,7 @@ from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.const import (
     ATTRIBUTION,
     CONF_DIVA,
+    CONF_LINES,
     DOMAIN,
     MAX_DEPARTURES_IN_ATTRS,
 )
@@ -557,6 +558,31 @@ async def test_attributes_cap_at_max_departures(hass: HomeAssistant) -> None:
     # The cap keeps the *earliest* departures — check the countdown order.
     assert attrs["departures"][0]["countdown"] == 0
     assert attrs["departures"][-1]["countdown"] == MAX_DEPARTURES_IN_ATTRS - 1
+
+
+async def test_tracked_lines_publish_the_realtime_spelling(
+    hass: HomeAssistant,
+) -> None:
+    """A selection saved as "LB|H" is published as "WLB|H".
+
+    The cards filter `departure.line` — always the feed's spelling — against
+    `tracked_lines`, so publishing the static-catalogue label would leave a
+    Badner Bahn card permanently empty (issue #110). Stored entry data is
+    left untouched; only what goes out is canonicalised.
+    """
+    entry = _make_entry({CONF_LINES: ["LB|H", "U1|H"]})
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+
+    attrs = WienerLinienStopSensor(coordinator, entry).extra_state_attributes
+
+    assert attrs["tracked_lines"] == ["U1", "WLB"]
+    assert attrs["tracked_line_keys"] == ["WLB|H", "U1|H"]
+    # The config entry itself is not rewritten.
+    assert entry.data[CONF_LINES] == ["LB|H", "U1|H"]
 
 
 async def test_attributes_include_matched_alerts(hass: HomeAssistant) -> None:

@@ -1171,3 +1171,15 @@ async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> Non
     ]
     _traffic, elevator = get_alerts_for(hass, {"U1"}, {4111})
     assert [e.name for e in elevator] == ["LINE_ONLY"]
+
+
+def test_line_names_from_keys_canonicalises_legacy_labels() -> None:
+    """Saved keys resolve to the spelling the alert feed's relatedLines use."""
+    from custom_components.wiener_linien_austria.alerts import line_names_from_keys
+
+    assert line_names_from_keys(["LB|H", "U1|R"]) == {"WLB", "U1"}
+    assert line_names_from_keys(["WLB|H"]) == {"WLB"}
+    assert line_names_from_keys([]) == set()
+    assert line_names_from_keys(None) == set()
+    # Non-strings and empties are still dropped.
+    assert line_names_from_keys(["", 7, "6|H"]) == {"6"}

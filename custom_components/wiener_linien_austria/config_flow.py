@@ -69,7 +69,12 @@ from .const import (
     USER_AGENT,
 )
 from .http import base_request_headers
-from .static import StaticCatalogue, Station, async_get_catalogue
+from .static import (
+    StaticCatalogue,
+    Station,
+    async_get_catalogue,
+    canonical_line_key,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -753,9 +758,15 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         # New entries start with nothing pre-selected — busy stops have
         # 20+ lines and users typically only want one or two, so opt-in
         # is the cheaper interaction. Reconfigure preserves whatever the
-        # user had before.
+        # user had before, mapped onto the realtime spelling so a key
+        # saved as "LB|H" still ticks the "WLB|H" option the picker now
+        # offers — an unmapped key matches nothing and silently shows the
+        # user an empty selection over their own configured lines.
         default_lines = (
-            [str(k) for k in {**existing.data, **existing.options}.get(CONF_LINES, [])]
+            [
+                canonical_line_key(str(k))
+                for k in {**existing.data, **existing.options}.get(CONF_LINES, [])
+            ]
             if existing is not None
             else []
         )

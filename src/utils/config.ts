@@ -1,6 +1,7 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
 import { accentTextColor } from "./color.js";
 import { CARD_DEFAULTS } from "./card-vocabulary.js";
+import { canonicalLineLabel } from "./line-labels.js";
 import { RETRO_HEADER_MDI_EXIT_KEYS } from "./retro-station-icons.js";
 import type {
   LineColorsMap,
@@ -266,7 +267,13 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   }
   const stop: NormalisedModernStop = { entity };
   if (Array.isArray(r.lines)) {
-    const lines = r.lines.filter((l): l is string => typeof l === "string" && l.length > 0);
+    // Canonicalised here rather than at each use so the filter, the chip
+    // row, the direction controls and the walk-time rows all compare the
+    // same spelling a live departure carries — a config saved as "LB"
+    // otherwise matches no Badner Bahn departure at all (issue #110).
+    const lines = r.lines
+      .filter((l): l is string => typeof l === "string" && l.length > 0)
+      .map(canonicalLineLabel);
     if (lines.length) stop.lines = lines;
   }
   if (r.direction === "H" || r.direction === "R") stop.direction = r.direction;

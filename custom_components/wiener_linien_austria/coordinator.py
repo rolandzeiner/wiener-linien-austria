@@ -33,6 +33,7 @@ from .static import (
     CATALOGUE_KEY,
     StaticCatalogue,
     async_get_catalogue,
+    canonical_line_key,
     stops_ahead_for_match,
 )
 
@@ -461,12 +462,51 @@ def _normalise_lines(raw: Any) -> set[str] | None:
     """Coerce CONF_LINES into a set of selected line keys.
 
     An entry missing/empty CONF_LINES means "track every line at this stop".
+
+    Keys are mapped through `canonical_line_key`, so a selection saved
+    before the catalogue learned the realtime spelling ("LB|H") compares
+    against the label the feed actually sends ("WLB|H"). Matching the same
+    way the sensor and the reconfigure form already read these keys keeps
+    one vocabulary across the entry (issue #110).
     """
     if raw is None:
         return None
     if not isinstance(raw, list):
         return None
-    return {str(x) for x in raw} or None
+    return {canonical_line_key(str(x)) for x in raw} or None
+
+
+def _row_is_selected(
+    selected_pairs: set[tuple[str, str]],
+    line_name: str,
+    direction: str,
+    line_id: int | None,
+    catalogue: StaticCatalogue | None,
+) -> bool:
+    """Does this live monitor row fall inside the user's line selection?
+
+    A row matches on either:
+
+      * its own `line.name` from the feed, or
+      * the catalogue's label for its `line.lineId`.
+
+    `_normalise_lines` has already folded the saved keys onto the realtime
+    spelling for the divergences we know about, so the first arm carries
+    the normal case. The second is for the ones we don't: a label the feed
+    and the catalogue disagree on that is *not* in `REALTIME_LINE_LABELS`
+    (the night Rufbus lines, which no daytime probe can observe), and the
+    window after an upgrade where the cached catalogue still holds the
+    pre-alias labels. Both are joins on an identifier both sides publish
+    rather than a guess about spelling.
+    """
+    if (line_name, direction) in selected_pairs:
+        return True
+    if line_id is None or catalogue is None or catalogue.trip_patterns is None:
+        return False
+    catalogue_label = catalogue.trip_patterns.label_for_line.get(line_id)
+    if catalogue_label is None or catalogue_label == line_name:
+        return False
+    return (catalogue_label, direction) in selected_pairs
 
 
 def _parse_monitor_body(
@@ -554,6 +594,12 @@ def _parse_monitor_body(
             line_name = str(line.get("name") or "").strip()
             if not line_name:
                 continue
+            # `line.lineId` is the same identifier `linien.csv` publishes
+            # as `LineID`, so it joins a live row to the catalogue without
+            # going through the label — which the two sources do not
+            # always spell the same way (issue #110: the Badner Bahn is
+            # "WLB" live and "LB" in the CSV).
+            line_id = _safe_int(line.get("lineId"))
             line_towards = str(line.get("towards") or "").strip()
             direction = str(line.get("direction") or "").strip()
             line_type = str(line.get("type") or "").strip()
@@ -562,9 +608,12 @@ def _parse_monitor_body(
             traffic_jam = bool(line.get("trafficjam"))
             platform = str(line.get("platform") or "").strip() or None
 
-            if (
-                selected_pairs is not None
-                and (line_name, direction) not in selected_pairs
+            if selected_pairs is not None and not _row_is_selected(
+                selected_pairs,
+                line_name,
+                direction,
+                line_id,
+                pattern_catalogue,
             ):
                 continue
 
@@ -597,6 +646,7 @@ def _parse_monitor_body(
                             entry_rbls,
                             resolved_towards,
                             live_direction=direction,
+                            line_id=line_id,
                         )
                     except Exception:
                         # Fail-soft: a single matcher hiccup must not poison

@@ -29,7 +29,7 @@ from .coordinator import (
     WienerLinienAustriaCoordinator,
     WienerLinienConfigEntry,
 )
-from .static import CATALOGUE_KEY, StaticCatalogue
+from .static import CATALOGUE_KEY, StaticCatalogue, canonical_line_key
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -220,8 +220,17 @@ class WienerLinienStopSensor(
         # that aren't currently driving (nightlines during the day,
         # day-only lines after midnight). Empty when nothing's tracked,
         # in which case the editors fall through to `lines_at_stop`.
+        # Canonicalised on the way out: a selection saved as "LB|H" is
+        # published as "WLB|H", the spelling the live departures carry.
+        # The cards filter `departure.line` against this list, so a legacy
+        # key published verbatim silently empties the board (issue #110).
+        # Stored entry data is deliberately left alone — every reader
+        # canonicalises, so there is nothing to migrate and nothing to
+        # break if a user downgrades.
         tracked_keys = [
-            str(k) for k in (selected_line_keys or []) if isinstance(k, str) and k
+            canonical_line_key(k)
+            for k in (selected_line_keys or [])
+            if isinstance(k, str) and k
         ]
         tracked_lines = sorted({k.split("|", 1)[0] for k in tracked_keys})
 

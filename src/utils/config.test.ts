@@ -214,6 +214,13 @@ describe("normaliseModernConfig — defaults", () => {
     expect(c.entities[0]?.direction).toBe("H");
   });
 
+  it("canonicalises a legacy line label in the stop filter", () => {
+    const c = normaliseModernConfig({
+      entities: [{ entity: "sensor.wl", lines: ["LB", "U1"] }],
+    });
+    expect(c.entities[0]?.lines).toEqual(["WLB", "U1"]);
+  });
+
   it("drops duplicate stops, keeping first-seen order", () => {
     const c = normaliseModernConfig({
       entities: ["sensor.a", "sensor.b", "sensor.a"],

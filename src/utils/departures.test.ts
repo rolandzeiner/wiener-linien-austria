@@ -41,6 +41,18 @@ describe("filterDepartures — line and direction", () => {
     expect(filterDepartures(feed, { lines: [] })).toHaveLength(3);
   });
 
+  // Issue #110: the retro card passes its single `line` config straight
+  // into this filter, so a config saved with the static-catalogue label
+  // has to be folded onto the spelling live departures carry.
+  it("matches a legacy line label against the realtime spelling", () => {
+    const wlb = [dep({ line: "WLB", direction: "H" })];
+    expect(filterDepartures(wlb, { lines: ["LB"] }).map((d) => d.line)).toEqual([
+      "WLB",
+    ]);
+    expect(filterDepartures(wlb, { lines: ["WLB"] })).toHaveLength(1);
+    expect(filterDepartures(wlb, { lines: ["U1"] })).toHaveLength(0);
+  });
+
   it("applies a stop-wide direction to every line", () => {
     const out = filterDepartures(feed, { direction: "H" });
     expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual([

@@ -1,4 +1,5 @@
 import type { HomeAssistant } from "../types.js";
+import { canonicalLineLabel } from "./line-labels.js";
 
 import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 
@@ -256,7 +257,10 @@ export function filterDepartures(
   filter: ModernStopFilter,
 ): DepartureAttr[] {
   const { lines, direction, line_directions, walk_times, accessibility_only } = filter;
-  const lineSet = lines && lines.length ? new Set(lines) : null;
+  // Canonicalised on the way in: the retro card passes its single `line`
+  // config straight here without going through a stop normaliser, so this
+  // is where a legacy "LB" becomes the "WLB" the departures carry.
+  const lineSet = lines && lines.length ? new Set(lines.map(canonicalLineLabel)) : null;
   return departures.filter((d) => {
     if (lineSet && !lineSet.has(d.line)) return false;
     // Per-line direction wins; fall back to stop-wide; "no override and

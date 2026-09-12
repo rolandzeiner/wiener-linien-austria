@@ -166,3 +166,26 @@ def test_line_type_constants_match_python_and_ts() -> None:
             f"{name} drift: const.py={py_value!r} vs "
             f"src/utils/mot.ts={ts_value!r} — bump both together"
         )
+
+
+# LEGACY_LINE_LABELS parity. The alias map lives in two places (Python
+# const.py + TS src/utils/line-labels.ts) for the same reason LINE_TYPE_*
+# does: a handful of stable upstream strings, cheaper duplicated than
+# published on every state write. The card copy exists to rescue configs
+# saved with the old spelling, so a drifted copy silently empties a board.
+_LINE_LABELS_TS = Path(__file__).parent.parent / "src" / "utils" / "line-labels.ts"
+_LEGACY_LABEL_ENTRY_RE = re.compile(r'"?([\w]+)"?\s*:\s*"([^"]+)"\s*,')
+
+
+def test_legacy_line_labels_match_python_and_ts() -> None:
+    """The legacy→realtime label map must be identical on both sides."""
+    from custom_components.wiener_linien_austria.const import LEGACY_LINE_LABELS
+
+    assert _LINE_LABELS_TS.is_file(), f"expected TS module at {_LINE_LABELS_TS}"
+    ts_source = _LINE_LABELS_TS.read_text(encoding="utf-8")
+    body = ts_source.split("LEGACY_LINE_LABELS", 1)[1].split("{", 1)[1].split("}", 1)[0]
+    ts_map = dict(_LEGACY_LABEL_ENTRY_RE.findall(body))
+    assert ts_map == LEGACY_LINE_LABELS, (
+        f"alias-map drift: const.py={LEGACY_LINE_LABELS} vs "
+        f"src/utils/line-labels.ts={ts_map} — update both together"
+    )

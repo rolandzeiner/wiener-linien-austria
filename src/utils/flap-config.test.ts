@@ -71,6 +71,13 @@ describe("normaliseFlapConfig — defaults", () => {
     expect(c.entities[0]?.direction).toBe("H");
   });
 
+  it("canonicalises a legacy line label in the stop filter", () => {
+    const c = normaliseFlapConfig(
+      flap({ entities: [{ entity: "sensor.wl", lines: ["LB"] }] }),
+    );
+    expect(c.entities[0]?.lines).toEqual(["WLB"]);
+  });
+
   it("drops malformed stops and de-duplicates the rest", () => {
     const c = normaliseFlapConfig(
       flap({

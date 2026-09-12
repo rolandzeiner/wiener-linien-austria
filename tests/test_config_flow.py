@@ -162,6 +162,35 @@ async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) 
     assert refreshed.data[CONF_SCAN_INTERVAL] == 120
 
 
+async def test_reconfigure_preselects_canonical_line_keys(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """A key saved as "LB|H" pre-ticks the picker's "WLB|H" option.
+
+    The picker offers whatever the catalogue now spells the line — the
+    realtime label. An unmapped legacy default matches no option, and the
+    user opens reconfigure to find their own selection gone (issue #110).
+    """
+    await _complete_flow(hass)
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, CONF_LINES: ["LB|H", "U1|H"]}
+    )
+
+    flow = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+    )
+    assert flow["step_id"] == "select_lines"
+    default = next(
+        key.default() for key in flow["data_schema"].schema if str(key) == CONF_LINES
+    )
+    assert default == ["WLB|H", "U1|H"]
+
+
 async def test_options_flow_updates_interval(hass: HomeAssistant, mock_fetch) -> None:
     """Options flow changes only the scan interval."""
     await _complete_flow(hass)

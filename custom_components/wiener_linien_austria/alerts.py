@@ -58,7 +58,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-from .static import CATALOGUE_KEY, StaticCatalogue
+from .static import CATALOGUE_KEY, StaticCatalogue, canonical_line_label
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -642,10 +642,19 @@ def line_names_from_keys(keys: Any) -> set[str]:
     so the alert-filter callers in `diagnostics` and `sensor` agree on
     one parse. Non-string / empty entries are dropped silently — they
     can never carry a line name anyway.
+
+    Names are mapped through `canonical_line_label`, so a selection saved
+    as "LB" answers "WLB" — the spelling the alert feed's `relatedLines`
+    and every live departure use. Without it a Badner Bahn entry matches
+    no disruption notice at all.
     """
     if not keys:
         return set()
-    return {k.split("|", 1)[0] for k in keys if isinstance(k, str) and k}
+    return {
+        canonical_line_label(k.split("|", 1)[0])
+        for k in keys
+        if isinstance(k, str) and k
+    }
 
 
 def get_alerts_for(

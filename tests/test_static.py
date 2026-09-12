@@ -18,6 +18,8 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN_COOLDOWN_SECONDS,
     DOMAIN_LAST_CALL_KEY,
     ENTRY_COUNT_KEY,
+    LEGACY_LINE_LABELS,
+    REALTIME_LINE_LABELS,
     USER_AGENT,
 )
 from custom_components.wiener_linien_austria.static import (
@@ -33,6 +35,7 @@ from custom_components.wiener_linien_austria.static import (
     _catalogue_to_store,
     _download_or_fail_soft,
     _fetch_and_build,
+    _has_stale_line_labels,
     _merge_haltepunkte,
     _parse_all,
     _parse_haltestellen,
@@ -42,6 +45,8 @@ from custom_components.wiener_linien_austria.static import (
     async_load_catalogue,
     async_refresh_catalogue,
     async_set_cached_catalogue,
+    canonical_line_key,
+    canonical_line_label,
     stops_ahead_for_match,
 )
 from tests.conftest import make_response_cm
@@ -1910,3 +1915,136 @@ def test_lines_at_rbls_unions_and_sorts_platform_lines() -> None:
     assert index.lines_at_rbls([]) is None
     # One unknown platform alongside a known one still answers.
     assert index.lines_at_rbls([9999, 461]) == ("6",)
+
+
+# ---------------------------------------------------------------------------
+# Realtime line-label aliasing (issue #110 — Badner Bahn)
+# ---------------------------------------------------------------------------
+
+# linien.csv rows for the two lines the realtime feed spells differently,
+# verbatim from the published catalogue on 2026-09-12.
+ALIAS_LINIEN_CSV = (
+    "LineID;LineText;SortingHelp;Realtime;MeansOfTransport\n"
+    "399;LB;204;1;ptTramWLB\n"
+    "825;25BR;190;1;ptRufBus\n"
+)
+ALIAS_FAHR_CSV = (
+    "LineID;PatternID;StopSeqCount;StopID;Direction\n"
+    "399;1;0;4001;1\n"
+    "399;1;1;4111;1\n"
+    "399;1;2;4222;1\n"
+    "825;1;0;4001;1\n"
+    "825;1;1;4111;1\n"
+)
+
+
+def test_parse_trip_patterns_uses_realtime_line_labels() -> None:
+    """linien.csv's "LB" is indexed as the feed's "WLB" (and 25BR as 25B)."""
+    index = _parse_trip_patterns(ALIAS_LINIEN_CSV, ALIAS_FAHR_CSV)
+    assert index.lines_by_label == {"WLB": 399, "25B": 825}
+    assert index.label_for_line[399] == "WLB"
+    assert "LB" not in index.lines_by_label
+
+
+def test_parse_trip_patterns_alias_ignored_when_csv_label_changes() -> None:
+    """The override only fires while linien.csv still spells it the old way.
+
+    If Wiener Linien ever publishes LineText="WLB" for LineID 399 itself,
+    the table must not pin some third spelling — it becomes a no-op.
+    """
+    csv_text = (
+        "LineID;LineText;SortingHelp;Realtime;MeansOfTransport\n"
+        "399;Badner Bahn;204;1;ptTramWLB\n"
+    )
+    index = _parse_trip_patterns(csv_text, ALIAS_FAHR_CSV)
+    assert index.lines_by_label == {"Badner Bahn": 399}
+
+
+def test_parse_trip_patterns_alias_reaches_lines_at_diva() -> None:
+    """The changeover chips carry the realtime spelling, not the CSV's."""
+    stations = _parse_haltestellen(HALTESTELLEN_CSV)
+    _merge_haltepunkte(stations, HALTEPUNKTE_CSV)
+    index = _parse_trip_patterns(ALIAS_LINIEN_CSV, ALIAS_FAHR_CSV, stations)
+    labels = {label for labels in index.lines_at_diva.values() for label in labels}
+    assert "WLB" in labels
+    assert "LB" not in labels
+
+
+def test_parse_route_colors_folds_gtfs_bb_onto_wlb() -> None:
+    """GTFS calls the Badner Bahn "BB"; the palette must key it as "WLB"."""
+    csv_text = (
+        "route_id,agency_id,route_short_name,route_long_name,"
+        "route_type,route_color,route_text_color\n"
+        "11-WLB-j26-1,03,BB,Wien Oper - Baden Josefsplatz,0,0A295D,FFFFFF\n"
+    )
+    bg, fg = _parse_route_colors(csv_text)
+    assert bg == {"WLB": "0A295D"}
+    assert fg == {"WLB": "FFFFFF"}
+    assert "BB" not in bg
+
+
+def test_canonical_line_label_and_key_map_legacy_spellings() -> None:
+    """Saved selections written before the alias table still resolve."""
+    assert canonical_line_label("LB") == "WLB"
+    assert canonical_line_label("WLB") == "WLB"
+    assert canonical_line_label("U1") == "U1"
+    assert canonical_line_key("LB|H") == "WLB|H"
+    assert canonical_line_key("25BR|R") == "25B|R"
+    assert canonical_line_key("U1|H") == "U1|H"
+    # A key with no direction segment is passed through, not mangled.
+    assert canonical_line_key("LB") == "WLB"
+    assert canonical_line_key("") == ""
+
+
+def test_has_stale_line_labels_detects_pre_alias_cache() -> None:
+    """A cache carrying the CSV spelling triggers the background refresh."""
+    stale = TripPatternIndex(
+        lines_by_label={"LB": 399}, means_by_line={399: "ptTramWLB"}
+    )
+    fresh = TripPatternIndex(
+        lines_by_label={"WLB": 399}, means_by_line={399: "ptTramWLB"}
+    )
+    unrelated = TripPatternIndex(lines_by_label={"U1": 301})
+    assert _has_stale_line_labels(stale) is True
+    assert _has_stale_line_labels(fresh) is False
+    assert _has_stale_line_labels(unrelated) is False
+
+
+def test_realtime_line_label_table_is_self_consistent() -> None:
+    """Every alias maps a distinct CSV spelling onto a distinct live one."""
+    legacy = [csv_label for csv_label, _live in REALTIME_LINE_LABELS.values()]
+    assert len(legacy) == len(set(legacy))
+    assert dict(REALTIME_LINE_LABELS.values()) == LEGACY_LINE_LABELS
+    for csv_label, live_label in REALTIME_LINE_LABELS.values():
+        assert csv_label and live_label and csv_label != live_label
+        # A live spelling must not itself be a legacy key, or canonicalising
+        # would need more than one pass.
+        assert live_label not in LEGACY_LINE_LABELS
+
+
+def test_stops_ahead_for_match_resolves_by_line_id() -> None:
+    """A live row whose name the catalogue doesn't know still matches by lineId.
+
+    This is the pre-refresh path: the cache still says "LB", the feed says
+    "WLB", and only `line.lineId` connects the two.
+    """
+    stations = _parse_haltestellen(HALTESTELLEN_CSV)
+    _merge_haltepunkte(stations, HALTEPUNKTE_CSV)
+    index = _parse_trip_patterns(ALIAS_LINIEN_CSV, ALIAS_FAHR_CSV, stations)
+    # Simulate the stale cache by putting the CSV spelling back.
+    stale_index = TripPatternIndex(
+        patterns_by_line=index.patterns_by_line,
+        lines_by_label={"LB": 399},
+        means_by_line=index.means_by_line,
+        lines_at_diva=index.lines_at_diva,
+    )
+    catalogue = StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="2026-09-12T12:00:00+00:00",
+        trip_patterns=stale_index,
+    )
+    assert stops_ahead_for_match(catalogue, "WLB", [4001], "", line_id=399) is not None
+    # Without the lineId there is nothing to join on.
+    assert stops_ahead_for_match(catalogue, "WLB", [4001], "") is None
+    # An unknown lineId falls back to the label lookup rather than failing.
+    assert stops_ahead_for_match(catalogue, "LB", [4001], "", line_id=999) is not None

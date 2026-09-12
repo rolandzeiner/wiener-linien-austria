@@ -134,6 +134,57 @@ STATIC_FILES: Final = {
     "routes": f"{API_BASE_URL}/doku/ogd/gtfs/routes.txt",
 }
 
+# Line labels where `wienerlinien-ogd-linien.csv` and the realtime
+# `/monitor` feed disagree about the same line. Keyed by `LineID`, which
+# both sources carry (`LineID` in the CSV, `line.lineId` in the feed), so
+# an entry can never be applied to the wrong line — a label-keyed table
+# could, because the CSV reuses labels across modes.
+#
+# Verified 2026-09-12 by joining every live `line.lineId` seen across one
+# probe per line (195 stops) against the CSV; exactly two lines diverge:
+#
+#     LineID | linien.csv | /monitor | line
+#     -------+------------+----------+---------------------------------
+#     399    | LB         | WLB      | Badner Bahn (Wiener Lokalbahnen)
+#     825    | 25BR       | 25B      | 25B Rufbus (AST)
+#
+# Each value is `(linien.csv spelling, realtime spelling)`. The CSV half is
+# checked before the override is applied, so if Wiener Linien ever fixes
+# `LineText` upstream the entry quietly becomes a no-op rather than
+# pinning a stale label.
+#
+# The feed's spelling wins: it is what `line.name` puts on every departure
+# the cards render, so the catalogue has to speak the same vocabulary or
+# a selected line silently matches nothing (issue #110).
+#
+# This table is the *display* half of the fix and only covers lines we
+# could observe running. The coordinator additionally joins live rows to
+# the catalogue by `lineId` at match time, so a divergence not listed here
+# (the night Rufbus lines, which never run during a daytime probe) still
+# filters correctly — it just keeps the catalogue's spelling on the chips.
+REALTIME_LINE_LABELS: Final[dict[int, tuple[str, str]]] = {
+    399: ("LB", "WLB"),
+    825: ("25BR", "25B"),
+}
+
+# Derived reverse view: linien.csv spelling -> realtime spelling. Saved
+# selections (`CONF_LINES`) written before the catalogue learned the feed's
+# vocabulary carry the CSV spelling, and so does anything downstream that
+# reads them back — the `tracked_lines` attribute the cards filter on, the
+# alert line-matcher, the reconfigure form's preselection. Mapping through
+# this on read keeps those entries working without rewriting stored data.
+LEGACY_LINE_LABELS: Final[dict[str, str]] = dict(REALTIME_LINE_LABELS.values())
+
+# GTFS `routes.txt` is a third vocabulary: it labels the Badner Bahn "BB"
+# (agency 03, Wiener Lokalbahnen) where the realtime feed says "WLB".
+# Without this the line's published navy (#0A295D) never reaches the
+# cards and it renders in the neutral fallback. Applied on the GTFS side
+# only — `REALTIME_LINE_LABELS` above cannot help here because routes.txt
+# carries no LineID.
+GTFS_LINE_LABEL_ALIASES: Final[dict[str, str]] = {
+    "BB": "WLB",
+}
+
 # Response attribution (CC-BY mandated)
 ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 

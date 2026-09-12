@@ -26,6 +26,7 @@ import type {
   WienerLinienFlapCardConfig,
 } from "../types.js";
 import { CARD_DEFAULTS } from "./card-vocabulary.js";
+import { canonicalLineLabel } from "./line-labels.js";
 import {
   filterPassthrough,
   normaliseRetroHeaderSide,
@@ -88,9 +89,11 @@ function normaliseStopEntry(raw: unknown): NormalisedFlapStop | null {
   if (!entity?.startsWith("sensor.")) return null;
   const stop: NormalisedFlapStop = { entity };
   if (Array.isArray(r.lines)) {
-    const lines = r.lines.filter(
-      (l): l is string => typeof l === "string" && l.length > 0,
-    );
+    // See the matching note in utils/config.ts — a `lines:` saved with the
+    // static-catalogue spelling has to survive (issue #110).
+    const lines = r.lines
+      .filter((l): l is string => typeof l === "string" && l.length > 0)
+      .map(canonicalLineLabel);
     if (lines.length) stop.lines = lines;
   }
   if (r.direction === "H" || r.direction === "R") stop.direction = r.direction;

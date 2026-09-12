@@ -47,7 +47,10 @@ from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN,
     ENTRY_COUNT_KEY,
+    GTFS_LINE_LABEL_ALIASES,
+    LEGACY_LINE_LABELS,
     MAX_STOPS_AHEAD,
+    REALTIME_LINE_LABELS,
     STATIC_FILES,
     USER_AGENT,
 )
@@ -435,6 +438,45 @@ def async_set_cached_catalogue(hass: HomeAssistant, catalogue: StaticCatalogue) 
     domain_data[CATALOGUE_KEY] = catalogue
 
 
+def canonical_line_label(label: str) -> str:
+    """Map a line label onto the spelling the realtime feed uses.
+
+    `linien.csv` and `/monitor` disagree on a couple of lines (the Badner
+    Bahn is "LB" in the catalogue and "WLB" on every departure). The
+    catalogue itself is normalised at parse time, so this exists for the
+    values that were written down *before* that happened — saved
+    `CONF_LINES` selections, and everything derived from them. Anything
+    already canonical, or not in the table, passes through unchanged.
+    """
+    return LEGACY_LINE_LABELS.get(label, label)
+
+
+def canonical_line_key(key: str) -> str:
+    """`canonical_line_label` applied to a `{line}|{direction}` key.
+
+    Keys with no pipe are returned as-is — they are malformed and would
+    never match a live row anyway, so this is not the place to reject them.
+    """
+    label, sep, rest = key.partition("|")
+    canonical = LEGACY_LINE_LABELS.get(label)
+    return key if canonical is None else f"{canonical}{sep}{rest}"
+
+
+def _has_stale_line_labels(index: TripPatternIndex) -> bool:
+    """True when a cached index still spells a line the way linien.csv does.
+
+    Compares the cache's own label for each aliased `LineID` against
+    `REALTIME_LINE_LABELS`. A cache written before the table existed keeps
+    "LB" for LineID 399 and answers True; one written after keeps "WLB"
+    and answers False. Lines the cache doesn't know are ignored — an
+    absent LineID is not a stale label.
+    """
+    return any(
+        index.label_for_line.get(line_id) == legacy
+        for line_id, (legacy, _live) in REALTIME_LINE_LABELS.items()
+    )
+
+
 async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     """Return the current static catalogue, loading from cache or network.
 
@@ -489,6 +531,15 @@ async def async_load_catalogue(hass: HomeAssistant) -> StaticCatalogue:
                 # isn't stuck on the fallback palette until the next
                 # weekly tick.
                 (tp is not None and not tp.colors_by_line, "missing route colours"),
+                # Cache predates `REALTIME_LINE_LABELS` (or the table has
+                # grown since it was written), so it still carries the
+                # linien.csv spelling for a line the realtime feed names
+                # differently. Left alone, the picker keeps offering "LB"
+                # while every departure says "WLB".
+                (
+                    tp is not None and _has_stale_line_labels(tp),
+                    "line labels predate the realtime alias table",
+                ),
             )
             needs_refresh_reason = next(
                 (reason for cond, reason in migration_tells if cond),
@@ -950,7 +1001,17 @@ def _parse_trip_patterns(
             line_id = int(row["LineID"])
         except (KeyError, ValueError, TypeError):
             continue
+        # `REALTIME_LINE_LABELS` overrides `LineText` for the handful of
+        # lines the realtime feed spells differently (LineID 399 is "LB"
+        # here and "WLB" on every departure). Rewriting it at the single
+        # point the label enters the catalogue means the picker, the
+        # changeover chips, the stops-ahead matcher and the saved
+        # selection keys all inherit the feed's spelling — see
+        # `REALTIME_LINE_LABELS` for why LineID is the right key.
         label = (row.get("LineText") or "").strip()
+        alias = REALTIME_LINE_LABELS.get(line_id)
+        if alias is not None and alias[0] == label:
+            label = alias[1]
         if label:
             lines_by_label[label] = line_id
         means = (row.get("MeansOfTransport") or "").strip()
@@ -1061,7 +1122,12 @@ def _parse_route_colors(routes_text: str) -> tuple[dict[str, str], dict[str, str
     bg_agency: dict[str, str] = {}
     reader = csv.DictReader(io.StringIO(routes_text), delimiter=",")
     for row in reader:
-        label = (row.get("route_short_name") or "").strip()
+        raw_label = (row.get("route_short_name") or "").strip()
+        # routes.txt is a third vocabulary — the Badner Bahn is "BB" here,
+        # "WLB" on the realtime feed and "LB" in linien.csv. Fold it onto
+        # the feed's spelling so the palette lands on the label the cards
+        # actually render (see GTFS_LINE_LABEL_ALIASES).
+        label = GTFS_LINE_LABEL_ALIASES.get(raw_label, raw_label)
         color = (row.get("route_color") or "").strip().upper()
         # `_HEX6_RE`, not `len() == 6` — see the constant. A malformed row
         # falls through to the card's fallback palette, which is correct.
@@ -1087,8 +1153,17 @@ def stops_ahead_for_match(
     entry_rbls: Iterable[int],
     towards: str,
     live_direction: str | None = None,
+    line_id: int | None = None,
 ) -> list[dict[str, Any]] | None:
     """Resolve the next-stops list for a live monitor row.
+
+    `line_id` is the `/monitor` row's `line.lineId`, the same identifier
+    `linien.csv` publishes as `LineID`. When given it resolves the line
+    directly, so a row whose `line.name` the catalogue spells differently
+    (the Badner Bahn is "WLB" live, "LB" in the CSV) still finds its
+    patterns — including from a cache written before `REALTIME_LINE_LABELS`
+    existed. Falls back to the label lookup when absent or unknown, which
+    is what the fixtures and older payloads exercise.
 
     `live_direction` is the `/monitor` row's "H" / "R" string; when given,
     we filter candidate patterns to the matching numeric Direction (Wiener
@@ -1117,11 +1192,13 @@ def stops_ahead_for_match(
     """
     if catalogue.trip_patterns is None:
         return None
-    line_id = catalogue.trip_patterns.lines_by_label.get(line_label)
-    if line_id is None:
+    resolved_line_id = line_id
+    if resolved_line_id not in catalogue.trip_patterns.patterns_by_line:
+        resolved_line_id = catalogue.trip_patterns.lines_by_label.get(line_label)
+    if resolved_line_id is None:
         return None
 
-    candidates = catalogue.trip_patterns.patterns_by_line.get(line_id)
+    candidates = catalogue.trip_patterns.patterns_by_line.get(resolved_line_id)
     if not candidates:
         return None
 

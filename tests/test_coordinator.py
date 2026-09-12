@@ -22,6 +22,7 @@ from custom_components.wiener_linien_austria.const import (
 from custom_components.wiener_linien_austria.coordinator import (
     MonitorData,
     WienerLinienAustriaCoordinator,
+    _normalise_lines,
     _parse_iso,
     _parse_monitor_body,
 )
@@ -283,6 +284,172 @@ def _u1_h_body() -> dict:
             ]
         }
     }
+
+
+def _wlb_catalogue():
+    """A catalogue that spells LineID 399 the way linien.csv does ("LB").
+
+    That is the pre-refresh shape a running install has on the first tick
+    after upgrading: the cached index still carries the CSV label while
+    the feed is already answering "WLB".
+    """
+    from custom_components.wiener_linien_austria.static import (
+        StaticCatalogue,
+        Station,
+        TripPattern,
+        TripPatternIndex,
+    )
+
+    stations = {
+        62000010: Station(62000010, "Eichenstraße", "Wien", 16.34, 48.18, [4900]),
+        62000011: Station(62000011, "Wien Oper", "Wien", 16.37, 48.20, [4901]),
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            399: [
+                TripPattern(line_id=399, pattern_id=1, direction=1, stops=(4900, 4901))
+            ]
+        },
+        lines_by_label={"LB": 399},
+        means_by_line={399: "ptTramWLB"},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def _wlb_body() -> dict:
+    """One Badner Bahn departure, spelled the way /monitor spells it."""
+    return {
+        "data": {
+            "monitors": [
+                {
+                    "lines": [
+                        {
+                            "name": "WLB",
+                            "lineId": 399,
+                            "towards": "Wien Oper",
+                            "direction": "H",
+                            "type": "ptTramWLB",
+                            "barrierFree": True,
+                            "realtimeSupported": True,
+                            "trafficjam": False,
+                            "departures": {
+                                "departure": [
+                                    {
+                                        "departureTime": {"countdown": 4},
+                                        "vehicle": {"towards": "Wien Oper"},
+                                    },
+                                ]
+                            },
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+
+
+def test_parse_monitor_body_keeps_legacy_line_label_selection() -> None:
+    """A selection saved as "LB|H" still matches the feed's "WLB" rows.
+
+    Issue #110: the picker offered the static catalogue's label, the feed
+    answers with a different one, and the (line, direction) compare dropped
+    every Badner Bahn departure without logging anything.
+    """
+    result = _parse_monitor_body(
+        _wlb_body(),
+        {"LB|H"},
+        None,
+        catalogue=_wlb_catalogue(),
+        entry_rbls=[4900],
+    )
+    assert [d.line for d in result.departures] == ["WLB"]
+
+
+def test_normalise_lines_canonicalises_legacy_selection() -> None:
+    """Saved keys are folded onto the realtime spelling before matching.
+
+    This is the path a user is on once the catalogue has refreshed: it now
+    spells LineID 399 "WLB" like the feed does, so the lineId join has
+    nothing left to widen and the saved "LB|H" has to be translated on the
+    way in instead.
+    """
+    from custom_components.wiener_linien_austria.static import (
+        StaticCatalogue,
+        Station,
+        TripPattern,
+        TripPatternIndex,
+    )
+
+    refreshed = StaticCatalogue(
+        stations_by_diva={
+            62000010: Station(62000010, "Eichenstraße", "Wien", 16.34, 48.18, [4900]),
+            62000011: Station(62000011, "Wien Oper", "Wien", 16.37, 48.20, [4901]),
+        },
+        last_fetched="t",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={
+                399: [
+                    TripPattern(
+                        line_id=399, pattern_id=1, direction=1, stops=(4900, 4901)
+                    )
+                ]
+            },
+            lines_by_label={"WLB": 399},
+            means_by_line={399: "ptTramWLB"},
+        ),
+    )
+    assert _normalise_lines(["LB|H"]) == {"WLB|H"}
+    result = _parse_monitor_body(
+        _wlb_body(),
+        _normalise_lines(["LB|H"]),
+        None,
+        catalogue=refreshed,
+        entry_rbls=[4900],
+    )
+    assert [d.line for d in result.departures] == ["WLB"]
+
+
+def test_parse_monitor_body_matches_realtime_line_label_selection() -> None:
+    """The realtime spelling matches directly, with or without a catalogue."""
+    for catalogue in (_wlb_catalogue(), None):
+        result = _parse_monitor_body(
+            _wlb_body(), {"WLB|H"}, None, catalogue=catalogue, entry_rbls=[4900]
+        )
+        assert [d.line for d in result.departures] == ["WLB"]
+
+
+def test_parse_monitor_body_line_id_alias_respects_direction() -> None:
+    """The lineId join widens the label, never the direction."""
+    result = _parse_monitor_body(
+        _wlb_body(),
+        {"LB|R"},
+        None,
+        catalogue=_wlb_catalogue(),
+        entry_rbls=[4900],
+    )
+    assert result.departures == []
+
+
+def test_parse_monitor_body_line_id_alias_does_not_leak_other_lines() -> None:
+    """An unrelated line is not pulled in just because a lineId is present."""
+    body = _wlb_body()
+    body["data"]["monitors"][0]["lines"][0].update({"name": "6", "lineId": 106})
+    result = _parse_monitor_body(
+        body, {"LB|H"}, None, catalogue=_wlb_catalogue(), entry_rbls=[4900]
+    )
+    assert result.departures == []
+
+
+def test_parse_monitor_body_stops_ahead_uses_line_id_for_aliased_line() -> None:
+    """stops_ahead resolves off lineId when the label lookup would miss."""
+    result = _parse_monitor_body(
+        _wlb_body(), None, None, catalogue=_wlb_catalogue(), entry_rbls=[4900]
+    )
+    sa = result.departures[0].stops_ahead
+    assert sa is not None
+    assert [s["name"] for s in sa] == ["Wien Oper"]
 
 
 def test_parse_monitor_body_enriches_with_stops_ahead() -> None:
