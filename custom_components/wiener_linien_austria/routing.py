@@ -49,6 +49,7 @@ from .const import (
     DEFAULT_WALK_SPEED,
     EXCLUDABLE_MEANS,
     MAX_CHANGES_ANY,
+    ROUTE_TYPES,
     ROUTING_BASE_URL,
     ROUTING_REQUEST_TIMEOUT_SECONDS,
     ROUTING_TRIP_ENDPOINT,
@@ -114,6 +115,17 @@ class RoutingError(Exception):
         self.placeholders: dict[str, str] = dict(placeholders or {})
 
 
+def route_type_option(value: object) -> str:
+    """A stored or requested route type as one of `ROUTE_TYPES`.
+
+    Case-insensitive, so a route saved with the upper-case EFA spelling still
+    loads and still shares cache entries with a lower-case request. Anything
+    unrecognised takes the default rather than reaching the server.
+    """
+    folded = str(value or "").strip().lower()
+    return folded if folded in ROUTE_TYPES else DEFAULT_ROUTE_TYPE
+
+
 @dataclass(slots=True, frozen=True)
 class RouteOptions:
     """What a route entry asks the server for, independent of the time."""
@@ -132,9 +144,9 @@ class RouteOptions:
     ) -> RouteOptions:
         """Build options from a route entry, the setup form or a card request.
 
-        All three name the fields alike. A missing or empty field takes its
-        default and an unknown means of transport is dropped, so an entry
-        saved by an older version still loads.
+        All three name the fields alike. A missing, empty or unknown route
+        type takes its default and an unknown means of transport is dropped,
+        so an entry saved by an older version still loads.
         """
         raw_transfer = config.get(CONF_MIN_TRANSFER_MINUTES)
         try:
@@ -148,7 +160,7 @@ class RouteOptions:
         return cls(
             origin_diva=origin_diva,
             destination_diva=destination_diva,
-            route_type=str(config.get(CONF_ROUTE_TYPE) or DEFAULT_ROUTE_TYPE),
+            route_type=route_type_option(config.get(CONF_ROUTE_TYPE)),
             max_changes=str(config.get(CONF_MAX_CHANGES) or MAX_CHANGES_ANY),
             walk_speed=str(config.get(CONF_WALK_SPEED) or DEFAULT_WALK_SPEED),
             excluded_means=tuple(
@@ -346,7 +358,7 @@ def build_trip_params(
         ("calcNumberOfTrips", str(ROUTING_TRIPS_REQUESTED)),
         ("useRealtime", "1"),
         ("ptOptionsActive", "1"),
-        ("routeType", options.route_type),
+        ("routeType", options.route_type.upper()),
         ("changeSpeed", options.walk_speed),
     ]
     if options.max_changes != MAX_CHANGES_ANY:

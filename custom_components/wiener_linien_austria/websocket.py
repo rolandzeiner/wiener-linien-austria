@@ -142,7 +142,10 @@ async def _websocket_stops(
         vol.Required("type"): "wiener_linien_austria/plan",
         vol.Required("origin"): vol.Coerce(int),
         vol.Required("destination"): vol.Coerce(int),
-        vol.Optional("route_type", default=DEFAULT_ROUTE_TYPE): vol.In(ROUTE_TYPES),
+        # Lower-cased first, so the EFA spelling (`LEASTTIME`) is accepted too.
+        vol.Optional("route_type", default=DEFAULT_ROUTE_TYPE): vol.All(
+            vol.Lower, vol.In(ROUTE_TYPES)
+        ),
         vol.Optional("max_changes", default=MAX_CHANGES_ANY): vol.In(
             MAX_CHANGES_CHOICES
         ),

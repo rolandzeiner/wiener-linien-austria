@@ -335,7 +335,7 @@ The action skips the request cooldown, because someone is waiting for the answer
 | Field | Required | Values |
 |---|---|---|
 | `origin`, `destination` | yes | Stop DIVAs from the `stops` list. |
-| `route_type` | no | `LEASTTIME` (default), `LEASTINTERCHANGE` or `LEASTWALKING`. |
+| `route_type` | no | `leasttime` (default), `leastinterchange` or `leastwalking`. Case doesn't matter. |
 | `max_changes` | no | `"0"`–`"3"`, or `"any"` (default). |
 | `walk_speed` | no | `slow`, `normal` (default) or `fast`. |
 | `excluded_means` | no | Any of `train`, `sbahn`, `metro`, `tram`, `bus`. Default: none. |

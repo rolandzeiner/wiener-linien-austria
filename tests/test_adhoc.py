@@ -8,6 +8,7 @@ from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
+import aiohttp
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
@@ -110,6 +111,54 @@ async def test_stops_lists_trackable_stops(
     await client.send_json_auto_id({"type": "wiener_linien_austria/stops"})
     assert (await client.receive_json())["success"]
     assert hass.data[DOMAIN][STOPS_CACHE_KEY] is cached
+
+
+@pytest.mark.parametrize(
+    "request_payload",
+    [
+        {"type": "wiener_linien_austria/stops"},
+        {
+            "type": "wiener_linien_austria/plan",
+            "origin": STEPHANSPLATZ,
+            "destination": SCHWARZENBERGPLATZ,
+        },
+    ],
+)
+async def test_commands_report_an_unavailable_catalogue(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    request_payload: dict[str, Any],
+) -> None:
+    client = await _connect(hass, hass_ws_client, freezer)
+    before = fetch.await_count
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_get_catalogue",
+        side_effect=aiohttp.ClientError,
+    ):
+        await client.send_json_auto_id(request_payload)
+        response = await client.receive_json()
+    assert response["error"]["code"] == "catalogue_unavailable"
+    assert response["error"]["translation_key"] == "adhoc_catalogue_unavailable"
+    # Nothing to validate stops against, so nothing is planned either.
+    assert fetch.await_count == before
+
+
+async def test_plan_accepts_either_spelling_of_route_type(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+) -> None:
+    client = await _connect(hass, hass_ws_client, freezer)
+    before = fetch.await_count
+    ends = {"origin": STEPHANSPLATZ, "destination": SCHWARZENBERGPLATZ}
+    assert (await _plan(client, **ends, route_type="LEASTWALKING"))["success"]
+    assert dict(fetch.call_args.args[1])["routeType"] == "LEASTWALKING"
+    # The same query in the stored spelling is a cache hit, not a new request.
+    assert (await _plan(client, **ends, route_type="leastwalking"))["success"]
+    assert fetch.await_count == before + 1
 
 
 async def test_commands_answer_not_loaded_without_an_entry(

@@ -78,7 +78,6 @@ from .const import (
     CONF_WALK_SPEED,
     DEFAULT_MIN_TRANSFER_MINUTES,
     DEFAULT_ROUTE_SCAN_INTERVAL,
-    DEFAULT_ROUTE_TYPE,
     DEFAULT_SCAN_INTERVAL,
     DEFAULT_WALK_SPEED,
     DOMAIN,
@@ -101,7 +100,12 @@ from .const import (
 )
 from .http import base_request_headers
 from .route_coordinator import async_plan_trips
-from .routing import ROUTE_STOP_ERRORS, RouteOptions, RoutingError
+from .routing import (
+    ROUTE_STOP_ERRORS,
+    RouteOptions,
+    RoutingError,
+    route_type_option,
+)
 from .static import (
     StaticCatalogue,
     Station,
@@ -733,9 +737,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_ORIGIN_NAME: origin_name,
                     CONF_DESTINATION_DIVA: destination_diva,
                     CONF_DESTINATION_NAME: destination_name,
-                    CONF_ROUTE_TYPE: str(
-                        user_input.get(CONF_ROUTE_TYPE, DEFAULT_ROUTE_TYPE)
-                    ),
+                    CONF_ROUTE_TYPE: route_type_option(user_input.get(CONF_ROUTE_TYPE)),
                     CONF_MAX_CHANGES: str(
                         user_input.get(CONF_MAX_CHANGES, MAX_CHANGES_ANY)
                     ),
@@ -786,7 +788,9 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(
                     CONF_ROUTE_TYPE,
-                    default=defaults.get(CONF_ROUTE_TYPE, DEFAULT_ROUTE_TYPE),
+                    # Normalised so a route saved in upper case preselects
+                    # its option on reconfigure.
+                    default=route_type_option(defaults.get(CONF_ROUTE_TYPE)),
                 ): SelectSelector(
                     SelectSelectorConfig(
                         options=list(ROUTE_TYPES),

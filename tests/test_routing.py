@@ -25,6 +25,7 @@ from custom_components.wiener_linien_austria.routing import (
     parse_time_option,
     parse_trip_body,
     rank_trips,
+    route_type_option,
     within_window,
 )
 
@@ -331,13 +332,14 @@ def test_build_params_options() -> None:
     options = RouteOptions(
         1,
         2,
-        route_type="LEASTINTERCHANGE",
+        route_type="leastinterchange",
         max_changes="1",
         walk_speed="slow",
         excluded_means=("4", "5"),
     )
     params = build_trip_params(options, _at(8, 5), arrive_by=True, language="en-GB")
     as_dict = dict(params)
+    # Stored lower-case, sent in the server's own spelling.
     assert as_dict["routeType"] == "LEASTINTERCHANGE"
     assert as_dict["maxChanges"] == "1"
     assert as_dict["changeSpeed"] == "slow"
@@ -462,6 +464,14 @@ def test_route_options_from_config_fills_defaults_and_drops_unknowns() -> None:
     assert options == RouteOptions(
         origin_diva=1, destination_diva=2, excluded_means=("4",)
     )
+    # An entry saved with the EFA spelling reads as the stored spelling, so
+    # both share cache entries; an unknown value never reaches the server.
+    assert RouteOptions.from_config(
+        1, 2, {"route_type": "LEASTWALKING"}
+    ).route_type == ("leastwalking")
+    assert route_type_option(" LeastInterchange ") == "leastinterchange"
+    assert route_type_option("FASTEST") == "leasttime"
+    assert route_type_option(None) == "leasttime"
     assert RouteOptions.from_config(
         1, 2, {"walk_speed": "slow", "min_transfer_minutes": "5"}
     ) == RouteOptions(

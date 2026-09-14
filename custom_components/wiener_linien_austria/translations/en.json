@@ -219,9 +219,9 @@
   "selector": {
     "route_type": {
       "options": {
-        "LEASTTIME": "Fastest trip",
-        "LEASTINTERCHANGE": "Fewest changes",
-        "LEASTWALKING": "Least walking"
+        "leasttime": "Fastest trip",
+        "leastinterchange": "Fewest changes",
+        "leastwalking": "Least walking"
       }
     },
     "max_changes": {

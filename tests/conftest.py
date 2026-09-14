@@ -192,7 +192,7 @@ ROUTE_DATA: dict[str, Any] = {
     CONF_ORIGIN_NAME: "Westbahnhof",
     CONF_DESTINATION_DIVA: 60201040,
     CONF_DESTINATION_NAME: "Praterstern",
-    CONF_ROUTE_TYPE: "LEASTTIME",
+    CONF_ROUTE_TYPE: "leasttime",
     CONF_MAX_CHANGES: "any",
     CONF_WALK_SPEED: "normal",
     CONF_MIN_TRANSFER_MINUTES: 2,

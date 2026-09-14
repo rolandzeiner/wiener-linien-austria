@@ -207,9 +207,13 @@ CONF_ACTIVE_FROM: Final = "active_from"
 CONF_ACTIVE_TO: Final = "active_to"
 CONF_ACTIVE_DAYS: Final = "active_days"
 
-# The EFA `routeType` optimisation targets (Mentz EFA XML interface, §5.2).
-ROUTE_TYPES: Final = ("LEASTTIME", "LEASTINTERCHANGE", "LEASTWALKING")
-DEFAULT_ROUTE_TYPE: Final = "LEASTTIME"
+# The EFA `routeType` optimisation targets (Mentz EFA XML interface, §5.2),
+# stored lower-case. They double as selector translation keys, which hassfest
+# requires to match `[a-z0-9-_]+`; `build_trip_params` upper-cases them for the
+# request. Entries saved in upper case before 2.0.0 shipped are read through
+# `routing.route_type_option`, so they keep working without a migration.
+ROUTE_TYPES: Final = ("leasttime", "leastinterchange", "leastwalking")
+DEFAULT_ROUTE_TYPE: Final = "leasttime"
 # `changeSpeed` accepts named speeds; "normal" is the server default.
 WALK_SPEEDS: Final = ("slow", "normal", "fast")
 DEFAULT_WALK_SPEED: Final = "normal"

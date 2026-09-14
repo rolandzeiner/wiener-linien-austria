@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -39,9 +40,12 @@ from custom_components.wiener_linien_austria.const import (
     CONF_WALK_SPEED,
     DOMAIN,
     ENTRY_TYPE_ROUTE,
+    MAX_CHANGES_CHOICES,
+    ROUTE_TYPES,
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
     S_BAHN_TEXT_COLOR,
+    WALK_SPEEDS,
 )
 from custom_components.wiener_linien_austria.diagnostics import (
     async_get_config_entry_diagnostics,
@@ -490,7 +494,7 @@ async def _start_route_flow(hass: HomeAssistant) -> Any:
 
 
 OPTIONS_INPUT: dict[str, Any] = {
-    CONF_ROUTE_TYPE: "LEASTINTERCHANGE",
+    CONF_ROUTE_TYPE: "leastinterchange",
     CONF_MAX_CHANGES: "1",
     CONF_WALK_SPEED: "slow",
     CONF_MIN_TRANSFER_MINUTES: 3,
@@ -529,6 +533,7 @@ async def test_route_flow_creates_entry(hass: HomeAssistant) -> None:
     assert data[CONF_ENTRY_TYPE] == ENTRY_TYPE_ROUTE
     assert data[CONF_ORIGIN_DIVA] == 60201012
     assert data[CONF_DESTINATION_NAME] == "Schwarzenbergplatz"
+    assert data[CONF_ROUTE_TYPE] == "leastinterchange"
     assert data[CONF_EXCLUDED_MEANS] == ["bus"]
     assert data[CONF_ACTIVE_DAYS] == ["mon", "fri"]
     assert data[CONF_ACTIVE_FROM] == "06:30:00"
@@ -619,6 +624,45 @@ async def test_route_reconfigure_keeps_the_ends(
     assert entry.data[CONF_MIN_TRANSFER_MINUTES] == 5
     assert entry.data[CONF_ORIGIN_DIVA] == 60201468
     assert entry.unique_id == "route_60201468_60201040"
+
+
+async def test_route_saved_in_upper_case_still_plans_and_preselects(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """A route saved with the EFA spelling, before the values went lower-case."""
+    entry = route_entry(**{CONF_ROUTE_TYPE: "LEASTWALKING"})
+    await async_setup_entry_and_wait(hass, entry)
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data.options.route_type == "leastwalking"
+    assert dict(fetch.call_args.args[1])["routeType"] == "LEASTWALKING"
+
+    result = await entry.start_reconfigure_flow(hass)
+    (route_type_key,) = (
+        key for key in result["data_schema"].schema if key == CONF_ROUTE_TYPE
+    )
+    assert route_type_key.default() == "leastwalking"
+
+
+def test_selector_option_keys_pass_hassfest() -> None:
+    """Selector option keys must be `[a-z0-9-_]+`, or hassfest rejects the file.
+
+    Also checks every option the config flow offers has a label, so a value
+    renamed in const.py can't leave the dropdown showing the raw key.
+    """
+    root = Path(__file__).parents[1] / "custom_components" / DOMAIN
+    offered = {
+        CONF_ROUTE_TYPE: set(ROUTE_TYPES),
+        CONF_WALK_SPEED: set(WALK_SPEEDS),
+        CONF_MAX_CHANGES: set(MAX_CHANGES_CHOICES),
+    }
+    valid = re.compile(r"^[a-z0-9]([a-z0-9-_]*[a-z0-9])?$")
+    for name in ("strings.json", "translations/en.json", "translations/de.json"):
+        selectors = json.loads((root / name).read_text(encoding="utf-8"))["selector"]
+        for selector, block in selectors.items():
+            for key in block.get("options", {}):
+                assert valid.match(key), f"{name}: selector.{selector}.options.{key}"
+        for selector, values in offered.items():
+            assert set(selectors[selector]["options"]) >= values, (name, selector)
 
 
 async def test_route_reconfigure_with_corrupt_data_aborts(hass: HomeAssistant) -> None:

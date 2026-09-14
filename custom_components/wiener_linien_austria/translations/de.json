@@ -219,9 +219,9 @@
   "selector": {
     "route_type": {
       "options": {
-        "LEASTTIME": "Schnellste Fahrt",
-        "LEASTINTERCHANGE": "Wenig Umstiege",
-        "LEASTWALKING": "Wenig Fußweg"
+        "leasttime": "Schnellste Fahrt",
+        "leastinterchange": "Wenig Umstiege",
+        "leastwalking": "Wenig Fußweg"
       }
     },
     "max_changes": {
