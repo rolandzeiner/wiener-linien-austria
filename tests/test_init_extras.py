@@ -22,6 +22,7 @@ from custom_components.wiener_linien_austria import (
     _websocket_card_version,
     _websocket_flap_card_version,
     _websocket_retro_card_version,
+    _websocket_route_card_version,
     async_migrate_entry,
     async_setup,
     async_unload_entry,
@@ -32,6 +33,7 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     FLAP_CARD_VERSION,
     RETRO_CARD_VERSION,
+    ROUTE_CARD_VERSION,
 )
 
 from .conftest import make_entry as _make_entry
@@ -59,6 +61,13 @@ async def test_websocket_retro_card_version(hass: HomeAssistant) -> None:
     conn = _make_connection()
     await _websocket_retro_card_version.__wrapped__(hass, conn, {"id": 18, "type": "x"})
     conn.send_result.assert_called_once_with(18, {"version": RETRO_CARD_VERSION})
+
+
+async def test_websocket_route_card_version(hass: HomeAssistant) -> None:
+    """The undecorated handler returns the route card version."""
+    conn = _make_connection()
+    await _websocket_route_card_version.__wrapped__(hass, conn, {"id": 20, "type": "x"})
+    conn.send_result.assert_called_once_with(20, {"version": ROUTE_CARD_VERSION})
 
 
 async def test_websocket_flap_card_version(hass: HomeAssistant) -> None:

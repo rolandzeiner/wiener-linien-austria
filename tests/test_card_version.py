@@ -10,8 +10,8 @@ If these drift, HA's frontend WebSocket check sees a mismatch, shows a
 reload banner, the reload re-serves the same mismatched JS, and the
 banner reappears — infinite loop for every user on an old card.
 
-Wiener Linien ships *three* card variants (modern + retro + flap), each
-with its own constant. The test asserts all three separately so a
+Wiener Linien ships *four* card variants (modern + retro + flap + route),
+each with its own constant. The test asserts all four separately so a
 failure points at exactly which constant drifted.
 """
 
@@ -26,6 +26,7 @@ from custom_components.wiener_linien_austria.const import (
     FLAP_CARD_VERSION,
     INTEGRATION_VERSION,
     RETRO_CARD_VERSION,
+    ROUTE_CARD_VERSION,
 )
 
 _TS_CONST = Path(__file__).parent.parent / "src" / "const.ts"
@@ -38,6 +39,7 @@ _MANIFEST = (
 _CARD_PATTERN = re.compile(r'\bCARD_VERSION\s*=\s*"([^"]+)"')
 _RETRO_PATTERN = re.compile(r'\bRETRO_CARD_VERSION\s*=\s*"([^"]+)"')
 _FLAP_PATTERN = re.compile(r'\bFLAP_CARD_VERSION\s*=\s*"([^"]+)"')
+_ROUTE_PATTERN = re.compile(r'\bROUTE_CARD_VERSION\s*=\s*"([^"]+)"')
 
 
 def _read_ts_source() -> str:
@@ -189,3 +191,17 @@ def test_legacy_line_labels_match_python_and_ts() -> None:
         f"alias-map drift: const.py={LEGACY_LINE_LABELS} vs "
         f"src/utils/line-labels.ts={ts_map} — update both together"
     )
+
+
+def test_route_card_version_aliases_integration_version() -> None:
+    """`ROUTE_CARD_VERSION` is in lockstep with `INTEGRATION_VERSION`."""
+    assert ROUTE_CARD_VERSION == INTEGRATION_VERSION
+
+
+def test_route_card_version_matches_ts() -> None:
+    """`src/const.ts:ROUTE_CARD_VERSION` must equal the manifest version."""
+    match = _ROUTE_PATTERN.search(_read_ts_source())
+    assert match is not None, (
+        f"ROUTE_CARD_VERSION literal not found in {_TS_CONST}; regex may be stale"
+    )
+    assert match.group(1) == _expected_version()

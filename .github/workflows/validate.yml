@@ -116,7 +116,7 @@ jobs:
         run: python scripts/check_module_coverage.py
 
   validate-card:
-    # Rebuilds all three Lovelace card bundles from src/ and verifies each
+    # Rebuilds all four Lovelace card bundles from src/ and verifies each
     # output is valid JS. Catches TS errors, missing deps, and high-severity
     # npm advisories before they reach the served www/*.js files.
     runs-on: ubuntu-latest
@@ -196,7 +196,7 @@ jobs:
       - name: Assert the committed bundles match a fresh build
         # The build above regenerates www/ from src/. Any diff means a
         # committed bundle is stale — someone changed src/ and didn't
-        # rebuild. This repo ships THREE bundles (modern, retro, flap),
+        # rebuild. This repo ships FOUR bundles (modern, retro, flap, route),
         # so the whole www/ directory is checked rather than one file;
         # www/fonts/ is not generated and will never diff.
         #
@@ -219,3 +219,5 @@ jobs:
         run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-retro-card.js
       - name: Syntax-check flap bundle
         run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-flap-card.js
+      - name: Syntax-check route bundle
+        run: node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-route-card.js

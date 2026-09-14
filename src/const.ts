@@ -1,4 +1,4 @@
-// CARD_VERSION / RETRO_CARD_VERSION / FLAP_CARD_VERSION must match
+// CARD_VERSION / RETRO_CARD_VERSION / FLAP_CARD_VERSION / ROUTE_CARD_VERSION must match
 // the corresponding constants in
 // custom_components/wiener_linien_austria/const.py byte-for-byte.
 // If they drift, the WebSocket version check sees a mismatch, shows
@@ -7,6 +7,7 @@
 export const CARD_VERSION = "2.0.0";
 export const RETRO_CARD_VERSION = "2.0.0";
 export const FLAP_CARD_VERSION = "2.0.0";
+export const ROUTE_CARD_VERSION = "2.0.0";
 
 export const DOMAIN = "wiener_linien_austria";
 

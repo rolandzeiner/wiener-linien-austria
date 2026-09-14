@@ -36,6 +36,8 @@ from custom_components.wiener_linien_austria.const import (
     FONTS_URL,
     RETRO_CARD_URL,
     RETRO_CARD_VERSION,
+    ROUTE_CARD_URL,
+    ROUTE_CARD_VERSION,
 )
 
 
@@ -75,12 +77,13 @@ def _build_lovelace(
 
 
 async def test_jsmodules_lists_all_cards() -> None:
-    """JSMODULES carries modern, retro, and flap tuples."""
+    """JSMODULES carries modern, retro, flap and route tuples."""
     urls = {url for url, _v, _f in JSMODULES}
     assert CARD_URL in urls
     assert RETRO_CARD_URL in urls
     assert FLAP_CARD_URL in urls
-    assert len(JSMODULES) == 3
+    assert ROUTE_CARD_URL in urls
+    assert len(JSMODULES) == 4
 
 
 async def test_register_creates_all_resources_when_absent(
@@ -95,17 +98,23 @@ async def test_register_creates_all_resources_when_absent(
     await reg.async_register()
 
     static.assert_awaited_once()
-    # Static-paths call carries every URL in one batch: the three card
+    # Static-paths call carries every URL in one batch: the four card
     # JS files plus the fonts directory (registered conditionally via
     # `fonts_dir.is_dir()`; the committed `www/fonts/` makes that
     # branch fire in CI and in any working tree that hasn't deleted
     # the bundled WL webfonts).
     static_args = static.await_args.args[0]
     static_urls = {cfg.url_path for cfg in static_args}
-    assert static_urls == {CARD_URL, RETRO_CARD_URL, FLAP_CARD_URL, FONTS_URL}
+    assert static_urls == {
+        CARD_URL,
+        RETRO_CARD_URL,
+        FLAP_CARD_URL,
+        ROUTE_CARD_URL,
+        FONTS_URL,
+    }
 
     # Cache headers are split by whether the URL carries a version.
-    # The three card bundles are served under `?v={version}`, so a 31-day
+    # The four card bundles are served under `?v={version}`, so a 31-day
     # `Cache-Control` is invalidated by the next release; the fonts
     # directory has no buster, so a long max-age there would pin a stale
     # subset for a month. Getting this backwards is silent in both
@@ -115,11 +124,12 @@ async def test_register_creates_all_resources_when_absent(
         CARD_URL: True,
         RETRO_CARD_URL: True,
         FLAP_CARD_URL: True,
+        ROUTE_CARD_URL: True,
         FONTS_URL: False,
     }
 
-    # Three create_item calls — one per card.
-    assert lovelace.resources.async_create_item.await_count == 3
+    # Four create_item calls — one per card.
+    assert lovelace.resources.async_create_item.await_count == 4
     created_urls = {
         call.args[0]["url"]
         for call in lovelace.resources.async_create_item.await_args_list
@@ -128,11 +138,12 @@ async def test_register_creates_all_resources_when_absent(
         f"{CARD_URL}?v={CARD_VERSION}",
         f"{RETRO_CARD_URL}?v={RETRO_CARD_VERSION}",
         f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}",
+        f"{ROUTE_CARD_URL}?v={ROUTE_CARD_VERSION}",
     }
 
 
 async def test_register_updates_outdated_modern_resource(hass: HomeAssistant) -> None:
-    """An existing modern resource with a stale ?v=… is upserted; retro + flap are created."""
+    """An existing modern resource with a stale ?v=… is upserted; the rest are created."""
     _stub_static(hass)
     stale = {"id": "abc", "url": f"{CARD_URL}?v=0.0.0", "res_type": "module"}
     lovelace = _build_lovelace([stale])
@@ -145,8 +156,8 @@ async def test_register_updates_outdated_modern_resource(hass: HomeAssistant) ->
         "abc",
         {"res_type": "module", "url": f"{CARD_URL}?v={CARD_VERSION}"},
     )
-    # Retro + flap had no rows → both created.
-    assert lovelace.resources.async_create_item.await_count == 2
+    # Retro, flap and route had no rows → all created.
+    assert lovelace.resources.async_create_item.await_count == 3
     created_urls = {
         call.args[0]["url"]
         for call in lovelace.resources.async_create_item.await_args_list
@@ -154,6 +165,7 @@ async def test_register_updates_outdated_modern_resource(hass: HomeAssistant) ->
     assert created_urls == {
         f"{RETRO_CARD_URL}?v={RETRO_CARD_VERSION}",
         f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}",
+        f"{ROUTE_CARD_URL}?v={ROUTE_CARD_VERSION}",
     }
 
 
@@ -170,6 +182,11 @@ async def test_register_skips_when_all_already_current(hass: HomeAssistant) -> N
         {
             "id": "c",
             "url": f"{FLAP_CARD_URL}?v={FLAP_CARD_VERSION}",
+            "res_type": "module",
+        },
+        {
+            "id": "d",
+            "url": f"{ROUTE_CARD_URL}?v={ROUTE_CARD_VERSION}",
             "res_type": "module",
         },
     ]
@@ -206,7 +223,7 @@ async def test_register_uses_resource_mode_on_new_ha(hass: HomeAssistant) -> Non
     await reg.async_register()
 
     # All cards still get created when `resource_mode="storage"`.
-    assert lovelace.resources.async_create_item.await_count == 3
+    assert lovelace.resources.async_create_item.await_count == 4
 
 
 async def test_register_fails_closed_when_neither_mode_field_set(
@@ -320,7 +337,7 @@ async def test_register_waits_for_lovelace_then_registers(
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
 
-    assert lovelace.resources.async_create_item.await_count == 3
+    assert lovelace.resources.async_create_item.await_count == 4
 
 
 async def test_register_gives_up_after_the_retry_cap(

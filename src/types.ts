@@ -658,3 +658,83 @@ export interface WienerLinienFlapCardConfig extends LovelaceCardConfig {
    *  utils/card-vocabulary.ts. */
   housing?: boolean | undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Route card (experimental) — A→B connections from a route entry.
+// Shapes mirror `routing.py`'s `to_dict()` output, published on
+// `sensor.<route>_next_connection`.
+// ---------------------------------------------------------------------------
+
+export type RouteRisk = "ok" | "tight" | "at_risk";
+
+export interface RouteStopAttr {
+  name: string;
+  stop_id: string | null;
+  platform: string | null;
+  planned: string | null;
+  estimated: string | null;
+  delay_minutes: number | null;
+}
+
+export interface RouteLegAttr {
+  walk: boolean;
+  line: string | null;
+  type: string | null;
+  product: string | null;
+  towards: string | null;
+  origin: RouteStopAttr;
+  destination: RouteStopAttr;
+  realtime: boolean;
+  stop_count: number;
+  duration_minutes: number | null;
+  walk_after_minutes: number;
+  cancelled: boolean;
+}
+
+export interface RouteTransferAttr {
+  at: string;
+  walk_minutes: number;
+  slack_minutes: number;
+  risk: RouteRisk;
+}
+
+export interface RouteTripAttr {
+  departure: string | null;
+  arrival: string | null;
+  duration_minutes: number | null;
+  interchanges: number;
+  risk: RouteRisk;
+  cancelled: boolean;
+  legs: RouteLegAttr[];
+  transfers: RouteTransferAttr[];
+}
+
+export interface RouteActiveWindow {
+  from: string | null;
+  to: string | null;
+  days: string[] | null;
+}
+
+export interface RouteAttrs {
+  origin?: string;
+  destination?: string;
+  active?: boolean;
+  active_window?: RouteActiveWindow;
+  fetched_at?: string | null;
+  min_transfer_minutes?: number;
+  trips?: RouteTripAttr[];
+  line_colors?: LineColorsMap;
+  traffic_info?: Array<{ title?: string; description?: string; related_lines?: string[] }>;
+  attribution?: string;
+  [key: string]: unknown;
+}
+
+export interface WienerLinienRouteCardConfig extends LovelaceCardConfig {
+  type: string;
+  entity?: string | undefined;
+  /** Overrides the "Origin → Destination" heading. */
+  title?: string | undefined;
+  /** How many further connections the disclosure lists. 0 hides it. */
+  alternatives?: number | undefined;
+  hide_attribution?: boolean | undefined;
+}

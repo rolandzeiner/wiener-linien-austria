@@ -24,7 +24,7 @@ export interface EditorTranslators {
 }
 
 export function editorTranslators(
-  cardNamespace: "modern" | "retro" | "flap",
+  cardNamespace: "modern" | "retro" | "flap" | "route",
   language: string | undefined,
 ): EditorTranslators {
   const ctx: TranslateContext = { hassLanguage: language };

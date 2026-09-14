@@ -7,9 +7,11 @@ import en from "./languages/en.json";
 import modernCard from "../wiener-linien-austria-card.ts?raw";
 import retroCard from "../wiener-linien-austria-retro-card.ts?raw";
 import flapCard from "../wiener-linien-austria-flap-card.ts?raw";
+import routeCard from "../wiener-linien-austria-route-card.ts?raw";
 import modernEditor from "../editor.ts?raw";
 import retroEditor from "../retro-editor.ts?raw";
 import flapEditor from "../flap-editor.ts?raw";
+import routeEditor from "../route-editor.ts?raw";
 import stopBlock from "../editor/stop-block.ts?raw";
 import headerStrip from "../editor/header-strip.ts?raw";
 import editorCommon from "../editor/editor-common.ts?raw";
@@ -48,9 +50,11 @@ const SOURCES: Record<string, string> = {
   modernCard,
   retroCard,
   flapCard,
+  routeCard,
   modernEditor,
   retroEditor,
   flapEditor,
+  routeEditor,
   stopBlock,
   headerStrip,
   editorCommon,
@@ -124,6 +128,7 @@ describe("every key the code asks for resolves", () => {
     ["modern", modernCard],
     ["retro", retroCard],
     ["flap", flapCard],
+    ["route", routeCard],
   ])("%s card _t() keys exist", (ns, src) => {
     const missing = literals(src, T_CALL).filter((k) => DE[`${ns}.${k}`] === undefined);
     expect(missing).toEqual([]);
@@ -137,6 +142,7 @@ describe("every key the code asks for resolves", () => {
     ["modern", modernEditor],
     ["retro", retroEditor],
     ["flap", flapEditor],
+    ["route", routeEditor],
   ])("%s editor et() keys and ha-form field labels exist", (ns, src) => {
     const keys = [...literals(src, ET_CALL), ...literals(src, FORM_FIELD)];
     expect(keys.filter((k) => !editorKeyResolves(ns, k))).toEqual([]);

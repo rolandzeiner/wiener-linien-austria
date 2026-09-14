@@ -36,6 +36,9 @@ from .const import (
     RETRO_CARD_FILENAME,
     RETRO_CARD_URL,
     RETRO_CARD_VERSION,
+    ROUTE_CARD_FILENAME,
+    ROUTE_CARD_URL,
+    ROUTE_CARD_VERSION,
 )
 
 # Older HA installs lacked LOVELACE_DATA — fall back to the bare-string
@@ -75,11 +78,12 @@ class CardModule(NamedTuple):
     filename: str
 
 
-# All cards registered by this integration. Adding a fourth card = append a row.
+# All cards registered by this integration. Adding a card = append a row.
 JSMODULES: tuple[CardModule, ...] = (
     CardModule(CARD_URL, CARD_VERSION, CARD_FILENAME),
     CardModule(RETRO_CARD_URL, RETRO_CARD_VERSION, RETRO_CARD_FILENAME),
     CardModule(FLAP_CARD_URL, FLAP_CARD_VERSION, FLAP_CARD_FILENAME),
+    CardModule(ROUTE_CARD_URL, ROUTE_CARD_VERSION, ROUTE_CARD_FILENAME),
 )
 
 

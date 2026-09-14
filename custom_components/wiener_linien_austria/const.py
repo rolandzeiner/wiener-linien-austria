@@ -326,7 +326,7 @@ LineType = Literal["ptMetro", "ptTram", "ptBusCity", "ptBusNight"]
 # "R" = Rückfahrt (return). Used as keys in CONF_LINES ("U1|H").
 Direction = Literal["H", "R"]
 
-# Lovelace cards — this integration ships THREE (modern, retro, flap).
+# Lovelace cards — this integration ships FOUR (modern, retro, flap, route).
 # Each JS file carries a `const CARD_VERSION` that must match the
 # corresponding Python constant below byte-for-byte, else the reload
 # banner loops. All three version in lockstep with the integration
@@ -343,6 +343,11 @@ RETRO_CARD_FILENAME: Final = "wiener-linien-austria-retro-card.js"
 FLAP_CARD_VERSION: Final = INTEGRATION_VERSION
 FLAP_CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-flap-card.js"
 FLAP_CARD_FILENAME: Final = "wiener-linien-austria-flap-card.js"
+# Fourth card (experimental): an A→B connection, fed by a route entry's
+# `sensor.<route>_next_connection`. Same lockstep versioning as the others.
+ROUTE_CARD_VERSION: Final = INTEGRATION_VERSION
+ROUTE_CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-route-card.js"
+ROUTE_CARD_FILENAME: Final = "wiener-linien-austria-route-card.js"
 
 # Webfonts directory — subsetted woff2 derivatives of TeX Gyre Heros +
 # TeX Gyre Cursor (GUST Font License). Served from www/fonts/ as a

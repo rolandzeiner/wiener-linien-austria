@@ -72,12 +72,13 @@ const card = (name) => ({
   plugins: plugins(),
 });
 
-// Three cards, three entrypoints, three bundles (modern + retro + flap).
+// Four cards, four entrypoints, four bundles (modern + retro + flap + route).
 // Each card has an independent CARD_VERSION / RETRO_CARD_VERSION /
-// FLAP_CARD_VERSION in src/const.ts so they can rev without spurious
-// reload banners on the others.
+// FLAP_CARD_VERSION / ROUTE_CARD_VERSION in src/const.ts so they can rev
+// without spurious reload banners on the others.
 export default defineConfig([
   card("wiener-linien-austria-card"),
   card("wiener-linien-austria-retro-card"),
   card("wiener-linien-austria-flap-card"),
+  card("wiener-linien-austria-route-card"),
 ]);
