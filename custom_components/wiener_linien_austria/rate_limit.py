@@ -15,6 +15,12 @@ Three callers, each taking exactly one slot per cycle:
   fail-soft background refresh into 5 x 15 s of held lock and stall every
   `/monitor` tick behind it; one slot still keeps the burst from landing on
   top of a monitor tick, which is the part the upstream notices.
+
+Route entries take a separate 15 s slot on the routing backend
+(`async_enforce_routing_cooldown`). Requests someone is waiting for take no
+slot at all: `plan_trip` and the route card's From / To mode go through the
+cache, coalescing and token-bucket budget in adhoc.py instead. A cooldown
+bounds what runs unattended; the budget bounds what people ask for.
 """
 
 from __future__ import annotations
@@ -46,8 +52,9 @@ async def async_enforce_routing_cooldown(hass: HomeAssistant) -> None:
 
     Same lock-then-sleep shape as `async_enforce_domain_cooldown`, on
     separate keys. Only the recurring route coordinators take it; the
-    user-initiated `plan_trip` action does not, for the same reason the
-    config-flow line probe skips the realtime slot — someone is waiting.
+    user-initiated `plan_trip` action and the route card's ad-hoc mode do
+    not, for the same reason the config-flow line probe skips the realtime
+    slot — someone is waiting. adhoc.py's budget bounds those instead.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
     current_loop = asyncio.get_running_loop()

@@ -35,9 +35,15 @@ from typing import Any, Final, Literal
 import aiohttp
 
 from .const import (
+    CONF_EXCLUDED_MEANS,
+    CONF_MAX_CHANGES,
+    CONF_MIN_TRANSFER_MINUTES,
+    CONF_ROUTE_TYPE,
+    CONF_WALK_SPEED,
     DEFAULT_MIN_TRANSFER_MINUTES,
     DEFAULT_ROUTE_TYPE,
     DEFAULT_WALK_SPEED,
+    EXCLUDABLE_MEANS,
     MAX_CHANGES_ANY,
     ROUTING_BASE_URL,
     ROUTING_REQUEST_TIMEOUT_SECONDS,
@@ -82,6 +88,13 @@ ERR_STOP_INVALID: Final = -2000
 ERR_TOO_CLOSE: Final = -4007
 ERR_OUTSIDE_TIMETABLE: Final = -4001
 
+# Answers about the stops themselves. Asking again can't change them: the
+# setup dialog shows them as form errors, the route card stops retrying.
+ROUTE_STOP_ERRORS: Final = frozenset({"route_stop_invalid", "route_too_close"})
+# Answers about the query that won't change within minutes either. The route
+# card doesn't retry these on its short cadence.
+ROUTE_QUERY_ERRORS: Final = ROUTE_STOP_ERRORS | {"route_outside_timetable"}
+
 
 class RoutingError(Exception):
     """A routing request failed; carries a translation key for the caller."""
@@ -108,6 +121,39 @@ class RouteOptions:
     walk_speed: str = DEFAULT_WALK_SPEED
     excluded_means: tuple[str, ...] = ()
     min_transfer_minutes: int = DEFAULT_MIN_TRANSFER_MINUTES
+
+    @classmethod
+    def from_config(
+        cls, origin_diva: int, destination_diva: int, config: Mapping[str, Any]
+    ) -> RouteOptions:
+        """Build options from a route entry, the setup form or a card request.
+
+        All three name the fields alike. A missing or empty field takes its
+        default and an unknown means of transport is dropped, so an entry
+        saved by an older version still loads.
+        """
+        raw_transfer = config.get(CONF_MIN_TRANSFER_MINUTES)
+        try:
+            min_transfer = (
+                DEFAULT_MIN_TRANSFER_MINUTES
+                if raw_transfer is None
+                else int(raw_transfer)
+            )
+        except (TypeError, ValueError):
+            min_transfer = DEFAULT_MIN_TRANSFER_MINUTES
+        return cls(
+            origin_diva=origin_diva,
+            destination_diva=destination_diva,
+            route_type=str(config.get(CONF_ROUTE_TYPE) or DEFAULT_ROUTE_TYPE),
+            max_changes=str(config.get(CONF_MAX_CHANGES) or MAX_CHANGES_ANY),
+            walk_speed=str(config.get(CONF_WALK_SPEED) or DEFAULT_WALK_SPEED),
+            excluded_means=tuple(
+                EXCLUDABLE_MEANS[name]
+                for name in config.get(CONF_EXCLUDED_MEANS) or ()
+                if name in EXCLUDABLE_MEANS
+            ),
+            min_transfer_minutes=min_transfer,
+        )
 
 
 @dataclass(slots=True, frozen=True)

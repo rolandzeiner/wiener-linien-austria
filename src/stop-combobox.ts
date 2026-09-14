@@ -19,9 +19,13 @@ import { LitElement, html, nothing, type PropertyValues, type TemplateResult } f
 import { customElement, property, state } from "lit/decorators.js";
 
 import type { AdhocStopOption } from "./types.js";
-import { filterStops, foldStopText } from "./utils/route.js";
+import { filterStops, foldStopLabels, foldStopText } from "./utils/route.js";
 
 export const STOP_COMBOBOX_TAG = "wiener-linien-austria-stop-combobox";
+
+/** How long typing has to pause before the match count is announced, so a
+ *  screen reader doesn't read out a count for every keystroke. */
+export const STOP_STATUS_DELAY_MS = 500;
 
 export interface StopPickedDetail {
   value: string;
@@ -57,16 +61,27 @@ export class WienerLinienStopCombobox extends LitElement {
   /** True once the user has typed since the last pick. An opened list that
    *  still shows the committed label lists every stop, not just that one. */
   @state() private _filtering = false;
+  /** The match count as announced, trailing the typing by
+   *  `STOP_STATUS_DELAY_MS`. */
+  @state() private _status = "";
 
   private _labelByValue = new Map<string, string>();
+  private _folded: string[] = [];
+  private _statusTimer: ReturnType<typeof setTimeout> | null = null;
 
   protected override createRenderRoot(): HTMLElement {
     return this;
   }
 
+  public override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._clearStatus();
+  }
+
   protected override willUpdate(changed: PropertyValues): void {
     if (changed.has("stops")) {
       this._labelByValue = new Map(this.stops.map((stop) => [stop.value, stop.label]));
+      this._folded = foldStopLabels(this.stops);
     }
     // Follow outside changes (swap, restored pick) unless the user is typing
     // in this very field right now.
@@ -84,7 +99,7 @@ export class WienerLinienStopCombobox extends LitElement {
   }
 
   private get _results(): { matches: AdhocStopOption[]; total: number } {
-    return filterStops(this.stops, this._filtering ? this._text : "");
+    return filterStops(this.stops, this._filtering ? this._text : "", undefined, this._folded);
   }
 
   private _hasFocus(): boolean {
@@ -104,6 +119,7 @@ export class WienerLinienStopCombobox extends LitElement {
     this._invalid = false;
     this._open = false;
     this._active = -1;
+    this._clearStatus();
     if (value !== this.value) {
       this.dispatchEvent(
         new CustomEvent<StopPickedDetail>("stop-picked", { detail: { value } }),
@@ -117,6 +133,23 @@ export class WienerLinienStopCombobox extends LitElement {
     this._invalid = false;
     this._open = true;
     this._active = -1;
+    this._scheduleStatus();
+  }
+
+  private _scheduleStatus(): void {
+    if (this._statusTimer !== null) clearTimeout(this._statusTimer);
+    this._statusTimer = setTimeout(() => {
+      this._statusTimer = null;
+      if (!this._open || !this._filtering) return;
+      const { matches, total } = this._results;
+      this._status = this.strings.count(matches.length, total);
+    }, STOP_STATUS_DELAY_MS);
+  }
+
+  private _clearStatus(): void {
+    if (this._statusTimer !== null) clearTimeout(this._statusTimer);
+    this._statusTimer = null;
+    this._status = "";
   }
 
   private _onKeyDown(ev: KeyboardEvent): void {
@@ -138,7 +171,8 @@ export class WienerLinienStopCombobox extends LitElement {
           this._active = matches.length - 1;
           return;
         }
-        this._active = Math.max(this._active - 1, 0);
+        // With nothing listed there is no option to point at.
+        this._active = matches.length ? Math.max(this._active - 1, 0) : -1;
         return;
       case "Enter": {
         if (!this._open) return;
@@ -154,6 +188,7 @@ export class WienerLinienStopCombobox extends LitElement {
           ev.preventDefault();
           this._open = false;
           this._active = -1;
+          this._clearStatus();
         } else if (this._filtering || this._invalid) {
           ev.preventDefault();
           this._revert();
@@ -169,13 +204,14 @@ export class WienerLinienStopCombobox extends LitElement {
   private _onBlur(): void {
     this._open = false;
     this._active = -1;
+    this._clearStatus();
     if (!this._filtering) return;
     const text = foldStopText(this._text.trim());
     if (!text) {
       this._pick(null);
       return;
     }
-    const exact = this.stops.find((stop) => foldStopText(stop.label) === text);
+    const exact = this.stops[this._folded.indexOf(text)];
     if (exact) {
       this._pick(exact);
       return;
@@ -192,6 +228,7 @@ export class WienerLinienStopCombobox extends LitElement {
   private _toggle(): void {
     this._open = !this._open;
     this._active = -1;
+    this._clearStatus();
     if (this._open) this._filtering = false;
     this._input?.focus();
   }
@@ -202,6 +239,9 @@ export class WienerLinienStopCombobox extends LitElement {
     const listId = `${id}-list`;
     const activeId = this._open && this._active >= 0 ? `${id}-option-${this._active}` : "";
     const describedBy = this._invalid ? `${id}-error` : nothing;
+    // Enter with nothing highlighted takes the best match; mark it, so what
+    // Enter will pick is visible before it happens.
+    const enterTarget = this._filtering && this._active < 0 ? 0 : -1;
     return html`
       <label class="combo-label" for=${`${id}-input`}>${this.strings.label}</label>
       <div class="combo-field" ?data-open=${this._open}>
@@ -255,6 +295,7 @@ export class WienerLinienStopCombobox extends LitElement {
                 class="combo-option"
                 aria-selected=${index === this._active ? "true" : "false"}
                 ?data-current=${stop.value === this.value}
+                ?data-enter=${index === enterTarget}
                 @pointerdown=${(ev: Event) => ev.preventDefault()}
                 @click=${() => this._pick(stop)}
               >
@@ -269,9 +310,7 @@ export class WienerLinienStopCombobox extends LitElement {
       ${this._open && total > matches.length
         ? html`<p class="combo-note" aria-hidden="true">${this.strings.count(matches.length, total)}</p>`
         : nothing}
-      <span class="sr-only" role="status">
-        ${this._open && this._filtering ? this.strings.count(matches.length, total) : ""}
-      </span>
+      <span class="sr-only" role="status">${this._open ? this._status : ""}</span>
       ${this._invalid
         ? html`<p class="field-error" id=${`${id}-error`}>${this.strings.noMatch}</p>`
         : nothing}

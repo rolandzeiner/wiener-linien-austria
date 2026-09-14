@@ -20,6 +20,7 @@ import stationHeader from "../utils/station-header.ts?raw";
 import retroView from "../utils/retro-view.ts?raw";
 import stationIcons from "../utils/retro-station-icons.ts?raw";
 import sharedRender from "../shared-render.ts?raw";
+import routeUtils from "../utils/route.ts?raw";
 
 // Catalogue health, guarded mechanically.
 //
@@ -63,6 +64,7 @@ const SOURCES: Record<string, string> = {
   retroView,
   stationIcons,
   sharedRender,
+  routeUtils,
 };
 const ALL_SOURCE = Object.values(SOURCES).join("\n");
 
@@ -124,6 +126,14 @@ describe("no orphaned keys", () => {
 });
 
 describe("every key the code asks for resolves", () => {
+  // The ad-hoc error table names its copy as `title: "key"` / `detail: "key"`
+  // rather than through `_t()`, so it needs its own check.
+  it("route error table keys exist in both languages", () => {
+    const keys = [...routeUtils.matchAll(/\b(?:title|detail): "(adhoc_[a-z_]+)"/g)].map((m) => m[1]!);
+    expect(keys.length).toBeGreaterThan(10);
+    expect(keys.filter((k) => DE[`route.${k}`] === undefined || EN[`route.${k}`] === undefined)).toEqual([]);
+  });
+
   it.each([
     ["modern", modernCard],
     ["retro", retroCard],

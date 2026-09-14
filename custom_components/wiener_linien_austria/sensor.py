@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from datetime import datetime
 from typing import Any
 
@@ -25,9 +24,6 @@ from .const import (
     CONF_STOP_NAME,
     DOMAIN,
     MAX_DEPARTURES_IN_ATTRS,
-    S_BAHN_COLORS,
-    S_BAHN_DEFAULT_COLOR,
-    S_BAHN_TEXT_COLOR,
 )
 from .coordinator import (
     MonitorData,
@@ -38,14 +34,18 @@ from .route_coordinator import (
     WienerLinienRouteConfigEntry,
     WienerLinienRouteCoordinator,
     route_device_info,
+    route_trip_attributes,
 )
-from .static import CATALOGUE_KEY, StaticCatalogue, canonical_line_key
+from .static import (
+    CATALOGUE_KEY,
+    StaticCatalogue,
+    canonical_line_key,
+    line_colors_for,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 0
-
-_S_BAHN_LABEL = re.compile(r"^S\d+$", re.IGNORECASE)
 
 
 async def async_setup_entry(
@@ -59,49 +59,6 @@ async def async_setup_entry(
         async_add_entities([WienerLinienRouteSensor(coordinator, entry)])
         return
     async_add_entities([WienerLinienStopSensor(coordinator, entry)])
-
-
-def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str, str]]:
-    """Return the GTFS palette for `labels`, as `{label: {bg, fg}}`.
-
-    Reads the shared catalogue ref live rather than capturing it at
-    setup, so a background trip-pattern refresh (which also refreshes
-    route colours) is picked up without a restart.
-
-    A label with no GTFS entry is omitted rather than published with an
-    empty colour, and so is any label the catalogue doesn't know. Returns
-    only the S-Bahn entries when the catalogue isn't loaded yet or the
-    routes payload hasn't landed — the cards have their own fallbacks
-    (nightline rule + neutral default), which is also what an omitted label
-    gets. S-Bahn lines ("S" + number) come from `S_BAHN_COLORS`, since the
-    GTFS feed only covers Wiener Linien's own lines.
-    """
-    out: dict[str, dict[str, str]] = {}
-    # S-Bahn first: not in Wiener Linien's GTFS, so it needs no catalogue.
-    for label in labels:
-        if _S_BAHN_LABEL.match(label):
-            out[label] = {
-                "bg": S_BAHN_COLORS.get(label.upper(), S_BAHN_DEFAULT_COLOR),
-                "fg": S_BAHN_TEXT_COLOR,
-            }
-    catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
-    if not isinstance(catalogue, StaticCatalogue):
-        return out
-    index = catalogue.trip_patterns
-    if index is None or not index.colors_by_line:
-        return out
-    for label in labels:
-        if label in out:
-            continue
-        bg = index.colors_by_line.get(label)
-        if not bg:
-            continue
-        entry = {"bg": bg}
-        fg = index.text_colors_by_line.get(label)
-        if fg:
-            entry["fg"] = fg
-        out[label] = entry
-    return out
 
 
 class WienerLinienStopSensor(
@@ -433,10 +390,6 @@ class WienerLinienRouteSensor(
         coordinator = self.coordinator
         data = coordinator.data
         trips = data.trips if data is not None else []
-        labels = {
-            leg.line for trip in trips for leg in trip.legs if leg.line and not leg.walk
-        }
-        traffic, _elevator = get_alerts_for(coordinator.hass, labels, set())
         best = trips[0] if trips else None
         return {
             "origin": coordinator.origin_name,
@@ -453,7 +406,5 @@ class WienerLinienRouteSensor(
             "interchanges": best.interchanges if best else None,
             "risk": best.risk if best else None,
             "min_transfer_minutes": coordinator.options.min_transfer_minutes,
-            "trips": [trip.to_dict() for trip in trips],
-            "line_colors": line_colors_for(coordinator.hass, labels),
-            "traffic_info": [t.to_dict() for t in traffic],
+            **route_trip_attributes(coordinator.hass, trips),
         }

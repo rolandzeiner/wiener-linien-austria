@@ -447,3 +447,23 @@ def test_effective_prefers_realtime() -> None:
     assert stop.delay_minutes == 3
     assert _stop("A", _at(8, 0)).delay_minutes is None
     assert _at(8, 3) - timedelta(minutes=3) == _at(8, 0)
+
+
+def test_route_options_from_config_fills_defaults_and_drops_unknowns() -> None:
+    options = RouteOptions.from_config(
+        1,
+        2,
+        {
+            "route_type": "",
+            "excluded_means": ["tram", "hovercraft"],
+            "min_transfer_minutes": "not a number",
+        },
+    )
+    assert options == RouteOptions(
+        origin_diva=1, destination_diva=2, excluded_means=("4",)
+    )
+    assert RouteOptions.from_config(
+        1, 2, {"walk_speed": "slow", "min_transfer_minutes": "5"}
+    ) == RouteOptions(
+        origin_diva=1, destination_diva=2, walk_speed="slow", min_transfer_minutes=5
+    )

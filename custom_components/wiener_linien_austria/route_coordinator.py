@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, tzinfo
 from typing import Any
@@ -16,6 +17,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from .alerts import get_alerts_for
 from .const import (
     BACKOFF_CAP_SECONDS,
     CONF_ACTIVE_DAYS,
@@ -23,20 +25,10 @@ from .const import (
     CONF_ACTIVE_TO,
     CONF_DESTINATION_DIVA,
     CONF_DESTINATION_NAME,
-    CONF_EXCLUDED_MEANS,
-    CONF_MAX_CHANGES,
-    CONF_MIN_TRANSFER_MINUTES,
     CONF_ORIGIN_DIVA,
     CONF_ORIGIN_NAME,
-    CONF_ROUTE_TYPE,
-    CONF_WALK_SPEED,
-    DEFAULT_MIN_TRANSFER_MINUTES,
     DEFAULT_ROUTE_SCAN_INTERVAL,
-    DEFAULT_ROUTE_TYPE,
-    DEFAULT_WALK_SPEED,
     DOMAIN,
-    EXCLUDABLE_MEANS,
-    MAX_CHANGES_ANY,
     MIN_ROUTE_ROLLOVER_SECONDS,
     ROUTING_TIME_ZONE,
     USER_AGENT,
@@ -53,6 +45,7 @@ from .routing import (
     rank_trips,
     within_window,
 )
+from .static import line_colors_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,21 +89,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         assert destination is not None
         self.origin_name = str(config.get(CONF_ORIGIN_NAME) or origin)
         self.destination_name = str(config.get(CONF_DESTINATION_NAME) or destination)
-        self.options = RouteOptions(
-            origin_diva=origin,
-            destination_diva=destination,
-            route_type=str(config.get(CONF_ROUTE_TYPE) or DEFAULT_ROUTE_TYPE),
-            max_changes=str(config.get(CONF_MAX_CHANGES) or MAX_CHANGES_ANY),
-            walk_speed=str(config.get(CONF_WALK_SPEED) or DEFAULT_WALK_SPEED),
-            excluded_means=tuple(
-                EXCLUDABLE_MEANS[name]
-                for name in config.get(CONF_EXCLUDED_MEANS) or ()
-                if name in EXCLUDABLE_MEANS
-            ),
-            min_transfer_minutes=_int_or(
-                config.get(CONF_MIN_TRANSFER_MINUTES), DEFAULT_MIN_TRANSFER_MINUTES
-            ),
-        )
+        self.options = RouteOptions.from_config(origin, destination, config)
         self._active_from = parse_time_option(config.get(CONF_ACTIVE_FROM))
         self._active_to = parse_time_option(config.get(CONF_ACTIVE_TO))
         days = config.get(CONF_ACTIVE_DAYS)
@@ -257,6 +236,25 @@ async def async_plan_trips(
     return rank_trips(trips, dt_util.utcnow())
 
 
+def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[str, Any]:
+    """`trips`, `line_colors` and `traffic_info` for a list of connections.
+
+    Shared by the route sensor and the route card's ad-hoc answer
+    (websocket.py), so both modes of the card read the same shape.
+    """
+    labels = {
+        leg.line for trip in trips for leg in trip.legs if leg.line and not leg.walk
+    }
+    # `get_alerts_for` reads an empty line set as "every line". A plan with
+    # no ride in it has no disruption of its own to show.
+    traffic = get_alerts_for(hass, labels, set())[0] if labels else []
+    return {
+        "trips": [trip.to_dict() for trip in trips],
+        "line_colors": line_colors_for(hass, labels),
+        "traffic_info": [t.to_dict() for t in traffic],
+    }
+
+
 def route_device_info(entry: ConfigEntry) -> DeviceInfo:
     """Device shared by both route entities and set up front in __init__."""
     return DeviceInfo(
@@ -266,11 +264,6 @@ def route_device_info(entry: ConfigEntry) -> DeviceInfo:
         model="Verbindung",
         configuration_url="https://www.wienerlinien.at/",
     )
-
-
-def _int_or(value: Any, default: int) -> int:
-    parsed = _safe_int(value)
-    return default if parsed is None else parsed
 
 
 def _safe_int(value: Any) -> int | None:

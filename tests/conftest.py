@@ -9,18 +9,32 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import CONF_SCAN_INTERVAL
+from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
 from syrupy.assertion import SnapshotAssertion
 
 from custom_components.wiener_linien_austria import rate_limit
 from custom_components.wiener_linien_austria.const import (
+    CONF_ACTIVE_DAYS,
+    CONF_DESTINATION_DIVA,
+    CONF_DESTINATION_NAME,
     CONF_DIVA,
+    CONF_ENTRY_TYPE,
+    CONF_EXCLUDED_MEANS,
     CONF_LINES,
+    CONF_MAX_CHANGES,
+    CONF_MIN_TRANSFER_MINUTES,
+    CONF_ORIGIN_DIVA,
+    CONF_ORIGIN_NAME,
     CONF_RBLS,
+    CONF_ROUTE_TYPE,
     CONF_STOP_NAME,
+    CONF_WALK_SPEED,
     DOMAIN,
+    ENTRY_TYPE_ROUTE,
 )
 from custom_components.wiener_linien_austria.static import (
     StaticCatalogue,
@@ -160,6 +174,74 @@ def make_v1_entry(
         options=options,
         title=title,
     )
+
+
+# ---------------------------------------------------------------------------
+# Routing: shared by test_route.py and test_adhoc.py
+# ---------------------------------------------------------------------------
+
+ROUTE_FETCH = (
+    "custom_components.wiener_linien_austria.route_coordinator.async_fetch_trip_body"
+)
+# 07:50 in Vienna on the capture day — every captured trip is still ahead.
+ROUTE_NOW = "2026-09-14 05:50:00+00:00"
+
+ROUTE_DATA: dict[str, Any] = {
+    CONF_ENTRY_TYPE: ENTRY_TYPE_ROUTE,
+    CONF_ORIGIN_DIVA: 60201468,
+    CONF_ORIGIN_NAME: "Westbahnhof",
+    CONF_DESTINATION_DIVA: 60201040,
+    CONF_DESTINATION_NAME: "Praterstern",
+    CONF_ROUTE_TYPE: "LEASTTIME",
+    CONF_MAX_CHANGES: "any",
+    CONF_WALK_SPEED: "normal",
+    CONF_MIN_TRANSFER_MINUTES: 2,
+    CONF_EXCLUDED_MEANS: [],
+    CONF_ACTIVE_DAYS: [],
+    CONF_SCAN_INTERVAL: 300,
+}
+
+
+def routing_body(name: str = "routing_westbahnhof_praterstern.json") -> dict[str, Any]:
+    """A captured trip-planner response."""
+    result: dict[str, Any] = json.loads((FIXTURES / name).read_text())
+    return result
+
+
+def route_entry(**overrides: Any) -> MockConfigEntry:
+    """A Westbahnhof → Praterstern route entry, not yet added to hass."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        data={**ROUTE_DATA, **overrides},
+        title="Westbahnhof → Praterstern",
+        version=2,
+        unique_id="route_60201468_60201040",
+    )
+
+
+async def async_setup_entry_and_wait(
+    hass: HomeAssistant, entry: MockConfigEntry
+) -> None:
+    """Add `entry` to hass, set it up and let it settle."""
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+@pytest.fixture
+def frozen(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
+    """The clock at `ROUTE_NOW`."""
+    freezer.move_to(ROUTE_NOW)
+    return freezer
+
+
+@pytest.fixture
+def fetch() -> Generator[AsyncMock]:
+    """The trip-planner request, answering with the captured response."""
+    with patch(
+        ROUTE_FETCH, new_callable=AsyncMock, return_value=routing_body()
+    ) as mock:
+        yield mock
 
 
 def _load_fixture(name: str) -> dict:

@@ -8,7 +8,10 @@ user.
   nearest to the HA home first. The same list the setup dialog offers.
 - `wiener_linien_austria/plan` — connections between two stops, now. Answers
   in the shape of the route sensor's attributes so the card renders both
-  through one path.
+  through one path. It also takes a route entry's trip options
+  (`route_type`, `max_changes`, `walk_speed`, `excluded_means`,
+  `min_transfer_minutes`) with the same defaults. The card sends none of
+  them yet; each distinct combination is its own cache entry.
 
 Registered once per HA process in `async_setup`. `websocket_api` has no
 deregister hook, so the handlers outlive a removed integration; each one
@@ -32,8 +35,6 @@ from homeassistant.core import HomeAssistant, callback
 
 from . import static
 from .adhoc import AdhocRateLimited, async_get_planner
-from .alerts import get_alerts_for
-from .config_flow import _stop_options
 from .const import (
     ATTRIBUTION,
     DEFAULT_MIN_TRANSFER_MINUTES,
@@ -47,15 +48,18 @@ from .const import (
     ROUTE_TYPES,
     WALK_SPEEDS,
 )
-from .route_coordinator import MAX_TRIPS_PUBLISHED
-from .routing import RouteOptions, RoutingError
-from .sensor import line_colors_for
+from .route_coordinator import MAX_TRIPS_PUBLISHED, route_trip_attributes
+from .routing import ROUTE_QUERY_ERRORS, RouteOptions, RoutingError
 from .static import StaticCatalogue
+from .stops import stop_options, trackable_station
 
 # Error codes the card maps onto its own copy. Stable: the card matches them.
 ERR_NOT_LOADED: Final = "not_loaded"
 ERR_CATALOGUE: Final = "catalogue_unavailable"
 ERR_INVALID_STOP: Final = "invalid_stop"
+# The trip planner refused this query (stops too close, unknown to it, no
+# timetable). Asking again soon gets the same answer.
+ERR_INVALID_QUERY: Final = "invalid_query"
 ERR_SAME_STOP: Final = "same_stop"
 ERR_RATE_LIMITED: Final = "rate_limited"
 ERR_UPSTREAM: Final = "upstream"
@@ -125,7 +129,7 @@ async def _websocket_stops(
     if cached is None or any(
         a is not b for a, b in zip(cached[0], signature, strict=True)
     ):
-        options = _stop_options(
+        options = stop_options(
             catalogue, config.latitude, config.longitude, config.language
         )
         cached = (signature, [dict(option) for option in options])
@@ -166,10 +170,9 @@ async def _websocket_plan(
 
     stations = []
     for diva in (msg["origin"], msg["destination"]):
-        station = catalogue.stations_by_diva.get(diva)
-        # Same rule as the setup picker: only stops with platforms are
-        # offered, so only those are accepted.
-        if station is None or not station.rbls:
+        # Same rule as the setup picker: only stops it offers are accepted.
+        station = trackable_station(catalogue, diva)
+        if station is None:
             connection.send_error(
                 msg_id,
                 ERR_INVALID_STOP,
@@ -191,15 +194,7 @@ async def _websocket_plan(
         )
         return
 
-    options = RouteOptions(
-        origin_diva=origin.diva,
-        destination_diva=destination.diva,
-        route_type=msg["route_type"],
-        max_changes=msg["max_changes"],
-        walk_speed=msg["walk_speed"],
-        excluded_means=tuple(EXCLUDABLE_MEANS[name] for name in msg["excluded_means"]),
-        min_transfer_minutes=msg["min_transfer_minutes"],
-    )
+    options = RouteOptions.from_config(origin.diva, destination.diva, msg)
     try:
         # A stale plan beats an error on a dashboard: the card shows when it
         # was fetched and refreshes once the budget allows.
@@ -219,7 +214,9 @@ async def _websocket_plan(
     except RoutingError as err:
         connection.send_error(
             msg_id,
-            ERR_UPSTREAM,
+            ERR_INVALID_QUERY
+            if err.translation_key in ROUTE_QUERY_ERRORS
+            else ERR_UPSTREAM,
             str(err),
             translation_domain=DOMAIN,
             translation_key=err.translation_key,
@@ -227,11 +224,6 @@ async def _websocket_plan(
         )
         return
 
-    trips = plan.trips[:MAX_TRIPS_PUBLISHED]
-    labels = {
-        leg.line for trip in trips for leg in trip.legs if leg.line and not leg.walk
-    }
-    traffic, _elevator = get_alerts_for(hass, labels, set())
     connection.send_result(
         msg_id,
         {
@@ -239,9 +231,7 @@ async def _websocket_plan(
             "destination": destination.name,
             "fetched_at": plan.fetched_at.isoformat(),
             "min_transfer_minutes": options.min_transfer_minutes,
-            "trips": [trip.to_dict() for trip in trips],
-            "line_colors": line_colors_for(hass, labels),
-            "traffic_info": [t.to_dict() for t in traffic],
+            **route_trip_attributes(hass, plan.trips[:MAX_TRIPS_PUBLISHED]),
             "attribution": ATTRIBUTION,
             "stale": plan.stale,
             "retry_after": plan.retry_after,

@@ -28,8 +28,10 @@ The 15 s routing cooldown in rate_limit.py is deliberately not taken: someone
 is waiting for the answer. The budget is what bounds this path instead.
 
 Nothing here is written to diagnostics, the recorder or an info-level log. A
-stop pair picked on a dashboard is a movement pattern, and it stays in memory
-for at most `ADHOC_STALE_MAX_SECONDS`.
+stop pair picked on a dashboard is a movement pattern: a plan is purged once
+it is older than `ADHOC_STALE_MAX_SECONDS`, and all of them when the last
+entry unloads. The budget itself is kept, so removing and re-adding the
+integration doesn't refill it.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, tzinfo
 from typing import Final
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, ROUTING_TIME_ZONE
@@ -143,6 +145,9 @@ class AdhocPlanner:
             ADHOC_BURST, ADHOC_BUDGET_PER_HOUR, hass.loop.time()
         )
         self._user_buckets: dict[str, _TokenBucket] = {}
+        # Bumped by `async_clear_cache`, so a fetch started before a clear
+        # doesn't put its plan back afterwards.
+        self._generation = 0
 
     async def async_plan(
         self,
@@ -169,6 +174,7 @@ class AdhocPlanner:
             arrive_by,
         )
         loop_now = self._hass.loop.time()
+        self._purge(loop_now)
 
         cached = self._cache.get(key)
         if cached is not None and loop_now - cached[0] < ADHOC_CACHE_TTL_SECONDS:
@@ -204,6 +210,7 @@ class AdhocPlanner:
         return await asyncio.shield(task)
 
     async def _async_fetch(self, key: _CacheKey, at: datetime, tz: tzinfo) -> AdhocPlan:
+        generation = self._generation
         try:
             trips = await async_plan_trips(self._hass, key[0], at, tz, arrive_by=key[2])
         except RoutingError as err:
@@ -212,7 +219,8 @@ class AdhocPlanner:
             # Nothing left tonight is an answer, and worth caching.
             trips = []
         plan = AdhocPlan(trips=tuple(trips), fetched_at=dt_util.utcnow())
-        self._store(key, plan)
+        if generation == self._generation:
+            self._store(key, plan)
         return plan
 
     def _forget(self, key: _CacheKey, task: asyncio.Task[AdhocPlan]) -> None:
@@ -221,6 +229,26 @@ class AdhocPlanner:
         # Marks a failure as retrieved even when every waiter went away.
         if not task.cancelled():
             task.exception()
+
+    @callback
+    def async_clear_cache(self) -> None:
+        """Forget every plan, including any a request on the wire returns.
+
+        That request still answers whoever is waiting for it; only the
+        cache doesn't keep it.
+        """
+        self._cache.clear()
+        self._generation += 1
+
+    def _purge(self, loop_now: float) -> None:
+        """Drop plans too old to serve, even as stale."""
+        expired = [
+            key
+            for key, (stored_at, _plan) in self._cache.items()
+            if loop_now - stored_at >= ADHOC_STALE_MAX_SECONDS
+        ]
+        for key in expired:
+            del self._cache[key]
 
     def _store(self, key: _CacheKey, plan: AdhocPlan) -> None:
         # Stored with its fetch time, not an expiry: the same entry is fresh
@@ -273,6 +301,7 @@ class AdhocPlanner:
         return self._tz
 
 
+@callback
 def async_get_planner(hass: HomeAssistant) -> AdhocPlanner:
     """Return the instance-wide planner, creating it on first use."""
     domain_data = hass.data.setdefault(DOMAIN, {})

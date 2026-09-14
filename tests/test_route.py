@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 import json
-from collections.abc import Generator
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -36,7 +35,6 @@ from custom_components.wiener_linien_austria.const import (
     CONF_MAX_CHANGES,
     CONF_MIN_TRANSFER_MINUTES,
     CONF_ORIGIN_DIVA,
-    CONF_ORIGIN_NAME,
     CONF_ROUTE_TYPE,
     CONF_WALK_SPEED,
     DOMAIN,
@@ -52,64 +50,20 @@ from custom_components.wiener_linien_austria.route_coordinator import (
     WienerLinienRouteCoordinator,
 )
 from custom_components.wiener_linien_austria.routing import RoutingError
-from custom_components.wiener_linien_austria.sensor import line_colors_for
+from custom_components.wiener_linien_austria.static import line_colors_for
 
-from .conftest import make_entry
+from .conftest import (
+    ROUTE_DATA,
+    ROUTE_FETCH,
+    ROUTE_NOW,
+    async_setup_entry_and_wait,
+    make_entry,
+    route_entry,
+    routing_body,
+)
 
 FIXTURES = Path(__file__).parent / "fixtures"
-FETCH = (
-    "custom_components.wiener_linien_austria.route_coordinator.async_fetch_trip_body"
-)
 PROBE = "custom_components.wiener_linien_austria.config_flow._probe_route"
-# 07:50 in Vienna on the capture day — every captured trip is still ahead.
-NOW = "2026-09-14 05:50:00+00:00"
-
-ROUTE_DATA: dict[str, Any] = {
-    CONF_ENTRY_TYPE: ENTRY_TYPE_ROUTE,
-    CONF_ORIGIN_DIVA: 60201468,
-    CONF_ORIGIN_NAME: "Westbahnhof",
-    CONF_DESTINATION_DIVA: 60201040,
-    CONF_DESTINATION_NAME: "Praterstern",
-    CONF_ROUTE_TYPE: "LEASTTIME",
-    CONF_MAX_CHANGES: "any",
-    CONF_WALK_SPEED: "normal",
-    CONF_MIN_TRANSFER_MINUTES: 2,
-    CONF_EXCLUDED_MEANS: [],
-    CONF_ACTIVE_DAYS: [],
-    CONF_SCAN_INTERVAL: 300,
-}
-
-
-def _body(name: str = "routing_westbahnhof_praterstern.json") -> dict[str, Any]:
-    return json.loads((FIXTURES / name).read_text())
-
-
-def _route_entry(**overrides: Any) -> MockConfigEntry:
-    return MockConfigEntry(
-        domain=DOMAIN,
-        data={**ROUTE_DATA, **overrides},
-        title="Westbahnhof → Praterstern",
-        version=2,
-        unique_id="route_60201468_60201040",
-    )
-
-
-@pytest.fixture
-def frozen(freezer: FrozenDateTimeFactory) -> FrozenDateTimeFactory:
-    freezer.move_to(NOW)
-    return freezer
-
-
-@pytest.fixture
-def fetch() -> Generator[AsyncMock]:
-    with patch(FETCH, new_callable=AsyncMock, return_value=_body()) as mock:
-        yield mock
-
-
-async def _setup(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
 
 
 def _entity_id(hass: HomeAssistant, entry: MockConfigEntry, suffix: str) -> str:
@@ -129,8 +83,8 @@ def _entity_id(hass: HomeAssistant, entry: MockConfigEntry, suffix: str) -> str:
 async def test_route_entry_sets_up_sensor_and_risk(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     assert entry.state is ConfigEntryState.LOADED
     assert isinstance(entry.runtime_data, WienerLinienRouteCoordinator)
 
@@ -170,15 +124,15 @@ async def test_route_entry_sets_up_sensor_and_risk(
 async def test_realtime_delay_turns_risk_sensor_on(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory
 ) -> None:
-    body = copy.deepcopy(_body())
+    body = copy.deepcopy(routing_body())
     for trip in body["trips"]:
         arrival = trip["legs"][0]["points"][1]["dateTime"]
         hour, minute = arrival["time"].split(":")
         arrival["rtTime"] = f"{hour}:{int(minute) + 3:02d}"
         arrival["rtDate"] = arrival["date"]
-    with patch(FETCH, new_callable=AsyncMock, return_value=body):
-        entry = _route_entry()
-        await _setup(hass, entry)
+    with patch(ROUTE_FETCH, new_callable=AsyncMock, return_value=body):
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
     risk = hass.states.get(_entity_id(hass, entry, "route_at_risk"))
     assert risk is not None
     assert risk.state == "on"
@@ -188,9 +142,9 @@ async def test_realtime_delay_turns_risk_sensor_on(
 async def test_no_connection_is_not_an_outage(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory
 ) -> None:
-    with patch(FETCH, new_callable=AsyncMock, return_value={"trips": None}):
-        entry = _route_entry()
-        await _setup(hass, entry)
+    with patch(ROUTE_FETCH, new_callable=AsyncMock, return_value={"trips": None}):
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
     assert entry.state is ConfigEntryState.LOADED
     state = hass.states.get(_entity_id(hass, entry, "route"))
     assert state is not None
@@ -206,8 +160,8 @@ async def test_no_connection_is_not_an_outage(
 async def test_outside_window_does_not_fetch(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry(**{CONF_ACTIVE_FROM: "17:00:00", CONF_ACTIVE_TO: "19:00:00"})
-    await _setup(hass, entry)
+    entry = route_entry(**{CONF_ACTIVE_FROM: "17:00:00", CONF_ACTIVE_TO: "19:00:00"})
+    await async_setup_entry_and_wait(hass, entry)
     fetch.assert_not_called()
     state = hass.states.get(_entity_id(hass, entry, "route"))
     assert state is not None
@@ -224,20 +178,20 @@ async def test_upstream_failure_retries_setup(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory
 ) -> None:
     with patch(
-        FETCH,
+        ROUTE_FETCH,
         new_callable=AsyncMock,
         side_effect=RoutingError("api_timeout", {"seconds": "20"}),
     ):
-        entry = _route_entry()
-        await _setup(hass, entry)
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
     assert entry.state is ConfigEntryState.SETUP_RETRY
 
 
 async def test_invalid_diva_is_a_setup_error(
     hass: HomeAssistant, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry(**{CONF_ORIGIN_DIVA: "nope"})
-    await _setup(hass, entry)
+    entry = route_entry(**{CONF_ORIGIN_DIVA: "nope"})
+    await async_setup_entry_and_wait(hass, entry)
     assert entry.state is ConfigEntryState.SETUP_ERROR
     fetch.assert_not_called()
 
@@ -245,8 +199,8 @@ async def test_invalid_diva_is_a_setup_error(
 async def test_unload_last_route_entry_tears_down(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     assert hass.data[DOMAIN]["entry_count"] == 1
     assert await hass.config_entries.async_unload(entry.entry_id)
     assert hass.data[DOMAIN]["entry_count"] == 0
@@ -256,7 +210,7 @@ async def test_unload_last_route_entry_tears_down(
 async def test_platform_failure_rolls_back_route_setup(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
+    entry = route_entry()
     entry.add_to_hass(hass)
     with patch.object(
         hass.config_entries,
@@ -280,16 +234,16 @@ async def test_refresh_is_pulled_up_to_the_next_departure(
     # 07:55 in Vienna; the best connection leaves at 07:57. Refresh 30 s
     # after it goes rather than waiting out the 300 s interval.
     freezer.move_to("2026-09-14 05:55:00+00:00")
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     assert entry.runtime_data.update_interval == timedelta(seconds=150)
 
 
 async def test_distant_departure_keeps_the_scan_interval(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     # Seven and a half minutes to the rollover is later than the interval.
     assert entry.runtime_data.update_interval == timedelta(seconds=300)
 
@@ -298,16 +252,16 @@ async def test_rollover_never_drops_below_the_floor(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
     freezer.move_to("2026-09-14 05:56:50+00:00")
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     assert entry.runtime_data.update_interval == timedelta(seconds=60)
 
 
 async def test_backoff_stretches_and_resets(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     coordinator: WienerLinienRouteCoordinator = entry.runtime_data
     fetch.side_effect = RoutingError("api_http_error", {"status": "503", "reason": ""})
     await coordinator.async_refresh()
@@ -332,9 +286,9 @@ async def test_backoff_stretches_and_resets(
 async def test_leaving_the_window_resets_backoff(
     hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    freezer.move_to(NOW)
-    entry = _route_entry(**{CONF_ACTIVE_FROM: "07:00:00", CONF_ACTIVE_TO: "08:00:00"})
-    await _setup(hass, entry)
+    freezer.move_to(ROUTE_NOW)
+    entry = route_entry(**{CONF_ACTIVE_FROM: "07:00:00", CONF_ACTIVE_TO: "08:00:00"})
+    await async_setup_entry_and_wait(hass, entry)
     coordinator: WienerLinienRouteCoordinator = entry.runtime_data
     fetch.side_effect = RoutingError("api_timeout", {"seconds": "20"})
     await coordinator.async_refresh()
@@ -370,8 +324,8 @@ async def test_routing_cooldown_waits_out_the_slice(hass: HomeAssistant) -> None
 async def test_route_diagnostics_carry_counts_not_connections(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     diag = await async_get_config_entry_diagnostics(hass, entry)
     assert diag["coordinator"]["trip_count"] == 4
     assert diag["coordinator"]["risks"] == ["tight", "tight", "tight", "tight"]
@@ -387,8 +341,8 @@ async def test_route_diagnostics_carry_counts_not_connections(
 async def test_plan_trip_returns_connections(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     response = await hass.services.async_call(
         DOMAIN,
         "plan_trip",
@@ -405,8 +359,8 @@ async def test_plan_trip_returns_connections(
 async def test_plan_trip_at_a_given_time(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     await hass.services.async_call(
         DOMAIN,
         "plan_trip",
@@ -421,8 +375,8 @@ async def test_plan_trip_at_a_given_time(
 async def test_plan_trip_no_connection_is_an_empty_answer(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     fetch.return_value = {"trips": None}
     response = await hass.services.async_call(
         DOMAIN,
@@ -438,8 +392,8 @@ async def test_plan_trip_no_connection_is_an_empty_answer(
 async def test_plan_trip_routing_failure_is_translated(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     fetch.side_effect = RoutingError("route_too_close")
     with pytest.raises(HomeAssistantError) as err:
         await hass.services.async_call(
@@ -455,11 +409,11 @@ async def test_plan_trip_routing_failure_is_translated(
 async def test_plan_trip_rejects_bad_targets(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock, mock_fetch
 ) -> None:
-    route = _route_entry()
-    await _setup(hass, route)
+    route = route_entry()
+    await async_setup_entry_and_wait(hass, route)
     stop = make_entry()
-    await _setup(hass, stop)
-    not_loaded = _route_entry()
+    await async_setup_entry_and_wait(hass, stop)
+    not_loaded = route_entry()
     not_loaded.add_to_hass(hass)
 
     for entry_id, key in (
@@ -481,8 +435,8 @@ async def test_plan_trip_rejects_bad_targets(
 async def test_plan_trip_repeated_now_is_served_from_the_cache(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     before = fetch.await_count
     for _ in range(3):
         await hass.services.async_call(
@@ -498,8 +452,8 @@ async def test_plan_trip_repeated_now_is_served_from_the_cache(
 async def test_plan_trip_in_a_loop_hits_the_budget(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     # Distinct times are distinct queries, so each one needs a token. An
     # automation carries no user and draws on the shared no-user bucket.
     with pytest.raises(HomeAssistantError) as err:
@@ -652,8 +606,8 @@ async def test_route_flow_catalogue_unavailable(hass: HomeAssistant) -> None:
 async def test_route_reconfigure_keeps_the_ends(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     result = await entry.start_reconfigure_flow(hass)
     assert result["step_id"] == "route_options"
     with patch(PROBE, new_callable=AsyncMock, return_value=None):
@@ -668,7 +622,7 @@ async def test_route_reconfigure_keeps_the_ends(
 
 
 async def test_route_reconfigure_with_corrupt_data_aborts(hass: HomeAssistant) -> None:
-    entry = _route_entry(**{CONF_ORIGIN_DIVA: None})
+    entry = route_entry(**{CONF_ORIGIN_DIVA: None})
     entry.add_to_hass(hass)
     result = await entry.start_reconfigure_flow(hass)
     assert result["type"] == FlowResultType.ABORT
@@ -678,8 +632,8 @@ async def test_route_reconfigure_with_corrupt_data_aborts(hass: HomeAssistant) -
 async def test_route_options_flow_uses_route_range(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
-    entry = _route_entry()
-    await _setup(hass, entry)
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     selector = next(iter(result["data_schema"].schema.values()))
     assert selector.config["min"] == 120
@@ -698,7 +652,7 @@ async def test_route_options_flow_uses_route_range(
 @pytest.mark.parametrize(
     ("outcome", "expected"),
     [
-        (_body(), None),
+        (routing_body(), None),
         ({"trips": None}, None),
         (RoutingError("route_too_close"), "route_too_close"),
         (RoutingError("route_stop_invalid", {"which": "origin"}), "route_stop_invalid"),
@@ -715,11 +669,11 @@ async def test_probe_route_outcomes(
     )
     with (
         patch(
-            "custom_components.wiener_linien_austria.config_flow.async_fetch_trip_body",
+            "custom_components.wiener_linien_austria.route_coordinator.async_fetch_trip_body",
             mock,
         ),
         patch(
-            "custom_components.wiener_linien_austria.config_flow.async_get_clientsession",
+            "custom_components.wiener_linien_austria.route_coordinator.async_get_clientsession",
             MagicMock(),
         ),
     ):

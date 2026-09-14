@@ -152,7 +152,7 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
 
-**How the card plans between any two stops.** Requests go through Home Assistant, never from the browser to Wiener Linien. The card refreshes every 2 minutes while it's on screen and the browser tab is visible, and right after the best connection leaves. After 30 minutes without a tap or key press it pauses until someone touches it, so a wall tablet left open stops asking. Home Assistant answers identical requests from the same minute once, whichever dashboards ask, and allows at most 120 trip-planner requests an hour for all cards together.
+**How the card plans between any two stops.** Requests go through Home Assistant, never from the browser to Wiener Linien. The card refreshes every 2 minutes while it's on screen and the browser tab is visible, and shortly after the best connection leaves. After 30 minutes without a tap or key press it pauses until someone touches it, so a wall tablet left open stops asking. Home Assistant reuses an answer for up to a minute, whichever dashboard asks. Each Home Assistant user gets up to 60 trip-planner requests an hour, and all users together up to 120.
 
 ## Sensor Attributes
 
@@ -219,7 +219,7 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
-| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card: every 120 s while visible, paused after 30 min idle; cached for 1 min and capped at 120 requests/h per Home Assistant |
+| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`: every 120 s while visible, paused after 30 min idle; answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
 
 **The polling interval is per entry; the request is not.** Every entry configured
 with the same interval joins one group that issues a single `/monitor` request
@@ -243,13 +243,15 @@ delay a departure poll. A route also refreshes right after its best connection
 leaves, so the list moves on without a faster interval. Like departures, it
 backs off from the second failure in a row, capped at 30 min.
 
-Planning between any two stops on the card skips that cooldown slot, because
-someone is waiting for the answer. Three other limits keep it in check: an answer
-is reused for every identical request in the same minute, a request already
-under way is shared rather than repeated, and all cards together get at most
-120 trip-planner requests an hour. The stop pair is held in memory for that
-minute only, and the integration doesn't write it to diagnostics, the recorder
-or its log.
+Planning between any two stops on the card, and the `plan_trip` action, skip
+that cooldown slot, because someone is waiting for the answer. Three other
+limits keep them in check: an identical request within a minute gets the same
+answer, a request already under way is shared rather than repeated, and each
+Home Assistant user gets at most 60 trip-planner requests an hour, all users
+together 120. Once a user's requests are used up, the card keeps showing its
+last plan for up to 5 minutes and says so. Plans stay in memory for 5 minutes
+at most and are dropped when you remove the integration. The integration
+doesn't write stop pairs to diagnostics, the recorder or its log.
 
 Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
@@ -278,7 +280,7 @@ data:
 response_variable: plan
 ```
 
-The action skips the request cooldown, because someone is waiting for the answer. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
+The action skips the request cooldown, because someone is waiting for the answer, and shares the route card's limits instead. Calling it again for the same route and time within a minute returns the same answer without a new request. A script can make 5 requests in a row, then about one a minute; beyond that the action fails with a message saying when to try again. Automations, which run without a user, share one allowance. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
 
 ## Use Cases
 
@@ -347,9 +349,9 @@ action:
 
 **A route shows "Outside the refresh window".** That's the window you set, not an error. Change it via **Reconfigure**.
 
-**The route card says "Too many requests right now".** All cards on this Home Assistant together have used their 120 trip-planner requests for the hour. The card tries again on its own once a request is free, usually within a minute.
+**The route card says "Too many route requests right now".** The card has used up its trip-planner requests for the moment. Each Home Assistant user gets 60 an hour, and all users together 120, so several tablets signed in as the same user share one allowance. The card tries again on its own once a request is free, usually within a minute.
 
-**The route card says "Updates paused".** Nobody has touched the card for 30 minutes. Tap it, or select **Refresh**, and it plans again.
+**The route card says "Updates paused".** Nobody has touched the card for 30 minutes. Tap it, or select **Resume updates**, and it plans again.
 
 **"No stop matches that."** Try a shorter or partial name — `Karls` matches Karlsplatz, Karlskirche, and more. Search is case-insensitive, but umlauts matter.
 

@@ -271,14 +271,106 @@ export function adhocPlanRefreshDelay(plan: RouteAttrs, nowMs: number): number {
   return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.max(base, retryAfter * 1000) : base;
 }
 
-/** Error codes the backend answers that are worth retrying on their own,
- *  and after how long. The rest need the user to change something. */
-export function adhocRetryDelay(code: string, retryAfterSeconds: number | null): number | null {
-  if (code === "rate_limited") {
+/** How long a card with no loaded integration waits before asking again.
+ *  Right after an HA restart the card can reach HA before the integration
+ *  has loaded, so this can't be a dead end. */
+export const ADHOC_NOT_LOADED_RETRY_MS = 60_000;
+/** A query the trip planner has no timetable for won't change within
+ *  minutes; ask again much later rather than on the usual cadence. */
+export const ADHOC_NO_TIMETABLE_RETRY_MS = 10 * 60_000;
+
+/** How the card presents one backend error and whether it retries.
+ *
+ *  `retry`: `"countdown"` retries after the backend's `retry_after` (or
+ *  `ADHOC_RETRY_MS`) and says so in the detail line; a number retries
+ *  quietly after that many ms; `null` waits for the user to change
+ *  something. `title` and `detail` are keys under `route.`. */
+export interface AdhocErrorSpec {
+  icon: string;
+  title: string;
+  detail?: string;
+  retry: "countdown" | number | null;
+}
+
+const ADHOC_UNKNOWN_ERROR: AdhocErrorSpec = {
+  icon: "mdi:alert-circle-outline",
+  title: "adhoc_error_unknown",
+  retry: "countdown",
+};
+
+/** Keyed by the WebSocket error code, the one table both the message and the
+ *  retry decision read from. */
+const ADHOC_ERRORS: Readonly<Record<string, AdhocErrorSpec>> = {
+  same_stop: {
+    icon: "mdi:map-marker-alert-outline",
+    title: "adhoc_error_same_stop",
+    detail: "adhoc_error_same_stop_detail",
+    retry: null,
+  },
+  rate_limited: { icon: "mdi:timer-sand", title: "adhoc_error_rate_limited", retry: "countdown" },
+  not_loaded: {
+    icon: "mdi:power-plug-off-outline",
+    title: "adhoc_error_not_loaded",
+    detail: "adhoc_error_not_loaded_detail",
+    retry: ADHOC_NOT_LOADED_RETRY_MS,
+  },
+  invalid_stop: {
+    icon: "mdi:map-marker-question-outline",
+    title: "adhoc_error_invalid_stop",
+    detail: "adhoc_error_invalid_stop_detail",
+    retry: null,
+  },
+  catalogue_unavailable: {
+    icon: "mdi:cloud-off-outline",
+    title: "adhoc_error_catalogue",
+    retry: "countdown",
+  },
+  upstream: { icon: "mdi:cloud-off-outline", title: "adhoc_error_upstream", retry: "countdown" },
+};
+
+/** `invalid_query` — the trip planner refused the query itself — told apart
+ *  by the backend's translation key. Asking again soon gets the same answer. */
+const ADHOC_QUERY_ERRORS: Readonly<Record<string, AdhocErrorSpec>> = {
+  route_too_close: {
+    icon: "mdi:map-marker-distance",
+    title: "adhoc_error_too_close",
+    detail: "adhoc_error_too_close_detail",
+    retry: null,
+  },
+  route_stop_invalid: {
+    icon: "mdi:map-marker-question-outline",
+    title: "adhoc_error_stop_unknown",
+    detail: "adhoc_error_stop_unknown_detail",
+    retry: null,
+  },
+  route_outside_timetable: {
+    icon: "mdi:calendar-remove-outline",
+    title: "adhoc_error_no_timetable",
+    detail: "adhoc_error_no_timetable_detail",
+    retry: ADHOC_NO_TIMETABLE_RETRY_MS,
+  },
+};
+
+const ADHOC_QUERY_ERROR_FALLBACK: AdhocErrorSpec = {
+  icon: "mdi:map-marker-alert-outline",
+  title: "adhoc_error_refused",
+  detail: "adhoc_error_refused_detail",
+  retry: null,
+};
+
+export function adhocErrorSpec(code: string, translationKey?: string | null): AdhocErrorSpec {
+  if (code === "invalid_query") {
+    return (translationKey && ADHOC_QUERY_ERRORS[translationKey]) || ADHOC_QUERY_ERROR_FALLBACK;
+  }
+  return ADHOC_ERRORS[code] ?? ADHOC_UNKNOWN_ERROR;
+}
+
+/** After how long to retry an error on its own, or null to wait for the user. */
+export function adhocRetryDelay(spec: AdhocErrorSpec, retryAfterSeconds: number | null): number | null {
+  if (spec.retry === "countdown") {
     return Math.max(1, retryAfterSeconds ?? ADHOC_RETRY_MS / 1000) * 1000;
   }
-  if (code === "not_loaded" || code === "invalid_stop" || code === "same_stop") return null;
-  return ADHOC_RETRY_MS;
+  return spec.retry;
 }
 
 const ADHOC_STORAGE_KEY = "wiener-linien-austria-route-adhoc";
@@ -321,6 +413,11 @@ export function foldStopText(text: string): string {
     .toLowerCase();
 }
 
+/** Every label folded by `foldStopText`, index for index. */
+export function foldStopLabels(stops: readonly AdhocStopOption[]): string[] {
+  return stops.map((stop) => foldStopText(stop.label));
+}
+
 /** How many suggestions the stop combobox lists at once. Enough to scroll
  *  through, few enough that each keystroke re-renders instantly. */
 export const STOP_SUGGESTION_LIMIT = 50;
@@ -331,18 +428,22 @@ export const STOP_SUGGESTION_LIMIT = 50;
  *  ranks first, then one where a word starts with it, then any other hit.
  *  Within a rank the list keeps its order, which is nearest to home first, so
  *  "Stephansplatz" near home beats a namesake across town. An empty query
- *  returns the list as it came. */
+ *  returns the list as it came.
+ *
+ *  `folded` is `foldStopLabels(stops)`, passed in by a caller that filters the
+ *  same list on every keystroke so ~1,800 labels aren't folded each time. */
 export function filterStops(
   stops: readonly AdhocStopOption[],
   query: string,
   limit = STOP_SUGGESTION_LIMIT,
+  folded?: readonly string[],
 ): { matches: AdhocStopOption[]; total: number } {
   const words = foldStopText(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return { matches: stops.slice(0, limit), total: stops.length };
   const first = words[0]!;
   const ranked: Array<{ stop: AdhocStopOption; rank: number; index: number }> = [];
   stops.forEach((stop, index) => {
-    const label = foldStopText(stop.label);
+    const label = folded?.[index] ?? foldStopText(stop.label);
     if (!words.every((word) => label.includes(word))) return;
     const rank = label.startsWith(first)
       ? 0

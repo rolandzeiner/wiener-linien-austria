@@ -50,7 +50,7 @@ rules:
   # Silver
   action-exceptions:
     status: done
-    comment: plan_trip raises ServiceValidationError for a bad target and a translated HomeAssistantError for routing failures.
+    comment: plan_trip raises ServiceValidationError for a bad target and a translated HomeAssistantError for routing failures and a spent request budget.
   config-entry-unloading:
     status: done
   docs-configuration-parameters:

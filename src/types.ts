@@ -743,6 +743,7 @@ export interface AdhocStopOption {
 export interface HassWsError {
   code?: string;
   message?: string;
+  translation_key?: string;
   translation_placeholders?: Record<string, string>;
 }
 

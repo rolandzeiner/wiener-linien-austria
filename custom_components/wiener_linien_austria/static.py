@@ -51,6 +51,9 @@ from .const import (
     LEGACY_LINE_LABELS,
     MAX_STOPS_AHEAD,
     REALTIME_LINE_LABELS,
+    S_BAHN_COLORS,
+    S_BAHN_DEFAULT_COLOR,
+    S_BAHN_TEXT_COLOR,
     STATIC_FILES,
     USER_AGENT,
 )
@@ -1514,3 +1517,49 @@ def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
         last_fetched=data["last_fetched"],
         trip_patterns=trip_patterns,
     )
+
+
+_S_BAHN_LABEL = re.compile(r"^S\d+$", re.IGNORECASE)
+
+
+def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str, str]]:
+    """Return the GTFS palette for `labels`, as `{label: {bg, fg}}`.
+
+    Reads the shared catalogue ref live rather than capturing it at
+    setup, so a background trip-pattern refresh (which also refreshes
+    route colours) is picked up without a restart.
+
+    A label with no GTFS entry is omitted rather than published with an
+    empty colour, and so is any label the catalogue doesn't know. Returns
+    only the S-Bahn entries when the catalogue isn't loaded yet or the
+    routes payload hasn't landed — the cards have their own fallbacks
+    (nightline rule + neutral default), which is also what an omitted label
+    gets. S-Bahn lines ("S" + number) come from `S_BAHN_COLORS`, since the
+    GTFS feed only covers Wiener Linien's own lines.
+    """
+    out: dict[str, dict[str, str]] = {}
+    # S-Bahn first: not in Wiener Linien's GTFS, so it needs no catalogue.
+    for label in labels:
+        if _S_BAHN_LABEL.match(label):
+            out[label] = {
+                "bg": S_BAHN_COLORS.get(label.upper(), S_BAHN_DEFAULT_COLOR),
+                "fg": S_BAHN_TEXT_COLOR,
+            }
+    catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
+    if not isinstance(catalogue, StaticCatalogue):
+        return out
+    index = catalogue.trip_patterns
+    if index is None or not index.colors_by_line:
+        return out
+    for label in labels:
+        if label in out:
+            continue
+        bg = index.colors_by_line.get(label)
+        if not bg:
+            continue
+        entry = {"bg": bg}
+        fg = index.text_colors_by_line.get(label)
+        if fg:
+            entry["fg"] = fg
+        out[label] = entry
+    return out

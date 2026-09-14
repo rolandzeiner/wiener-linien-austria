@@ -6,6 +6,9 @@ import {
   ADHOC_ROLLOVER_FLOOR_MS,
   adhocPlanRefreshDelay,
   adhocRefreshDelay,
+  ADHOC_NO_TIMETABLE_RETRY_MS,
+  ADHOC_NOT_LOADED_RETRY_MS,
+  adhocErrorSpec,
   adhocRetryDelay,
   clockOf,
   filterStops,
@@ -207,12 +210,32 @@ describe("ad-hoc timing", () => {
   });
 
   it("retries only what can succeed on its own", () => {
-    expect(adhocRetryDelay("rate_limited", 30)).toBe(30_000);
-    expect(adhocRetryDelay("rate_limited", null)).toBe(60_000);
-    expect(adhocRetryDelay("upstream", null)).toBe(60_000);
-    expect(adhocRetryDelay("not_loaded", null)).toBeNull();
-    expect(adhocRetryDelay("invalid_stop", null)).toBeNull();
-    expect(adhocRetryDelay("same_stop", null)).toBeNull();
+    const retry = (code: string, after: number | null, key?: string) =>
+      adhocRetryDelay(adhocErrorSpec(code, key), after);
+    expect(retry("rate_limited", 30)).toBe(30_000);
+    expect(retry("rate_limited", null)).toBe(60_000);
+    expect(retry("upstream", 5)).toBe(5_000);
+    expect(retry("upstream", null)).toBe(60_000);
+    expect(retry("something_new", null)).toBe(60_000);
+    // Right after a restart the integration may not be loaded yet.
+    expect(retry("not_loaded", null)).toBe(ADHOC_NOT_LOADED_RETRY_MS);
+    expect(retry("invalid_stop", null)).toBeNull();
+    expect(retry("same_stop", null)).toBeNull();
+    // A query the trip planner refused isn't asked again on its own ...
+    expect(retry("invalid_query", null, "route_too_close")).toBeNull();
+    expect(retry("invalid_query", null, "route_stop_invalid")).toBeNull();
+    expect(retry("invalid_query", null, "who_knows")).toBeNull();
+    // ... except a missing timetable, much later.
+    expect(retry("invalid_query", null, "route_outside_timetable")).toBe(
+      ADHOC_NO_TIMETABLE_RETRY_MS,
+    );
+  });
+
+  it("describes a refused query by what the trip planner said", () => {
+    expect(adhocErrorSpec("invalid_query", "route_too_close").title).toBe("adhoc_error_too_close");
+    expect(adhocErrorSpec("invalid_query", null).title).toBe("adhoc_error_refused");
+    expect(adhocErrorSpec("upstream").title).toBe("adhoc_error_upstream");
+    expect(adhocErrorSpec("something_new").title).toBe("adhoc_error_unknown");
   });
 
   it("prints fetched_at in Vienna time, whatever zone the stamp carries", () => {

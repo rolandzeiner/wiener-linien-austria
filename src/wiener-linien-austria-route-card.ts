@@ -50,6 +50,7 @@ import {
   ADHOC_IDLE_MS,
   ADHOC_RETRY_MS,
   adhocPlanRefreshDelay,
+  adhocErrorSpec,
   adhocRetryDelay,
   clockOf,
   findRouteEntities,
@@ -75,6 +76,25 @@ const TICK_MS = 15_000;
 const MAX_NOTICES = 2;
 
 type AdhocPhase = "idle" | "loading" | "ready" | "error" | "paused";
+
+/** A backend error as the card keeps it: the WebSocket code, how long the
+ *  backend asked to wait, and its translation key where the code alone
+ *  doesn't say enough (`invalid_query`). */
+interface AdhocError {
+  code: string;
+  retryAfter: number | null;
+  translationKey: string | null;
+}
+
+function adhocErrorOf(err: unknown): AdhocError {
+  const wsError = err as HassWsError | undefined;
+  const retryAfter = Number(wsError?.translation_placeholders?.["retry_after"]);
+  return {
+    code: typeof wsError?.code === "string" ? wsError.code : "unknown",
+    retryAfter: Number.isFinite(retryAfter) ? retryAfter : null,
+    translationKey: wsError?.translation_key ?? null,
+  };
+}
 type Which = "from" | "to";
 
 
@@ -110,12 +130,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   // --- Ad-hoc mode (no `entity`) ---------------------------------------
   @state() private _stops: AdhocStopOption[] | null = null;
-  @state() private _stopsError: string | null = null;
+  @state() private _stopsError: AdhocError | null = null;
   @state() private _from = "";
   @state() private _to = "";
   @state() private _plan: RouteAttrs | null = null;
   @state() private _phase: AdhocPhase = "idle";
-  @state() private _error: { code: string; retryAfter: number | null } | null = null;
+  @state() private _error: AdhocError | null = null;
   @state() private _announcement = "";
 
   private _tick: ReturnType<typeof setInterval> | null = null;
@@ -124,6 +144,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _planKey = "";
   private _planSeq = 0;
   private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the scheduled refresh is due (epoch ms). Survives a disconnect, so
+   *  a card HA re-attaches on a view switch waits out the rest instead of
+   *  asking again straight away. */
+  private _nextRefreshAt: number | null = null;
+  private _comboStringsCache = new Map<string, StopComboboxStrings>();
   private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private _stopsRetryTimer: ReturnType<typeof setTimeout> | null = null;
   private _stopsLoading = false;
@@ -245,10 +270,16 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._observer.observe(this);
     }
     if (this._from && this._to) {
-      // Reconnecting with a plan already on screen: refresh only if due.
+      // Reconnecting with a plan already on screen: refresh only once due.
       if (this._plan && this._planKey === `${this._from}>${this._to}`) {
-        this._pendingRefresh = true;
-        this._catchUp();
+        const remaining =
+          this._nextRefreshAt === null ? 0 : this._nextRefreshAt - Date.now();
+        if (remaining > 0) {
+          this._schedule(remaining);
+        } else {
+          this._pendingRefresh = true;
+          this._catchUp();
+        }
       } else {
         void this._runPlan(false);
       }
@@ -297,6 +328,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _schedule(delayMs: number): void {
     if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
     this._refreshTimer = null;
+    this._nextRefreshAt = Date.now() + delayMs;
     // An answer landing after the card was removed must not start a timer.
     if (!this._adhocStarted) return;
     this._refreshTimer = setTimeout(() => {
@@ -332,13 +364,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._stops = stops;
       this._stopsError = null;
     } catch (err) {
-      const code = (err as HassWsError | undefined)?.code ?? "unknown";
-      this._stopsError = code;
-      if (code !== "not_loaded" && this._adhocStarted) {
+      const error = adhocErrorOf(err);
+      this._stopsError = error;
+      const delay = adhocRetryDelay(adhocErrorSpec(error.code), error.retryAfter);
+      if (delay !== null && this._adhocStarted) {
         this._stopsRetryTimer = setTimeout(() => {
           this._stopsRetryTimer = null;
           void this._loadStops();
-        }, ADHOC_RETRY_MS);
+        }, delay);
       }
     } finally {
       this._stopsLoading = false;
@@ -348,6 +381,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private async _runPlan(userInitiated: boolean): Promise<void> {
     if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
     this._refreshTimer = null;
+    this._nextRefreshAt = null;
     this._pendingRefresh = false;
     const { _from: from, _to: to } = this;
     const seq = ++this._planSeq;
@@ -361,9 +395,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (from === to) {
       this._plan = null;
       this._planKey = "";
-      this._error = { code: "same_stop", retryAfter: null };
+      this._error = { code: "same_stop", retryAfter: null, translationKey: null };
       this._phase = "error";
-      if (userInitiated) this._announce(this._adhocError("same_stop", null).title);
+      if (userInitiated) this._announce(this._adhocError(this._error).title);
       return;
     }
     if (!this.hass?.callWS) return;
@@ -389,17 +423,18 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
     } catch (err) {
       if (seq !== this._planSeq) return;
-      const wsError = err as HassWsError | undefined;
-      const code = wsError?.code ?? "unknown";
-      const retryAfter = Number(wsError?.translation_placeholders?.["retry_after"]);
-      this._error = { code, retryAfter: Number.isFinite(retryAfter) ? retryAfter : null };
+      const error = adhocErrorOf(err);
+      this._error = error;
       // A stale plan through an outage reads as "these still run"; show the
       // problem instead, as the route sensor does when it goes unavailable.
       this._plan = null;
       this._planKey = "";
       this._phase = "error";
-      if (userInitiated) this._announce(this._adhocError(code, this._error.retryAfter).title);
-      const delay = adhocRetryDelay(code, this._error.retryAfter);
+      if (userInitiated) this._announce(this._adhocError(error).title);
+      const delay = adhocRetryDelay(
+        adhocErrorSpec(error.code, error.translationKey),
+        error.retryAfter,
+      );
       if (delay !== null) this._schedule(delay);
     }
   }
@@ -436,41 +471,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       : this._t("adhoc_announce", { n: minutes ?? 0, summary });
   }
 
-  private _adhocError(
-    code: string,
-    retryAfter: number | null,
-  ): { icon: string; title: string; detail?: string } {
-    const retry = this._t("adhoc_error_retry_detail", {
-      s: retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000),
-    });
-    switch (code) {
-      case "same_stop":
-        return {
-          icon: "mdi:map-marker-alert-outline",
-          title: this._t("adhoc_error_same_stop"),
-          detail: this._t("adhoc_error_same_stop_detail"),
-        };
-      case "rate_limited":
-        return { icon: "mdi:timer-sand", title: this._t("adhoc_error_rate_limited"), detail: retry };
-      case "not_loaded":
-        return {
-          icon: "mdi:power-plug-off-outline",
-          title: this._t("adhoc_error_not_loaded"),
-          detail: this._t("adhoc_error_not_loaded_detail"),
-        };
-      case "invalid_stop":
-        return {
-          icon: "mdi:map-marker-question-outline",
-          title: this._t("adhoc_error_invalid_stop"),
-          detail: this._t("adhoc_error_invalid_stop_detail"),
-        };
-      case "catalogue_unavailable":
-        return { icon: "mdi:cloud-off-outline", title: this._t("adhoc_error_catalogue"), detail: retry };
-      case "upstream":
-        return { icon: "mdi:cloud-off-outline", title: this._t("adhoc_error_upstream"), detail: retry };
-      default:
-        return { icon: "mdi:alert-circle-outline", title: this._t("adhoc_error_unknown"), detail: retry };
-    }
+  private _adhocError(error: AdhocError): { icon: string; title: string; detail?: string } {
+    const spec = adhocErrorSpec(error.code, error.translationKey);
+    const detail =
+      spec.retry === "countdown"
+        ? this._t("adhoc_error_retry_detail", {
+            s: error.retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000),
+          })
+        : spec.detail && this._t(spec.detail);
+    return { icon: spec.icon, title: this._t(spec.title), ...(detail ? { detail } : {}) };
   }
 
   private async _checkCardVersion(): Promise<void> {
@@ -579,17 +588,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
+  /** One strings object per picker and language: a fresh object on every
+   *  render (the clock ticks every 15 s) would re-render both pickers. */
   private _comboStrings(label: string): StopComboboxStrings {
-    return {
-      label,
-      toggle: this._t("adhoc_show_stops"),
-      noMatch: this._t("adhoc_no_match"),
-      noResults: this._t("adhoc_no_results"),
-      count: (shown, total) =>
-        shown < total
-          ? this._t("adhoc_matches_more", { shown, total })
-          : this._t("adhoc_matches", { n: total }),
-    };
+    const cacheKey = `${this.hass?.language ?? ""}|${label}`;
+    let strings = this._comboStringsCache.get(cacheKey);
+    if (!strings) {
+      strings = {
+        label,
+        toggle: this._t("adhoc_show_stops"),
+        noMatch: this._t("adhoc_no_match"),
+        noResults: this._t("adhoc_no_results"),
+        count: (shown, total) =>
+          shown < total
+            ? this._t("adhoc_matches_more", { shown, total })
+            : this._t("adhoc_matches", { n: total }),
+      };
+      this._comboStringsCache.set(cacheKey, strings);
+    }
+    return strings;
   }
 
   private _renderPicker(which: Which, label: string): TemplateResult {
@@ -607,7 +624,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // Live announcements go through the one status line above, so these
     // empties stay silent (`live` false) instead of speaking twice.
     if (this._stopsError) {
-      const { icon, title, detail } = this._adhocError(this._stopsError, null);
+      const { icon, title, detail } = this._adhocError(this._stopsError);
       return this._empty(icon, title, detail, false);
     }
     if (this._stops === null) return html``;
@@ -620,7 +637,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       );
     }
     if (this._phase === "error" && this._error) {
-      const { icon, title, detail } = this._adhocError(this._error.code, this._error.retryAfter);
+      const { icon, title, detail } = this._adhocError(this._error);
       return this._empty(icon, title, detail, false);
     }
     const paused =
@@ -1500,6 +1517,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--primary-text-color);
       cursor: pointer;
     }
+    .combo-option[data-enter] {
+      background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+      box-shadow: inset 3px 0 0 var(--primary-color);
+    }
     .combo-option[data-current] {
       font-weight: 600;
     }
@@ -1617,6 +1638,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         forced-color-adjust: none;
         background: Highlight;
         color: HighlightText;
+      }
+      .combo-option[data-enter] {
+        outline: 1px dashed Highlight;
+        outline-offset: -2px;
       }
       .leg::before,
       .node {

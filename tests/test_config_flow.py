@@ -12,12 +12,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from custom_components.wiener_linien_austria.config_flow import (
-    _format_distance,
-    _nearest_stations,
     _probe_monitor_lines,
     _resolve_lines_for_picker,
     _static_lines_for_station,
-    _stop_options,
 )
 from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
@@ -31,6 +28,11 @@ from custom_components.wiener_linien_austria.static import (
     Station,
     TripPattern,
     TripPatternIndex,
+)
+from custom_components.wiener_linien_austria.stops import (
+    format_distance,
+    nearest_stations,
+    stop_options,
 )
 from tests.conftest import make_response_cm
 
@@ -863,11 +865,10 @@ def test_platformless_stops_are_never_offered() -> None:
     )
     # Nearby block and alphabetical remainder must both exclude it.
     assert [
-        s.diva for s, _ in _nearest_stations(catalogue, HOME_LATITUDE, HOME_LONGITUDE)
+        s.diva for s, _ in nearest_stations(catalogue, HOME_LATITUDE, HOME_LONGITUDE)
     ] == [1]
     assert [
-        o["value"]
-        for o in _stop_options(catalogue, HOME_LATITUDE, HOME_LONGITUDE, "en")
+        o["value"] for o in stop_options(catalogue, HOME_LATITUDE, HOME_LONGITUDE, "en")
     ] == ["1"]
 
 
@@ -888,16 +889,16 @@ def test_nearest_stations_honours_limit() -> None:
         },
         last_fetched="2026-04-20T12:00:00+00:00",
     )
-    nearest = _nearest_stations(catalogue, HOME_LATITUDE, HOME_LONGITUDE, limit=2)
+    nearest = nearest_stations(catalogue, HOME_LATITUDE, HOME_LONGITUDE, limit=2)
     assert [station.diva for station, _ in nearest] == [1, 2]
 
 
 def test_format_distance_localises_the_decimal_separator() -> None:
     """Metres below 1 km, kilometres above — with a German decimal comma."""
-    assert _format_distance(72.4, "en") == "70 m"
-    assert _format_distance(846.0, "de") == "850 m"
-    assert _format_distance(1412.0, "en") == "1.4 km"
-    assert _format_distance(1412.0, "de") == "1,4 km"
+    assert format_distance(72.4, "en") == "70 m"
+    assert format_distance(846.0, "de") == "850 m"
+    assert format_distance(1412.0, "en") == "1.4 km"
+    assert format_distance(1412.0, "de") == "1,4 km"
 
 
 def test_same_named_stops_are_disambiguated() -> None:
@@ -939,7 +940,7 @@ def test_same_named_stops_are_disambiguated() -> None:
             lines_at_diva={1: ("U2", "U4", "1", "2", "31"), 2: ("N31",)},
         ),
     )
-    labels = {o["value"]: o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en")}
+    labels = {o["value"]: o["label"] for o in stop_options(catalogue, 0.0, 0.0, "en")}
     # Truncated at 4 lines — a 14-line hub would be unreadable otherwise.
     assert labels["1"] == "Schottenring (Wien) · U2, U4, 1, 2, …"
     assert labels["2"] == "Schottenring (Wien) · N31"
@@ -973,7 +974,7 @@ def test_identical_line_sets_fall_back_to_the_diva() -> None:
             lines_at_diva={1: ("54A",), 2: ("54A",)},
         ),
     )
-    labels = sorted(o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en"))
+    labels = sorted(o["label"] for o in stop_options(catalogue, 0.0, 0.0, "en"))
     assert labels == [
         "Lafitegasse (Wien) · 54A · #1",
         "Lafitegasse (Wien) · 54A · #2",
@@ -1004,7 +1005,7 @@ def test_collision_without_line_data_still_resolves() -> None:
         },
         last_fetched="2026-04-20T12:00:00+00:00",
     )
-    labels = sorted(o["label"] for o in _stop_options(catalogue, 0.0, 0.0, "en"))
+    labels = sorted(o["label"] for o in stop_options(catalogue, 0.0, 0.0, "en"))
     assert labels == ["Kirchengasse (Wien) · #1", "Kirchengasse (Wien) · #2"]
 
 

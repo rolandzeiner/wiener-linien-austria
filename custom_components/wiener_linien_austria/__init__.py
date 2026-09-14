@@ -23,6 +23,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_track_time_interval
 
+from .adhoc import ADHOC_PLANNER_KEY, AdhocPlanner
 from .alerts import async_refresh_alerts
 from .batch import MonitorBatchGroup
 from .card_registration import JSModuleRegistration
@@ -436,12 +437,17 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         ROUTING_LOCK_KEY,
         ROUTING_LOCK_LOOP_KEY,
         CATALOGUE_KEY,
-        # Holds a reference to the catalogue it was built from. The ad-hoc
-        # planner stays: its request budget must survive remove + re-add.
+        # Holds a reference to the catalogue it was built from.
         STOPS_CACHE_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)
+    # The ad-hoc planner stays, so removing and re-adding the integration
+    # doesn't refill its request budget. Its plans go: a stop pair picked on
+    # a dashboard shouldn't outlive the integration in memory.
+    planner = domain_data.get(ADHOC_PLANNER_KEY)
+    if isinstance(planner, AdhocPlanner):
+        planner.async_clear_cache()
 
 
 async def _rollback_setup_failure(

@@ -489,8 +489,10 @@ describe("ad-hoc mode", () => {
     await settle(el);
     await settle(el, 32 * 60_000);
     const before = planCalls(callWS).length;
-    // One initial plan plus one per 120 s until the half hour is up.
-    expect(before).toBeLessThanOrEqual(17);
+    // 07:50, then every 120 s, pulled forward to 30 s after each of the three
+    // connections leaves (07:57, 08:00, 08:03): 9 requests up to 08:03:30 and
+    // 8 more, every 120 s, until the half hour is up.
+    expect(before).toBe(17);
     expect(text(el)).toContain("Aktualisierung pausiert");
     await settle(el, 60 * 60_000);
     expect(planCalls(callWS)).toHaveLength(before);
@@ -512,7 +514,7 @@ describe("ad-hoc mode", () => {
     });
     const el = await mount(h, {});
     await settle(el);
-    expect(text(el)).toContain("Gerade zu viele Abfragen");
+    expect(text(el)).toContain("Gerade zu viele Verbindungsabfragen");
     expect(text(el)).toContain("Neuer Versuch in 30 s");
     limited = false;
     await settle(el, 30_000);
@@ -535,16 +537,131 @@ describe("ad-hoc mode", () => {
     expect(planCalls(callWS)).toHaveLength(2);
   });
 
-  it("drops the plan when the trip planner fails, and doesn't retry what can't succeed", async () => {
+  it("drops the plan when the trip planner fails, and tries again", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
-    const { h, callWS } = adhocHass(async () => {
-      throw { code: "not_loaded" };
+    let failing = false;
+    const { h } = adhocHass(async () => {
+      if (failing) throw { code: "upstream", translation_key: "api_timeout" };
+      return PLAN;
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Abfahrt in");
+    failing = true;
+    await settle(el, 120_000);
+    expect(text(el)).toContain("Routenplaner nicht erreichbar");
+    expect(text(el)).not.toContain("Abfahrt in");
+    failing = false;
+    await settle(el, 60_000);
+    expect(text(el)).toContain("Abfahrt in");
+  });
+
+  it("recovers when the integration loads after the card asked", async () => {
+    // Right after an HA restart the card can be quicker than the integration.
+    remember(WESTBAHNHOF, PRATERSTERN);
+    let loaded = false;
+    const { h, callWS } = adhocHass();
+    callWS.mockImplementation(async (msg: WsMessage) => {
+      if (msg.type === "wiener_linien_austria/route_card_version") {
+        return { version: ROUTE_CARD_VERSION };
+      }
+      if (!loaded) throw { code: "not_loaded" };
+      return msg.type === "wiener_linien_austria/stops" ? { stops: STOPS } : PLAN;
     });
     const el = await mount(h, {});
     await settle(el);
     expect(text(el)).toContain("Wiener Linien Austria ist nicht geladen");
-    await settle(el, 600_000);
+    loaded = true;
+    await settle(el, 60_000);
+    expect(combos(el)).toHaveLength(2);
+    expect(text(el)).toContain("Abfahrt in");
+  });
+
+  it("explains a query the trip planner refuses, and doesn't ask again on its own", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => {
+      throw { code: "invalid_query", translation_key: "route_too_close" };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Die Haltestellen liegen zu nah beieinander");
+    expect(text(el)).not.toContain("Neuer Versuch");
+    await settle(el, 3_600_000);
     expect(planCalls(callWS)).toHaveLength(1);
+  });
+
+  it("keeps the answer to the latest pick when an older one arrives last", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const answers: Array<(plan: unknown) => void> = [];
+    const { h, callWS } = adhocHass(
+      () => new Promise((resolve) => answers.push(resolve)),
+    );
+    const el = await mount(h, {});
+    await settle(el);
+    root(el).querySelector<HTMLButtonElement>(".swap")!.click();
+    await settle(el, 400);
+    expect(planCalls(callWS)).toHaveLength(2);
+    // The reversed pick answers first; the original one lands afterwards.
+    answers[1]!({ ...PLAN, origin: "Praterstern", destination: "Westbahnhof" });
+    await settle(el);
+    answers[0]!({ ...PLAN, fetched_at: "2026-09-14T05:40:00+00:00" });
+    await settle(el);
+    expect(text(el)).toContain("Zuletzt aktualisiert 07:49");
+    expect(text(el)).not.toContain("07:40");
+  });
+
+  it("waits out the rest of the refresh interval when re-attached", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(1);
+    // A view switch detaches the card and attaches it again.
+    await settle(el, 30_000);
+    el.remove();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(1);
+    await settle(el, 89_999);
+    expect(planCalls(callWS)).toHaveLength(1);
+    await settle(el, 1);
+    expect(planCalls(callWS)).toHaveLength(2);
+
+    // Detached past its due time, it refreshes as soon as it's back.
+    el.remove();
+    await settle(el, 600_000);
+    document.body.appendChild(el);
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(3);
+  });
+
+  it("holds a due refresh while scrolled out of view", async () => {
+    let observerCallback: ((entries: Array<{ isIntersecting: boolean }>) => void) | null = null;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
+          observerCallback = callback;
+        }
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+    try {
+      remember(WESTBAHNHOF, PRATERSTERN);
+      const { h, callWS } = adhocHass();
+      const el = await mount(h, {});
+      await settle(el);
+      expect(planCalls(callWS)).toHaveLength(1);
+      observerCallback!([{ isIntersecting: false }]);
+      await settle(el, 600_000);
+      expect(planCalls(callWS)).toHaveLength(1);
+      observerCallback!([{ isIntersecting: true }]);
+      await settle(el);
+      expect(planCalls(callWS)).toHaveLength(2);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("stops every timer once removed", async () => {
@@ -625,6 +742,50 @@ describe("ad-hoc mode", () => {
       "Praterstern (Wien)",
       "Westbahnhof (Wien) — 450 m",
     ]);
+  });
+
+  it("marks the stop Enter will pick, and never points at an option that isn't there", async () => {
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const from = combos(el)[0]!;
+    await typeInto(el, from, "platz");
+    const marked = root(el).querySelectorAll("#wl-adhoc-from-list [data-enter]");
+    expect([...marked].map((o) => o.textContent?.trim())).toEqual(["Stephansplatz (Wien)"]);
+    await press(el, from, "ArrowDown");
+    expect(root(el).querySelector("#wl-adhoc-from-list [data-enter]")).toBeNull();
+
+    await typeInto(el, from, "nowhere");
+    await press(el, from, "ArrowUp");
+    expect(from.hasAttribute("aria-activedescendant")).toBe(false);
+  });
+
+  it("announces the match count once typing pauses", async () => {
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const from = combos(el)[0]!;
+    const status = () =>
+      root(el).querySelector<HTMLElement>('.picker--from [role="status"]')!.textContent!.trim();
+    await typeInto(el, from, "w");
+    await typeInto(el, from, "wa");
+    expect(status()).toBe("");
+    await settle(el, 499);
+    expect(status()).toBe("");
+    await settle(el, 1);
+    expect(status()).toBe("1 Treffer");
+    await press(el, from, "Escape");
+    expect(status()).toBe("");
+  });
+
+  it("hands the pickers the same strings on every tick", async () => {
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const picker = root(el).querySelector<HTMLElement & { strings: unknown }>(".picker--from")!;
+    const before = picker.strings;
+    await settle(el, 60_000);
+    expect(picker.strings).toBe(before);
   });
 
   it("caps the list and says how many more there are", async () => {
