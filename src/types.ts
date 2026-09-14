@@ -2,7 +2,7 @@
 // Replaces the `custom-card-helpers` dependency — the package is
 // effectively unmaintained and bundled HA-internal types drift faster
 // than its release cadence. Value-side helpers stay out of this layer:
-// `fireEvent` has one implementation, in utils.ts, which all three
+// `fireEvent` has one implementation, in utils.ts, which all four
 // editors import.
 
 /** Single entity in `hass.states`. The attributes bag is open-ended —
@@ -85,7 +85,7 @@ export interface CustomCardEntry extends Record<string, unknown> {
   ) => Record<string, unknown> | Array<Record<string, unknown>> | null;
 }
 
-/** Window shape for the HA `customCards` registry. All three card
+/** Window shape for the HA `customCards` registry. All four card
  *  entrypoints push their picker descriptor into `window.customCards` at
  *  module load — this interface is the canonical cast target so the
  *  registration blocks read identically and a future maintainer can't

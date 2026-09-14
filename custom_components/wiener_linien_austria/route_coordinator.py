@@ -165,9 +165,12 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
     ) -> list[Trip]:
         """Plan and rank connections at `when`. No cooldown, no state.
 
-        Shared by the polling path and the `plan_trip` action. Connections
-        that have already left in real time are dropped either way; for a
-        query about later today or tomorrow that removes nothing.
+        The polling path's hook into `async_plan_trips`, bound to this
+        entry's options and zone; the caller takes the routing cooldown.
+        `plan_trip` doesn't come through here: it goes through adhoc.py's
+        planner, which calls `async_plan_trips` directly. Connections that
+        have already departed are dropped; for a query about later today
+        or tomorrow that removes nothing.
         """
         return await async_plan_trips(
             self.hass, self.options, when, self._tz, arrive_by=arrive_by
@@ -219,8 +222,10 @@ async def async_plan_trips(
     """Fetch, parse and rank one trip request. No cooldown, no state.
 
     The one planning path shared by route entries, the `plan_trip` action
-    and the route card's ad-hoc mode (adhoc.py), so all three see the same
-    connections for the same query.
+    and the route card's ad-hoc mode (the last two via adhoc.py), plus the
+    config flow's setup probe, so every caller sees the same connections
+    for the same query. Tests patch the fetch at
+    `route_coordinator.async_fetch_trip_body`.
     """
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),

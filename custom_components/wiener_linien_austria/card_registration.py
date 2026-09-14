@@ -3,8 +3,8 @@
 Canonical pattern from the HA developer community guide:
 https://community.home-assistant.io/t/developer-guide-embedded-lovelace-card-in-a-home-assistant-integration/974909
 
-This integration ships three bundled cards (modern + retro + flap),
-registered via a single ``JSModuleRegistration`` instance.
+This integration ships four bundled cards (modern + retro + flap +
+route), registered via a single ``JSModuleRegistration`` instance.
 
 ``resources`` itself is a ``ResourceYAMLCollection |
 ResourceStorageCollection`` union; the type-only import + ``cast``
@@ -147,8 +147,9 @@ class JSModuleRegistration:
             # the Lovelace resource URL these files are served under carries
             # `?v={version}` (see `_async_upsert_resource`) and the version
             # comes from manifest.json — so a release changes the URL and the
-            # long max-age never has to be invalidated. Without it all three
-            # bundles (443 KB raw) are re-fetched on every dashboard boot.
+            # long max-age never has to be invalidated. Without it all four
+            # bundles (~574 KB raw, 2026-09-14) are re-fetched on every
+            # dashboard boot.
             #
             # The cost is local: dev-push rsyncs a rebuilt bundle to the same
             # URL with the same `?v=`, so card iteration now needs a hard
@@ -170,7 +171,7 @@ class JSModuleRegistration:
             configs.append(StaticPathConfig(FONTS_URL, str(fonts_dir), False))
         if not configs:
             # No card JS at all on disk — the integration's user-visible
-            # surface (all three Lovelace cards) is broken.
+            # surface (all four Lovelace cards) is broken.
             # Promote from the per-file warning to a single error so the
             # condition is loud in the integration log instead of silent.
             if JSMODULES:

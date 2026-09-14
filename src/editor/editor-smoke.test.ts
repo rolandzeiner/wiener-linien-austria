@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-// Component-level coverage for the three card editors.
+// Component-level coverage for the three departure-board card editors. The
+// route editor is covered in route-card.test.ts.
 //
 // The rest of the suite tests pure functions in a node environment, which left
 // the v2 editor rewrite — the largest change in this release, and ~3,700 lines

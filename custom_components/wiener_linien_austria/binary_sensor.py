@@ -232,14 +232,19 @@ class WienerLinienStaleBinarySensor(
 class WienerLinienRouteRiskBinarySensor(
     CoordinatorEntity[WienerLinienRouteCoordinator], BinarySensorEntity
 ):
-    """On when the best connection's transfer no longer fits on live times.
+    """On when the best connection's transfer no longer fits on current times.
 
     Deliberately `at_risk` only, not `tight`. The trip planner schedules
     zero-slack changes as a matter of course, so a sensor that fired on
     `tight` would be on for most connections most of the time and teach
-    people to ignore it. `at_risk` means realtime data says the walk no
-    longer fits — the moment a notification is worth sending. The finer
-    grading stays available in the `risk` attribute.
+    people to ignore it. `at_risk` means the effective times (realtime when
+    the upstream supplies it) say the walk no longer fits — the moment a
+    notification is worth sending. The finer grading stays available in the
+    `risk` attribute.
+
+    The routing backend supplied no realtime times at all as of 2026-09-14
+    (see routing.py), so in practice this grades timetable times: a delay
+    can't turn it on until the upstream starts sending them.
     """
 
     _attr_has_entity_name = True

@@ -358,7 +358,9 @@ FLAP_CARD_VERSION: Final = INTEGRATION_VERSION
 FLAP_CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-flap-card.js"
 FLAP_CARD_FILENAME: Final = "wiener-linien-austria-flap-card.js"
 # Fourth card (experimental): an A→B connection, fed by a route entry's
-# `sensor.<route>_next_connection`. Same lockstep versioning as the others.
+# `sensor.<route>_next_connection`, or planned on demand between two stops
+# over the `wiener_linien_austria/plan` WebSocket command when no entity is
+# set. Same lockstep versioning as the others.
 ROUTE_CARD_VERSION: Final = INTEGRATION_VERSION
 ROUTE_CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-route-card.js"
 ROUTE_CARD_FILENAME: Final = "wiener-linien-austria-route-card.js"

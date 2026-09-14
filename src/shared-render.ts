@@ -1,5 +1,5 @@
-// Shared render helpers used by all three bundled cards (modern + retro
-// + flap).
+// Shared render helpers used by all four bundled cards (modern + retro
+// + flap + route).
 // Extracted so the version-banner + the WS card-version probe live in
 // one place — each card stays focused on its own rendering rather than
 // carrying its own copy of the integration-upgrade plumbing. Each card

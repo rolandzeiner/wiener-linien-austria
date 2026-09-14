@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-// Component-level coverage for the three card entrypoints.
+// Component-level coverage for the three departure-board card entrypoints.
+// The route card and its editor have their own suite, route-card.test.ts.
 //
 // These three files are 6,568 lines — the entire user-visible surface of the
 // integration — and until this test existed not one of them was ever loaded by

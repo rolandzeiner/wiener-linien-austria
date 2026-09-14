@@ -1,4 +1,6 @@
-// Logic shared by the three card editors.
+// Logic shared by the card editors. All four use `editorLabel` and
+// `editorHelper`; the stop and header-strip helpers serve the three
+// departure-board editors, each taking the ones its config shape needs.
 //
 // v2 extracted the shared widgets but left the shared logic in each editor,
 // where the copies drifted: the modern and flap entity handlers disagreed on

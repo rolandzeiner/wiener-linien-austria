@@ -189,7 +189,7 @@ describe("ad-hoc timing", () => {
     expect(adhocRefreshDelay([departing("2026-09-14T07:57:00+02:00")], NOW)).toBe(ADHOC_REFRESH_MS);
     // Leaves in 60 s: refresh 30 s after it has gone.
     expect(adhocRefreshDelay([departing("2026-09-14T07:51:00+02:00")], NOW)).toBe(90_000);
-    // Leaves now: never sooner than the floor.
+    // Leaves in 10 s: never sooner than the floor.
     expect(adhocRefreshDelay([departing("2026-09-14T07:50:10+02:00")], NOW)).toBe(
       ADHOC_ROLLOVER_FLOOR_MS,
     );

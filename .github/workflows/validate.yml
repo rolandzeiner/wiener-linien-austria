@@ -131,7 +131,7 @@ jobs:
         # at module load. Cheapest possible CI guard: scan the body of
         # every cardStyles / editorStyles / html`` template for an
         # unescaped backtick. Critical for wiener-linien because all
-        # three cards are 1900+ lines of Lit templates each.
+        # four cards are 1,600+ lines of Lit templates each.
         run: |
           if perl -0777 -ne '
             while (m{(css|html)\`(.*?)(?<!\\)\`}gs) {
@@ -171,9 +171,10 @@ jobs:
         # green all the way to the bundle. Never make this step conditional.
         run: npx tsc --noEmit
       - name: Card unit tests
-        # Pure-function coverage of the three config normalisers, the
-        # departure filter and the time helpers, plus component-level smoke
-        # tests for the three cards and the three editors. The normaliser
+        # Pure-function coverage of the config normalisers, the departure
+        # filter, the route helpers and the time helpers, plus component-level
+        # tests for all four cards and their editors (route-card.test.ts
+        # covers the route card and its editor). The normaliser
         # tests double as the spec for cross-card config defaults, which is
         # where this integration's drift has historically hidden.
         run: npm test

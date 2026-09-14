@@ -1,4 +1,5 @@
-// Shared config vocabulary for the three cards.
+// Shared config vocabulary for the three departure-board cards. The route
+// card's keys are validated in utils/route.ts and aren't tracked here.
 //
 // WHY THIS FILE EXISTS
 //

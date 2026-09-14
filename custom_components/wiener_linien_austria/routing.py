@@ -2,16 +2,20 @@
 
 The routing service is a Mentz EFA server (`ogd_routing/XML_TRIP_REQUEST2`,
 interface described in "Beschreibung der EFA XML-Schnittstelle", Wiener
-Linien OGD, 2013). It does the actual routing server-side — including
-realtime-adjusted times (`rtTime`) — so this module never searches a
-timetable itself. Its job is the three things the server does not do:
+Linien OGD, 2013). It does the actual routing server-side, so this module
+never searches a timetable itself. The interface carries realtime-adjusted
+times (`rtTime`) and they are used when the upstream supplies them; none
+were observed as of 2026-09-14 (every leg had `rtTime == time`, and
+`XML_DM_REQUEST` reported `realtime: "0"` even for U-Bahn lines `/monitor`
+shows live), so in practice plans are timetable-based. Its job is the
+three things the server does not do:
 
 1. **Parse** the JSON variant (`outputFormat=JSON`) into typed trips. The
    server stamps Vienna wall-clock time with no offset, regardless of Home
    Assistant's own zone.
 2. **Score transfer risk.** For every change between two vehicles the slack
    is `next departure - previous arrival - transfer walk`, using realtime
-   times where the server has them. The server happily plans a connection
+   times where the server supplies them. The server happily plans a connection
    with zero slack (U3 → U1 at Stephansplatz: arrive 08:04, 4 min walk,
    depart 08:08), which is exactly the connection a two-minute delay breaks.
 3. **Drop dominated connections** (Pareto over departure, arrival, number

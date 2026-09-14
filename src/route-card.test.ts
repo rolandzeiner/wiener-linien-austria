@@ -95,9 +95,11 @@ const root = (el: HTMLElement): ShadowRoot => {
 };
 const text = (el: HTMLElement): string => (root(el).textContent ?? "").replace(/\s+/g, " ");
 
-/** happy-dom here leaves `window.localStorage` undefined, so hand the card an
- *  in-memory one per test. The card itself treats a missing store as "don't
- *  remember", which the first ad-hoc test exercises implicitly. */
+/** happy-dom here leaves `window.localStorage` undefined, so `beforeEach`
+ *  hands the card a fresh in-memory one per test. Every test therefore starts
+ *  with an empty store, never a missing one; the missing-store path (private
+ *  mode, blocked storage) is the `?.` and `try` in utils/route.ts's
+ *  `loadAdhocSelection` / `saveAdhocSelection`. */
 function memoryStorage(): Storage {
   const data = new Map<string, string>();
   return {

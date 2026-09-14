@@ -119,17 +119,20 @@ async def _websocket_route_card_version(
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the Wiener Linien Austria component.
 
-    Process-scoped concerns only: register the WebSocket card-version
-    commands and the Lovelace JS resource. Domain-wide *timers* are
-    booted from the FIRST `async_setup_entry` and torn down by the LAST
-    `async_unload_entry` — see `_ensure_domain_timers` and the unload
-    cleanup tuple. Putting the timers here would leak across the
-    "remove last entry, add a new one" flow because `async_setup` only
+    Process-scoped concerns only: register the WebSocket commands (the
+    four card-version probes plus the route card's `stops` / `plan`, see
+    websocket.py), the `plan_trip` action and the Lovelace JS resources.
+    Domain-wide *timers* are booted from the FIRST `async_setup_entry` and
+    torn down by the LAST `async_unload_entry` — see `_ensure_domain_timers`
+    and the unload cleanup tuple. Putting the timers here would leak across
+    the "remove last entry, add a new one" flow because `async_setup` only
     runs once per HA process.
     """
     # WS commands are process-scoped — HA core has no deregister API.
     # `async_setup` only runs once per HA process, so duplicate
-    # registration can't happen.
+    # registration can't happen. The flip side: the handlers outlive a
+    # removed integration, which is why the ad-hoc ones answer
+    # `not_loaded` unless an entry is loaded.
     async_register_command(hass, _websocket_card_version)
     async_register_command(hass, _websocket_retro_card_version)
     async_register_command(hass, _websocket_flap_card_version)
@@ -516,7 +519,7 @@ async def async_remove_entry(
 ) -> None:
     """Drop the Lovelace resources when the LAST config entry is removed.
 
-    All three card resources are registered once globally per integration,
+    All four card resources are registered once globally per integration,
     so reloading or removing a single entry must not remove them. Only when
     no other entries of this domain remain do we unregister.
     """

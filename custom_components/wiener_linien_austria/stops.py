@@ -171,7 +171,9 @@ def stop_options(
     the option labels client-side, so shipping the whole catalogue in one
     control gives type-to-filter over every stop without a round trip.
     Picking a suggestion goes straight to line selection; only free text
-    that matched no stop exactly falls through to `select_stop`.
+    that matched no stop exactly falls through to `select_stop`. The route
+    card gets the same list over `wiener_linien_austria/stops` and filters
+    it in its own combobox (src/stop-combobox.ts), not HA's selector.
 
     Ordering carries the useful default: the stops closest to the home
     location head the list with their distance shown, so the unfiltered

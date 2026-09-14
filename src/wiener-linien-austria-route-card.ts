@@ -1,10 +1,16 @@
 // Wiener Linien Austria — Route Card (experimental).
 //
-// Shows the best A→B connection from a route entry's
-// `sensor.<route>_next_connection`: a "leave in" countdown, the trip drawn as
-// a strand whose ride segments carry each line's own colour (the way the
+// Shows the best A→B connection: a "leave in" countdown, the trip drawn as a
+// strand whose ride segments carry each line's own colour (the way the
 // network map draws it), a buffer badge on every change, and the next few
 // connections behind a disclosure.
+//
+// Two modes, one renderer. With `entity` set it reads a route entry's
+// `sensor.<route>_next_connection`. Without one it shows From / To stop
+// comboboxes and plans on demand over the `wiener_linien_austria/plan`
+// WebSocket command (websocket.py), which answers in the sensor's attribute
+// shape. Refresh cadence, idle pause and error handling for that mode live in
+// utils/route.ts; the backend's cache and request budget in adhoc.py.
 //
 // Colour discipline: nothing here introduces a palette. Line colours come off
 // the same GTFS ladder as every other card (`chipPalette`), and the transfer
