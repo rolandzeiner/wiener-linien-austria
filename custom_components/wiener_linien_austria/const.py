@@ -221,15 +221,16 @@ DEFAULT_MIN_TRANSFER_MINUTES: Final = 2
 MAX_MIN_TRANSFER_MINUTES: Final = 15
 WEEKDAYS: Final = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
 
-# Transport modes a route may exclude, by EFA `motType` code (the `code`
-# field on a leg's `mode`, and the `exclMOT_<code>` request parameter).
-# Only the codes that actually run inside Vienna are offered.
+# Transport modes a route may exclude: stored name -> EFA `motType` code
+# (the `code` field on a leg's `mode`, and the `exclMOT_<code>` request
+# parameter). Names rather than codes are stored so entry data reads on its
+# own. Only the modes that actually run inside Vienna are offered.
 EXCLUDABLE_MEANS: Final[dict[str, str]] = {
-    "0": "train",
-    "1": "sbahn",
-    "2": "metro",
-    "4": "tram",
-    "5": "bus",
+    "train": "0",
+    "sbahn": "1",
+    "metro": "2",
+    "tram": "4",
+    "bus": "5",
 }
 
 ROUTING_BASE_URL: Final = "https://www.wienerlinien.at/ogd_routing"

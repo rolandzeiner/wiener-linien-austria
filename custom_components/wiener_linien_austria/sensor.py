@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
@@ -29,6 +30,11 @@ from .coordinator import (
     WienerLinienAustriaCoordinator,
     WienerLinienConfigEntry,
 )
+from .route_coordinator import (
+    WienerLinienRouteConfigEntry,
+    WienerLinienRouteCoordinator,
+    route_device_info,
+)
 from .static import CATALOGUE_KEY, StaticCatalogue, canonical_line_key
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,12 +44,47 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: WienerLinienConfigEntry,
+    entry: WienerLinienConfigEntry | WienerLinienRouteConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the single stop sensor for this entry."""
+    """Set up the stop sensor, or the route sensor for a route entry."""
     coordinator = entry.runtime_data
+    if isinstance(coordinator, WienerLinienRouteCoordinator):
+        async_add_entities([WienerLinienRouteSensor(coordinator, entry)])
+        return
     async_add_entities([WienerLinienStopSensor(coordinator, entry)])
+
+
+def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str, str]]:
+    """Return the GTFS palette for `labels`, as `{label: {bg, fg}}`.
+
+    Reads the shared catalogue ref live rather than capturing it at
+    setup, so a background trip-pattern refresh (which also refreshes
+    route colours) is picked up without a restart.
+
+    A label with no GTFS entry is omitted rather than published with an
+    empty colour, and so is any label the catalogue doesn't know. Returns
+    `{}` when the catalogue isn't loaded yet or the routes payload hasn't
+    landed — the cards have their own fallbacks (nightline rule + neutral
+    default), which is also what an omitted label gets.
+    """
+    catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
+    if not isinstance(catalogue, StaticCatalogue):
+        return {}
+    index = catalogue.trip_patterns
+    if index is None or not index.colors_by_line:
+        return {}
+    out: dict[str, dict[str, str]] = {}
+    for label in labels:
+        bg = index.colors_by_line.get(label)
+        if not bg:
+            continue
+        entry = {"bg": bg}
+        fg = index.text_colors_by_line.get(label)
+        if fg:
+            entry["fg"] = fg
+        out[label] = entry
+    return out
 
 
 class WienerLinienStopSensor(
@@ -280,49 +321,18 @@ class WienerLinienStopSensor(
         return list(labels) if labels else []
 
     def _line_colors(self, labels: set[str]) -> dict[str, dict[str, str]]:
-        """Return the GTFS palette for `labels`, as `{label: {bg, fg}}`.
+        """Return the GTFS palette for `labels`; see `line_colors_for`.
 
-        Reads the shared catalogue ref live rather than capturing it at
-        setup, so a background trip-pattern refresh (which also refreshes
-        route colours) is picked up without a restart.
-
-        NOT on the very next sensor read, which an earlier revision of
-        this docstring claimed. This runs inside
-        `extra_state_attributes`, whose result is memoised on the
-        coordinator, and `static.async_set_cached_catalogue` publishes a
-        new catalogue without invalidating that cache. So the refreshed
-        colours land on the next coordinator tick — bounded by the
-        entry's scan interval, 60 s by default and up to 600 s at the
-        ceiling. Harmless for data that changes on a weeks-to-months
-        cadence; wrong to rely on if something ever needs the catalogue
-        promptly.
-
-        A label with no GTFS entry is omitted rather than published with
-        an empty colour, and so is any label the catalogue doesn't know.
-        Returns `{}` when the catalogue isn't loaded yet or the routes
-        payload hasn't landed — the card has its own fallbacks
-        (nightline rule + neutral default), which is also what an omitted
-        label gets. See the call site for which labels have to be in
+        Refreshed colours land on the next coordinator tick, not the next
+        sensor read: this runs inside `extra_state_attributes`, whose
+        result is memoised on the coordinator, and
+        `static.async_set_cached_catalogue` publishes a new catalogue
+        without invalidating that cache. Bounded by the entry's scan
+        interval — harmless for data that changes on a weeks-to-months
+        cadence. See the call site for which labels have to be in
         `labels` and why.
         """
-        domain_data = self.coordinator.hass.data.get(DOMAIN, {})
-        catalogue = domain_data.get(CATALOGUE_KEY)
-        if not isinstance(catalogue, StaticCatalogue):
-            return {}
-        index = catalogue.trip_patterns
-        if index is None or not index.colors_by_line:
-            return {}
-        out: dict[str, dict[str, str]] = {}
-        for label in labels:
-            bg = index.colors_by_line.get(label)
-            if not bg:
-                continue
-            entry = {"bg": bg}
-            fg = index.text_colors_by_line.get(label)
-            if fg:
-                entry["fg"] = fg
-            out[label] = entry
-        return out
+        return line_colors_for(self.coordinator.hass, labels)
 
     @property
     def available(self) -> bool:
@@ -361,3 +371,72 @@ class WienerLinienStopSensor(
         removal of the availability contract; the pair is the design.
         """
         return self.coordinator.data is not None
+
+
+class WienerLinienRouteSensor(
+    CoordinatorEntity[WienerLinienRouteCoordinator], SensorEntity
+):
+    """One sensor per route. State = departure of the best connection.
+
+    A timestamp rather than a countdown: Home Assistant renders it as
+    "in 4 minutes" on its own, automations can compare it directly, and
+    the state only changes when the plan does instead of every minute.
+    Uses the stock `available` contract — unlike the stop sensor there is
+    no cached board worth keeping on screen through an outage, because a
+    stale connection plan is actively misleading.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "route"
+    _attr_attribution = ATTRIBUTION
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+    _unrecorded_attributes = frozenset({"trips", "line_colors", "traffic_info"})
+
+    def __init__(
+        self,
+        coordinator: WienerLinienRouteCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialise the sensor — unique_id format is frozen."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_route"
+        self._attr_device_info = route_device_info(entry)
+
+    @property
+    def native_value(self) -> datetime | None:
+        """Departure of the best connection, or None when there is none."""
+        data = self.coordinator.data
+        if data is None or not data.trips:
+            return None
+        return data.trips[0].departure
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The ranked connections, their line colours and matching alerts."""
+        coordinator = self.coordinator
+        data = coordinator.data
+        trips = data.trips if data is not None else []
+        labels = {
+            leg.line for trip in trips for leg in trip.legs if leg.line and not leg.walk
+        }
+        traffic, _elevator = get_alerts_for(coordinator.hass, labels, set())
+        best = trips[0] if trips else None
+        return {
+            "origin": coordinator.origin_name,
+            "destination": coordinator.destination_name,
+            "active": data.active if data is not None else False,
+            "active_window": coordinator.active_window,
+            "fetched_at": (
+                data.fetched_at.isoformat()
+                if data is not None and data.fetched_at is not None
+                else None
+            ),
+            "arrival": best.arrival.isoformat() if best and best.arrival else None,
+            "duration_minutes": best.duration_minutes if best else None,
+            "interchanges": best.interchanges if best else None,
+            "risk": best.risk if best else None,
+            "min_transfer_minutes": coordinator.options.min_transfer_minutes,
+            "trips": [trip.to_dict() for trip in trips],
+            "line_colors": line_colors_for(coordinator.hass, labels),
+            "traffic_info": [t.to_dict() for t in traffic],
+        }

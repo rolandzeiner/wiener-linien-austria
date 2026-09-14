@@ -15,6 +15,7 @@ from homeassistant.components.websocket_api.decorators import (
     async_response,
     websocket_command,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
 from homeassistant.core import CoreState, Event, HomeAssistant
 from homeassistant.helpers import config_validation as cv
@@ -30,11 +31,13 @@ from .const import (
     ALERTS_REFRESH_UNSUB_KEY,
     BATCH_REGISTRY_KEY,
     CARD_VERSION,
+    CONF_ENTRY_TYPE,
     CONF_LINES,
     DOMAIN,
     DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
+    ENTRY_TYPE_ROUTE,
     FLAP_CARD_VERSION,
     RESOURCES_REGISTERED_KEY,
     RETRO_CARD_VERSION,
@@ -42,7 +45,15 @@ from .const import (
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
-from .rate_limit import LOCK_KEY, LOCK_LOOP_KEY
+from .rate_limit import (
+    LOCK_KEY,
+    LOCK_LOOP_KEY,
+    ROUTING_LAST_CALL_KEY,
+    ROUTING_LOCK_KEY,
+    ROUTING_LOCK_LOOP_KEY,
+)
+from .route_coordinator import WienerLinienRouteCoordinator, route_device_info
+from .services import async_setup_services
 from .static import (
     BACKGROUND_REFRESH_TASK_KEY,
     CATALOGUE_KEY,
@@ -108,6 +119,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     async_register_command(hass, _websocket_card_version)
     async_register_command(hass, _websocket_retro_card_version)
     async_register_command(hass, _websocket_flap_card_version)
+    async_setup_services(hass)
 
     registration = JSModuleRegistration(hass)
 
@@ -258,6 +270,8 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: WienerLinienConfigEntry
 ) -> bool:
     """Set up Wiener Linien Austria from a config entry."""
+    if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_ROUTE:
+        return await _async_setup_route_entry(hass, entry)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     # Register into the shared batch group for this entry's scan interval
     # BEFORE the first refresh, so the combined /monitor request already
@@ -325,6 +339,39 @@ async def async_setup_entry(
     return True
 
 
+async def _async_setup_route_entry(
+    hass: HomeAssistant, entry: ConfigEntry[Any]
+) -> bool:
+    """Set up an A→B route entry.
+
+    Mirrors the stop path's bookkeeping — entry count, domain timers, the
+    up-front device, rollback on a platform failure — minus the batch
+    group: a route polls the routing backend on its own coordinator timer
+    and never touches `/monitor`. It still counts as a live entry, so the
+    alerts refresh keeps running for a route-only install and route legs
+    can be matched against disruptions.
+    """
+    coordinator = WienerLinienRouteCoordinator(hass, entry)
+    await coordinator.async_config_entry_first_refresh()
+
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data[ENTRY_COUNT_KEY] = domain_data.get(ENTRY_COUNT_KEY, 0) + 1
+    _ensure_domain_timers(hass)
+
+    entry.runtime_data = coordinator
+    dr.async_get(hass).async_get_or_create(
+        config_entry_id=entry.entry_id, **route_device_info(entry)
+    )
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:
+        await _rollback_setup_failure(hass, coordinator)
+        raise
+    entry.async_on_unload(coordinator.async_shutdown)
+    entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    return True
+
+
 def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     """Tear down every domain-wide resource that should die with the LAST entry.
 
@@ -370,6 +417,9 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         DOMAIN_LAST_CALL_KEY,
         LOCK_KEY,
         LOCK_LOOP_KEY,
+        ROUTING_LAST_CALL_KEY,
+        ROUTING_LOCK_KEY,
+        ROUTING_LOCK_LOOP_KEY,
         CATALOGUE_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
@@ -377,7 +427,8 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
 
 
 async def _rollback_setup_failure(
-    hass: HomeAssistant, coordinator: WienerLinienAustriaCoordinator
+    hass: HomeAssistant,
+    coordinator: WienerLinienAustriaCoordinator | WienerLinienRouteCoordinator,
 ) -> None:
     """Decrement counter + tear down domain state on a partial-setup failure.
 

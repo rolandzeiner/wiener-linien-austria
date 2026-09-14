@@ -1,0 +1,16 @@
+plan_trip:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: wiener_linien_austria
+    datetime:
+      required: false
+      selector:
+        datetime:
+    arrive_by:
+      required: false
+      default: false
+      selector:
+        boolean:

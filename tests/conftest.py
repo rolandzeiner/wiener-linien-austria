@@ -54,7 +54,10 @@ def _collapse_domain_cooldown(request: pytest.FixtureRequest) -> Generator[None]
     if "real_domain_cooldown" in request.keywords:
         yield
         return
-    with patch.object(rate_limit, "DOMAIN_COOLDOWN_SECONDS", 0):
+    with (
+        patch.object(rate_limit, "DOMAIN_COOLDOWN_SECONDS", 0),
+        patch.object(rate_limit, "ROUTING_COOLDOWN_SECONDS", 0),
+    ):
         yield
 
 
@@ -286,8 +289,13 @@ def mock_aiohttp_session():
     creates one. Patch the batch binding so a group timer firing during a
     time-advancing test can't reach the real network.
     """
-    with patch(
-        "custom_components.wiener_linien_austria.batch.async_get_clientsession",
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.batch.async_get_clientsession",
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.route_coordinator.async_get_clientsession",
+        ),
     ):
         yield
 

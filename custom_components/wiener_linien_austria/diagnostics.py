@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from .alerts import get_alerts_for, line_names_from_keys
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
 from .coordinator import WienerLinienConfigEntry
+from .route_coordinator import WienerLinienRouteCoordinator
 from .static import CATALOGUE_KEY, StaticCatalogue
 
 # Treat as monotonically growing — never shrink. Diagnostics dumps end
@@ -50,6 +51,8 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: WienerLinienConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
+    if isinstance(entry.runtime_data, WienerLinienRouteCoordinator):
+        return _route_diagnostics(entry, entry.runtime_data)
     coordinator = entry.runtime_data
     data = coordinator.data
 
@@ -115,5 +118,42 @@ async def async_get_config_entry_diagnostics(
         "alerts": {
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
+        },
+    }
+
+
+def _route_diagnostics(
+    entry: WienerLinienConfigEntry, coordinator: WienerLinienRouteCoordinator
+) -> dict[str, Any]:
+    """Diagnostics for a route entry.
+
+    Counts and shape only, never the connections themselves: a dump of
+    "leaves Floridsdorf at 07:44 every weekday" in a public issue is the
+    routine this integration should not publish on the user's behalf. The
+    origin and destination are in the entry data already, on the same
+    ratified terms as a stop entry's title.
+    """
+    data = coordinator.data
+    trips = data.trips if data is not None else []
+    return {
+        "attribution": ATTRIBUTION,
+        "entry": {
+            "title": entry.title,
+            "version": entry.version,
+            "data": async_redact_data(dict(entry.data), TO_REDACT),
+            "options": async_redact_data(dict(entry.options), TO_REDACT),
+        },
+        "coordinator": {
+            "last_update_success": coordinator.last_update_success,
+            "last_exception": repr(coordinator.last_exception),
+            "scan_interval": str(coordinator.scan_interval),
+            "update_interval": str(coordinator.update_interval),
+            "active": data.active if data is not None else None,
+            "active_window": coordinator.active_window,
+            "trip_count": len(trips),
+            "risks": [trip.risk for trip in trips],
+            "realtime_legs": sum(
+                1 for trip in trips for leg in trip.legs if leg.realtime
+            ),
         },
     }

@@ -6,12 +6,26 @@
         "state": {
           "off": "mdi:cloud-check-outline"
         }
+      },
+      "route_at_risk": {
+        "default": "mdi:transit-transfer",
+        "state": {
+          "on": "mdi:alert-circle-outline"
+        }
       }
     },
     "sensor": {
       "stop": {
         "default": "mdi:train-variant"
+      },
+      "route": {
+        "default": "mdi:routes"
       }
+    }
+  },
+  "services": {
+    "plan_trip": {
+      "service": "mdi:map-marker-path"
     }
   }
 }

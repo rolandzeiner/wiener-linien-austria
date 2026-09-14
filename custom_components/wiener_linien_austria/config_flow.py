@@ -1,7 +1,10 @@
 """Config flow for Wiener Linien Austria.
 
 Flow:
-  1. `user`           — a combo box (`custom_value=True`) over every trackable
+  0. `user`           — a menu: a departure board (`stop`) or an A→B route
+                        (`route`, then `route_options`). Everything below
+                        describes the departure-board branch.
+  1. `stop`           — a combo box (`custom_value=True`) over every trackable
                         stop. Typing filters the catalogue live, so the user
                         gets autocomplete instead of a blind search; the stops
                         nearest the Home Assistant home location are pinned to
@@ -50,25 +53,63 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TimeSelector,
 )
+from homeassistant.util import dt as dt_util
 from homeassistant.util.location import distance
 
 from .const import (
     API_BASE_URL,
+    CONF_ACTIVE_DAYS,
+    CONF_ACTIVE_FROM,
+    CONF_ACTIVE_TO,
+    CONF_DESTINATION_DIVA,
+    CONF_DESTINATION_NAME,
     CONF_DIVA,
+    CONF_ENTRY_TYPE,
+    CONF_EXCLUDED_MEANS,
     CONF_LINES,
+    CONF_MAX_CHANGES,
+    CONF_MIN_TRANSFER_MINUTES,
+    CONF_ORIGIN_DIVA,
+    CONF_ORIGIN_NAME,
     CONF_RBLS,
+    CONF_ROUTE_TYPE,
     CONF_STOP_NAME,
+    CONF_WALK_SPEED,
+    DEFAULT_MIN_TRANSFER_MINUTES,
+    DEFAULT_ROUTE_SCAN_INTERVAL,
+    DEFAULT_ROUTE_TYPE,
     DEFAULT_SCAN_INTERVAL,
+    DEFAULT_WALK_SPEED,
     DOMAIN,
+    ENTRY_TYPE_ROUTE,
+    ENTRY_TYPE_STOP,
+    EXCLUDABLE_MEANS,
+    MAX_CHANGES_ANY,
+    MAX_CHANGES_CHOICES,
+    MAX_MIN_TRANSFER_MINUTES,
     MAX_POLL_SECONDS,
+    MAX_ROUTE_POLL_SECONDS,
     MIN_POLL_SECONDS,
+    MIN_ROUTE_POLL_SECONDS,
     MONITOR_ENDPOINT,
     NEARBY_STOP_LIMIT,
     NEARBY_STOP_MAX_METERS,
+    ROUTE_TYPES,
+    ROUTING_TIME_ZONE,
     USER_AGENT,
+    WALK_SPEEDS,
+    WEEKDAYS,
 )
 from .http import base_request_headers
+from .routing import (
+    RouteOptions,
+    RoutingError,
+    async_fetch_trip_body,
+    build_trip_params,
+    parse_trip_body,
+)
 from .static import (
     StaticCatalogue,
     Station,
@@ -489,6 +530,9 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         self._matches: list[Station] = []
         self._lines: list[dict[str, str]] = []
         self._reconfigure_entry: ConfigEntry | None = None
+        # Route flow: (diva, name) for each end, set by `route`.
+        self._route_origin: tuple[int, str] | None = None
+        self._route_destination: tuple[int, str] | None = None
 
     @staticmethod
     @callback
@@ -520,6 +564,14 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         return self._stop_options
 
     async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Ask what to add: a departure board or an A→B route."""
+        return self.async_show_menu(
+            step_id="user", menu_options=[ENTRY_TYPE_STOP, ENTRY_TYPE_ROUTE]
+        )
+
+    async def async_step_stop(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Pick a stop from the full catalogue, nearest to home first."""
@@ -568,7 +620,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     return await self.async_step_select_stop()
 
         return self.async_show_form(
-            step_id="user",
+            step_id="stop",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_DIVA): SelectSelector(
@@ -601,7 +653,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Let the user pick one station from the search hits.
 
-        Only reached from the free-text branch of `async_step_user` — a
+        Only reached from the free-text branch of `async_step_stop` — a
         picked suggestion already carries its DIVA and skips straight to
         line selection.
         """
@@ -609,7 +661,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             diva_str = user_input.get(CONF_DIVA)
             if diva_str == "__search_again__":
-                return await self.async_step_user()
+                return await self.async_step_stop()
             try:
                 diva = int(diva_str) if diva_str is not None else None
             except ValueError as err:
@@ -803,6 +855,234 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
+    # Route — pick two stops, then how to plan between them
+    # ------------------------------------------------------------------
+
+    async def async_step_route(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Pick where a route starts and ends."""
+        try:
+            catalogue = await async_get_catalogue(self.hass)
+        except (TimeoutError, aiohttp.ClientError) as err:
+            _LOGGER.warning("Static catalogue load failed: %s", err)
+            return self.async_abort(reason="catalogue_unavailable")
+
+        options = await self._async_stop_options(catalogue)
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            origin = _resolve_route_stop(catalogue, user_input.get(CONF_ORIGIN_DIVA))
+            destination = _resolve_route_stop(
+                catalogue, user_input.get(CONF_DESTINATION_DIVA)
+            )
+            if origin is None:
+                errors[CONF_ORIGIN_DIVA] = "route_stop_unresolved"
+            if destination is None:
+                errors[CONF_DESTINATION_DIVA] = "route_stop_unresolved"
+            if origin is not None and destination is not None:
+                if origin.diva == destination.diva:
+                    errors["base"] = "same_stop"
+                else:
+                    await self.async_set_unique_id(
+                        f"route_{origin.diva}_{destination.diva}"
+                    )
+                    self._abort_if_unique_id_configured(
+                        reload_on_update=False, error="already_configured_route"
+                    )
+                    self._route_origin = (origin.diva, origin.name)
+                    self._route_destination = (destination.diva, destination.name)
+                    return await self.async_step_route_options()
+
+        picker = SelectSelector(
+            SelectSelectorConfig(
+                options=options,
+                mode=SelectSelectorMode.DROPDOWN,
+                custom_value=True,
+                sort=False,
+            )
+        )
+        return self.async_show_form(
+            step_id="route",
+            data_schema=self.add_suggested_values_to_schema(
+                vol.Schema(
+                    {
+                        vol.Required(CONF_ORIGIN_DIVA): picker,
+                        vol.Required(CONF_DESTINATION_DIVA): picker,
+                    }
+                ),
+                user_input or {},
+            ),
+            errors=errors,
+        )
+
+    async def async_step_route_options(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Choose how the route is planned and when it refreshes."""
+        assert self._route_origin is not None
+        assert self._route_destination is not None
+        origin_diva, origin_name = self._route_origin
+        destination_diva, destination_name = self._route_destination
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            active_from = user_input.get(CONF_ACTIVE_FROM)
+            active_to = user_input.get(CONF_ACTIVE_TO)
+            if bool(active_from) != bool(active_to):
+                errors["base"] = "window_incomplete"
+            else:
+                data: dict[str, Any] = {
+                    CONF_ENTRY_TYPE: ENTRY_TYPE_ROUTE,
+                    CONF_ORIGIN_DIVA: origin_diva,
+                    CONF_ORIGIN_NAME: origin_name,
+                    CONF_DESTINATION_DIVA: destination_diva,
+                    CONF_DESTINATION_NAME: destination_name,
+                    CONF_ROUTE_TYPE: str(
+                        user_input.get(CONF_ROUTE_TYPE, DEFAULT_ROUTE_TYPE)
+                    ),
+                    CONF_MAX_CHANGES: str(
+                        user_input.get(CONF_MAX_CHANGES, MAX_CHANGES_ANY)
+                    ),
+                    CONF_WALK_SPEED: str(
+                        user_input.get(CONF_WALK_SPEED, DEFAULT_WALK_SPEED)
+                    ),
+                    CONF_MIN_TRANSFER_MINUTES: int(
+                        user_input.get(
+                            CONF_MIN_TRANSFER_MINUTES, DEFAULT_MIN_TRANSFER_MINUTES
+                        )
+                    ),
+                    CONF_EXCLUDED_MEANS: [
+                        str(x)
+                        for x in user_input.get(CONF_EXCLUDED_MEANS, [])
+                        if str(x) in EXCLUDABLE_MEANS
+                    ],
+                    CONF_SCAN_INTERVAL: int(
+                        user_input.get(CONF_SCAN_INTERVAL, DEFAULT_ROUTE_SCAN_INTERVAL)
+                    ),
+                    CONF_ACTIVE_DAYS: [
+                        str(d)
+                        for d in user_input.get(CONF_ACTIVE_DAYS, [])
+                        if str(d) in WEEKDAYS
+                    ],
+                }
+                if active_from and active_to:
+                    data[CONF_ACTIVE_FROM] = str(active_from)
+                    data[CONF_ACTIVE_TO] = str(active_to)
+                error = await _probe_route(self.hass, data)
+                if error is not None:
+                    errors["base"] = error
+                elif self._reconfigure_entry is not None:
+                    return self.async_update_and_abort(
+                        self._reconfigure_entry, data=data, options={}
+                    )
+                else:
+                    return self.async_create_entry(
+                        title=f"{origin_name} → {destination_name}", data=data
+                    )
+
+        existing: dict[str, Any] = (
+            {**self._reconfigure_entry.data, **self._reconfigure_entry.options}
+            if self._reconfigure_entry is not None
+            else {}
+        )
+        defaults = {**existing, **(user_input or {})}
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_ROUTE_TYPE,
+                    default=defaults.get(CONF_ROUTE_TYPE, DEFAULT_ROUTE_TYPE),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(ROUTE_TYPES),
+                        translation_key=CONF_ROUTE_TYPE,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_MAX_CHANGES,
+                    default=str(defaults.get(CONF_MAX_CHANGES, MAX_CHANGES_ANY)),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(MAX_CHANGES_CHOICES),
+                        translation_key=CONF_MAX_CHANGES,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_WALK_SPEED,
+                    default=defaults.get(CONF_WALK_SPEED, DEFAULT_WALK_SPEED),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(WALK_SPEEDS),
+                        translation_key=CONF_WALK_SPEED,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_MIN_TRANSFER_MINUTES,
+                    default=int(
+                        defaults.get(
+                            CONF_MIN_TRANSFER_MINUTES, DEFAULT_MIN_TRANSFER_MINUTES
+                        )
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=0,
+                        max=MAX_MIN_TRANSFER_MINUTES,
+                        step=1,
+                        unit_of_measurement="min",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Optional(
+                    CONF_EXCLUDED_MEANS,
+                    default=list(defaults.get(CONF_EXCLUDED_MEANS, [])),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(EXCLUDABLE_MEANS),
+                        translation_key=CONF_EXCLUDED_MEANS,
+                        multiple=True,
+                        mode=SelectSelectorMode.LIST,
+                    )
+                ),
+                vol.Optional(
+                    CONF_ACTIVE_FROM,
+                    description={"suggested_value": defaults.get(CONF_ACTIVE_FROM)},
+                ): TimeSelector(),
+                vol.Optional(
+                    CONF_ACTIVE_TO,
+                    description={"suggested_value": defaults.get(CONF_ACTIVE_TO)},
+                ): TimeSelector(),
+                vol.Optional(
+                    CONF_ACTIVE_DAYS,
+                    default=list(defaults.get(CONF_ACTIVE_DAYS, [])),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=list(WEEKDAYS),
+                        translation_key="weekday",
+                        multiple=True,
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Required(
+                    CONF_SCAN_INTERVAL,
+                    default=int(
+                        defaults.get(CONF_SCAN_INTERVAL, DEFAULT_ROUTE_SCAN_INTERVAL)
+                    ),
+                ): _route_interval_selector(),
+            }
+        )
+        return self.async_show_form(
+            step_id="route_options",
+            data_schema=schema,
+            errors=errors,
+            description_placeholders={
+                "origin": origin_name,
+                "destination": destination_name,
+            },
+        )
+
+    # ------------------------------------------------------------------
     # Reconfigure
     # ------------------------------------------------------------------
 
@@ -813,6 +1093,22 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
         self._reconfigure_entry = entry
         data = entry.data
+        if data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_ROUTE:
+            # The two ends are the entry's identity (its unique_id), so a
+            # reconfigure changes how the route is planned, never where it
+            # goes. A different route is a different entry.
+            try:
+                self._route_origin = (
+                    int(data[CONF_ORIGIN_DIVA]),
+                    str(data.get(CONF_ORIGIN_NAME) or data[CONF_ORIGIN_DIVA]),
+                )
+                self._route_destination = (
+                    int(data[CONF_DESTINATION_DIVA]),
+                    str(data.get(CONF_DESTINATION_NAME) or data[CONF_DESTINATION_DIVA]),
+                )
+            except (KeyError, TypeError, ValueError):
+                return self.async_abort(reason="stop_gone")
+            return await self.async_step_route_options(user_input)
 
         try:
             catalogue = await async_get_catalogue(self.hass)
@@ -846,27 +1142,30 @@ class WienerLinienAustriaOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Handle options."""
         config = {**self.config_entry.data, **self.config_entry.options}
+        is_route = config.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_ROUTE
+        fallback = DEFAULT_ROUTE_SCAN_INTERVAL if is_route else DEFAULT_SCAN_INTERVAL
         if user_input is not None:
-            interval = int(user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+            interval = int(user_input.get(CONF_SCAN_INTERVAL, fallback))
             return self.async_create_entry(data={CONF_SCAN_INTERVAL: interval})
 
-        default_interval = int(config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+        default_interval = int(config.get(CONF_SCAN_INTERVAL, fallback))
+        selector = (
+            _route_interval_selector()
+            if is_route
+            else NumberSelector(
+                NumberSelectorConfig(
+                    min=MIN_POLL_SECONDS,
+                    max=MAX_POLL_SECONDS,
+                    step=5,
+                    unit_of_measurement="s",
+                    mode=NumberSelectorMode.BOX,
+                )
+            )
+        )
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_SCAN_INTERVAL, default=default_interval
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=MIN_POLL_SECONDS,
-                            max=MAX_POLL_SECONDS,
-                            step=5,
-                            unit_of_measurement="s",
-                            mode=NumberSelectorMode.BOX,
-                        )
-                    )
-                }
+                {vol.Required(CONF_SCAN_INTERVAL, default=default_interval): selector}
             ),
         )
 
@@ -874,3 +1173,74 @@ class WienerLinienAustriaOptionsFlow(OptionsFlow):
 def _line_label(row: dict[str, str]) -> str:
     """Render a line selection label: 'U1 → Leopoldau'."""
     return f"{row['line']} → {row['towards']}"
+
+
+def _route_interval_selector() -> NumberSelector:
+    """Scan-interval field for a route entry (its own, slower range)."""
+    return NumberSelector(
+        NumberSelectorConfig(
+            min=MIN_ROUTE_POLL_SECONDS,
+            max=MAX_ROUTE_POLL_SECONDS,
+            step=30,
+            unit_of_measurement="s",
+            mode=NumberSelectorMode.BOX,
+        )
+    )
+
+
+def _resolve_route_stop(catalogue: StaticCatalogue, value: Any) -> Station | None:
+    """A picked suggestion, or typed text that matches exactly one stop.
+
+    Unlike the stop flow there is no shortlist step to fall back on — a
+    route form has two fields, and bouncing through a shortlist for
+    either would lose the other — so ambiguous text is an error that asks
+    the user to pick from the suggestions instead.
+    """
+    station = _station_for_value(catalogue, value)
+    if station is not None:
+        return station
+    text = str(value or "").strip()
+    if not 2 <= len(text) <= 100:
+        return None
+    matches = catalogue.search(text)
+    return matches[0] if len(matches) == 1 else None
+
+
+async def _probe_route(hass: HomeAssistant, data: dict[str, Any]) -> str | None:
+    """Plan the route once before saving; return a form error key or None.
+
+    Test-before-configure for a route: catches a pair the routing service
+    refuses (too close together, a stop it does not know) while the user
+    can still change it. "No connection right now" is accepted — at 02:00
+    that is the honest answer for most routes, not a broken one.
+
+    Like the line probe, this skips the routing cooldown on purpose:
+    someone is watching the dialog.
+    """
+    options = RouteOptions(
+        origin_diva=int(data[CONF_ORIGIN_DIVA]),
+        destination_diva=int(data[CONF_DESTINATION_DIVA]),
+        route_type=str(data[CONF_ROUTE_TYPE]),
+        max_changes=str(data[CONF_MAX_CHANGES]),
+        walk_speed=str(data[CONF_WALK_SPEED]),
+        excluded_means=tuple(EXCLUDABLE_MEANS[m] for m in data[CONF_EXCLUDED_MEANS]),
+    )
+    zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE)
+    now = dt_util.utcnow().astimezone(zone)
+    try:
+        body = await async_fetch_trip_body(
+            async_get_clientsession(hass),
+            build_trip_params(options, now, language=hass.config.language),
+            USER_AGENT,
+        )
+        parse_trip_body(body, zone)
+    except RoutingError as err:
+        if err.translation_key == "route_no_connection":
+            return None
+        if err.translation_key in {"route_too_close", "route_stop_invalid"}:
+            return err.translation_key
+        _LOGGER.warning(
+            "Route probe failed: %s %s", err.translation_key, err.placeholders
+        )
+        return "cannot_connect_routing"
+    return None

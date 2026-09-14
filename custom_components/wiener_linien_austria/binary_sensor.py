@@ -19,6 +19,11 @@ from homeassistant.util import dt as dt_util
 
 from .const import ATTRIBUTION, DOMAIN, STALE_INTERVAL_MULTIPLIER
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
+from .route_coordinator import (
+    WienerLinienRouteConfigEntry,
+    WienerLinienRouteCoordinator,
+    route_device_info,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,11 +32,14 @@ PARALLEL_UPDATES = 0
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: WienerLinienConfigEntry,
+    entry: WienerLinienConfigEntry | WienerLinienRouteConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Set up the staleness binary sensor for this entry."""
+    """Set up the staleness sensor, or the at-risk sensor for a route."""
     coordinator = entry.runtime_data
+    if isinstance(coordinator, WienerLinienRouteCoordinator):
+        async_add_entities([WienerLinienRouteRiskBinarySensor(coordinator, entry)])
+        return
     async_add_entities([WienerLinienStaleBinarySensor(coordinator, entry)])
 
 
@@ -219,3 +227,56 @@ class WienerLinienStaleBinarySensor(
         successful fetch, when there is genuinely nothing to say.
         """
         return self.coordinator.data is not None
+
+
+class WienerLinienRouteRiskBinarySensor(
+    CoordinatorEntity[WienerLinienRouteCoordinator], BinarySensorEntity
+):
+    """On when the best connection's transfer no longer fits on live times.
+
+    Deliberately `at_risk` only, not `tight`. The trip planner schedules
+    zero-slack changes as a matter of course, so a sensor that fired on
+    `tight` would be on for most connections most of the time and teach
+    people to ignore it. `at_risk` means realtime data says the walk no
+    longer fits — the moment a notification is worth sending. The finer
+    grading stays available in the `risk` attribute.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "route_at_risk"
+    _attr_attribution = ATTRIBUTION
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+
+    def __init__(
+        self,
+        coordinator: WienerLinienRouteCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialise the entity — unique_id format is frozen."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_route_at_risk"
+        self._attr_device_info = route_device_info(entry)
+
+    @property
+    def is_on(self) -> bool | None:
+        """True when the best connection has an at-risk transfer."""
+        data = self.coordinator.data
+        if data is None or not data.trips:
+            return None
+        return data.trips[0].risk == "at_risk"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """The tightest transfer on the best connection."""
+        data = self.coordinator.data
+        best = data.trips[0] if data is not None and data.trips else None
+        tightest = (
+            min(best.transfers, key=lambda t: t.slack_minutes)
+            if best is not None and best.transfers
+            else None
+        )
+        return {
+            "risk": best.risk if best is not None else None,
+            "transfer_at": tightest.at if tightest is not None else None,
+            "slack_minutes": tightest.slack_minutes if tightest is not None else None,
+        }

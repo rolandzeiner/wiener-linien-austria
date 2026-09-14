@@ -3,6 +3,14 @@
     "step": {
       "user": {
         "title": "Wiener Linien Austria",
+        "description": "What do you want to add?",
+        "menu_options": {
+          "stop": "Departure board for a stop",
+          "route": "Route from A to B"
+        }
+      },
+      "stop": {
+        "title": "Wiener Linien Austria",
         "description": "Pick the stop you want to track.",
         "data": {
           "diva": "Stop"
@@ -36,6 +44,39 @@
           "lines": "Lines to track",
           "scan_interval": "Update interval (seconds)"
         }
+      },
+      "route": {
+        "title": "Route",
+        "description": "Pick where your trip starts and ends.",
+        "data": {
+          "origin_diva": "From",
+          "destination_diva": "To"
+        },
+        "data_description": {
+          "origin_diva": "Start typing to filter. Stops nearest your Home Assistant location come first.",
+          "destination_diva": "Start typing to filter."
+        }
+      },
+      "route_options": {
+        "title": "{origin} → {destination}",
+        "description": "Choose how connections are planned and when they refresh.",
+        "data": {
+          "route_type": "Prefer",
+          "max_changes": "Most changes",
+          "walk_speed": "Walking speed",
+          "min_transfer_minutes": "Transfer buffer",
+          "excluded_means": "Avoid",
+          "active_from": "Refresh from",
+          "active_to": "Refresh until",
+          "active_days": "Refresh on",
+          "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "min_transfer_minutes": "Changes with less time to spare than this are marked tight.",
+          "active_from": "Optional. Outside this window the route doesn't refresh. Set both times or neither.",
+          "active_days": "Leave empty for every day.",
+          "scan_interval": "Minimum 120 seconds. The route also refreshes right after the best connection leaves."
+        }
       }
     },
     "error": {
@@ -43,13 +84,20 @@
       "no_matches": "No stop matches that. Check the spelling, or pick from the list.",
       "invalid_stop": "That stop is no longer in the catalogue. Pick another one.",
       "no_lines": "Select at least one line.",
-      "cannot_connect": "Cannot reach the Wiener Linien real-time API. Try again in a minute."
+      "cannot_connect": "Cannot reach the Wiener Linien real-time API. Try again in a minute.",
+      "route_stop_unresolved": "Pick a stop from the list. Typed names must match exactly one stop.",
+      "same_stop": "Start and destination are the same stop. Pick two different stops.",
+      "window_incomplete": "Set both a start and an end time, or leave both empty.",
+      "route_too_close": "These stops are too close together to plan a trip. Pick stops further apart.",
+      "route_stop_invalid": "The trip planner doesn't know one of these stops. Pick a different stop.",
+      "cannot_connect_routing": "Can't reach the Wiener Linien trip planner. Try again in a minute."
     },
     "abort": {
       "already_configured": "This stop is already configured.",
       "reconfigure_successful": "Reconfigure completed successfully.",
       "stop_gone": "This stop is no longer in the Wiener Linien catalogue. Delete and re-add.",
-      "catalogue_unavailable": "Cannot load the Wiener Linien stop catalogue. Try again later."
+      "catalogue_unavailable": "Cannot load the Wiener Linien stop catalogue. Try again later.",
+      "already_configured_route": "This route is already set up."
     }
   },
   "options": {
@@ -67,11 +115,17 @@
     "binary_sensor": {
       "stale": {
         "name": "Departure data stale"
+      },
+      "route_at_risk": {
+        "name": "Connection at risk"
       }
     },
     "sensor": {
       "stop": {
         "name": "Departures"
+      },
+      "route": {
+        "name": "Next connection"
       }
     }
   },
@@ -111,6 +165,30 @@
     },
     "api_no_data": {
       "message": "Wiener Linien API has no data for this stop right now (error {code}): {value}."
+    },
+    "route_no_connection": {
+      "message": "The trip planner found no connection for this route right now."
+    },
+    "route_stop_invalid": {
+      "message": "The trip planner doesn't know the {which} stop. Remove the route and add it again with a different stop."
+    },
+    "route_too_close": {
+      "message": "The trip planner says start and destination are too close together to plan a trip."
+    },
+    "route_outside_timetable": {
+      "message": "That date is outside the published timetable. Pick a date closer to today."
+    },
+    "route_upstream_error": {
+      "message": "The trip planner reported error {code}: {value}"
+    },
+    "route_entry_not_found": {
+      "message": "No Wiener Linien Austria entry with ID {entry_id}."
+    },
+    "route_entry_not_loaded": {
+      "message": "{title} isn't loaded right now. Check the integration page, then try again."
+    },
+    "route_entry_not_route": {
+      "message": "{title} is a departure board, not a route. Pick a route entry."
     }
   },
   "issues": {
@@ -121,6 +199,71 @@
     "catalogue_unavailable": {
       "title": "Wiener Linien stop catalogue unavailable",
       "description": "The static stop catalogue (Open Government Data) could not be downloaded during configuration. The line picker fell back to a live-only probe, which omits any currently out-of-service lines (e.g. nightlines polled during the day, or seasonal services). Re-run the configuration once the OGD endpoint is reachable to get the full picker."
+    }
+  },
+  "selector": {
+    "route_type": {
+      "options": {
+        "LEASTTIME": "Fastest trip",
+        "LEASTINTERCHANGE": "Fewest changes",
+        "LEASTWALKING": "Least walking"
+      }
+    },
+    "max_changes": {
+      "options": {
+        "0": "Direct only",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "any": "No limit"
+      }
+    },
+    "walk_speed": {
+      "options": {
+        "slow": "Slow",
+        "normal": "Normal",
+        "fast": "Fast"
+      }
+    },
+    "excluded_means": {
+      "options": {
+        "train": "Trains",
+        "sbahn": "S-Bahn",
+        "metro": "U-Bahn",
+        "tram": "Trams",
+        "bus": "Buses"
+      }
+    },
+    "weekday": {
+      "options": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      }
+    }
+  },
+  "services": {
+    "plan_trip": {
+      "name": "Plan trip",
+      "description": "Plans connections for a configured route and returns them, soonest first.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Route",
+          "description": "The route to plan."
+        },
+        "datetime": {
+          "name": "Time",
+          "description": "When to leave, or when to arrive with Arrive by. Leave empty for now."
+        },
+        "arrive_by": {
+          "name": "Arrive by",
+          "description": "Treat the time as the latest arrival instead of the departure."
+        }
+      }
     }
   }
 }

@@ -3,6 +3,14 @@
     "step": {
       "user": {
         "title": "Wiener Linien Austria",
+        "description": "Was möchtest du hinzufügen?",
+        "menu_options": {
+          "stop": "Abfahrtsmonitor für eine Haltestelle",
+          "route": "Verbindung von A nach B"
+        }
+      },
+      "stop": {
+        "title": "Wiener Linien Austria",
         "description": "Die gewünschte Haltestelle wählen.",
         "data": {
           "diva": "Haltestelle"
@@ -36,6 +44,39 @@
           "lines": "Linien verfolgen",
           "scan_interval": "Aktualisierungsintervall (Sekunden)"
         }
+      },
+      "route": {
+        "title": "Verbindung",
+        "description": "Start und Ziel der Fahrt wählen.",
+        "data": {
+          "origin_diva": "Von",
+          "destination_diva": "Nach"
+        },
+        "data_description": {
+          "origin_diva": "Zum Filtern tippen. Die dem Home-Assistant-Standort nächstgelegenen Haltestellen stehen oben.",
+          "destination_diva": "Zum Filtern tippen."
+        }
+      },
+      "route_options": {
+        "title": "{origin} → {destination}",
+        "description": "Festlegen, wie Verbindungen geplant und wann sie aktualisiert werden.",
+        "data": {
+          "route_type": "Bevorzugen",
+          "max_changes": "Höchstens umsteigen",
+          "walk_speed": "Gehtempo",
+          "min_transfer_minutes": "Umsteigepuffer",
+          "excluded_means": "Vermeiden",
+          "active_from": "Aktualisieren ab",
+          "active_to": "Aktualisieren bis",
+          "active_days": "Aktualisieren an",
+          "scan_interval": "Aktualisierungsintervall (Sekunden)"
+        },
+        "data_description": {
+          "min_transfer_minutes": "Umstiege mit weniger Zeitreserve werden als knapp markiert.",
+          "active_from": "Optional. Außerhalb dieses Zeitfensters wird nicht aktualisiert. Beide Zeiten setzen oder keine.",
+          "active_days": "Leer lassen für jeden Tag.",
+          "scan_interval": "Mindestens 120 Sekunden. Zusätzlich wird direkt nach Abfahrt der besten Verbindung aktualisiert."
+        }
       }
     },
     "error": {
@@ -43,13 +84,20 @@
       "no_matches": "Keine Haltestelle dazu gefunden. Schreibweise prüfen oder aus der Liste wählen.",
       "invalid_stop": "Diese Haltestelle steht nicht mehr im Katalog. Eine andere wählen.",
       "no_lines": "Mindestens eine Linie auswählen.",
-      "cannot_connect": "Die Wiener-Linien-Echtzeit-API ist nicht erreichbar. Gleich nochmal versuchen."
+      "cannot_connect": "Die Wiener-Linien-Echtzeit-API ist nicht erreichbar. Gleich nochmal versuchen.",
+      "route_stop_unresolved": "Eine Haltestelle aus der Liste wählen. Getippte Namen müssen genau eine Haltestelle treffen.",
+      "same_stop": "Start und Ziel sind dieselbe Haltestelle. Zwei verschiedene Haltestellen wählen.",
+      "window_incomplete": "Start- und Endzeit setzen oder beide leer lassen.",
+      "route_too_close": "Diese Haltestellen liegen zu nah beieinander für eine Fahrtplanung. Weiter entfernte Haltestellen wählen.",
+      "route_stop_invalid": "Der Routenplaner kennt eine dieser Haltestellen nicht. Eine andere Haltestelle wählen.",
+      "cannot_connect_routing": "Der Routenplaner der Wiener Linien ist nicht erreichbar. Gleich nochmal versuchen."
     },
     "abort": {
       "already_configured": "Diese Haltestelle ist bereits konfiguriert.",
       "reconfigure_successful": "Neukonfiguration erfolgreich abgeschlossen.",
       "stop_gone": "Diese Haltestelle steht nicht mehr im Katalog. Eintrag löschen und neu anlegen.",
-      "catalogue_unavailable": "Der Haltestellenkatalog kann nicht geladen werden. Später erneut versuchen."
+      "catalogue_unavailable": "Der Haltestellenkatalog kann nicht geladen werden. Später erneut versuchen.",
+      "already_configured_route": "Diese Verbindung ist bereits eingerichtet."
     }
   },
   "options": {
@@ -67,11 +115,17 @@
     "binary_sensor": {
       "stale": {
         "name": "Abfahrtsdaten veraltet"
+      },
+      "route_at_risk": {
+        "name": "Anschluss gefährdet"
       }
     },
     "sensor": {
       "stop": {
         "name": "Abfahrten"
+      },
+      "route": {
+        "name": "Nächste Verbindung"
       }
     }
   },
@@ -111,6 +165,30 @@
     },
     "api_no_data": {
       "message": "Wiener-Linien-API hat derzeit keine Daten für diese Haltestelle (Fehler {code}): {value}."
+    },
+    "route_no_connection": {
+      "message": "Der Routenplaner findet für diese Verbindung gerade keine Fahrt."
+    },
+    "route_stop_invalid": {
+      "message": "Der Routenplaner kennt die Haltestelle ({which}) nicht. Verbindung entfernen und mit einer anderen Haltestelle neu anlegen."
+    },
+    "route_too_close": {
+      "message": "Laut Routenplaner liegen Start und Ziel zu nah beieinander für eine Fahrtplanung."
+    },
+    "route_outside_timetable": {
+      "message": "Dieses Datum liegt außerhalb des veröffentlichten Fahrplans. Ein näheres Datum wählen."
+    },
+    "route_upstream_error": {
+      "message": "Der Routenplaner meldet Fehler {code}: {value}"
+    },
+    "route_entry_not_found": {
+      "message": "Kein Wiener-Linien-Austria-Eintrag mit der ID {entry_id}."
+    },
+    "route_entry_not_loaded": {
+      "message": "{title} ist gerade nicht geladen. Integrationsseite prüfen und erneut versuchen."
+    },
+    "route_entry_not_route": {
+      "message": "{title} ist ein Abfahrtsmonitor, keine Verbindung. Einen Verbindungs-Eintrag wählen."
     }
   },
   "issues": {
@@ -121,6 +199,71 @@
     "catalogue_unavailable": {
       "title": "Wiener-Linien-Haltestellenkatalog nicht verfügbar",
       "description": "Der statische Haltestellenkatalog (Open Government Data) konnte während der Einrichtung nicht geladen werden. Die Linienauswahl ist auf eine reine Live-Abfrage zurückgefallen, in der aktuell außer Betrieb stehende Linien fehlen (z. B. Nightlines tagsüber oder saisonaler Verkehr). Konfiguration erneut durchführen, sobald die OGD-Schnittstelle wieder erreichbar ist, um die vollständige Auswahl zu erhalten."
+    }
+  },
+  "selector": {
+    "route_type": {
+      "options": {
+        "LEASTTIME": "Schnellste Fahrt",
+        "LEASTINTERCHANGE": "Wenig Umstiege",
+        "LEASTWALKING": "Wenig Fußweg"
+      }
+    },
+    "max_changes": {
+      "options": {
+        "0": "Nur direkt",
+        "1": "1",
+        "2": "2",
+        "3": "3",
+        "any": "Beliebig"
+      }
+    },
+    "walk_speed": {
+      "options": {
+        "slow": "Langsam",
+        "normal": "Normal",
+        "fast": "Schnell"
+      }
+    },
+    "excluded_means": {
+      "options": {
+        "train": "Züge",
+        "sbahn": "S-Bahn",
+        "metro": "U-Bahn",
+        "tram": "Straßenbahn",
+        "bus": "Bus"
+      }
+    },
+    "weekday": {
+      "options": {
+        "mon": "Montag",
+        "tue": "Dienstag",
+        "wed": "Mittwoch",
+        "thu": "Donnerstag",
+        "fri": "Freitag",
+        "sat": "Samstag",
+        "sun": "Sonntag"
+      }
+    }
+  },
+  "services": {
+    "plan_trip": {
+      "name": "Fahrt planen",
+      "description": "Plant Verbindungen für eine eingerichtete Route und gibt sie zurück, früheste zuerst.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Verbindung",
+          "description": "Die zu planende Verbindung."
+        },
+        "datetime": {
+          "name": "Zeit",
+          "description": "Abfahrtszeit, mit „Ankunft bis“ die späteste Ankunft. Leer lassen für jetzt."
+        },
+        "arrive_by": {
+          "name": "Ankunft bis",
+          "description": "Die Zeit als späteste Ankunft statt als Abfahrt verwenden."
+        }
+      }
     }
   }
 }

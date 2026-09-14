@@ -1,8 +1,8 @@
 rules:
   # Bronze
   action-setup:
-    status: exempt
-    comment: This integration does not provide any service actions.
+    status: done
+    comment: plan_trip is registered in async_setup, not per entry.
   appropriate-polling:
     status: done
   brands:
@@ -17,8 +17,8 @@ rules:
   dependency-transparency:
     status: done
   docs-actions:
-    status: exempt
-    comment: No service actions.
+    status: todo
+    comment: plan_trip (experimental routing) still needs its README section.
   docs-conditions:
     status: exempt
     comment: This integration does not have any conditions.
@@ -49,8 +49,8 @@ rules:
 
   # Silver
   action-exceptions:
-    status: exempt
-    comment: No service actions.
+    status: done
+    comment: plan_trip raises ServiceValidationError for a bad target and a translated HomeAssistantError for routing failures.
   config-entry-unloading:
     status: done
   docs-configuration-parameters:

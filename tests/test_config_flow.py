@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
@@ -36,6 +37,17 @@ from tests.conftest import make_response_cm
 DEFAULT_LINES = ["U1|H", "U1|R"]
 
 
+async def _start_stop_flow(hass: HomeAssistant) -> Any:
+    """Open the user flow and pick the departure-board branch of the menu."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    assert result["type"] == FlowResultType.MENU
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "stop"}
+    )
+
+
 async def _complete_flow(
     hass: HomeAssistant,
     *,
@@ -49,9 +61,7 @@ async def _complete_flow(
     tests that assert intermediate step transitions (step_id/type checks)
     stay in-line so those assertions remain readable.
     """
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: diva}
     )
@@ -67,10 +77,8 @@ async def _complete_flow(
 async def test_full_flow_creates_entry(hass: HomeAssistant, mock_fetch) -> None:
     """Pick stop → pick lines → entry created with correct data."""
     # Step 1: pick Stephansplatz straight out of the catalogue dropdown
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    assert result["step_id"] == "user"
+    result = await _start_stop_flow(hass)
+    assert result["step_id"] == "stop"
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
@@ -103,9 +111,7 @@ async def test_duplicate_entry_aborted(hass: HomeAssistant, mock_fetch) -> None:
 
 async def test_empty_line_selection_rejected(hass: HomeAssistant, mock_fetch) -> None:
     """Submitting the lines step with no lines selected shows `no_lines`."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
@@ -118,9 +124,7 @@ async def test_empty_line_selection_rejected(hass: HomeAssistant, mock_fetch) ->
 
 async def test_cannot_connect_during_probe(hass: HomeAssistant) -> None:
     """Live /monitor probe failure surfaces cannot_connect."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     with patch(
         "custom_components.wiener_linien_austria.config_flow._probe_monitor_lines",
         new_callable=AsyncMock,
@@ -216,9 +220,7 @@ async def test_catalogue_unavailable_aborts_user_step(hass: HomeAssistant) -> No
         new_callable=AsyncMock,
         side_effect=aiohttp.ClientError("upstream down"),
     ):
-        result = await hass.config_entries.flow.async_init(
-            DOMAIN, context={"source": config_entries.SOURCE_USER}
-        )
+        result = await _start_stop_flow(hass)
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "catalogue_unavailable"
 
@@ -555,9 +557,7 @@ async def test_select_lines_raises_repairs_issue_when_catalogue_fails(
     """Catalogue failure during select_lines must create a Repairs issue."""
     from homeassistant.helpers import issue_registry as ir
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
 
     # The step-1 picker needs the catalogue to render at all, so let the
     # first load succeed and fail only the second — the one select_lines
@@ -605,9 +605,7 @@ async def test_select_lines_clears_repairs_issue_on_recovery(
 
     # Run the flow normally — the autouse mock_static_catalogue fixture
     # makes async_get_catalogue succeed, so the issue should be cleared.
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
@@ -654,10 +652,8 @@ async def test_picker_holds_every_trackable_stop(hass: HomeAssistant) -> None:
     """One field, one option per trackable stop — no separate search step."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
-    assert result["step_id"] == "user"
+    result = await _start_stop_flow(hass)
+    assert result["step_id"] == "stop"
     assert _schema_keys(result) == [CONF_DIVA]
 
     options = _options(result)
@@ -681,9 +677,7 @@ async def test_nearby_stops_pinned_first_with_distance(
     """The nearest stops head the list, carrying their distance."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     options = _options(result)
 
     # First three: nearest-first, distance in the label.
@@ -712,9 +706,7 @@ async def test_picker_is_alphabetical_without_a_home_location(
     """A never-onboarded 0/0 home location just drops the pinned block."""
     _set_home(hass, 0.0, 0.0)
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     options = _options(result)
     assert [o["label"] for o in options] == [
         "Alaudagasse (Wien)",
@@ -737,9 +729,7 @@ async def test_picker_is_alphabetical_when_home_is_far_away(
     """
     _set_home(hass, 47.0707, 15.4395)  # Graz — 145 km out
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     options = _options(result)
     assert len(options) == 6
     assert options[0]["label"] == "Alaudagasse (Wien)"
@@ -752,9 +742,7 @@ async def test_picking_a_stop_goes_straight_to_lines(
     """One pick is enough to reach line selection and save the entry."""
     _set_home(hass, HOME_LATITUDE, HOME_LONGITUDE)
 
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "60201012"}
     )
@@ -775,9 +763,7 @@ async def test_typed_text_with_several_matches_shows_the_shortlist(
     hass: HomeAssistant,
 ) -> None:
     """Ambiguous free text falls through to the match list, as before."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     # "gasse" hits Taubstummengasse, Lafitegasse-style names — several stops.
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "gasse"}
@@ -797,9 +783,7 @@ async def test_typed_text_with_one_match_skips_the_shortlist(
     hass: HomeAssistant, mock_fetch
 ) -> None:
     """Unambiguous free text is clear enough — go straight to the lines."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "Stephans"}
     )
@@ -809,9 +793,7 @@ async def test_typed_text_with_one_match_skips_the_shortlist(
 
 async def test_search_again_returns_to_step_one(hass: HomeAssistant) -> None:
     """The shortlist keeps its escape hatch back to the picker."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "gasse"}
     )
@@ -820,28 +802,24 @@ async def test_search_again_returns_to_step_one(hass: HomeAssistant) -> None:
         result["flow_id"], {CONF_DIVA: "__search_again__"}
     )
     assert result["type"] == FlowResultType.FORM
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "stop"
 
 
 async def test_typed_text_matching_nothing_reports_no_matches(
     hass: HomeAssistant,
 ) -> None:
     """Free text that matches no stop stays on step 1 with a clear error."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "XYZ-nope"}
     )
-    assert result["step_id"] == "user"
+    assert result["step_id"] == "stop"
     assert result["errors"][CONF_DIVA] == "no_matches"
 
 
 async def test_typed_text_too_short_is_rejected(hass: HomeAssistant) -> None:
     """A single character is not a search — say so rather than scanning."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {CONF_DIVA: "a"}
     )
@@ -850,9 +828,7 @@ async def test_typed_text_too_short_is_rejected(hass: HomeAssistant) -> None:
 
 async def test_custom_value_is_enabled_on_the_picker(hass: HomeAssistant) -> None:
     """The picker must accept typed text, not just a pick from the list."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": config_entries.SOURCE_USER}
-    )
+    result = await _start_stop_flow(hass)
     for key, validator in result["data_schema"].schema.items():
         if str(key) == CONF_DIVA:
             assert validator.config["custom_value"] is True

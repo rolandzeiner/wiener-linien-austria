@@ -131,13 +131,13 @@ def test_realtime_delay_turns_transfer_at_risk() -> None:
 def test_mode_types_cover_tram_sbahn_and_nightbus() -> None:
     types = {
         leg.type
-        for trip in parse_trip_body(_load("routing_breitensee_schottentor.json"), VIENNA)
+        for trip in parse_trip_body(
+            _load("routing_breitensee_schottentor.json"), VIENNA
+        )
         for leg in trip.legs
     }
     assert {"ptTram", "ptMetro", "ptTrainS"} <= types
-    night = parse_trip_body(
-        _load("routing_nightbus_floridsdorf_meidling.json"), VIENNA
-    )
+    night = parse_trip_body(_load("routing_nightbus_floridsdorf_meidling.json"), VIENNA)
     assert night[0].legs[0].type == "ptBusNight"
     assert night[0].legs[0].line == "N31"
 
@@ -374,7 +374,10 @@ async def test_fetch_returns_body_and_sends_user_agent() -> None:
             lambda r: setattr(r, "json", AsyncMock(side_effect=ValueError("bad"))),
             "api_invalid_response",
         ),
-        (lambda r: setattr(r, "json", AsyncMock(return_value=[])), "api_invalid_response"),
+        (
+            lambda r: setattr(r, "json", AsyncMock(return_value=[])),
+            "api_invalid_response",
+        ),
     ],
 )
 async def test_fetch_maps_response_failures(setup: Any, key: str) -> None:
