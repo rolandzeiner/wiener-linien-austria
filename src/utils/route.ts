@@ -263,6 +263,14 @@ export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number
   return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
 }
 
+/** When to refresh after a plan arrived. A stale plan means the request
+ *  budget is spent, so asking before `retry_after` would only get it again. */
+export function adhocPlanRefreshDelay(plan: RouteAttrs, nowMs: number): number {
+  const base = adhocRefreshDelay(plan.trips ?? [], nowMs);
+  const retryAfter = plan.stale ? Number(plan.retry_after) : NaN;
+  return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.max(base, retryAfter * 1000) : base;
+}
+
 /** Error codes the backend answers that are worth retrying on their own,
  *  and after how long. The rest need the user to change something. */
 export function adhocRetryDelay(code: string, retryAfterSeconds: number | null): number | null {

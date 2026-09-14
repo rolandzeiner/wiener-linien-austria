@@ -366,6 +366,7 @@
     "adhoc_loading": "Suche Verbindungen …",
     "adhoc_no_trips": "Keine Verbindung gefunden",
     "adhoc_no_trips_detail": "Probier eine andere Haltestelle oder versuch es später nochmal.",
+    "adhoc_stale": "Gerade zu viele Abfragen, darum ein etwas älterer Stand.",
     "adhoc_paused": "Aktualisierung pausiert",
     "adhoc_resume": "Aktualisieren",
     "adhoc_announce": "Abfahrt in {n} Minuten. {summary}",

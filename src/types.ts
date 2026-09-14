@@ -726,6 +726,10 @@ export interface RouteAttrs {
   line_colors?: LineColorsMap;
   traffic_info?: Array<{ title?: string; description?: string; related_lines?: string[] }>;
   attribution?: string;
+  /** Ad-hoc only: an older plan served because the request budget is spent. */
+  stale?: boolean;
+  /** Ad-hoc only, with `stale`: seconds until a fresh plan can be had. */
+  retry_after?: number | null;
   [key: string]: unknown;
 }
 

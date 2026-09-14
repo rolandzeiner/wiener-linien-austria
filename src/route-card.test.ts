@@ -520,6 +520,21 @@ describe("ad-hoc mode", () => {
     expect(text(el)).toContain("Abfahrt in");
   });
 
+  it("shows a stale plan with a note, and waits out the budget before asking again", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => ({ ...PLAN, stale: true, retry_after: 600 }));
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Abfahrt in");
+    expect(text(el)).toContain("etwas älterer Stand");
+    expect(text(el)).toContain("Zuletzt aktualisiert 07:49");
+    // Past the usual 120 s cadence, but before retry_after: no new request.
+    await settle(el, 300_000);
+    expect(planCalls(callWS)).toHaveLength(1);
+    await settle(el, 300_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+  });
+
   it("drops the plan when the trip planner fails, and doesn't retry what can't succeed", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h, callWS } = adhocHass(async () => {

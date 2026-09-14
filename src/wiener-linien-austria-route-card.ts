@@ -49,7 +49,7 @@ import {
   ADHOC_DEBOUNCE_MS,
   ADHOC_IDLE_MS,
   ADHOC_RETRY_MS,
-  adhocRefreshDelay,
+  adhocPlanRefreshDelay,
   adhocRetryDelay,
   clockOf,
   findRouteEntities,
@@ -386,7 +386,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._error = null;
       this._phase = "ready";
       if (userInitiated) this._announce(this._planAnnouncement(plan));
-      this._schedule(adhocRefreshDelay(plan.trips ?? [], Date.now()));
+      this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
     } catch (err) {
       if (seq !== this._planSeq) return;
       const wsError = err as HassWsError | undefined;
@@ -637,16 +637,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         ? html`${paused}`
         : this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false);
     }
+    // Budget spent: the plan on screen is older than usual. The header's
+    // "Zuletzt aktualisiert" already says how old; this says why.
+    const stale =
+      plan.stale && this._phase !== "paused"
+        ? html`<p class="stale-note">
+            <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
+            <span>${this._t("adhoc_stale")}</span>
+          </p>`
+        : nothing;
     const trips = upcomingTrips(plan, this._now);
     if (!trips[0]) {
-      return html`${paused}${this._empty(
+      return html`${paused}${stale}${this._empty(
         "mdi:timetable",
         this._t("adhoc_no_trips"),
         this._t("adhoc_no_trips_detail"),
         false,
       )}`;
     }
-    return html`${paused}${this._renderTrips(trips, plan, cfg)}`;
+    return html`${paused}${stale}${this._renderTrips(trips, plan, cfg)}`;
   }
 
   // ------------------------------------------------------------------
@@ -1535,6 +1544,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .paused ha-icon {
       --mdc-icon-size: 18px;
+    }
+    .stale-note {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color);
+    }
+    .stale-note ha-icon {
+      --mdc-icon-size: 16px;
     }
     .paused > button {
       min-height: 44px;

@@ -201,7 +201,11 @@ async def _websocket_plan(
         min_transfer_minutes=msg["min_transfer_minutes"],
     )
     try:
-        plan = await async_get_planner(hass).async_plan(options)
+        # A stale plan beats an error on a dashboard: the card shows when it
+        # was fetched and refreshes once the budget allows.
+        plan = await async_get_planner(hass).async_plan(
+            options, user_id=connection.user.id, allow_stale=True
+        )
     except AdhocRateLimited as err:
         connection.send_error(
             msg_id,
@@ -239,5 +243,7 @@ async def _websocket_plan(
             "line_colors": line_colors_for(hass, labels),
             "traffic_info": [t.to_dict() for t in traffic],
             "attribution": ATTRIBUTION,
+            "stale": plan.stale,
+            "retry_after": plan.retry_after,
         },
     )

@@ -4,6 +4,7 @@ import type { HomeAssistant, RouteTripAttr } from "../types.js";
 import {
   ADHOC_REFRESH_MS,
   ADHOC_ROLLOVER_FLOOR_MS,
+  adhocPlanRefreshDelay,
   adhocRefreshDelay,
   adhocRetryDelay,
   clockOf,
@@ -192,6 +193,17 @@ describe("ad-hoc timing", () => {
     // Only trips that already left: nothing to roll over to.
     expect(adhocRefreshDelay([departing("2026-09-14T07:40:00+02:00")], NOW)).toBe(ADHOC_REFRESH_MS);
     expect(adhocRefreshDelay([], NOW)).toBe(ADHOC_REFRESH_MS);
+  });
+
+  it("waits out the budget after a stale plan", () => {
+    const trips = [departing("2026-09-14T07:57:00+02:00")];
+    expect(adhocPlanRefreshDelay({ trips }, NOW)).toBe(ADHOC_REFRESH_MS);
+    // Stale with a long wait: don't ask again before a token is back.
+    expect(adhocPlanRefreshDelay({ trips, stale: true, retry_after: 900 }, NOW)).toBe(900_000);
+    // Stale with a short wait: the usual cadence is already later.
+    expect(adhocPlanRefreshDelay({ trips, stale: true, retry_after: 5 }, NOW)).toBe(ADHOC_REFRESH_MS);
+    // retry_after without stale is ignored.
+    expect(adhocPlanRefreshDelay({ trips, retry_after: 900 }, NOW)).toBe(ADHOC_REFRESH_MS);
   });
 
   it("retries only what can succeed on its own", () => {

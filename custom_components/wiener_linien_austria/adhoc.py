@@ -1,28 +1,35 @@
-"""Ad-hoc trip planning for the route card's From / To mode.
+"""On-demand trip planning: the route card's From / To mode and `plan_trip`.
 
 A configured route is polled once by the backend and shared by every
-dashboard. An ad-hoc query is the opposite: any viewer picks any two stops,
-and every open dashboard is a potential caller. Three guards keep that from
-turning into a load the upstream notices:
+dashboard. An on-demand query is the opposite: any viewer picks any two
+stops, any script can call `plan_trip`, and every open dashboard is a
+potential caller. Four guards keep that from turning into a load the
+upstream notices:
 
-- **Cache.** A plan is keyed on the query plus the Vienna wall-clock minute,
-  which is the resolution the trip request itself carries (`itdTime=HHMM`).
-  Two identical queries in the same minute are the same upstream request, so
-  the second one never leaves Home Assistant. Entries live for
-  `ADHOC_CACHE_TTL_SECONDS`.
+- **Cache.** A plan for "now" is keyed on the query alone and lives for
+  `ADHOC_CACHE_TTL_SECONDS`, so every dashboard showing the same pair shares
+  one answer per minute however their refresh timers are phased. (Keying on
+  the wall-clock minute as well only shared answers between refreshes that
+  happened to land in the same minute.) A plan up to a minute old is still
+  correct for "now": departed connections are dropped when it is served. A
+  plan for a given time is keyed on that minute, the request's resolution.
 - **Coalescing.** A query already on the wire is awaited, not repeated, so N
-  dashboards opening on the same pair at once cost one request.
-- **Budget.** A token bucket per HA instance (`ADHOC_BURST` tokens, refilled at
-  `ADHOC_BUDGET_PER_HOUR`) caps what cache misses can add up to. Only a miss
-  takes a token. An empty bucket raises `AdhocRateLimited` with the wait.
+  callers asking at once cost one request.
+- **Budget.** Only a cache miss takes a token, from two buckets at once: one
+  per HA user (`ADHOC_USER_BURST`, `ADHOC_USER_BUDGET_PER_HOUR`) and one for
+  the whole instance (`ADHOC_BURST`, `ADHOC_BUDGET_PER_HOUR`). The per-user
+  bucket runs out first, so one noisy tab or script can't spend everybody's
+  share. Calls without a user (automations) share one bucket.
+- **Stale answer.** With the budget spent, a caller that allows it gets the
+  last plan for the same query if it is at most `ADHOC_STALE_MAX_SECONDS`
+  old, marked `stale`, instead of an error. Otherwise `AdhocRateLimited`.
 
 The 15 s routing cooldown in rate_limit.py is deliberately not taken: someone
-is waiting for the answer, the same reasoning as `plan_trip`. The budget is
-what bounds this path instead.
+is waiting for the answer. The budget is what bounds this path instead.
 
 Nothing here is written to diagnostics, the recorder or an info-level log. A
 stop pair picked on a dashboard is a movement pattern, and it stays in memory
-for at most a minute.
+for at most `ADHOC_STALE_MAX_SECONDS`.
 """
 
 from __future__ import annotations
@@ -31,8 +38,8 @@ import asyncio
 import logging
 import math
 from collections import OrderedDict
-from dataclasses import dataclass
-from datetime import datetime, tzinfo
+from dataclasses import dataclass, replace
+from datetime import datetime, timedelta, tzinfo
 from typing import Final
 
 from homeassistant.core import HomeAssistant
@@ -46,21 +53,33 @@ _LOGGER = logging.getLogger(__name__)
 
 ADHOC_PLANNER_KEY: Final = "adhoc_planner"
 
-# One minute: the resolution of the trip request, so a longer TTL would serve
-# a query for 07:41 an answer planned for 07:40.
+# One minute. A plan for "now" that is up to a minute old still lists the
+# right connections once departed ones are dropped; any older and a
+# connection added in the meantime could be missing.
 ADHOC_CACHE_TTL_SECONDS: Final = 60
+# How old a plan may be to stand in when the budget is spent. The card says
+# when it was fetched, so an older plan is honest, just less useful.
+ADHOC_STALE_MAX_SECONDS: Final = 300
 # Distinct queries kept at once. A household is a handful of dashboards.
 ADHOC_CACHE_MAX_ENTRIES: Final = 32
 # Upstream requests this path may add per HA instance. A configured route at
-# its 300 s default makes 12 an hour; one viewer refreshing every 120 s while
-# the card is on screen makes 30. 120 leaves room for a busy household and
-# still caps a runaway client at a rate the upstream won't notice.
+# its 300 s default makes 12-60 an hour; one viewer refreshing every 60-120 s
+# while the card is on screen makes 30-60. 120 leaves room for a busy
+# household and still caps a runaway client at a rate the upstream won't
+# notice.
 ADHOC_BUDGET_PER_HOUR: Final = 120
 ADHOC_BURST: Final = 10
+# Per HA user: one viewer's refresh rate plus room to pick a few pairs, so a
+# single user can never spend more than half the instance's budget.
+ADHOC_USER_BUDGET_PER_HOUR: Final = 60
+ADHOC_USER_BURST: Final = 5
+
+# Bucket for calls that carry no user, e.g. `plan_trip` from an automation.
+_NO_USER: Final = ""
 
 
 class AdhocRateLimited(Exception):
-    """The instance's ad-hoc budget is spent for now."""
+    """The caller's or the instance's budget is spent for now."""
 
     def __init__(self, retry_after: int) -> None:
         """Remember how long until a token is back."""
@@ -70,50 +89,106 @@ class AdhocRateLimited(Exception):
 
 @dataclass(slots=True, frozen=True)
 class AdhocPlan:
-    """Ranked connections and when the upstream produced them."""
+    """Ranked connections and when the upstream produced them.
+
+    `stale` marks a plan served past its TTL because the budget was spent;
+    `retry_after` then says when a fresh one can be had.
+    """
 
     trips: tuple[Trip, ...]
     fetched_at: datetime
+    stale: bool = False
+    retry_after: int | None = None
 
 
-type _CacheKey = tuple[RouteOptions, str]
+class _TokenBucket:
+    """`burst` tokens, refilled continuously at `per_hour`."""
+
+    __slots__ = ("_burst", "_rate", "_refilled_at", "_tokens")
+
+    def __init__(self, burst: int, per_hour: int, now: float) -> None:
+        self._burst = float(burst)
+        self._rate = per_hour / 3600
+        self._tokens = float(burst)
+        self._refilled_at = now
+
+    def wait(self, now: float) -> int:
+        """Seconds until a token is available; 0 when one is now."""
+        self._tokens = min(
+            self._burst, self._tokens + (now - self._refilled_at) * self._rate
+        )
+        self._refilled_at = now
+        if self._tokens >= 1:
+            return 0
+        return math.ceil((1 - self._tokens) / self._rate)
+
+    def take(self) -> None:
+        """Spend one token. Call only right after `wait` returned 0."""
+        self._tokens -= 1
+
+
+type _CacheKey = tuple[RouteOptions, str | None, bool]
 
 
 class AdhocPlanner:
-    """Cache, coalesce and budget ad-hoc trip requests for one HA instance."""
+    """Cache, coalesce and budget on-demand trip requests for one HA instance."""
 
     def __init__(self, hass: HomeAssistant) -> None:
-        """Start with a full bucket and an empty cache."""
+        """Start with full buckets and an empty cache."""
         self._hass = hass
         self._tz: tzinfo | None = None
         self._cache: OrderedDict[_CacheKey, tuple[float, AdhocPlan]] = OrderedDict()
         self._in_flight: dict[_CacheKey, asyncio.Task[AdhocPlan]] = {}
-        self._tokens = float(ADHOC_BURST)
-        self._refilled_at = hass.loop.time()
+        self._bucket = _TokenBucket(
+            ADHOC_BURST, ADHOC_BUDGET_PER_HOUR, hass.loop.time()
+        )
+        self._user_buckets: dict[str, _TokenBucket] = {}
 
-    async def async_plan(self, options: RouteOptions) -> AdhocPlan:
-        """Return connections for `options` departing now.
+    async def async_plan(
+        self,
+        options: RouteOptions,
+        *,
+        user_id: str | None = None,
+        when: datetime | None = None,
+        arrive_by: bool = False,
+        allow_stale: bool = False,
+    ) -> AdhocPlan:
+        """Return connections for `options`, now or at `when`.
 
-        Raises `AdhocRateLimited` when a fresh request is needed and the
-        budget is spent, and `RoutingError` for upstream failures. Failures
-        are not cached: the next caller retries, and the budget bounds how
-        often that can happen.
+        Raises `AdhocRateLimited` when a fresh request is needed, the budget
+        is spent and no stale plan may stand in, and `RoutingError` for
+        upstream failures. Failures are not cached: the next caller retries,
+        and the budget bounds how often that can happen.
         """
         tz = await self._async_tz()
         now = dt_util.now(tz)
-        key: _CacheKey = (options, now.strftime("%Y%m%d%H%M"))
+        at = now if when is None else when.astimezone(tz)
+        key: _CacheKey = (
+            options,
+            None if when is None else at.strftime("%Y%m%d%H%M"),
+            arrive_by,
+        )
         loop_now = self._hass.loop.time()
 
         cached = self._cache.get(key)
-        if cached is not None and cached[0] > loop_now:
+        if cached is not None and loop_now - cached[0] < ADHOC_CACHE_TTL_SECONDS:
             self._cache.move_to_end(key)
-            return cached[1]
+            return self._drop_departed(cached[1], now)
 
         task = self._in_flight.get(key)
         if task is None:
-            self._take_token(loop_now)
+            retry_after = self._take_token(user_id, loop_now)
+            if retry_after:
+                if (
+                    allow_stale
+                    and cached is not None
+                    and loop_now - cached[0] < ADHOC_STALE_MAX_SECONDS
+                ):
+                    plan = self._drop_departed(cached[1], now)
+                    return replace(plan, stale=True, retry_after=retry_after)
+                raise AdhocRateLimited(retry_after)
             task = self._hass.async_create_background_task(
-                self._async_fetch(key, now, tz),
+                self._async_fetch(key, at, tz),
                 name=f"{DOMAIN}_adhoc_plan",
             )
             # HA starts background tasks eagerly, so a fetch that fails
@@ -128,11 +203,9 @@ class AdhocPlanner:
         # the request every other waiter shares.
         return await asyncio.shield(task)
 
-    async def _async_fetch(
-        self, key: _CacheKey, now: datetime, tz: tzinfo
-    ) -> AdhocPlan:
+    async def _async_fetch(self, key: _CacheKey, at: datetime, tz: tzinfo) -> AdhocPlan:
         try:
-            trips = await async_plan_trips(self._hass, key[0], now, tz)
+            trips = await async_plan_trips(self._hass, key[0], at, tz, arrive_by=key[2])
         except RoutingError as err:
             if err.translation_key != "route_no_connection":
                 raise
@@ -150,24 +223,47 @@ class AdhocPlanner:
             task.exception()
 
     def _store(self, key: _CacheKey, plan: AdhocPlan) -> None:
-        self._cache[key] = (self._hass.loop.time() + ADHOC_CACHE_TTL_SECONDS, plan)
+        # Stored with its fetch time, not an expiry: the same entry is fresh
+        # for the TTL and may stand in as stale for longer.
+        self._cache[key] = (self._hass.loop.time(), plan)
         self._cache.move_to_end(key)
         while len(self._cache) > ADHOC_CACHE_MAX_ENTRIES:
             self._cache.popitem(last=False)
 
-    def _take_token(self, loop_now: float) -> None:
-        rate = ADHOC_BUDGET_PER_HOUR / 3600
-        self._tokens = min(
-            float(ADHOC_BURST), self._tokens + (loop_now - self._refilled_at) * rate
+    @staticmethod
+    def _drop_departed(plan: AdhocPlan, now: datetime) -> AdhocPlan:
+        """Serve a cached plan without connections that left since.
+
+        Same one-minute grace as `rank_trips`. Returns `plan` itself when
+        nothing left, so callers sharing a plan keep sharing the object.
+        """
+        cutoff = now - timedelta(minutes=1)
+        kept = tuple(
+            trip
+            for trip in plan.trips
+            if trip.departure is None or trip.departure >= cutoff
         )
-        self._refilled_at = loop_now
-        if self._tokens < 1:
-            retry_after = math.ceil((1 - self._tokens) / rate)
-            _LOGGER.debug(
-                "Ad-hoc routing budget spent; next token in %d s", retry_after
+        return plan if len(kept) == len(plan.trips) else replace(plan, trips=kept)
+
+    def _take_token(self, user_id: str | None, loop_now: float) -> int:
+        """Take one token from both buckets, or neither.
+
+        Returns 0 on success, else the seconds until both have one again.
+        """
+        user_key = user_id or _NO_USER
+        user_bucket = self._user_buckets.get(user_key)
+        if user_bucket is None:
+            user_bucket = _TokenBucket(
+                ADHOC_USER_BURST, ADHOC_USER_BUDGET_PER_HOUR, loop_now
             )
-            raise AdhocRateLimited(retry_after)
-        self._tokens -= 1
+            self._user_buckets[user_key] = user_bucket
+        retry_after = max(user_bucket.wait(loop_now), self._bucket.wait(loop_now))
+        if retry_after:
+            _LOGGER.debug("Routing budget spent; next token in %d s", retry_after)
+            return retry_after
+        user_bucket.take()
+        self._bucket.take()
+        return 0
 
     async def _async_tz(self) -> tzinfo:
         if self._tz is None:

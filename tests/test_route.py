@@ -23,7 +23,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.wiener_linien_austria import rate_limit
+from custom_components.wiener_linien_austria import adhoc, rate_limit
 from custom_components.wiener_linien_austria.config_flow import _probe_route
 from custom_components.wiener_linien_austria.const import (
     CONF_ACTIVE_DAYS,
@@ -476,6 +476,47 @@ async def test_plan_trip_rejects_bad_targets(
                 return_response=True,
             )
         assert err.value.translation_key == key
+
+
+async def test_plan_trip_repeated_now_is_served_from_the_cache(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    entry = _route_entry()
+    await _setup(hass, entry)
+    before = fetch.await_count
+    for _ in range(3):
+        await hass.services.async_call(
+            DOMAIN,
+            "plan_trip",
+            {"config_entry_id": entry.entry_id},
+            blocking=True,
+            return_response=True,
+        )
+    assert fetch.await_count == before + 1
+
+
+async def test_plan_trip_in_a_loop_hits_the_budget(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    entry = _route_entry()
+    await _setup(hass, entry)
+    # Distinct times are distinct queries, so each one needs a token. An
+    # automation carries no user and draws on the shared no-user bucket.
+    with pytest.raises(HomeAssistantError) as err:
+        for minute in range(adhoc.ADHOC_USER_BURST + 1):
+            await hass.services.async_call(
+                DOMAIN,
+                "plan_trip",
+                {
+                    "config_entry_id": entry.entry_id,
+                    "datetime": f"2026-09-14 08:{minute:02d}:00",
+                },
+                blocking=True,
+                return_response=True,
+            )
+    assert err.value.translation_key == "adhoc_rate_limited"
+    assert int(err.value.translation_placeholders["retry_after"]) > 0
+    assert fetch.await_count >= adhoc.ADHOC_USER_BURST
 
 
 # ---------------------------------------------------------------------------

@@ -366,6 +366,7 @@
     "adhoc_loading": "Finding connections …",
     "adhoc_no_trips": "No connection found",
     "adhoc_no_trips_detail": "Try another stop, or try again later.",
+    "adhoc_stale": "Too many requests right now, so this is a slightly older plan.",
     "adhoc_paused": "Updates paused",
     "adhoc_resume": "Refresh",
     "adhoc_announce": "Leave in {n} minutes. {summary}",

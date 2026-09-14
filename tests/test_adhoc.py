@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Generator
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -152,7 +153,7 @@ async def test_plan_answers_in_the_route_sensor_shape(
     assert params["name_destination"] == str(SCHWARZENBERGPLATZ)
 
 
-async def test_plan_is_cached_within_the_minute(
+async def test_plan_is_cached_for_the_ttl_across_minutes(
     hass: HomeAssistant,
     hass_ws_client: WebSocketGenerator,
     freezer: FrozenDateTimeFactory,
@@ -172,10 +173,125 @@ async def test_plan_is_cached_within_the_minute(
     )
     assert fetch.await_count == before + 2
 
-    # The next minute is a new request.
-    freezer.tick(60)
+    # Crossing into the next minute inside the TTL still shares the answer,
+    # so dashboards refreshing at different moments share one request.
+    freezer.tick(45)
+    response = await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)
+    assert response["success"]
+    assert response["result"]["stale"] is False
+    assert fetch.await_count == before + 2
+
+    # Past the TTL it's a new request.
+    freezer.tick(16)
     await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)
     assert fetch.await_count == before + 3
+
+
+async def test_a_cached_plan_drops_connections_that_left(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+    options = adhoc.RouteOptions(
+        origin_diva=STEPHANSPLATZ, destination_diva=SCHWARZENBERGPLATZ
+    )
+    fresh = await planner.async_plan(options)
+    first = fresh.trips[0].departure
+    assert first is not None
+    # The fixture's first connection may leave later than one TTL from now,
+    # so widen the TTL to reach the cache-hit path at that moment.
+    frozen.move_to(first + timedelta(minutes=1, seconds=1))
+    with patch.object(adhoc, "ADHOC_CACHE_TTL_SECONDS", 24 * 3600):
+        served = await planner.async_plan(options)
+    assert all(t.departure is None or t.departure > first for t in served.trips)
+    assert len(served.trips) < len(fresh.trips)
+
+
+async def test_one_user_cannot_spend_everyones_budget(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+
+    def query(n: int) -> adhoc.RouteOptions:
+        # Distinct queries, so every call is a cache miss.
+        return adhoc.RouteOptions(
+            origin_diva=STEPHANSPLATZ,
+            destination_diva=SCHWARZENBERGPLATZ,
+            min_transfer_minutes=n,
+        )
+
+    for n in range(adhoc.ADHOC_USER_BURST):
+        await planner.async_plan(query(n), user_id="tablet")
+    with pytest.raises(adhoc.AdhocRateLimited) as err:
+        await planner.async_plan(query(99), user_id="tablet")
+    # 60/h refills a token every 60 s.
+    assert 0 < err.value.retry_after <= 60
+
+    # Another user still has their own share of the instance budget.
+    await planner.async_plan(query(99), user_id="phone")
+
+
+async def test_instance_budget_caps_all_users_together(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+    for n in range(adhoc.ADHOC_BURST):
+        await planner.async_plan(
+            adhoc.RouteOptions(
+                origin_diva=STEPHANSPLATZ,
+                destination_diva=SCHWARZENBERGPLATZ,
+                min_transfer_minutes=n,
+            ),
+            user_id=f"user{n}",
+        )
+    with pytest.raises(adhoc.AdhocRateLimited):
+        await planner.async_plan(
+            adhoc.RouteOptions(
+                origin_diva=SCHWARZENBERGPLATZ, destination_diva=STEPHANSPLATZ
+            ),
+            user_id="someone_new",
+        )
+
+
+async def test_spent_budget_serves_a_recent_plan_as_stale(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+) -> None:
+    client = await _connect(hass, hass_ws_client, freezer)
+    hass.data[DOMAIN].pop(adhoc.ADHOC_PLANNER_KEY, None)
+    # One token, refilled once an hour: nothing comes back during the test.
+    with (
+        patch.object(adhoc, "ADHOC_BURST", 1),
+        patch.object(adhoc, "ADHOC_BUDGET_PER_HOUR", 1),
+    ):
+        first = await _plan(
+            client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ
+        )
+        assert first["success"]
+        before = fetch.await_count
+
+        # Past the TTL, no token left: the last plan stands in, marked stale.
+        freezer.tick(90)
+        response = await _plan(
+            client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ
+        )
+        assert response["success"], response
+        result = response["result"]
+        assert result["stale"] is True
+        assert result["retry_after"] > 0
+        assert result["fetched_at"] == first["result"]["fetched_at"]
+        assert fetch.await_count == before
+
+        # Too old to stand in: an error instead.
+        freezer.tick(adhoc.ADHOC_STALE_MAX_SECONDS)
+        response = await _plan(
+            client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ
+        )
+    assert response["error"]["code"] == "rate_limited"
 
 
 async def test_concurrent_identical_plans_share_one_request(

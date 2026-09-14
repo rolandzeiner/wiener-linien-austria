@@ -18,6 +18,7 @@ from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
+from .adhoc import AdhocRateLimited, async_get_planner
 from .const import DOMAIN
 from .route_coordinator import MAX_TRIPS_PUBLISHED, WienerLinienRouteCoordinator
 from .routing import RoutingError
@@ -80,28 +81,36 @@ async def _async_plan_trip(call: ServiceCall) -> ServiceResponse:
     """Plan a route entry's connections, now or at a given time.
 
     Returns the same trip shape the route sensor publishes, so a script
-    or a voice assistant sees exactly what the card shows. Deliberately
-    skips the routing cooldown: someone is waiting for the answer.
+    or a voice assistant sees exactly what the card shows. Skips the routing
+    cooldown, since someone is waiting for the answer, and goes through the
+    on-demand planner instead: its cache, per-user and instance budget bound
+    a script that calls this in a loop. A script gets an error rather than a
+    stale plan when the budget is spent, since it can't see how old a plan is.
     """
     coordinator = _route_coordinator(call.hass, call.data[ATTR_CONFIG_ENTRY_ID])
     raw_when: datetime | None = call.data.get(ATTR_DATETIME)
-    when = dt_util.as_local(raw_when) if raw_when is not None else dt_util.now()
     try:
-        trips = await coordinator.async_plan(
-            when, arrive_by=bool(call.data[ATTR_ARRIVE_BY])
+        plan = await async_get_planner(call.hass).async_plan(
+            coordinator.options,
+            user_id=call.context.user_id,
+            when=dt_util.as_local(raw_when) if raw_when is not None else None,
+            arrive_by=bool(call.data[ATTR_ARRIVE_BY]),
         )
+    except AdhocRateLimited as err:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="adhoc_rate_limited",
+            translation_placeholders={"retry_after": str(err.retry_after)},
+        ) from err
     except RoutingError as err:
-        if err.translation_key == "route_no_connection":
-            trips = []
-        else:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key=err.translation_key,
-                translation_placeholders=err.placeholders,
-            ) from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=err.translation_key,
+            translation_placeholders=err.placeholders,
+        ) from err
     response: dict[str, Any] = {
         "origin": coordinator.origin_name,
         "destination": coordinator.destination_name,
-        "trips": [trip.to_dict() for trip in trips[:MAX_TRIPS_PUBLISHED]],
+        "trips": [trip.to_dict() for trip in plan.trips[:MAX_TRIPS_PUBLISHED]],
     }
     return response
