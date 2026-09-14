@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from typing import Any
 
@@ -24,6 +25,9 @@ from .const import (
     CONF_STOP_NAME,
     DOMAIN,
     MAX_DEPARTURES_IN_ATTRS,
+    S_BAHN_COLORS,
+    S_BAHN_DEFAULT_COLOR,
+    S_BAHN_TEXT_COLOR,
 )
 from .coordinator import (
     MonitorData,
@@ -40,6 +44,8 @@ from .static import CATALOGUE_KEY, StaticCatalogue, canonical_line_key
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 0
+
+_S_BAHN_LABEL = re.compile(r"^S\d+$", re.IGNORECASE)
 
 
 async def async_setup_entry(
@@ -64,18 +70,29 @@ def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str
 
     A label with no GTFS entry is omitted rather than published with an
     empty colour, and so is any label the catalogue doesn't know. Returns
-    `{}` when the catalogue isn't loaded yet or the routes payload hasn't
-    landed — the cards have their own fallbacks (nightline rule + neutral
-    default), which is also what an omitted label gets.
+    only the S-Bahn entries when the catalogue isn't loaded yet or the
+    routes payload hasn't landed — the cards have their own fallbacks
+    (nightline rule + neutral default), which is also what an omitted label
+    gets. S-Bahn lines ("S" + number) come from `S_BAHN_COLORS`, since the
+    GTFS feed only covers Wiener Linien's own lines.
     """
+    out: dict[str, dict[str, str]] = {}
+    # S-Bahn first: not in Wiener Linien's GTFS, so it needs no catalogue.
+    for label in labels:
+        if _S_BAHN_LABEL.match(label):
+            out[label] = {
+                "bg": S_BAHN_COLORS.get(label.upper(), S_BAHN_DEFAULT_COLOR),
+                "fg": S_BAHN_TEXT_COLOR,
+            }
     catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
     if not isinstance(catalogue, StaticCatalogue):
-        return {}
+        return out
     index = catalogue.trip_patterns
     if index is None or not index.colors_by_line:
-        return {}
-    out: dict[str, dict[str, str]] = {}
+        return out
     for label in labels:
+        if label in out:
+            continue
         bg = index.colors_by_line.get(label)
         if not bg:
             continue

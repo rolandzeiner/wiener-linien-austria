@@ -41,6 +41,9 @@ from custom_components.wiener_linien_austria.const import (
     CONF_WALK_SPEED,
     DOMAIN,
     ENTRY_TYPE_ROUTE,
+    S_BAHN_COLORS,
+    S_BAHN_DEFAULT_COLOR,
+    S_BAHN_TEXT_COLOR,
 )
 from custom_components.wiener_linien_austria.diagnostics import (
     async_get_config_entry_diagnostics,
@@ -49,6 +52,7 @@ from custom_components.wiener_linien_austria.route_coordinator import (
     WienerLinienRouteCoordinator,
 )
 from custom_components.wiener_linien_austria.routing import RoutingError
+from custom_components.wiener_linien_austria.sensor import line_colors_for
 
 from .conftest import make_entry
 
@@ -682,3 +686,36 @@ async def test_probe_route_outcomes(
         assert await _probe_route(hass, data) == expected
     params = dict(mock.call_args.args[1])
     assert params["exclMOT_4"] == "1"
+
+
+# ---------------------------------------------------------------------------
+# S-Bahn colours
+# ---------------------------------------------------------------------------
+
+
+def test_s_bahn_text_is_white_by_choice() -> None:
+    """White matches the signage; see the const.py note on its contrast."""
+    assert S_BAHN_TEXT_COLOR == "FFFFFF"
+    assert S_BAHN_DEFAULT_COLOR == "469CD4"
+    assert S_BAHN_COLORS == {"S45": "C1D781"}
+
+
+async def test_line_colors_cover_s_bahn_without_catalogue(hass: HomeAssistant) -> None:
+    hass.data.pop(DOMAIN, None)
+    colors = line_colors_for(hass, {"S80", "S45", "s7", "U1", "SEV"})
+    assert colors == {
+        "S80": {"bg": "469CD4", "fg": "FFFFFF"},
+        "S45": {"bg": "C1D781", "fg": "FFFFFF"},
+        "s7": {"bg": "469CD4", "fg": "FFFFFF"},
+    }
+
+
+async def test_line_colors_merge_s_bahn_with_gtfs(
+    hass: HomeAssistant, mock_static_catalogue: Any
+) -> None:
+    assert mock_static_catalogue.trip_patterns is not None
+    mock_static_catalogue.trip_patterns.colors_by_line["U1"] = "E3000F"
+    hass.data.setdefault(DOMAIN, {})["static_catalogue"] = mock_static_catalogue
+    colors = line_colors_for(hass, {"S45", "U1"})
+    assert colors["S45"] == {"bg": "C1D781", "fg": "FFFFFF"}
+    assert colors["U1"]["bg"] == "E3000F"

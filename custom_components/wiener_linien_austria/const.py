@@ -267,6 +267,20 @@ MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
 # matter which zone Home Assistant itself is configured in.
 ROUTING_TIME_ZONE: Final = "Europe/Vienna"
 
+# S-Bahn line colours. Wiener Linien's GTFS `routes.txt` only carries its own
+# lines, so an S-Bahn leg on a route would otherwise get the neutral fallback.
+# Every S-Bahn line is #469CD4 except the S45 (#C1D781).
+#
+# White text is a deliberate choice, matching the signage (Roland, 2026-09-14),
+# and it does NOT meet WCAG AA 4.5:1 for the chip label: measured 3.01:1 on
+# 469CD4 and 1.58:1 on C1D781. Black would give 6.97:1 and 13.30:1. The chip
+# text is not the only carrier of the line — the leg's direction, stops and
+# train icon sit next to it — but the label itself stays below AA. Don't flip
+# it to black without asking.
+S_BAHN_DEFAULT_COLOR: Final = "469CD4"
+S_BAHN_COLORS: Final[dict[str, str]] = {"S45": "C1D781"}
+S_BAHN_TEXT_COLOR: Final = "FFFFFF"
+
 # Response attribution (CC-BY mandated)
 ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 
