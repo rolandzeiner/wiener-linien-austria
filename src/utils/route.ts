@@ -2,8 +2,10 @@
 // whole decision layer — which entity is a route, what the countdown says,
 // how a transfer is graded — is testable without rendering a card.
 
+import { filterPassthrough } from "./config.js";
 import { lineTypeIcon } from "./mot.js";
 import type {
+  AdhocStopOption,
   HomeAssistant,
   RouteActiveWindow,
   RouteAttrs,
@@ -15,6 +17,17 @@ import type {
 
 export const ROUTE_CARD_TYPE = "wiener-linien-austria-route-card";
 export const DEFAULT_ALTERNATIVES = 2;
+
+/** Keys `normaliseRouteConfig` validates; everything else passes through. */
+const ROUTE_VALIDATED_KEYS: ReadonlySet<string> = new Set([
+  "type",
+  "entity",
+  "from",
+  "to",
+  "title",
+  "alternatives",
+  "hide_attribution",
+]);
 export const MAX_ALTERNATIVES = 3;
 
 // Discover route sensors by attribute fingerprint, like findWienerLinienEntities
@@ -39,6 +52,9 @@ export function findRouteEntities(hass: HomeAssistant | undefined): string[] {
 }
 
 export interface NormalisedRouteConfig {
+  /** HA's dashboard layout keys (grid_options, view_layout, visibility,
+   *  layout_options) ride along untouched — see `filterPassthrough`. */
+  [key: string]: unknown;
   type: string;
   entity: string;
   /** Ad-hoc defaults; "" when unset. Ignored while `entity` is set. */
@@ -70,6 +86,9 @@ export function normaliseRouteConfig(
     ? Math.min(MAX_ALTERNATIVES, Math.max(0, Math.round(raw)))
     : DEFAULT_ALTERNATIVES;
   return {
+    // Without this, every editor change dropped `grid_options`, and a card
+    // resized to full width snapped back to the 6-column default.
+    ...filterPassthrough(config, ROUTE_VALIDATED_KEYS),
     type: config.type,
     entity: config.entity ?? "",
     from,
@@ -282,4 +301,48 @@ export function saveAdhocSelection(selection: AdhocSelection): void {
   } catch {
     // Private mode or blocked storage: the pick just isn't remembered.
   }
+}
+
+/** Lower-case, accents and ß folded, so "wahringer" finds "Währinger" and
+ *  "strasse" finds "Straße". */
+export function foldStopText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/ß/g, "ss")
+    .toLowerCase();
+}
+
+/** How many suggestions the stop combobox lists at once. Enough to scroll
+ *  through, few enough that each keystroke re-renders instantly. */
+export const STOP_SUGGESTION_LIMIT = 50;
+
+/** Stops matching `query`, best first, capped at `limit`.
+ *
+ *  Every word of the query has to appear. A label that starts with the query
+ *  ranks first, then one where a word starts with it, then any other hit.
+ *  Within a rank the list keeps its order, which is nearest to home first, so
+ *  "Stephansplatz" near home beats a namesake across town. An empty query
+ *  returns the list as it came. */
+export function filterStops(
+  stops: readonly AdhocStopOption[],
+  query: string,
+  limit = STOP_SUGGESTION_LIMIT,
+): { matches: AdhocStopOption[]; total: number } {
+  const words = foldStopText(query).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return { matches: stops.slice(0, limit), total: stops.length };
+  const first = words[0]!;
+  const ranked: Array<{ stop: AdhocStopOption; rank: number; index: number }> = [];
+  stops.forEach((stop, index) => {
+    const label = foldStopText(stop.label);
+    if (!words.every((word) => label.includes(word))) return;
+    const rank = label.startsWith(first)
+      ? 0
+      : new RegExp(`(^|[\\s(\\-/·])${first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(label)
+        ? 1
+        : 2;
+    ranked.push({ stop, rank, index });
+  });
+  ranked.sort((a, b) => a.rank - b.rank || a.index - b.index);
+  return { matches: ranked.slice(0, limit).map((r) => r.stop), total: ranked.length };
 }

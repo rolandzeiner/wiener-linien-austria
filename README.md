@@ -148,7 +148,7 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 - **Disruptions** for the lines the trip uses.
 - **More connections** — up to three later options, folded away until you open them.
 - **Last updated** — the time the trip planner last answered, so a plan kept on screen can't pass for a fresh one.
-- **Any two stops** — leave the route empty and the card shows **From** and **To** pickers instead. Pick two stops, or swap them with one tap, and the connections appear. No route setup needed. The card remembers the last pick on each device, and the editor can preselect a start and destination.
+- **Any two stops** — leave the route empty and the card shows **From** and **To** pickers instead. Type a few letters to narrow the list, or open it and pick. Swap the two stops with one tap. The connections appear as soon as both are set. No route setup needed. The card remembers the last pick on each device, and the editor can preselect a start and destination.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
 

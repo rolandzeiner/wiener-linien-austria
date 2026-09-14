@@ -145,6 +145,14 @@ describe("registration + config", () => {
     expect(Card.getStubConfig({ states: {} } as unknown as HomeAssistant)).toEqual({});
   });
 
+  it("sizes to content in sections view", () => {
+    const el = document.createElement(TAG) as CardElement & {
+      getGridOptions(): Record<string, unknown>;
+    };
+    // No `rows`: the HA docs' way to let the card size itself.
+    expect(el.getGridOptions()).toEqual({ columns: 6, min_columns: 4 });
+  });
+
   it("throws for configs Lovelace should show as an error card", () => {
     const el = document.createElement(TAG) as CardElement;
     expect(() => el.setConfig(undefined as never)).toThrow();
@@ -181,6 +189,11 @@ describe("rendering", () => {
 
     const risks = [...root(el).querySelectorAll(".risk")].map((r) => r.getAttribute("data-risk"));
     expect(risks).toContain("tight");
+
+    // The ride before a change hands over to the dotted walk; the last ride
+    // runs on into the destination node.
+    const legs = [...root(el).querySelectorAll(".strand > .leg")];
+    expect(legs.map((leg) => leg.classList.contains("leg--before-transfer"))).toEqual([true, false]);
   });
 
   it("says when the connections were last updated, in Vienna time", async () => {
@@ -193,6 +206,15 @@ describe("rendering", () => {
       entity: ENTITY,
     });
     expect(root(never).querySelector(".updated")).toBeNull();
+  });
+
+  it("puts the update time on the heading's line, not under the credit", async () => {
+    const el = await mount(hass("x", ACTIVE), { entity: ENTITY });
+    const header = root(el).querySelector(".header");
+    expect(header?.querySelector("h2")).not.toBeNull();
+    expect(header?.querySelector(".updated")).not.toBeNull();
+    const wrap = root(el).querySelector(".wrap")!;
+    expect(wrap.lastElementChild?.classList.contains("attribution")).toBe(true);
   });
 
   it("toggles the alternatives with matching ARIA state", async () => {
@@ -284,6 +306,8 @@ const PRATERSTERN = "60201040";
 const STOPS = [
   { value: WESTBAHNHOF, label: "Westbahnhof (Wien) — 450 m" },
   { value: PRATERSTERN, label: "Praterstern (Wien)" },
+  { value: "60201091", label: "Währinger Straße-Volksoper (Wien)" },
+  { value: "60201012", label: "Stephansplatz (Wien)" },
 ];
 const PLAN = { ...ACTIVE, fetched_at: "2026-09-14T05:49:00+00:00" };
 
@@ -307,21 +331,47 @@ async function settle(el: CardElement, ms = 0): Promise<void> {
   await el.updateComplete;
 }
 
+const combos = (el: CardElement): HTMLInputElement[] => [
+  ...root(el).querySelectorAll<HTMLInputElement>('input[role="combobox"]'),
+];
+
+async function typeInto(el: CardElement, input: HTMLInputElement, value: string): Promise<void> {
+  input.focus();
+  input.value = value;
+  input.dispatchEvent(new Event("input"));
+  await settle(el);
+}
+
+async function press(el: CardElement, input: HTMLInputElement, key: string): Promise<void> {
+  input.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  await settle(el);
+}
+
+const options = (el: CardElement, which: "from" | "to"): string[] =>
+  [...root(el).querySelectorAll(`#wl-adhoc-${which}-list [role="option"]`)].map(
+    (o) => o.textContent?.trim() ?? "",
+  );
+
 function remember(from: string, to: string): void {
   window.localStorage.setItem("wiener-linien-austria-route-adhoc", JSON.stringify({ from, to }));
 }
 
 describe("ad-hoc mode", () => {
-  it("asks for both stops and offers the native fallback while HA's picker loads", async () => {
+  it("asks for both stops with two labelled comboboxes", async () => {
     const { h, callWS } = adhocHass();
     const el = await mount(h, {});
     await settle(el);
     expect(text(el)).toContain("Verbindung suchen");
     expect(text(el)).toContain("Wähle Start und Ziel");
-    const inputs = root(el).querySelectorAll<HTMLInputElement>(".fallback input");
+    const inputs = combos(el);
     expect(inputs).toHaveLength(2);
-    expect(inputs[0]?.getAttribute("list")).toBe("wl-adhoc-stops");
-    expect(root(el).querySelectorAll("#wl-adhoc-stops option")).toHaveLength(2);
+    const [from] = inputs;
+    expect(from!.getAttribute("aria-expanded")).toBe("false");
+    expect(from!.getAttribute("aria-autocomplete")).toBe("list");
+    expect(root(el).getElementById(from!.getAttribute("aria-controls")!)?.getAttribute("role")).toBe(
+      "listbox",
+    );
+    expect(root(el).querySelector(`label[for="${from!.id}"]`)?.textContent).toBe("Von");
     expect(root(el).querySelector("legend")?.textContent).toContain("Start und Ziel");
     expect(root(el).querySelector('.swap[aria-label="Start und Ziel tauschen"]')).not.toBeNull();
     expect(planCalls(callWS)).toHaveLength(0);
@@ -342,8 +392,7 @@ describe("ad-hoc mode", () => {
     expect(text(el)).toContain("Zuletzt aktualisiert 07:49");
     // A plan that wasn't asked for right now isn't announced.
     expect(root(el).querySelector('p[role="status"]')?.textContent).toBe("");
-    const inputs = root(el).querySelectorAll<HTMLInputElement>(".fallback input");
-    expect(inputs[0]?.value).toBe("Westbahnhof (Wien) — 450 m");
+    expect(combos(el)[0]?.value).toBe("Westbahnhof (Wien) — 450 m");
   });
 
   it("falls back to the card's defaults without a remembered pick", async () => {
@@ -357,12 +406,12 @@ describe("ad-hoc mode", () => {
     const { h, callWS } = adhocHass();
     const el = await mount(h, {});
     await settle(el);
-    const [from, to] = root(el).querySelectorAll<HTMLInputElement>(".fallback input");
-    from!.value = "Westbahnhof (Wien) — 450 m";
-    from!.dispatchEvent(new Event("change"));
-    to!.value = "Praterstern (Wien)";
-    to!.dispatchEvent(new Event("change"));
-    await settle(el, 399);
+    const [from, to] = combos(el);
+    await typeInto(el, from!, "westb");
+    await press(el, from!, "Enter");
+    await typeInto(el, to!, "prater");
+    await press(el, to!, "Enter");
+    await settle(el, 399 - 0);
     expect(planCalls(callWS)).toHaveLength(0);
     await settle(el, 1);
     expect(planCalls(callWS)).toHaveLength(1);
@@ -380,11 +429,15 @@ describe("ad-hoc mode", () => {
     const { h, callWS } = adhocHass();
     const el = await mount(h, {});
     await settle(el);
-    const from = root(el).querySelector<HTMLInputElement>(".fallback input")!;
-    from.value = "Westbhf";
-    from.dispatchEvent(new Event("change"));
+    const from = combos(el)[0]!;
+    await typeInto(el, from, "Westbhf");
+    expect(root(el).querySelector("#wl-adhoc-from-list + .combo-note")?.textContent).toContain(
+      "Keine Haltestelle gefunden",
+    );
+    from.blur();
+    from.dispatchEvent(new FocusEvent("blur"));
     await settle(el, 500);
-    const input = root(el).querySelector<HTMLInputElement>(".fallback input")!;
+    const input = combos(el)[0]!;
     expect(input.getAttribute("aria-invalid")).toBe("true");
     const errorId = input.getAttribute("aria-describedby");
     expect(root(el).getElementById(errorId!)?.textContent).toContain("Keine passende Haltestelle");
@@ -489,25 +542,91 @@ describe("ad-hoc mode", () => {
     expect(planCalls(callWS)).toHaveLength(1);
   });
 
-  it("uses HA's own picker once it is defined", async () => {
-    if (!customElements.get("ha-selector")) {
-      customElements.define("ha-selector", class extends HTMLElement {});
-    }
+  it("narrows the list while typing, ignoring case and accents", async () => {
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const from = combos(el)[0]!;
+    await typeInto(el, from, "WAHRINGER str");
+    expect(from.getAttribute("aria-expanded")).toBe("true");
+    expect(options(el, "from")).toEqual(["Währinger Straße-Volksoper (Wien)"]);
+    await typeInto(el, from, "");
+    expect(options(el, "from")).toHaveLength(STOPS.length);
+  });
+
+  it("opens the full list from the button and picks with the arrow keys", async () => {
     const { h, callWS } = adhocHass();
     const el = await mount(h, {});
     await settle(el);
-    const pickers = root(el).querySelectorAll("ha-selector");
-    expect(pickers).toHaveLength(2);
-    expect(root(el).querySelector(".fallback")).toBeNull();
-    const selector = (pickers[0] as unknown as { selector: { select: { options: unknown[] } } })
-      .selector;
-    expect(selector.select.options).toEqual(STOPS);
-    expect((pickers[0] as unknown as { label: string }).label).toBe("Von");
+    const from = combos(el)[0]!;
+    root(el).querySelector<HTMLButtonElement>(".picker--from .combo-toggle")!.click();
+    await settle(el);
+    expect(options(el, "from")).toHaveLength(STOPS.length);
 
-    pickers[0]!.dispatchEvent(new CustomEvent("value-changed", { detail: { value: WESTBAHNHOF } }));
-    pickers[1]!.dispatchEvent(new CustomEvent("value-changed", { detail: { value: PRATERSTERN } }));
+    await press(el, from, "ArrowDown");
+    await press(el, from, "ArrowDown");
+    const active = from.getAttribute("aria-activedescendant");
+    expect(root(el).getElementById(active!)?.textContent).toContain("Praterstern");
+    expect(root(el).getElementById(active!)?.getAttribute("aria-selected")).toBe("true");
+    await press(el, from, "Enter");
+    expect(from.getAttribute("aria-expanded")).toBe("false");
+    expect(from.value).toBe("Praterstern (Wien)");
+
+    const to = combos(el)[1]!;
+    await typeInto(el, to, "stephan");
+    // A mouse pick works too.
+    root(el).querySelector<HTMLElement>('#wl-adhoc-to-list [role="option"]')!.click();
+    await settle(el, 400);
+    expect(planCalls(callWS).at(-1)).toMatchObject({ origin: 60201040, destination: 60201012 });
+  });
+
+  it("closes on Escape, then restores the committed stop on a second Escape", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const from = combos(el)[0]!;
+    await typeInto(el, from, "steph");
+    await press(el, from, "Escape");
+    expect(from.getAttribute("aria-expanded")).toBe("false");
+    expect(from.value).toBe("steph");
+    await press(el, from, "Escape");
+    expect(combos(el)[0]!.value).toBe("Westbahnhof (Wien) — 450 m");
+  });
+
+  it("commits an exactly typed stop on blur and follows a swap", async () => {
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, { to: PRATERSTERN });
+    await settle(el);
+    const from = combos(el)[0]!;
+    await typeInto(el, from, "westbahnhof (wien) — 450 m");
+    from.blur();
+    from.dispatchEvent(new FocusEvent("blur"));
     await settle(el, 400);
     expect(planCalls(callWS)).toHaveLength(1);
+    root(el).querySelector<HTMLButtonElement>(".swap")!.click();
+    await settle(el);
+    expect(combos(el).map((i) => i.value)).toEqual([
+      "Praterstern (Wien)",
+      "Westbahnhof (Wien) — 450 m",
+    ]);
+  });
+
+  it("caps the list and says how many more there are", async () => {
+    const many = Array.from({ length: 80 }, (_, i) => ({
+      value: String(60200000 + i),
+      label: `Gasse ${i} (Wien)`,
+    }));
+    const { h, callWS } = adhocHass();
+    callWS.mockImplementation(async (msg: WsMessage) =>
+      msg.type === "wiener_linien_austria/stops" ? { stops: many } : { version: ROUTE_CARD_VERSION },
+    );
+    const el = await mount(h, {});
+    await settle(el);
+    const from = combos(el)[0]!;
+    await typeInto(el, from, "gasse");
+    expect(options(el, "from")).toHaveLength(50);
+    expect(text(el)).toContain("50 von 80 Treffern");
   });
 });
 
@@ -612,6 +731,27 @@ describe("editor", () => {
       new CustomEvent("value-changed", { detail: { value: { entity: ENTITY, from: WESTBAHNHOF } } }),
     );
     expect(config).toEqual({ type: `custom:${TAG}`, entity: ENTITY, alternatives: 2 });
+  });
+
+  it("keeps the dashboard layout keys through every change", async () => {
+    const el = document.createElement(`${TAG}-editor`) as CardElement;
+    document.body.appendChild(el);
+    el.hass = hass("x", ACTIVE);
+    const layout = {
+      grid_options: { columns: "full", rows: 8 },
+      visibility: [{ condition: "screen", media_query: "(min-width: 0px)" }],
+    };
+    el.setConfig({ type: `custom:${TAG}`, entity: ENTITY, ...layout });
+    await el.updateComplete;
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+    const form = root(el).querySelector("ha-form")!;
+    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { title: "Arbeit" } } }));
+    expect(config).toMatchObject({ title: "Arbeit", ...layout });
+    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { alternatives: 1 } } }));
+    expect(config).toMatchObject({ title: "Arbeit", alternatives: 1, ...layout });
   });
 
   it("renders nothing before it has a config", async () => {

@@ -28,6 +28,8 @@ import { registerWlFonts } from "./font-face.js";
 import { translate } from "./localize/localize.js";
 import "./route-editor.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
+import "./stop-combobox.js";
+import type { StopComboboxStrings } from "./stop-combobox.js";
 import type {
   AdhocStopOption,
   HassWsError,
@@ -71,44 +73,10 @@ const ATTRIBUTION = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
 // minute stale while costing nothing measurable.
 const TICK_MS = 15_000;
 const MAX_NOTICES = 2;
-// How long to wait for HA's own picker to load before offering the native
-// fallback. The helpers path normally resolves in well under a second.
-const PICKER_LOAD_TIMEOUT_MS = 5_000;
 
 type AdhocPhase = "idle" | "loading" | "ready" | "error" | "paused";
 type Which = "from" | "to";
 
-interface CardHelpers {
-  createCardElement(config: Record<string, unknown>): Promise<HTMLElement> | HTMLElement;
-}
-
-/** Make sure `ha-selector` is defined before the pickers render.
- *
- *  A dashboard only defines it once some editor has been opened, so a viewer
- *  who never edits would otherwise get an inert tag. The tile card's editor
- *  imports `ha-form`, which imports `ha-selector` — verified in the frontend
- *  shipped with HA 2025.6 and on current `dev`. Only the selector is used, never
- *  what it renders inside: that changed from `ha-combo-box` to
- *  `ha-generic-picker` between those two versions. */
-async function ensureHaSelector(): Promise<boolean> {
-  if (customElements.get("ha-selector")) return true;
-  try {
-    const load = (window as unknown as { loadCardHelpers?: () => Promise<CardHelpers> })
-      .loadCardHelpers;
-    if (load) {
-      const helpers = await load();
-      const card = await helpers.createCardElement({ type: "tile", entity: "sun.sun" });
-      const ctor = card.constructor as { getConfigElement?: () => Promise<unknown> };
-      await ctor.getConfigElement?.();
-    }
-  } catch (err) {
-    console.warn(`[${ROUTE_CARD_TYPE}] couldn't load the stop picker`, err);
-  }
-  return Promise.race([
-    customElements.whenDefined("ha-selector").then(() => true),
-    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), PICKER_LOAD_TIMEOUT_MS)),
-  ]);
-}
 
 {
   const win = window as unknown as WindowWithCustomCards;
@@ -143,14 +111,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   // --- Ad-hoc mode (no `entity`) ---------------------------------------
   @state() private _stops: AdhocStopOption[] | null = null;
   @state() private _stopsError: string | null = null;
-  @state() private _pickerReady = false;
   @state() private _from = "";
   @state() private _to = "";
   @state() private _plan: RouteAttrs | null = null;
   @state() private _phase: AdhocPhase = "idle";
   @state() private _error: { code: string; retryAfter: number | null } | null = null;
   @state() private _announcement = "";
-  @state() private _noMatch: Record<Which, boolean> = { from: false, to: false };
 
   private _tick: ReturnType<typeof setInterval> | null = null;
   private _versionCheckDone = false;
@@ -165,9 +131,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _onScreen = true;
   private _lastInteraction = Date.now();
   private _observer: IntersectionObserver | null = null;
-  private _selector: Record<string, unknown> | null = null;
-  private _valueByLabel = new Map<string, string>();
-  private _labelByValue = new Map<string, string>();
 
   public setConfig(config: WienerLinienRouteCardConfig): void {
     const previous = this._config;
@@ -194,13 +157,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return 6;
   }
 
-  public getGridOptions(): {
-    columns: number;
-    rows: "auto";
-    min_columns: number;
-    min_rows: number;
-  } {
-    return { columns: 6, rows: "auto", min_columns: 4, min_rows: 4 };
+  /** Sections-view sizing, per the HA custom-card docs: half the 12-column
+   *  section by default (a multiple of 3, as the docs recommend), never
+   *  narrower than the pickers and strand stay readable at. `rows` is left out
+   *  on purpose — the docs' way to say "size to content", which this card
+   *  needs because opening the alternatives or a stop list grows it. A size
+   *  set in the dashboard's layout tab lands in `grid_options` and wins over
+   *  these defaults. */
+  public getGridOptions(): { columns: number; min_columns: number } {
+    return { columns: 6, min_columns: 4 };
   }
 
   public static getConfigElement(): LovelaceCardEditor {
@@ -272,9 +237,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._to = saved?.to || cfg.to;
     }
     void this._loadStops();
-    void ensureHaSelector().then((ready) => {
-      this._pickerReady = ready;
-    });
     if (typeof IntersectionObserver !== "undefined") {
       this._observer = new IntersectionObserver((entries) => {
         this._onScreen = entries.some((entry) => entry.isIntersecting);
@@ -367,11 +329,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         type: "wiener_linien_austria/stops",
       });
       const stops = Array.isArray(result?.stops) ? result.stops : [];
-      this._valueByLabel = new Map(stops.map((s) => [s.label, s.value]));
-      this._labelByValue = new Map(stops.map((s) => [s.value, s.label]));
-      // One object for the lifetime of the list: a fresh selector per render
-      // would make the picker re-process every option each time.
-      this._selector = { select: { mode: "dropdown", sort: false, options: stops } };
       this._stops = stops;
       this._stopsError = null;
     } catch (err) {
@@ -451,7 +408,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const next = typeof value === "string" || typeof value === "number" ? String(value) : "";
     if (which === "from") this._from = next;
     else this._to = next;
-    this._noMatch = { ...this._noMatch, [which]: false };
     saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
@@ -459,26 +415,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   private _swap = (): void => {
     [this._from, this._to] = [this._to, this._from];
-    this._noMatch = { from: this._noMatch.to, to: this._noMatch.from };
     saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
   };
 
-  /** Native fallback: the text has to match a suggestion exactly. */
-  private _onFallbackChange(which: Which, ev: Event): void {
-    const text = (ev.target as HTMLInputElement).value.trim();
-    if (!text) {
-      this._onPick(which, "");
-      return;
-    }
-    const value = this._valueByLabel.get(text);
-    if (value === undefined) {
-      this._noMatch = { ...this._noMatch, [which]: true };
-      return;
-    }
-    this._onPick(which, value);
-  }
 
   /** Re-setting identical text wouldn't be announced, so nudge it. */
   private _announce(text: string): void {
@@ -577,10 +518,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       <ha-card @pointerdown=${this._onCardActivity} @keydown=${this._onCardActivity}>
         <div class="wrap">
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
-          <h2 class="heading">
-            <ha-icon icon="mdi:map-marker-path" aria-hidden="true"></ha-icon>
-            <span>${heading}</span>
-          </h2>
+          <div class="header">
+            <h2 class="heading">
+              <ha-icon icon="mdi:map-marker-path" aria-hidden="true"></ha-icon>
+              <span>${heading}</span>
+            </h2>
+            ${this._renderUpdated(attrs.fetched_at)}
+          </div>
           ${adhoc
             ? html`
                 ${this._renderPickers()}
@@ -590,7 +534,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 </div>
               `
             : this._renderBody(cfg, state?.state, attrs)}
-          ${this._renderUpdated(attrs.fetched_at)}
           ${attribution ? html`<div class="attribution">${attribution}</div>` : nothing}
         </div>
       </ha-card>
@@ -603,6 +546,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const clock = viennaClock(fetchedAt);
     if (!clock || !fetchedAt) return nothing;
     return html`<p class="updated">
+      <ha-icon icon="mdi:update" aria-hidden="true"></ha-icon>
       <time datetime=${fetchedAt}>${this._t("updated", { time: clock })}</time>
     </p>`;
   }
@@ -632,49 +576,31 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         </button>
         ${this._renderPicker("to", this._t("adhoc_to"))}
       </fieldset>
-      ${this._pickerReady
-        ? nothing
-        : html`<datalist id="wl-adhoc-stops">
-            ${this._stops.map((stop) => html`<option value=${stop.label}></option>`)}
-          </datalist>`}
     `;
   }
 
+  private _comboStrings(label: string): StopComboboxStrings {
+    return {
+      label,
+      toggle: this._t("adhoc_show_stops"),
+      noMatch: this._t("adhoc_no_match"),
+      noResults: this._t("adhoc_no_results"),
+      count: (shown, total) =>
+        shown < total
+          ? this._t("adhoc_matches_more", { shown, total })
+          : this._t("adhoc_matches", { n: total }),
+    };
+  }
+
   private _renderPicker(which: Which, label: string): TemplateResult {
-    const value = which === "from" ? this._from : this._to;
-    if (this._pickerReady) {
-      return html`<ha-selector
-        class=${`picker picker--${which}`}
-        .hass=${this.hass}
-        .selector=${this._selector}
-        .value=${value || undefined}
-        .label=${label}
-        .required=${false}
-        @value-changed=${(ev: CustomEvent<{ value?: unknown }>) => {
-          ev.stopPropagation();
-          this._onPick(which, ev.detail?.value);
-        }}
-      ></ha-selector>`;
-    }
-    const errorId = `wl-adhoc-${which}-error`;
-    const invalid = this._noMatch[which];
-    return html`
-      <label class=${`fallback picker--${which}`}>
-        <span class="fallback-label">${label}</span>
-        <input
-          type="text"
-          list="wl-adhoc-stops"
-          autocomplete="off"
-          .value=${this._labelByValue.get(value) ?? ""}
-          aria-invalid=${invalid ? "true" : "false"}
-          aria-describedby=${invalid ? errorId : nothing}
-          @change=${(ev: Event) => this._onFallbackChange(which, ev)}
-        />
-        ${invalid
-          ? html`<span class="field-error" id=${errorId}>${this._t("adhoc_no_match")}</span>`
-          : nothing}
-      </label>
-    `;
+    return html`<wiener-linien-austria-stop-combobox
+      class=${`picker picker--${which}`}
+      .stops=${this._stops ?? []}
+      .value=${which === "from" ? this._from : this._to}
+      .idBase=${`wl-adhoc-${which}`}
+      .strings=${this._comboStrings(label)}
+      @stop-picked=${(ev: CustomEvent<{ value: string }>) => this._onPick(which, ev.detail.value)}
+    ></wiener-linien-austria-stop-combobox>`;
   }
 
   private _renderAdhocBody(cfg: NormalisedRouteConfig): TemplateResult {
@@ -902,7 +828,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           const colour = this._lineStyle(leg.line ?? "", attrs).background;
           const transfer: RouteTransferAttr | undefined = trip.transfers[i];
           return html`
-            ${this._renderLeg(leg, colour, i === 0, attrs)}
+            ${this._renderLeg(leg, colour, i === 0, attrs, !!transfer && i < legs.length - 1)}
             ${transfer && i < legs.length - 1 ? this._renderTransfer(transfer) : nothing}
           `;
         })}
@@ -926,6 +852,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     colour: string,
     first: boolean,
     attrs: RouteAttrs,
+    beforeTransfer: boolean,
   ): TemplateResult {
     const departs = leg.origin.estimated ?? leg.origin.planned;
     const late = leg.origin.delay_minutes ?? 0;
@@ -936,7 +863,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : this._t("stops_many", { n: leg.stop_count });
     const platform = this._platformText(leg);
     return html`
-      <li class="leg" style=${styleMap({ "--leg-colour": colour })}>
+      <li
+        class=${beforeTransfer ? "leg leg--before-transfer" : "leg"}
+        style=${styleMap({ "--leg-colour": colour })}
+      >
         <div class="stop">
           <span class=${first ? "node node--start" : "node"} aria-hidden="true"></span>
           <time datetime=${departs ?? ""}>${clockOf(departs)}</time>
@@ -1070,6 +1000,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
       --strand-width: 4px;
       --node-size: 12px;
+      --node-top: 5px;
+      /* Where a stop's node is centred, measured from the top of its row.
+         Every rail segment starts or ends here, so nodes sit exactly on the
+         joins instead of the segments guessing at a shared offset. */
+      --node-centre: calc(var(--node-top) + var(--node-size) / 2);
       --strand-x: 6px;
       --leg-colour: var(--primary-color);
     }
@@ -1099,10 +1034,20 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       white-space: nowrap;
     }
 
+    /* Heading left, "Zuletzt aktualisiert" right on the same line. On a
+       narrow card the time wraps under the heading and stays right-aligned. */
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 2px 12px;
+    }
     .heading {
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
       margin: 0;
       font-size: 1rem;
       font-weight: 600;
@@ -1170,28 +1115,36 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       position: relative;
       padding-inline-start: calc(var(--strand-x) * 2 + var(--node-size));
     }
+    /* A ride runs from its boarding node down into the next stop's node.
+       Before a change it stops at the row's edge instead, and the transfer's
+       dotted walk takes over from there. */
     .leg::before {
       content: "";
       position: absolute;
       inset-inline-start: calc(var(--strand-x) + var(--node-size) / 2 - var(--strand-width) / 2);
-      top: 10px;
-      bottom: -10px;
+      top: var(--node-centre);
+      bottom: calc(-1 * var(--node-centre));
       width: var(--strand-width);
       border-radius: 2px;
       background: var(--leg-colour);
     }
+    .leg--before-transfer::before {
+      bottom: 0;
+    }
+    /* The walk spans the whole transfer row and reaches down into the next
+       ride's boarding node, which covers the end of it. */
     .transfer::before {
       content: "";
       position: absolute;
       inset-inline-start: calc(var(--strand-x) + var(--node-size) / 2 - 1px);
       top: 0;
-      bottom: 0;
+      bottom: calc(-1 * var(--node-centre));
       border-inline-start: 2px dotted var(--secondary-text-color);
     }
     .node {
       position: absolute;
       inset-inline-start: var(--strand-x);
-      top: 5px;
+      top: var(--node-top);
       width: var(--node-size);
       height: var(--node-size);
       box-sizing: border-box;
@@ -1418,8 +1371,16 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--secondary-text-color);
     }
     .updated {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-inline-start: auto;
       font-size: 0.75rem;
+      white-space: nowrap;
       color: var(--secondary-text-color);
+    }
+    .updated ha-icon {
+      --mdc-icon-size: 14px;
     }
 
     /* Ad-hoc pickers: From above To, the swap button beside both. DOM order
@@ -1442,8 +1403,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       grid-column: 1;
       grid-row: 2;
     }
-    .pickers > ha-selector {
-      display: block;
+    .pickers > .picker {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
       min-width: 0;
     }
     .swap {
@@ -1465,29 +1428,83 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       cursor: default;
       color: var(--disabled-text-color, var(--secondary-text-color));
     }
-    .fallback {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-    .fallback-label {
+    .combo-label {
       font-size: 0.85rem;
       color: var(--secondary-text-color);
     }
-    .fallback input {
+    .combo-field {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .combo-field input {
       min-height: 44px;
       box-sizing: border-box;
       width: 100%;
-      padding: 0 12px;
+      padding: 0 44px 0 12px;
       border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.5));
       border-radius: var(--wl-radius-md);
       background: var(--card-background-color, transparent);
       color: var(--primary-text-color);
       font: inherit;
     }
-    .fallback input[aria-invalid="true"] {
+    .combo-field[data-open] input {
+      border-color: var(--primary-color);
+    }
+    .combo-field input[aria-invalid="true"] {
       border-color: var(--wl-error);
+    }
+    .combo-toggle {
+      position: absolute;
+      inset-inline-end: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--secondary-text-color);
+      cursor: pointer;
+    }
+    /* In flow, not an overlay: ha-card clips anything that pokes out. */
+    .combo-list {
+      list-style: none;
+      margin: 0;
+      padding: 4px 0;
+      max-height: 240px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+      border-radius: var(--wl-radius-md);
+      background: var(--card-background-color, var(--ha-card-background, #fff));
+    }
+    .combo-list[hidden] {
+      display: none;
+    }
+    .combo-option {
+      display: flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 4px 12px;
+      color: var(--primary-text-color);
+      cursor: pointer;
+    }
+    .combo-option[data-current] {
+      font-weight: 600;
+    }
+    .combo-option:hover {
+      background: color-mix(in srgb, var(--primary-text-color) 8%, transparent);
+    }
+    .combo-option[aria-selected="true"] {
+      background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+      outline: 2px solid var(--primary-color);
+      outline-offset: -2px;
+    }
+    .combo-note {
+      font-size: 0.8rem;
+      color: var(--secondary-text-color);
     }
     .field-error {
       font-size: 0.8rem;
@@ -1563,7 +1580,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     .alt-toggle:focus-visible,
-    .fallback input:focus-visible,
+    .combo-field input:focus-visible,
     button:focus-visible {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;
@@ -1575,6 +1592,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       .risk,
       .notice {
         outline: 1px solid CanvasText;
+      }
+      .combo-option[aria-selected="true"] {
+        forced-color-adjust: none;
+        background: Highlight;
+        color: HighlightText;
       }
       .leg::before,
       .node {

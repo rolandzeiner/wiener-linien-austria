@@ -7,6 +7,8 @@ import {
   adhocRefreshDelay,
   adhocRetryDelay,
   clockOf,
+  filterStops,
+  foldStopText,
   findRouteEntities,
   legTypeIcon,
   minutesUntil,
@@ -77,6 +79,18 @@ describe("normaliseRouteConfig", () => {
     expect(() => normaliseRouteConfig({ type: "x", entity: 3 as never })).toThrow(/string/);
     expect(() => normaliseRouteConfig({ type: "x", entity: "light.a" })).toThrow(/sensor/);
     expect(() => normaliseRouteConfig({ type: "x", to: "Praterstern" })).toThrow(/stop number/);
+  });
+
+  it("passes HA's layout keys through, but never a raw validated key", () => {
+    const cfg = normaliseRouteConfig({
+      type: "x",
+      alternatives: 9,
+      grid_options: { columns: "full" },
+      view_layout: { position: "sidebar" },
+    });
+    expect(cfg["grid_options"]).toEqual({ columns: "full" });
+    expect(cfg["view_layout"]).toEqual({ position: "sidebar" });
+    expect(cfg.alternatives).toBe(3);
   });
 
   it("keeps ad-hoc defaults as digit strings", () => {
@@ -194,5 +208,41 @@ describe("ad-hoc timing", () => {
     expect(viennaClock("2026-01-14T05:48:00+00:00")).toBe("06:48");
     expect(viennaClock("nonsense")).toBe("");
     expect(viennaClock(null)).toBe("");
+  });
+});
+
+describe("stop filtering", () => {
+  const stops = [
+    { value: "1", label: "Neubaugasse (Wien) — 300 m" },
+    { value: "2", label: "Stephansplatz (Wien)" },
+    { value: "3", label: "Währinger Straße-Volksoper (Wien)" },
+    { value: "4", label: "Schottenring (Wien) · U2, U4" },
+    { value: "5", label: "Rathaus (Wien)" },
+  ];
+  const values = (query: string, limit?: number): string[] =>
+    filterStops(stops, query, limit).matches.map((s) => s.value);
+
+  it("folds case, accents and ß", () => {
+    expect(foldStopText("Währinger Straße")).toBe("wahringer strasse");
+    expect(values("WAHRINGER strasse")).toEqual(["3"]);
+  });
+
+  it("needs every word and ranks label, then word, then any hit", () => {
+    // Substring hits only, so the list order (nearest first) stands.
+    expect(values("gasse")).toEqual(["1"]);
+    expect(values("ring")).toEqual(["3", "4"]);
+    // "Stephansplatz" starts with it; "Straße" is a later word.
+    expect(values("st")).toEqual(["2", "3"]);
+    // A hit inside a word counts too.
+    expect(values("oper")).toEqual(["3"]);
+    expect(values("haus")).toEqual(["5"]);
+    expect(values("u4 schotten")).toEqual(["4"]);
+    expect(values("nothing here")).toEqual([]);
+  });
+
+  it("returns the list unchanged for an empty query, and caps it", () => {
+    expect(values("   ")).toEqual(["1", "2", "3", "4", "5"]);
+    expect(filterStops(stops, "", 2)).toEqual({ matches: stops.slice(0, 2), total: 5 });
+    expect(filterStops(stops, "wien", 3).total).toBe(5);
   });
 });
