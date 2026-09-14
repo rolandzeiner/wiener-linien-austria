@@ -1,0 +1,243 @@
+"""WebSocket commands behind the route card's ad-hoc From / To mode.
+
+Two commands, both open to any signed-in user rather than admins only: the
+dashboard that shows the card is often a wall tablet signed in as a regular
+user.
+
+- `wiener_linien_austria/stops` — every trackable stop as a picker option,
+  nearest to the HA home first. The same list the setup dialog offers.
+- `wiener_linien_austria/plan` — connections between two stops, now. Answers
+  in the shape of the route sensor's attributes so the card renders both
+  through one path.
+
+Registered once per HA process in `async_setup`. `websocket_api` has no
+deregister hook, so the handlers outlive a removed integration; each one
+therefore answers `not_loaded` unless an entry of this domain is loaded. By
+then the card's resource is gone too, so nothing should be calling.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Final
+
+import aiohttp
+import voluptuous as vol
+from homeassistant.components.websocket_api import async_register_command
+from homeassistant.components.websocket_api.connection import ActiveConnection
+from homeassistant.components.websocket_api.decorators import (
+    async_response,
+    websocket_command,
+)
+from homeassistant.core import HomeAssistant, callback
+
+from . import static
+from .adhoc import AdhocRateLimited, async_get_planner
+from .alerts import get_alerts_for
+from .config_flow import _stop_options
+from .const import (
+    ATTRIBUTION,
+    DEFAULT_MIN_TRANSFER_MINUTES,
+    DEFAULT_ROUTE_TYPE,
+    DEFAULT_WALK_SPEED,
+    DOMAIN,
+    EXCLUDABLE_MEANS,
+    MAX_CHANGES_ANY,
+    MAX_CHANGES_CHOICES,
+    MAX_MIN_TRANSFER_MINUTES,
+    ROUTE_TYPES,
+    WALK_SPEEDS,
+)
+from .route_coordinator import MAX_TRIPS_PUBLISHED
+from .routing import RouteOptions, RoutingError
+from .sensor import line_colors_for
+from .static import StaticCatalogue
+
+# Error codes the card maps onto its own copy. Stable: the card matches them.
+ERR_NOT_LOADED: Final = "not_loaded"
+ERR_CATALOGUE: Final = "catalogue_unavailable"
+ERR_INVALID_STOP: Final = "invalid_stop"
+ERR_SAME_STOP: Final = "same_stop"
+ERR_RATE_LIMITED: Final = "rate_limited"
+ERR_UPSTREAM: Final = "upstream"
+
+STOPS_CACHE_KEY: Final = "adhoc_stops"
+
+
+@callback
+def async_setup_websocket(hass: HomeAssistant) -> None:
+    """Register the ad-hoc commands (once per HA process)."""
+    async_register_command(hass, _websocket_stops)
+    async_register_command(hass, _websocket_plan)
+
+
+def _is_loaded(hass: HomeAssistant) -> bool:
+    return bool(hass.config_entries.async_loaded_entries(DOMAIN))
+
+
+def _send_not_loaded(connection: ActiveConnection, msg_id: int) -> None:
+    connection.send_error(
+        msg_id,
+        ERR_NOT_LOADED,
+        "Wiener Linien Austria isn't loaded.",
+        translation_domain=DOMAIN,
+        translation_key="adhoc_not_loaded",
+    )
+
+
+async def _async_catalogue(
+    hass: HomeAssistant, connection: ActiveConnection, msg_id: int
+) -> StaticCatalogue | None:
+    """The shared catalogue, or None after answering the error."""
+    try:
+        return await static.async_get_catalogue(hass)
+    except (TimeoutError, aiohttp.ClientError):
+        connection.send_error(
+            msg_id,
+            ERR_CATALOGUE,
+            "The stop catalogue isn't available.",
+            translation_domain=DOMAIN,
+            translation_key="adhoc_catalogue_unavailable",
+        )
+        return None
+
+
+@websocket_command({vol.Required("type"): "wiener_linien_austria/stops"})
+@async_response
+async def _websocket_stops(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Every trackable stop as `{value, label}`, nearest to home first."""
+    if not _is_loaded(hass):
+        _send_not_loaded(connection, msg["id"])
+        return
+    catalogue = await _async_catalogue(hass, connection, msg["id"])
+    if catalogue is None:
+        return
+    config = hass.config
+    signature = (catalogue, config.latitude, config.longitude, config.language)
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    cached = domain_data.get(STOPS_CACHE_KEY)
+    # Identity, not equality: a background refresh replaces the catalogue
+    # object, and comparing two 1,800-station catalogues field by field on
+    # every card load would cost more than rebuilding the list.
+    if cached is None or any(
+        a is not b for a, b in zip(cached[0], signature, strict=True)
+    ):
+        options = _stop_options(
+            catalogue, config.latitude, config.longitude, config.language
+        )
+        cached = (signature, [dict(option) for option in options])
+        domain_data[STOPS_CACHE_KEY] = cached
+    connection.send_result(msg["id"], {"stops": cached[1]})
+
+
+@websocket_command(
+    {
+        vol.Required("type"): "wiener_linien_austria/plan",
+        vol.Required("origin"): vol.Coerce(int),
+        vol.Required("destination"): vol.Coerce(int),
+        vol.Optional("route_type", default=DEFAULT_ROUTE_TYPE): vol.In(ROUTE_TYPES),
+        vol.Optional("max_changes", default=MAX_CHANGES_ANY): vol.In(
+            MAX_CHANGES_CHOICES
+        ),
+        vol.Optional("walk_speed", default=DEFAULT_WALK_SPEED): vol.In(WALK_SPEEDS),
+        vol.Optional("excluded_means", default=list): [vol.In(list(EXCLUDABLE_MEANS))],
+        vol.Optional(
+            "min_transfer_minutes", default=DEFAULT_MIN_TRANSFER_MINUTES
+        ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_MIN_TRANSFER_MINUTES)),
+    }
+)
+@async_response
+async def _websocket_plan(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Plan connections between two stops, departing now."""
+    msg_id: int = msg["id"]
+    if not _is_loaded(hass):
+        _send_not_loaded(connection, msg_id)
+        return
+    catalogue = await _async_catalogue(hass, connection, msg_id)
+    if catalogue is None:
+        return
+
+    stations = []
+    for diva in (msg["origin"], msg["destination"]):
+        station = catalogue.stations_by_diva.get(diva)
+        # Same rule as the setup picker: only stops with platforms are
+        # offered, so only those are accepted.
+        if station is None or not station.rbls:
+            connection.send_error(
+                msg_id,
+                ERR_INVALID_STOP,
+                f"Unknown stop {diva}.",
+                translation_domain=DOMAIN,
+                translation_key="adhoc_invalid_stop",
+                translation_placeholders={"diva": str(diva)},
+            )
+            return
+        stations.append(station)
+    origin, destination = stations
+    if origin.diva == destination.diva:
+        connection.send_error(
+            msg_id,
+            ERR_SAME_STOP,
+            "Origin and destination are the same stop.",
+            translation_domain=DOMAIN,
+            translation_key="adhoc_same_stop",
+        )
+        return
+
+    options = RouteOptions(
+        origin_diva=origin.diva,
+        destination_diva=destination.diva,
+        route_type=msg["route_type"],
+        max_changes=msg["max_changes"],
+        walk_speed=msg["walk_speed"],
+        excluded_means=tuple(EXCLUDABLE_MEANS[name] for name in msg["excluded_means"]),
+        min_transfer_minutes=msg["min_transfer_minutes"],
+    )
+    try:
+        plan = await async_get_planner(hass).async_plan(options)
+    except AdhocRateLimited as err:
+        connection.send_error(
+            msg_id,
+            ERR_RATE_LIMITED,
+            f"Too many requests. Try again in {err.retry_after} s.",
+            translation_domain=DOMAIN,
+            translation_key="adhoc_rate_limited",
+            translation_placeholders={"retry_after": str(err.retry_after)},
+        )
+        return
+    except RoutingError as err:
+        connection.send_error(
+            msg_id,
+            ERR_UPSTREAM,
+            str(err),
+            translation_domain=DOMAIN,
+            translation_key=err.translation_key,
+            translation_placeholders=err.placeholders,
+        )
+        return
+
+    trips = plan.trips[:MAX_TRIPS_PUBLISHED]
+    labels = {
+        leg.line for trip in trips for leg in trip.legs if leg.line and not leg.walk
+    }
+    traffic, _elevator = get_alerts_for(hass, labels, set())
+    connection.send_result(
+        msg_id,
+        {
+            "origin": origin.name,
+            "destination": destination.name,
+            "fetched_at": plan.fetched_at.isoformat(),
+            "min_transfer_minutes": options.min_transfer_minutes,
+            "trips": [trip.to_dict() for trip in trips],
+            "line_colors": line_colors_for(hass, labels),
+            "traffic_info": [t.to_dict() for t in traffic],
+            "attribution": ATTRIBUTION,
+        },
+    )

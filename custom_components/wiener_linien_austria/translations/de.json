@@ -189,6 +189,21 @@
     },
     "route_entry_not_route": {
       "message": "{title} ist ein Abfahrtsmonitor, keine Verbindung. Einen Verbindungs-Eintrag wählen."
+    },
+    "adhoc_not_loaded": {
+      "message": "Wiener Linien Austria ist nicht geladen. Richte in der Integration eine Haltestelle oder Verbindung ein und versuche es erneut."
+    },
+    "adhoc_catalogue_unavailable": {
+      "message": "Die Haltestellenliste lässt sich gerade nicht laden. Versuche es in ein paar Minuten erneut."
+    },
+    "adhoc_invalid_stop": {
+      "message": "Haltestelle {diva} steht nicht in der Haltestellenliste. Wähle eine andere Haltestelle."
+    },
+    "adhoc_same_stop": {
+      "message": "Start und Ziel sind dieselbe Haltestelle. Wähle ein anderes Ziel."
+    },
+    "adhoc_rate_limited": {
+      "message": "Gerade zu viele Verbindungsabfragen. Versuche es in {retry_after} s erneut."
     }
   },
   "issues": {

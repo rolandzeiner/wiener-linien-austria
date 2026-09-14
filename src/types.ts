@@ -729,9 +729,27 @@ export interface RouteAttrs {
   [key: string]: unknown;
 }
 
+/** One picker option from `wiener_linien_austria/stops`. */
+export interface AdhocStopOption {
+  value: string;
+  label: string;
+}
+
+/** Rejection shape of `hass.callWS` for a command that answered an error. */
+export interface HassWsError {
+  code?: string;
+  message?: string;
+  translation_placeholders?: Record<string, string>;
+}
+
 export interface WienerLinienRouteCardConfig extends LovelaceCardConfig {
   type: string;
+  /** A configured route sensor. Unset switches the card to ad-hoc mode:
+   *  From / To pickers, planned on demand. */
   entity?: string | undefined;
+  /** Ad-hoc mode: stop DIVA preselected as origin / destination. */
+  from?: string | number | undefined;
+  to?: string | number | undefined;
   /** Overrides the "Origin → Destination" heading. */
   title?: string | undefined;
   /** How many further connections the disclosure lists. 0 hides it. */

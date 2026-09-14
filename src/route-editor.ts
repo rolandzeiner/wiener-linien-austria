@@ -1,6 +1,7 @@
 // Lovelace editor for the route card. Everything it configures fits ha-form,
 // so unlike the three departure-board editors there is no bespoke residue —
-// one schema, no tabs.
+// one schema, no tabs. Leaving the route empty switches the card to ad-hoc
+// mode, and the schema then offers default From / To stops instead.
 //
 // `_commit` assigns `this._config` BEFORE firing `config-changed` — see
 // editor/editor-common.ts for why that ordering is load-bearing.
@@ -11,6 +12,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { editorHelper, editorLabel } from "./editor/editor-common.js";
 import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
 import type {
+  AdhocStopOption,
   HaFormSchema,
   HomeAssistant,
   LovelaceCardEditor,
@@ -33,13 +35,22 @@ const ADD_ROUTE_HREF = "/_my_redirect/config_flow_start?domain=wiener_linien_aus
 /** `include_entities` rather than an integration filter: the integration
  *  filter also matches every departure-board sensor, and picking one of those
  *  gives a card with nothing to show. */
-function schema(routes: string[]): ReadonlyArray<HaFormSchema> {
+function schema(
+  routes: string[],
+  adhoc: boolean,
+  stopSelector: Record<string, unknown> | null,
+): ReadonlyArray<HaFormSchema> {
   return [
     {
       name: "entity",
-      required: true,
       selector: { entity: { include_entities: routes } },
     },
+    ...(adhoc && stopSelector
+      ? [
+          { name: "from", selector: stopSelector },
+          { name: "to", selector: stopSelector },
+        ]
+      : []),
     { name: "title", selector: { text: {} } },
     {
       name: "alternatives",
@@ -59,6 +70,12 @@ export class WienerLinienAustriaRouteCardEditor
   @property({ attribute: false }) public hass?: HomeAssistant;
 
   @state() private _config?: NormalisedRouteConfig;
+  /** The same stop list the card shows, so a default can't name a stop the
+   *  card would reject. Built once: a fresh selector object per render would
+   *  make ha-form re-process all ~1,800 options on every keystroke. */
+  @state() private _stopSelector: Record<string, unknown> | null = null;
+
+  private _stopsRequested = false;
 
   public setConfig(config: WienerLinienRouteCardConfig): void {
     this._config = normaliseRouteConfig(config);
@@ -79,10 +96,31 @@ export class WienerLinienAustriaRouteCardEditor
     const value = ev.detail.value;
     const next: Record<string, unknown> = { ...this._config, ...value };
     // Keep YAML tidy: drop fields that only restate a default.
+    if (!next.entity) delete next.entity;
+    // A route brings its own ends; stale ad-hoc defaults would only confuse.
+    if (next.entity || !next.from) delete next.from;
+    if (next.entity || !next.to) delete next.to;
     if (!next.title) delete next.title;
     if (next.hide_attribution !== true) delete next.hide_attribution;
     this._config = normaliseRouteConfig(next as WienerLinienRouteCardConfig);
     fireEvent(this, "config-changed", { config: next });
+  }
+
+  protected override updated(): void {
+    if (this._stopsRequested || !this._config || this._config.entity || !this.hass?.callWS) {
+      return;
+    }
+    this._stopsRequested = true;
+    this.hass
+      .callWS<{ stops: AdhocStopOption[] }>({ type: "wiener_linien_austria/stops" })
+      .then((result) => {
+        const stops = Array.isArray(result?.stops) ? result.stops : [];
+        this._stopSelector = { select: { mode: "dropdown", sort: false, options: stops } };
+      })
+      .catch((err: unknown) => {
+        // The defaults are optional; the card explains a missing stop list.
+        console.warn(`[${ROUTE_CARD_TYPE}-editor] stop list unavailable`, err);
+      });
   }
 
   protected override render(): TemplateResult | typeof nothing {
@@ -99,7 +137,7 @@ export class WienerLinienAustriaRouteCardEditor
       <ha-form
         .hass=${this.hass}
         .data=${this._config as unknown as Record<string, unknown>}
-        .schema=${schema(routes)}
+        .schema=${schema(routes, !this._config.entity, this._stopSelector)}
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}
         @value-changed=${this._onValueChanged}

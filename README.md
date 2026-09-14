@@ -17,7 +17,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
-- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live times where Wiener Linien has them and a buffer grade on every change. A second sensor turns on when a delay puts a connection at risk, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. See [Routes](#routes).
+- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live times where Wiener Linien has them and a buffer grade on every change. A second sensor turns on when a delay puts a connection at risk, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes).
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
 ## Screenshots
@@ -98,7 +98,7 @@ Four cards ship with the integration. All four register themselves as Lovelace r
 | **Modern** | Everyday dashboard, full feature set | Multi-stop | Themed HA card |
 | **Retro** | Wall-tablet kiosks, entryway displays | Single stop / direction | Wiener Linien LED platform sign |
 | **Flap** | Decorative boards, signage walls | Multi-stop | Solari split-flap mechanical board |
-| **Route** *(experimental)* | "When do I leave?" at a glance | One route | Themed HA card |
+| **Route** *(experimental)* | "When do I leave?" at a glance | One route, or any two stops | Themed HA card |
 
 ### Modern card — `wiener-linien-austria-card`
 
@@ -140,15 +140,19 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
 ### Route card — `wiener-linien-austria-route-card`
 
-*Experimental.* The next connection for one route, drawn the way the network map draws it.
+*Experimental.* The next connection for one route, or between any two stops you pick on the card, drawn the way the network map draws it.
 
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when live times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
 - **More connections** — up to three later options, folded away until you open them.
+- **Last updated** — the time the trip planner last answered, so a plan kept on screen can't pass for a fresh one.
+- **Any two stops** — leave the route empty and the card shows **From** and **To** pickers instead. Pick two stops, or swap them with one tap, and the connections appear. No route setup needed. The card remembers the last pick on each device, and the editor can preselect a start and destination.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
+
+**How the card plans between any two stops.** Requests go through Home Assistant, never from the browser to Wiener Linien. The card refreshes every 2 minutes while it's on screen and the browser tab is visible, and right after the best connection leaves. After 30 minutes without a tap or key press it pauses until someone touches it, so a wall tablet left open stops asking. Home Assistant answers identical requests from the same minute once, whichever dashboards ask, and allows at most 120 trip-planner requests an hour for all cards together.
 
 ## Sensor Attributes
 
@@ -215,6 +219,7 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
+| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card: every 120 s while visible, paused after 30 min idle; cached for 1 min and capped at 120 requests/h per Home Assistant |
 
 **The polling interval is per entry; the request is not.** Every entry configured
 with the same interval joins one group that issues a single `/monitor` request
@@ -237,6 +242,14 @@ Linien service, so route refreshes take their own 15 s cooldown slot and never
 delay a departure poll. A route also refreshes right after its best connection
 leaves, so the list moves on without a faster interval. Like departures, it
 backs off from the second failure in a row, capped at 30 min.
+
+Planning between any two stops on the card skips that cooldown slot, because
+someone is waiting for the answer. Three other limits keep it in check: an answer
+is reused for every identical request in the same minute, a request already
+under way is shared rather than repeated, and all cards together get at most
+120 trip-planner requests an hour. The stop pair is held in memory for that
+minute only, and the integration doesn't write it to diagnostics, the recorder
+or its log.
 
 Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
@@ -334,6 +347,10 @@ action:
 
 **A route shows "Outside the refresh window".** That's the window you set, not an error. Change it via **Reconfigure**.
 
+**The route card says "Too many requests right now".** All cards on this Home Assistant together have used their 120 trip-planner requests for the hour. The card tries again on its own once a request is free, usually within a minute.
+
+**The route card says "Updates paused".** Nobody has touched the card for 30 minutes. Tap it, or select **Refresh**, and it plans again.
+
 **"No stop matches that."** Try a shorter or partial name — `Karls` matches Karlsplatz, Karlskirche, and more. Search is case-insensitive, but umlauts matter.
 
 **Repairs issue "Wiener Linien rate limit hit".** Usually several HA instances behind one outbound IP sharing the OGD allowance. Raise the scan interval, or put your stops on the *same* interval so they share one request — adding stops at a cadence you already use costs nothing, while each distinct interval starts its own request stream. Or ignore it; the integration recovers on its own.
@@ -353,6 +370,7 @@ logger:
 ## Known Limitations
 
 - **Vienna only.** ÖBB, VOR, and regional services are out of scope.
+- **The card's last pick stays on that device.** It's saved in the browser, not in Home Assistant, so a phone and a wall tablet each remember their own. Two route cards without a route on the same device share that pick.
 - **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
 - **Live times on routes depend on the trip planner.** Where it has no live data for a leg, the timetable time is shown and the change is graded on that.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.

@@ -189,6 +189,21 @@
     },
     "route_entry_not_route": {
       "message": "{title} is a departure board, not a route. Pick a route entry."
+    },
+    "adhoc_not_loaded": {
+      "message": "Wiener Linien Austria isn't loaded. Add a stop or a route in the integration settings, then try again."
+    },
+    "adhoc_catalogue_unavailable": {
+      "message": "The stop list couldn't be loaded. Try again in a few minutes."
+    },
+    "adhoc_invalid_stop": {
+      "message": "Stop {diva} isn't in the stop list. Pick another stop."
+    },
+    "adhoc_same_stop": {
+      "message": "Origin and destination are the same stop. Pick a different destination."
+    },
+    "adhoc_rate_limited": {
+      "message": "Too many route requests right now. Try again in {retry_after} s."
     }
   },
   "issues": {

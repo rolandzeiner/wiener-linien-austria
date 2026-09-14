@@ -29,6 +29,8 @@ import { translate } from "./localize/localize.js";
 import "./route-editor.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
 import type {
+  AdhocStopOption,
+  HassWsError,
   HomeAssistant,
   LovelaceCardEditor,
   RouteAttrs,
@@ -42,15 +44,23 @@ import { chipPalette } from "./utils/config.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { safeDomId } from "./utils/html.js";
 import {
+  ADHOC_DEBOUNCE_MS,
+  ADHOC_IDLE_MS,
+  ADHOC_RETRY_MS,
+  adhocRefreshDelay,
+  adhocRetryDelay,
   clockOf,
   findRouteEntities,
   legTypeIcon,
+  loadAdhocSelection,
   minutesUntil,
   normaliseRouteConfig,
   RISK_ICON,
   ROUTE_CARD_TYPE,
+  saveAdhocSelection,
   transitLegs,
   upcomingTrips,
+  viennaClock,
   windowDays,
   windowRange,
   type NormalisedRouteConfig,
@@ -61,6 +71,44 @@ const ATTRIBUTION = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
 // minute stale while costing nothing measurable.
 const TICK_MS = 15_000;
 const MAX_NOTICES = 2;
+// How long to wait for HA's own picker to load before offering the native
+// fallback. The helpers path normally resolves in well under a second.
+const PICKER_LOAD_TIMEOUT_MS = 5_000;
+
+type AdhocPhase = "idle" | "loading" | "ready" | "error" | "paused";
+type Which = "from" | "to";
+
+interface CardHelpers {
+  createCardElement(config: Record<string, unknown>): Promise<HTMLElement> | HTMLElement;
+}
+
+/** Make sure `ha-selector` is defined before the pickers render.
+ *
+ *  A dashboard only defines it once some editor has been opened, so a viewer
+ *  who never edits would otherwise get an inert tag. The tile card's editor
+ *  imports `ha-form`, which imports `ha-selector` — verified in the frontend
+ *  shipped with HA 2025.6 and on current `dev`. Only the selector is used, never
+ *  what it renders inside: that changed from `ha-combo-box` to
+ *  `ha-generic-picker` between those two versions. */
+async function ensureHaSelector(): Promise<boolean> {
+  if (customElements.get("ha-selector")) return true;
+  try {
+    const load = (window as unknown as { loadCardHelpers?: () => Promise<CardHelpers> })
+      .loadCardHelpers;
+    if (load) {
+      const helpers = await load();
+      const card = await helpers.createCardElement({ type: "tile", entity: "sun.sun" });
+      const ctor = card.constructor as { getConfigElement?: () => Promise<unknown> };
+      await ctor.getConfigElement?.();
+    }
+  } catch (err) {
+    console.warn(`[${ROUTE_CARD_TYPE}] couldn't load the stop picker`, err);
+  }
+  return Promise.race([
+    customElements.whenDefined("ha-selector").then(() => true),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), PICKER_LOAD_TIMEOUT_MS)),
+  ]);
+}
 
 {
   const win = window as unknown as WindowWithCustomCards;
@@ -92,11 +140,54 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _now = Date.now();
   @state() private _alternativesOpen = false;
 
+  // --- Ad-hoc mode (no `entity`) ---------------------------------------
+  @state() private _stops: AdhocStopOption[] | null = null;
+  @state() private _stopsError: string | null = null;
+  @state() private _pickerReady = false;
+  @state() private _from = "";
+  @state() private _to = "";
+  @state() private _plan: RouteAttrs | null = null;
+  @state() private _phase: AdhocPhase = "idle";
+  @state() private _error: { code: string; retryAfter: number | null } | null = null;
+  @state() private _announcement = "";
+  @state() private _noMatch: Record<Which, boolean> = { from: false, to: false };
+
   private _tick: ReturnType<typeof setInterval> | null = null;
   private _versionCheckDone = false;
+  private _adhocStarted = false;
+  private _planKey = "";
+  private _planSeq = 0;
+  private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private _debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private _stopsRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private _stopsLoading = false;
+  private _pendingRefresh = false;
+  private _onScreen = true;
+  private _lastInteraction = Date.now();
+  private _observer: IntersectionObserver | null = null;
+  private _selector: Record<string, unknown> | null = null;
+  private _valueByLabel = new Map<string, string>();
+  private _labelByValue = new Map<string, string>();
 
   public setConfig(config: WienerLinienRouteCardConfig): void {
+    const previous = this._config;
     this._config = normaliseRouteConfig(config);
+    if (this._config.entity) {
+      this._stopAdhoc();
+      return;
+    }
+    // A changed default in the editor is the editor's intent: apply it now.
+    const cfg = this._config;
+    if (this._adhocStarted && previous && (previous.from !== cfg.from || previous.to !== cfg.to)) {
+      if (cfg.from) this._from = cfg.from;
+      if (cfg.to) this._to = cfg.to;
+      this._requestPlan(false);
+    }
+    this._startAdhoc();
+  }
+
+  private get _isAdhoc(): boolean {
+    return !!this._config && !this._config.entity;
   }
 
   public getCardSize(): number {
@@ -132,12 +223,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._versionCheckDone = true;
       void this._checkCardVersion();
     }
+    this._lastInteraction = Date.now();
+    document.addEventListener("visibilitychange", this._onVisibilityChange);
+    this._startAdhoc();
   }
 
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     if (this._tick !== null) clearInterval(this._tick);
     this._tick = null;
+    document.removeEventListener("visibilitychange", this._onVisibilityChange);
+    this._stopAdhoc();
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -145,14 +241,295 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._versionCheckDone = true;
       void this._checkCardVersion();
     }
+    if (changed.has("hass")) this._startAdhoc();
   }
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     if (!changed.has("hass") || changed.size > 1) return true;
     const prev = changed.get("hass") as HomeAssistant | undefined;
+    if (!prev) return true;
     const eid = this._config.entity;
-    return !prev || !eid || prev.states[eid] !== this.hass?.states[eid];
+    // Ad-hoc mode reads nothing from the state machine, and re-rendering two
+    // 1,800-option pickers on every state change anywhere in HA is not free.
+    if (!eid) return prev.language !== this.hass?.language;
+    return prev.states[eid] !== this.hass?.states[eid];
+  }
+
+  // ------------------------------------------------------------------
+  // Ad-hoc mode: lifecycle
+  // ------------------------------------------------------------------
+
+  private _startAdhoc(): void {
+    if (this._adhocStarted || !this._isAdhoc || !this.isConnected || !this.hass?.callWS) {
+      return;
+    }
+    this._adhocStarted = true;
+    const cfg = this._config!;
+    if (!this._from && !this._to) {
+      const saved = loadAdhocSelection();
+      this._from = saved?.from || cfg.from;
+      this._to = saved?.to || cfg.to;
+    }
+    void this._loadStops();
+    void ensureHaSelector().then((ready) => {
+      this._pickerReady = ready;
+    });
+    if (typeof IntersectionObserver !== "undefined") {
+      this._observer = new IntersectionObserver((entries) => {
+        this._onScreen = entries.some((entry) => entry.isIntersecting);
+        this._catchUp();
+      });
+      this._observer.observe(this);
+    }
+    if (this._from && this._to) {
+      // Reconnecting with a plan already on screen: refresh only if due.
+      if (this._plan && this._planKey === `${this._from}>${this._to}`) {
+        this._pendingRefresh = true;
+        this._catchUp();
+      } else {
+        void this._runPlan(false);
+      }
+    }
+  }
+
+  private _stopAdhoc(): void {
+    this._adhocStarted = false;
+    for (const timer of [this._refreshTimer, this._debounceTimer, this._stopsRetryTimer]) {
+      if (timer !== null) clearTimeout(timer);
+    }
+    this._refreshTimer = this._debounceTimer = this._stopsRetryTimer = null;
+    this._observer?.disconnect();
+    this._observer = null;
+  }
+
+  private _onVisibilityChange = (): void => {
+    this._catchUp();
+  };
+
+  /** Whether a refresh would be seen. Off screen or in a background tab it
+   *  would only spend the upstream's time. */
+  private _canRefresh(): boolean {
+    return this.isConnected && this._onScreen && document.visibilityState !== "hidden";
+  }
+
+  private _catchUp(): void {
+    if (this._pendingRefresh && this._canRefresh()) {
+      this._pendingRefresh = false;
+      this._refreshDue();
+    }
+  }
+
+  private _refreshDue(): void {
+    if (!this._canRefresh()) {
+      this._pendingRefresh = true;
+      return;
+    }
+    if (Date.now() - this._lastInteraction > ADHOC_IDLE_MS) {
+      this._phase = "paused";
+      return;
+    }
+    void this._runPlan(false);
+  }
+
+  private _schedule(delayMs: number): void {
+    if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
+    this._refreshTimer = null;
+    // An answer landing after the card was removed must not start a timer.
+    if (!this._adhocStarted) return;
+    this._refreshTimer = setTimeout(() => {
+      this._refreshTimer = null;
+      this._refreshDue();
+    }, delayMs);
+  }
+
+  private _requestPlan(userInitiated: boolean): void {
+    if (this._debounceTimer !== null) clearTimeout(this._debounceTimer);
+    this._debounceTimer = setTimeout(() => {
+      this._debounceTimer = null;
+      void this._runPlan(userInitiated);
+    }, ADHOC_DEBOUNCE_MS);
+  }
+
+  /** Any touch or key press inside the card counts as someone looking, and
+   *  resumes a paused card. */
+  private _onCardActivity = (): void => {
+    if (!this._isAdhoc) return;
+    this._lastInteraction = Date.now();
+    if (this._phase === "paused") void this._runPlan(true);
+  };
+
+  private async _loadStops(): Promise<void> {
+    if (this._stops || this._stopsLoading || !this.hass?.callWS) return;
+    this._stopsLoading = true;
+    try {
+      const result = await this.hass.callWS<{ stops: AdhocStopOption[] }>({
+        type: "wiener_linien_austria/stops",
+      });
+      const stops = Array.isArray(result?.stops) ? result.stops : [];
+      this._valueByLabel = new Map(stops.map((s) => [s.label, s.value]));
+      this._labelByValue = new Map(stops.map((s) => [s.value, s.label]));
+      // One object for the lifetime of the list: a fresh selector per render
+      // would make the picker re-process every option each time.
+      this._selector = { select: { mode: "dropdown", sort: false, options: stops } };
+      this._stops = stops;
+      this._stopsError = null;
+    } catch (err) {
+      const code = (err as HassWsError | undefined)?.code ?? "unknown";
+      this._stopsError = code;
+      if (code !== "not_loaded" && this._adhocStarted) {
+        this._stopsRetryTimer = setTimeout(() => {
+          this._stopsRetryTimer = null;
+          void this._loadStops();
+        }, ADHOC_RETRY_MS);
+      }
+    } finally {
+      this._stopsLoading = false;
+    }
+  }
+
+  private async _runPlan(userInitiated: boolean): Promise<void> {
+    if (this._refreshTimer !== null) clearTimeout(this._refreshTimer);
+    this._refreshTimer = null;
+    this._pendingRefresh = false;
+    const { _from: from, _to: to } = this;
+    const seq = ++this._planSeq;
+    if (!from || !to) {
+      this._plan = null;
+      this._planKey = "";
+      this._error = null;
+      this._phase = "idle";
+      return;
+    }
+    if (from === to) {
+      this._plan = null;
+      this._planKey = "";
+      this._error = { code: "same_stop", retryAfter: null };
+      this._phase = "error";
+      if (userInitiated) this._announce(this._adhocError("same_stop", null).title);
+      return;
+    }
+    if (!this.hass?.callWS) return;
+
+    const key = `${from}>${to}`;
+    if (this._planKey !== key) {
+      this._plan = null;
+      this._alternativesOpen = false;
+    }
+    if (!this._plan) this._phase = "loading";
+    try {
+      const plan = await this.hass.callWS<RouteAttrs>({
+        type: "wiener_linien_austria/plan",
+        origin: Number(from),
+        destination: Number(to),
+      });
+      if (seq !== this._planSeq) return;
+      this._plan = plan;
+      this._planKey = key;
+      this._error = null;
+      this._phase = "ready";
+      if (userInitiated) this._announce(this._planAnnouncement(plan));
+      this._schedule(adhocRefreshDelay(plan.trips ?? [], Date.now()));
+    } catch (err) {
+      if (seq !== this._planSeq) return;
+      const wsError = err as HassWsError | undefined;
+      const code = wsError?.code ?? "unknown";
+      const retryAfter = Number(wsError?.translation_placeholders?.["retry_after"]);
+      this._error = { code, retryAfter: Number.isFinite(retryAfter) ? retryAfter : null };
+      // A stale plan through an outage reads as "these still run"; show the
+      // problem instead, as the route sensor does when it goes unavailable.
+      this._plan = null;
+      this._planKey = "";
+      this._phase = "error";
+      if (userInitiated) this._announce(this._adhocError(code, this._error.retryAfter).title);
+      const delay = adhocRetryDelay(code, this._error.retryAfter);
+      if (delay !== null) this._schedule(delay);
+    }
+  }
+
+  private _onPick(which: Which, value: unknown): void {
+    const next = typeof value === "string" || typeof value === "number" ? String(value) : "";
+    if (which === "from") this._from = next;
+    else this._to = next;
+    this._noMatch = { ...this._noMatch, [which]: false };
+    saveAdhocSelection({ from: this._from, to: this._to });
+    this._lastInteraction = Date.now();
+    this._requestPlan(true);
+  }
+
+  private _swap = (): void => {
+    [this._from, this._to] = [this._to, this._from];
+    this._noMatch = { from: this._noMatch.to, to: this._noMatch.from };
+    saveAdhocSelection({ from: this._from, to: this._to });
+    this._lastInteraction = Date.now();
+    this._requestPlan(true);
+  };
+
+  /** Native fallback: the text has to match a suggestion exactly. */
+  private _onFallbackChange(which: Which, ev: Event): void {
+    const text = (ev.target as HTMLInputElement).value.trim();
+    if (!text) {
+      this._onPick(which, "");
+      return;
+    }
+    const value = this._valueByLabel.get(text);
+    if (value === undefined) {
+      this._noMatch = { ...this._noMatch, [which]: true };
+      return;
+    }
+    this._onPick(which, value);
+  }
+
+  /** Re-setting identical text wouldn't be announced, so nudge it. */
+  private _announce(text: string): void {
+    this._announcement = text === this._announcement ? `${text} ` : text;
+  }
+
+  private _planAnnouncement(plan: RouteAttrs): string {
+    const best = upcomingTrips(plan, Date.now())[0];
+    if (!best) return this._t("adhoc_no_trips");
+    const summary = this._tripSummary(best);
+    const minutes = minutesUntil(best.departure, Date.now());
+    return minutes === 0
+      ? this._t("adhoc_announce_now", { summary })
+      : this._t("adhoc_announce", { n: minutes ?? 0, summary });
+  }
+
+  private _adhocError(
+    code: string,
+    retryAfter: number | null,
+  ): { icon: string; title: string; detail?: string } {
+    const retry = this._t("adhoc_error_retry_detail", {
+      s: retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000),
+    });
+    switch (code) {
+      case "same_stop":
+        return {
+          icon: "mdi:map-marker-alert-outline",
+          title: this._t("adhoc_error_same_stop"),
+          detail: this._t("adhoc_error_same_stop_detail"),
+        };
+      case "rate_limited":
+        return { icon: "mdi:timer-sand", title: this._t("adhoc_error_rate_limited"), detail: retry };
+      case "not_loaded":
+        return {
+          icon: "mdi:power-plug-off-outline",
+          title: this._t("adhoc_error_not_loaded"),
+          detail: this._t("adhoc_error_not_loaded_detail"),
+        };
+      case "invalid_stop":
+        return {
+          icon: "mdi:map-marker-question-outline",
+          title: this._t("adhoc_error_invalid_stop"),
+          detail: this._t("adhoc_error_invalid_stop_detail"),
+        };
+      case "catalogue_unavailable":
+        return { icon: "mdi:cloud-off-outline", title: this._t("adhoc_error_catalogue"), detail: retry };
+      case "upstream":
+        return { icon: "mdi:cloud-off-outline", title: this._t("adhoc_error_upstream"), detail: retry };
+      default:
+        return { icon: "mdi:alert-circle-outline", title: this._t("adhoc_error_unknown"), detail: retry };
+    }
   }
 
   private async _checkCardVersion(): Promise<void> {
@@ -182,38 +559,179 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   protected override render(): TemplateResult | typeof nothing {
     const cfg = this._config;
     if (!cfg) return nothing;
+    const adhoc = !cfg.entity;
     const state = cfg.entity ? this.hass?.states[cfg.entity] : undefined;
-    const attrs = (state?.attributes ?? {}) as RouteAttrs;
+    const attrs = ((adhoc ? this._plan : state?.attributes) ?? {}) as RouteAttrs;
     const heading =
       cfg.title ||
-      (attrs.origin && attrs.destination
-        ? `${attrs.origin} → ${attrs.destination}`
-        : this._t("heading_fallback"));
+      (adhoc
+        ? this._t("adhoc_heading")
+        : attrs.origin && attrs.destination
+          ? `${attrs.origin} → ${attrs.destination}`
+          : this._t("heading_fallback"));
     const attribution = cfg.hide_attribution
       ? ""
       : (typeof attrs.attribution === "string" && attrs.attribution) || ATTRIBUTION;
 
     return html`
-      <ha-card>
+      <ha-card @pointerdown=${this._onCardActivity} @keydown=${this._onCardActivity}>
         <div class="wrap">
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
           <h2 class="heading">
             <ha-icon icon="mdi:map-marker-path" aria-hidden="true"></ha-icon>
             <span>${heading}</span>
           </h2>
-          ${this._renderBody(cfg, state?.state, attrs)}
+          ${adhoc
+            ? html`
+                ${this._renderPickers()}
+                <p class="sr-only" role="status" aria-live="polite">${this._announcement}</p>
+                <div class="results" aria-busy=${this._phase === "loading" ? "true" : "false"}>
+                  ${this._renderAdhocBody(cfg)}
+                </div>
+              `
+            : this._renderBody(cfg, state?.state, attrs)}
+          ${this._renderUpdated(attrs.fetched_at)}
           ${attribution ? html`<div class="attribution">${attribution}</div>` : nothing}
         </div>
       </ha-card>
     `;
   }
 
+  /** "Zuletzt aktualisiert 07:40": when the upstream last answered, so a
+   *  plan kept on screen through an outage can't pass for a fresh one. */
+  private _renderUpdated(fetchedAt: string | null | undefined): TemplateResult | typeof nothing {
+    const clock = viennaClock(fetchedAt);
+    if (!clock || !fetchedAt) return nothing;
+    return html`<p class="updated">
+      <time datetime=${fetchedAt}>${this._t("updated", { time: clock })}</time>
+    </p>`;
+  }
+
+  // ------------------------------------------------------------------
+  // Ad-hoc mode: render
+  // ------------------------------------------------------------------
+
+  private _renderPickers(): TemplateResult {
+    if (this._stops === null) {
+      if (this._stopsError) return html``;
+      return html`<p class="picker-status">${this._t("adhoc_stops_loading")}</p>`;
+    }
+    return html`
+      <fieldset class="pickers">
+        <legend class="sr-only">${this._t("adhoc_legend")}</legend>
+        ${this._renderPicker("from", this._t("adhoc_from"))}
+        <button
+          type="button"
+          class="swap"
+          aria-label=${this._t("adhoc_swap")}
+          title=${this._t("adhoc_swap")}
+          ?disabled=${!this._from && !this._to}
+          @click=${this._swap}
+        >
+          <ha-icon icon="mdi:swap-vertical" aria-hidden="true"></ha-icon>
+        </button>
+        ${this._renderPicker("to", this._t("adhoc_to"))}
+      </fieldset>
+      ${this._pickerReady
+        ? nothing
+        : html`<datalist id="wl-adhoc-stops">
+            ${this._stops.map((stop) => html`<option value=${stop.label}></option>`)}
+          </datalist>`}
+    `;
+  }
+
+  private _renderPicker(which: Which, label: string): TemplateResult {
+    const value = which === "from" ? this._from : this._to;
+    if (this._pickerReady) {
+      return html`<ha-selector
+        class=${`picker picker--${which}`}
+        .hass=${this.hass}
+        .selector=${this._selector}
+        .value=${value || undefined}
+        .label=${label}
+        .required=${false}
+        @value-changed=${(ev: CustomEvent<{ value?: unknown }>) => {
+          ev.stopPropagation();
+          this._onPick(which, ev.detail?.value);
+        }}
+      ></ha-selector>`;
+    }
+    const errorId = `wl-adhoc-${which}-error`;
+    const invalid = this._noMatch[which];
+    return html`
+      <label class=${`fallback picker--${which}`}>
+        <span class="fallback-label">${label}</span>
+        <input
+          type="text"
+          list="wl-adhoc-stops"
+          autocomplete="off"
+          .value=${this._labelByValue.get(value) ?? ""}
+          aria-invalid=${invalid ? "true" : "false"}
+          aria-describedby=${invalid ? errorId : nothing}
+          @change=${(ev: Event) => this._onFallbackChange(which, ev)}
+        />
+        ${invalid
+          ? html`<span class="field-error" id=${errorId}>${this._t("adhoc_no_match")}</span>`
+          : nothing}
+      </label>
+    `;
+  }
+
+  private _renderAdhocBody(cfg: NormalisedRouteConfig): TemplateResult {
+    // Live announcements go through the one status line above, so these
+    // empties stay silent (`live` false) instead of speaking twice.
+    if (this._stopsError) {
+      const { icon, title, detail } = this._adhocError(this._stopsError, null);
+      return this._empty(icon, title, detail, false);
+    }
+    if (this._stops === null) return html``;
+    if (!this._from || !this._to) {
+      return this._empty(
+        "mdi:map-search-outline",
+        this._t("adhoc_pick"),
+        this._t("adhoc_pick_detail"),
+        false,
+      );
+    }
+    if (this._phase === "error" && this._error) {
+      const { icon, title, detail } = this._adhocError(this._error.code, this._error.retryAfter);
+      return this._empty(icon, title, detail, false);
+    }
+    const paused =
+      this._phase === "paused"
+        ? html`<div class="paused">
+            <ha-icon icon="mdi:pause-circle-outline" aria-hidden="true"></ha-icon>
+            <span>${this._t("adhoc_paused")}</span>
+            <button type="button" @click=${this._onCardActivity}>${this._t("adhoc_resume")}</button>
+          </div>`
+        : nothing;
+    const plan = this._plan;
+    if (!plan) {
+      return this._phase === "paused"
+        ? html`${paused}`
+        : this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false);
+    }
+    const trips = upcomingTrips(plan, this._now);
+    if (!trips[0]) {
+      return html`${paused}${this._empty(
+        "mdi:timetable",
+        this._t("adhoc_no_trips"),
+        this._t("adhoc_no_trips_detail"),
+        false,
+      )}`;
+    }
+    return html`${paused}${this._renderTrips(trips, plan, cfg)}`;
+  }
+
+  // ------------------------------------------------------------------
+  // Route entity mode + shared trip rendering
+  // ------------------------------------------------------------------
+
   private _renderBody(
     cfg: NormalisedRouteConfig,
     stateValue: string | undefined,
     attrs: RouteAttrs,
   ): TemplateResult {
-    if (!cfg.entity) return this._empty("mdi:routes", this._t("no_entity"));
     if (stateValue === undefined) {
       return this._empty(
         "mdi:help-circle-outline",
@@ -244,14 +762,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       );
     }
     const trips = upcomingTrips(attrs, this._now);
-    const best = trips[0];
-    if (!best) {
+    if (!trips[0]) {
       return this._empty(
         "mdi:timetable",
         this._t("no_trips"),
         this._t("no_trips_detail"),
       );
     }
+    return this._renderTrips(trips, attrs, cfg);
+  }
+
+  /** The best connection expanded, then the alternatives. Both modes render
+   *  through here: an ad-hoc plan arrives in the route sensor's attribute
+   *  shape precisely so this stays one path. */
+  private _renderTrips(
+    trips: RouteTripAttr[],
+    attrs: RouteAttrs,
+    cfg: NormalisedRouteConfig,
+  ): TemplateResult {
+    const best = trips[0]!;
     const alternatives = trips.slice(1, 1 + cfg.alternatives);
     return html`
       ${this._renderHero(best)}
@@ -261,9 +790,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
-  private _empty(icon: string, title: string, detail?: string): TemplateResult {
+  private _empty(icon: string, title: string, detail?: string, live = true): TemplateResult {
     return html`
-      <div class="empty" role="status">
+      <div class="empty" role=${live ? "status" : nothing}>
         <ha-icon icon=${icon} aria-hidden="true"></ha-icon>
         <p class="empty-title">${title}</p>
         ${detail ? html`<p class="empty-detail">${detail}</p>` : nothing}
@@ -888,6 +1417,119 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.7rem;
       color: var(--secondary-text-color);
     }
+    .updated {
+      font-size: 0.75rem;
+      color: var(--secondary-text-color);
+    }
+
+    /* Ad-hoc pickers: From above To, the swap button beside both. DOM order
+       (From, swap, To) is the tab order, so the grid only places. */
+    .pickers {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      margin: 0;
+      padding: 0;
+      border: none;
+      min-inline-size: 0;
+    }
+    .pickers > .picker--from {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .pickers > .picker--to {
+      grid-column: 1;
+      grid-row: 2;
+    }
+    .pickers > ha-selector {
+      display: block;
+      min-width: 0;
+    }
+    .swap {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+      border-radius: 50%;
+      background: transparent;
+      color: var(--primary-text-color);
+      cursor: pointer;
+    }
+    .swap:disabled {
+      cursor: default;
+      color: var(--disabled-text-color, var(--secondary-text-color));
+    }
+    .fallback {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .fallback-label {
+      font-size: 0.85rem;
+      color: var(--secondary-text-color);
+    }
+    .fallback input {
+      min-height: 44px;
+      box-sizing: border-box;
+      width: 100%;
+      padding: 0 12px;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.5));
+      border-radius: var(--wl-radius-md);
+      background: var(--card-background-color, transparent);
+      color: var(--primary-text-color);
+      font: inherit;
+    }
+    .fallback input[aria-invalid="true"] {
+      border-color: var(--wl-error);
+    }
+    .field-error {
+      font-size: 0.8rem;
+      color: var(--primary-text-color);
+    }
+    .picker-status {
+      font-size: 0.85rem;
+      color: var(--secondary-text-color);
+    }
+    .results {
+      display: flex;
+      flex-direction: column;
+      gap: var(--wl-row-gap);
+    }
+    .paused {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: var(--wl-radius-md);
+      background: color-mix(in srgb, var(--secondary-text-color) 12%, transparent);
+      color: var(--primary-text-color);
+      font-size: 0.85rem;
+    }
+    .paused > span {
+      flex: 1;
+    }
+    .paused ha-icon {
+      --mdc-icon-size: 18px;
+    }
+    .paused > button {
+      min-height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--primary-text-color);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--primary-text-color);
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
 
     .banner {
       display: flex;
@@ -921,6 +1563,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     .alt-toggle:focus-visible,
+    .fallback input:focus-visible,
     button:focus-visible {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;

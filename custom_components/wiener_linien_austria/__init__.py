@@ -61,6 +61,7 @@ from .static import (
     async_refresh_catalogue,
     async_set_cached_catalogue,
 )
+from .websocket import STOPS_CACHE_KEY, async_setup_websocket
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
@@ -132,6 +133,7 @@ async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     async_register_command(hass, _websocket_retro_card_version)
     async_register_command(hass, _websocket_flap_card_version)
     async_register_command(hass, _websocket_route_card_version)
+    async_setup_websocket(hass)
     async_setup_services(hass)
 
     registration = JSModuleRegistration(hass)
@@ -434,6 +436,9 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         ROUTING_LOCK_KEY,
         ROUTING_LOCK_LOOP_KEY,
         CATALOGUE_KEY,
+        # Holds a reference to the catalogue it was built from. The ad-hoc
+        # planner stays: its request budget must survive remove + re-add.
+        STOPS_CACHE_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)

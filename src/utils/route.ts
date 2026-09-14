@@ -41,6 +41,9 @@ export function findRouteEntities(hass: HomeAssistant | undefined): string[] {
 export interface NormalisedRouteConfig {
   type: string;
   entity: string;
+  /** Ad-hoc defaults; "" when unset. Ignored while `entity` is set. */
+  from: string;
+  to: string;
   title: string;
   alternatives: number;
   hide_attribution: boolean;
@@ -60,6 +63,8 @@ export function normaliseRouteConfig(
   if (typeof config.entity === "string" && config.entity && !config.entity.startsWith("sensor.")) {
     throw new Error(`${ROUTE_CARD_TYPE}: 'entity' must be a sensor`);
   }
+  const from = stopIdOf(config.from, "from");
+  const to = stopIdOf(config.to, "to");
   const raw = Number(config.alternatives ?? DEFAULT_ALTERNATIVES);
   const alternatives = Number.isFinite(raw)
     ? Math.min(MAX_ALTERNATIVES, Math.max(0, Math.round(raw)))
@@ -67,10 +72,21 @@ export function normaliseRouteConfig(
   return {
     type: config.type,
     entity: config.entity ?? "",
+    from,
+    to,
     title: typeof config.title === "string" ? config.title : "",
     alternatives,
     hide_attribution: config.hide_attribution === true,
   };
+}
+
+function stopIdOf(value: unknown, field: string): string {
+  if (value === undefined || value === null || value === "") return "";
+  const text = String(value).trim();
+  if (!/^\d+$/.test(text)) {
+    throw new Error(`${ROUTE_CARD_TYPE}: '${field}' must be a stop number (DIVA)`);
+  }
+  return text;
 }
 
 /** Whole minutes until `iso`, never negative. Null when unparseable.
@@ -176,5 +192,94 @@ export function legTypeIcon(type: string | null | undefined, line: string | null
       return "mdi:ferry";
     default:
       return lineTypeIcon(type ?? undefined);
+  }
+}
+
+/** "07:40" in Vienna time for a UTC stamp such as `fetched_at`. `clockOf`
+ *  slices the ISO string, which is right for timetable stamps carrying their
+ *  Vienna offset but would print UTC for these. Empty when unparseable. */
+export function viennaClock(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return "";
+  return new Intl.DateTimeFormat("de-AT", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "Europe/Vienna",
+  }).format(ts);
+}
+
+// ---------------------------------------------------------------------------
+// Ad-hoc mode
+// ---------------------------------------------------------------------------
+
+/** Refresh cadence while the card is on screen. Matches the route entries'
+ *  poll floor (`MIN_ROUTE_POLL_SECONDS`): a connection plan changes on the
+ *  scale of minutes, and every open dashboard multiplies this. */
+export const ADHOC_REFRESH_MS = 120_000;
+/** Never refresh sooner than this after the best connection leaves
+ *  (`MIN_ROUTE_ROLLOVER_SECONDS`), so a departure in ten seconds can't turn
+ *  into a tight loop. */
+export const ADHOC_ROLLOVER_FLOOR_MS = 60_000;
+/** No interaction for this long pauses refreshing, so a wall tablet left open
+ *  stops asking the upstream after half an hour. */
+export const ADHOC_IDLE_MS = 30 * 60_000;
+/** Coalesces a swap and a pick made in quick succession into one request. */
+export const ADHOC_DEBOUNCE_MS = 400;
+/** Wait after an upstream failure that didn't say how long to wait. */
+export const ADHOC_RETRY_MS = 60_000;
+
+/** When to refresh next: shortly after the best connection departs, but
+ *  within [floor, cadence]. */
+export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number {
+  // Only a departure still ahead can roll the list over. Trips that already
+  // left would pin every refresh to the floor for no new information.
+  const next = trips
+    .filter((trip) => !trip.cancelled && trip.departure)
+    .map((trip) => Date.parse(trip.departure!))
+    .find((ts) => Number.isFinite(ts) && ts + 30_000 > nowMs);
+  if (next === undefined) return ADHOC_REFRESH_MS;
+  const untilRollover = next + 30_000 - nowMs;
+  return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
+}
+
+/** Error codes the backend answers that are worth retrying on their own,
+ *  and after how long. The rest need the user to change something. */
+export function adhocRetryDelay(code: string, retryAfterSeconds: number | null): number | null {
+  if (code === "rate_limited") {
+    return Math.max(1, retryAfterSeconds ?? ADHOC_RETRY_MS / 1000) * 1000;
+  }
+  if (code === "not_loaded" || code === "invalid_stop" || code === "same_stop") return null;
+  return ADHOC_RETRY_MS;
+}
+
+const ADHOC_STORAGE_KEY = "wiener-linien-austria-route-adhoc";
+
+export interface AdhocSelection {
+  from: string;
+  to: string;
+}
+
+/** The last pick on this device, or null. Stays in this browser: a stop pair
+ *  is a movement pattern and has no business in HA's storage. */
+export function loadAdhocSelection(): AdhocSelection | null {
+  try {
+    const raw = window.localStorage?.getItem(ADHOC_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AdhocSelection>;
+    const from = typeof parsed.from === "string" && /^\d*$/.test(parsed.from) ? parsed.from : "";
+    const to = typeof parsed.to === "string" && /^\d*$/.test(parsed.to) ? parsed.to : "";
+    return from || to ? { from, to } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAdhocSelection(selection: AdhocSelection): void {
+  try {
+    window.localStorage?.setItem(ADHOC_STORAGE_KEY, JSON.stringify(selection));
+  } catch {
+    // Private mode or blocked storage: the pick just isn't remembered.
   }
 }

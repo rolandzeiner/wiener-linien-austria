@@ -18,6 +18,7 @@ import routeCardSource from "./wiener-linien-austria-route-card.ts?raw";
 import "./wiener-linien-austria-route-card.js";
 import "./route-editor.js";
 
+import { ROUTE_CARD_VERSION } from "./const.js";
 import type { HomeAssistant, RouteTripAttr } from "./types.js";
 
 const TAG = "wiener-linien-austria-route-card";
@@ -73,6 +74,7 @@ const ACTIVE = {
   origin: "Westbahnhof",
   destination: "Praterstern",
   active: true,
+  fetched_at: "2026-09-14T05:48:00+00:00",
   trips: [trip("07:57", "08:11"), trip("08:00", "08:16", "ok"), trip("08:03", "08:19", "at_risk")],
   line_colors: { U3: { bg: "EF7C00", fg: "FFFFFF" } },
   traffic_info: [{ title: "U3: Verspätungen", related_lines: ["U3"] }],
@@ -93,8 +95,26 @@ const root = (el: HTMLElement): ShadowRoot => {
 };
 const text = (el: HTMLElement): string => (root(el).textContent ?? "").replace(/\s+/g, " ");
 
+/** happy-dom here leaves `window.localStorage` undefined, so hand the card an
+ *  in-memory one per test. The card itself treats a missing store as "don't
+ *  remember", which the first ad-hoc test exercises implicitly. */
+function memoryStorage(): Storage {
+  const data = new Map<string, string>();
+  return {
+    get length() {
+      return data.size;
+    },
+    clear: () => data.clear(),
+    getItem: (key: string) => data.get(key) ?? null,
+    key: (index: number) => [...data.keys()][index] ?? null,
+    removeItem: (key: string) => void data.delete(key),
+    setItem: (key: string, value: string) => void data.set(key, String(value)),
+  };
+}
+
 beforeEach(() => {
   document.body.innerHTML = "";
+  Object.defineProperty(window, "localStorage", { value: memoryStorage(), configurable: true });
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-09-14T07:50:00+02:00"));
 });
@@ -129,6 +149,8 @@ describe("registration + config", () => {
     const el = document.createElement(TAG) as CardElement;
     expect(() => el.setConfig(undefined as never)).toThrow();
     expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow();
+    expect(() => el.setConfig({ type: TAG, from: "Westbahnhof" })).toThrow(/stop number/);
+    expect(() => el.setConfig({ type: TAG, from: 60201468, to: "60201040" })).not.toThrow();
   });
 });
 
@@ -159,6 +181,18 @@ describe("rendering", () => {
 
     const risks = [...root(el).querySelectorAll(".risk")].map((r) => r.getAttribute("data-risk"));
     expect(risks).toContain("tight");
+  });
+
+  it("says when the connections were last updated, in Vienna time", async () => {
+    const el = await mount(hass("x", ACTIVE), { entity: ENTITY });
+    const updated = root(el).querySelector(".updated time");
+    expect(updated?.textContent).toContain("Zuletzt aktualisiert 07:48");
+    expect(updated?.getAttribute("datetime")).toBe(ACTIVE.fetched_at);
+
+    const never = await mount(hass("unknown", { ...ACTIVE, fetched_at: null, trips: [] }), {
+      entity: ENTITY,
+    });
+    expect(root(never).querySelector(".updated")).toBeNull();
   });
 
   it("toggles the alternatives with matching ARIA state", async () => {
@@ -201,7 +235,6 @@ describe("rendering", () => {
   });
 
   it.each([
-    [{ entity: "" }, undefined, "Keine Verbindung ausgewählt"],
     [{ entity: ENTITY }, { states: {} }, "existiert nicht mehr"],
     [{ entity: ENTITY }, hass("unavailable", {}), "Routenplaner nicht erreichbar"],
     [
@@ -239,6 +272,242 @@ describe("rendering", () => {
     const clear = vi.spyOn(globalThis, "clearInterval");
     el.remove();
     expect(clear).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ad-hoc mode
+// ---------------------------------------------------------------------------
+
+const WESTBAHNHOF = "60201468";
+const PRATERSTERN = "60201040";
+const STOPS = [
+  { value: WESTBAHNHOF, label: "Westbahnhof (Wien) — 450 m" },
+  { value: PRATERSTERN, label: "Praterstern (Wien)" },
+];
+const PLAN = { ...ACTIVE, fetched_at: "2026-09-14T05:49:00+00:00" };
+
+type WsMessage = { type: string; origin?: number; destination?: number };
+
+function adhocHass(plan: (msg: WsMessage) => Promise<unknown> = async () => PLAN) {
+  const callWS = vi.fn(async (msg: WsMessage) => {
+    if (msg.type === "wiener_linien_austria/stops") return { stops: STOPS };
+    if (msg.type === "wiener_linien_austria/plan") return plan(msg);
+    return { version: ROUTE_CARD_VERSION };
+  });
+  const h = { language: "de", states: {}, localize: (k: string) => k, callWS } as unknown as HomeAssistant;
+  return { h, callWS };
+}
+
+const planCalls = (callWS: ReturnType<typeof vi.fn>): WsMessage[] =>
+  callWS.mock.calls.map((c) => c[0] as WsMessage).filter((m) => m.type === "wiener_linien_austria/plan");
+
+async function settle(el: CardElement, ms = 0): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms);
+  await el.updateComplete;
+}
+
+function remember(from: string, to: string): void {
+  window.localStorage.setItem("wiener-linien-austria-route-adhoc", JSON.stringify({ from, to }));
+}
+
+describe("ad-hoc mode", () => {
+  it("asks for both stops and offers the native fallback while HA's picker loads", async () => {
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Verbindung suchen");
+    expect(text(el)).toContain("Wähle Start und Ziel");
+    const inputs = root(el).querySelectorAll<HTMLInputElement>(".fallback input");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0]?.getAttribute("list")).toBe("wl-adhoc-stops");
+    expect(root(el).querySelectorAll("#wl-adhoc-stops option")).toHaveLength(2);
+    expect(root(el).querySelector("legend")?.textContent).toContain("Start und Ziel");
+    expect(root(el).querySelector('.swap[aria-label="Start und Ziel tauschen"]')).not.toBeNull();
+    expect(planCalls(callWS)).toHaveLength(0);
+    // Nothing chosen, nothing fetched, nothing to date.
+    expect(root(el).querySelector(".updated")).toBeNull();
+  });
+
+  it("restores the last pick on this device and plans it", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, { from: PRATERSTERN, to: WESTBAHNHOF });
+    await settle(el);
+    expect(planCalls(callWS)).toEqual([
+      { type: "wiener_linien_austria/plan", origin: 60201468, destination: 60201040 },
+    ]);
+    expect(text(el)).toContain("Abfahrt in");
+    expect(text(el)).toContain("Umstieg Stephansplatz");
+    expect(text(el)).toContain("Zuletzt aktualisiert 07:49");
+    // A plan that wasn't asked for right now isn't announced.
+    expect(root(el).querySelector('p[role="status"]')?.textContent).toBe("");
+    const inputs = root(el).querySelectorAll<HTMLInputElement>(".fallback input");
+    expect(inputs[0]?.value).toBe("Westbahnhof (Wien) — 450 m");
+  });
+
+  it("falls back to the card's defaults without a remembered pick", async () => {
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, { from: WESTBAHNHOF, to: PRATERSTERN });
+    await settle(el);
+    expect(planCalls(callWS)[0]?.origin).toBe(60201468);
+  });
+
+  it("plans a pick after the debounce, remembers it and announces the answer", async () => {
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const [from, to] = root(el).querySelectorAll<HTMLInputElement>(".fallback input");
+    from!.value = "Westbahnhof (Wien) — 450 m";
+    from!.dispatchEvent(new Event("change"));
+    to!.value = "Praterstern (Wien)";
+    to!.dispatchEvent(new Event("change"));
+    await settle(el, 399);
+    expect(planCalls(callWS)).toHaveLength(0);
+    await settle(el, 1);
+    expect(planCalls(callWS)).toHaveLength(1);
+    await settle(el);
+    expect(root(el).querySelector('p[role="status"]')?.textContent).toContain(
+      "Abfahrt in 6 Minuten. 07:57 bis 08:11, 1 Umstieg",
+    );
+    expect(JSON.parse(window.localStorage.getItem("wiener-linien-austria-route-adhoc")!)).toEqual({
+      from: WESTBAHNHOF,
+      to: PRATERSTERN,
+    });
+  });
+
+  it("flags text that matches no stop instead of planning it", async () => {
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const from = root(el).querySelector<HTMLInputElement>(".fallback input")!;
+    from.value = "Westbhf";
+    from.dispatchEvent(new Event("change"));
+    await settle(el, 500);
+    const input = root(el).querySelector<HTMLInputElement>(".fallback input")!;
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    const errorId = input.getAttribute("aria-describedby");
+    expect(root(el).getElementById(errorId!)?.textContent).toContain("Keine passende Haltestelle");
+    expect(planCalls(callWS)).toHaveLength(0);
+  });
+
+  it("swaps the two stops and plans the reverse", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    root(el).querySelector<HTMLButtonElement>(".swap")!.click();
+    await settle(el, 400);
+    expect(planCalls(callWS).at(-1)).toMatchObject({ origin: 60201040, destination: 60201468 });
+  });
+
+  it("explains the same stop twice without asking the backend", async () => {
+    remember(WESTBAHNHOF, WESTBAHNHOF);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Start und Ziel sind dieselbe Haltestelle");
+    expect(planCalls(callWS)).toHaveLength(0);
+  });
+
+  it("refreshes on its cadence only while visible", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(1);
+    await settle(el, 120_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    await settle(el, 600_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+    visibility.mockReturnValue("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(3);
+    visibility.mockRestore();
+  });
+
+  it("pauses after half an hour without interaction and resumes on request", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    await settle(el, 32 * 60_000);
+    const before = planCalls(callWS).length;
+    // One initial plan plus one per 120 s until the half hour is up.
+    expect(before).toBeLessThanOrEqual(17);
+    expect(text(el)).toContain("Aktualisierung pausiert");
+    await settle(el, 60 * 60_000);
+    expect(planCalls(callWS)).toHaveLength(before);
+
+    root(el).querySelector<HTMLButtonElement>(".paused button")!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(before + 1);
+    expect(text(el)).not.toContain("Aktualisierung pausiert");
+  });
+
+  it("waits out a rate limit for as long as the backend says", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    let limited = true;
+    const { h, callWS } = adhocHass(async () => {
+      if (limited) {
+        throw { code: "rate_limited", translation_placeholders: { retry_after: "30" } };
+      }
+      return PLAN;
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Gerade zu viele Abfragen");
+    expect(text(el)).toContain("Neuer Versuch in 30 s");
+    limited = false;
+    await settle(el, 30_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+    expect(text(el)).toContain("Abfahrt in");
+  });
+
+  it("drops the plan when the trip planner fails, and doesn't retry what can't succeed", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => {
+      throw { code: "not_loaded" };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    expect(text(el)).toContain("Wiener Linien Austria ist nicht geladen");
+    await settle(el, 600_000);
+    expect(planCalls(callWS)).toHaveLength(1);
+  });
+
+  it("stops every timer once removed", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    el.remove();
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(planCalls(callWS)).toHaveLength(1);
+  });
+
+  it("uses HA's own picker once it is defined", async () => {
+    if (!customElements.get("ha-selector")) {
+      customElements.define("ha-selector", class extends HTMLElement {});
+    }
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    const pickers = root(el).querySelectorAll("ha-selector");
+    expect(pickers).toHaveLength(2);
+    expect(root(el).querySelector(".fallback")).toBeNull();
+    const selector = (pickers[0] as unknown as { selector: { select: { options: unknown[] } } })
+      .selector;
+    expect(selector.select.options).toEqual(STOPS);
+    expect((pickers[0] as unknown as { label: string }).label).toBe("Von");
+
+    pickers[0]!.dispatchEvent(new CustomEvent("value-changed", { detail: { value: WESTBAHNHOF } }));
+    pickers[1]!.dispatchEvent(new CustomEvent("value-changed", { detail: { value: PRATERSTERN } }));
+    await settle(el, 400);
+    expect(planCalls(callWS)).toHaveLength(1);
   });
 });
 
@@ -311,6 +580,38 @@ describe("editor", () => {
     expect(alert?.querySelector("a")?.getAttribute("href")).toContain(
       "config_flow_start?domain=wiener_linien_austria",
     );
+  });
+
+  it("offers default stops when no route is picked, and drops them for a route", async () => {
+    const el = document.createElement(`${TAG}-editor`) as CardElement;
+    document.body.appendChild(el);
+    el.hass = adhocHass().h;
+    el.setConfig({ type: `custom:${TAG}` });
+    await el.updateComplete;
+    await vi.advanceTimersByTimeAsync(0);
+    await el.updateComplete;
+    const form = root(el).querySelector("ha-form") as unknown as {
+      schema: Array<{ name: string; required?: boolean }>;
+    };
+    expect(form.schema.map((f) => f.name)).toEqual([
+      "entity", "from", "to", "title", "alternatives", "hide_attribution",
+    ]);
+    expect(form.schema[0]?.required).toBeUndefined();
+
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+    const formEl = root(el).querySelector("ha-form")!;
+    formEl.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { from: WESTBAHNHOF, to: "" } } }),
+    );
+    expect(config).toEqual({ type: `custom:${TAG}`, from: WESTBAHNHOF, alternatives: 2 });
+
+    formEl.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { entity: ENTITY, from: WESTBAHNHOF } } }),
+    );
+    expect(config).toEqual({ type: `custom:${TAG}`, entity: ENTITY, alternatives: 2 });
   });
 
   it("renders nothing before it has a config", async () => {

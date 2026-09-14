@@ -190,21 +190,9 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         that have already left in real time are dropped either way; for a
         query about later today or tomorrow that removes nothing.
         """
-        local = when.astimezone(self._tz)
-        body = await async_fetch_trip_body(
-            async_get_clientsession(self.hass),
-            build_trip_params(
-                self.options,
-                local,
-                arrive_by=arrive_by,
-                language=self.hass.config.language,
-            ),
-            USER_AGENT,
+        return await async_plan_trips(
+            self.hass, self.options, when, self._tz, arrive_by=arrive_by
         )
-        trips = parse_trip_body(
-            body, self._tz, min_transfer_minutes=self.options.min_transfer_minutes
-        )
-        return rank_trips(trips, dt_util.utcnow())
 
     def _note_success(self, trips: list[Trip]) -> None:
         """Reset backoff and pull the next refresh up to the next departure.
@@ -239,6 +227,34 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 seconds,
             )
         self.update_interval = timedelta(seconds=seconds)
+
+
+async def async_plan_trips(
+    hass: HomeAssistant,
+    options: RouteOptions,
+    when: datetime,
+    tz: tzinfo,
+    *,
+    arrive_by: bool = False,
+) -> list[Trip]:
+    """Fetch, parse and rank one trip request. No cooldown, no state.
+
+    The one planning path shared by route entries, the `plan_trip` action
+    and the route card's ad-hoc mode (adhoc.py), so all three see the same
+    connections for the same query.
+    """
+    body = await async_fetch_trip_body(
+        async_get_clientsession(hass),
+        build_trip_params(
+            options,
+            when.astimezone(tz),
+            arrive_by=arrive_by,
+            language=hass.config.language,
+        ),
+        USER_AGENT,
+    )
+    trips = parse_trip_body(body, tz, min_transfer_minutes=options.min_transfer_minutes)
+    return rank_trips(trips, dt_util.utcnow())
 
 
 def route_device_info(entry: ConfigEntry) -> DeviceInfo:

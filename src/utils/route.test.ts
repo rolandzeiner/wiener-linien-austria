@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { HomeAssistant, RouteTripAttr } from "../types.js";
 import {
+  ADHOC_REFRESH_MS,
+  ADHOC_ROLLOVER_FLOOR_MS,
+  adhocRefreshDelay,
+  adhocRetryDelay,
   clockOf,
   findRouteEntities,
   legTypeIcon,
@@ -9,6 +13,7 @@ import {
   normaliseRouteConfig,
   transitLegs,
   upcomingTrips,
+  viennaClock,
   windowDays,
   windowRange,
 } from "./route.js";
@@ -57,6 +62,8 @@ describe("normaliseRouteConfig", () => {
     expect(cfg).toEqual({
       type: "x",
       entity: "",
+      from: "",
+      to: "",
       title: "",
       alternatives: 3,
       hide_attribution: false,
@@ -69,6 +76,12 @@ describe("normaliseRouteConfig", () => {
     expect(() => normaliseRouteConfig(null as never)).toThrow(/object/);
     expect(() => normaliseRouteConfig({ type: "x", entity: 3 as never })).toThrow(/string/);
     expect(() => normaliseRouteConfig({ type: "x", entity: "light.a" })).toThrow(/sensor/);
+    expect(() => normaliseRouteConfig({ type: "x", to: "Praterstern" })).toThrow(/stop number/);
+  });
+
+  it("keeps ad-hoc defaults as digit strings", () => {
+    const cfg = normaliseRouteConfig({ type: "x", from: 60201468, to: " 60201040 " });
+    expect([cfg.from, cfg.to]).toEqual(["60201468", "60201040"]);
   });
 });
 
@@ -146,5 +159,40 @@ describe("legTypeIcon", () => {
     expect(legTypeIcon("ptShip", null)).toBe("mdi:ferry");
     expect(legTypeIcon("ptMetro", "U1")).toBe("mdi:subway-variant");
     expect(legTypeIcon("ptSomethingNew", "X1")).toBeNull();
+  });
+});
+
+describe("ad-hoc timing", () => {
+  const departing = (iso: string): RouteTripAttr =>
+    ({ departure: iso, cancelled: false }) as unknown as RouteTripAttr;
+
+  it("refreshes after the next departure, within floor and cadence", () => {
+    // Leaves in 7 min: the cadence comes first.
+    expect(adhocRefreshDelay([departing("2026-09-14T07:57:00+02:00")], NOW)).toBe(ADHOC_REFRESH_MS);
+    // Leaves in 60 s: refresh 30 s after it has gone.
+    expect(adhocRefreshDelay([departing("2026-09-14T07:51:00+02:00")], NOW)).toBe(90_000);
+    // Leaves now: never sooner than the floor.
+    expect(adhocRefreshDelay([departing("2026-09-14T07:50:10+02:00")], NOW)).toBe(
+      ADHOC_ROLLOVER_FLOOR_MS,
+    );
+    // Only trips that already left: nothing to roll over to.
+    expect(adhocRefreshDelay([departing("2026-09-14T07:40:00+02:00")], NOW)).toBe(ADHOC_REFRESH_MS);
+    expect(adhocRefreshDelay([], NOW)).toBe(ADHOC_REFRESH_MS);
+  });
+
+  it("retries only what can succeed on its own", () => {
+    expect(adhocRetryDelay("rate_limited", 30)).toBe(30_000);
+    expect(adhocRetryDelay("rate_limited", null)).toBe(60_000);
+    expect(adhocRetryDelay("upstream", null)).toBe(60_000);
+    expect(adhocRetryDelay("not_loaded", null)).toBeNull();
+    expect(adhocRetryDelay("invalid_stop", null)).toBeNull();
+    expect(adhocRetryDelay("same_stop", null)).toBeNull();
+  });
+
+  it("prints fetched_at in Vienna time, whatever zone the stamp carries", () => {
+    expect(viennaClock("2026-09-14T05:48:00+00:00")).toBe("07:48");
+    expect(viennaClock("2026-01-14T05:48:00+00:00")).toBe("06:48");
+    expect(viennaClock("nonsense")).toBe("");
+    expect(viennaClock(null)).toBe("");
   });
 });
