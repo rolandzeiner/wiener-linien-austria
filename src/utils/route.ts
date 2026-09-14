@@ -127,14 +127,18 @@ export function clockOf(iso: string | null | undefined): string {
 }
 
 /** The connections still ahead, soonest first. The sensor already ranks
- *  them; this only drops the ones that have left since its last refresh. */
+ *  them; this only drops the ones that have left since its last refresh.
+ *  A plan for a chosen time (`planned_for`) keeps them all: that is what
+ *  was asked for, whatever the clock says now. */
 export function upcomingTrips(
   attrs: RouteAttrs | undefined,
   nowMs: number,
 ): RouteTripAttr[] {
   const trips = Array.isArray(attrs?.trips) ? attrs.trips : [];
+  const planned = !!attrs?.planned_for;
   return trips.filter((trip) => {
     if (trip.cancelled) return false;
+    if (planned) return true;
     const ts = trip.departure ? Date.parse(trip.departure) : Number.NaN;
     return !Number.isFinite(ts) || ts >= nowMs - 30_000;
   });
@@ -229,9 +233,65 @@ export function viennaClock(iso: string | null | undefined): string {
   }).format(ts);
 }
 
+const VIENNA_PARTS = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Europe/Vienna",
+});
+
+/** `{year, month, day, hour, minute}` of an instant on a Vienna wall clock. */
+function viennaParts(ms: number): Record<string, string> {
+  const parts: Record<string, string> = {};
+  for (const part of VIENNA_PARTS.formatToParts(ms)) parts[part.type] = part.value;
+  return parts;
+}
+
+/** A `datetime-local` value ("2026-09-15T07:35") for `nowMs` on the Vienna
+ *  clock, rounded up to the next five minutes: the time field's starting
+ *  point when someone switches away from "now". */
+export function viennaInputValue(nowMs: number): string {
+  const step = 5 * 60_000;
+  const p = viennaParts(Math.ceil(nowMs / step) * step);
+  return `${p["year"]}-${p["month"]}-${p["day"]}T${p["hour"]}:${p["minute"]}`;
+}
+
+/** A well-formed `datetime-local` value, as the plan command accepts it. */
+export function isInputDateTime(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value);
+}
+
+/** Calendar days from today to the day of `iso`, both on the Vienna clock:
+ *  0 today, 1 tomorrow, -1 yesterday. Null when unparseable. */
+export function viennaDayOffset(iso: string | null | undefined, nowMs: number): number | null {
+  const ts = iso ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(ts)) return null;
+  const day = (ms: number): number => {
+    const p = viennaParts(ms);
+    return Date.UTC(Number(p["year"]), Number(p["month"]) - 1, Number(p["day"]));
+  };
+  return Math.round((day(ts) - day(nowMs)) / 86_400_000);
+}
+
+/** "Tue, 15/09" / "Di., 15.09." for a Vienna calendar day. */
+export function viennaShortDate(iso: string, lang: string): string {
+  return new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "de-AT", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Europe/Vienna",
+  }).format(Date.parse(iso));
+}
+
 // ---------------------------------------------------------------------------
 // Ad-hoc mode
 // ---------------------------------------------------------------------------
+
+/** When a plan is for: now, departing at a time, or arriving by it. */
+export type AdhocTimeMode = "now" | "depart" | "arrive";
 
 /** Refresh cadence while the card is on screen. Matches the route entries'
  *  poll floor (`MIN_ROUTE_POLL_SECONDS`): a connection plan changes on the
@@ -263,10 +323,17 @@ export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number
   return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
 }
 
+/** Refresh cadence for a plan at a chosen time. Its connections don't roll
+ *  over as the clock runs, so the usual two minutes would only spend budget;
+ *  this still picks up a timetable change or a disruption within minutes. */
+export const ADHOC_PLANNED_REFRESH_MS = 10 * 60_000;
+
 /** When to refresh after a plan arrived. A stale plan means the request
  *  budget is spent, so asking before `retry_after` would only get it again. */
 export function adhocPlanRefreshDelay(plan: RouteAttrs, nowMs: number): number {
-  const base = adhocRefreshDelay(plan.trips ?? [], nowMs);
+  const base = plan.planned_for
+    ? ADHOC_PLANNED_REFRESH_MS
+    : adhocRefreshDelay(plan.trips ?? [], nowMs);
   const retryAfter = plan.stale ? Number(plan.retry_after) : NaN;
   return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.max(base, retryAfter * 1000) : base;
 }

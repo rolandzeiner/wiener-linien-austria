@@ -730,6 +730,10 @@ export interface RouteAttrs {
   stale?: boolean;
   /** Ad-hoc only, with `stale`: seconds until a fresh plan can be had. */
   retry_after?: number | null;
+  /** Ad-hoc only: the chosen time the plan is for; null for "now". */
+  planned_for?: string | null;
+  /** Ad-hoc only, with `planned_for`: arriving by that time, not leaving. */
+  arrive_by?: boolean;
   [key: string]: unknown;
 }
 

@@ -464,6 +464,14 @@ async def test_a_cancelled_waiter_does_not_cancel_the_shared_request(
             },
             "invalid_format",
         ),
+        (
+            {
+                "origin": STEPHANSPLATZ,
+                "destination": SCHWARZENBERGPLATZ,
+                "datetime": "tomorrow morning",
+            },
+            "invalid_format",
+        ),
     ],
 )
 async def test_plan_rejects_bad_input(
@@ -560,3 +568,62 @@ async def test_last_unload_drops_the_stop_list(
     await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
     assert STOPS_CACHE_KEY not in hass.data[DOMAIN]
+
+
+async def test_plan_at_a_chosen_time(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+) -> None:
+    client = await _connect(hass, hass_ws_client, freezer)
+    before = fetch.await_count
+    ends = {"origin": STEPHANSPLATZ, "destination": SCHWARZENBERGPLATZ}
+
+    # No offset: Vienna wall clock, whatever zone HA itself is in.
+    response = await _plan(client, **ends, datetime="2026-09-15T07:30")
+    assert response["success"], response
+    result = response["result"]
+    assert result["planned_for"] == "2026-09-15T07:30:00+02:00"
+    assert result["arrive_by"] is False
+    params = dict(fetch.call_args.args[1])
+    assert (params["itdDate"], params["itdTime"]) == ("20260915", "0730")
+    assert params["itdTripDateTimeDepArr"] == "dep"
+
+    # The same minute is a cache hit; arriving by it is a different query.
+    assert (await _plan(client, **ends, datetime="2026-09-15T07:30:00"))["success"]
+    assert fetch.await_count == before + 1
+    response = await _plan(client, **ends, datetime="2026-09-15T07:30", arrive_by=True)
+    assert response["result"]["arrive_by"] is True
+    assert dict(fetch.call_args.args[1])["itdTripDateTimeDepArr"] == "arr"
+    assert fetch.await_count == before + 2
+
+    # An explicit offset is honoured, not reread as Vienna time.
+    await _plan(client, **ends, datetime="2026-09-15T05:45:00+00:00")
+    assert dict(fetch.call_args.args[1])["itdTime"] == "0745"
+
+    # "Now" plans don't carry a time.
+    response = await _plan(client, **ends)
+    assert response["result"]["planned_for"] is None
+
+
+async def test_a_plan_for_a_chosen_time_keeps_connections_that_left(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+) -> None:
+    client = await _connect(hass, hass_ws_client, freezer)
+    ends = {"origin": STEPHANSPLATZ, "destination": SCHWARZENBERGPLATZ}
+    # Two hours after every connection in the captured answer has left.
+    freezer.tick(timedelta(hours=2))
+    now = await _plan(client, **ends)
+    assert now["result"]["trips"] == []
+
+    planned = await _plan(client, **ends, datetime="2026-09-14T07:50")
+    assert len(planned["result"]["trips"]) == 4
+
+    # Served again from the cache, still whole.
+    freezer.tick(30)
+    again = await _plan(client, **ends, datetime="2026-09-14T07:50")
+    assert again["result"]["trips"] == planned["result"]["trips"]

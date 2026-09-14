@@ -685,10 +685,13 @@ def assess_transfers(
     return transfers
 
 
-def rank_trips(trips: Iterable[Trip], now: datetime) -> list[Trip]:
+def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
     """Keep the useful connections, soonest first.
 
-    1. Drop connections that have already left and cancelled ones.
+    1. Drop cancelled connections, and those that have already left `now`.
+       A query for a chosen time passes `now=None`: someone planning
+       tomorrow's trip, or checking what they could have caught, wants
+       every connection the server found for that time.
     2. Drop dominated ones: B is dominated when some A departs no earlier,
        arrives no later, changes no more often and is no riskier — and is
        strictly better on at least one of those. Departure counts in the
@@ -702,7 +705,7 @@ def rank_trips(trips: Iterable[Trip], now: datetime) -> list[Trip]:
         if not trip.cancelled
         and trip.departure is not None
         and trip.arrival is not None
-        and trip.departure >= now - timedelta(minutes=1)
+        and (now is None or trip.departure >= now - timedelta(minutes=1))
     ]
 
     def criteria(trip: Trip) -> tuple[float, float, int, int]:

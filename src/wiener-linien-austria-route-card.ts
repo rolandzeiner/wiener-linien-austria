@@ -58,8 +58,10 @@ import {
   adhocPlanRefreshDelay,
   adhocErrorSpec,
   adhocRetryDelay,
+  type AdhocTimeMode,
   clockOf,
   findRouteEntities,
+  isInputDateTime,
   legTypeIcon,
   loadAdhocSelection,
   minutesUntil,
@@ -70,6 +72,9 @@ import {
   transitLegs,
   upcomingTrips,
   viennaClock,
+  viennaDayOffset,
+  viennaInputValue,
+  viennaShortDate,
   windowDays,
   windowRange,
   type NormalisedRouteConfig,
@@ -102,6 +107,8 @@ function adhocErrorOf(err: unknown): AdhocError {
   };
 }
 type Which = "from" | "to";
+
+const TIME_MODES: readonly AdhocTimeMode[] = ["now", "depart", "arrive"];
 
 
 {
@@ -139,6 +146,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _stopsError: AdhocError | null = null;
   @state() private _from = "";
   @state() private _to = "";
+  /** "Now", or a Vienna wall-clock `datetime-local` value to depart at or
+   *  arrive by. Not remembered across reloads: yesterday's "depart at 07:30"
+   *  coming back would read as today's plan. */
+  @state() private _timeMode: AdhocTimeMode = "now";
+  @state() private _when = "";
   @state() private _plan: RouteAttrs | null = null;
   @state() private _phase: AdhocPhase = "idle";
   @state() private _error: AdhocError | null = null;
@@ -277,7 +289,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     if (this._from && this._to) {
       // Reconnecting with a plan already on screen: refresh only once due.
-      if (this._plan && this._planKey === `${this._from}>${this._to}`) {
+      if (this._plan && this._planKey === this._queryKey()) {
         const remaining =
           this._nextRefreshAt === null ? 0 : this._nextRefreshAt - Date.now();
         if (remaining > 0) {
@@ -408,17 +420,19 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     if (!this.hass?.callWS) return;
 
-    const key = `${from}>${to}`;
+    const key = this._queryKey();
     if (this._planKey !== key) {
       this._plan = null;
       this._alternativesOpen = false;
     }
     if (!this._plan) this._phase = "loading";
     try {
+      const planned = this._timeMode !== "now" && isInputDateTime(this._when);
       const plan = await this.hass.callWS<RouteAttrs>({
         type: "wiener_linien_austria/plan",
         origin: Number(from),
         destination: Number(to),
+        ...(planned ? { datetime: this._when, arrive_by: this._timeMode === "arrive" } : {}),
       });
       if (seq !== this._planSeq) return;
       this._plan = plan;
@@ -454,6 +468,33 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._requestPlan(true);
   }
 
+  /** Identifies what is being asked, so an answer for an older question
+   *  never stands in for the current one. */
+  private _queryKey(): string {
+    const when = this._timeMode === "now" ? "now" : `${this._timeMode}@${this._when}`;
+    return `${this._from}>${this._to}|${when}`;
+  }
+
+  private _onTimeMode(mode: AdhocTimeMode): void {
+    if (mode === this._timeMode) return;
+    if (mode !== "now" && !isInputDateTime(this._when)) {
+      this._when = viennaInputValue(Date.now());
+    }
+    this._timeMode = mode;
+    this._lastInteraction = Date.now();
+    this._requestPlan(true);
+  }
+
+  private _onWhen = (ev: Event): void => {
+    const value = (ev.target as HTMLInputElement).value;
+    // A cleared field leaves the last valid time in charge rather than
+    // quietly planning for "now" under a "depart at" label.
+    if (!isInputDateTime(value) || value === this._when) return;
+    this._when = value;
+    this._lastInteraction = Date.now();
+    this._requestPlan(true);
+  };
+
   private _swap = (): void => {
     [this._from, this._to] = [this._to, this._from];
     saveAdhocSelection({ from: this._from, to: this._to });
@@ -471,6 +512,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const best = upcomingTrips(plan, Date.now())[0];
     if (!best) return this._t("adhoc_no_trips");
     const summary = this._tripSummary(best);
+    if (plan.planned_for) {
+      return this._t("adhoc_announce_planned", {
+        day: this._dayText(best.departure),
+        time: clockOf(best.departure),
+        summary,
+      });
+    }
     const minutes = minutesUntil(best.departure, Date.now());
     return minutes === 0
       ? this._t("adhoc_announce_now", { summary })
@@ -502,6 +550,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   private _t(key: string, replacements?: Record<string, string | number>): string {
     return translate(`route.${key}`, { hassLanguage: this.hass?.language }, replacements);
+  }
+
+  /** "heute", "morgen" or "Di., 15.09." for a departure. */
+  private _dayText(iso: string | null): string {
+    const offset = viennaDayOffset(iso, this._now);
+    if (offset === 0) return this._t("day_today");
+    if (offset === 1) return this._t("day_tomorrow");
+    return iso ? viennaShortDate(iso, this._lang) : "";
   }
 
   private get _lang(): string {
@@ -542,7 +598,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           </div>
           ${adhoc
             ? html`
-                ${this._renderPickers()}
+                ${this._renderPickers()} ${this._renderTimeControl()}
                 <p class="sr-only" role="status" aria-live="polite">${this._announcement}</p>
                 <div class="results" aria-busy=${this._phase === "loading" ? "true" : "false"}>
                   ${this._renderAdhocBody(cfg)}
@@ -590,6 +646,41 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           <ha-icon icon="mdi:swap-vertical" aria-hidden="true"></ha-icon>
         </button>
         ${this._renderPicker("to", this._t("adhoc_to"))}
+      </fieldset>
+    `;
+  }
+
+  /** Now / depart at / arrive by, plus the time field once it matters.
+   *  Native radios give arrow-key movement and one tab stop for free. */
+  private _renderTimeControl(): TemplateResult | typeof nothing {
+    if (this._stops === null) return nothing;
+    const labels: Record<AdhocTimeMode, string> = {
+      now: this._t("when_now"),
+      depart: this._t("when_depart"),
+      arrive: this._t("when_arrive"),
+    };
+    return html`
+      <fieldset class="when">
+        <legend class="sr-only">${this._t("when_legend")}</legend>
+        <div class="when-modes">
+          ${TIME_MODES.map(
+            (mode) => html`<label class="when-mode">
+              <input
+                type="radio"
+                name="wl-adhoc-when"
+                .checked=${this._timeMode === mode}
+                @change=${() => this._onTimeMode(mode)}
+              />
+              <span>${labels[mode]}</span>
+            </label>`,
+          )}
+        </div>
+        ${this._timeMode === "now"
+          ? nothing
+          : html`<label class="when-field">
+              <span class="sr-only">${this._t("when_input")}</span>
+              <input type="datetime-local" .value=${this._when} @change=${this._onWhen} />
+            </label>`}
       </fieldset>
     `;
   }
@@ -741,7 +832,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const best = trips[0]!;
     const alternatives = trips.slice(1, 1 + cfg.alternatives);
     return html`
-      ${this._renderHero(best)}
+      ${this._renderHero(best, attrs)}
       ${this._renderNotices(best, attrs)}
       ${this._renderStrand(best, attrs)}
       ${alternatives.length ? this._renderAlternatives(alternatives, attrs) : nothing}
@@ -773,7 +864,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     });
   }
 
-  private _renderHero(trip: RouteTripAttr): TemplateResult {
+  private _renderHero(trip: RouteTripAttr, attrs: RouteAttrs): TemplateResult {
+    if (attrs.planned_for) return this._renderPlannedHero(trip);
     const minutes = minutesUntil(trip.departure, this._now);
     const isNow = minutes === 0;
     const spoken = isNow
@@ -803,6 +895,29 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             <span aria-hidden="true">${clockOf(trip.departure)} – ${clockOf(trip.arrival)}</span>
             <span class="sr-only">${this._tripSummary(trip)}</span>
           </p>
+          <p class="hero-sub">${sub}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  /** A plan for a chosen time answers "when do I leave?" with a clock time
+   *  and its day; a countdown to tomorrow morning would say nothing useful. */
+  private _renderPlannedHero(trip: RouteTripAttr): TemplateResult {
+    const sub = [
+      trip.duration_minutes !== null ? this._t("trip_minutes", { n: trip.duration_minutes }) : "",
+      this._changesText(trip),
+    ]
+      .filter(Boolean)
+      .join(", ");
+    return html`
+      <div class="hero">
+        <p class="hero-count">
+          <span class="hero-label">${this._t("planned_departs", { day: this._dayText(trip.departure) })}</span>
+          <time class="hero-metric" datetime=${trip.departure ?? ""}>${clockOf(trip.departure)}</time>
+        </p>
+        <div class="hero-meta">
+          <p class="hero-times">${this._t("planned_arrives", { time: clockOf(trip.arrival) })}</p>
           <p class="hero-sub">${sub}</p>
         </div>
       </div>
@@ -1546,6 +1661,69 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.8rem;
       color: var(--primary-text-color);
     }
+    /* Time control: three compact chips, the field beside them when needed. */
+    .when {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      border: none;
+      min-inline-size: 0;
+    }
+    .when-modes {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .when-mode {
+      position: relative;
+      display: inline-flex;
+    }
+    .when-mode input {
+      position: absolute;
+      inset: 0;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .when-mode span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 0 14px;
+      box-sizing: border-box;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.5));
+      border-radius: 999px;
+      color: var(--primary-text-color);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .when-mode input:checked + span {
+      border-color: var(--primary-color);
+      background: color-mix(in srgb, var(--primary-color) 20%, transparent);
+    }
+    .when-mode input:focus-visible + span {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+    .when-field {
+      display: inline-flex;
+      flex: 1 1 12rem;
+      min-width: 0;
+    }
+    .when-field input {
+      width: 100%;
+      min-height: 44px;
+      box-sizing: border-box;
+      padding: 0 12px;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.5));
+      border-radius: var(--wl-radius-md);
+      background: var(--card-background-color, transparent);
+      color: var(--primary-text-color);
+      font: inherit;
+    }
     .picker-status {
       font-size: 0.85rem;
       color: var(--secondary-text-color);
@@ -1628,6 +1806,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
     .alt-toggle:focus-visible,
     .combo-field input:focus-visible,
+    .when-field input:focus-visible,
     button:focus-visible {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;
@@ -1635,6 +1814,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     @media (forced-colors: active) {
+      .when-mode input:checked + span {
+        forced-color-adjust: none;
+        background: Highlight;
+        color: HighlightText;
+      }
       .line-badge,
       .risk,
       .notice {

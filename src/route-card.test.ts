@@ -427,6 +427,54 @@ describe("ad-hoc mode", () => {
     });
   });
 
+  it("plans for a chosen time and shows it as a clock time, not a countdown", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async (msg) =>
+      "datetime" in msg
+        ? { ...PLAN, planned_for: "2026-09-15T07:55:00+02:00", arrive_by: false }
+        : PLAN,
+    );
+    const el = await mount(h, {});
+    await settle(el);
+    const radios = [...root(el).querySelectorAll<HTMLInputElement>('.when input[type="radio"]')];
+    expect(radios.map((r) => r.nextElementSibling?.textContent)).toEqual([
+      "Jetzt",
+      "Abfahrt um",
+      "Ankunft bis",
+    ]);
+    expect(radios[0]!.checked).toBe(true);
+    expect(root(el).querySelector('input[type="datetime-local"]')).toBeNull();
+
+    radios[2]!.checked = true;
+    radios[2]!.dispatchEvent(new Event("change"));
+    await settle(el);
+    const field = root(el).querySelector<HTMLInputElement>('input[type="datetime-local"]')!;
+    // Starts at the next five minutes on the Vienna clock.
+    expect(field.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:(00|05|10|15|20|25|30|35|40|45|50|55)$/);
+    field.value = "2026-09-15T08:30";
+    field.dispatchEvent(new Event("change"));
+    await settle(el, 400);
+    await settle(el);
+    expect(planCalls(callWS).at(-1)).toMatchObject({
+      origin: 60201468,
+      destination: 60201040,
+      datetime: "2026-09-15T08:30",
+      arrive_by: true,
+    });
+    // The day comes from the connection itself (today in this answer), and
+    // the times show as clock times rather than a countdown.
+    expect(text(el)).toContain("Abfahrt heute 07:57");
+    expect(text(el)).not.toContain("Abfahrt in");
+    expect(root(el).querySelector("time.hero-metric")?.textContent).toBe("07:57");
+
+    // A cleared field keeps the last valid time rather than planning "now".
+    const calls = planCalls(callWS).length;
+    field.value = "";
+    field.dispatchEvent(new Event("change"));
+    await settle(el, 400);
+    expect(planCalls(callWS)).toHaveLength(calls);
+  });
+
   it("flags text that matches no stop instead of planning it", async () => {
     const { h, callWS } = adhocHass();
     const el = await mount(h, {});

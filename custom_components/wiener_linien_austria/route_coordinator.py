@@ -218,14 +218,16 @@ async def async_plan_trips(
     tz: tzinfo,
     *,
     arrive_by: bool = False,
+    planned: bool = False,
 ) -> list[Trip]:
     """Fetch, parse and rank one trip request. No cooldown, no state.
 
     The one planning path shared by route entries, the `plan_trip` action
     and the route card's ad-hoc mode (the last two via adhoc.py), plus the
     config flow's setup probe, so every caller sees the same connections
-    for the same query. Tests patch the fetch at
-    `route_coordinator.async_fetch_trip_body`.
+    for the same query. `planned` marks a query for a time the caller chose
+    rather than "now": its connections are kept even when they left
+    already. Tests patch the fetch at `route_coordinator.async_fetch_trip_body`.
     """
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),
@@ -238,7 +240,7 @@ async def async_plan_trips(
         USER_AGENT,
     )
     trips = parse_trip_body(body, tz, min_transfer_minutes=options.min_transfer_minutes)
-    return rank_trips(trips, dt_util.utcnow())
+    return rank_trips(trips, None if planned else dt_util.utcnow())
 
 
 def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[str, Any]:

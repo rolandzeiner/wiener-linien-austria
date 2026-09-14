@@ -20,6 +20,10 @@ import {
   transitLegs,
   upcomingTrips,
   viennaClock,
+  viennaDayOffset,
+  viennaInputValue,
+  ADHOC_PLANNED_REFRESH_MS,
+  isInputDateTime,
   windowDays,
   windowRange,
 } from "./route.js";
@@ -279,5 +283,35 @@ describe("stop filtering", () => {
     expect(values("   ")).toEqual(["1", "2", "3", "4", "5"]);
     expect(filterStops(stops, "", 2)).toEqual({ matches: stops.slice(0, 2), total: 5 });
     expect(filterStops(stops, "wien", 3).total).toBe(5);
+  });
+});
+
+describe("chosen-time planning", () => {
+  it("starts the time field at the next five minutes on the Vienna clock", () => {
+    expect(viennaInputValue(Date.parse("2026-09-14T07:51:30+02:00"))).toBe("2026-09-14T07:55");
+    expect(viennaInputValue(Date.parse("2026-09-14T07:55:00+02:00"))).toBe("2026-09-14T07:55");
+    // Rolls over midnight in Vienna, not in UTC.
+    expect(viennaInputValue(Date.parse("2026-09-14T21:58:00Z"))).toBe("2026-09-15T00:00");
+  });
+
+  it("accepts only a complete datetime-local value", () => {
+    expect(isInputDateTime("2026-09-15T08:30")).toBe(true);
+    expect(isInputDateTime("")).toBe(false);
+    expect(isInputDateTime("2026-09-15")).toBe(false);
+  });
+
+  it("counts calendar days on the Vienna clock", () => {
+    expect(viennaDayOffset("2026-09-14T23:30:00+02:00", NOW)).toBe(0);
+    expect(viennaDayOffset("2026-09-15T00:10:00+02:00", NOW)).toBe(1);
+    expect(viennaDayOffset("2026-09-13T12:00:00+02:00", NOW)).toBe(-1);
+    expect(viennaDayOffset("nonsense", NOW)).toBeNull();
+  });
+
+  it("keeps a planned answer's connections and refreshes it slowly", () => {
+    const plan = { trips: [trip("2026-09-14T06:00:00+02:00")], planned_for: "2026-09-14T06:00:00+02:00" };
+    expect(upcomingTrips(plan, NOW)).toHaveLength(1);
+    expect(upcomingTrips({ trips: plan.trips }, NOW)).toHaveLength(0);
+    expect(adhocPlanRefreshDelay(plan, NOW)).toBe(ADHOC_PLANNED_REFRESH_MS);
+    expect(adhocPlanRefreshDelay({ ...plan, stale: true, retry_after: 900 }, NOW)).toBe(900_000);
   });
 });

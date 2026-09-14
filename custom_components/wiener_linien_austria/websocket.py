@@ -6,12 +6,15 @@ user.
 
 - `wiener_linien_austria/stops` — every trackable stop as a picker option,
   nearest to the HA home first. The same list the setup dialog offers.
-- `wiener_linien_austria/plan` — connections between two stops, now. Answers
-  in the shape of the route sensor's attributes so the card renders both
-  through one path. It also takes a route entry's trip options
-  (`route_type`, `max_changes`, `walk_speed`, `excluded_means`,
-  `min_transfer_minutes`) with the same defaults. The card sends none of
-  them yet; each distinct combination is its own cache entry.
+- `wiener_linien_austria/plan` — connections between two stops, now or at
+  a chosen `datetime` (departing then, or arriving by then with
+  `arrive_by`). A `datetime` without an offset is Vienna wall-clock time,
+  the time the timetable and the station signs speak. Answers in the shape
+  of the route sensor's attributes so the card renders both through one
+  path. It also takes a route entry's trip options (`route_type`,
+  `max_changes`, `walk_speed`, `excluded_means`, `min_transfer_minutes`)
+  with the same defaults. The card sends none of them yet; each distinct
+  combination is its own cache entry.
 
 Registered once per HA process in `async_setup`. `websocket_api` has no
 deregister hook, so the handlers outlive a removed integration; each one
@@ -21,6 +24,7 @@ then the card's resource is gone too, so nothing should be calling.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Final
 
 import aiohttp
@@ -32,6 +36,8 @@ from homeassistant.components.websocket_api.decorators import (
     websocket_command,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
 
 from . import static
 from .adhoc import AdhocRateLimited, async_get_planner
@@ -46,6 +52,7 @@ from .const import (
     MAX_CHANGES_CHOICES,
     MAX_MIN_TRANSFER_MINUTES,
     ROUTE_TYPES,
+    ROUTING_TIME_ZONE,
     WALK_SPEEDS,
 )
 from .route_coordinator import MAX_TRIPS_PUBLISHED, route_trip_attributes
@@ -154,6 +161,8 @@ async def _websocket_stops(
         vol.Optional(
             "min_transfer_minutes", default=DEFAULT_MIN_TRANSFER_MINUTES
         ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_MIN_TRANSFER_MINUTES)),
+        vol.Optional("datetime"): vol.Any(None, cv.datetime),
+        vol.Optional("arrive_by", default=False): cv.boolean,
     }
 )
 @async_response
@@ -162,7 +171,7 @@ async def _websocket_plan(
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Plan connections between two stops, departing now."""
+    """Plan connections between two stops, now or at a chosen time."""
     msg_id: int = msg["id"]
     if not _is_loaded(hass):
         _send_not_loaded(connection, msg_id)
@@ -198,11 +207,17 @@ async def _websocket_plan(
         return
 
     options = RouteOptions.from_config(origin.diva, destination.diva, msg)
+    when = await _async_vienna_time(msg.get("datetime"))
+    arrive_by = bool(msg["arrive_by"])
     try:
         # A stale plan beats an error on a dashboard: the card shows when it
         # was fetched and refreshes once the budget allows.
         plan = await async_get_planner(hass).async_plan(
-            options, user_id=connection.user.id, allow_stale=True
+            options,
+            user_id=connection.user.id,
+            when=when,
+            arrive_by=arrive_by,
+            allow_stale=True,
         )
     except AdhocRateLimited as err:
         connection.send_error(
@@ -234,9 +249,24 @@ async def _websocket_plan(
             "destination": destination.name,
             "fetched_at": plan.fetched_at.isoformat(),
             "min_transfer_minutes": options.min_transfer_minutes,
+            "planned_for": when.isoformat() if when is not None else None,
+            "arrive_by": arrive_by,
             **route_trip_attributes(hass, plan.trips[:MAX_TRIPS_PUBLISHED]),
             "attribution": ATTRIBUTION,
             "stale": plan.stale,
             "retry_after": plan.retry_after,
         },
     )
+
+
+async def _async_vienna_time(value: datetime | None) -> datetime | None:
+    """A requested time as an aware datetime; naive means Vienna wall clock.
+
+    The card's time field has no zone, and the dashboard's browser or HA
+    itself may sit elsewhere. The trip planner, the timetable and the signs
+    at the stop all speak Vienna time, so that is what the person typed.
+    """
+    if value is None or value.tzinfo is not None:
+        return value
+    zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
+    return value.replace(tzinfo=zone)

@@ -12,7 +12,9 @@ upstream notices:
   the wall-clock minute as well only shared answers between refreshes that
   happened to land in the same minute.) A plan up to a minute old is still
   correct for "now": departed connections are dropped when it is served. A
-  plan for a given time is keyed on that minute, the request's resolution.
+  plan for a given time is keyed on that minute, the request's resolution,
+  and keeps every connection it found: planning tomorrow's trip at 23:00
+  must not lose the 07:00 departures to today's clock.
 - **Coalescing.** A query already on the wire is awaited, not repeated, so N
   callers asking at once cost one request.
 - **Budget.** Only a cache miss takes a token, from two buckets at once: one
@@ -179,7 +181,7 @@ class AdhocPlanner:
         cached = self._cache.get(key)
         if cached is not None and loop_now - cached[0] < ADHOC_CACHE_TTL_SECONDS:
             self._cache.move_to_end(key)
-            return self._drop_departed(cached[1], now)
+            return self._serve(key, cached[1], now)
 
         task = self._in_flight.get(key)
         if task is None:
@@ -190,7 +192,7 @@ class AdhocPlanner:
                     and cached is not None
                     and loop_now - cached[0] < ADHOC_STALE_MAX_SECONDS
                 ):
-                    plan = self._drop_departed(cached[1], now)
+                    plan = self._serve(key, cached[1], now)
                     return replace(plan, stale=True, retry_after=retry_after)
                 raise AdhocRateLimited(retry_after)
             task = self._hass.async_create_background_task(
@@ -212,7 +214,14 @@ class AdhocPlanner:
     async def _async_fetch(self, key: _CacheKey, at: datetime, tz: tzinfo) -> AdhocPlan:
         generation = self._generation
         try:
-            trips = await async_plan_trips(self._hass, key[0], at, tz, arrive_by=key[2])
+            trips = await async_plan_trips(
+                self._hass,
+                key[0],
+                at,
+                tz,
+                arrive_by=key[2],
+                planned=key[1] is not None,
+            )
         except RoutingError as err:
             if err.translation_key != "route_no_connection":
                 raise
@@ -257,6 +266,11 @@ class AdhocPlanner:
         self._cache.move_to_end(key)
         while len(self._cache) > ADHOC_CACHE_MAX_ENTRIES:
             self._cache.popitem(last=False)
+
+    @classmethod
+    def _serve(cls, key: _CacheKey, plan: AdhocPlan, now: datetime) -> AdhocPlan:
+        """A cached plan as served: "now" plans lose what left since."""
+        return plan if key[1] is not None else cls._drop_departed(plan, now)
 
     @staticmethod
     def _drop_departed(plan: AdhocPlan, now: datetime) -> AdhocPlan:
