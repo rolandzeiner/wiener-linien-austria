@@ -1,0 +1,1093 @@
+{
+ "parameters": [
+  {
+   "name": "serverID",
+   "value": "VOR-OGD02-PR"
+  },
+  {
+   "name": "requestID",
+   "value": "0"
+  },
+  {
+   "name": "sessionID",
+   "value": "0"
+  },
+  {
+   "name": "calcTime",
+   "value": "266.335"
+  },
+  {
+   "name": "serverTime",
+   "value": "2026-09-14T02:22:23"
+  },
+  {
+   "name": "logRequestId",
+   "value": "f1a4fe1812844f90"
+  }
+ ],
+ "itdMessageList": [],
+ "origin": {
+  "input": {
+   "input": "60201468"
+  },
+  "points": {
+   "point": {
+    "usage": "origin",
+    "type": "stop",
+    "name": "Wien, Westbahnhof",
+    "stateless": "60201468",
+    "ref": {
+     "id": "60201468",
+     "gid": "at:49:1468",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163376510.00,481966562.00"
+    }
+   }
+  },
+  "itdOdvAssignedStops": [
+   {
+    "stopID": "60201468",
+    "name": "Westbahnhof",
+    "x": "163376510",
+    "y": "481966562",
+    "mapName": "WG10",
+    "value": "60201468:Westbahnhof",
+    "place": "Wien",
+    "nameWithPlace": "Wien Westbahnhof",
+    "distanceTime": "0",
+    "isTransferStop": "0",
+    "vm": "100",
+    "gid": "at:49:1468"
+   },
+   {
+    "stopID": "60201566",
+    "name": "Westbahnhof/Gerstnerstraße",
+    "x": "163382349",
+    "y": "481954526",
+    "mapName": "WG10",
+    "value": "60201566:Westbahnhof/Gerstnerstraße",
+    "place": "Wien",
+    "nameWithPlace": "Wien Westbahnhof/Gerstnerstraße",
+    "distanceTime": "0",
+    "isTransferStop": "0",
+    "vm": "100",
+    "gid": "at:49:1566"
+   }
+  ]
+ },
+ "destination": {
+  "input": {
+   "input": "60201040"
+  },
+  "points": {
+   "point": {
+    "usage": "destination",
+    "type": "stop",
+    "name": "Wien, Praterstern",
+    "stateless": "60201040",
+    "ref": {
+     "id": "60201040",
+     "gid": "at:49:1040",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163921518.00,482189085.00"
+    }
+   }
+  }
+ },
+ "dateTime": {
+  "deparr": "dep",
+  "ttpFrom": "20251214",
+  "ttpTo": "20261212",
+  "year": "2026",
+  "month": "9",
+  "day": "14",
+  "hour": "8",
+  "minute": "0"
+ },
+ "trips": [
+  {
+   "distance": "-1",
+   "duration": "00:14",
+   "interchange": "1",
+   "desc": "1",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "7",
+     "points": [
+      {
+       "name": "Wien Westbahnhof",
+       "nameWO": "Westbahnhof",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Westbahnhof",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "07:57",
+        "timeSec": "07:57:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "07:57",
+        "rtTimeSec": "07:57:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": "U3-H"
+       }
+      },
+      {
+       "name": "Wien Stephansplatz",
+       "nameWO": "Stephansplatz",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Stephansplatz",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:04",
+        "timeSec": "08:04:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:04",
+        "rtTimeSec": "08:04:00"
+       },
+       "ref": {
+        "id": "60201320",
+        "platform": "U3-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "symbol": "U3",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "destID": "60201260",
+      "desc": "Ottakring - Simmering  Baustellenfahrplan 20.08. - 30.08.2026",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U3"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Zieglergasse",
+       "ref": {
+        "id": "60201530"
+       }
+      },
+      {
+       "name": "Wien Neubaugasse",
+       "ref": {
+        "id": "60200056"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Herrengasse",
+       "ref": {
+        "id": "60200506"
+       }
+      },
+      {
+       "name": "Wien Stephansplatz",
+       "ref": {
+        "id": "60201320"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "4",
+       "dTM": "40"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "3",
+     "points": [
+      {
+       "name": "Wien Stephansplatz",
+       "nameWO": "Stephansplatz",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Stephansplatz",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:08",
+        "timeSec": "08:08:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:08",
+        "rtTimeSec": "08:08:00"
+       },
+       "ref": {
+        "id": "60201320",
+        "platform": "U1-H"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "nameWO": "Praterstern",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Praterstern",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:11",
+        "timeSec": "08:11:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:11",
+        "rtTimeSec": "08:11:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": "U1-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U1",
+      "number": "U1",
+      "symbol": "U1",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Leopoldau",
+      "destID": "60200769",
+      "desc": "Oberlaa - Leopoldau Österreich Radrundfahrt",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U1"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Stephansplatz",
+       "ref": {
+        "id": "60201320"
+       }
+      },
+      {
+       "name": "Wien Schwedenplatz",
+       "ref": {
+        "id": "60201198"
+       }
+      },
+      {
+       "name": "Wien Nestroyplatz",
+       "ref": {
+        "id": "60200916"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  },
+  {
+   "distance": "-1",
+   "duration": "00:16",
+   "interchange": "1",
+   "desc": "2",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "4",
+     "points": [
+      {
+       "name": "Wien Westbahnhof",
+       "nameWO": "Westbahnhof",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Westbahnhof",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:00",
+        "timeSec": "08:00:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:00",
+        "rtTimeSec": "08:00:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": "U3-H"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "nameWO": "Volkstheater",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Volkstheater",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:04",
+        "timeSec": "08:04:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:04",
+        "rtTimeSec": "08:04:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U3-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "symbol": "U3",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "destID": "60201260",
+      "desc": "Ottakring - Simmering  Baustellenfahrplan 20.08. - 30.08.2026",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U3"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Zieglergasse",
+       "ref": {
+        "id": "60201530"
+       }
+      },
+      {
+       "name": "Wien Neubaugasse",
+       "ref": {
+        "id": "60200056"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3",
+       "dTM": "30"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "8",
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "nameWO": "Volkstheater",
+       "platformName": "2",
+       "plannedPlatformName": "2",
+       "place": "Wien",
+       "nameWithPlace": "Wien Volkstheater",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:08",
+        "timeSec": "08:08:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:08",
+        "rtTimeSec": "08:08:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U2-R"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "nameWO": "Praterstern",
+       "platformName": "2",
+       "plannedPlatformName": "2",
+       "place": "Wien",
+       "nameWithPlace": "Wien Praterstern",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:16",
+        "timeSec": "08:16:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:16",
+        "rtTimeSec": "08:16:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": "U2-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "symbol": "U2",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "destID": "60200942",
+      "desc": "Karlsplatz - Seestadt Österreich Radrundfahrt",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U2"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Rathaus",
+       "ref": {
+        "id": "60201072"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "ref": {
+        "id": "60201184"
+       }
+      },
+      {
+       "name": "Wien Schottenring",
+       "ref": {
+        "id": "60201182"
+       }
+      },
+      {
+       "name": "Wien Taborstraße",
+       "ref": {
+        "id": "60201891"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  },
+  {
+   "distance": "-1",
+   "duration": "00:16",
+   "interchange": "1",
+   "desc": "3",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "7",
+     "points": [
+      {
+       "name": "Wien Westbahnhof",
+       "nameWO": "Westbahnhof",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Westbahnhof",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:03",
+        "timeSec": "08:03:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:03",
+        "rtTimeSec": "08:03:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": "U3-H"
+       }
+      },
+      {
+       "name": "Wien Stephansplatz",
+       "nameWO": "Stephansplatz",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Stephansplatz",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:10",
+        "timeSec": "08:10:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:10",
+        "rtTimeSec": "08:10:00"
+       },
+       "ref": {
+        "id": "60201320",
+        "platform": "U3-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "symbol": "U3",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "destID": "60201260",
+      "desc": "Ottakring - Simmering  Baustellenfahrplan 20.08. - 30.08.2026",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U3"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Zieglergasse",
+       "ref": {
+        "id": "60201530"
+       }
+      },
+      {
+       "name": "Wien Neubaugasse",
+       "ref": {
+        "id": "60200056"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Herrengasse",
+       "ref": {
+        "id": "60200506"
+       }
+      },
+      {
+       "name": "Wien Stephansplatz",
+       "ref": {
+        "id": "60201320"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "4",
+       "dTM": "40"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "4",
+     "points": [
+      {
+       "name": "Wien Stephansplatz",
+       "nameWO": "Stephansplatz",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Stephansplatz",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:15",
+        "timeSec": "08:15:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:15",
+        "rtTimeSec": "08:15:00"
+       },
+       "ref": {
+        "id": "60201320",
+        "platform": "U1-H"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "nameWO": "Praterstern",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Praterstern",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:19",
+        "timeSec": "08:19:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:19",
+        "rtTimeSec": "08:19:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": "U1-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U1",
+      "number": "U1",
+      "symbol": "U1",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Leopoldau",
+      "destID": "60200769",
+      "desc": "Oberlaa - Leopoldau Österreich Radrundfahrt",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U1"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Stephansplatz",
+       "ref": {
+        "id": "60201320"
+       }
+      },
+      {
+       "name": "Wien Schwedenplatz",
+       "ref": {
+        "id": "60201198"
+       }
+      },
+      {
+       "name": "Wien Nestroyplatz",
+       "ref": {
+        "id": "60200916"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  },
+  {
+   "distance": "-1",
+   "duration": "00:15",
+   "interchange": "1",
+   "desc": "4",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "4",
+     "points": [
+      {
+       "name": "Wien Westbahnhof",
+       "nameWO": "Westbahnhof",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Westbahnhof",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:05",
+        "timeSec": "08:05:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:05",
+        "rtTimeSec": "08:05:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": "U3-H"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "nameWO": "Volkstheater",
+       "platformName": "1",
+       "plannedPlatformName": "1",
+       "place": "Wien",
+       "nameWithPlace": "Wien Volkstheater",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:09",
+        "timeSec": "08:09:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:09",
+        "rtTimeSec": "08:09:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U3-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "symbol": "U3",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "destID": "60201260",
+      "desc": "Ottakring - Simmering  Baustellenfahrplan 20.08. - 30.08.2026",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U3"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Zieglergasse",
+       "ref": {
+        "id": "60201530"
+       }
+      },
+      {
+       "name": "Wien Neubaugasse",
+       "ref": {
+        "id": "60200056"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3",
+       "dTM": "30"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "8",
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "nameWO": "Volkstheater",
+       "platformName": "2",
+       "plannedPlatformName": "2",
+       "place": "Wien",
+       "nameWithPlace": "Wien Volkstheater",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:12",
+        "timeSec": "08:12:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:12",
+        "rtTimeSec": "08:12:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U2-R"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "nameWO": "Praterstern",
+       "platformName": "2",
+       "plannedPlatformName": "2",
+       "place": "Wien",
+       "nameWithPlace": "Wien Praterstern",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "08:20",
+        "timeSec": "08:20:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "08:20",
+        "rtTimeSec": "08:20:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": "U2-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "symbol": "U2",
+      "product": "U-Bahn",
+      "productId": "3",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "destID": "60200942",
+      "desc": "Karlsplatz - Seestadt Österreich Radrundfahrt",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "210U2"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Rathaus",
+       "ref": {
+        "id": "60201072"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "ref": {
+        "id": "60201184"
+       }
+      },
+      {
+       "name": "Wien Schottenring",
+       "ref": {
+        "id": "60201182"
+       }
+      },
+      {
+       "name": "Wien Taborstraße",
+       "ref": {
+        "id": "60201891"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  }
+ ]
+}

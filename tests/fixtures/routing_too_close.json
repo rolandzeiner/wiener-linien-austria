@@ -1,0 +1,163 @@
+{
+ "parameters": [
+  {
+   "name": "serverID",
+   "value": "VOR-OGD02-PR"
+  },
+  {
+   "name": "requestID",
+   "value": "0"
+  },
+  {
+   "name": "sessionID",
+   "value": "0"
+  },
+  {
+   "name": "calcTime",
+   "value": "61.248"
+  },
+  {
+   "name": "serverTime",
+   "value": "2026-09-14T02:22:30"
+  },
+  {
+   "name": "logRequestId",
+   "value": "f1a4fe1812844f94"
+  }
+ ],
+ "itdMessageList": [
+  {
+   "message": [
+    {
+     "name": "code",
+     "value": "-4007"
+    },
+    {
+     "name": "error",
+     "value": "origin too close to destination"
+    },
+    {
+     "name": "type",
+     "value": ""
+    },
+    {
+     "name": "module",
+     "value": ""
+    }
+   ]
+  }
+ ],
+ "origin": {
+  "input": {
+   "input": "60201468"
+  },
+  "points": {
+   "point": {
+    "usage": "origin",
+    "type": "stop",
+    "name": "Wien, Westbahnhof",
+    "stateless": "60201468",
+    "ref": {
+     "id": "60201468",
+     "gid": "at:49:1468",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163376510.00,481966562.00"
+    }
+   }
+  },
+  "itdOdvAssignedStops": [
+   {
+    "stopID": "60201468",
+    "name": "Westbahnhof",
+    "x": "163376510",
+    "y": "481966562",
+    "mapName": "WG10",
+    "value": "60201468:Westbahnhof",
+    "place": "Wien",
+    "nameWithPlace": "Wien Westbahnhof",
+    "distanceTime": "0",
+    "isTransferStop": "0",
+    "vm": "100",
+    "gid": "at:49:1468"
+   },
+   {
+    "stopID": "60201566",
+    "name": "Westbahnhof/Gerstnerstraße",
+    "x": "163382349",
+    "y": "481954526",
+    "mapName": "WG10",
+    "value": "60201566:Westbahnhof/Gerstnerstraße",
+    "place": "Wien",
+    "nameWithPlace": "Wien Westbahnhof/Gerstnerstraße",
+    "distanceTime": "0",
+    "isTransferStop": "0",
+    "vm": "100",
+    "gid": "at:49:1566"
+   }
+  ]
+ },
+ "destination": {
+  "input": {
+   "input": "60201468"
+  },
+  "points": {
+   "point": {
+    "usage": "destination",
+    "type": "stop",
+    "name": "Wien, Westbahnhof",
+    "stateless": "60201468",
+    "ref": {
+     "id": "60201468",
+     "gid": "at:49:1468",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163376510.00,481966562.00"
+    }
+   }
+  },
+  "itdOdvAssignedStops": [
+   {
+    "stopID": "60201468",
+    "name": "Westbahnhof",
+    "x": "163376510",
+    "y": "481966562",
+    "mapName": "WG10",
+    "value": "60201468:Westbahnhof",
+    "place": "Wien",
+    "nameWithPlace": "Wien Westbahnhof",
+    "distanceTime": "0",
+    "isTransferStop": "0",
+    "vm": "100",
+    "gid": "at:49:1468"
+   },
+   {
+    "stopID": "60201566",
+    "name": "Westbahnhof/Gerstnerstraße",
+    "x": "163382349",
+    "y": "481954526",
+    "mapName": "WG10",
+    "value": "60201566:Westbahnhof/Gerstnerstraße",
+    "place": "Wien",
+    "nameWithPlace": "Wien Westbahnhof/Gerstnerstraße",
+    "distanceTime": "0",
+    "isTransferStop": "0",
+    "vm": "100",
+    "gid": "at:49:1566"
+   }
+  ]
+ },
+ "dateTime": {
+  "deparr": "dep",
+  "ttpFrom": "20251214",
+  "ttpTo": "20261212",
+  "year": "2026",
+  "month": "9",
+  "day": "14",
+  "hour": "8",
+  "minute": "0"
+ },
+ "trips": null
+}

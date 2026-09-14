@@ -185,6 +185,87 @@ GTFS_LINE_LABEL_ALIASES: Final[dict[str, str]] = {
     "BB": "WLB",
 }
 
+# --- A→B routing (experimental) -------------------------------------
+# A config entry is either a stop board (the original shape, which carries
+# no `entry_type` key at all) or a route between two stations. Absent means
+# stop, so every entry created before routing existed keeps loading as-is
+# and nothing needs migrating.
+CONF_ENTRY_TYPE: Final = "entry_type"
+ENTRY_TYPE_STOP: Final = "stop"
+ENTRY_TYPE_ROUTE: Final = "route"
+
+CONF_ORIGIN_DIVA: Final = "origin_diva"
+CONF_ORIGIN_NAME: Final = "origin_name"
+CONF_DESTINATION_DIVA: Final = "destination_diva"
+CONF_DESTINATION_NAME: Final = "destination_name"
+CONF_ROUTE_TYPE: Final = "route_type"
+CONF_MAX_CHANGES: Final = "max_changes"
+CONF_WALK_SPEED: Final = "walk_speed"
+CONF_MIN_TRANSFER_MINUTES: Final = "min_transfer_minutes"
+CONF_EXCLUDED_MEANS: Final = "excluded_means"
+CONF_ACTIVE_FROM: Final = "active_from"
+CONF_ACTIVE_TO: Final = "active_to"
+CONF_ACTIVE_DAYS: Final = "active_days"
+
+# The EFA `routeType` optimisation targets (Mentz EFA XML interface, §5.2).
+ROUTE_TYPES: Final = ("LEASTTIME", "LEASTINTERCHANGE", "LEASTWALKING")
+DEFAULT_ROUTE_TYPE: Final = "LEASTTIME"
+# `changeSpeed` accepts named speeds; "normal" is the server default.
+WALK_SPEEDS: Final = ("slow", "normal", "fast")
+DEFAULT_WALK_SPEED: Final = "normal"
+# "any" is stored instead of a number so the request simply omits
+# `maxChanges`, leaving the server's own ceiling in charge.
+MAX_CHANGES_ANY: Final = "any"
+MAX_CHANGES_CHOICES: Final = ("0", "1", "2", "3", MAX_CHANGES_ANY)
+DEFAULT_MIN_TRANSFER_MINUTES: Final = 2
+MAX_MIN_TRANSFER_MINUTES: Final = 15
+WEEKDAYS: Final = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
+# Transport modes a route may exclude, by EFA `motType` code (the `code`
+# field on a leg's `mode`, and the `exclMOT_<code>` request parameter).
+# Only the codes that actually run inside Vienna are offered.
+EXCLUDABLE_MEANS: Final[dict[str, str]] = {
+    "0": "train",
+    "1": "sbahn",
+    "2": "metro",
+    "4": "tram",
+    "5": "bus",
+}
+
+ROUTING_BASE_URL: Final = "https://www.wienerlinien.at/ogd_routing"
+ROUTING_TRIP_ENDPOINT: Final = "/XML_TRIP_REQUEST2"
+# --- Upstream capabilities, measured 2026-09-14 -------------------
+#   XML_TRIP_REQUEST2 (outputFormat=JSON), Floridsdorf -> Meidling, 3 trips.
+#   Compression: honoured (gzip). 85144 B identity -> 10698 B wire (8.0x).
+#   Conditional GET: impossible -- no ETag, no Last-Modified, and the
+#   response says `Cache-Control: no-cache`. Served by the VOR EFA backend
+#   (`serverID` VOR-OGD02-PR), not the `ogd_realtime` backend /monitor uses,
+#   so it gets its own cooldown slot (see rate_limit.py). No published
+#   rate limit; no API key. Re-probe with api-polling/scripts/probe_endpoint.py
+#   before changing any of this.
+# ----------------------------------------------------------------
+# How many connections to ask for. The Pareto filter in routing.py drops the
+# dominated ones, so asking for a few more than the card shows is what gives
+# the filter something to choose between.
+ROUTING_TRIPS_REQUESTED: Final = 5
+ROUTING_REQUEST_TIMEOUT_SECONDS: Final = 20
+
+# Route poll cadence. A trip query costs the upstream a full routing run
+# (~250 ms server-side, measured) rather than a table lookup, and a
+# connection plan changes on the scale of minutes, so this is deliberately
+# far slower than the departure board. The coordinator additionally pulls
+# the next refresh forward to just after the best connection departs, so
+# the list rolls on without the default having to be fast.
+DEFAULT_ROUTE_SCAN_INTERVAL: Final = 300  # seconds
+MIN_ROUTE_POLL_SECONDS: Final = 120
+MAX_ROUTE_POLL_SECONDS: Final = 1800
+# Never schedule the "departure just passed" refresh sooner than this.
+MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
+
+# The timetable server speaks Vienna wall-clock time with no offset, no
+# matter which zone Home Assistant itself is configured in.
+ROUTING_TIME_ZONE: Final = "Europe/Vienna"
+
 # Response attribution (CC-BY mandated)
 ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 

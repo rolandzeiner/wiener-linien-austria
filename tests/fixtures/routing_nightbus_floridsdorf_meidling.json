@@ -1,0 +1,1124 @@
+{
+ "parameters": [
+  {
+   "name": "serverID",
+   "value": "VOR-OGD02-PR"
+  },
+  {
+   "name": "requestID",
+   "value": "0"
+  },
+  {
+   "name": "sessionID",
+   "value": "0"
+  },
+  {
+   "name": "calcTime",
+   "value": "254.100"
+  },
+  {
+   "name": "serverTime",
+   "value": "2026-09-14T02:07:04"
+  },
+  {
+   "name": "logRequestId",
+   "value": "f1a4fe1812844d8a"
+  }
+ ],
+ "itdMessageList": [],
+ "origin": {
+  "input": {
+   "input": "60200334"
+  },
+  "points": {
+   "point": {
+    "usage": "origin",
+    "type": "stop",
+    "name": "Wien, Floridsdorf",
+    "stateless": "60200334",
+    "ref": {
+     "id": "60200334",
+     "gid": "at:49:334",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "164002097.00,482566442.00"
+    }
+   }
+  }
+ },
+ "destination": {
+  "input": {
+   "input": "60201015"
+  },
+  "points": {
+   "point": {
+    "usage": "destination",
+    "type": "stop",
+    "name": "Wien, Meidling",
+    "stateless": "60201015",
+    "ref": {
+     "id": "60201015",
+     "gid": "at:49:1015",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163319018.00,481742743.00"
+    }
+   }
+  }
+ },
+ "dateTime": {
+  "deparr": "dep",
+  "ttpFrom": "20251214",
+  "ttpTo": "20261212",
+  "year": "2026",
+  "month": "9",
+  "day": "14",
+  "hour": "2",
+  "minute": "7"
+ },
+ "trips": [
+  {
+   "distance": "-1",
+   "duration": "00:41",
+   "interchange": "1",
+   "desc": "1",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "4",
+     "points": [
+      {
+       "name": "Wien Floridsdorf (Franz-Jonas-Platz)",
+       "nameWO": "Floridsdorf (Franz-Jonas-Platz)",
+       "platformName": "J",
+       "plannedPlatformName": "J",
+       "place": "Wien",
+       "nameWithPlace": "Wien Floridsdorf",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "01:44",
+        "timeSec": "01:44:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "01:44",
+        "rtTimeSec": "01:44:00"
+       },
+       "ref": {
+        "id": "60200334",
+        "platform": "34A-H"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      },
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "nameWO": "Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "platformName": "",
+       "plannedPlatformName": "",
+       "place": "Wien",
+       "nameWithPlace": "Wien Friedrich-Engels-Platz",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "01:48",
+        "timeSec": "01:48:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "01:48",
+        "rtTimeSec": "01:48:00"
+       },
+       "ref": {
+        "id": "60200363",
+        "platform": "N31-R"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "Nachtbus N31",
+      "number": "N31",
+      "symbol": "N31",
+      "product": "Nachtbus",
+      "productId": "8",
+      "type": "3",
+      "code": "5",
+      "destination": "Wien Schwedenplatz",
+      "destID": "60201198",
+      "desc": "Stammersdorf - Schwedenplatz",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "24N31"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Floridsdorf (Franz-Jonas-Platz)",
+       "ref": {
+        "id": "60200334"
+       }
+      },
+      {
+       "name": "Wien Matthäus-Jiszda-Straße (Schöpfleuthnergasse)",
+       "ref": {
+        "id": "60200848"
+       }
+      },
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "ref": {
+        "id": "60200363"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "2",
+       "dTM": "20"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "34",
+     "points": [
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "nameWO": "Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "platformName": "",
+       "plannedPlatformName": "",
+       "place": "Wien",
+       "nameWithPlace": "Wien Friedrich-Engels-Platz",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "01:51",
+        "timeSec": "01:51:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "01:51",
+        "rtTimeSec": "01:51:00"
+       },
+       "ref": {
+        "id": "60200363",
+        "platform": "N31-R"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      },
+      {
+       "name": "Wien Meidling (Vorplatz)",
+       "nameWO": "Meidling (Vorplatz)",
+       "platformName": "A",
+       "plannedPlatformName": "A",
+       "place": "Wien",
+       "nameWithPlace": "Wien Meidling",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:25",
+        "timeSec": "02:25:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:25",
+        "rtTimeSec": "02:25:00"
+       },
+       "ref": {
+        "id": "60201015",
+        "platform": "62A-H"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "Nachtbus N8",
+      "number": "N8",
+      "symbol": "N8",
+      "product": "Nachtbus",
+      "productId": "8",
+      "type": "3",
+      "code": "5",
+      "destination": "Wien Alterlaa",
+      "destID": "60201499",
+      "desc": "Handelskai - Alterlaa",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "24N08"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "ref": {
+        "id": "60200363"
+       }
+      },
+      {
+       "name": "Wien Lorenz-Müller-Gasse",
+       "ref": {
+        "id": "60201666"
+       }
+      },
+      {
+       "name": "Wien Dietmayrgasse",
+       "ref": {
+        "id": "60200229"
+       }
+      },
+      {
+       "name": "Wien Gürtelbrücke",
+       "ref": {
+        "id": "60200692"
+       }
+      },
+      {
+       "name": "Wien Spittelau (Döblinger Gürtel)",
+       "ref": {
+        "id": "60201062"
+       }
+      },
+      {
+       "name": "Wien Glatzgasse (Währinger Gürtel)",
+       "ref": {
+        "id": "60200405"
+       }
+      },
+      {
+       "name": "Wien Nußdorfer Straße (Äußerer Währinger Gtl.)",
+       "ref": {
+        "id": "60200950"
+       }
+      },
+      {
+       "name": "Wien Währinger Straße-Volksoper (Gürtel/Schulgasse)",
+       "ref": {
+        "id": "60201510"
+       }
+      },
+      {
+       "name": "Wien Michelbeuern-AKH (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200874"
+       }
+      },
+      {
+       "name": "Wien Alser Straße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200027"
+       }
+      },
+      {
+       "name": "Wien Josefstädter Straße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200615"
+       }
+      },
+      {
+       "name": "Wien Thaliastraße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60201372"
+       }
+      },
+      {
+       "name": "Wien Urban-Loritz-Platz (Äußerer Gürtel)",
+       "ref": {
+        "id": "60201413"
+       }
+      },
+      {
+       "name": "Wien Westbahnhof (Europaplatz)",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Gumpendorfer Straße (Äußerer Mariahilfer Gtl.)",
+       "ref": {
+        "id": "60200436"
+       }
+      },
+      {
+       "name": "Wien Fünfhausgasse",
+       "ref": {
+        "id": "60200052"
+       }
+      },
+      {
+       "name": "Wien Stiegergasse",
+       "ref": {
+        "id": "60201324"
+       }
+      },
+      {
+       "name": "Wien Längenfeldgasse",
+       "ref": {
+        "id": "60200820"
+       }
+      },
+      {
+       "name": "Wien Hans-Mandl-Berufsschule (Längenfeldgasse)",
+       "ref": {
+        "id": "60200470"
+       }
+      },
+      {
+       "name": "Wien Aßmayergasse",
+       "ref": {
+        "id": "60200103"
+       }
+      },
+      {
+       "name": "Wien Dörfelstraße",
+       "ref": {
+        "id": "60200865"
+       }
+      },
+      {
+       "name": "Wien Meidling (Vorplatz)",
+       "ref": {
+        "id": "60201015"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  },
+  {
+   "distance": "-1",
+   "duration": "00:41",
+   "interchange": "1",
+   "desc": "2",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "4",
+     "points": [
+      {
+       "name": "Wien Floridsdorf (Franz-Jonas-Platz)",
+       "nameWO": "Floridsdorf (Franz-Jonas-Platz)",
+       "platformName": "J",
+       "plannedPlatformName": "J",
+       "place": "Wien",
+       "nameWithPlace": "Wien Floridsdorf",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:14",
+        "timeSec": "02:14:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:14",
+        "rtTimeSec": "02:14:00"
+       },
+       "ref": {
+        "id": "60200334",
+        "platform": "34A-H"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      },
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "nameWO": "Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "platformName": "",
+       "plannedPlatformName": "",
+       "place": "Wien",
+       "nameWithPlace": "Wien Friedrich-Engels-Platz",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:18",
+        "timeSec": "02:18:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:18",
+        "rtTimeSec": "02:18:00"
+       },
+       "ref": {
+        "id": "60200363",
+        "platform": "N31-R"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "Nachtbus N31",
+      "number": "N31",
+      "symbol": "N31",
+      "product": "Nachtbus",
+      "productId": "8",
+      "type": "3",
+      "code": "5",
+      "destination": "Wien Schwedenplatz",
+      "destID": "60201198",
+      "desc": "Stammersdorf - Schwedenplatz",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "24N31"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Floridsdorf (Franz-Jonas-Platz)",
+       "ref": {
+        "id": "60200334"
+       }
+      },
+      {
+       "name": "Wien Matthäus-Jiszda-Straße (Schöpfleuthnergasse)",
+       "ref": {
+        "id": "60200848"
+       }
+      },
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "ref": {
+        "id": "60200363"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "2",
+       "dTM": "20"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "34",
+     "points": [
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "nameWO": "Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "platformName": "",
+       "plannedPlatformName": "",
+       "place": "Wien",
+       "nameWithPlace": "Wien Friedrich-Engels-Platz",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:21",
+        "timeSec": "02:21:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:21",
+        "rtTimeSec": "02:21:00"
+       },
+       "ref": {
+        "id": "60200363",
+        "platform": "N31-R"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      },
+      {
+       "name": "Wien Meidling (Vorplatz)",
+       "nameWO": "Meidling (Vorplatz)",
+       "platformName": "A",
+       "plannedPlatformName": "A",
+       "place": "Wien",
+       "nameWithPlace": "Wien Meidling",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:55",
+        "timeSec": "02:55:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:55",
+        "rtTimeSec": "02:55:00"
+       },
+       "ref": {
+        "id": "60201015",
+        "platform": "62A-H"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "Nachtbus N8",
+      "number": "N8",
+      "symbol": "N8",
+      "product": "Nachtbus",
+      "productId": "8",
+      "type": "3",
+      "code": "5",
+      "destination": "Wien Alterlaa",
+      "destID": "60201499",
+      "desc": "Handelskai - Alterlaa",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "24N08"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "ref": {
+        "id": "60200363"
+       }
+      },
+      {
+       "name": "Wien Lorenz-Müller-Gasse",
+       "ref": {
+        "id": "60201666"
+       }
+      },
+      {
+       "name": "Wien Dietmayrgasse",
+       "ref": {
+        "id": "60200229"
+       }
+      },
+      {
+       "name": "Wien Gürtelbrücke",
+       "ref": {
+        "id": "60200692"
+       }
+      },
+      {
+       "name": "Wien Spittelau (Döblinger Gürtel)",
+       "ref": {
+        "id": "60201062"
+       }
+      },
+      {
+       "name": "Wien Glatzgasse (Währinger Gürtel)",
+       "ref": {
+        "id": "60200405"
+       }
+      },
+      {
+       "name": "Wien Nußdorfer Straße (Äußerer Währinger Gtl.)",
+       "ref": {
+        "id": "60200950"
+       }
+      },
+      {
+       "name": "Wien Währinger Straße-Volksoper (Gürtel/Schulgasse)",
+       "ref": {
+        "id": "60201510"
+       }
+      },
+      {
+       "name": "Wien Michelbeuern-AKH (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200874"
+       }
+      },
+      {
+       "name": "Wien Alser Straße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200027"
+       }
+      },
+      {
+       "name": "Wien Josefstädter Straße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200615"
+       }
+      },
+      {
+       "name": "Wien Thaliastraße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60201372"
+       }
+      },
+      {
+       "name": "Wien Urban-Loritz-Platz (Äußerer Gürtel)",
+       "ref": {
+        "id": "60201413"
+       }
+      },
+      {
+       "name": "Wien Westbahnhof (Europaplatz)",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Gumpendorfer Straße (Äußerer Mariahilfer Gtl.)",
+       "ref": {
+        "id": "60200436"
+       }
+      },
+      {
+       "name": "Wien Fünfhausgasse",
+       "ref": {
+        "id": "60200052"
+       }
+      },
+      {
+       "name": "Wien Stiegergasse",
+       "ref": {
+        "id": "60201324"
+       }
+      },
+      {
+       "name": "Wien Längenfeldgasse",
+       "ref": {
+        "id": "60200820"
+       }
+      },
+      {
+       "name": "Wien Hans-Mandl-Berufsschule (Längenfeldgasse)",
+       "ref": {
+        "id": "60200470"
+       }
+      },
+      {
+       "name": "Wien Aßmayergasse",
+       "ref": {
+        "id": "60200103"
+       }
+      },
+      {
+       "name": "Wien Dörfelstraße",
+       "ref": {
+        "id": "60200865"
+       }
+      },
+      {
+       "name": "Wien Meidling (Vorplatz)",
+       "ref": {
+        "id": "60201015"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  },
+  {
+   "distance": "-1",
+   "duration": "00:41",
+   "interchange": "1",
+   "desc": "3",
+   "optValue": "0",
+   "legs": [
+    {
+     "timeMinute": "4",
+     "points": [
+      {
+       "name": "Wien Floridsdorf (Franz-Jonas-Platz)",
+       "nameWO": "Floridsdorf (Franz-Jonas-Platz)",
+       "platformName": "J",
+       "plannedPlatformName": "J",
+       "place": "Wien",
+       "nameWithPlace": "Wien Floridsdorf",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:44",
+        "timeSec": "02:44:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:44",
+        "rtTimeSec": "02:44:00"
+       },
+       "ref": {
+        "id": "60200334",
+        "platform": "34A-H"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      },
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "nameWO": "Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "platformName": "",
+       "plannedPlatformName": "",
+       "place": "Wien",
+       "nameWithPlace": "Wien Friedrich-Engels-Platz",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:48",
+        "timeSec": "02:48:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:48",
+        "rtTimeSec": "02:48:00"
+       },
+       "ref": {
+        "id": "60200363",
+        "platform": "N31-R"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "Nachtbus N31",
+      "number": "N31",
+      "symbol": "N31",
+      "product": "Nachtbus",
+      "productId": "8",
+      "type": "3",
+      "code": "5",
+      "destination": "Wien Schwedenplatz",
+      "destID": "60201198",
+      "desc": "Stammersdorf - Schwedenplatz",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "24N31"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Floridsdorf (Franz-Jonas-Platz)",
+       "ref": {
+        "id": "60200334"
+       }
+      },
+      {
+       "name": "Wien Matthäus-Jiszda-Straße (Schöpfleuthnergasse)",
+       "ref": {
+        "id": "60200848"
+       }
+      },
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "ref": {
+        "id": "60200363"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "2",
+       "dTM": "20"
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "timeMinute": "34",
+     "points": [
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "nameWO": "Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "platformName": "",
+       "plannedPlatformName": "",
+       "place": "Wien",
+       "nameWithPlace": "Wien Friedrich-Engels-Platz",
+       "usage": "departure",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "02:51",
+        "timeSec": "02:51:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "02:51",
+        "rtTimeSec": "02:51:00"
+       },
+       "ref": {
+        "id": "60200363",
+        "platform": "N31-R"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      },
+      {
+       "name": "Wien Meidling (Vorplatz)",
+       "nameWO": "Meidling (Vorplatz)",
+       "platformName": "A",
+       "plannedPlatformName": "A",
+       "place": "Wien",
+       "nameWithPlace": "Wien Meidling",
+       "usage": "arrival",
+       "omc": "49000001",
+       "placeID": "50",
+       "desc": "",
+       "dateTime": {
+        "date": "14.09.2026",
+        "time": "03:25",
+        "timeSec": "03:25:00",
+        "rtDate": "14.09.2026",
+        "rtTime": "03:25",
+        "rtTimeSec": "03:25:00"
+       },
+       "ref": {
+        "id": "60201015",
+        "platform": "62A-H"
+       },
+       "sPAs": {
+        "sPA": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "Nachtbus N8",
+      "number": "N8",
+      "symbol": "N8",
+      "product": "Nachtbus",
+      "productId": "8",
+      "type": "3",
+      "code": "5",
+      "destination": "Wien Alterlaa",
+      "destID": "60201499",
+      "desc": "Handelskai - Alterlaa",
+      "timetablePeriod": "Jahresfahrplan 2026",
+      "realtime": "0",
+      "diva": {
+       "opPublicCode": "WL",
+       "line": "24N08"
+      }
+     },
+     "hints": null,
+     "stopSeq": [
+      {
+       "name": "Wien Friedrich-Engels-Platz (Adalbert-Stifter-Straße)",
+       "ref": {
+        "id": "60200363"
+       }
+      },
+      {
+       "name": "Wien Lorenz-Müller-Gasse",
+       "ref": {
+        "id": "60201666"
+       }
+      },
+      {
+       "name": "Wien Dietmayrgasse",
+       "ref": {
+        "id": "60200229"
+       }
+      },
+      {
+       "name": "Wien Gürtelbrücke",
+       "ref": {
+        "id": "60200692"
+       }
+      },
+      {
+       "name": "Wien Spittelau (Döblinger Gürtel)",
+       "ref": {
+        "id": "60201062"
+       }
+      },
+      {
+       "name": "Wien Glatzgasse (Währinger Gürtel)",
+       "ref": {
+        "id": "60200405"
+       }
+      },
+      {
+       "name": "Wien Nußdorfer Straße (Äußerer Währinger Gtl.)",
+       "ref": {
+        "id": "60200950"
+       }
+      },
+      {
+       "name": "Wien Währinger Straße-Volksoper (Gürtel/Schulgasse)",
+       "ref": {
+        "id": "60201510"
+       }
+      },
+      {
+       "name": "Wien Michelbeuern-AKH (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200874"
+       }
+      },
+      {
+       "name": "Wien Alser Straße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200027"
+       }
+      },
+      {
+       "name": "Wien Josefstädter Straße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60200615"
+       }
+      },
+      {
+       "name": "Wien Thaliastraße (Äußerer Gürtel)",
+       "ref": {
+        "id": "60201372"
+       }
+      },
+      {
+       "name": "Wien Urban-Loritz-Platz (Äußerer Gürtel)",
+       "ref": {
+        "id": "60201413"
+       }
+      },
+      {
+       "name": "Wien Westbahnhof (Europaplatz)",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Gumpendorfer Straße (Äußerer Mariahilfer Gtl.)",
+       "ref": {
+        "id": "60200436"
+       }
+      },
+      {
+       "name": "Wien Fünfhausgasse",
+       "ref": {
+        "id": "60200052"
+       }
+      },
+      {
+       "name": "Wien Stiegergasse",
+       "ref": {
+        "id": "60201324"
+       }
+      },
+      {
+       "name": "Wien Längenfeldgasse",
+       "ref": {
+        "id": "60200820"
+       }
+      },
+      {
+       "name": "Wien Hans-Mandl-Berufsschule (Längenfeldgasse)",
+       "ref": {
+        "id": "60200470"
+       }
+      },
+      {
+       "name": "Wien Aßmayergasse",
+       "ref": {
+        "id": "60200103"
+       }
+      },
+      {
+       "name": "Wien Dörfelstraße",
+       "ref": {
+        "id": "60200865"
+       }
+      },
+      {
+       "name": "Wien Meidling (Vorplatz)",
+       "ref": {
+        "id": "60201015"
+       }
+      }
+     ],
+     "format": "x,y",
+     "vAI": {
+      "vA": ""
+     },
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ],
+   "attrs": []
+  }
+ ]
+}

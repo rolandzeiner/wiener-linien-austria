@@ -30,6 +30,40 @@ from .const import DOMAIN, DOMAIN_COOLDOWN_SECONDS, DOMAIN_LAST_CALL_KEY
 LOCK_KEY = "cooldown_lock"
 LOCK_LOOP_KEY = "cooldown_lock_loop"
 
+# The routing endpoint is served by a different backend (the VOR EFA
+# server behind `ogd_routing`) than `/monitor` and `/trafficInfoList`
+# (`ogd_realtime`), so it gets its own slot. Sharing the realtime slot
+# would make every route refresh push a departure tick back by up to 15 s
+# while buying the realtime backend nothing — it never sees the request.
+ROUTING_LAST_CALL_KEY = "routing_last_call_ts"
+ROUTING_LOCK_KEY = "routing_cooldown_lock"
+ROUTING_LOCK_LOOP_KEY = "routing_cooldown_lock_loop"
+ROUTING_COOLDOWN_SECONDS = 15
+
+
+async def async_enforce_routing_cooldown(hass: HomeAssistant) -> None:
+    """Serialise unattended routing requests under their own 15 s floor.
+
+    Same lock-then-sleep shape as `async_enforce_domain_cooldown`, on
+    separate keys. Only the recurring route coordinators take it; the
+    user-initiated `plan_trip` action does not, for the same reason the
+    config-flow line probe skips the realtime slot — someone is waiting.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    current_loop = asyncio.get_running_loop()
+    if domain_data.get(ROUTING_LOCK_LOOP_KEY) is not current_loop:
+        domain_data[ROUTING_LOCK_KEY] = asyncio.Lock()
+        domain_data[ROUTING_LOCK_LOOP_KEY] = current_loop
+    lock: asyncio.Lock = domain_data[ROUTING_LOCK_KEY]
+    async with lock:
+        last: datetime | None = domain_data.get(ROUTING_LAST_CALL_KEY)
+        now = dt_util.utcnow()
+        if last is not None:
+            elapsed = (now - last).total_seconds()
+            if elapsed < ROUTING_COOLDOWN_SECONDS:
+                await asyncio.sleep(ROUTING_COOLDOWN_SECONDS - elapsed)
+        domain_data[ROUTING_LAST_CALL_KEY] = dt_util.utcnow()
+
 
 async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
     """Serialise outbound calls across all callers under the 15s floor.
