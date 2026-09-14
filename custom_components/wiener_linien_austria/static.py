@@ -70,14 +70,19 @@ _LINE_BUS_DAY_RE = re.compile(r"^\d+[A-Z]+$")
 _LINE_SORT_LETTER_TIE = 10**9  # sentinel: letter-only labels rank after numerics
 
 # Mode-of-transport sort tiers — applied first so the lines_at_diva
-# changeover chips group by colour-coded mode (Metro → Tram → Bus →
-# Nightline) rather than interleaving every mode by number alone.
+# changeover chips group by colour-coded mode (Metro → Tram → Badner Bahn
+# → Bus → Nightline) rather than interleaving every mode by number alone.
 # Matches the GTFS palette tiers the card now renders.
+#
+# linien.csv tags the Badner Bahn (LineID 399) "ptTramWLB", not "ptTram".
+# Without its own tier it took the unknown sentinel and sorted after the
+# nightlines on the stops-ahead chips.
 _MOT_SORT_RANK: dict[str, int] = {
     "ptMetro": 0,
     "ptTram": 1,
-    "ptBusCity": 2,
-    "ptBusNight": 3,
+    "ptTramWLB": 2,
+    "ptBusCity": 3,
+    "ptBusNight": 4,
 }
 # Sentinel for unknown MoT values — derived from the table size so it
 # always ranks AFTER every defined tier, even if Wiener Linien adds a

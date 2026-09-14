@@ -925,6 +925,25 @@ def test_sort_line_labels_uses_mot_lookup_when_provided() -> None:
     assert _sort_line_labels(labels, mot) == ("U6", "71", "WLB")
 
 
+def test_sort_line_labels_ranks_badner_bahn_between_tram_and_bus() -> None:
+    """linien.csv's "ptTramWLB" sorts after trams and before buses.
+
+    Regression: the value was missing from the rank table, so the Badner
+    Bahn took the unknown sentinel and landed after the nightlines.
+    """
+    from custom_components.wiener_linien_austria.static import _sort_line_labels
+
+    labels = ["N62", "WLB", "59A", "62", "U6"]
+    mot = {
+        "U6": "ptMetro",
+        "62": "ptTram",
+        "WLB": "ptTramWLB",
+        "59A": "ptBusCity",
+        "N62": "ptBusNight",
+    }
+    assert _sort_line_labels(labels, mot) == ("U6", "62", "WLB", "59A", "N62")
+
+
 def test_stops_ahead_omits_lines_when_no_transfers() -> None:
     """Stops without transfer data don't add an empty `lines` field."""
     catalogue = _u1_catalogue()  # lines_at_diva empty by default
