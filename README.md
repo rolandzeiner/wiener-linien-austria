@@ -12,11 +12,12 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 ## Supported Functions
 
 - **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; the state is the next-departure countdown, attributes carry the full board.
-- **Three Lovelace cards** — modern board, retro LED panel, Solari split-flap — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
+- **Four Lovelace cards** — modern board, retro LED panel, Solari split-flap and a route card — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared across all three cards *(2.0.0)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
+- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live times where Wiener Linien has them and a buffer grade on every change. A second sensor turns on when a delay puts a connection at risk, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. See [Routes](#routes).
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
 ## Screenshots
@@ -65,22 +66,39 @@ Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_comp
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=wiener_linien_austria)
 
-1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**.
+1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**, and choose **Departure board for a stop**.
 2. Start typing in **Stop** (e.g. `Stephans`) and pick a suggestion. The list opens on the stops nearest your Home Assistant location, with distances shown. Submit a partial name instead to see every stop that matches.
 3. Pick the lines to track. Off-service lines — nightlines during the day, day-only lines after midnight — stay selectable.
 4. Set a polling interval (default 60 s, range 30–600 s) and save.
 
 Change tracked lines via **Reconfigure**, the polling interval via **Configure**.
 
+### Routes
+
+*Experimental.* A route plans connections between two stops with the Wiener Linien trip planner.
+
+1. Add the integration again and choose **Route from A to B**.
+2. Pick **From** and **To**. Both fields filter as you type, like the stop picker.
+3. Choose how to plan:
+   - **Prefer** — fastest trip, fewest changes or least walking.
+   - **Most changes** and **Avoid** — limit changes, or leave out trains, S-Bahn, U-Bahn, trams or buses.
+   - **Walking speed** — how long the trip planner allows for walking between platforms.
+   - **Transfer buffer** — changes with less time to spare are marked tight. Default 2 min.
+4. Optionally set a refresh window, such as weekdays 06:30–09:00. Outside it the route makes no requests.
+5. Save. The integration plans the route once first, so a pair of stops the trip planner can't route is caught right away.
+
+Change the planning options via **Reconfigure**. Start and destination can't change, because they identify the route: add a new route instead.
+
 ## Lovelace Cards
 
-Three cards ship with the integration. All three register themselves as Lovelace resources and find Wiener Linien sensors automatically — no entity-name prefix needed. Each version-checks itself over WebSocket and shows a reload banner when your browser holds stale JS, so hard-refresh (⌘⇧R / Ctrl⇧R) after upgrading.
+Four cards ship with the integration. All four register themselves as Lovelace resources and find Wiener Linien sensors automatically — no entity-name prefix needed. Each version-checks itself over WebSocket and shows a reload banner when your browser holds stale JS, so hard-refresh (⌘⇧R / Ctrl⇧R) after upgrading.
 
 | Card | Best for | Stops | Style |
 |---|---|---|---|
 | **Modern** | Everyday dashboard, full feature set | Multi-stop | Themed HA card |
 | **Retro** | Wall-tablet kiosks, entryway displays | Single stop / direction | Wiener Linien LED platform sign |
 | **Flap** | Decorative boards, signage walls | Multi-stop | Solari split-flap mechanical board |
+| **Route** *(experimental)* | "When do I leave?" at a glance | One route | Themed HA card |
 
 ### Modern card — `wiener-linien-austria-card`
 
@@ -120,6 +138,18 @@ A Solari split-flap board — characters cascade one tile at a time toward the t
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
+### Route card — `wiener-linien-austria-route-card`
+
+*Experimental.* The next connection for one route, drawn the way the network map draws it.
+
+- **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time.
+- **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
+- **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when live times say the change no longer fits. The grade is written out, not just coloured.
+- **Disruptions** for the lines the trip uses.
+- **More connections** — up to three later options, folded away until you open them.
+
+Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
+
 ## Sensor Attributes
 
 Each stop gets two entities, and Home Assistant names both in your interface language — check **Developer tools → States** if you're unsure which you have:
@@ -128,6 +158,17 @@ Each stop gets two entities, and Home Assistant names both in your interface lan
 |---|---|---|
 | Departure board | `sensor.<stop>_departures` | `sensor.<stop>_abfahrten` |
 | Stale-data flag | `binary_sensor.<stop>_departure_data_stale` | `binary_sensor.<stop>_abfahrtsdaten_veraltet` |
+
+Each route gets two entities too:
+
+| | English install | German install |
+|---|---|---|
+| Next connection | `sensor.<route>_next_connection` | `sensor.<route>_nachste_verbindung` |
+| Connection at risk | `binary_sensor.<route>_connection_at_risk` | `binary_sensor.<route>_anschluss_gefahrdet` |
+
+The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
+
+The at-risk sensor turns on only when live times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day.
 
 ### Stale-data sensor
 
@@ -164,7 +205,7 @@ When the static schedule resolves a matching trip, `stops_ahead` adds an ordered
 
 ## Data Updates
 
-Two live endpoints and three static catalogues, on separate cadences:
+Three live endpoints and three static catalogues, on separate cadences:
 
 | What | Endpoint | Cadence |
 |---|---|---|
@@ -173,6 +214,7 @@ Two live endpoints and three static catalogues, on separate cadences:
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
+| Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
 
 **The polling interval is per entry; the request is not.** Every entry configured
 with the same interval joins one group that issues a single `/monitor` request
@@ -190,11 +232,40 @@ no meaningful saving. The floor sits at or above the 15-second minimum interval
 conventionally cited for the OGD real-time endpoint — Wiener Linien publish no
 numeric cap, so the figure is convention rather than rule.
 
+**Routes run on their own schedule.** The trip planner is a separate Wiener
+Linien service, so route refreshes take their own 15 s cooldown slot and never
+delay a departure poll. A route also refreshes right after its best connection
+leaves, so the list moves on without a faster interval. Like departures, it
+backs off from the second failure in a row, capped at 30 min.
+
 Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests do **not** send conditional-GET validators, because the upstream cannot answer them — `/monitor` and `/trafficInfoList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. An identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`) goes on every request so Wiener Linien can traffic-shape this integration specifically.
 
 > **After a Home Assistant restart**: alerts (`traffic_info` / `elevator_info`) refresh on a 5-min cadence, so they may be empty for up to 5 min. Departures fetch immediately.
 
 **Failure handling.** A single failed poll keeps the cadence and serves the last successful board. Watch the stale-data flag ([Sensor Attributes](#sensor-attributes)) to catch that, or compare `server_time` to `now()` in a template. From the second consecutive failure the interval doubles each tick, capped at 30 min, until a fetch succeeds; because the request is shared, that backoff applies to the whole interval group. Rate-limit error 316 is the exception: it widens on the first failure instead, since upstream has already said the poll is too fast. It also raises a Repairs issue per entry, which clears itself when the API recovers. Only an integration that has never succeeded stays unavailable.
+
+## Actions
+
+### `wiener_linien_austria.plan_trip`
+
+*Experimental.* Plans connections for a route entry and returns them, soonest first — the same shape as the sensor's `trips` attribute.
+
+| Field | Required | Description |
+|---|---|---|
+| `config_entry_id` | yes | The route to plan. |
+| `datetime` | no | When to leave. Leave empty for now. |
+| `arrive_by` | no | Treat `datetime` as the latest arrival instead. |
+
+```yaml
+action: wiener_linien_austria.plan_trip
+data:
+  config_entry_id: 01J8EXAMPLEROUTEENTRY
+  datetime: "2026-09-15 08:30:00"
+  arrive_by: true
+response_variable: plan
+```
+
+The action skips the request cooldown, because someone is waiting for the answer. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
 
 ## Use Cases
 
@@ -202,6 +273,7 @@ Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monit
 - **Dashboard departure board** — one of the bundled cards, or your own attribute-driven card.
 - **Line-triggered automations** — turn on the entrance light when the tram is approaching.
 - **Travel-time comparison** — track two stops and take whichever leaves sooner.
+- **Commute check** *(experimental)* — a route with a weekday morning window, and a notification when a delay puts your change at risk.
 
 ## Automation Examples
 
@@ -237,9 +309,30 @@ template:
         unit_of_measurement: min
 ```
 
+Notify when a delay puts the commute's change at risk:
+
+```yaml
+alias: "Commute change at risk"
+trigger:
+  - platform: state
+    entity_id: binary_sensor.home_work_connection_at_risk
+    to: "on"
+action:
+  - service: notify.mobile_app_phone
+    data:
+      title: "Your change is at risk"
+      message: >
+        {{ state_attr('binary_sensor.home_work_connection_at_risk', 'transfer_at') }}:
+        {{ state_attr('binary_sensor.home_work_connection_at_risk', 'slack_minutes') }} min to spare
+```
+
 ## Troubleshooting
 
 **"Cannot reach the Wiener Linien real-time API" during setup.** The integration probes `/monitor` before saving. Either the API is down or outbound HTTPS from your HA host is blocked. Retry in a minute.
+
+**"Can't reach the Wiener Linien trip planner" when adding a route.** The integration plans the route once before saving. The trip planner runs separately from the departure API, so one can be down while the other works. Retry in a minute.
+
+**A route shows "Outside the refresh window".** That's the window you set, not an error. Change it via **Reconfigure**.
 
 **"No stop matches that."** Try a shorter or partial name — `Karls` matches Karlsplatz, Karlskirche, and more. Search is case-insensitive, but umlauts matter.
 
@@ -260,7 +353,8 @@ logger:
 ## Known Limitations
 
 - **Vienna only.** ÖBB, VOR, and regional services are out of scope.
-- **No journey planning.** The OGD monitor returns departures at a stop; routing is not provided.
+- **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
+- **Live times on routes depend on the trip planner.** Where it has no live data for a leg, the timetable time is shown and the change is graded on that.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
 - **Stops-ahead is best-effort.** Short-turn services may show the full scheduled path. Replacement buses (SEV) and unscheduled detours produce no panel — the row stays as it is, with no chevron.
 

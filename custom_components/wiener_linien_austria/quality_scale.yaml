@@ -17,8 +17,8 @@ rules:
   dependency-transparency:
     status: done
   docs-actions:
-    status: todo
-    comment: plan_trip (experimental routing) still needs its README section.
+    status: done
+    comment: README "Actions" documents plan_trip.
   docs-conditions:
     status: exempt
     comment: This integration does not have any conditions.
