@@ -18,31 +18,38 @@ import type {
 } from "./types.js";
 import { fireEvent } from "./utils.js";
 import {
+  findRouteEntities,
   MAX_ALTERNATIVES,
   normaliseRouteConfig,
   ROUTE_CARD_TYPE,
   type NormalisedRouteConfig,
 } from "./utils/route.js";
 
-const SCHEMA = [
-  {
-    name: "entity",
-    required: true,
-    selector: {
-      entity: {
-        filter: { domain: "sensor", integration: "wiener_linien_austria" },
+/** Route setup lives in the integration, not the card: a route is polled
+ *  once by the backend and shared by every dashboard showing it. This is the
+ *  My-link that opens that flow from inside Home Assistant. */
+const ADD_ROUTE_HREF = "/_my_redirect/config_flow_start?domain=wiener_linien_austria";
+
+/** `include_entities` rather than an integration filter: the integration
+ *  filter also matches every departure-board sensor, and picking one of those
+ *  gives a card with nothing to show. */
+function schema(routes: string[]): ReadonlyArray<HaFormSchema> {
+  return [
+    {
+      name: "entity",
+      required: true,
+      selector: { entity: { include_entities: routes } },
+    },
+    { name: "title", selector: { text: {} } },
+    {
+      name: "alternatives",
+      selector: {
+        number: { min: 0, max: MAX_ALTERNATIVES, step: 1, mode: "slider" },
       },
     },
-  },
-  { name: "title", selector: { text: {} } },
-  {
-    name: "alternatives",
-    selector: {
-      number: { min: 0, max: MAX_ALTERNATIVES, step: 1, mode: "slider" },
-    },
-  },
-  { name: "hide_attribution", selector: { boolean: {} } },
-] as unknown as ReadonlyArray<HaFormSchema>;
+    { name: "hide_attribution", selector: { boolean: {} } },
+  ] as unknown as ReadonlyArray<HaFormSchema>;
+}
 
 @customElement(`${ROUTE_CARD_TYPE}-editor`)
 export class WienerLinienAustriaRouteCardEditor
@@ -80,11 +87,19 @@ export class WienerLinienAustriaRouteCardEditor
 
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
+    const routes = findRouteEntities(this.hass);
+    const { et } = this._i18n;
     return html`
+      ${routes.length === 0
+        ? html`<ha-alert alert-type="info">
+            ${et("no_routes")}
+            <a slot="action" href=${ADD_ROUTE_HREF}>${et("add_route")}</a>
+          </ha-alert>`
+        : nothing}
       <ha-form
         .hass=${this.hass}
         .data=${this._config as unknown as Record<string, unknown>}
-        .schema=${SCHEMA}
+        .schema=${schema(routes)}
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}
         @value-changed=${this._onValueChanged}

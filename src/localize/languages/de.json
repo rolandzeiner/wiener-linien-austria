@@ -357,13 +357,16 @@
     "version_reload_stuck": "Neu laden hat die neue Version nicht übernommen. Schließe diesen Browser-Tab und öffne das Dashboard erneut, oder lösche die Website-Daten für Home Assistant in den Browser-Einstellungen.",
     "editor": {
       "entity": "Verbindung",
-      "entity_helper": "Richte Verbindungen unter Einstellungen → Geräte & Dienste → Wiener Linien Austria ein.",
+      "entity_helper": "Nur eingerichtete Verbindungen stehen zur Wahl. Start und Ziel legst du beim Einrichten der Verbindung fest.",
       "title": "Überschrift",
       "title_helper": "Leer lassen für „Start → Ziel“.",
       "alternatives": "Weitere Verbindungen",
       "alternatives_helper": "Wie viele spätere Verbindungen unter der besten stehen. 0 blendet sie aus.",
       "hide_attribution": "Datenquelle ausblenden",
-      "hide_attribution_helper": "Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern sie nicht an anderer Stelle im Dashboard steht."
-    }
+      "hide_attribution_helper": "Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern sie nicht an anderer Stelle im Dashboard steht.",
+      "no_routes": "Noch keine Verbindung eingerichtet. Start und Ziel legst du in der Integration fest, danach steht die Verbindung hier zur Wahl.",
+      "add_route": "Verbindung einrichten"
+    },
+    "not_a_route": "Das ist ein Abfahrtsmonitor, keine Verbindung. Wähle im Editor eine Verbindung."
   }
 }

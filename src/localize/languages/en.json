@@ -357,13 +357,16 @@
     "version_reload_stuck": "Reloading didn't pick up the new version. Close this browser tab and open the dashboard again, or clear the site data for Home Assistant in your browser settings.",
     "editor": {
       "entity": "Route",
-      "entity_helper": "Set up routes under Settings → Devices & services → Wiener Linien Austria.",
+      "entity_helper": "Only routes you've set up are listed. Start and destination are chosen when you set up the route.",
       "title": "Heading",
       "title_helper": "Leave empty for “Start → Destination”.",
       "alternatives": "More connections",
       "alternatives_helper": "How many later connections to list under the best one. 0 hides them.",
       "hide_attribution": "Hide data source",
-      "hide_attribution_helper": "The Wiener Linien OGD licence requires a visible credit unless it appears elsewhere on the dashboard."
-    }
+      "hide_attribution_helper": "The Wiener Linien OGD licence requires a visible credit unless it appears elsewhere on the dashboard.",
+      "no_routes": "No route set up yet. Start and destination are set in the integration; the route then shows up here.",
+      "add_route": "Set up a route"
+    },
+    "not_a_route": "This is a departure board, not a route. Pick a route in the editor."
   }
 }

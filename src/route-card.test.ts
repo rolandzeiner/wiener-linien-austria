@@ -219,6 +219,15 @@ describe("rendering", () => {
     expect(root(el).querySelector('[role="status"]')).not.toBeNull();
   });
 
+  it("names a departure board picked as the entity", async () => {
+    const board = {
+      language: "de",
+      states: { [ENTITY]: { state: "3", attributes: { diva: 1, departures: [], next_by_line: {} } } },
+    } as unknown as HomeAssistant;
+    const el = await mount(board, { entity: ENTITY });
+    expect(text(el)).toContain("Das ist ein Abfahrtsmonitor, keine Verbindung");
+  });
+
   it("speaks English when HA does", async () => {
     const el = await mount(hass("x", ACTIVE, "en"), { entity: ENTITY });
     expect(text(el)).toContain("Leave in");
@@ -276,6 +285,32 @@ describe("editor", () => {
     const helper = (form as unknown as { computeHelper(f: { name: string }): string | undefined })
       .computeHelper;
     expect(helper({ name: "title" })).toContain("Start → Ziel");
+  });
+
+  it("offers only route sensors and links to route setup when there are none", async () => {
+    const el = document.createElement(`${TAG}-editor`) as CardElement;
+    document.body.appendChild(el);
+    const mixed = hass("x", ACTIVE);
+    (mixed.states as Record<string, unknown>)["sensor.taubstummengasse_abfahrten"] = {
+      state: "3",
+      attributes: { diva: 1, departures: [], next_by_line: {} },
+    };
+    el.hass = mixed;
+    el.setConfig({ type: `custom:${TAG}` });
+    await el.updateComplete;
+    const form = root(el).querySelector("ha-form") as unknown as {
+      schema: Array<{ name: string; selector: { entity?: { include_entities: string[] } } }>;
+    };
+    expect(form.schema[0]?.selector.entity?.include_entities).toEqual([ENTITY]);
+    expect(root(el).querySelector("ha-alert")).toBeNull();
+
+    el.hass = { states: {}, language: "de" } as unknown as HomeAssistant;
+    await el.updateComplete;
+    const alert = root(el).querySelector("ha-alert");
+    expect(alert?.textContent).toContain("Noch keine Verbindung eingerichtet");
+    expect(alert?.querySelector("a")?.getAttribute("href")).toContain(
+      "config_flow_start?domain=wiener_linien_austria",
+    );
   });
 
   it("renders nothing before it has a config", async () => {

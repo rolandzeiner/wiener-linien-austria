@@ -219,6 +219,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         this._t("entity_missing", { entity: cfg.entity }),
       );
     }
+    if (!findRouteEntities(this.hass).includes(cfg.entity) && stateValue !== "unavailable") {
+      // A departure board (or any other sensor) picked by hand in YAML. Say
+      // so, instead of the "no connection right now" a missing trips list
+      // would otherwise fall through to.
+      return this._empty("mdi:swap-horizontal", this._t("not_a_route"));
+    }
     if (stateValue === "unavailable") {
       return this._empty(
         "mdi:cloud-off-outline",
