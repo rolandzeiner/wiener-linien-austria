@@ -4,6 +4,7 @@ import type { HomeAssistant, RouteTripAttr } from "../types.js";
 import {
   clockOf,
   findRouteEntities,
+  legTypeIcon,
   minutesUntil,
   normaliseRouteConfig,
   transitLegs,
@@ -130,5 +131,20 @@ describe("window labels", () => {
     expect(windowDays(mixed, "en")).toBe("Mon, Tue, Thu–Sat");
     const all = { from: null, to: null, days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] };
     expect(windowDays(all, "en")).toBe("");
+  });
+});
+
+describe("legTypeIcon", () => {
+  it("covers the modes only routes reach", () => {
+    expect(legTypeIcon("ptTrainS", "S80")).toBe("mdi:train");
+    expect(legTypeIcon("ptOther", "S45")).toBe("mdi:train");
+    expect(legTypeIcon(null, "s7")).toBe("mdi:train");
+    expect(legTypeIcon("ptTrain", "REX")).toBe("mdi:train");
+    expect(legTypeIcon("ptBusRegion", "200")).toBe("mdi:bus");
+    expect(legTypeIcon("ptBusOnDemand", "25B")).toBe("mdi:bus");
+    expect(legTypeIcon("ptCableCar", null)).toBe("mdi:gondola");
+    expect(legTypeIcon("ptShip", null)).toBe("mdi:ferry");
+    expect(legTypeIcon("ptMetro", "U1")).toBe("mdi:subway-variant");
+    expect(legTypeIcon("ptSomethingNew", "X1")).toBeNull();
   });
 });

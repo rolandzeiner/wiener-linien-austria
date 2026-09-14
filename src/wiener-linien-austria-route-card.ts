@@ -8,9 +8,9 @@
 //
 // Colour discipline: nothing here introduces a palette. Line colours come off
 // the same GTFS ladder as every other card (`chipPalette`), and the transfer
-// grades use the portfolio's semantic tokens as a tint plus an edge stripe —
-// never as the text colour — so the label keeps body-text contrast in both
-// themes and the grade is carried by icon + words, not hue (WCAG 1.4.1).
+// grades use the portfolio's semantic tokens as a flat tint — never as the
+// text colour — so the label keeps body-text contrast in both themes and the
+// grade is carried by icon + words, not hue (WCAG 1.4.1).
 
 import {
   LitElement,
@@ -39,11 +39,12 @@ import type {
   WindowWithCustomCards,
 } from "./types.js";
 import { chipPalette } from "./utils/config.js";
-import { lineTypeIcon, LINE_TYPE_METRO } from "./utils/mot.js";
+import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { safeDomId } from "./utils/html.js";
 import {
   clockOf,
   findRouteEntities,
+  legTypeIcon,
   minutesUntil,
   normaliseRouteConfig,
   RISK_ICON,
@@ -399,7 +400,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   ): TemplateResult {
     const departs = leg.origin.estimated ?? leg.origin.planned;
     const late = leg.origin.delay_minutes ?? 0;
-    const icon = lineTypeIcon(leg.type ?? undefined);
+    const icon = legTypeIcon(leg.type, leg.line);
     const stops =
       leg.stop_count === 1
         ? this._t("stops_one")
@@ -764,18 +765,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       gap: 2px 8px;
     }
 
-    /* Transfer grade: tint + edge stripe in the semantic token, text in the
-       theme's body colour. The 16% mix keeps body-text contrast on both the
-       light and the dark card ground. */
+    /* Transfer grade: a flat tint of the semantic token, text in the theme's
+       body colour. The 18% mix keeps body-text contrast on both the light and
+       the dark card ground. */
     .risk {
       --risk: var(--wl-rt);
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 2px 8px 2px 10px;
+      padding: 2px 8px;
       border-radius: var(--wl-radius-sm);
-      background: color-mix(in srgb, var(--risk) 16%, transparent);
-      box-shadow: inset 3px 0 0 var(--risk);
+      background: color-mix(in srgb, var(--risk) 18%, transparent);
       color: var(--primary-text-color);
       font-size: 0.8rem;
       font-weight: 600;
@@ -804,8 +804,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       align-items: flex-start;
       padding: 8px 10px;
       border-radius: var(--wl-radius-md);
-      background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
-      box-shadow: inset 3px 0 0 var(--wl-warning);
+      background: color-mix(in srgb, var(--wl-warning) 18%, transparent);
       color: var(--primary-text-color);
       font-size: 0.85rem;
     }

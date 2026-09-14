@@ -2,6 +2,7 @@
 // whole decision layer — which entity is a route, what the countdown says,
 // how a transfer is graded — is testable without rendering a card.
 
+import { lineTypeIcon } from "./mot.js";
 import type {
   HomeAssistant,
   RouteActiveWindow,
@@ -154,4 +155,26 @@ export function windowDays(
     start = end + 1;
   }
   return parts.join(", ");
+}
+
+/** Vehicle icon for a route leg. Routes reach modes a stop board never shows
+ *  (S-Bahn, regional trains and buses), so this extends `lineTypeIcon` rather
+ *  than widening it for all four cards. An "S" + number label is always the
+ *  S-Bahn, whatever type the trip planner reported. */
+export function legTypeIcon(type: string | null | undefined, line: string | null | undefined): string | null {
+  if (line && /^S\d/i.test(line)) return "mdi:train";
+  switch (type) {
+    case "ptTrain":
+    case "ptTrainS":
+      return "mdi:train";
+    case "ptBusRegion":
+    case "ptBusOnDemand":
+      return "mdi:bus";
+    case "ptCableCar":
+      return "mdi:gondola";
+    case "ptShip":
+      return "mdi:ferry";
+    default:
+      return lineTypeIcon(type ?? undefined);
+  }
 }
