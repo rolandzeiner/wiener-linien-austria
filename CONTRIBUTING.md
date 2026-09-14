@@ -10,14 +10,15 @@ uv pip install -r requirements_test.txt pre-commit
 pre-commit install      # runs ruff + mypy + checks on every commit
 
 npm ci                  # Lovelace card deps
-npm run build           # Rolldown builds three bundles into
+npm run build           # Rolldown builds four bundles into
                         # custom_components/wiener_linien_austria/www/:
                         #   wiener-linien-austria-card.js
                         #   wiener-linien-austria-retro-card.js
                         #   wiener-linien-austria-flap-card.js
+                        #   wiener-linien-austria-route-card.js
 ```
 
-`npm run dev` watches `src/` and rebuilds all three bundles on save.
+`npm run dev` watches `src/` and rebuilds all four bundles on save.
 
 ## Branching & releases
 
@@ -27,11 +28,11 @@ npm run build           # Rolldown builds three bundles into
 
 ## Card-version sync
 
-Three cards, three version constants. `manifest.json` is the single source of truth: `const.py` reads it at import and aliases `CARD_VERSION`, `RETRO_CARD_VERSION` and `FLAP_CARD_VERSION` to it, so the Python side needs no manual edit. The three literals in `src/const.ts` do — each must equal `manifest.json::version` byte-for-byte. `tests/test_card_version.py` checks every constant against the manifest independently, so a failure names exactly which one drifted.
+Four cards, four version constants. `manifest.json` is the single source of truth: `const.py` reads it at import and aliases `CARD_VERSION`, `RETRO_CARD_VERSION`, `FLAP_CARD_VERSION` and `ROUTE_CARD_VERSION` to it, so the Python side needs no manual edit. The four literals in `src/const.ts` do — each must equal `manifest.json::version` byte-for-byte. `tests/test_card_version.py` checks every constant against the manifest independently, so a failure names exactly which one drifted.
 
 A version bump is therefore two files: `manifest.json` and `src/const.ts`. The TS constants drive the served `?v=…` query string; the Python constants drive the WebSocket version check. If they drift, users get an infinite reload-banner loop — the card sees a mismatch, shows the reload banner, the reload re-serves the same JS, and the banner comes straight back.
 
-Because the TS literals are asserted equal to the manifest, none of the three can carry a `-beta-N` suffix on its own; the manifest version is whatever the cards say. Bump both files in the same commit as a rebuilt bundle — `validate.yml` asserts the committed `www/` matches a fresh `npm run build`. The README badge auto-fetches the latest release tag, so it needs no manual edit.
+Because the TS literals are asserted equal to the manifest, none of the four can carry a `-beta-N` suffix on its own; the manifest version is whatever the cards say. Bump both files in the same commit as a rebuilt bundle — `validate.yml` asserts the committed `www/` matches a fresh `npm run build`. The README badge auto-fetches the latest release tag, so it needs no manual edit.
 
 ## Tooling & config
 
@@ -44,7 +45,7 @@ Because the TS literals are asserted equal to the manifest, none of the three ca
   17.8% of the modern bundle. Comments stay intact in `npm run dev`. It carried
   over to `rolldown.config.mjs` unchanged — rolldown implements the Rollup plugin
   API — and still runs *after* the transpile step, which is the ordering it needs.
-- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~97%.
+- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.12% on 2026-09-14).
   - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the other twelve carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
 
     ```bash
@@ -76,7 +77,7 @@ Bumping an exact pin is a deliberate act — say why in the commit message. Depe
 
 **Two output options are load-bearing and fail silently.** The banner must be a **legal** comment — `/*! ... */` — with `comments: { legal: true }`; a `//` banner is stripped by the minifier and only the built file's first bytes reveal it. And **`dropConsole` stays `false`**: rolldown's option is a boolean rather than terser's per-method array, so it is all-or-nothing, and most `console.*` calls in these cards sit in `catch` blocks where dropping them turns a caught error into a silent one.
 
-**The three bundles are excluded from the `end-of-file-fixer` / `trailing-whitespace` pre-commit hooks.** Rolldown emits no trailing newline where Rollup did, so a hook that "fixes" the file *after* the build leaves the committed bundle out of sync with a fresh one — exactly what `validate.yml` asserts byte-for-byte. `output.footer: "\n"` does not work around it; the minifier strips trailing whitespace.
+**The card bundles are excluded from the `end-of-file-fixer` / `trailing-whitespace` pre-commit hooks.** The exclude pattern, `^custom_components/.*/www/.*\.js$`, covers all four. Rolldown emits no trailing newline where Rollup did, so a hook that "fixes" the file *after* the build leaves the committed bundle out of sync with a fresh one — exactly what `validate.yml` asserts byte-for-byte. `output.footer: "\n"` does not work around it; the minifier strips trailing whitespace.
 
 **The bundler does not type-check, and `tsc` is the only type-checker.** This has been true since the move off `@rollup/plugin-typescript` (TypeScript 7 is the Go-native compiler and its npm package no longer ships the JS compiler API, so that plugin dies at load). swc filled the gap for one release cycle; rolldown does the transpile now. `npx tsc --noEmit` still type-checks. Two consequences worth knowing:
 
@@ -108,8 +109,8 @@ npx vitest run --coverage --coverage.provider=v8 \
 # -> empty table, "100% (0/0)" — not a 0% row
 ```
 
-This is why the three card entrypoints — 6,568 lines, the entire user-visible
-surface — were absent from the coverage report until `src/card-smoke.test.ts`
+This is why the three departure-board card entrypoints, then the largest files
+in the tree, were absent from the coverage report until `src/card-smoke.test.ts`
 existed, rather than listed at 0%. The headline percentage was computed over a
 denominator that excluded the largest files in the tree. Adding the smoke tests
 moved covered statements from 833 to 1480 and the reported percentage *down*
@@ -140,10 +141,12 @@ picks between them per file:
 - **node (the default)** for the pure functions: config normalisers, departure
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
-- **happy-dom**, opted into with a `// @vitest-environment happy-dom` docblock on
-  the first line, for anything that needs a DOM. Five files today:
-  `card-smoke.test.ts` mounts the three card entrypoints, `editor-smoke.test.ts`
-  mounts the three editors and asserts the `config-changed` payload,
+- **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
+  file's leading comment, for anything that needs a DOM. Six of the 18 test
+  files today: `card-smoke.test.ts` mounts the three departure-board cards,
+  `editor-smoke.test.ts` mounts their three editors and asserts the
+  `config-changed` payload, `route-card.test.ts` covers the route card, its
+  ad-hoc mode and its editor,
   `editor/header-strip.test.ts` drives the signage-strip editor,
   `shared-render.test.ts` covers the stale-cache reload machinery, and
   `utils/traffic-notice.test.ts` needs `DOMParser` to extract notice prose.
@@ -161,6 +164,57 @@ parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`.
 Both are fine in every browser HA supports — assert on the source, not on parsed
 `cssText`.
 
+## On-demand route planning
+
+The route card can plan between any two stops without a route entry. That path
+has more moving parts than the rest of the integration, and a few of them are
+easy to break without a test noticing.
+
+**Where it lives.** `websocket.py` holds the two commands the card calls,
+`wiener_linien_austria/stops` and `wiener_linien_austria/plan`. `adhoc.py`
+holds the planner behind `plan` and the `plan_trip` action: cache, coalescing,
+per-user and instance budgets, and the stale fallback. `stops.py` builds the
+stop list the setup dialog and the card share. On the card side,
+`src/stop-combobox.ts` is the picker and `src/utils/route.ts` holds the refresh
+cadence, error table and stop filter.
+
+**Why the commands are registered in `async_setup`.** `websocket_api` has no
+deregister hook, so a command can't be tied to an entry's lifetime: whatever
+registers it, it stays until HA restarts. `async_setup` runs once per HA
+process, which makes it the one place a single registration is guaranteed. The trade-off is that the
+handlers outlive a removed integration, so every command answers `not_loaded`
+unless an entry of the domain is loaded. Keep that check in any command you add.
+
+**One planning path.** `route_coordinator.async_plan_trips` is the only function
+that fetches, parses and ranks a trip request. Route entries, `plan_trip`, the
+card's `plan` command and the config flow's setup probe all go through it, so
+they can't disagree about the same query. In tests, patch the fetch at
+`custom_components.wiener_linien_austria.route_coordinator.async_fetch_trip_body`
+(the name `route_coordinator` imported), not in `routing.py`. The fixtures in
+`tests/conftest.py` already do.
+
+**The fair-use numbers are measured, not picked.** The backend constants sit at
+the top of `adhoc.py`: a 60 s cache, a 5 min stale limit, 120 requests an hour
+(burst 10) for the instance and 60 (burst 5) per user. The card's sit in
+`src/utils/route.ts`: a 120 s refresh while on screen, a 60 s rollover floor,
+a 30 min idle pause and a 400 ms debounce. They were sized against the routing
+backend's measured capabilities (the block in `const.py`) and the load a
+configured route already makes.
+Changing any of them means re-measuring with the `api-polling` skill's probe
+first, and updating the README's Data Updates section in the same commit.
+
+**Privacy.** A stop pair picked on a dashboard is a movement pattern. The card
+keeps the last pick in the browser's `localStorage`, and the backend keeps plans
+in memory for at most 5 minutes and clears them when the last entry unloads.
+Don't add stop pairs to diagnostics, the recorder or any log above `debug`.
+
+**Tests.** `tests/test_adhoc.py` covers both commands and the planner. Its
+`_connect` helper authenticates the WebSocket client **before** freezing time.
+The auth token is stamped with the real clock, and a clock frozen earlier than
+that rejects it, so a new test that freezes first fails at login rather than at
+the assertion. On the card side, `src/route-card.test.ts` installs an in-memory
+`localStorage` in `beforeEach`, because happy-dom leaves it undefined.
+
 ## Snapshot tests
 
 Diagnostics output is pinned via `syrupy`. Snapshots live under `tests/snapshots/`. After an intentional change to the diagnostics shape (new field, redaction-set drift), regenerate:
@@ -174,16 +228,21 @@ Commit the updated `.ambr` file alongside the code change so the diff is reviewa
 ## Verification gate (must pass before pushing)
 
 ```bash
-pytest tests/ -v
+source .venv/bin/activate
+pytest tests/ -q
+python scripts/check_module_coverage.py   # per-module floor, reads coverage.json
 mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
 ruff check .
 ruff format --check .   # separate: `ruff check` never inspects formatting
+FLOOR=$(sed -n 's/^target-version = "py3\([0-9]*\)"/3.\1/p' pyproject.toml)
+uv run --python "$FLOOR" --no-project python -m compileall -q custom_components/wiener_linien_austria
 npx tsc --noEmit
 npm test
-npm run build
+npm run test:coverage:gate
+npm run build           # commit the rebuilt www/*.js with any src/ change
 ```
 
-CI runs the same checks plus hassfest + HACS validation. Failing locally wastes a push.
+CI runs the same checks plus hassfest + HACS validation, the Lit template backtick guard, `npm audit`, and a byte-for-byte check that the committed bundles match a fresh build. Failing locally wastes a push.
 
 ## Reporting issues
 

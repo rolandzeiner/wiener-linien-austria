@@ -13,11 +13,11 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 - **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; the state is the next-departure countdown, attributes carry the full board.
 - **Four Lovelace cards** — modern board, retro LED panel, Solari split-flap and a route card — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
-- **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared across all three cards *(2.0.0)*.
+- **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared by the modern, retro and flap cards *(2.0.0)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
-- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live times where Wiener Linien has them and a buffer grade on every change. A second sensor turns on when a delay puts a connection at risk, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes).
+- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, planned on the timetable, with a buffer grade on every change. Live times are used whenever the trip planner supplies them. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
 ## Screenshots
@@ -142,15 +142,53 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
 
 *Experimental.* The next connection for one route, or between any two stops you pick on the card, drawn the way the network map draws it.
 
+The card works in one of two ways:
+
+- **With a route.** Pick a route you set up under [Routes](#routes). The card shows what that route's sensor reports.
+- **Without a route.** Leave the route empty and the card shows **From** and **To** pickers instead. It plans on the spot, so you don't need to set up a route first.
+
+What the card shows:
+
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
-- **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when live times say the change no longer fits. The grade is written out, not just coloured.
+- **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
 - **More connections** — up to three later options, folded away until you open them.
-- **Last updated** — the time the trip planner last answered, so a plan kept on screen can't pass for a fresh one.
-- **Any two stops** — leave the route empty and the card shows **From** and **To** pickers instead. Type a few letters to narrow the list, or open it and pick. Swap the two stops with one tap. The connections appear as soon as both are set. No route setup needed. The card remembers the last pick on each device, and the editor can preselect a start and destination.
+- **Last updated** (*Zuletzt aktualisiert* on a German install) — the time the trip planner last answered, next to the heading, so a plan kept on screen can't pass for a fresh one.
+
+Picking stops without a route:
+
+- **Type to narrow the list.** Case and accents don't matter, so `wahringer strasse` finds Währinger Straße. Or open the list and pick. The nearest stops to your Home Assistant location come first.
+- **Swap** start and destination with one tap.
+- The connections appear as soon as both stops are set.
+- The card remembers your last pick on each device. In the card editor you can also preselect a start and destination.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
+
+#### Card configuration
+
+With a route:
+
+```yaml
+type: custom:wiener-linien-austria-route-card
+entity: sensor.home_work_next_connection
+```
+
+Without a route, preselecting Hauptbahnhof → Gregorygasse:
+
+```yaml
+type: custom:wiener-linien-austria-route-card
+from: "60201349"
+to: "60200421"
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `entity` | none | A route's next-connection sensor. Leave it out to pick stops on the card. |
+| `from` / `to` | none | Stops to preselect when there's no `entity`, as DIVA numbers. A departure sensor shows its stop's DIVA in the `diva` attribute, and the card editor lists stops by name. A pick remembered on a device wins there, until you change these options. |
+| `title` | see note | Heading text. Without it the card shows the route's start and destination, or "Plan a trip" when you pick stops on the card. |
+| `alternatives` | `2` | Later connections to offer, `0`–`3`. |
+| `hide_attribution` | `false` | Hides the data-source line. |
 
 **How the card plans between any two stops.** Requests go through Home Assistant, never from the browser to Wiener Linien. The card refreshes every 2 minutes while it's on screen and the browser tab is visible, and shortly after the best connection leaves. After 30 minutes without a tap or key press it pauses until someone touches it, so a wall tablet left open stops asking. Home Assistant reuses an answer for up to a minute, whichever dashboard asks. Each Home Assistant user gets up to 60 trip-planner requests an hour, and all users together up to 120.
 
@@ -172,7 +210,7 @@ Each route gets two entities too:
 
 The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
 
-The at-risk sensor turns on only when live times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day.
+The at-risk sensor turns on only when the current times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day. Delays only count if the trip planner sends live times, and as of September 2026 it sends none (see [Known Limitations](#known-limitations)).
 
 ### Stale-data sensor
 
@@ -195,7 +233,7 @@ Use it instead of the departure sensor's availability. The departure sensor stay
 | `line_colors` | dict[str, dict] | Official GTFS colours per line — `{"U1": {"bg": "E20D17", "fg": "FFFFFF"}}`. |
 | `lines_at_stop` | list[str] | Every line serving this DIVA per the static schedule, regardless of live status. |
 | `tracked_lines` | list[str] | Lines tracked in this entry. Card editors filter their pickers to this set. |
-| `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys. All three card editors use them to offer only directions this stop actually serves. |
+| `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys. The modern, retro and flap card editors use them to offer only directions this stop actually serves. |
 | `stale_departures` | int | Records dropped this poll because the feed stopped advancing them. |
 | `stale_since` | ISO string \| None | Newest planned time among those dropped — roughly when the feed froze. |
 | `traffic_info` | list[dict] | Service disruptions. `category` says which feed a notice came from: `stoerunglang` matches your tracked lines. `stoerungkurz` is the stop's own display text. It needs one of this stop's RBLs plus one of your tracked lines — named in the notice or, if it names none, calling at that platform per the timetable. A notice with no lines of its own lists those tracked lines in `inferred_lines`, which the card shows as badges. Every `stoerungkurz` notice has the platform's station name in `location`. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `inferred_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
@@ -281,6 +319,45 @@ response_variable: plan
 ```
 
 The action skips the request cooldown, because someone is waiting for the answer, and shares the route card's limits instead. Calling it again for the same route and time within a minute returns the same answer without a new request. A script can make 5 requests in a row, then about one a minute; beyond that the action fails with a message saying when to try again. Automations, which run without a user, share one allowance. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
+
+### WebSocket API (for card and dashboard developers)
+
+*Experimental.* The route card plans between any two stops through two WebSocket commands. The route card is the intended caller. You can call them from your own card too, but they may change while routes are experimental. Any signed-in user can call them, not only admins, so a wall tablet signed in as a regular user works.
+
+**`wiener_linien_austria/stops`** takes no fields. It returns every stop you can plan from, nearest to your Home Assistant location first. It's the same list the setup dialog offers.
+
+```json
+{"stops": [{"value": "60201349", "label": "Hauptbahnhof (Wien) — 450 m"}]}
+```
+
+**`wiener_linien_austria/plan`** plans connections between two stops, leaving now.
+
+| Field | Required | Values |
+|---|---|---|
+| `origin`, `destination` | yes | Stop DIVAs from the `stops` list. |
+| `route_type` | no | `LEASTTIME` (default), `LEASTINTERCHANGE` or `LEASTWALKING`. |
+| `max_changes` | no | `"0"`–`"3"`, or `"any"` (default). |
+| `walk_speed` | no | `slow`, `normal` (default) or `fast`. |
+| `excluded_means` | no | Any of `train`, `sbahn`, `metro`, `tram`, `bus`. Default: none. |
+| `min_transfer_minutes` | no | `0`–`15`, default `2`. |
+
+The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `trips` (up to four), `line_colors`, `traffic_info` and `attribution`. Two more fields cover a used-up allowance. `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
+
+`plan` shares the limits described under [Data Updates](#data-updates): answers reused for a minute, and at most 60 requests an hour per user and 120 for all users together.
+
+Errors come back with one of these codes:
+
+| Code | Meaning |
+|---|---|
+| `not_loaded` | The integration has no loaded entry. Both commands answer this until one loads. |
+| `catalogue_unavailable` | The stop list couldn't be loaded. |
+| `invalid_stop` | A DIVA isn't in the `stops` list. |
+| `same_stop` | Origin and destination are the same stop. |
+| `invalid_query` | The trip planner refused this pair, for example because the stops are too close together. Asking again soon gets the same answer. |
+| `rate_limited` | The allowance is used up and there's no recent plan to fall back on. `translation_placeholders.retry_after` gives the seconds to wait. |
+| `upstream` | The trip planner couldn't be reached or sent an error. |
+
+A request that doesn't match the schema gets Home Assistant's own `invalid_format` error.
 
 ## Use Cases
 
@@ -374,7 +451,7 @@ logger:
 - **Vienna only.** ÖBB, VOR, and regional services are out of scope.
 - **The card's last pick stays on that device.** It's saved in the browser, not in Home Assistant, so a phone and a wall tablet each remember their own. Two route cards without a route on the same device share that pick.
 - **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
-- **Live times on routes depend on the trip planner.** Where it has no live data for a leg, the timetable time is shown and the change is graded on that.
+- **Routes use timetable times for now.** The integration uses live times whenever the trip planner supplies them. In tests on 14 September 2026 it supplied none, not even for U-Bahn lines the departure boards show live. Until that changes, a delay doesn't show up on a route, and the at-risk sensor can't react to one.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
 - **Stops-ahead is best-effort.** Short-turn services may show the full scheduled path. Replacement buses (SEV) and unscheduled detours produce no panel — the row stays as it is, with no chevron.
 
