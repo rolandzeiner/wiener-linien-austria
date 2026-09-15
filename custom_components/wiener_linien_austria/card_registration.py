@@ -257,7 +257,7 @@ class JSModuleRegistration:
                     item["id"],
                     {"res_type": "module", "url": versioned_url},
                 )
-            except Exception as update_err:  # noqa: BLE001
+            except Exception as update_err:  # noqa: BLE001 — HA shifts the class
                 # Broad except: HA core has shifted the concrete
                 # exception class for this failure across versions
                 # (HomeAssistantError, KeyError on a mid-flight evict,

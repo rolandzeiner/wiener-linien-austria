@@ -656,7 +656,7 @@ async def _async_background_refresh(
     except asyncio.CancelledError:
         # HA stopping or task explicitly cancelled — don't log noisily.
         raise
-    except Exception as err:  # noqa: BLE001
+    except Exception as err:  # noqa: BLE001 — background task safety net
         # Network, parse, schema-surprise — none should crash the
         # integration. Log + retry on the next weekly tick.
         _LOGGER.warning(
