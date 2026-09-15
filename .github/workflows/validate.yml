@@ -100,7 +100,7 @@ jobs:
         # resolver surfaces hard PHACC transitive pins (e.g.
         # pytest-asyncio==1.4.0) just as clearly as pip 26.1 did, which is
         # what lets requirements_test.txt declare so little.
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@v10.1.0
         with:
           enable-cache: true
       - name: Install dependencies
