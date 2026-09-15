@@ -4,13 +4,13 @@
 // needs literal SVG path data, so HA's <ha-icon> / <ha-svg-icon> cannot
 // serve this call site — only the raw `d` attribute will do. Depending on
 // `@mdi/js` for four constants meant a 6.3 MB, 7,447-icon package that
-// rollup already tree-shook to exactly these four, so vendoring changes no
+// rollup already tree-shook to exactly the four it had then, so vendoring changes no
 // icon and no rendered pixel; it drops install-time and supply-chain
 // weight. Same precedent as utils/retro-station-icons.ts: icon path data
 // is content, not an API.
 //
 // PROVENANCE — Material Design Icons v7.4.47, Apache-2.0, copied verbatim
-// from @mdi/js. All four use MDI's standard 24x24 viewBox, which the canvas
+// from @mdi/js. All of them use MDI's standard 24x24 viewBox, which the canvas
 // scale factor in `_renderTintedQr` assumes. To refresh, reinstall @mdi/js
 // at the desired version and re-copy; never hand-edit the geometry.
 
@@ -22,6 +22,11 @@ const mdiTram = "M19,16.94V8.5C19,5.71 16.39,5.1 13,5L13.75,3.5H17V2H7V3.5H11.75
 
 /** MDI `mdiBus` (v7.4.47) — 24x24 viewBox. */
 const mdiBus = "M18,11H6V6H18M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M4,16C4,16.88 4.39,17.67 5,18.22V20A1,1 0 0,0 6,21H7A1,1 0 0,0 8,20V19H16V20A1,1 0 0,0 17,21H18A1,1 0 0,0 19,20V18.22C19.61,17.67 20,16.88 20,16V6C20,2.5 16.42,2 12,2C7.58,2 4,2.5 4,6V16Z";
+
+/** MDI `mdiTrain` (v7.4.47) — 24x24 viewBox. For the S-Bahn rows the
+ *  timetable adds to a board. Copied from @mdi/svg 7.4.47 `svg/train.svg`,
+ *  the same geometry @mdi/js ships. */
+const mdiTrain = "M12,2C8,2 4,2.5 4,6V15.5A3.5,3.5 0 0,0 7.5,19L6,20.5V21H8.23L10.23,19H14L16,21H18V20.5L16.5,19A3.5,3.5 0 0,0 20,15.5V6C20,2.5 16.42,2 12,2M7.5,17A1.5,1.5 0 0,1 6,15.5A1.5,1.5 0 0,1 7.5,14A1.5,1.5 0 0,1 9,15.5A1.5,1.5 0 0,1 7.5,17M11,10H6V6H11V10M13,10V6H18V10H13M16.5,17A1.5,1.5 0 0,1 15,15.5A1.5,1.5 0 0,1 16.5,14A1.5,1.5 0 0,1 18,15.5A1.5,1.5 0 0,1 16.5,17Z";
 
 /** MDI `mdiBusStop` (v7.4.47) — 24x24 viewBox. */
 const mdiBusStop = "M22 7V16C22 16.71 21.62 17.36 21 17.72V19.25C21 19.66 20.66 20 20.25 20H19.75C19.34 20 19 19.66 19 19.25V18H12V19.25C12 19.66 11.66 20 11.25 20H10.75C10.34 20 10 19.66 10 19.25V17.72C9.39 17.36 9 16.71 9 16V7C9 4 12 4 15.5 4S22 4 22 7M13 15C13 14.45 12.55 14 12 14S11 14.45 11 15 11.45 16 12 16 13 15.55 13 15M20 15C20 14.45 19.55 14 19 14S18 14.45 18 15 18.45 16 19 16 20 15.55 20 15M20 7H11V11H20V7M7 9.5C6.97 8.12 5.83 7 4.45 7.05C3.07 7.08 1.97 8.22 2 9.6C2.03 10.77 2.86 11.77 4 12V20H5V12C6.18 11.76 7 10.71 7 9.5Z";
@@ -43,6 +48,8 @@ export function mdiPathForIcon(iconName: string): string {
       return mdiTram;
     case "mdi:bus":
       return mdiBus;
+    case "mdi:train":
+      return mdiTrain;
     case "mdi:bus-stop":
     default:
       return mdiBusStop;
