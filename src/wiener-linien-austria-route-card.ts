@@ -1057,6 +1057,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               i === 0,
               attrs,
               !!transfer && i < legs.length - 1,
+              i < legs.length - 1,
               i === 0 ? walkAccess(trip, "start") : undefined,
             )}
             ${transfer && i < legs.length - 1
@@ -1085,6 +1086,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     first: boolean,
     attrs: RouteAttrs,
     beforeTransfer: boolean,
+    showArrival: boolean,
     accessBefore?: RouteAccessStepAttr[],
   ): TemplateResult {
     const icon = legTypeIcon(leg.type, leg.line);
@@ -1168,14 +1170,23 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               )}
             </ol>`
           : nothing}
+        ${showArrival
+          ? html`<div class="stop stop--arrive">
+              <span class="node" aria-hidden="true"></span>
+              <span class="sr-only">${this._t("arrival")}</span>
+              ${this._renderStopTime(leg.destination)}
+              <span class="stop-name">${leg.destination.name}</span>
+              ${this._renderMapLink(leg.destination)}
+            </div>`
+          : nothing}
       </li>
     `;
   }
 
   /** A pin after a stop name that opens the stop on the city map, or searches
    *  for it by name where the catalogue gave no coordinates. The label says
-   *  which of the two it does. Only boarding stops and the destination get
-   *  one: the stops in between sit too close together for a 24px target each. */
+   *  which of the two it does. Boarding stops, arrivals and the destination get
+   *  one; the stops in between sit too close together for a 24px target each. */
   private _renderMapLink(stop: RouteStopAttr): TemplateResult | typeof nothing {
     if (this._config?.show_map_pins === false) return nothing;
     const url = stopMapUrl(stop.name, stop.latitude, stop.longitude);
@@ -1395,6 +1406,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
          Every rail segment starts or ends here, so nodes sit exactly on the
          joins instead of the segments guessing at a shared offset. */
       --node-centre: calc(var(--node-top) + var(--node-size) / 2);
+      --stop-row: 22px;
       --strand-x: 6px;
       --leg-colour: var(--primary-color);
     }
@@ -1505,9 +1517,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       position: relative;
       padding-inline-start: calc(var(--strand-x) * 2 + var(--node-size));
     }
-    /* A ride runs from its boarding node down into the next stop's node.
-       Before a change it stops at the row's edge instead, and the transfer's
-       dotted walk takes over from there. */
+    /* A ride runs from its boarding node down into the next stop's node. */
     .leg::before {
       content: "";
       position: absolute;
@@ -1518,8 +1528,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       border-radius: 2px;
       background: var(--leg-colour);
     }
+    /* Before a change the ride ends in its arrival node, and the dotted walk
+       picks up from that node. Both assume the arrival row is one line high,
+       as its time and stop name are on any card wider than a phone. */
     .leg--before-transfer::before {
-      bottom: 0;
+      bottom: calc(var(--stop-row) - var(--node-centre));
     }
     /* The walk spans the whole transfer row and reaches down into the next
        ride's boarding node, which covers the end of it. */
@@ -1527,7 +1540,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       content: "";
       position: absolute;
       inset-inline-start: calc(var(--strand-x) + var(--node-size) / 2 - 1px);
-      top: 0;
+      top: calc(var(--node-centre) - var(--stop-row));
       bottom: calc(-1 * var(--node-centre));
       border-inline-start: 2px dotted var(--secondary-text-color);
     }
@@ -1561,11 +1574,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       flex-wrap: wrap;
       align-items: baseline;
       gap: 2px 8px;
-      min-height: 22px;
+      min-height: var(--stop-row);
     }
     .stop time {
       font-weight: 700;
       color: var(--primary-text-color);
+    }
+    /* Where a ride is left: quieter than a boarding stop, which is what you
+       act on. Its node sits on the rail, backed out of the row's indent. */
+    .stop--arrive {
+      position: relative;
+    }
+    .stop--arrive .node {
+      inset-inline-start: calc(var(--strand-x) - (var(--strand-x) * 2 + var(--node-size)));
+    }
+    .stop--arrive time {
+      font-weight: 600;
+    }
+    .stop--arrive .stop-name {
+      font-weight: 400;
     }
     .stop-name {
       font-weight: 600;

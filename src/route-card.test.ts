@@ -349,7 +349,7 @@ describe("map links", () => {
     ...root(el).querySelectorAll<HTMLAnchorElement>(".strand a.map-link"),
   ];
 
-  it("links each boarding stop and the destination to the city map, or a search without coordinates", async () => {
+  it("links each boarding stop, arrival and the destination to the city map, or a search without coordinates", async () => {
     const base = trip("07:57", "08:11");
     const first = base.legs[0]!;
     const located = {
@@ -362,7 +362,7 @@ describe("map links", () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [located] }), {
       entity: ENTITY,
     });
-    const [westbahnhof, stephansplatz, praterstern, ...rest] = links(el);
+    const [westbahnhof, arrival, stephansplatz, praterstern, ...rest] = links(el);
     expect(rest).toEqual([]);
     expect(westbahnhof!.getAttribute("href")).toBe(
       "https://stadtplan.wien.gv.at/#/@16.3376511,48.1966562,17.5,0,0,standard/themes",
@@ -370,6 +370,7 @@ describe("map links", () => {
     expect(westbahnhof!.getAttribute("aria-label")).toBe("Im Stadtplan öffnen: Westbahnhof");
     expect(westbahnhof!.getAttribute("target")).toBe("_blank");
     expect(westbahnhof!.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(arrival!.closest(".stop--arrive")).not.toBeNull();
     expect(stephansplatz!.getAttribute("aria-label")).toBe("In Karte suchen: Stephansplatz");
     expect(praterstern!.getAttribute("href")).toBe(
       "https://www.openstreetmap.org/search?query=Praterstern%2C%20Wien",
@@ -394,6 +395,7 @@ describe("map links", () => {
     expect(labels).toEqual([
       "In Karte suchen: Westbahnhof",
       "In Karte suchen: Stephansplatz",
+      "In Karte suchen: Stephansplatz",
       "In Karte suchen: Praterstern",
     ]);
   });
@@ -401,6 +403,42 @@ describe("map links", () => {
   it("speaks English when HA does", async () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE, "en"), { entity: ENTITY });
     expect(links(el)[0]!.getAttribute("aria-label")).toBe("Find on map: Westbahnhof");
+  });
+
+  it("ends each ride before a change at its arrival, and the last one at the destination", async () => {
+    const base = trip("07:57", "08:11");
+    const first = base.legs[0]!;
+    const late = {
+      ...base,
+      legs: [
+        {
+          ...first,
+          destination: {
+            ...first.destination,
+            estimated: "2026-09-14T08:06:00+02:00",
+            delay_minutes: 2,
+          },
+        },
+        base.legs[1]!,
+      ],
+    };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [late] }), {
+      entity: ENTITY,
+    });
+    const [ride, lastRide] = [...root(el).querySelectorAll(".strand .leg")];
+    const arrival = ride!.querySelector(".stop--arrive")!;
+    expect(arrival.querySelector(".stop-name")?.textContent).toBe("Stephansplatz");
+    expect(arrival.querySelector(".sr-only")?.textContent).toBe("Ankunft");
+    // A late arrival reads like a late departure: planned struck, new time red.
+    expect(arrival.querySelector("s.time-planned")?.textContent).toBe("08:04");
+    expect(arrival.querySelector(".time-late")?.textContent).toBe("08:06");
+    expect(arrival.querySelector(".node")).not.toBeNull();
+    // It comes after the stops in between, and before the change.
+    expect(ride!.lastElementChild).toBe(arrival);
+    expect(ride!.nextElementSibling?.classList.contains("transfer")).toBe(true);
+    // The last ride has no arrival row; the destination row is its end.
+    expect(lastRide!.querySelector(".stop--arrive")).toBeNull();
+    expect(root(el).querySelector(".stop--end .stop-name")?.textContent).toBe("Praterstern");
   });
 
   it("puts the platform with the ride's direction, not the stop name", async () => {

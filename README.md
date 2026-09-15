@@ -152,8 +152,8 @@ The card works in one of two ways:
 What the card shows:
 
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time. For a trip at a chosen time, the departure time and day instead.
-- **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
-- **Stops on the map** *(2.0.0)* — a pin after each boarding stop and the destination opens that stop in Vienna's city map. For a stop the map can't place, such as an S-Bahn-only station, the pin searches for it on OpenStreetMap.
+- **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops. Before a change, the ride ends with its arrival time at the stop where you get off *(2.0.0)*.
+- **Stops on the map** *(2.0.0)* — a pin after each stop where you board, get off or arrive opens that stop in Vienna's city map. For a stop the map can't place, such as an S-Bahn-only station, the pin searches for it on OpenStreetMap.
 - **Stops along each ride** *(2.0.0)* — tap the number of stops to see every stop in between with its time, on the ride's own line. Live delays move these times too.
 - **Live times and frequency** *(2.0.0)* — a U-Bahn, tram or bus ride with a live time gets a live icon next to its departure; a late one also shows its planned time struck through and the expected time in red (for example ~~09:22~~ 09:25). A line running every 5 min or more often shows *every 3 min*; a less frequent one shows its next two departures instead. S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
@@ -196,7 +196,7 @@ to: "60200421"
 | `from` / `to` | none | Stops to preselect when there's no `entity`, as DIVA numbers. A departure sensor shows its stop's DIVA in the `diva` attribute, and the card editor lists stops by name. A pick remembered on a device wins there, until you change these options. |
 | `title` | see note | Heading text. Without it the card shows the route's start and destination, or "Plan a trip" when you pick stops on the card. |
 | `alternatives` | `2` | Later connections to offer, `0`–`3`. |
-| `show_map_pins` | `true` | Shows the map pin after each boarding stop and the destination. |
+| `show_map_pins` | `true` | Shows the map pin after each stop where you board, get off or arrive. |
 | `hide_attribution` | `false` | Hides the data-source line. |
 | `step_free` | `false` | Plans step-free connections when there's no `entity`. A route uses its own **Step-free** setting. |
 
