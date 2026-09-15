@@ -29,7 +29,7 @@ import {
 import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { ROUTE_CARD_VERSION } from "./const.js";
+import { ATTRIBUTION_FALLBACK, ROUTE_CARD_VERSION } from "./const.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import "./route-editor.js";
@@ -93,7 +93,6 @@ import {
   type NormalisedRouteConfig,
 } from "./utils/route.js";
 
-const ATTRIBUTION = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
 // The countdown only shows whole minutes, so a 15 s tick is at most a quarter
 // minute stale while costing nothing measurable.
 const TICK_MS = 15_000;
@@ -604,7 +603,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           : this._t("heading_fallback"));
     const attribution = cfg.hide_attribution
       ? ""
-      : (typeof attrs.attribution === "string" && attrs.attribution) || ATTRIBUTION;
+      : (typeof attrs.attribution === "string" && attrs.attribution) || ATTRIBUTION_FALLBACK;
 
     return html`
       <ha-card @pointerdown=${this._onCardActivity} @keydown=${this._onCardActivity}>

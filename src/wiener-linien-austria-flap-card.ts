@@ -19,7 +19,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { FLAP_CARD_VERSION } from "./const.js";
+import { ATTRIBUTION_FALLBACK, FLAP_CARD_VERSION } from "./const.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import {
@@ -639,7 +639,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const attribution = cfg.hide_attribution
       ? ""
       : (typeof firstAttrs.attribution === "string" && firstAttrs.attribution) ||
-        "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
+        ATTRIBUTION_FALLBACK;
 
     return html`
       <ha-card style="padding:0;overflow:hidden;">

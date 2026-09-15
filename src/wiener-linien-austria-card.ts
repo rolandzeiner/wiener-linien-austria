@@ -11,7 +11,7 @@ import type {
 
 import { cardStyles } from "./card-styles.js";
 import { registerWlFonts } from "./font-face.js";
-import { CARD_VERSION, NIGHTLINE_BG } from "./const.js";
+import { ATTRIBUTION_FALLBACK, CARD_VERSION, NIGHTLINE_BG } from "./const.js";
 import { pickerText, translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
@@ -541,7 +541,7 @@ export class WienerLinienAustriaCard extends LitElement {
       : stops
           .map((s) => this._attrs(s.entity).attribution)
           .find((v): v is string => typeof v === "string" && v.length > 0) ||
-        "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
+        ATTRIBUTION_FALLBACK;
 
     return html`
       <ha-card>

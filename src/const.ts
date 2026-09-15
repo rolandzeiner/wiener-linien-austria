@@ -11,6 +11,11 @@ export const ROUTE_CARD_VERSION = "2.0.0";
 
 export const DOMAIN = "wiener_linien_austria";
 
+// CC-BY credit shown in a card footer until the sensor reports its own
+// `attribution` attribute (fresh card, sensor not up yet). Same text as
+// ATTRIBUTION in const.py.
+export const ATTRIBUTION_FALLBACK = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0";
+
 // Per-line palette is sourced from the integration's GTFS-backed
 // `line_colors` sensor attribute (Wiener Linien `routes.txt`); a
 // hardcoded copy here would silently diverge after every WL palette
