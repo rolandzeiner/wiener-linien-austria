@@ -361,17 +361,21 @@ S_BAHN_NETWORK_CHECK_INTERVAL: Final = timedelta(hours=24)
 
 # S-Bahn line colours. Wiener Linien's GTFS `routes.txt` only carries its own
 # lines, so an S-Bahn leg on a route would otherwise get the neutral fallback.
-# Every S-Bahn line is #469CD4 except the S45 (#C1D781).
 #
-# White text is a deliberate choice, matching the signage (Roland, 2026-09-14),
-# and it does NOT meet WCAG AA 4.5:1 for the chip label: measured 3.01:1 on
-# 469CD4 and 1.58:1 on C1D781. Black would give 6.97:1 and 13.30:1. The chip
-# text is not the only carrier of the line — the leg's direction, stops and
-# train icon sit next to it — but the label itself stays below AA. Don't flip
-# it to black without asking.
-S_BAHN_DEFAULT_COLOR: Final = "469CD4"
-S_BAHN_COLORS: Final[dict[str, str]] = {"S45": "C1D781"}
+# The official line logos (Wikimedia Commons "S1 Wien.svg", "S45 Wien.svg")
+# are white on #159DD9 and white on #BBD976. At chip size neither meets WCAG
+# AA 1.4.3 (4.5:1): 3.06:1 and 1.58:1. Chosen 2026-09-15 (Roland, option B):
+#   * S-Bahn: the logo blue's hue darkened to #107AA8, white text kept like
+#     the signage. 4.80:1, APCA Lc -78.
+#   * S45: the logo's light green kept, with dark text instead of white.
+#     #1A2308 on #BBD976 is 10.33:1, APCA Lc 75.
+# Black on the blue was rejected although WCAG 2 passes it (6.97:1): APCA
+# rates it below white (Lc 47 vs 62), and it reads that way. test_route.py
+# checks every pair stays at 4.5:1 or above.
+S_BAHN_DEFAULT_COLOR: Final = "107AA8"
 S_BAHN_TEXT_COLOR: Final = "FFFFFF"
+S_BAHN_COLORS: Final[dict[str, str]] = {"S45": "BBD976"}
+S_BAHN_TEXT_COLORS: Final[dict[str, str]] = {"S45": "1A2308"}
 
 # Response attribution (CC-BY mandated)
 ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"

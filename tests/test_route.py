@@ -51,6 +51,7 @@ from custom_components.wiener_linien_austria.const import (
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
     S_BAHN_TEXT_COLOR,
+    S_BAHN_TEXT_COLORS,
     WALK_SPEEDS,
 )
 from custom_components.wiener_linien_austria.diagnostics import (
@@ -1033,20 +1034,36 @@ async def test_route_stops_carry_catalogue_coordinates(hass: HomeAssistant) -> N
 # ---------------------------------------------------------------------------
 
 
-def test_s_bahn_text_is_white_by_choice() -> None:
-    """White matches the signage; see the const.py note on its contrast."""
-    assert S_BAHN_TEXT_COLOR == "FFFFFF"
-    assert S_BAHN_DEFAULT_COLOR == "469CD4"
-    assert S_BAHN_COLORS == {"S45": "C1D781"}
+def _contrast(first: str, second: str) -> float:
+    """WCAG 2 contrast ratio of two 6-digit hex colours."""
+
+    def luminance(hex_colour: str) -> float:
+        channels = [int(hex_colour[i : i + 2], 16) / 255 for i in (0, 2, 4)]
+        linear = [
+            c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+            for c in channels
+        ]
+        return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+    light, dark = sorted((luminance(first), luminance(second)), reverse=True)
+    return (light + 0.05) / (dark + 0.05)
+
+
+def test_s_bahn_chip_colours_meet_wcag_aa() -> None:
+    """Every S-Bahn chip's text clears 4.5:1 on its fill (see const.py)."""
+    for label in {"S1", *S_BAHN_COLORS, *S_BAHN_TEXT_COLORS}:
+        bg = S_BAHN_COLORS.get(label, S_BAHN_DEFAULT_COLOR)
+        fg = S_BAHN_TEXT_COLORS.get(label, S_BAHN_TEXT_COLOR)
+        assert _contrast(bg, fg) >= 4.5, (label, bg, fg)
 
 
 async def test_line_colors_cover_s_bahn_without_catalogue(hass: HomeAssistant) -> None:
     hass.data.pop(DOMAIN, None)
     colors = line_colors_for(hass, {"S80", "S45", "s7", "U1", "SEV"})
     assert colors == {
-        "S80": {"bg": "469CD4", "fg": "FFFFFF"},
-        "S45": {"bg": "C1D781", "fg": "FFFFFF"},
-        "s7": {"bg": "469CD4", "fg": "FFFFFF"},
+        "S80": {"bg": "107AA8", "fg": "FFFFFF"},
+        "S45": {"bg": "BBD976", "fg": "1A2308"},
+        "s7": {"bg": "107AA8", "fg": "FFFFFF"},
     }
 
 
@@ -1057,5 +1074,5 @@ async def test_line_colors_merge_s_bahn_with_gtfs(
     mock_static_catalogue.trip_patterns.colors_by_line["U1"] = "E3000F"
     hass.data.setdefault(DOMAIN, {})["static_catalogue"] = mock_static_catalogue
     colors = line_colors_for(hass, {"S45", "U1"})
-    assert colors["S45"] == {"bg": "C1D781", "fg": "FFFFFF"}
+    assert colors["S45"] == {"bg": "BBD976", "fg": "1A2308"}
     assert colors["U1"]["bg"] == "E3000F"
