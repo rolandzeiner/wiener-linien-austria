@@ -23,6 +23,7 @@ import {
   viennaDayOffset,
   viennaInputValue,
   ADHOC_PLANNED_REFRESH_MS,
+  rideFrequency,
   isInputDateTime,
   windowDays,
   windowRange,
@@ -314,5 +315,19 @@ describe("chosen-time planning", () => {
     expect(upcomingTrips({ trips: plan.trips }, NOW)).toHaveLength(0);
     expect(adhocPlanRefreshDelay(plan, NOW)).toBe(ADHOC_PLANNED_REFRESH_MS);
     expect(adhocPlanRefreshDelay({ ...plan, stale: true, retry_after: 900 }, NOW)).toBe(900_000);
+  });
+});
+
+describe("rideFrequency", () => {
+  // Only the two fields rideFrequency reads.
+  const leg = (headway: number | null, next: string[] = []) =>
+    ({ headway_minutes: headway, next_departures: next }) as unknown as Parameters<typeof rideFrequency>[0];
+
+  it("gives the headway for a frequent line and the next times otherwise", () => {
+    const next = ["2026-09-14T08:07:00+02:00", "2026-09-14T08:14:00+02:00"];
+    expect(rideFrequency(leg(5, next))).toEqual({ every: 5 });
+    expect(rideFrequency(leg(7, next))).toEqual({ then: ["08:07", "08:14"] });
+    expect(rideFrequency(leg(12))).toEqual({ every: 12 });
+    expect(rideFrequency(leg(null))).toBeNull();
   });
 });

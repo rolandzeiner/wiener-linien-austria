@@ -326,7 +326,6 @@
     "now": "Jetzt",
     "minutes": "{n} min",
     "minutes_long": "{n} Minuten",
-    "trip_minutes": "{n} min unterwegs",
     "direct": "Direkt",
     "changes_one": "1 Umstieg",
     "changes_many": "{n} Umstiege",

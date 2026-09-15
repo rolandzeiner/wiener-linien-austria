@@ -149,6 +149,24 @@ export function upcomingTrips(
   });
 }
 
+/** Up to this headway a line counts as frequent: "alle 3 min" says all
+ *  anyone needs, and the next exact times would only add reading. */
+export const FREQUENT_HEADWAY_MINUTES = 5;
+
+export type RideFrequency = { every: number } | { then: string[] } | null;
+
+/** What the card says about how often a ride's line runs: the headway for a
+ *  frequent line, otherwise the next departures, otherwise the headway if
+ *  that is all there is. */
+export function rideFrequency(leg: RouteLegAttr): RideFrequency {
+  const headway = leg.headway_minutes ?? null;
+  const next = (leg.next_departures ?? []).map(clockOf).filter(Boolean);
+  if (headway !== null && headway <= FREQUENT_HEADWAY_MINUTES) return { every: headway };
+  if (next.length) return { then: next };
+  if (headway !== null) return { every: headway };
+  return null;
+}
+
 /** A ride's identity across refreshes: line, direction and boarding stop
  *  and time, all of which a new plan for the same vehicle repeats. */
 export function rideKey(leg: RouteLegAttr): string {

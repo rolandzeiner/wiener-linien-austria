@@ -67,6 +67,7 @@ import {
   isInputDateTime,
   legTypeIcon,
   loadAdhocSelection,
+  rideFrequency,
   rideKey,
   minutesUntil,
   normaliseRouteConfig,
@@ -904,7 +905,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       : this._t("minutes_long", { n: minutes ?? 0 });
     const sub = [
       trip.duration_minutes !== null
-        ? this._t("trip_minutes", { n: trip.duration_minutes })
+        ? this._t("minutes", { n: trip.duration_minutes })
         : "",
       this._changesText(trip),
     ]
@@ -936,7 +937,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  and its day; a countdown to tomorrow morning would say nothing useful. */
   private _renderPlannedHero(trip: RouteTripAttr): TemplateResult {
     const sub = [
-      trip.duration_minutes !== null ? this._t("trip_minutes", { n: trip.duration_minutes }) : "",
+      trip.duration_minutes !== null ? this._t("minutes", { n: trip.duration_minutes }) : "",
       this._changesText(trip),
     ]
       .filter(Boolean)
@@ -1081,7 +1082,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     accessBefore?: RouteAccessStepAttr[],
   ): TemplateResult {
     const departs = leg.origin.estimated ?? leg.origin.planned;
-    const late = leg.origin.delay_minutes ?? 0;
     const icon = legTypeIcon(leg.type, leg.line);
     const stops =
       leg.stop_count === 1
@@ -1100,6 +1100,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         <div class="stop">
           <span class=${first ? "node node--start" : "node"} aria-hidden="true"></span>
           <time datetime=${departs ?? ""}>${clockOf(departs)}</time>
+          ${this._renderLiveMark(leg)}
           <span class="stop-name">${leg.origin.name}</span>
           ${platform ? html`<span class="platform">${platform}</span>` : nothing}
           ${first ? this._renderAccess(accessBefore, attrs) : nothing}
@@ -1120,6 +1121,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           <span class="towards">
             ${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}
           </span>
+        </div>
+        <div class="ride-detail">
           ${between.length
             ? html`<button
                 type="button"
@@ -1136,12 +1139,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               </button>`
             : html`<span class="ride-meta">${stops}</span>`}
           ${this._renderFrequency(leg)}
-          ${late > 0
-            ? html`<span class="late">
-                <ha-icon icon="mdi:clock-alert-outline" aria-hidden="true"></ha-icon>
-                ${this._t("late", { n: late })}
-              </span>`
-            : nothing}
         </div>
         ${between.length
           ? html`<ol
@@ -1169,24 +1166,31 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._openRides = next;
   }
 
-  /** "Echtzeit · alle 5 min · danach 06:23, 06:29": what the departure
-   *  boards know about this ride. The live marker is words plus an icon,
-   *  never colour alone. */
+  /** Live state belongs to the time it qualifies: "09:19 +2" for a late
+   *  ride, a small live icon for one running on time. Screen readers hear
+   *  "2 min später" or "Echtzeit". The delay is a tinted chip with body-text
+   *  colour, so the number, not the hue, carries it. */
+  private _renderLiveMark(leg: RouteLegAttr): TemplateResult | typeof nothing {
+    const late = leg.origin.delay_minutes ?? 0;
+    if (late > 0) {
+      return html`<span class="delay" aria-hidden="true">+${late}</span
+        ><span class="sr-only">${this._t("late", { n: late })}</span>`;
+    }
+    if (!leg.realtime) return nothing;
+    return html`<ha-icon class="live-mark" icon="mdi:access-point" aria-hidden="true"></ha-icon
+      ><span class="sr-only">${this._t("live")}</span>`;
+  }
+
+  /** How often to expect this line: "alle 3 min" where it runs often enough
+   *  that exact times don't matter, otherwise the next two departures. */
   private _renderFrequency(leg: RouteLegAttr): TemplateResult | typeof nothing {
-    const next = (leg.next_departures ?? []).map(clockOf).filter(Boolean);
-    const headway = leg.headway_minutes;
-    if (!leg.realtime && !headway && !next.length) return nothing;
-    return html`
-      ${leg.realtime
-        ? html`<span class="live">
-            <ha-icon icon="mdi:access-point" aria-hidden="true"></ha-icon>${this._t("live")}
-          </span>`
-        : nothing}
-      ${headway ? html`<span class="ride-meta">${this._t("every_minutes", { n: headway })}</span>` : nothing}
-      ${next.length
-        ? html`<span class="ride-meta">${this._t("then_at", { times: next.join(", ") })}</span>`
-        : nothing}
-    `;
+    const frequency = rideFrequency(leg);
+    if (!frequency) return nothing;
+    return html`<span class="ride-frequency">
+      ${"every" in frequency
+        ? this._t("every_minutes", { n: frequency.every })
+        : this._t("then_at", { times: frequency.then.join(", ") })}
+    </span>`;
   }
 
   private _riskText(transfer: RouteTransferAttr): string {
@@ -1482,12 +1486,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.8rem;
       color: var(--secondary-text-color);
     }
+    /* A ride reads in two lines: what you board (badge, direction), then
+       the quieter detail (stop list, how often it runs). */
     .ride {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 4px 8px;
-      padding-block: 6px 12px;
+      padding-block: 6px 2px;
       font-size: 0.9rem;
       color: var(--secondary-text-color);
     }
@@ -1505,112 +1511,36 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .type-icon {
       --mdc-icon-size: 18px;
     }
-    .towards {
-      color: var(--primary-text-color);
-    }
-    .late {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-weight: 600;
-      color: var(--primary-text-color);
-    }
-    .live {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-weight: 600;
-      color: var(--primary-text-color);
-    }
-    .live ha-icon {
-      --mdc-icon-size: 16px;
-      color: var(--wl-rt);
-    }
-    .access {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-size: 0.8rem;
-      color: var(--secondary-text-color);
-    }
-    .access ha-icon {
-      --mdc-icon-size: 16px;
-    }
-    .access--out {
-      font-weight: 600;
-      color: var(--primary-text-color);
-    }
-    .access--out ha-icon {
-      color: var(--wl-error);
-    }
-    /* Stops along a ride: the departure board's stops-ahead dots, sat on
-       this ride's own rail so they read as stations the line passes. */
-    .stops-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      min-height: 32px;
-      padding: 0 4px;
-      margin-inline-start: -4px;
-      border: none;
-      border-radius: var(--wl-radius-sm);
-      background: none;
-      color: inherit;
-      font: inherit;
-      cursor: pointer;
-    }
-    .stops-toggle ha-icon {
-      --mdc-icon-size: 18px;
-    }
-    .leg-stops {
-      --stops-ahead-dot-size: 8px;
-      list-style: none;
-      margin: 0;
-      /* Padding, not margin: a bottom margin collapses through the ride's
-         <li>, which ends the ride's box early and leaves a gap before the
-         dotted transfer walk (or the end node) picks the line up. */
-      padding: 0 0 12px;
+    .ride-detail {
       display: flex;
-      flex-direction: column;
-      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 2px 12px;
+      padding-block: 0 12px;
       font-size: 0.85rem;
       color: var(--secondary-text-color);
     }
-    .leg-stops[hidden] {
-      display: none;
+    .ride-frequency {
+      margin-inline-start: auto;
     }
-    .leg-stop {
-      position: relative;
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
-    }
-    .leg-stop time {
+    .delay {
+      align-self: center;
+      padding: 2px 6px;
+      border-radius: var(--wl-radius-sm);
+      background: color-mix(in srgb, var(--wl-error) 22%, transparent);
+      color: var(--primary-text-color);
+      font-size: 0.8rem;
+      font-weight: 700;
+      line-height: 1;
       font-variant-numeric: tabular-nums;
     }
-    .leg-stop-name {
-      color: var(--primary-text-color);
-    }
-    /* Centred on the rail: back out of the row's indent to the strand. */
-    .leg-stop-dot {
-      position: absolute;
-      inset-inline-start: calc(
-        var(--strand-x) + var(--node-size) / 2 - var(--stops-ahead-dot-size) / 2 -
-          (var(--strand-x) * 2 + var(--node-size))
-      );
-      top: 50%;
-      width: var(--stops-ahead-dot-size);
-      height: var(--stops-ahead-dot-size);
-      box-sizing: border-box;
-      transform: translateY(-50%);
-      border-radius: 50%;
-      background: var(--card-background-color, var(--ha-card-background, #fff));
-      border: 2px solid var(--leg-colour);
-      z-index: 1;
-    }
-    .late ha-icon {
+    .live-mark {
       --mdc-icon-size: 16px;
-      color: var(--wl-error);
+      align-self: center;
+      color: var(--wl-rt);
+    }
+    .towards {
+      color: var(--primary-text-color);
     }
 
     .transfer {

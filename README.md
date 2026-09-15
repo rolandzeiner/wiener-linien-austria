@@ -154,7 +154,7 @@ What the card shows:
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time. For a trip at a chosen time, the departure time and day instead.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
 - **Stops along each ride** *(2.0.0)* — tap the number of stops to see every stop in between with its time, on the ride's own line. Live delays move these times too.
-- **Live times and frequency** *(2.0.0)* — U-Bahn, tram and bus rides show **Live** when the departure boards have a live time, plus how often the line runs and the next two departures (for example *every 5 min · then 06:23, 06:29*). S-Bahn and train rides stay on the timetable.
+- **Live times and frequency** *(2.0.0)* — a U-Bahn, tram or bus ride with a live time gets a live icon next to its departure, or the delay (for example *+2*). A line running every 5 min or more often shows *every 3 min*; a less frequent one shows its next two departures instead. S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
 - **Lifts and stairs** *(2.0.0)* — on a step-free trip, each lift on the way to the platform, at a change and at the destination, for example *Lift down*. A lift at a station with an outage says *out of service*, and a warning names the station. Rides planned with a low-floor vehicle show a wheelchair icon.

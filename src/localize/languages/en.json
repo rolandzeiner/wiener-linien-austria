@@ -326,7 +326,6 @@
     "now": "Now",
     "minutes": "{n} min",
     "minutes_long": "{n} minutes",
-    "trip_minutes": "{n} min trip",
     "direct": "Direct",
     "changes_one": "1 change",
     "changes_many": "{n} changes",

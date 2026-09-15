@@ -170,6 +170,31 @@ describe("registration + config", () => {
   });
 });
 
+describe("live state and frequency", () => {
+  it("marks an on-time live ride at its time and says how often a frequent line runs", async () => {
+    const base = trip("07:57", "08:11");
+    const onTime = {
+      ...base,
+      legs: [
+        { ...base.legs[0]!, origin: { ...base.legs[0]!.origin, delay_minutes: 0 }, headway_minutes: 3,
+          next_departures: ["2026-09-14T08:00:00+02:00"] },
+        base.legs[1]!,
+      ],
+    };
+    const el = await mount(hass("x", { ...ACTIVE, trips: [onTime] }), { entity: ENTITY });
+    const first = root(el).querySelector(".strand .leg")!;
+    expect(first.querySelector(".stop .live-mark")).not.toBeNull();
+    expect(first.querySelector(".stop .delay")).toBeNull();
+    expect(first.querySelector(".stop")?.textContent).toContain("Echtzeit");
+    expect(first.querySelector(".ride-frequency")?.textContent?.trim()).toBe("alle 3 min");
+    // A ride that isn't live gets neither mark.
+    const second = root(el).querySelectorAll(".strand .leg")[1]!;
+    expect(second.querySelector(".live-mark, .delay")).toBeNull();
+    // The hero drops "unterwegs".
+    expect(root(el).querySelector(".hero-sub")?.textContent).toBe("14 min, 1 Umstieg");
+  });
+});
+
 describe("last connection", () => {
   it("shows the night's last connection until it leaves", async () => {
     const attrs = {
@@ -284,11 +309,18 @@ describe("rendering", () => {
     expect(t).toContain("Gleis 1");
     expect(t).toContain("Richtung Simmering");
     expect(t).toContain("5 Stationen");
-    expect(t).toContain("2 min später");
-    // What the departure boards add: live marker, frequency, the next ones.
-    expect(t).toContain("Echtzeit");
-    expect(t).toContain("alle 10 min");
+    // Live state sits at the time: a late ride shows "+2" there, and a
+    // screen reader hears the words.
+    const delay = root(el).querySelector(".strand .stop .delay");
+    expect(delay?.textContent).toBe("+2");
+    expect(delay?.nextElementSibling?.textContent).toBe("2 min später");
+    // Every 10 min is not frequent, so the next departures are shown instead.
     expect(t).toContain("danach 08:18, 08:28");
+    expect(t).not.toContain("alle 10 min");
+    // Each ride reads in two lines: what you board, then its detail.
+    const legRow = root(el).querySelector(".strand .leg")!;
+    expect(legRow.querySelector(".ride .towards")?.textContent).toContain("Richtung Simmering");
+    expect(legRow.querySelector(".ride-detail .stops-toggle")).not.toBeNull();
     expect(t).toContain("Umstieg Stephansplatz");
     expect(t).toContain("4 min Fußweg");
     expect(t).toContain("Knapp: 0 min Puffer");
