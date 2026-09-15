@@ -426,6 +426,7 @@
     "stops_between": "Stops in between, {line}",
     "last_connection": "Last connection without night bus {time}",
     "planned_late": "scheduled {time}, {n} min late",
+    "next_catchable": "Next you can catch: {time}",
     "editor": {
       "entity": "Route",
       "entity_helper": "Leave empty to pick origin and destination right on the card. Only routes you've set up are listed.",

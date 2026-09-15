@@ -13,6 +13,7 @@ import type {
   RouteLegAttr,
   RouteRisk,
   RouteStopAttr,
+  RouteTransferAttr,
   RouteTripAttr,
   WienerLinienRouteCardConfig,
 } from "../types.js";
@@ -150,6 +151,31 @@ export function upcomingTrips(
   });
 }
 
+/** HH:MM in Vienna rounded to the nearest minute. Live estimates carry
+ *  seconds; slicing them off would print 09:37:40 as 09:37 next to a
+ *  departure that rounded 09:36:40 up to 09:37. */
+export function roundedClock(iso: string | null | undefined): string {
+  const ts = iso ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(ts)) return "";
+  return viennaClock(new Date(Math.round(ts / 60_000) * 60_000).toISOString());
+}
+
+/** For a change that no longer fits: the first later departure of the next
+ *  ride that can still be reached, arrival plus walk, from the departure
+ *  board's times. Null when the change isn't at risk or no such departure
+ *  is known. */
+export function catchableDeparture(
+  arriving: RouteLegAttr,
+  transfer: RouteTransferAttr,
+  departing: RouteLegAttr,
+): string | null {
+  if (transfer.risk !== "at_risk") return null;
+  const arrival = Date.parse(arriving.destination.estimated ?? arriving.destination.planned ?? "");
+  if (!Number.isFinite(arrival)) return null;
+  const ready = arrival + transfer.walk_minutes * 60_000;
+  return (departing.next_departures ?? []).find((iso) => Date.parse(iso) >= ready) ?? null;
+}
+
 /** The planned and the expected clock time of a stop that runs late, or null
  *  when it doesn't (or the two print as the same minute). The expected time
  *  rounds to the nearest minute: a live estimate carries seconds, and a
@@ -163,7 +189,7 @@ export function delayedClock(
   if (!Number.isFinite(planned) || !Number.isFinite(estimated) || estimated <= planned) {
     return null;
   }
-  const expected = viennaClock(new Date(Math.round(estimated / 60_000) * 60_000).toISOString());
+  const expected = roundedClock(stop.estimated);
   const plannedClock = clockOf(stop.planned);
   return expected && expected !== plannedClock ? { planned: plannedClock, expected } : null;
 }

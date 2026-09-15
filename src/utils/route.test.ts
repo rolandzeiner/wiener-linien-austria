@@ -24,6 +24,8 @@ import {
   viennaInputValue,
   ADHOC_PLANNED_REFRESH_MS,
   rideFrequency,
+  roundedClock,
+  catchableDeparture,
   delayedClock,
   isInputDateTime,
   windowDays,
@@ -353,5 +355,33 @@ describe("delayedClock", () => {
     expect(delayedClock({ planned: at("09:22:00"), estimated: at("09:21:00") })).toBeNull();
     expect(delayedClock({ planned: at("09:22:00"), estimated: null })).toBeNull();
     expect(delayedClock({ planned: null, estimated: at("09:25:00") })).toBeNull();
+  });
+});
+
+describe("roundedClock", () => {
+  it("rounds live seconds to the nearest minute on the Vienna clock", () => {
+    expect(roundedClock("2026-09-14T09:37:40+02:00")).toBe("09:38");
+    expect(roundedClock("2026-09-14T09:37:20+02:00")).toBe("09:37");
+    expect(roundedClock(null)).toBe("");
+  });
+});
+
+describe("catchableDeparture", () => {
+  const leg = (fields: Record<string, unknown>) => fields as unknown as Parameters<typeof catchableDeparture>[0];
+  const arriving = leg({ destination: { planned: "2026-09-14T09:44:00+02:00", estimated: "2026-09-14T09:46:00+02:00" } });
+  const departing = leg({
+    next_departures: ["2026-09-14T09:52:11+02:00", "2026-09-14T09:59:56+02:00"],
+  });
+  const transfer = (risk: string, walk = 4) =>
+    ({ at: "Ottakring", walk_minutes: walk, slack_minutes: -2, risk }) as never;
+
+  it("picks the first later departure reachable after the walk", () => {
+    expect(catchableDeparture(arriving, transfer("at_risk"), departing)).toBe("2026-09-14T09:52:11+02:00");
+    expect(catchableDeparture(arriving, transfer("at_risk", 7), departing)).toBe("2026-09-14T09:59:56+02:00");
+    expect(catchableDeparture(arriving, transfer("at_risk", 20), departing)).toBeNull();
+  });
+
+  it("only speaks up for a change at risk", () => {
+    expect(catchableDeparture(arriving, transfer("tight"), departing)).toBeNull();
   });
 });

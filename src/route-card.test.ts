@@ -207,6 +207,23 @@ describe("live state and frequency", () => {
   });
 });
 
+describe("a change that no longer fits", () => {
+  it("names the next departure that can still be reached", async () => {
+    const el = await mount(hass("x", { ...ACTIVE, trips: [trip("07:57", "08:11", "at_risk")] }), {
+      entity: ENTITY,
+    });
+    // Arrive 08:04, walk 4 min: the 08:08 is gone, the 08:18 isn't.
+    expect(root(el).querySelector(".transfer .catchable")?.textContent?.trim()).toBe(
+      "Nächster erreichbar: 08:18",
+    );
+  });
+
+  it("stays quiet for a change that still fits", async () => {
+    const el = await mount(hass("x", ACTIVE), { entity: ENTITY });
+    expect(root(el).querySelector(".transfer .catchable")).toBeNull();
+  });
+});
+
 describe("last connection", () => {
   it("shows the night's last connection until it leaves", async () => {
     const attrs = {
@@ -328,7 +345,12 @@ describe("rendering", () => {
     expect(change.querySelector("time.time-late")?.textContent).toBe("07:59");
     // The red must survive `.stop time`, which colours every stop time as
     // body text; a selector that loses to it paints the late time white.
-    expect(routeCardSource).toMatch(/\.time-change \.time-late,\s*\.alt-times \.time-late \{\s*color: color-mix\(in srgb, var\(--wl-error\)/);
+    expect(routeCardSource).toMatch(
+      /\.time-change \.time-late,\s*\.alt-times \.time-late,\s*\.leg-stop \.time-late \{\s*color: color-mix\(in srgb, var\(--wl-error\)/,
+    );
+    // The stops in between carry the ride's delay, so they show late too.
+    const between = [...root(el).querySelectorAll(".strand .leg-stop time")];
+    expect(between.every((time) => time.classList.contains("time-late"))).toBe(true);
     expect(change.querySelector(".sr-only")?.textContent).toBe("geplant 07:57, 2 min später");
     // Alternatives show the same, so an at-risk change there has its reason.
     const alt = root(el).querySelector(".alt-times")!;

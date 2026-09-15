@@ -63,6 +63,7 @@ import {
   adhocErrorSpec,
   adhocRetryDelay,
   type AdhocTimeMode,
+  catchableDeparture,
   clockOf,
   delayedClock,
   findRouteEntities,
@@ -71,6 +72,7 @@ import {
   loadAdhocSelection,
   rideFrequency,
   rideKey,
+  roundedClock,
   minutesUntil,
   normaliseRouteConfig,
   RISK_ICON,
@@ -1056,7 +1058,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               !!transfer && i < legs.length - 1,
               i === 0 ? walkAccess(trip, "start") : undefined,
             )}
-            ${transfer && i < legs.length - 1 ? this._renderTransfer(transfer, attrs) : nothing}
+            ${transfer && i < legs.length - 1
+              ? this._renderTransfer(transfer, attrs, catchableDeparture(leg, transfer, legs[i + 1]!))
+              : nothing}
           `;
         })}
         ${last
@@ -1087,6 +1091,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         ? this._t("stops_one")
         : this._t("stops_many", { n: leg.stop_count });
     const between = leg.stops ?? [];
+    // The stops in between already carry the ride's delay; show them late too.
+    const late = !!delayedClock(leg.origin);
     const key = rideKey(leg);
     const open = between.length > 0 && this._openRides.has(key);
     const listId = safeDomId(`route-stops-${key}`);
@@ -1149,7 +1155,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               ${between.map(
                 (stop) => html`<li class="leg-stop">
                   <span class="leg-stop-dot" aria-hidden="true"></span>
-                  <time datetime=${stop.time ?? ""}>${clockOf(stop.time)}</time>
+                  <time class=${late ? "time-late" : ""} datetime=${stop.time ?? ""}
+                    >${late ? roundedClock(stop.time) : clockOf(stop.time)}</time
+                  >
                   <span class="leg-stop-name">${stop.name}</span>
                 </li>`,
               )}
@@ -1222,7 +1230,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
-  private _renderTransfer(transfer: RouteTransferAttr, attrs: RouteAttrs): TemplateResult {
+  private _renderTransfer(
+    transfer: RouteTransferAttr,
+    attrs: RouteAttrs,
+    catchable: string | null = null,
+  ): TemplateResult {
     return html`
       <li class="transfer" data-risk=${transfer.risk}>
         <span class="node node--transfer" aria-hidden="true"></span>
@@ -1235,6 +1247,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           : nothing}
         ${this._renderAccess(transfer.access, attrs)}
         ${this._renderRisk(transfer)}
+        ${catchable
+          ? html`<span class="catchable">
+              ${this._t("next_catchable", { time: roundedClock(catchable) })}
+            </span>`
+          : nothing}
       </li>
     `;
   }
@@ -1579,7 +1596,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     /* Two classes, so it outranks ".stop time", which sets every stop time
        to body text and would otherwise paint a late time white again. */
     .time-change .time-late,
-    .alt-times .time-late {
+    .alt-times .time-late,
+    .leg-stop .time-late {
       color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
       font-weight: 700;
     }
@@ -1679,6 +1697,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       padding-block: 8px;
       font-size: 0.85rem;
       color: var(--secondary-text-color);
+    }
+    .catchable {
+      font-weight: 600;
+      color: var(--primary-text-color);
     }
     .walk {
       display: inline-flex;
