@@ -17,7 +17,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
-- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, planned on the timetable, with a buffer grade on every change. Live times are used whenever the trip planner supplies them. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
+- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live departure times for Wiener Linien rides and a buffer grade on every change. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
 ## Screenshots
@@ -151,6 +151,7 @@ What the card shows:
 
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time. For a trip at a chosen time, the departure time and day instead.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
+- **Live times and frequency** *(2.0.0)* — U-Bahn, tram and bus rides show **Live** when the departure boards have a live time, plus how often the line runs and the next two departures (for example *every 5 min · then 06:23, 06:29*). S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
 - **More connections** — up to three later options, folded away until you open them.
@@ -211,7 +212,9 @@ Each route gets two entities too:
 
 The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
 
-The at-risk sensor turns on only when the current times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day. Delays only count if the trip planner sends live times, and as of September 2026 it sends none (see [Known Limitations](#known-limitations)).
+Each ride in `trips` also carries `direction` (`H` or `R`), `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line typically runs there). A ride with a live time has `realtime: true` and a live `estimated` departure; its arrival moves by the same delay.
+
+The at-risk sensor turns on only when the current times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day. Live times count for U-Bahn, tram and bus rides; they come from the departure boards, because the trip planner itself sends none.
 
 ### Stale-data sensor
 
@@ -259,6 +262,7 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
 | Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`: every 120 s while visible, paused after 30 min idle; answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
+| Live times on connections *(experimental)* | `/monitor?stopId=…` | Rides in the departure boards' request. A request of its own only for a stop that has no answer yet, or when no departure board is set up (then once per route refresh, shared by all routes for 1 min) |
 
 **The polling interval is per entry; the request is not.** Every entry configured
 with the same interval joins one group that issues a single `/monitor` request
@@ -281,6 +285,14 @@ Linien service, so route refreshes take their own 15 s cooldown slot and never
 delay a departure poll. A route also refreshes right after its best connection
 leaves, so the list moves on without a faster interval. Like departures, it
 backs off from the second failure in a row, capped at 30 min.
+
+**Live times on routes cost no extra polling.** A route and a plan on the card
+add their boarding stops to the departure boards' combined `/monitor` request,
+so live times follow the boards' cadence without asking the trip planner
+again. A new plan makes one request of its own only when its stops have no
+answer yet. Without any departure board, a route refresh makes that request
+itself, taking the 15 s cooldown slot, and one answer serves every route for a
+minute. If it fails, the plan simply stays on the timetable.
 
 Planning between any two stops on the card, and the `plan_trip` action, skip
 that cooldown slot, because someone is waiting for the answer. Three other
@@ -454,7 +466,7 @@ logger:
 - **Vienna only.** ÖBB, VOR, and regional services are out of scope.
 - **The card's last pick stays on that device.** It's saved in the browser, not in Home Assistant, so a phone and a wall tablet each remember their own. Two route cards without a route on the same device share that pick.
 - **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
-- **Routes use timetable times for now.** The integration uses live times whenever the trip planner supplies them. In tests on 14 September 2026 it supplied none, not even for U-Bahn lines the departure boards show live. Until that changes, a delay doesn't show up on a route, and the at-risk sensor can't react to one.
+- **Live times on routes come from the departure boards.** The trip planner sends none, so a ride gets its live time from `/monitor`, which lists about the next hour. S-Bahn and train rides, and rides more than about an hour away, stay on the timetable. `/monitor` has no arrival times, so a ride's arrival moves by its departure delay.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
 - **Stops-ahead is best-effort.** Short-turn services may show the full scheduled path. Replacement buses (SEV) and unscheduled detours produce no panel — the row stays as it is, with no chevron.
 

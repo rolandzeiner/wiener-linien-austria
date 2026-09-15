@@ -46,6 +46,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from .const import (
     API_BASE_URL,
     BACKOFF_CAP_SECONDS,
+    BATCH_REGISTRY_KEY,
     DOMAIN,
     ERR_RATE_LIMIT,
     MONITOR_ENDPOINT,
@@ -54,6 +55,7 @@ from .const import (
     USER_AGENT,
 )
 from .http import base_request_headers
+from .live import async_get_live_board
 from .rate_limit import async_enforce_domain_cooldown
 
 if TYPE_CHECKING:
@@ -104,12 +106,40 @@ class MonitorBatchGroup:
         self._members.pop(entry_id, None)
         return not self._members
 
+    @property
+    def has_members(self) -> bool:
+        """Whether this group is polling for anyone."""
+        return bool(self._members)
+
+    @property
+    def interval_seconds(self) -> int:
+        """The configured cadence this group was created for."""
+        return self._interval_seconds
+
     def union_rbls(self) -> list[int]:
-        """Deduplicated, sorted union of every member's RBLs."""
+        """Deduplicated, sorted union of every member's RBLs.
+
+        The fastest group also carries the stops that routes and on-demand
+        plans need live times for (live.py), so those ride in a request made
+        anyway instead of one of their own. Members only parse their own
+        RBLs, so the extra monitors in the answer don't reach their boards.
+        """
         seen: set[int] = set()
         for coordinator in self._members.values():
             seen.update(coordinator.rbls)
+        if seen and self._is_fastest():
+            seen.update(async_get_live_board(self.hass).leased_rbls())
         return sorted(seen)
+
+    def _is_fastest(self) -> bool:
+        registry = self.hass.data.get(DOMAIN, {}).get(BATCH_REGISTRY_KEY)
+        if not isinstance(registry, dict):
+            return True
+        running = [group for group in registry.values() if group.has_members]
+        if not running:
+            return True
+        fastest = min(running, key=lambda group: group.interval_seconds)
+        return fastest is self
 
     # ------------------------------------------------------------------
     # Timer lifecycle
@@ -324,6 +354,10 @@ class MonitorBatchGroup:
                 },
             ) from err
 
+        try:
+            async_get_live_board(self.hass).ingest(body, rbls)
+        except Exception as err:  # noqa: BLE001 — live times must never fail a board
+            _LOGGER.warning("Recording live times for routes failed: %s", err)
         return BatchResult(body=body, server_time=server_time)
 
     # ------------------------------------------------------------------

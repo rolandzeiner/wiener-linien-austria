@@ -415,7 +415,8 @@ async def test_concurrent_identical_plans_share_one_request(
     gate.set()
     plans = await asyncio.gather(*waiters)
     assert fetch.await_count == before + 1
-    assert plans[0] is plans[1] is plans[2]
+    # Copies, since live times are applied per answer, but of one plan.
+    assert plans[0] == plans[1] == plans[2]
 
 
 async def test_a_cancelled_waiter_does_not_cancel_the_shared_request(

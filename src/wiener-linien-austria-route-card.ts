@@ -1029,6 +1029,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             ${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}
           </span>
           <span class="ride-meta">${stops}</span>
+          ${this._renderFrequency(leg)}
           ${late > 0
             ? html`<span class="late">
                 <ha-icon icon="mdi:clock-alert-outline" aria-hidden="true"></ha-icon>
@@ -1037,6 +1038,26 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             : nothing}
         </div>
       </li>
+    `;
+  }
+
+  /** "Echtzeit · alle 5 min · danach 06:23, 06:29": what the departure
+   *  boards know about this ride. The live marker is words plus an icon,
+   *  never colour alone. */
+  private _renderFrequency(leg: RouteLegAttr): TemplateResult | typeof nothing {
+    const next = (leg.next_departures ?? []).map(clockOf).filter(Boolean);
+    const headway = leg.headway_minutes;
+    if (!leg.realtime && !headway && !next.length) return nothing;
+    return html`
+      ${leg.realtime
+        ? html`<span class="live">
+            <ha-icon icon="mdi:access-point" aria-hidden="true"></ha-icon>${this._t("live")}
+          </span>`
+        : nothing}
+      ${headway ? html`<span class="ride-meta">${this._t("every_minutes", { n: headway })}</span>` : nothing}
+      ${next.length
+        ? html`<span class="ride-meta">${this._t("then_at", { times: next.join(", ") })}</span>`
+        : nothing}
     `;
   }
 
@@ -1364,6 +1385,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       gap: 2px;
       font-weight: 600;
       color: var(--primary-text-color);
+    }
+    .live {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-weight: 600;
+      color: var(--primary-text-color);
+    }
+    .live ha-icon {
+      --mdc-icon-size: 16px;
+      color: var(--wl-rt);
     }
     .late ha-icon {
       --mdc-icon-size: 16px;

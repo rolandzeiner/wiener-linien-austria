@@ -1,0 +1,254 @@
+{
+ "data": {
+  "monitors": [
+   {
+    "locationStop": {
+     "properties": {
+      "name": "60200166",
+      "title": "Breitensee S",
+      "attributes": {
+       "rbl": 1452
+      }
+     }
+    },
+    "lines": [
+     {
+      "name": "49",
+      "towards": "Hütteldorf, Bujattigasse",
+      "direction": "H",
+      "realtimeSupported": true,
+      "type": "ptTram",
+      "lineId": 149,
+      "departures": {
+       "departure": [
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:17:30.000+0200",
+          "timeReal": "2026-09-15T06:19:29.000+0200",
+          "countdown": 4
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:25:00.000+0200",
+          "timeReal": "2026-09-15T06:23:52.000+0200",
+          "countdown": 8
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:32:30.000+0200",
+          "timeReal": "2026-09-15T06:32:30.000+0200",
+          "countdown": 17
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:40:00.000+0200",
+          "timeReal": "2026-09-15T06:40:00.000+0200",
+          "countdown": 24
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:47:00.000+0200",
+          "timeReal": "2026-09-15T06:47:00.000+0200",
+          "countdown": 31
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:54:00.000+0200",
+          "timeReal": "2026-09-15T06:54:00.000+0200",
+          "countdown": 38
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T07:00:30.000+0200",
+          "timeReal": "2026-09-15T07:00:30.000+0200",
+          "countdown": 45
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T07:07:00.000+0200",
+          "timeReal": "2026-09-15T07:07:00.000+0200",
+          "countdown": 51
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "locationStop": {
+     "properties": {
+      "name": "60200166",
+      "title": "Breitensee S",
+      "attributes": {
+       "rbl": 1471
+      }
+     }
+    },
+    "lines": [
+     {
+      "name": "49",
+      "towards": "Parlament, U Volkstheater",
+      "direction": "R",
+      "realtimeSupported": true,
+      "type": "ptTram",
+      "lineId": 149,
+      "departures": {
+       "departure": [
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:17:30.000+0200",
+          "timeReal": "2026-09-15T06:17:31.000+0200",
+          "countdown": 2
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:23:30.000+0200",
+          "timeReal": "2026-09-15T06:23:40.000+0200",
+          "countdown": 8
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:29:00.000+0200",
+          "timeReal": "2026-09-15T06:29:00.000+0200",
+          "countdown": 13
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:35:00.000+0200",
+          "timeReal": "2026-09-15T06:35:00.000+0200",
+          "countdown": 19
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:40:00.000+0200",
+          "timeReal": "2026-09-15T06:40:00.000+0200",
+          "countdown": 24
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:44:30.000+0200",
+          "timeReal": "2026-09-15T06:44:30.000+0200",
+          "countdown": 29
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:49:00.000+0200",
+          "timeReal": "2026-09-15T06:49:00.000+0200",
+          "countdown": 33
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:54:00.000+0200",
+          "timeReal": "2026-09-15T06:54:00.000+0200",
+          "countdown": 38
+         }
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "locationStop": {
+     "properties": {
+      "name": "60201430",
+      "title": "Volkstheater",
+      "attributes": {
+       "rbl": 4206
+      }
+     }
+    },
+    "lines": [
+     {
+      "name": "U2",
+      "towards": "Seestadt",
+      "direction": "R",
+      "realtimeSupported": true,
+      "type": "ptMetro",
+      "lineId": 302,
+      "departures": {
+       "departure": [
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:19:30.000+0200",
+          "timeReal": "2026-09-15T06:19:30.000+0200",
+          "countdown": 4
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:24:30.000+0200",
+          "timeReal": "2026-09-15T06:24:30.000+0200",
+          "countdown": 9
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:29:30.000+0200",
+          "timeReal": "2026-09-15T06:29:30.000+0200",
+          "countdown": 14
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:34:30.000+0200",
+          "timeReal": "2026-09-15T06:34:30.000+0200",
+          "countdown": 19
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:39:30.000+0200",
+          "timeReal": "2026-09-15T06:39:30.000+0200",
+          "countdown": 24
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:44:30.000+0200",
+          "timeReal": "2026-09-15T06:44:30.000+0200",
+          "countdown": 29
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:49:00.000+0200",
+          "timeReal": "2026-09-15T06:49:00.000+0200",
+          "countdown": 33
+         }
+        },
+        {
+         "departureTime": {
+          "timePlanned": "2026-09-15T06:53:00.000+0200",
+          "timeReal": "2026-09-15T06:53:00.000+0200",
+          "countdown": 37
+         }
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "message": {
+  "value": "OK",
+  "messageCode": 1,
+  "serverTime": "2026-09-15T06:15:15.000+0200"
+ }
+}

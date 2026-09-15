@@ -75,6 +75,22 @@ def _collapse_domain_cooldown(request: pytest.FixtureRequest) -> Generator[None]
         yield
 
 
+LIVE_FETCH = "custom_components.wiener_linien_austria.live.async_fetch_monitor_body"
+
+
+@pytest.fixture(autouse=True)
+def live_fetch() -> Generator[AsyncMock]:
+    """The live-times `/monitor` call, answering with no departures.
+
+    Autouse so no route or on-demand test can reach the real endpoint. Tests
+    about live times set `return_value` (see `monitor_live_body`).
+    """
+    with patch(
+        LIVE_FETCH, new_callable=AsyncMock, return_value={"data": {"monitors": []}}
+    ) as mock:
+        yield mock
+
+
 def make_response_cm(resp: Any) -> MagicMock:
     """Wrap a mock response as an async context manager.
 

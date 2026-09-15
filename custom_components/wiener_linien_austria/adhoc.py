@@ -29,6 +29,13 @@ upstream notices:
 The 15 s routing cooldown in rate_limit.py is deliberately not taken: someone
 is waiting for the answer. The budget is what bounds this path instead.
 
+Live times (live.py) are applied when a plan is served, never stored: the
+cache keeps the timetable plan, and every answer takes the newest `/monitor`
+rows. A fresh plan leases its boarding stops for `ADHOC_LEASE_SECONDS` so
+the departure boards' shared request carries them, and makes a `/monitor`
+call of its own only when those stops have no answer yet. That call rides on
+the plan's budget token; a cache hit never makes one.
+
 Nothing here is written to diagnostics, the recorder or an info-level log. A
 stop pair picked on a dashboard is a movement pattern: a plan is purged once
 it is older than `ADHOC_STALE_MAX_SECONDS`, and all of them when the last
@@ -50,6 +57,14 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, ROUTING_TIME_ZONE
+from .live import (
+    ADHOC_LEASE_SECONDS,
+    apply_live,
+    async_get_live_board,
+    async_live_trips,
+    current_catalogue,
+    rbls_for_trips,
+)
 from .route_coordinator import async_plan_trips
 from .routing import RouteOptions, RoutingError, Trip
 
@@ -181,7 +196,7 @@ class AdhocPlanner:
         cached = self._cache.get(key)
         if cached is not None and loop_now - cached[0] < ADHOC_CACHE_TTL_SECONDS:
             self._cache.move_to_end(key)
-            return self._serve(key, cached[1], now)
+            return self._with_live_rows(key, self._serve(key, cached[1], now))
 
         task = self._in_flight.get(key)
         if task is None:
@@ -192,7 +207,7 @@ class AdhocPlanner:
                     and cached is not None
                     and loop_now - cached[0] < ADHOC_STALE_MAX_SECONDS
                 ):
-                    plan = self._serve(key, cached[1], now)
+                    plan = self._with_live_rows(key, self._serve(key, cached[1], now))
                     return replace(plan, stale=True, retry_after=retry_after)
                 raise AdhocRateLimited(retry_after)
             task = self._hass.async_create_background_task(
@@ -209,7 +224,34 @@ class AdhocPlanner:
             task.add_done_callback(lambda done: self._forget(key, done))
         # Shielded: a dashboard closing mid-request cancels its own wait, not
         # the request every other waiter shares.
-        return await asyncio.shield(task)
+        plan = await asyncio.shield(task)
+        trips = await async_live_trips(
+            self._hass,
+            _lease_owner(key),
+            plan.trips,
+            key[0].min_transfer_minutes,
+            cooldown=False,
+            lease_seconds=ADHOC_LEASE_SECONDS,
+        )
+        return replace(plan, trips=tuple(trips))
+
+    @callback
+    def _with_live_rows(self, key: _CacheKey, plan: AdhocPlan) -> AdhocPlan:
+        """A cached plan with the newest rows applied and its lease renewed.
+
+        No request: whatever the shared `/monitor` answer holds is used.
+        """
+        board = async_get_live_board(self._hass)
+        rbls = rbls_for_trips(
+            current_catalogue(self._hass), plan.trips, dt_util.utcnow()
+        )
+        board.lease(_lease_owner(key), rbls, ADHOC_LEASE_SECONDS)
+        if not rbls:
+            return plan
+        trips = apply_live(
+            plan.trips, board.rows_for(rbls), key[0].min_transfer_minutes
+        )
+        return replace(plan, trips=tuple(trips))
 
     async def _async_fetch(self, key: _CacheKey, at: datetime, tz: tzinfo) -> AdhocPlan:
         generation = self._generation
@@ -313,6 +355,11 @@ class AdhocPlanner:
                 await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
             )
         return self._tz
+
+
+def _lease_owner(key: _CacheKey) -> str:
+    """One lease per distinct query, so two dashboards share it."""
+    return f"adhoc:{hash(key)}"
 
 
 @callback

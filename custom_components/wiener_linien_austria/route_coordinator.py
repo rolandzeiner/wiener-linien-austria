@@ -10,7 +10,7 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -32,6 +32,15 @@ from .const import (
     MIN_ROUTE_ROLLOVER_SECONDS,
     ROUTING_TIME_ZONE,
     USER_AGENT,
+)
+from .live import (
+    LIVE_BOARD_KEY,
+    LiveBoard,
+    apply_live,
+    async_get_live_board,
+    async_live_trips,
+    current_catalogue,
+    rbls_for_trips,
 )
 from .rate_limit import async_enforce_routing_cooldown
 from .routing import (
@@ -102,6 +111,11 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         self.scan_interval = timedelta(seconds=seconds)
         self._failures = 0
         self._tz: tzinfo = dt_util.UTC
+        # The published connections as planned, before live times. Every
+        # `/monitor` answer is applied to these afresh, never to an already
+        # adjusted copy.
+        self._timetable: list[Trip] = []
+        self._unsub_live: CALLBACK_TYPE | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -115,6 +129,46 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE)
         if zone is not None:
             self._tz = zone
+        self._unsub_live = async_get_live_board(self.hass).async_add_listener(
+            self._on_live_times
+        )
+
+    async def async_shutdown(self) -> None:
+        """Stop taking live times and take this route's stops off the request."""
+        if self._unsub_live is not None:
+            self._unsub_live()
+            self._unsub_live = None
+        # Unloading the last entry has already dropped the board; don't
+        # create a new one just to release on it.
+        board = self.hass.data.get(DOMAIN, {}).get(LIVE_BOARD_KEY)
+        if isinstance(board, LiveBoard):
+            board.release(self._live_owner)
+        await super().async_shutdown()
+
+    @property
+    def _live_owner(self) -> str:
+        assert self.config_entry is not None
+        return f"route:{self.config_entry.entry_id}"
+
+    @callback
+    def _on_live_times(self) -> None:
+        """Re-apply the newest `/monitor` answer without asking the planner.
+
+        Updates the entities in place rather than through
+        `async_set_updated_data`, which would reschedule the next planner
+        refresh every time a departure board answers.
+        """
+        data = self.data
+        if data is None or not data.active or not self._timetable:
+            return
+        board = async_get_live_board(self.hass)
+        rbls = rbls_for_trips(
+            current_catalogue(self.hass), self._timetable, dt_util.utcnow()
+        )
+        data.trips = apply_live(
+            self._timetable, board.rows_for(rbls), self.options.min_transfer_minutes
+        )
+        self.async_update_listeners()
 
     @property
     def active_window(self) -> dict[str, object]:
@@ -138,6 +192,8 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         if not self.is_active(now):
             self._failures = 0
             self.update_interval = self.scan_interval
+            self._timetable = []
+            async_get_live_board(self.hass).release(self._live_owner)
             return RouteData(trips=[], active=False, fetched_at=None)
 
         await async_enforce_routing_cooldown(self.hass)
@@ -147,6 +203,8 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
             if err.translation_key == "route_no_connection":
                 # Late at night a route can genuinely have nothing left.
                 # That is an answer, not an outage.
+                self._timetable = []
+                async_get_live_board(self.hass).release(self._live_owner)
                 self._note_success([])
                 return RouteData(trips=[], active=True, fetched_at=dt_util.utcnow())
             self._note_failure()
@@ -156,7 +214,14 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 translation_placeholders=err.placeholders,
             ) from err
 
-        published = trips[:MAX_TRIPS_PUBLISHED]
+        self._timetable = trips[:MAX_TRIPS_PUBLISHED]
+        published = await async_live_trips(
+            self.hass,
+            self._live_owner,
+            self._timetable,
+            self.options.min_transfer_minutes,
+            cooldown=True,
+        )
         self._note_success(published)
         return RouteData(trips=published, active=True, fetched_at=dt_util.utcnow())
 

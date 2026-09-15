@@ -1,0 +1,829 @@
+{
+ "itdMessageList": [],
+ "trips": [
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "platformName": "",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:11",
+        "timeSec": "06:11:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:11",
+        "rtTimeSec": "06:11:00"
+       },
+       "ref": {
+        "id": "60200166",
+        "platform": "49-R"
+       }
+      },
+      {
+       "name": "Wien Volkstheater (Burggasse)",
+       "platformName": "",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:30",
+        "timeSec": "06:30:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:30",
+        "rtTimeSec": "06:30:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "49-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 49",
+      "number": "49",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Ring/Volkstheater",
+      "realtime": "0",
+      "diva": {
+       "line": "22049",
+       "dir": "R",
+       "opPublicCode": "WL",
+       "tripCode": "40"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Hütteldorfer Straße",
+       "ref": {
+        "id": "60201035"
+       }
+      },
+      {
+       "name": "Wien Johnstraße (Hütteldorfer Straße)",
+       "ref": {
+        "id": "60200606"
+       }
+      },
+      {
+       "name": "Wien Huglgasse",
+       "ref": {
+        "id": "60200556"
+       }
+      },
+      {
+       "name": "Wien Schweglerstraße (Märzstraße)",
+       "ref": {
+        "id": "60201200"
+       }
+      },
+      {
+       "name": "Wien Beingasse",
+       "ref": {
+        "id": "60200458"
+       }
+      },
+      {
+       "name": "Wien Urban-Loritz-Platz",
+       "ref": {
+        "id": "60201413"
+       }
+      },
+      {
+       "name": "Wien Kaiserstraße",
+       "ref": {
+        "id": "60200646"
+       }
+      },
+      {
+       "name": "Wien Westbahnstraße/Zieglergasse",
+       "ref": {
+        "id": "60201533"
+       }
+      },
+      {
+       "name": "Wien Siebensterngasse",
+       "ref": {
+        "id": "60201088"
+       }
+      },
+      {
+       "name": "Wien Kirchengasse",
+       "ref": {
+        "id": "60201237"
+       }
+      },
+      {
+       "name": "Wien Stiftgasse",
+       "ref": {
+        "id": "60201325"
+       }
+      },
+      {
+       "name": "Wien Volkstheater (Burggasse)",
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3",
+       "dTM": "30",
+       "footpathElem": [
+        {
+         "description": "",
+         "type": "LEVEL",
+         "lF": "0",
+         "lT": "0",
+         "level": "LEVEL",
+         "orig": {
+          "stopID": "60201430",
+          "area": "4",
+          "platform": "",
+          "x": "1820912.00",
+          "y": "5858986.00",
+          "mapName": "MRCV",
+          "georef": "25029115:6:MRCV:100"
+         },
+         "dest": {
+          "stopID": "60201430",
+          "area": "9",
+          "platform": "",
+          "x": "1821021.00",
+          "y": "5858928.00",
+          "mapName": "MRCV",
+          "georef": "23241222:69:MRCV:100"
+         }
+        },
+        {
+         "description": "",
+         "type": "ESCALATOR",
+         "lF": "0",
+         "lT": "-1",
+         "level": "DOWN",
+         "orig": {
+          "stopID": "60201430",
+          "area": "9",
+          "platform": "",
+          "x": "1821021.00",
+          "y": "5858928.00",
+          "mapName": "MRCV",
+          "georef": "23241222:69:MRCV:100"
+         },
+         "dest": {
+          "stopID": "60201430",
+          "area": "2",
+          "platform": "",
+          "x": "1820974.00",
+          "y": "5858953.00",
+          "mapName": "MRCV",
+          "georef": "33109578:22:MRCV:100"
+         }
+        }
+       ]
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:34",
+        "timeSec": "06:34:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:34",
+        "rtTimeSec": "06:34:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U2-R"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "platformName": "2",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:38",
+        "timeSec": "06:38:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:38",
+        "rtTimeSec": "06:38:00"
+       },
+       "ref": {
+        "id": "60201184",
+        "platform": "U2-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "realtime": "0",
+      "diva": {
+       "line": "210U2",
+       "dir": "R",
+       "opPublicCode": "WL",
+       "tripCode": "1317"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Rathaus",
+       "ref": {
+        "id": "60201072"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "ref": {
+        "id": "60201184"
+       }
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:16",
+        "timeSec": "06:16:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:16",
+        "rtTimeSec": "06:16:00"
+       },
+       "ref": {
+        "id": "60200166",
+        "platform": "G1"
+       }
+      },
+      {
+       "name": "Wien Ottakring",
+       "platformName": "1",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:18",
+        "timeSec": "06:18:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:18",
+        "rtTimeSec": "06:18:00"
+       },
+       "ref": {
+        "id": "60200981",
+        "platform": "G1"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Handelskai",
+      "realtime": "0",
+      "diva": {
+       "line": "01S45",
+       "dir": "R",
+       "tripCode": "36"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Breitensee",
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Ottakring",
+       "ref": {
+        "id": "60200981"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "5",
+       "dTM": "45",
+       "footpathElem": [
+        {
+         "description": "",
+         "type": "STAIRS",
+         "lF": "1",
+         "lT": "0",
+         "level": "DOWN",
+         "orig": {
+          "stopID": "60200981",
+          "area": "1",
+          "platform": "",
+          "x": "1815758.00",
+          "y": "5857837.00",
+          "mapName": "MRCV",
+          "georef": "523065098:1:MRCV:100"
+         },
+         "dest": {
+          "stopID": "60200981",
+          "area": "5",
+          "platform": "",
+          "x": "1815800.00",
+          "y": "5857836.00",
+          "mapName": "MRCV",
+          "georef": "25082793:0:MRCV:100"
+         }
+        },
+        {
+         "description": "",
+         "type": "LEVEL",
+         "lF": "0",
+         "lT": "0",
+         "level": "LEVEL",
+         "orig": {
+          "stopID": "60200981",
+          "area": "5",
+          "platform": "",
+          "x": "1815800.00",
+          "y": "5857836.00",
+          "mapName": "MRCV",
+          "georef": "25082793:0:MRCV:100"
+         },
+         "dest": {
+          "stopID": "60200981",
+          "area": "3",
+          "platform": "",
+          "x": "1815808.00",
+          "y": "5857702.00",
+          "mapName": "MRCV",
+          "georef": "25083389:14:MRCV:100"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Ottakring (Thaliastraße)",
+       "platformName": "",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:25",
+        "timeSec": "06:25:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:25",
+        "rtTimeSec": "06:25:00"
+       },
+       "ref": {
+        "id": "60200981",
+        "platform": "46-R"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "platformName": "B",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:40",
+        "timeSec": "06:40:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:40",
+        "rtTimeSec": "06:40:00"
+       },
+       "ref": {
+        "id": "60201184",
+        "platform": "43"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 44",
+      "number": "44",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Schottentor",
+      "realtime": "0",
+      "diva": {
+       "line": "22044",
+       "dir": "R",
+       "opPublicCode": "WL",
+       "tripCode": "21"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Ottakring (Thaliastraße)",
+       "ref": {
+        "id": "60200981"
+       }
+      },
+      {
+       "name": "Wien Redtenbachergasse",
+       "ref": {
+        "id": "60201080"
+       }
+      },
+      {
+       "name": "Wien Familienplatz (Ottakringer Straße)",
+       "ref": {
+        "id": "60200669"
+       }
+      },
+      {
+       "name": "Wien Johann-Nepomuk-Berger-Platz (Ottakringer Str.)",
+       "ref": {
+        "id": "60200602"
+       }
+      },
+      {
+       "name": "Wien Frauengasse",
+       "ref": {
+        "id": "60200977"
+       }
+      },
+      {
+       "name": "Wien Yppengasse",
+       "ref": {
+        "id": "60200124"
+       }
+      },
+      {
+       "name": "Wien Hernalser Gürtel (Ottakringer Straße)",
+       "ref": {
+        "id": "60200507"
+       }
+      },
+      {
+       "name": "Wien Brünnlbadgasse",
+       "ref": {
+        "id": "60200178"
+       }
+      },
+      {
+       "name": "Wien Skodagasse",
+       "ref": {
+        "id": "60201267"
+       }
+      },
+      {
+       "name": "Wien Lange Gasse",
+       "ref": {
+        "id": "60200747"
+       }
+      },
+      {
+       "name": "Wien Landesgerichtsstraße",
+       "ref": {
+        "id": "60200742"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "ref": {
+        "id": "60201184"
+       }
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "platformName": "",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:17",
+        "timeSec": "06:17:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:17",
+        "rtTimeSec": "06:17:00"
+       },
+       "ref": {
+        "id": "60200166",
+        "platform": "49-R"
+       }
+      },
+      {
+       "name": "Wien Volkstheater (Burggasse)",
+       "platformName": "",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:36",
+        "timeSec": "06:36:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:36",
+        "rtTimeSec": "06:36:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "49-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 49",
+      "number": "49",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Ring/Volkstheater",
+      "realtime": "0",
+      "diva": {
+       "line": "22049",
+       "dir": "R",
+       "opPublicCode": "WL",
+       "tripCode": "44"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Hütteldorfer Straße",
+       "ref": {
+        "id": "60201035"
+       }
+      },
+      {
+       "name": "Wien Johnstraße (Hütteldorfer Straße)",
+       "ref": {
+        "id": "60200606"
+       }
+      },
+      {
+       "name": "Wien Huglgasse",
+       "ref": {
+        "id": "60200556"
+       }
+      },
+      {
+       "name": "Wien Schweglerstraße (Märzstraße)",
+       "ref": {
+        "id": "60201200"
+       }
+      },
+      {
+       "name": "Wien Beingasse",
+       "ref": {
+        "id": "60200458"
+       }
+      },
+      {
+       "name": "Wien Urban-Loritz-Platz",
+       "ref": {
+        "id": "60201413"
+       }
+      },
+      {
+       "name": "Wien Kaiserstraße",
+       "ref": {
+        "id": "60200646"
+       }
+      },
+      {
+       "name": "Wien Westbahnstraße/Zieglergasse",
+       "ref": {
+        "id": "60201533"
+       }
+      },
+      {
+       "name": "Wien Siebensterngasse",
+       "ref": {
+        "id": "60201088"
+       }
+      },
+      {
+       "name": "Wien Kirchengasse",
+       "ref": {
+        "id": "60201237"
+       }
+      },
+      {
+       "name": "Wien Stiftgasse",
+       "ref": {
+        "id": "60201325"
+       }
+      },
+      {
+       "name": "Wien Volkstheater (Burggasse)",
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3",
+       "dTM": "30",
+       "footpathElem": [
+        {
+         "description": "",
+         "type": "LEVEL",
+         "lF": "0",
+         "lT": "0",
+         "level": "LEVEL",
+         "orig": {
+          "stopID": "60201430",
+          "area": "4",
+          "platform": "",
+          "x": "1820912.00",
+          "y": "5858986.00",
+          "mapName": "MRCV",
+          "georef": "25029115:6:MRCV:100"
+         },
+         "dest": {
+          "stopID": "60201430",
+          "area": "9",
+          "platform": "",
+          "x": "1821021.00",
+          "y": "5858928.00",
+          "mapName": "MRCV",
+          "georef": "23241222:69:MRCV:100"
+         }
+        },
+        {
+         "description": "",
+         "type": "ESCALATOR",
+         "lF": "0",
+         "lT": "-1",
+         "level": "DOWN",
+         "orig": {
+          "stopID": "60201430",
+          "area": "9",
+          "platform": "",
+          "x": "1821021.00",
+          "y": "5858928.00",
+          "mapName": "MRCV",
+          "georef": "23241222:69:MRCV:100"
+         },
+         "dest": {
+          "stopID": "60201430",
+          "area": "2",
+          "platform": "",
+          "x": "1820974.00",
+          "y": "5858953.00",
+          "mapName": "MRCV",
+          "georef": "33109578:22:MRCV:100"
+         }
+        }
+       ]
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:39",
+        "timeSec": "06:39:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:39",
+        "rtTimeSec": "06:39:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U2-R"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "platformName": "2",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:43",
+        "timeSec": "06:43:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:43",
+        "rtTimeSec": "06:43:00"
+       },
+       "ref": {
+        "id": "60201184",
+        "platform": "U2-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "realtime": "0",
+      "diva": {
+       "line": "210U2",
+       "dir": "R",
+       "opPublicCode": "WL",
+       "tripCode": "1320"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Rathaus",
+       "ref": {
+        "id": "60201072"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "ref": {
+        "id": "60201184"
+       }
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

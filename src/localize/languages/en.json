@@ -406,6 +406,9 @@
     "day_today": "today",
     "day_tomorrow": "tomorrow",
     "adhoc_announce_planned": "Leave {day} at {time}. {summary}",
+    "live": "Live",
+    "every_minutes": "every {n} min",
+    "then_at": "then {times}",
     "editor": {
       "entity": "Route",
       "entity_helper": "Leave empty to pick origin and destination right on the card. Only routes you've set up are listed.",

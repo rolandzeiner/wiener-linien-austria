@@ -16,6 +16,10 @@ Three callers, each taking exactly one slot per cycle:
   `/monitor` tick behind it; one slot still keeps the burst from landing on
   top of a monitor tick, which is the part the upstream notices.
 
+live.py takes this slot too, for the `/monitor` request a route refresh
+makes when its stops aren't in a batch answer (see live.py for when). An
+on-demand plan's request doesn't, like the routing calls below.
+
 Route entries take a separate 15 s slot on the routing backend
 (`async_enforce_routing_cooldown`). Requests someone is waiting for take no
 slot at all: `plan_trip` and the route card's From / To mode go through the

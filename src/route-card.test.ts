@@ -55,6 +55,7 @@ function trip(dep: string, arr: string, risk: RouteTripAttr["risk"] = "tight"): 
         origin: stop("Stephansplatz", "08:08", null),
         destination: stop("Praterstern", arr),
         realtime: false, stop_count: 1, duration_minutes: 3, walk_after_minutes: 0, cancelled: false,
+        headway_minutes: 10, next_departures: ["2026-09-14T08:18:00+02:00", "2026-09-14T08:28:40+02:00"],
       },
     ],
     transfers: [{ at: "Stephansplatz", walk_minutes: 4, slack_minutes: risk === "at_risk" ? -2 : 0, risk }],
@@ -175,6 +176,10 @@ describe("rendering", () => {
     expect(t).toContain("Richtung Simmering");
     expect(t).toContain("5 Stationen");
     expect(t).toContain("2 min später");
+    // What the departure boards add: live marker, frequency, the next ones.
+    expect(t).toContain("Echtzeit");
+    expect(t).toContain("alle 10 min");
+    expect(t).toContain("danach 08:18, 08:28");
     expect(t).toContain("Umstieg Stephansplatz");
     expect(t).toContain("4 min Fußweg");
     expect(t).toContain("Knapp: 0 min Puffer");

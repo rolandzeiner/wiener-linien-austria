@@ -4,11 +4,12 @@ The routing service is a Mentz EFA server (`ogd_routing/XML_TRIP_REQUEST2`,
 interface described in "Beschreibung der EFA XML-Schnittstelle", Wiener
 Linien OGD, 2013). It does the actual routing server-side, so this module
 never searches a timetable itself. The interface carries realtime-adjusted
-times (`rtTime`) and they are used when the upstream supplies them; none
-were observed as of 2026-09-14 (every leg had `rtTime == time`, and
-`XML_DM_REQUEST` reported `realtime: "0"` even for U-Bahn lines `/monitor`
-shows live), so in practice plans are timetable-based. Its job is the
-three things the server does not do:
+times (`rtTime`) and they are used when the upstream supplies them, but none
+were observed (every leg had `rtTime == time` on 2026-09-14 and 2026-09-15,
+and `XML_DM_REQUEST` reported `realtime: "0"` even for U-Bahn lines
+`/monitor` shows live). Live times come from `/monitor` instead, matched
+onto the parsed rides in live.py, which re-scores the changes with them.
+Its job is the three things the server does not do:
 
 1. **Parse** the JSON variant (`outputFormat=JSON`) into typed trips. The
    server stamps Vienna wall-clock time with no offset, regardless of Home
@@ -223,6 +224,15 @@ class RouteLeg:
     # `footpath` block with `position: AFTER`), in minutes.
     walk_after_minutes: int
     cancelled: bool = False
+    # `H` / `R` from `mode.diva.dir`, the same code `/monitor` uses.
+    direction: str | None = None
+    # Run by Wiener Linien (`mode.diva.opPublicCode == "WL"`), so `/monitor`
+    # can know it. S-Bahn and ÖBB rides can't get live times.
+    wiener_linien: bool = False
+    # From `/monitor` (live.py): the departures after this one, and how many
+    # minutes apart the line typically runs here.
+    next_departures: tuple[datetime, ...] = ()
+    headway_minutes: int | None = None
 
     @property
     def duration_minutes(self) -> int | None:
@@ -247,6 +257,9 @@ class RouteLeg:
             "duration_minutes": self.duration_minutes,
             "walk_after_minutes": self.walk_after_minutes,
             "cancelled": self.cancelled,
+            "direction": self.direction,
+            "next_departures": [_iso(value) for value in self.next_departures],
+            "headway_minutes": self.headway_minutes,
         }
 
 
@@ -520,6 +533,7 @@ def _parse_leg(raw: Mapping[str, Any], tz: Any) -> RouteLeg | None:
     if not isinstance(start, Mapping) or not isinstance(end, Mapping):
         return None
     mode = _mapping(raw.get("mode"))
+    diva = _mapping(mode.get("diva"))
     walk = str(mode.get("type") or "") in _WALK_MODE_TYPES
     stop_seq = raw.get("stopSeq")
     # stopSeq includes both the boarding and the alighting stop.
@@ -536,6 +550,8 @@ def _parse_leg(raw: Mapping[str, Any], tz: Any) -> RouteLeg | None:
         stop_count=stop_count,
         walk_after_minutes=_walk_after(raw.get("footpath")),
         cancelled=_is_cancelled(raw, mode),
+        direction=None if walk else _text(diva.get("dir")),
+        wiener_linien=not walk and _text(diva.get("opPublicCode")) == "WL",
     )
 
 

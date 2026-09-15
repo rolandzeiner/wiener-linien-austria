@@ -689,6 +689,12 @@ export interface RouteLegAttr {
   duration_minutes: number | null;
   walk_after_minutes: number;
   cancelled: boolean;
+  /** `H` / `R`, as on the departure boards. */
+  direction?: string | null;
+  /** Live (or planned) departures after this one, from `/monitor`. */
+  next_departures?: string[];
+  /** Typical minutes between departures here, from `/monitor`. */
+  headway_minutes?: number | null;
 }
 
 export interface RouteTransferAttr {

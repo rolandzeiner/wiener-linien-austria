@@ -406,6 +406,9 @@
     "day_today": "heute",
     "day_tomorrow": "morgen",
     "adhoc_announce_planned": "Abfahrt {day} um {time}. {summary}",
+    "live": "Echtzeit",
+    "every_minutes": "alle {n} min",
+    "then_at": "danach {times}",
     "editor": {
       "entity": "Verbindung",
       "entity_helper": "Leer lassen, um Start und Ziel direkt auf der Karte zu wählen. Zur Wahl stehen nur eingerichtete Verbindungen.",

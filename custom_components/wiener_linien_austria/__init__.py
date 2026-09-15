@@ -47,6 +47,7 @@ from .const import (
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
+from .live import LIVE_BOARD_KEY
 from .rate_limit import (
     LOCK_KEY,
     LOCK_LOOP_KEY,
@@ -365,8 +366,9 @@ async def _async_setup_route_entry(
 
     Mirrors the stop path's bookkeeping — entry count, domain timers, the
     up-front device, rollback on a platform failure — minus the batch
-    group: a route polls the routing backend on its own coordinator timer
-    and never touches `/monitor`. It still counts as a live entry, so the
+    group: a route polls the routing backend on its own coordinator timer.
+    Its live times come from `/monitor` through live.py, riding in the
+    boards' batch request where one exists. It still counts as a live entry, so the
     alerts refresh keeps running for a route-only install and route legs
     can be matched against disruptions.
     """
@@ -442,6 +444,8 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         CATALOGUE_KEY,
         # Holds a reference to the catalogue it was built from.
         STOPS_CACHE_KEY,
+        # Live rows and leases name the stops routes and dashboards use.
+        LIVE_BOARD_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)
