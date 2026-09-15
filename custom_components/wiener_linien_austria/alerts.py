@@ -6,15 +6,13 @@ Both user-visible alert types are surfaced by the same endpoint, just via the
 - `stoerunglang` — line/route disruptions (scope: city-wide)
 - `aufzugsinfo` — elevator out-of-service notices (scope: per station + per RBL)
 
-Both names travel in ONE request. `name=` may be repeated (Schnittstellen-
+All names travel in ONE request. `name=` may be repeated (Schnittstellen-
 dokumentation V1.5 §4.2.1), and the response tags every entry with a
 `refTrafficInfoCategoryId` that resolves through `data.trafficInfoCategories`.
-That halves the alert request count (576/day to 288/day) and — the reason it
-actually matters — removes a 15-second stall from the domain lock every cycle:
-two `_fetch_info_list` calls gathered concurrently both took
-`async_enforce_domain_cooldown`, which sleeps *inside* the lock by design, so
-the second always waited its full slice while any `/monitor` tick queued behind
-it. Category ids are assigned per response and NOT in request order (measured
+One request per feed would each take `async_enforce_domain_cooldown`, which
+sleeps *inside* the lock by design, so every extra request would stall the
+domain lock for its full 15 s slice with any `/monitor` tick queued behind it.
+Category ids are assigned per response and NOT in request order (measured
 2026-09-07: `stoerunglang` sent first came back as id 2), so always resolve
 through the category table rather than assuming an ordering.
 
@@ -305,7 +303,7 @@ def _split_by_category(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 
 async def async_refresh_alerts(hass: HomeAssistant) -> None:
-    """Refresh both traffic and elevator alerts into hass.data.
+    """Refresh the traffic (long + short) and elevator alerts into hass.data.
 
     Safe to call whenever; a failed fetch keeps the previous cache.
 
@@ -330,9 +328,8 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
 
     # Fetch/parse failure → leave both caches exactly as they were. Only an
     # actual successful 200 (possibly empty) overwrites — a legitimately
-    # empty list must clear stale resolved entries. Both feeds now travel in
-    # one request, so they succeed or fail together; there is no longer a
-    # mixed case to reason about.
+    # empty list must clear stale resolved entries. All feeds travel in one
+    # request, so they succeed or fail together.
     failed = isinstance(result, _FetchFailed)
     if not isinstance(result, _FetchFailed):
         parsed = [_parse_traffic(x) for x in result[ALERT_FEED_TRAFFIC]]

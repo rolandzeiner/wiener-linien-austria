@@ -64,9 +64,8 @@ async def async_get_config_entry_diagnostics(
     # Surface trip-pattern index health so user-reported "stops_ahead is
     # missing" issues can be triaged from a redacted dump alone — the
     # signal is "did the static layer actually load the index for this
-    # session" not "is the data correct for stop X". Read the live
-    # shared catalogue ref so a background refresh that hasn't been
-    # picked up by the coordinator yet still reports as loaded.
+    # session" not "is the data correct for stop X". Read from the live
+    # shared catalogue ref, the same one every parse uses.
     cached = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
     trip_patterns = (
         cached.trip_patterns if isinstance(cached, StaticCatalogue) else None
@@ -101,7 +100,7 @@ async def async_get_config_entry_diagnostics(
             # last_update_success is False.
             "last_exception": repr(coordinator.last_exception),
             "last_error_code": coordinator.last_error_code,
-            # The coordinator no longer self-polls (a shared batch group drives
+            # The coordinator doesn't self-poll (a shared batch group drives
             # fetches), so `update_interval` is None. Report the configured
             # scan interval instead — the cadence the batch group is keyed on.
             "scan_interval": str(coordinator.scan_interval),

@@ -1,8 +1,9 @@
 """HTTP helpers for the Wiener Linien integration.
 
-Centralises the outbound identity headers so the four call sites — the batch
-`/monitor` fetch, the `/trafficInfoList` alerts refresh, the config-flow probe
-and the static CSV downloads — cannot drift in what they send.
+Centralises the outbound identity headers so every call site — the batch
+`/monitor` fetch, the live-times `/monitor` call, the `/trafficInfoList` alerts
+refresh, the config-flow probe, the static CSV downloads and the routing
+server's trip and departure requests — cannot drift in what they send.
 
 Deliberately **absent**: `Accept-Encoding`. `aiohttp` already sets one of its
 own (`ClientRequest.DEFAULT_HEADERS`, built by `_gen_default_accept_encoding()`),

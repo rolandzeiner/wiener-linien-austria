@@ -5,26 +5,27 @@ Every outbound call this integration makes stays above the conventional
 aggregate*. An asyncio.Lock serialises the check-then-update, so concurrent
 callers can't both observe the same `last_call_ts` and skip the sleep.
 
-Three callers, each taking exactly one slot per cycle:
+Four callers, each taking exactly one slot per request:
 
 - batch.py — one combined `/monitor` request per interval group per tick.
 - alerts.py — one combined `/trafficInfoList` request per 5-minute cycle
-  (both feed names ride in it as repeated `name=` params).
+  (all three feed names ride in it as repeated `name=` params).
 - static.py — one slot for the whole weekly five-file burst, taken before
   the `asyncio.gather` rather than per file. Per-file would serialise a
   fail-soft background refresh into 5 x 15 s of held lock and stall every
   `/monitor` tick behind it; one slot still keeps the burst from landing on
   top of a monitor tick, which is the part the upstream notices.
+- live.py — the `/monitor` request a route refresh makes when its stops
+  aren't in a batch answer (see live.py for when). An on-demand plan's
+  request doesn't take it.
 
-live.py takes this slot too, for the `/monitor` request a route refresh
-makes when its stops aren't in a batch answer (see live.py for when). An
-on-demand plan's request doesn't, like the routing calls below.
-
-Route entries take a separate 15 s slot on the routing backend
-(`async_enforce_routing_cooldown`). Requests someone is waiting for take no
+The routing backend has a separate 15 s slot
+(`async_enforce_routing_cooldown`), taken by route refreshes and the S-Bahn
+timetable refresh (timetable.py). Requests someone is waiting for take no
 slot at all: `plan_trip` and the route card's From / To mode go through the
-cache, coalescing and token-bucket budget in adhoc.py instead. A cooldown
-bounds what runs unattended; the budget bounds what people ask for.
+cache, coalescing and token-bucket budget in adhoc.py instead, and the config
+flow's probes skip both slots. A cooldown bounds what runs unattended; the
+budget bounds what people ask for.
 """
 
 from __future__ import annotations
@@ -55,9 +56,9 @@ async def async_enforce_routing_cooldown(hass: HomeAssistant) -> None:
     """Serialise unattended routing requests under their own 15 s floor.
 
     Same lock-then-sleep shape as `async_enforce_domain_cooldown`, on
-    separate keys. Only the recurring route coordinators take it; the
-    user-initiated `plan_trip` action and the route card's ad-hoc mode do
-    not, for the same reason the config-flow line probe skips the realtime
+    separate keys. Only the unattended callers take it (route coordinators
+    and the S-Bahn `TimetableBoard`); the user-initiated `plan_trip` action
+    and the route card's ad-hoc mode do not, for the same reason the config-flow line probe skips the realtime
     slot — someone is waiting. adhoc.py's budget bounds those instead.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
@@ -84,12 +85,11 @@ async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
     callers take ~N × 15s to drain. This is exactly the conventional
     15-second minimum interval the OGD endpoint asks for; it's not a bug.
 
-    Since batching landed there is at most one caller per tick, not one per
-    entry: every entry sharing a scan interval fetches through ONE combined
+    The queue stays short because callers are shared rather than per entry:
+    every entry sharing a scan interval fetches through ONE combined
     /monitor request (batch.py), and the alerts refresh runs on its own
     5-min cadence through ONE combined /trafficInfoList request. Adding stops
-    no longer lengthens the queue — see batch.py's module docstring for why
-    that drain was worth eliminating.
+    doesn't lengthen the queue — see batch.py's module docstring.
     """
     domain_data = hass.data.setdefault(DOMAIN, {})
     # Loop-pin the lock — `asyncio.Lock()` lazy-binds to the running

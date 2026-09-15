@@ -62,9 +62,9 @@ MAX_POLL_SECONDS: Final = 600
 DOMAIN_LAST_CALL_KEY: Final = "last_call_ts"
 DOMAIN_COOLDOWN_SECONDS: Final = 15
 
-# Exponential-backoff ceiling for the per-entry monitor coordinator.
-# Sustained API outages settle at this cadence instead of hammering at
-# the user-configured interval. Cap chosen to keep an outage visible
+# Exponential-backoff ceiling, shared by the monitor batch groups (batch.py)
+# and the route coordinators. Sustained API outages settle at this cadence
+# instead of hammering at the user-configured interval. Cap chosen to keep an outage visible
 # without amplifying load — 30 min is comfortably below "user thinks
 # the integration is broken" and well above any realistic transient hiccup.
 BACKOFF_CAP_SECONDS: Final = 1800
@@ -374,16 +374,14 @@ UPSTREAM_ERROR_KEYS: Final[dict[int, str]] = {
 
 # MeansOfTransport values → rough categorisation for UI icons. Mirrored in
 # src/utils/mot.ts; test_line_type_constants_match_python_and_ts pins these
-# four names against it by name — a fifth constant added to one side only
-# would pass. `LineType` carries the same set as a Literal so call sites can
-# declare the narrow shape without restating the strings.
+# five names against it by name — a sixth constant added to one side only
+# would pass.
 LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
 LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
 # Not a `/monitor` type: the S-Bahn rows timetable.py adds to a board.
 LINE_TYPE_S_BAHN: Final = "ptTrainS"
-LineType = Literal["ptMetro", "ptTram", "ptBusCity", "ptBusNight"]
 
 # Direction codes from the /monitor feed. "H" = Hinfahrt (outbound),
 # "R" = Rückfahrt (return). Used as keys in CONF_LINES ("U1|H").
@@ -392,7 +390,7 @@ Direction = Literal["H", "R"]
 # Lovelace cards — this integration ships FOUR (modern, retro, flap, route).
 # Each JS file carries a `const CARD_VERSION` that must match the
 # corresponding Python constant below byte-for-byte, else the reload
-# banner loops. All three version in lockstep with the integration
+# banner loops. All four version in lockstep with the integration
 # (mirrored in src/const.ts; tests/test_card_version.py checks each
 # constant here AND each literal there against manifest.json). Each card
 # still ships an independent WS probe so a mismatch on one bundle doesn't
@@ -426,8 +424,8 @@ FONTS_DIRNAME: Final = "fonts"
 # costs payload for nothing.
 #
 # Not a recorder budget: `departures` is in sensor.py's
-# `_unrecorded_attributes`, so the 16 KB attribute cap does not apply. (It
-# used to, and is why the attribute was excluded.) What this bounds now is
+# `_unrecorded_attributes`, so the 16 KB attribute cap does not apply. What
+# this bounds is
 # the live payload pushed to the frontend, WebSocket subscribers, and
 # `/api/states` on every state write — which at busy multi-line stops
 # (Stephansplatz tracks U1/U3/U4) is the cost that actually matters.

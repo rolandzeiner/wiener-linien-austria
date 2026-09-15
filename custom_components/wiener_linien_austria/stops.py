@@ -137,19 +137,19 @@ def _unique_stop_labels(catalogue: StaticCatalogue) -> dict[int, str]:
 
 
 def trackable_station(catalogue: StaticCatalogue, value: Any) -> Station | None:
-    """Resolve a picker value back to a trackable Station, or None.
+    """Resolve a picker value (a DIVA) back to a trackable Station, or None.
 
-    The SelectSelector already constrains submissions to values we
-    offered, so this is the second line of defence — it also re-checks
-    `rbls`, which keeps the resolution honest if the catalogue was
-    refreshed between rendering the form and submitting it.
+    The combo box accepts free text (`custom_value=True`), and the WebSocket
+    `plan` command and `plan_trip` pass values from outside any picker, so
+    anything may arrive here. It also re-checks `rbls`, which keeps the
+    resolution honest if the catalogue was refreshed between rendering the
+    form and submitting it.
     """
     try:
         diva = int(value)
     except (TypeError, ValueError):
-        # Only reachable if the selector contract changes under us or the
-        # flow state is hand-edited; the user-visible `invalid_stop` is
-        # already the right answer, so this stays at DEBUG.
+        # Typed text that isn't a DIVA. Callers fall back to a name search
+        # or their own error, so this stays at DEBUG.
         _LOGGER.debug("Failed to parse diva %r", value)
         return None
     station = catalogue.stations_by_diva.get(diva)

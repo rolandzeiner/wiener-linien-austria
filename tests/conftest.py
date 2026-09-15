@@ -83,7 +83,7 @@ def live_fetch() -> Generator[AsyncMock]:
     """The live-times `/monitor` call, answering with no departures.
 
     Autouse so no route or on-demand test can reach the real endpoint. Tests
-    about live times set `return_value` (see `monitor_live_body`).
+    about live times set `return_value` (see `_monitor_body` in test_live.py).
     """
     with patch(
         LIVE_FETCH, new_callable=AsyncMock, return_value={"data": {"monitors": []}}
@@ -383,8 +383,8 @@ def auto_enable_custom_integrations(enable_custom_integrations):
 def mock_aiohttp_session():
     """Stub the aiohttp session to prevent pycares DNS thread leaks.
 
-    The batch group owns the /monitor session; the coordinator no longer
-    creates one. Patch the batch binding so a group timer firing during a
+    The batch group owns the /monitor session; the coordinator doesn't
+    create one. Patch the batch binding so a group timer firing during a
     time-advancing test can't reach the real network.
     """
     with (

@@ -1,8 +1,7 @@
 """Tests for the shared MonitorBatchGroup fetcher.
 
-These cover the HTTP / rate-limit / backoff / domain-cooldown behaviour that
-used to live on the per-entry coordinator, now re-homed to the batch group,
-PLUS the batching-specific behaviour: RBL union/dedupe, one combined request
+These cover the HTTP / rate-limit / backoff / domain-cooldown behaviour of
+the batch group, PLUS the batching-specific behaviour: RBL union/dedupe, one combined request
 for N members, and per-member fan-out (each member keeps only its own stops,
 a missing RBL yields empty-not-error).
 """

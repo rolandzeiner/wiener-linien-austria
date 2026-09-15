@@ -495,9 +495,9 @@ def test_parse_monitor_body_failsoft_on_match_exception() -> None:
     def _boom(*_args, **_kwargs):
         raise RuntimeError("synthetic matcher failure")
 
-    # Patch the symbol bound in coordinator (where it's actually called)
-    # — the import is now at module level, so the historical
-    # `static.stops_ahead_for_match` patch path no longer intercepts.
+    # Patch the symbol bound in coordinator (where it's actually called):
+    # the module-level import means patching `static.stops_ahead_for_match`
+    # would not intercept.
     with patch(
         "custom_components.wiener_linien_austria.coordinator.stops_ahead_for_match",
         side_effect=_boom,
@@ -603,9 +603,8 @@ async def test_async_setup_no_coords_when_catalogue_load_fails(
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
 
     # Patch the binding `coordinator` resolves at runtime, not the source
-    # in `static`. After hoist (no more lazy import), patching the source
-    # module no longer affects `coordinator.async_get_catalogue` — it was
-    # bound at import time.
+    # in `static`: `coordinator.async_get_catalogue` is bound at import
+    # time, so patching the source module wouldn't affect it.
     with patch(
         "custom_components.wiener_linien_austria.coordinator.async_get_catalogue",
         new_callable=AsyncMock,
@@ -650,8 +649,8 @@ def test_parse_monitor_body_handles_bus_fixture(tram_fixture) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Batch delegation — the coordinator no longer fetches; it parses its slice
-# out of a shared batch result. The HTTP / 304 / backoff / rate-limit / domain
+# Batch delegation — the coordinator doesn't fetch; it parses its slice
+# out of a shared batch result. The HTTP / backoff / rate-limit / domain
 # cooldown behaviour lives in test_batch.py against MonitorBatchGroup.
 # ---------------------------------------------------------------------------
 
@@ -832,7 +831,7 @@ async def test_apply_upstream_meta_records_server_time_and_code(
 async def test_scan_interval_reflects_config(hass: HomeAssistant) -> None:
     """The configured scan interval is exposed and drives batch grouping.
 
-    The coordinator no longer self-polls (update_interval is None); the shared
+    The coordinator doesn't self-poll (update_interval is None); the shared
     batch group is keyed on this value instead.
     """
     entry = _make_entry({CONF_SCAN_INTERVAL: 120})

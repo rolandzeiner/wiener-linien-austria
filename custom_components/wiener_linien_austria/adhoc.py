@@ -8,9 +8,8 @@ upstream notices:
 
 - **Cache.** A plan for "now" is keyed on the query alone and lives for
   `ADHOC_CACHE_TTL_SECONDS`, so every dashboard showing the same pair shares
-  one answer per minute however their refresh timers are phased. (Keying on
-  the wall-clock minute as well only shared answers between refreshes that
-  happened to land in the same minute.) A plan up to a minute old is still
+  one answer per minute however their refresh timers are phased. A plan up
+  to a minute old is still
   correct for "now": departed connections are dropped when it is served. A
   plan for a given time is keyed on that minute, the request's resolution,
   and keeps every connection it found: planning tomorrow's trip at 23:00
@@ -82,8 +81,10 @@ ADHOC_STALE_MAX_SECONDS: Final = 300
 # Distinct queries kept at once. A household is a handful of dashboards.
 ADHOC_CACHE_MAX_ENTRIES: Final = 32
 # Upstream requests this path may add per HA instance. A configured route at
-# its 300 s default makes 12-60 an hour; one viewer refreshing every 60-120 s
-# while the card is on screen makes 30-60. 120 leaves room for a busy
+# its 300 s default makes 12 an hour in steady state (the refresh pulled up
+# after a departure replaces the scheduled one, and never comes sooner than
+# 60 s); one viewer refreshing every 60-120 s while the card is on screen
+# makes 30-60. 120 leaves room for a busy
 # household and still caps a runaway client at a rate the upstream won't
 # notice.
 ADHOC_BUDGET_PER_HOUR: Final = 120

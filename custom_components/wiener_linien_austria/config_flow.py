@@ -15,12 +15,14 @@ Flow:
                         search over what was typed and offers the hits as a
                         shortlist, plus a "search again" escape hatch.
   3. `select_lines`   — the station's line × direction pairs, merged from a
-                        live `/monitor` call and the static catalogue, offered
-                        as an opt-in checklist. A new entry starts with nothing
-                        selected; reconfigure restores the saved picks.
-                        Submitting saves the entry.
-`async_step_reconfigure` re-enters `select_lines` for an existing entry,
-preserving unique_id. Options flow tweaks the scan interval only.
+                        live `/monitor` call and the static catalogue, plus the
+                        stop's S-Bahn lines from the timetable, offered as an
+                        opt-in checklist with the scan interval. A new entry
+                        starts with nothing selected; reconfigure restores the
+                        saved picks. Submitting saves the entry.
+`async_step_reconfigure` re-enters `select_lines` for a stop entry, or
+`route_options` for a route, preserving unique_id. Options flow tweaks the
+scan interval only.
 
 The combo box is what makes step 1 usable at both extremes: a plain
 free-text box gave no feedback until submit, and a plain dropdown of ~1800
@@ -158,14 +160,15 @@ async def _probe_monitor_lines(
     Each dict: {key, line, towards, direction, type}. Empty list on any failure
     — caller must handle by surfacing a `cannot_connect` form error.
 
-    This is the one outbound call that deliberately does NOT take
-    `async_enforce_domain_cooldown`. Every recurring caller does (batch.py,
-    alerts.py, static.py), because they run unattended and their aggregate rate
-    is what the upstream notices. This one is user-initiated, fires at most
-    twice in an entry's lifetime (initial setup and reconfigure), and the
-    cooldown sleeps *inside* the lock — taking it would freeze the config-flow
-    dialog for up to DOMAIN_COOLDOWN_SECONDS while someone is watching it, to
-    spare a free public API a single request. Not a trade worth making.
+    This call deliberately does NOT take `async_enforce_domain_cooldown`.
+    Every unattended caller does (batch.py, alerts.py, static.py, and live.py
+    for route refreshes), because their aggregate rate is what the upstream
+    notices. This one is user-initiated, runs once each time someone opens
+    the line picker (setup or reconfigure), and the cooldown sleeps *inside*
+    the lock — taking it would freeze the config-flow dialog for up to
+    DOMAIN_COOLDOWN_SECONDS while someone is watching it, to spare a free
+    public API a single request. Not a trade worth making. The S-Bahn picker
+    probe and `_probe_route` skip the routing slot for the same reason.
 
     If you are here because a linter or an audit flagged the inconsistency:
     it is deliberate, and README's Data Updates section documents it.
@@ -357,7 +360,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         return WienerLinienAustriaOptionsFlow()
 
     # ------------------------------------------------------------------
-    # Step 1 — user: searchable dropdown over the whole catalogue
+    # Step 1 — stop: searchable dropdown over the whole catalogue
     # ------------------------------------------------------------------
 
     async def _async_stop_options(
@@ -411,8 +414,8 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
 
             # Anything else is free text the combo box let through: a
             # partial name, a typo, or a name typed out without opening
-            # the suggestion list. Resolve it the same way the old search
-            # step did and offer the hits as a shortlist.
+            # the suggestion list. Search the catalogue for it and offer the
+            # hits as a shortlist.
             self._query = raw
             # Clamp pathologically long queries — `catalogue.search` does
             # an O(stations × len(query)) `casefold` substring scan per
@@ -523,13 +526,17 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
     # ------------------------------------------------------------------
-    # Step 3 — select_lines: live /monitor probe + checkbox selection
+    # Step 3 — select_lines: line probes + checkbox selection
     # ------------------------------------------------------------------
 
     async def async_step_select_lines(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Probe /monitor for live lines at the chosen station and let the user pick."""
+        """List the lines at the chosen station and let the user pick.
+
+        Live `/monitor` lines, merged with the catalogue's scheduled lines,
+        plus the stop's S-Bahn lines from the timetable.
+        """
         assert self._selected_station is not None
         station = self._selected_station
         errors: dict[str, str] = {}
@@ -931,7 +938,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Re-enter the line selection for an existing entry."""
+        """Re-enter line selection for a stop entry, or the options for a route."""
         entry = self._get_reconfigure_entry()
         self._reconfigure_entry = entry
         data = entry.data

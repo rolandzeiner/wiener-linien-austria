@@ -1327,28 +1327,6 @@ async def test_background_refresh_propagates_cancellation(
     assert "Background refresh failed" not in caplog.text
 
 
-async def test_background_refresh_skips_the_write_when_nothing_changed(
-    hass: HomeAssistant,
-) -> None:
-    """`refreshed is prior` means no write and, importantly, no re-publish.
-
-    Re-publishing `prior` could itself clobber a newer catalogue the
-    weekly refresh installed while this one was downloading.
-    """
-    prior = _build_catalogue()
-    store = MagicMock()
-    store.async_save = AsyncMock()
-
-    with patch(
-        "custom_components.wiener_linien_austria.static._fetch_and_build",
-        new_callable=AsyncMock,
-        return_value=prior,
-    ):
-        await _async_background_refresh(hass, prior, store)
-
-    store.async_save.assert_not_awaited()
-
-
 async def test_background_refresh_declines_to_clobber_a_newer_catalogue(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:

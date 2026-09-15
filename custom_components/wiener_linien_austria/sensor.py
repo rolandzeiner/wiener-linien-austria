@@ -155,7 +155,7 @@ class WienerLinienStopSensor(
             next_by_line.setdefault(dep.line, dep.countdown)
 
         # Match domain-wide alert caches against this entry's lines + RBLs.
-        # Lines derived from CONF_LINES ("U1|H|Leopoldau") — the user's own
+        # Lines derived from CONF_LINES ("U1|H") — the user's own
         # selection, stable even when no departures are flowing right now.
         # Fall back to live departures for the "all lines" case.
         selected_line_keys = config.get(CONF_LINES) or []
@@ -169,7 +169,7 @@ class WienerLinienStopSensor(
         # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
         # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) don't pay to
         # publish rows nothing renders. NOT a recorder budget — `departures`
-        # is in `_unrecorded_attributes` below; see MAX_DEPARTURES_IN_ATTRS in
+        # is in `_unrecorded_attributes` above; see MAX_DEPARTURES_IN_ATTRS in
         # const.py for what the cap actually bounds. The card respects its own
         # max_departures setting (≤ 20) so nothing the UI shows is lost.
         capped = [d.to_dict() for d in departures[:MAX_DEPARTURES_IN_ATTRS]]
@@ -184,13 +184,11 @@ class WienerLinienStopSensor(
         # GTFS-derived per-line palette, scoped to the lines this entity
         # can actually be asked to colour.
         #
-        # It used to publish the whole Wiener Linien catalogue. Measured
-        # 2026-09-09 against the live feed: 7,242 bytes for 179 lines with
-        # bg+fg — ~26% of a 27.4 KB payload at a hub stop, and
-        # byte-identical on every entry, so a five-stop install pushed
-        # ~36 KB of the same palette on every state write. (An earlier
-        # revision of this comment claimed "~3 KB"; it was never
-        # re-measured after `text_colors_by_line` landed.)
+        # Not the whole Wiener Linien catalogue. Measured 2026-09-09 against
+        # the live feed: that is 7,242 bytes for 179 lines with bg+fg —
+        # ~26% of a 27.4 KB payload at a hub stop, and byte-identical on
+        # every entry, so a five-stop install pushed ~36 KB of the same
+        # palette on every state write.
         #
         # The union below is the contract, and every term is load-bearing
         # — a label the cards render but this set omits gets the neutral
@@ -201,9 +199,7 @@ class WienerLinienStopSensor(
         #   * live departures — belt-and-braces; normally a subset of the
         #                      above, but the live feed is not bound by
         #                      the weekly catalogue
-        #   * stops_ahead lines — transfer chips for lines at OTHER stops,
-        #                      which is why publishing unscoped was right
-        #                      until the cards learned to merge palettes
+        #   * stops_ahead lines — transfer chips for lines at OTHER stops
         #   * traffic/elevator related_lines — notice badges, which name
         #                      lines that need not serve this stop at all
         #                      (plus a short notice's inferred_lines, the
@@ -211,10 +207,9 @@ class WienerLinienStopSensor(
         #
         # Cross-entity reuse is the other half. The flap board and the
         # modern card's notice badges render lines from EVERY configured
-        # stop off one palette; they now merge across entities
-        # (`mergeLineColorsMaps`) rather than taking the first stop's map,
-        # which only worked while every map was the identical catalogue.
-        # Don't narrow this set without checking that helper's callers.
+        # stop off one palette, merged across entities
+        # (`mergeLineColorsMaps`). Don't narrow this set without checking
+        # that helper's callers.
         needed_labels: set[str] = set(lines_at_stop)
         needed_labels.update(d.line for d in departures if d.line)
         for row in capped:
@@ -229,7 +224,7 @@ class WienerLinienStopSensor(
 
         # User-tracked subset of `lines_at_stop` — the lines selected in
         # the integration's config flow (`CONF_LINES` is a list of
-        # `{line}|{direction}` keys). All three card editors prefer this
+        # `{line}|{direction}` keys). The three departure-board card editors prefer this
         # filtered list so the per-stop pickers don't surface lines the
         # user has explicitly opted out of, while still including ones
         # that aren't currently driving (nightlines during the day,

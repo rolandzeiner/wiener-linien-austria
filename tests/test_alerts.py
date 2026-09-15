@@ -263,7 +263,7 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     params in a single GET. Two separate calls would still populate the
     caches, so asserting the call count is the only thing that stops a
     refactor silently reintroducing the second request — and with it the
-    15-second domain-lock stall it used to cost every cycle.
+    15-second domain-lock stall each extra request costs.
     """
     body = _combined_body(
         traffic=[

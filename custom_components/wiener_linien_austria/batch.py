@@ -16,7 +16,7 @@ drain the domain cooldown otherwise imposed (see rate_limit.py).
 The upstream API omits unknown/decommissioned ``stopId``s from an otherwise
 ``messageCode: 1`` response rather than erroring (verified empirically), so a
 single stale RBL never fails the batch — the affected member simply parses
-zero departures for that stop, exactly as a per-entry fetch would today.
+zero departures for that stop.
 
 There is no cap on how many ``stopId`` params one request may carry: measured
 2026-09-07, 200 real RBLs returned ``messageCode: 1`` with 168 stops populated,
@@ -308,7 +308,7 @@ class MonitorBatchGroup:
                         coordinator.note_rate_limited()
                     raise UpdateFailed(
                         translation_domain=DOMAIN,
-                        translation_key="api_rate_limited",
+                        translation_key=RATE_LIMIT_TRANSLATION_KEY,
                     )
 
                 if code is not None and code != 1:

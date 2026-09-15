@@ -200,10 +200,10 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
                 _LOGGER.warning("Static-catalogue periodic refresh failed: %s", err)
                 return
             if refreshed is not None:
-                # Surface the new catalogue to future config-flow / entry-load
-                # callers. Already-running coordinators keep their captured
-                # ref — accepted because trip patterns and stops change on a
-                # weeks-to-months cadence.
+                # Publish the new catalogue. Coordinators, sensors and live.py
+                # read the shared ref on every use, so they pick it up without
+                # a reload; only a stop's coordinates, captured at setup, wait
+                # for the next entry reload.
                 async_set_cached_catalogue(hass, refreshed)
 
         domain_data[STATIC_REFRESH_UNSUB_KEY] = async_track_time_interval(
@@ -368,9 +368,9 @@ async def _async_setup_route_entry(
     up-front device, rollback on a platform failure — minus the batch
     group: a route polls the routing backend on its own coordinator timer.
     Its live times come from `/monitor` through live.py, riding in the
-    boards' batch request where one exists. It still counts as a live entry, so the
-    alerts refresh keeps running for a route-only install and route legs
-    can be matched against disruptions.
+    boards' batch request where one exists. It still counts as a live
+    entry, so the alerts refresh keeps running for a route-only install and
+    route legs can be matched against disruptions.
     """
     coordinator = WienerLinienRouteCoordinator(hass, entry)
     await coordinator.async_config_entry_first_refresh()
@@ -401,7 +401,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     path) so a new cleanup key only has to land in one place.
 
     Cancels timer subscriptions, in-flight bg tasks, and pops every
-    cache + validator key.
+    cache and cooldown key.
 
     For NEW per-entry cleanup prefer `entry.async_on_unload`, which HA
     invokes on both unload and setup-failure. This exists because the
@@ -485,8 +485,8 @@ async def _async_reload_entry(
     """Reload the config entry when its options or data change.
 
     Fires for options-flow updates AND for reconfigure-flow data changes
-    (the config flow now calls ``async_update_and_abort`` without a
-    built-in reload), making this the single reload owner.
+    (the config flow calls ``async_update_and_abort``, which doesn't
+    reload), making this the single reload owner.
     """
     await hass.config_entries.async_reload(entry.entry_id)
 

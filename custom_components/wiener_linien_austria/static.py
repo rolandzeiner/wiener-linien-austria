@@ -75,7 +75,7 @@ _LINE_SORT_LETTER_TIE = 10**9  # sentinel: letter-only labels rank after numeric
 # Mode-of-transport sort tiers — applied first so the lines_at_diva
 # changeover chips group by colour-coded mode (Metro → Tram → Badner Bahn
 # → Bus → Nightline) rather than interleaving every mode by number alone.
-# Matches the GTFS palette tiers the card now renders.
+# Matches the GTFS palette tiers the cards render.
 #
 # linien.csv tags the Badner Bahn (LineID 399) "ptTramWLB", not "ptTram".
 # Without its own tier it took the unknown sentinel and sorted after the
@@ -333,9 +333,7 @@ class StaticCatalogue:
     `trip_patterns` is None on caches written before v1.4 (the field was
     introduced additively); the next refresh fills it in.
 
-    Store payloads written before the conditional-GET removal also carry a
-    `validators` key. It is ignored on read and no longer written — see
-    `http.py` for why the upstream can never answer 304.
+    Old Store payloads may carry a `validators` key; it is ignored on read.
     """
 
     stations_by_diva: dict[int, Station]
@@ -426,11 +424,10 @@ async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
 def async_set_cached_catalogue(hass: HomeAssistant, catalogue: StaticCatalogue) -> None:
     """Replace the shared catalogue ref (called by the periodic refresher).
 
-    Existing coordinators continue to hold their captured ref from setup
-    — acceptable because trip patterns / stops / RBLs change on a
-    weeks-to-months cadence. This call ensures only that *new*
-    coordinators (after entry reload) and the next config-flow
-    invocation see the refreshed data.
+    Every reader looks the ref up on use (coordinators, sensors, live.py,
+    the config flow), so the refreshed data is picked up without a reload.
+    The exception is a stop's coordinates, which its coordinator captures
+    at setup.
 
     No-op when the integration has been torn down (no entries left). A
     background refresh task spawned earlier may otherwise complete
@@ -627,11 +624,6 @@ async def _async_background_refresh(
             err,
         )
         return
-    if refreshed is prior:
-        # Nothing changed (e.g. every CSV returned 304). No write, and
-        # no re-publish — re-publishing `prior` could itself clobber a
-        # newer catalogue the weekly refresh installed meanwhile.
-        return
     # Lost-update guard: this background fetch started from `prior`, but
     # the weekly `async_refresh_catalogue` may have fetched and published
     # a newer catalogue while we were downloading. Publishing `refreshed`
@@ -728,7 +720,8 @@ async def _fetch_and_build(
     wire (73,622 raw — the only one of the five the origin gzips) + linien
     4,990, so ~1.89 MB. For scale that is ~7% of one week of `/monitor`
     polling at the default 60 s cadence, which is why this refresh is not
-    where the bytes are.
+    where the bytes are. (That ratio predates route leases, which add stops
+    to the `/monitor` request, so today's share is if anything smaller.)
     """
     session = async_get_clientsession(hass)
     timeout = aiohttp.ClientTimeout(total=30)
@@ -779,9 +772,8 @@ async def _fetch_and_build(
     )
     stations = parsed.stations
 
-    # Trip-pattern index: re-parse only when at least one of the two source
-    # CSVs came back fresh AND neither failed. On any failure / both-304,
-    # carry the prior index forward unchanged. Carrying prior is the
+    # Trip-pattern index: rebuild only when both source CSVs downloaded and
+    # parsed. On any failure, carry the prior index forward unchanged. Carrying prior is the
     # important fail-soft guarantee — a temporary fetch hiccup must not
     # wipe the stops_ahead feature for the next 7 days.
     trip_patterns = prior.trip_patterns if prior is not None else None
@@ -1443,9 +1435,8 @@ def _trip_patterns_from_store(
             int(k): str(v) for k, v in (raw.get("means_by_line") or {}).items()
         }
         # Build label → MoT for the per-stop sort tier — same as the
-        # parse path. Re-sort on read so a cache written under the old
-        # numeric-only sort gets reordered to the new MoT-grouped order
-        # without a network refresh.
+        # parse path. Re-sorted on read so a cache written under an older
+        # sort order still comes out MoT-grouped without a network refresh.
         mot_by_label_load = _mot_by_label(lines_by_label, means_by_line)
         lines_at_diva = {
             int(k): _sort_line_labels(
@@ -1497,8 +1488,8 @@ def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
     """Rebuild a StaticCatalogue from a Store payload.
 
     Older payloads may lack the `trip_patterns` key — default to None
-    and let the next refresh fill it in. Payloads written before the
-    conditional-GET removal also carry a `validators` key; it is ignored.
+    and let the next refresh fill it in. A leftover `validators` key is
+    ignored.
     """
     stations: dict[int, Station] = {}
     for row in data["stations"]:

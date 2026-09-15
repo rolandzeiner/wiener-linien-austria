@@ -137,7 +137,7 @@ def test_flap_card_version_matches_ts() -> None:
     )
 
 
-# LINE_TYPE_* parity. The four MeansOfTransport strings live in two places
+# LINE_TYPE_* parity. The five MeansOfTransport strings live in two places
 # (Python const.py + TS src/utils/mot.ts) because they're stable upstream
 # URL constants — duplicating them is cheaper than publishing them as a
 # sensor attribute on every state write. The test here locks that the two

@@ -13,9 +13,8 @@ user.
   of the route sensor's attributes so the card renders both through one
   path. It also takes a route entry's trip options (`route_type`,
   `max_changes`, `walk_speed`, `excluded_means`, `min_transfer_minutes`,
-  `step_free`)
-  with the same defaults. The card sends none of them yet; each distinct
-  combination is its own cache entry.
+  `step_free`) with the same defaults. The card sends only `step_free`; each
+  distinct combination is its own cache entry.
 
 Registered once per HA process in `async_setup`. `websocket_api` has no
 deregister hook, so the handlers outlive a removed integration; each one

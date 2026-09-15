@@ -31,10 +31,6 @@ from .const import (
     MIN_POLL_SECONDS,
     STALE_DEPARTURE_MAX_AGE,
 )
-
-# Eager import — `stops_ahead_for_match` runs in the /monitor parser's
-# hot loop, so the other names from `static` are already in sys.modules
-# anyway. No import-time saving from lazy imports here.
 from .static import (
     CATALOGUE_KEY,
     StaticCatalogue,
@@ -67,7 +63,7 @@ class Departure:
     line: str
     towards: str
     direction: str  # "H" | "R"
-    type: str  # ptMetro | ptTram | ptBusCity | ptBusNight | …
+    type: str  # ptMetro | ptTram | ptBusCity | ptBusNight | ptTrainS | …
     countdown: int
     time_planned: str | None
     time_real: str | None
@@ -167,7 +163,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # hass.data (alerts, line colours, catalogue) and re-parses
         # CONF_LINES every time; caching collapses that to once per
         # coordinator tick OR alerts refresh. Invalidated by:
-        #   • `_async_update_data` setting cache=None at the top, and
+        #   • `_invalidate_attrs_cache`, called before every data or error
+        #     push (`_async_update_data`, `batch_apply`, `batch_set_error`
+        #     and the timetable refresh), and
         #   • `cached_attrs` seeing `ALERTS_SEQ_KEY` advance past
         #     `_attrs_cache_alerts_seq`.
         # Read and written through `cached_attrs` / `store_attrs` — see
@@ -662,8 +660,7 @@ def _parse_monitor_body(
     # `locationStop.properties.attributes.rbl`. Applied only when `entry_rbls`
     # is given AND the monitor actually carries an rbl: a monitor with no rbl
     # (older payloads, hand-built test fixtures) falls through to
-    # include-all, matching the pre-batch single-request behaviour where the
-    # request already scoped the response.
+    # include-all.
     rbl_filter: set[int] | None = set(entry_rbls) if entry_rbls else None
 
     for monitor in monitors:
