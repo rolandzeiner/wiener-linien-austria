@@ -37,9 +37,8 @@ from .route_coordinator import (
     route_trip_attributes,
 )
 from .static import (
-    CATALOGUE_KEY,
-    StaticCatalogue,
     canonical_line_key,
+    current_catalogue,
     line_colors_for,
 )
 
@@ -279,9 +278,8 @@ class WienerLinienStopSensor(
         loaded yet — callers (the card editor) fall through to the
         live-derived list in that case so behaviour degrades gracefully.
         """
-        domain_data = self.coordinator.hass.data.get(DOMAIN, {})
-        catalogue = domain_data.get(CATALOGUE_KEY)
-        if not isinstance(catalogue, StaticCatalogue):
+        catalogue = current_catalogue(self.coordinator.hass)
+        if catalogue is None:
             return []
         index = catalogue.trip_patterns
         if index is None:

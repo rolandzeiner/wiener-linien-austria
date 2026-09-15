@@ -56,7 +56,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-from .static import CATALOGUE_KEY, StaticCatalogue, canonical_line_label
+from .static import StaticCatalogue, canonical_line_label, current_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -702,8 +702,7 @@ def get_alerts_for(
     domain_data = hass.data.get(DOMAIN, {})
     all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
     all_elevator: list[ElevatorInfo] = domain_data.get(ELEVATOR_INFO_KEY, []) or []
-    cached = domain_data.get(CATALOGUE_KEY)
-    catalogue = cached if isinstance(cached, StaticCatalogue) else None
+    catalogue = current_catalogue(hass)
 
     matched_traffic: list[TrafficInfo] = []
     for t in all_traffic:

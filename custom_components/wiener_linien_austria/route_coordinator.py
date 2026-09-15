@@ -43,7 +43,6 @@ from .live import (
     apply_live,
     async_get_live_board,
     async_live_trips,
-    current_catalogue,
     rbls_for_trips,
 )
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
@@ -60,7 +59,7 @@ from .routing import (
     rank_trips,
     within_window,
 )
-from .static import line_colors_for
+from .static import current_catalogue, line_colors_for
 
 _LOGGER = logging.getLogger(__name__)
 

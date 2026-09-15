@@ -58,7 +58,7 @@ from .const import (
 from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
 from .routing import Trip, assess_transfers
-from .static import CATALOGUE_KEY, StaticCatalogue
+from .static import StaticCatalogue, current_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -497,13 +497,6 @@ def async_get_live_board(hass: HomeAssistant) -> LiveBoard:
         board = LiveBoard(hass)
         domain_data[LIVE_BOARD_KEY] = board
     return board
-
-
-@callback
-def current_catalogue(hass: HomeAssistant) -> StaticCatalogue | None:
-    """The loaded stop catalogue, or None while it's still loading."""
-    catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
-    return catalogue if isinstance(catalogue, StaticCatalogue) else None
 
 
 async def async_live_trips(

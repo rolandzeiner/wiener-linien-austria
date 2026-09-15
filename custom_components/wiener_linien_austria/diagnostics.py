@@ -8,11 +8,11 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from .alerts import get_alerts_for, line_names_from_keys
-from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
+from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS
 from .coordinator import WienerLinienConfigEntry
 from .route_coordinator import WienerLinienRouteCoordinator
-from .s_bahn_network import S_BAHN_NETWORK_KEY, SBahnNetwork
-from .static import CATALOGUE_KEY, StaticCatalogue
+from .s_bahn_network import current_network
+from .static import current_catalogue
 
 # Treat as monotonically growing — never shrink. Diagnostics dumps end
 # up in public GitHub issues, so over-redacting is essentially free and
@@ -67,10 +67,8 @@ async def async_get_config_entry_diagnostics(
     # signal is "did the static layer actually load the index for this
     # session" not "is the data correct for stop X". Read from the live
     # shared catalogue ref, the same one every parse uses.
-    cached = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
-    trip_patterns = (
-        cached.trip_patterns if isinstance(cached, StaticCatalogue) else None
-    )
+    catalogue = current_catalogue(hass)
+    trip_patterns = catalogue.trip_patterns if catalogue is not None else None
     trip_pattern_summary: dict[str, Any] = {
         "loaded": trip_patterns is not None,
     }
@@ -87,9 +85,9 @@ async def async_get_config_entry_diagnostics(
 
     # Same triage question for the S-Bahn transfer chips: did the network
     # load, and how old is each hub's sample.
-    network = hass.data.get(DOMAIN, {}).get(S_BAHN_NETWORK_KEY)
-    s_bahn_summary: dict[str, Any] = {"loaded": isinstance(network, SBahnNetwork)}
-    if isinstance(network, SBahnNetwork):
+    network = current_network(hass)
+    s_bahn_summary: dict[str, Any] = {"loaded": network is not None}
+    if network is not None:
         s_bahn_summary["stop_count"] = len(network.lines_at_diva)
         s_bahn_summary["hub_fetched_at"] = {
             str(hub): sample.fetched_at.isoformat()

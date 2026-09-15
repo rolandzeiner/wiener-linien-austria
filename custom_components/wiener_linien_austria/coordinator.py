@@ -35,10 +35,10 @@ from .const import (
 from .s_bahn_network import current_lines_at_diva as current_s_bahn_lines
 from .s_bahn_network import merge_transfer_lines
 from .static import (
-    CATALOGUE_KEY,
     StaticCatalogue,
     async_get_catalogue,
     canonical_line_key,
+    current_catalogue,
     is_s_bahn_label,
     stops_ahead_for_match,
 )
@@ -408,7 +408,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         Reads the live catalogue ref so a background trip-pattern refresh that
         lands after setup is picked up on the next parse — no restart needed.
         """
-        catalogue = self._current_catalogue()
+        catalogue = current_catalogue(self.hass)
         data = _parse_monitor_body(
             result.body,
             self._selected_lines,
@@ -431,7 +431,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             self._timetable.departures,
             self._timetable_pairs,
             dt_util.utcnow(),
-            catalogue=self._current_catalogue(),
+            catalogue=current_catalogue(self.hass),
             s_bahn_lines_at_diva=current_s_bahn_lines(self.hass),
         )
         if not planned:
@@ -530,21 +530,6 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         """Drop the memoised extra_state_attributes payload before a state change."""
         self._attrs_cache = None
         self._attrs_cache_alerts_seq = None
-
-    def _current_catalogue(self) -> StaticCatalogue | None:
-        """Fetch the live catalogue ref from hass.data, or None.
-
-        The catalogue may be a `StaticCatalogue` (resolved), an
-        `asyncio.Task` (still loading on a fresh start), or absent
-        (load hasn't been triggered yet). Only the resolved form is
-        useful for enrichment; the others fall through to None and
-        the parser skips stops_ahead.
-        """
-        domain_data = self.hass.data.get(DOMAIN, {})
-        cached = domain_data.get(CATALOGUE_KEY)
-        if isinstance(cached, StaticCatalogue):
-            return cached
-        return None
 
 
 def _normalise_lines(raw: Any) -> set[str] | None:

@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
 import aiohttp
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
@@ -442,6 +442,20 @@ def async_set_cached_catalogue(hass: HomeAssistant, catalogue: StaticCatalogue) 
     if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
         return
     domain_data[CATALOGUE_KEY] = catalogue
+
+
+@callback
+def current_catalogue(hass: HomeAssistant) -> StaticCatalogue | None:
+    """The loaded stop catalogue, or None while it's still loading.
+
+    The slot may hold a resolved `StaticCatalogue`, an `asyncio.Task` (still
+    loading on a fresh start), or nothing (no load triggered yet). Only the
+    resolved form is useful to readers; the others come back as None, and
+    each caller degrades on its own terms (the parser skips stops_ahead, the
+    sensor falls back to live-derived lines).
+    """
+    catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
+    return catalogue if isinstance(catalogue, StaticCatalogue) else None
 
 
 def canonical_line_label(label: str) -> str:
@@ -1547,8 +1561,8 @@ def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str
                 "bg": S_BAHN_COLORS.get(label.upper(), S_BAHN_DEFAULT_COLOR),
                 "fg": S_BAHN_TEXT_COLOR,
             }
-    catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
-    if not isinstance(catalogue, StaticCatalogue):
+    catalogue = current_catalogue(hass)
+    if catalogue is None:
         return out
     index = catalogue.trip_patterns
     if index is None or not index.colors_by_line:

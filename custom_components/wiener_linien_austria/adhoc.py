@@ -61,11 +61,11 @@ from .live import (
     apply_live,
     async_get_live_board,
     async_live_trips,
-    current_catalogue,
     rbls_for_trips,
 )
 from .route_coordinator import async_plan_trips
 from .routing import RouteOptions, RoutingError, Trip, async_routing_zone
+from .static import current_catalogue
 
 _LOGGER = logging.getLogger(__name__)
 

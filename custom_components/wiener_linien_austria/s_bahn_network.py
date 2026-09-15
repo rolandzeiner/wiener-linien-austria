@@ -118,12 +118,16 @@ def merge_transfer_lines(
     return [label for label in merged if label != exclude]
 
 
+def current_network(hass: HomeAssistant) -> SBahnNetwork | None:
+    """The published S-Bahn network, or None until the first load."""
+    network = hass.data.get(DOMAIN, {}).get(S_BAHN_NETWORK_KEY)
+    return network if isinstance(network, SBahnNetwork) else None
+
+
 def current_lines_at_diva(hass: HomeAssistant) -> Mapping[int, tuple[str, ...]]:
     """The published stop → S-Bahn lines lookup; empty until the first load."""
-    network = hass.data.get(DOMAIN, {}).get(S_BAHN_NETWORK_KEY)
-    if isinstance(network, SBahnNetwork):
-        return network.lines_at_diva
-    return {}
+    network = current_network(hass)
+    return network.lines_at_diva if network is not None else {}
 
 
 def sample_time(now: datetime, zone: Any) -> datetime:
