@@ -453,19 +453,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    try {
-      this._versionMismatch = await checkCardVersionWS(
-        this.hass,
-        "wiener_linien_austria/flap_card_version",
-        FLAP_CARD_VERSION,
-      );
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[wiener-linien-austria-flap-card] version probe failed",
-        err,
-      );
-    }
+    // checkCardVersionWS never rejects, so there is nothing to catch here.
+    this._versionMismatch = await checkCardVersionWS(
+      this.hass,
+      "wiener_linien_austria/flap_card_version",
+      FLAP_CARD_VERSION,
+    );
   }
 
   /** Configured stop entity ids that actually exist in hass.states.

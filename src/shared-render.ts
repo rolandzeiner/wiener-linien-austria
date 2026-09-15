@@ -23,6 +23,8 @@ import type { HomeAssistant } from "./types.js";
  * (i.e. banner should appear), or null otherwise. Silent on transport
  * error — older HA installs without the handler simply don't surface a
  * mismatch, which is correct (cache-buster URL still applies).
+ *
+ * Never rejects: the cards call it bare, without a catch of their own.
  */
 export async function checkCardVersionWS(
   hass: HomeAssistant | undefined,

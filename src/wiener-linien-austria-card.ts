@@ -468,19 +468,12 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    try {
-      this._versionMismatch = await checkCardVersionWS(
-        this.hass,
-        "wiener_linien_austria/card_version",
-        CARD_VERSION,
-      );
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[wiener-linien-austria-card] version probe failed",
-        err,
-      );
-    }
+    // checkCardVersionWS never rejects, so there is nothing to catch here.
+    this._versionMismatch = await checkCardVersionWS(
+      this.hass,
+      "wiener_linien_austria/card_version",
+      CARD_VERSION,
+    );
   }
 
   // ------------------------------------------------------------------

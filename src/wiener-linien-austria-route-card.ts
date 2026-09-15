@@ -557,15 +557,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   private async _checkCardVersion(): Promise<void> {
-    try {
-      this._versionMismatch = await checkCardVersionWS(
-        this.hass,
-        "wiener_linien_austria/route_card_version",
-        ROUTE_CARD_VERSION,
-      );
-    } catch (err) {
-      console.warn(`[${ROUTE_CARD_TYPE}] version probe failed`, err);
-    }
+    // checkCardVersionWS never rejects, so there is nothing to catch here.
+    this._versionMismatch = await checkCardVersionWS(
+      this.hass,
+      "wiener_linien_austria/route_card_version",
+      ROUTE_CARD_VERSION,
+    );
   }
 
   private _t(key: string, replacements?: Record<string, string | number>): string {

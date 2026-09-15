@@ -74,6 +74,16 @@ describe("checkCardVersionWS", () => {
     expect(await checkCardVersionWS(hass, "x/card_version", "2.0.0")).toBeNull();
   });
 
+  it("never rejects, even when callWS throws synchronously", async () => {
+    // The cards await this without a catch of their own.
+    const hass = {
+      callWS: vi.fn(() => {
+        throw new Error("socket gone");
+      }),
+    } as unknown as HomeAssistant;
+    await expect(checkCardVersionWS(hass, "x/card_version", "2.0.0")).resolves.toBeNull();
+  });
+
   it("stays silent without hass or without callWS", async () => {
     expect(await checkCardVersionWS(undefined, "x", "2.0.0")).toBeNull();
     expect(
