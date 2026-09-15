@@ -41,6 +41,9 @@
       'title': 'Stephansplatz',
       'version': 2,
     }),
+    's_bahn_network': dict({
+      'loaded': False,
+    }),
     'trip_patterns': dict({
       'loaded': False,
     }),

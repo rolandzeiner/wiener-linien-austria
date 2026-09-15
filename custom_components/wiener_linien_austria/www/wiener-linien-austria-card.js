@@ -2524,7 +2524,7 @@ if(super(e),e.type!==B.PROPERTY&&e.type!==B.ATTRIBUTE&&e.type!==B.BOOLEAN_ATTRIB
               aria-hidden="true"
             ></ha-icon>`:F}
       </li>
-    `;return v?[C,this._renderStopsAheadPanel(`row`,e.stops_ahead,x,b,a,y,t)]:C}_renderStopAhead(e,t,n,r,i){let a=e.lines??[],o=this._isNightlineHour(),s=[],c=[];for(let e of a)/^U\d/.test(e)||o&&/^N\d/.test(e)?s.push(e):c.push(e);let l=this._transferKey(n,t),u=this._expandedTransfers.has(l),d={"stops-ahead-stop":!0,terminus:!!e.is_terminus,"transfers-expanded":u},f=s.length?N`<span class="stops-ahead-metros">
+    `;return v?[C,this._renderStopsAheadPanel(`row`,e.stops_ahead,x,b,a,y,t)]:C}_renderStopAhead(e,t,n,r,i){let a=e.lines??[],o=this._isNightlineHour(),s=[],c=[];for(let e of a)/^[US]\d/.test(e)||o&&/^N\d/.test(e)?s.push(e):c.push(e);let l=this._transferKey(n,t),u=this._expandedTransfers.has(l),d={"stops-ahead-stop":!0,terminus:!!e.is_terminus,"transfers-expanded":u},f=s.length?N`<span class="stops-ahead-metros">
           ${s.map(e=>N`<span
               class="stops-ahead-line-chip"
               style=${H(Y(e,r,i))}

@@ -11,6 +11,7 @@ from .alerts import get_alerts_for, line_names_from_keys
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS, DOMAIN
 from .coordinator import WienerLinienConfigEntry
 from .route_coordinator import WienerLinienRouteCoordinator
+from .s_bahn_network import S_BAHN_NETWORK_KEY, SBahnNetwork
 from .static import CATALOGUE_KEY, StaticCatalogue
 
 # Treat as monotonically growing — never shrink. Diagnostics dumps end
@@ -84,6 +85,17 @@ async def async_get_config_entry_diagnostics(
         trip_pattern_summary["lines_at_diva_count"] = len(trip_patterns.lines_at_diva)
         trip_pattern_summary["colors_by_line_count"] = len(trip_patterns.colors_by_line)
 
+    # Same triage question for the S-Bahn transfer chips: did the network
+    # load, and how old is each hub's sample.
+    network = hass.data.get(DOMAIN, {}).get(S_BAHN_NETWORK_KEY)
+    s_bahn_summary: dict[str, Any] = {"loaded": isinstance(network, SBahnNetwork)}
+    if isinstance(network, SBahnNetwork):
+        s_bahn_summary["stop_count"] = len(network.lines_at_diva)
+        s_bahn_summary["hub_fetched_at"] = {
+            str(hub): sample.fetched_at.isoformat()
+            for hub, sample in network.hubs.items()
+        }
+
     return {
         "attribution": ATTRIBUTION,
         "entry": {
@@ -114,6 +126,7 @@ async def async_get_config_entry_diagnostics(
             "stale_since": data.stale_since if data is not None else None,
         },
         "trip_patterns": trip_pattern_summary,
+        "s_bahn_network": s_bahn_summary,
         "alerts": {
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],

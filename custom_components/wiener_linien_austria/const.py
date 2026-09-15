@@ -314,6 +314,51 @@ TIMETABLE_RETRY_AFTER: Final = timedelta(minutes=5)
 # matter which zone Home Assistant itself is configured in.
 ROUTING_TIME_ZONE: Final = "Europe/Vienna"
 
+# Which S-Bahn lines call at which stop, for the transfer chips on the
+# stops-ahead trails (s_bahn_network.py). Wiener Linien's trip patterns don't
+# know the S-Bahn, and the routing server has no working per-line stop list
+# (`XML_STOPSEQCOORD_REQUEST` answers with an empty `stopSeq`, probed
+# 2026-09-15). What it does have: every train in a departure-monitor answer
+# with `includeCompleteStopSeq` carries the stops it called at before
+# (`prevStopSeq`) and after (`onwardStopSeq`), under the same DIVAs the
+# catalogue uses (Floridsdorf 60200334, Handelskai 60201705, and the
+# Hauptbahnhof S-Bahn platforms under the station's own 60201349). So a few
+# hubs' departures map the whole network.
+# --- Upstream capabilities, measured 2026-09-15 -------------------
+#   XML_DM_REQUEST, S-Bahn only, 40 rows with stop sequences, 10:00 sample:
+#   Praterstern 28 KB wire / 277 KB identity, Meidling 43 / 329,
+#   Handelskai 36 / 303, Hütteldorf 34 / 326, Hauptbahnhof 52 / 397,
+#   Heiligenstadt 42 / 349, Flughafen Wien 13 KB wire. ~250 KB a week.
+#   `itdDate` / `itdTime` are honoured: the 40 rows start at the asked time.
+#   Together the seven hubs saw S1 S2 S3 S4 S7 S40 S45 S50 S60 S80 at 43
+#   stops in Vienna. The airport hub is not optional: with the Stammstrecke
+#   closed (see ROUTING_DEPARTURE_ENDPOINT) the S7 runs Flughafen - St. Marx
+#   on its own, and no other hub's trains call at that section.
+# ----------------------------------------------------------------
+S_BAHN_NETWORK_HUBS: Final[tuple[int, ...]] = (
+    60201040,  # Praterstern
+    60201015,  # Meidling
+    60201705,  # Handelskai
+    60200560,  # Hütteldorf
+    60201349,  # Hauptbahnhof
+    60200491,  # Heiligenstadt
+    60204708,  # Flughafen Wien
+)
+# Rows per hub. At Praterstern 40 trains span 10:08 to 14:56, which reaches
+# every line there including the half-hourly ones.
+S_BAHN_NETWORK_DEPARTURES: Final = 40
+# Every hub is sampled at this Vienna wall-clock time on the next day, not
+# at whatever hour the refresh happens to run: a sample taken at 02:00 would
+# see the night gap and map half the network.
+S_BAHN_NETWORK_SAMPLE_HOUR: Final = 10
+# A hub's sample is refetched once it is this old. Lines only change with a
+# timetable change or a long closure, which a week covers.
+S_BAHN_NETWORK_MAX_AGE: Final = timedelta(days=7)
+# How often the domain checks for stale hubs. The check costs nothing when
+# every hub is fresh; it is what retries a failed hub a day later instead of
+# a week later.
+S_BAHN_NETWORK_CHECK_INTERVAL: Final = timedelta(hours=24)
+
 # S-Bahn line colours. Wiener Linien's GTFS `routes.txt` only carries its own
 # lines, so an S-Bahn leg on a route would otherwise get the neutral fallback.
 # Every S-Bahn line is #469CD4 except the S45 (#C1D781).

@@ -1760,17 +1760,17 @@ export class WienerLinienAustriaCard extends LitElement {
     overrides: Record<string, string>,
     lineColors: LineColorsMap,
   ): TemplateResult {
-    // Inline lines (always shown next to the station name): U-Bahn at
-    // any time, plus night lines (N-prefix + digit) WHEN they're
-    // actually running. Outside the night window the N-chips fold
-    // back into the +N toggle so the daytime trail stays compact.
+    // Inline lines (always shown next to the station name): U-Bahn and
+    // S-Bahn at any time, plus night lines (N-prefix + digit) WHEN
+    // they're actually running. Outside the night window the N-chips
+    // fold back into the +N toggle so the daytime trail stays compact.
     // Night window per `_isNightlineHour`.
     const allLines = s.lines ?? [];
     const nightActive = this._isNightlineHour();
     const inlineLines: string[] = [];
     const otherLines: string[] = [];
     for (const l of allLines) {
-      if (/^U\d/.test(l) || (nightActive && /^N\d/.test(l))) {
+      if (/^[US]\d/.test(l) || (nightActive && /^N\d/.test(l))) {
         inlineLines.push(l);
       } else {
         otherLines.push(l);

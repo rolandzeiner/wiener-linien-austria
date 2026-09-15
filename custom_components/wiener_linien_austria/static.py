@@ -34,7 +34,7 @@ import io
 import json
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, NamedTuple
 
@@ -59,6 +59,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
+from .s_bahn_network import merge_transfer_lines
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1154,8 +1155,12 @@ def stops_ahead_for_match(
     towards: str,
     live_direction: str | None = None,
     line_id: int | None = None,
+    s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Resolve the next-stops list for a live monitor row.
+
+    `s_bahn_lines_at_diva` (s_bahn_network.py) adds the S-Bahn lines at each
+    stop to its transfer lines, after the U-Bahn.
 
     `line_id` is the `/monitor` row's `line.lineId`, the same identifier
     `linien.csv` publishes as `LineID`. When given it resolves the line
@@ -1328,9 +1333,10 @@ def stops_ahead_for_match(
         # Transfer chips: every line at this DIVA except the one we're
         # already on. Skipped silently when the index is empty (e.g. a
         # cache built without stations passed through).
-        transfers = lines_at_diva.get(diva)
-        if transfers:
-            other = [t for t in transfers if t != current_label]
+        transfers = lines_at_diva.get(diva, ())
+        trains = s_bahn_lines_at_diva.get(diva, ()) if s_bahn_lines_at_diva else ()
+        if transfers or trains:
+            other = merge_transfer_lines(transfers, trains, exclude=current_label)
             if other:
                 entry["lines"] = other
         full.append(entry)

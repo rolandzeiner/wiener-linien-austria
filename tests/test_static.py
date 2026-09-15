@@ -883,6 +883,26 @@ def test_stops_ahead_includes_transfer_lines() -> None:
     assert stephansplatz.get("lines") == ["U3", "U4"]
 
 
+def test_stops_ahead_adds_s_bahn_after_the_u_bahn() -> None:
+    """S-Bahn lines from the network join the transfers behind the U-Bahn."""
+    catalogue = _u1_catalogue()
+    catalogue.trip_patterns.lines_at_diva = {60201012: ("U1", "U3", "1")}
+    result = stops_ahead_for_match(
+        catalogue,
+        "U1",
+        [4001],
+        "Leopoldau",
+        live_direction="H",
+        s_bahn_lines_at_diva={60201012: ("S7",), 62000002: ("S1", "S2")},
+    )
+    assert result is not None
+    by_name = {stop["name"]: stop for stop in result}
+    assert by_name["Stephansplatz"]["lines"] == ["U3", "S7", "1"]
+    # A stop the Wiener Linien index lists no transfers for still gets them.
+    assert by_name["Praterstern"]["lines"] == ["S1", "S2"]
+    assert "lines" not in by_name["Leopoldau"]
+
+
 def test_lines_at_diva_sort_groups_by_mode_of_transport() -> None:
     """lines_at_diva groups by MoT first (Metro → Tram → Bus → Night),
     then by leading-digit number within each mode.

@@ -43,6 +43,7 @@ from custom_components.wiener_linien_austria.timetable import (
     async_fetch_planned_departures,
     async_probe_picker_rows,
     build_departure_params,
+    parse_calling_points,
     parse_departure_body,
     picker_rows,
 )
@@ -95,6 +96,67 @@ def test_params_ask_for_the_s_bahn_only() -> None:
     excluded = {key for key in params if key.startswith("exclMOT_")}
     assert "exclMOT_1" not in excluded
     assert {"exclMOT_0", "exclMOT_2", "exclMOT_4", "exclMOT_5"} <= excluded
+
+
+def test_params_can_ask_for_a_later_time() -> None:
+    """`itdDate` / `itdTime` carry the given wall clock; absent by default."""
+    params = dict(
+        build_departure_params(
+            PRATERSTERN, 40, at=datetime(2026, 9, 16, 10, 0, tzinfo=VIENNA)
+        )
+    )
+    assert (params["itdDate"], params["itdTime"]) == ("20260916", "1000")
+    assert "itdDate" not in dict(build_departure_params(PRATERSTERN, 40))
+
+
+def test_calling_points_cover_the_whole_run() -> None:
+    """Stops before and after, the row's own stop, S-Bahn rows only."""
+    body = {
+        "departureList": [
+            {
+                "stopID": "60201040",
+                "servingLine": {"number": "S3", "motType": "1"},
+                # A single previous stop arrives as a bare point.
+                "prevStopSeq": {"name": "Wien Meidling", "ref": {"id": "60201015"}},
+                "onwardStopSeq": [
+                    {"name": "Wien Floridsdorf", "ref": {"id": "60200334"}},
+                    {"name": "Stockerau Bahnhof", "ref": {"id": "no-id"}},
+                ],
+            },
+            {
+                "stopID": "60201040",
+                "servingLine": {"number": "S80", "motType": "1"},
+                "onwardStopSeq": [
+                    {"name": "Wien Floridsdorf", "ref": {"id": "60200334"}}
+                ],
+            },
+            {
+                "stopID": "60201040",
+                "servingLine": {"number": "U1", "motType": "2"},
+                "onwardStopSeq": [{"name": "Wien Vorgartenstr.", "ref": {"id": "1"}}],
+            },
+            {"servingLine": {"motType": "1"}},
+            "garbage",
+        ]
+    }
+    assert parse_calling_points(body) == {
+        60201015: {"S3"},
+        60201040: {"S3", "S80"},
+        60200334: {"S3", "S80"},
+    }
+
+
+def test_calling_points_of_an_empty_or_collapsed_answer() -> None:
+    assert parse_calling_points({}) == {}
+    collapsed = {
+        "departureList": {
+            "departure": {
+                "stopID": "60201040",
+                "servingLine": {"number": "S7", "motType": "1"},
+            }
+        }
+    }
+    assert parse_calling_points(collapsed) == {60201040: {"S7"}}
 
 
 def test_parse_praterstern_fixture() -> None:
@@ -572,6 +634,29 @@ def test_timetable_rows_carry_stops_ahead() -> None:
     # The S2's sequence stops at Hauptbahnhof but the train runs on to
     # Wolfsthal: no terminus flag on a stop that isn't one.
     assert by_line["S2"].stops_ahead == [{"name": "Hauptbahnhof"}]
+
+
+def test_timetable_trail_lists_the_other_s_bahn_lines() -> None:
+    """S-Bahn transfers follow the U-Bahn; the train's own line is left out."""
+    s80, _, _ = parse_departure_body(_stops_body(), MEIDLING, VIENNA)
+    # Mode-sorted, as the real index is.
+    catalogue = SimpleNamespace(
+        trip_patterns=SimpleNamespace(lines_at_diva={60200788: ("U6", "60A")})
+    )
+    rows = timetable_departures(
+        (s80,),
+        frozenset({("S80", "H")}),
+        S80_AT - timedelta(minutes=2),
+        catalogue=catalogue,  # type: ignore[arg-type]
+        s_bahn_lines_at_diva={
+            60200788: ("S1", "S2", "S80"),
+            60200511: ("S80",),
+        },
+    )
+    trail = rows[0].stops_ahead
+    assert trail is not None
+    assert trail[0] == {"name": "Hetzendorf"}
+    assert trail[2] == {"name": "Liesing", "lines": ["U6", "S1", "S2", "60A"]}
 
 
 def test_timetable_rows_without_stops_have_no_trail() -> None:

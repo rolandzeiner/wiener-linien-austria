@@ -276,3 +276,43 @@ async def test_diagnostics_reports_an_absent_trip_pattern_index(
     assert summary["loaded"] is False
     assert "line_count" not in summary
     assert "lines_at_diva_count" not in summary
+
+
+async def test_diagnostics_summarises_the_s_bahn_network(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Stop count and each hub's sample age; `loaded: false` without one."""
+    from datetime import UTC, datetime
+
+    from custom_components.wiener_linien_austria.s_bahn_network import (
+        S_BAHN_NETWORK_KEY,
+        HubSample,
+        SBahnNetwork,
+    )
+
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["s_bahn_network"] == {"loaded": False}
+
+    fetched_at = datetime(2026, 9, 15, 20, 0, tzinfo=UTC)
+    hass.data[DOMAIN][S_BAHN_NETWORK_KEY] = SBahnNetwork(
+        hubs={
+            60201040: HubSample(
+                fetched_at=fetched_at,
+                lines_at_stop={
+                    60200334: frozenset({"S1"}),
+                    60201040: frozenset({"S1"}),
+                },
+            )
+        }
+    )
+    diag = await async_get_config_entry_diagnostics(hass, entry)
+    assert diag["s_bahn_network"] == {
+        "loaded": True,
+        "stop_count": 2,
+        "hub_fetched_at": {"60201040": "2026-09-15T20:00:00+00:00"},
+    }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -31,6 +32,8 @@ from .const import (
     MIN_POLL_SECONDS,
     STALE_DEPARTURE_MAX_AGE,
 )
+from .s_bahn_network import current_lines_at_diva as current_s_bahn_lines
+from .s_bahn_network import merge_transfer_lines
 from .static import (
     CATALOGUE_KEY,
     StaticCatalogue,
@@ -413,6 +416,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             catalogue=catalogue,
             entry_rbls=self._rbls,
             warned_lines=self._stops_ahead_warned_lines,
+            s_bahn_lines_at_diva=current_s_bahn_lines(self.hass),
         )
         self._note_stale_departures(data)
         self._last_monitor = data
@@ -428,6 +432,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             self._timetable_pairs,
             dt_util.utcnow(),
             catalogue=self._current_catalogue(),
+            s_bahn_lines_at_diva=current_s_bahn_lines(self.hass),
         )
         if not planned:
             return data
@@ -601,6 +606,7 @@ def _parse_monitor_body(
     catalogue: StaticCatalogue | None = None,
     entry_rbls: list[int] | None = None,
     warned_lines: set[str] | None = None,
+    s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
 ) -> MonitorData:
     """Parse a successful /monitor response into a MonitorData.
 
@@ -612,6 +618,8 @@ def _parse_monitor_body(
     `warned_lines`, when supplied, is a per-coordinator de-dupe set so
     a stops_ahead matcher exception logs once at WARNING per line label
     rather than spamming on every poll.
+
+    `s_bahn_lines_at_diva` adds the S-Bahn to the trails' transfer lines.
     """
     departures: list[Departure] = []
     stale_dropped = 0
@@ -730,6 +738,7 @@ def _parse_monitor_body(
                             resolved_towards,
                             live_direction=direction,
                             line_id=line_id,
+                            s_bahn_lines_at_diva=s_bahn_lines_at_diva,
                         )
                     except Exception:
                         # Fail-soft: a single matcher hiccup must not poison
@@ -792,6 +801,7 @@ def timetable_departures(
     now: datetime,
     *,
     catalogue: StaticCatalogue | None = None,
+    s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
 ) -> list[Departure]:
     """Board rows for the picked S-Bahn lines that haven't left yet.
 
@@ -807,7 +817,8 @@ def timetable_departures(
     `stops_ahead` comes from the timetable's own stop sequence rather than
     the Wiener Linien trip patterns, which don't know the S-Bahn. Same
     shape as `/monitor` rows get; `catalogue` adds the Wiener Linien lines
-    at each stop as transfers.
+    at each stop as transfers, and `s_bahn_lines_at_diva` the other S-Bahn
+    lines.
     """
     rows: list[Departure] = []
     for dep in planned:
@@ -829,7 +840,9 @@ def timetable_departures(
                 barrier_free=False,
                 traffic_jam=False,
                 platform=dep.platform,
-                stops_ahead=_timetable_stops_ahead(dep, catalogue),
+                stops_ahead=_timetable_stops_ahead(
+                    dep, catalogue, s_bahn_lines_at_diva
+                ),
                 timetable=True,
             )
         )
@@ -837,7 +850,9 @@ def timetable_departures(
 
 
 def _timetable_stops_ahead(
-    dep: PlannedDeparture, catalogue: StaticCatalogue | None
+    dep: PlannedDeparture,
+    catalogue: StaticCatalogue | None,
+    s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
 ) -> list[dict[str, Any]] | None:
     """A planned train's onward stops as a `stops_ahead` list.
 
@@ -846,9 +861,9 @@ def _timetable_stops_ahead(
     as the terminus only when it is the train's destination: a capped list
     isn't, and neither is a sequence the server ends early (seen
     2026-09-15: an S2 towards Wolfsthal listing only Hauptbahnhof, where
-    the run continues under another number). Transfer lines
-    are the Wiener Linien lines at the stop's DIVA; the S-Bahn lines
-    passing through aren't known here, so none are listed.
+    the run continues under another number). Transfer lines are the Wiener
+    Linien lines at the stop's DIVA plus the other S-Bahn lines there, the
+    train's own line left out.
     """
     if not dep.stops:
         return None
@@ -863,9 +878,14 @@ def _timetable_stops_ahead(
         entry: dict[str, Any] = {"name": stop.name}
         if index == last and _same_stop_name(stop.name, dep.towards):
             entry["is_terminus"] = True
-        transfers = lines_at_diva.get(stop.stop_id) if stop.stop_id else None
-        if transfers:
-            entry["lines"] = list(transfers)
+        if stop.stop_id is not None:
+            lines = merge_transfer_lines(
+                lines_at_diva.get(stop.stop_id, ()),
+                (s_bahn_lines_at_diva or {}).get(stop.stop_id, ()),
+                exclude=dep.line,
+            )
+            if lines:
+                entry["lines"] = lines
         out.append(entry)
     return out
 

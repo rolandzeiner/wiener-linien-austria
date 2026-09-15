@@ -454,6 +454,21 @@ def mock_s_bahn_picker_probe():
         yield probe
 
 
+@pytest.fixture(autouse=True)
+def mock_s_bahn_network_update():
+    """Keep entry setup from starting the S-Bahn network crawl.
+
+    Setup schedules it as a background task that would queue seven routing
+    requests behind the 15 s cooldown. Only the binding `__init__` calls is
+    patched, so test_s_bahn_network.py still reaches the real scheduler
+    through its own module.
+    """
+    with patch(
+        "custom_components.wiener_linien_austria.async_schedule_network_update",
+    ) as schedule:
+        yield schedule
+
+
 @pytest.fixture
 def monitor_fixture() -> dict:
     """Canonical monitor response captured against the live API."""

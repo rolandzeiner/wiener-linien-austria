@@ -17,7 +17,7 @@ from homeassistant.components.websocket_api.decorators import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
-from homeassistant.core import CoreState, Event, HomeAssistant
+from homeassistant.core import CoreState, Event, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
@@ -43,6 +43,7 @@ from .const import (
     RESOURCES_REGISTERED_KEY,
     RETRO_CARD_VERSION,
     ROUTE_CARD_VERSION,
+    S_BAHN_NETWORK_CHECK_INTERVAL,
     STATIC_CACHE_REFRESH_HOURS,
     TRAFFIC_INFO_KEY,
 )
@@ -56,6 +57,11 @@ from .rate_limit import (
     ROUTING_LOCK_LOOP_KEY,
 )
 from .route_coordinator import WienerLinienRouteCoordinator, route_device_info
+from .s_bahn_network import (
+    S_BAHN_NETWORK_KEY,
+    S_BAHN_NETWORK_TASK_KEY,
+    async_schedule_network_update,
+)
 from .services import async_setup_services
 from .static import (
     BACKGROUND_REFRESH_TASK_KEY,
@@ -71,6 +77,7 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.SENSOR]
 
 STATIC_REFRESH_UNSUB_KEY = "static_refresh_unsub"
+S_BAHN_NETWORK_UNSUB_KEY = "s_bahn_network_unsub"
 
 
 @websocket_command({vol.Required("type"): "wiener_linien_austria/card_version"})
@@ -239,6 +246,31 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
         )
 
 
+def _ensure_s_bahn_network(hass: HomeAssistant) -> None:
+    """Start the S-Bahn network's daily staleness check, and one check now.
+
+    Board entries only: the network feeds the stops-ahead transfer chips,
+    and a route-only install has no stops-ahead trails. Idempotent like
+    `_ensure_domain_timers`; the check itself fetches nothing while every
+    hub sample is fresh, so a restart costs a Store read.
+    """
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    if S_BAHN_NETWORK_UNSUB_KEY in domain_data:
+        return
+
+    @callback
+    def _periodic_check(_now: Any) -> None:
+        async_schedule_network_update(hass)
+
+    domain_data[S_BAHN_NETWORK_UNSUB_KEY] = async_track_time_interval(
+        hass,
+        _periodic_check,
+        S_BAHN_NETWORK_CHECK_INTERVAL,
+        cancel_on_shutdown=True,
+    )
+    async_schedule_network_update(hass)
+
+
 def _register_in_batch(
     hass: HomeAssistant, coordinator: WienerLinienAustriaCoordinator
 ) -> None:
@@ -318,6 +350,7 @@ async def async_setup_entry(
     # recreates them, which `async_setup` (process-scoped, runs once)
     # cannot do.
     _ensure_domain_timers(hass)
+    _ensure_s_bahn_network(hass)
 
     entry.runtime_data = coordinator
 
@@ -408,7 +441,11 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     cleanup here is domain-wide and refcount-driven — the wrong
     granularity for a per-entry callback.
     """
-    for unsub_key in (ALERTS_REFRESH_UNSUB_KEY, STATIC_REFRESH_UNSUB_KEY):
+    for unsub_key in (
+        ALERTS_REFRESH_UNSUB_KEY,
+        STATIC_REFRESH_UNSUB_KEY,
+        S_BAHN_NETWORK_UNSUB_KEY,
+    ):
         unsub = domain_data.pop(unsub_key, None)
         if callable(unsub):
             unsub()
@@ -416,9 +453,10 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     # complete after teardown and re-poison the catalogue ref. The
     # task's done-callback also self-clears the slot; popping here is
     # belt-and-braces.
-    bg_task = domain_data.pop(BACKGROUND_REFRESH_TASK_KEY, None)
-    if isinstance(bg_task, asyncio.Task) and not bg_task.done():
-        bg_task.cancel()
+    for task_key in (BACKGROUND_REFRESH_TASK_KEY, S_BAHN_NETWORK_TASK_KEY):
+        bg_task = domain_data.pop(task_key, None)
+        if isinstance(bg_task, asyncio.Task) and not bg_task.done():
+            bg_task.cancel()
     # Stop every remaining batch-group timer. Groups normally self-stop as
     # their last member deregisters, but the LAST entry's `async_on_unload`
     # dereg fires AFTER this teardown runs (HA runs on_unload callbacks after
@@ -442,6 +480,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         ROUTING_LOCK_KEY,
         ROUTING_LOCK_LOOP_KEY,
         CATALOGUE_KEY,
+        S_BAHN_NETWORK_KEY,
         # Holds a reference to the catalogue it was built from.
         STOPS_CACHE_KEY,
         # Live rows and leases name the stops routes and dashboards use.

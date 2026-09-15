@@ -80,7 +80,11 @@ class PlannedDeparture:
 
 
 def build_departure_params(
-    diva: int, limit: int, *, with_stops: bool = False
+    diva: int,
+    limit: int,
+    *,
+    with_stops: bool = False,
+    at: datetime | None = None,
 ) -> list[tuple[str, str]]:
     """Query string for the next `limit` S-Bahn departures at a stop.
 
@@ -88,6 +92,9 @@ def build_departure_params(
     for the stops-ahead trail. It costs about 10 KB per train before gzip,
     because the server sends the stops already passed too, so the line
     picker's probe, which only needs the lines, leaves it off.
+
+    `at` asks for departures from that time instead of from now. Its wall
+    clock is sent as-is, so pass it in `ROUTING_TIME_ZONE`.
     """
     params: list[tuple[str, str]] = [
         ("outputFormat", "JSON"),
@@ -103,6 +110,9 @@ def build_departure_params(
     params.extend((f"exclMOT_{code}", "1") for code in _EXCLUDED_MOTS)
     if with_stops:
         params.append(("includeCompleteStopSeq", "1"))
+    if at is not None:
+        params.append(("itdDate", at.strftime("%Y%m%d")))
+        params.append(("itdTime", at.strftime("%H%M")))
     return params
 
 
@@ -153,6 +163,43 @@ def parse_departure_body(
         )
     departures.sort(key=lambda dep: (dep.planned, dep.line))
     return departures
+
+
+def parse_calling_points(body: Mapping[str, Any]) -> dict[int, set[str]]:
+    """Every stop each S-Bahn line in a departure-monitor answer calls at.
+
+    Reads the whole run of every train, the stops before this one
+    (`prevStopSeq`) as well as after, so a hub's departures map its lines in
+    both directions. Keyed by DIVA; points without a numeric id are skipped,
+    since nothing could join them to a stop. Unlike `parse_departure_body`
+    the rows aren't filtered to the asked stop: any train's run is true
+    wherever the server lists it.
+    """
+    raw = body.get("departureList")
+    if isinstance(raw, Mapping):
+        raw = [raw.get("departure")]
+    if not isinstance(raw, list):
+        return {}
+    lines_at: dict[int, set[str]] = {}
+    for row in raw:
+        if not isinstance(row, Mapping):
+            continue
+        line = _mapping(row.get("servingLine"))
+        label = _text(line.get("number"))
+        if label is None or str(line.get("motType") or "") != _MOT_S_BAHN:
+            continue
+        stop_ids = [
+            stop.stop_id
+            for sequence in ("prevStopSeq", "onwardStopSeq")
+            for stop in _onward_stops(row.get(sequence))
+        ]
+        own = _text(row.get("stopID"))
+        if own is not None and own.isdigit():
+            stop_ids.append(int(own))
+        for stop_id in stop_ids:
+            if stop_id is not None:
+                lines_at.setdefault(stop_id, set()).add(label)
+    return lines_at
 
 
 def picker_rows(departures: list[PlannedDeparture]) -> list[dict[str, str]]:
