@@ -265,6 +265,16 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
     );
     return null;
   }
+  return normaliseStopFields(entity, r);
+}
+
+/** The per-stop filters of an `entities[]` entry whose `entity` has already
+ *  been validated. Shared by the modern and flap normalisers, which differ
+ *  only in how loudly they reject a malformed entry. */
+export function normaliseStopFields(
+  entity: string,
+  r: Record<string, unknown>,
+): NormalisedModernStop {
   const stop: NormalisedModernStop = { entity };
   if (Array.isArray(r.lines)) {
     // Canonicalised here rather than at each use so the filter, the chip

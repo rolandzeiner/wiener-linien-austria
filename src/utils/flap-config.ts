@@ -26,12 +26,10 @@ import type {
   WienerLinienFlapCardConfig,
 } from "../types.js";
 import { CARD_DEFAULTS } from "./card-vocabulary.js";
-import { canonicalLineLabel } from "./line-labels.js";
 import {
   filterPassthrough,
   normaliseRetroHeaderSide,
-  normaliseWalkTimes,
-  normaliseLineDirections,
+  normaliseStopFields,
 } from "./config.js";
 
 const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
@@ -87,21 +85,7 @@ function normaliseStopEntry(raw: unknown): NormalisedFlapStop | null {
   const r = raw as Record<string, unknown>;
   const entity = typeof r.entity === "string" ? r.entity : null;
   if (!entity?.startsWith("sensor.")) return null;
-  const stop: NormalisedFlapStop = { entity };
-  if (Array.isArray(r.lines)) {
-    // See the matching note in utils/config.ts — a `lines:` saved with the
-    // static-catalogue spelling has to survive (issue #110).
-    const lines = r.lines
-      .filter((l): l is string => typeof l === "string" && l.length > 0)
-      .map(canonicalLineLabel);
-    if (lines.length) stop.lines = lines;
-  }
-  if (r.direction === "H" || r.direction === "R") stop.direction = r.direction;
-  const lineDirs = normaliseLineDirections(r.line_directions);
-  if (lineDirs) stop.line_directions = lineDirs;
-  const walk = normaliseWalkTimes(r.walk_times);
-  if (walk) stop.walk_times = walk;
-  return stop;
+  return normaliseStopFields(entity, r);
 }
 
 export interface NormalisedFlapConfigValidated {
