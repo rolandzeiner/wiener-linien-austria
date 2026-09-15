@@ -1,6 +1,6 @@
-// Top-level helpers shared by both bundled cards (modern + retro).
+// Top-level helpers shared across the cards, their editors and src/utils/*.
 // Extracted so security-critical primitives like the URL-trust gate
-// have one canonical implementation rather than two near-copies.
+// have one canonical implementation rather than several near-copies.
 //
 // Kept narrow on purpose: card-specific helpers stay in src/utils/*.
 

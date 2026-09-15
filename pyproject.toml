@@ -50,7 +50,7 @@ select = [
     "TID",                  # tidy imports
     "ISC",                  # implicit str concat
     "PIE", "RSE", "FURB", "PERF",
-    "BLE",                  # the seven noqa directives above
+    "BLE",                  # broad excepts, each a reasoned noqa (see above)
     "SLF",                  # private-member access across class boundaries
     "RUF",                  # ruff-specific, incl. RUF100 dead-noqa
 ]

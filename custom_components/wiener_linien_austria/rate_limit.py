@@ -20,12 +20,13 @@ Four callers, each taking exactly one slot per request:
   request doesn't take it.
 
 The routing backend has a separate 15 s slot
-(`async_enforce_routing_cooldown`), taken by route refreshes and the S-Bahn
-timetable refresh (timetable.py). Requests someone is waiting for take no
-slot at all: `plan_trip` and the route card's From / To mode go through the
-cache, coalescing and token-bucket budget in adhoc.py instead, and the config
-flow's probes skip both slots. A cooldown bounds what runs unattended; the
-budget bounds what people ask for.
+(`async_enforce_routing_cooldown`), taken by route refreshes, the S-Bahn
+timetable refresh (timetable.py) and the daily S-Bahn network sample
+(s_bahn_network.py, one slot per hub). Requests someone is waiting for take
+no slot at all: `plan_trip` and the route card's From / To mode go through
+the cache, coalescing and token-bucket budget in adhoc.py instead, and the
+config flow's probes skip both slots. A cooldown bounds what runs
+unattended; the budget bounds what people ask for.
 """
 
 from __future__ import annotations
@@ -62,10 +63,12 @@ async def async_enforce_routing_cooldown(hass: HomeAssistant) -> None:
     """Serialise unattended routing requests under their own 15 s floor.
 
     Shares `_async_enforce_cooldown` with `async_enforce_domain_cooldown`,
-    on separate keys. Only the unattended callers take it (route coordinators
-    and the S-Bahn `TimetableBoard`); the user-initiated `plan_trip` action
-    and the route card's ad-hoc mode do not, for the same reason the config-flow line probe skips the realtime
-    slot — someone is waiting. adhoc.py's budget bounds those instead.
+    on separate keys. Only the unattended callers take it (route
+    coordinators, the S-Bahn `TimetableBoard` and the S-Bahn network
+    update); the user-initiated `plan_trip` action and the route card's
+    ad-hoc mode do not, for the same reason the config-flow line probe skips
+    the realtime slot — someone is waiting. adhoc.py's budget bounds those
+    instead.
     """
     await _async_enforce_cooldown(
         hass,
