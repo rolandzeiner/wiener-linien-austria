@@ -455,6 +455,8 @@ container-type: inline-size;
 --wl-rt: var(--success-color, #43a047);
 --wl-warning: var(--warning-color, #ffa000);
 --wl-error: var(--error-color, #db4437);
+--wl-alarm: color-mix(in srgb, var(--wl-error) 88%, #000);
+--wl-on-alarm: #fff;
 --wl-radius-sm: var(--ha-border-radius-sm, 4px);
 --wl-radius-md: var(--ha-border-radius-md, 8px);
 --wl-pad-x: var(--ha-space-4, 16px);
@@ -679,7 +681,10 @@ text-decoration-thickness: 1.5px;
 font-variant-numeric: tabular-nums;
 }
 .stop .time-late {
-color: color-mix(in srgb, var(--wl-error) 75%, var(--primary-text-color));
+padding: 1px 6px;
+border-radius: var(--wl-radius-sm);
+background: var(--wl-alarm);
+color: var(--wl-on-alarm);
 }
 .live-mark {
 --mdc-icon-size: 16px;
@@ -697,11 +702,11 @@ color: var(--secondary-text-color);
 --mdc-icon-size: 16px;
 }
 .access--out {
+padding: 2px 6px;
+border-radius: var(--wl-radius-sm);
+background: var(--wl-alarm);
+color: var(--wl-on-alarm);
 font-weight: 600;
-color: var(--primary-text-color);
-}
-.access--out ha-icon {
-color: var(--wl-error);
 }
 .stops-toggle {
 display: inline-flex;
@@ -808,7 +813,8 @@ display: block;
 --risk: var(--wl-warning);
 }
 .risk[data-risk="at_risk"] {
---risk: var(--wl-error);
+background: var(--wl-alarm);
+color: var(--wl-on-alarm);
 }
 .risk ha-icon {
 --mdc-icon-size: 16px;
@@ -1209,6 +1215,10 @@ outline-offset: 2px;
 border-radius: 6px;
 }
 @media (forced-colors: active) {
+.time-late,
+.access--out {
+outline: 1px solid CanvasText;
+}
 .when-mode input:checked + span {
 forced-color-adjust: none;
 background: Highlight;

@@ -1301,6 +1301,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --wl-rt: var(--success-color, #43a047);
       --wl-warning: var(--warning-color, #ffa000);
       --wl-error: var(--error-color, #db4437);
+      /* One alarm look for everything that is actually wrong (a late
+         departure, a change that no longer fits, a lift out of service):
+         solid fill, white text. The theme's error red, darkened just enough
+         that white text keeps about 5.3:1 on it in light and dark themes. A
+         tint or a red text colour read as decoration, not as an alarm. */
+      --wl-alarm: color-mix(in srgb, var(--wl-error) 88%, #000);
+      --wl-on-alarm: #fff;
       --wl-radius-sm: var(--ha-border-radius-sm, 4px);
       --wl-radius-md: var(--ha-border-radius-md, 8px);
       --wl-pad-x: var(--ha-space-4, 16px);
@@ -1547,11 +1554,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       text-decoration-thickness: 1.5px;
       font-variant-numeric: tabular-nums;
     }
-    /* The error red mixed a quarter toward the body text: lighter on a dark
-       card, darker on a light one, so the time keeps its contrast in both
-       themes where the raw token would fall short of 4.5:1. */
     .stop .time-late {
-      color: color-mix(in srgb, var(--wl-error) 75%, var(--primary-text-color));
+      padding: 1px 6px;
+      border-radius: var(--wl-radius-sm);
+      background: var(--wl-alarm);
+      color: var(--wl-on-alarm);
     }
     .live-mark {
       --mdc-icon-size: 16px;
@@ -1569,11 +1576,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 16px;
     }
     .access--out {
+      padding: 2px 6px;
+      border-radius: var(--wl-radius-sm);
+      background: var(--wl-alarm);
+      color: var(--wl-on-alarm);
       font-weight: 600;
-      color: var(--primary-text-color);
-    }
-    .access--out ha-icon {
-      color: var(--wl-error);
     }
     /* Stops along a ride: the departure board's stops-ahead dots, sat on
        this ride's own rail so they read as stations the line passes. */
@@ -1693,7 +1700,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --risk: var(--wl-warning);
     }
     .risk[data-risk="at_risk"] {
-      --risk: var(--wl-error);
+      background: var(--wl-alarm);
+      color: var(--wl-on-alarm);
     }
     .risk ha-icon {
       --mdc-icon-size: 16px;
@@ -2109,6 +2117,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     @media (forced-colors: active) {
+      .time-late,
+      .access--out {
+        outline: 1px solid CanvasText;
+      }
       .when-mode input:checked + span {
         forced-color-adjust: none;
         background: Highlight;
