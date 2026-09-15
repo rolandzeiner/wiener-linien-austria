@@ -375,6 +375,8 @@ LINE_TYPE_METRO: Final = "ptMetro"
 LINE_TYPE_TRAM: Final = "ptTram"
 LINE_TYPE_BUS_DAY: Final = "ptBusCity"
 LINE_TYPE_BUS_NIGHT: Final = "ptBusNight"
+# Not a `/monitor` type: the S-Bahn rows timetable.py adds to a board.
+LINE_TYPE_S_BAHN: Final = "ptTrainS"
 LineType = Literal["ptMetro", "ptTram", "ptBusCity", "ptBusNight"]
 
 # Direction codes from the /monitor feed. "H" = Hinfahrt (outbound),

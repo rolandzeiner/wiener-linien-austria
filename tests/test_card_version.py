@@ -147,6 +147,7 @@ _LINE_TYPE_PATTERNS: dict[str, re.Pattern[str]] = {
     "LINE_TYPE_METRO": re.compile(r'\bLINE_TYPE_METRO\s*=\s*"([^"]+)"'),
     "LINE_TYPE_TRAM": re.compile(r'\bLINE_TYPE_TRAM\s*=\s*"([^"]+)"'),
     "LINE_TYPE_BUS_DAY": re.compile(r'\bLINE_TYPE_BUS_DAY\s*=\s*"([^"]+)"'),
+    "LINE_TYPE_S_BAHN": re.compile(r'\bLINE_TYPE_S_BAHN\s*=\s*"([^"]+)"'),
     "LINE_TYPE_BUS_NIGHT": re.compile(r'\bLINE_TYPE_BUS_NIGHT\s*=\s*"([^"]+)"'),
 }
 

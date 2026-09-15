@@ -151,7 +151,9 @@
       "show_stops_ahead": "Zwischenstationen anzeigen",
       "show_traffic_info": "Störungen anzeigen",
       "show_type_icon": "Verkehrsmittel-Symbol anzeigen"
-    }
+    },
+    "timetable_only": "nur Fahrplan",
+    "timetable_title": "Fahrplanzeit, keine Echtzeitdaten"
   },
   "retro": {
     "editor": {
@@ -242,7 +244,8 @@
     "version_reload": "Neu laden",
     "version_reload_stuck": "Neu laden hat die neue Version nicht übernommen. Schließe diesen Browser-Tab und öffne das Dashboard erneut, oder lösche die Website-Daten für Home Assistant in den Browser-Einstellungen.",
     "version_update": "Retro-Karte wurde auf v{v} aktualisiert — bitte neu laden",
-    "via_prefix": "ÜBER"
+    "via_prefix": "ÜBER",
+    "timetable_title": "Fahrplanzeit, keine Echtzeitdaten"
   },
   "flap": {
     "no_entity": "Keine Haltestelle ausgewählt",
@@ -324,7 +327,8 @@
       "station_bg_line": "Erste Linie",
       "station_bg_white": "Weiß",
       "text": "Beschriftung"
-    }
+    },
+    "timetable_title": "Fahrplanzeit, keine Echtzeitdaten"
   },
   "route": {
     "heading_fallback": "Verbindung",

@@ -1029,8 +1029,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
     const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
+    const timetableLabel = d.timetable ? this._t("timetable_title") : "";
     const viaA11y = via ? `${this._t("via_prefix")} ${via}` : "";
-    const rowLabel = [line, towards, viaA11y, cdLabel, a11yLabel].filter(Boolean).join(" — ");
+    const rowLabel = [line, towards, viaA11y, cdLabel, timetableLabel, a11yLabel]
+      .filter(Boolean)
+      .join(" — ");
     // Resolve the line's WL palette through the same precedence ladder
     // chips use elsewhere: GTFS routes.txt first, then the nightline
     // override, then a CSS-var fallback that doesn't read well on the
@@ -1086,6 +1089,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
                 `
               : nothing}
           </span>
+          ${d.timetable
+            ? html`<ha-icon
+                class="retro-timetable"
+                icon="mdi:calendar-clock"
+                title=${this._t("timetable_title")}
+              ></ha-icon>`
+            : nothing}
           ${d.barrier_free
             ? html`<ha-icon
                 class="retro-wheelchair"
@@ -1427,7 +1437,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     .retro-dest-text--visible {
       opacity: 1;
     }
-    .retro-wheelchair {
+    /* The timetable pictogram marks a planned S-Bahn row (no live time)
+       and shares the wheelchair's sizing and optical-centre nudge. */
+    .retro-wheelchair,
+    .retro-timetable {
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;

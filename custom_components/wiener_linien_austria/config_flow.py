@@ -88,6 +88,7 @@ from .const import (
     ENTRY_TYPE_ROUTE,
     ENTRY_TYPE_STOP,
     EXCLUDABLE_MEANS,
+    LINE_TYPE_S_BAHN,
     MAX_CHANGES_ANY,
     MAX_CHANGES_CHOICES,
     MAX_LEAVE_MINUTES,
@@ -119,7 +120,7 @@ from .static import (
     is_s_bahn_label,
 )
 from .stops import stop_options, trackable_station
-from .timetable import LINE_TYPE_S_BAHN, async_probe_picker_rows
+from .timetable import async_probe_picker_rows
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -261,6 +261,10 @@ export interface DepartureAttr {
   // Optional per-departure list of upcoming stops on this trip. Absent
   // (or empty) means "no panel" — the row renders without a chevron.
   stops_ahead?: StopAheadAttr[];
+  /** A planned S-Bahn row from the timetable, not a live `/monitor` row.
+   *  Absent on live rows. Its countdown runs off the planned time, so the
+   *  cards mark it rather than let it pass for live. */
+  timetable?: boolean;
 }
 
 export interface TrafficInfoAttr {

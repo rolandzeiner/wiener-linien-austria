@@ -547,6 +547,30 @@ export const cardStyles = css`
       transparent
     );
   }
+  /* Planned S-Bahn departure: the countdown runs off the timetable, not a
+     live feed. Text rather than an icon-only badge, because "no live data"
+     is the one thing here nobody can guess from a glyph. Secondary text
+     colour: it qualifies the time, it isn't a warning. */
+  .hero-timetable {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--ha-font-size-xs, 10px);
+    font-weight: 500;
+    color: var(--secondary-text-color);
+    white-space: nowrap;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(
+      in srgb,
+      var(--primary-text-color) 10%,
+      transparent
+    );
+  }
+  .hero-timetable ha-icon {
+    --mdc-icon-size: 12px;
+    display: flex;
+  }
   /* Hero status flags — icon-only badges on the next departure, each
      rendered only when its condition holds AND the user enabled it
      (show_accessibility / show_cooling).
@@ -1273,6 +1297,21 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
     margin-right: 4px;
     vertical-align: 1px;
+  }
+  /* Sits in the same wrap slot as .delay; see .hero-timetable. */
+  .timetable-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: var(--secondary-text-color);
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .timetable-note ha-icon {
+    --mdc-icon-size: 14px;
+    display: flex;
   }
   .delay {
     color: var(--wl-warning);

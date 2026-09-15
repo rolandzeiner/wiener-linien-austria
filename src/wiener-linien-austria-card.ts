@@ -20,6 +20,7 @@ import {
 import { deText } from "./utils.js";
 import {
   LINE_TYPE_METRO,
+  LINE_TYPE_S_BAHN,
   headerIconForType,
   lineTypeIcon,
 } from "./utils/mot.js";
@@ -101,7 +102,7 @@ import "./editor.js";
 // Unknown vehicle types fall back to the bus prefix — most Wien stops
 // are bus stops.
 function platformLabelKey(type: string | undefined): string {
-  if (type === LINE_TYPE_METRO) {
+  if (type === LINE_TYPE_METRO || type === LINE_TYPE_S_BAHN) {
     return "platform_short_rail";
   }
   return "platform_short_bus";
@@ -1339,6 +1340,15 @@ export class WienerLinienAustriaCard extends LitElement {
               >${this._t(platformLabelKey(d.type))} ${platform}</span
             >`
           : nothing}
+        ${d.timetable
+          ? html`<span
+              class="hero-timetable"
+              title=${this._t("timetable_title")}
+            >
+              <ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon>
+              ${this._t("timetable_only")}
+            </span>`
+          : nothing}
         ${isBarrierFree
           ? html`<span
               class="hero-a11y"
@@ -1552,6 +1562,11 @@ export class WienerLinienAustriaCard extends LitElement {
           <div class="towards-rows">
             <span class="towards-name">${deText(d.towards)}</span>${delayText
               ? html`<span class="delay">${delayText}</span>`
+              : nothing}${d.timetable
+              ? html`<span class="timetable-note" title=${this._t("timetable_title")}
+                  ><ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon
+                  >${this._t("timetable_only")}</span
+                >`
               : nothing}
           </div>
         </div>

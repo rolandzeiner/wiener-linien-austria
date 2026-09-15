@@ -874,7 +874,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         : isAtPlatform
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
-    const rowLabel = [rawLine, towards, cdLabel].filter(Boolean).join(" — ");
+    const timetableLabel = d.timetable ? this._t("timetable_title") : "";
+    const rowLabel = [rawLine, towards, cdLabel, timetableLabel]
+      .filter(Boolean)
+      .join(" — ");
 
     // Resolve the line palette through chipPalette so each character
     // tile in the line column is painted with the official WL line
@@ -945,6 +948,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         </div>
         ${platformCell}
         <div class="flap-cell flap-cell--cd" aria-hidden="true">
+          ${d.timetable
+            ? // Before the digits: the cell packs to the end, so the
+              // countdown stays aligned with the live rows above and below.
+              this._renderPictogramTile(
+                "mdi:calendar-clock",
+                this._t("timetable_title"),
+                "plain",
+              )
+            : nothing}
           <span class="flap-cd-tiles">${cdContent}</span>
           ${cfg.show_min_unit && cd !== null
             ? html`<span class="flap-cd-unit">${this._t("unit_min")}</span>`
@@ -1050,12 +1062,17 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   private _renderPictogramTile(
     icon: string,
     ariaLabel: string,
+    face: "a11y" | "plain" = "a11y",
   ): TemplateResult {
     // Single ha-icon overlay (NOT one per half) — ha-icon refuses to
     // clip itself to its parent half, so two halves = two visible
     // icons. Seam draws on top via z-index 2 vs the overlay's 1.
+    // The blue face is reserved for the accessibility sign; any other
+    // pictogram takes the cream face so it can't be read as one.
     return html`<span
-      class="flap-tile flap-tile--pictogram"
+      class="flap-tile flap-tile--pictogram${face === "plain"
+        ? " flap-tile--pictogram-plain"
+        : ""}"
       aria-label=${ariaLabel}
     >
       <span class="flap-tile__half flap-tile__half--top"></span>
@@ -1564,6 +1581,34 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     .flap-tile--pictogram .flap-tile__seam::after {
       background: rgba(255, 255, 255, 0.28);
+    }
+    /* Cream face for non-accessibility pictograms (the timetable clock
+       on planned S-Bahn rows): same material as the text tiles. */
+    .flap-tile--pictogram.flap-tile--pictogram-plain .flap-tile__half--top {
+      background: linear-gradient(
+        180deg,
+        var(--flap-cream-hi) 0%,
+        var(--flap-cream) 100%
+      );
+    }
+    .flap-tile--pictogram.flap-tile--pictogram-plain .flap-tile__half--bottom {
+      background: linear-gradient(
+        180deg,
+        var(--flap-cream) 0%,
+        var(--flap-cream-lo) 100%
+      );
+    }
+    .flap-tile--pictogram.flap-tile--pictogram-plain .flap-tile__seam {
+      background: var(--flap-seam);
+    }
+    .flap-tile--pictogram-plain .flap-tile__pictogram-overlay,
+    .flap-tile--pictogram-plain .flap-tile__pictogram {
+      color: var(--flap-ink);
+    }
+    /* The cd cell aligns its tiles on the baseline; a pictogram tile has
+       no text to give it one. */
+    .flap-cell--cd > .flap-tile--pictogram {
+      align-self: center;
     }
     .flap-tile__pictogram-overlay {
       position: absolute;

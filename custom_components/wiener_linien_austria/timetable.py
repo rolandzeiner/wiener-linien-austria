@@ -32,6 +32,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    LINE_TYPE_S_BAHN,
     ROUTING_DEPARTURE_ENDPOINT,
     ROUTING_TIME_ZONE,
     TIMETABLE_DEPARTURES_REQUESTED,
@@ -51,9 +52,6 @@ _MOT_S_BAHN = "1"
 # Every other code the interface defines, excluded server-side so the
 # answer carries only trains the boards don't already have.
 _EXCLUDED_MOTS = ("0", *(str(code) for code in range(2, 12)))
-# Wiener Linien's vehicle-type vocabulary for the S-Bahn, as routing.py
-# already maps it for route legs.
-LINE_TYPE_S_BAHN = "ptTrainS"
 
 
 @dataclass(slots=True, frozen=True)

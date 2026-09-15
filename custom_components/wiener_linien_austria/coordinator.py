@@ -25,6 +25,7 @@ from .const import (
     CONF_RBLS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    LINE_TYPE_S_BAHN,
     STALE_DEPARTURE_MAX_AGE,
 )
 
@@ -39,7 +40,7 @@ from .static import (
     is_s_bahn_label,
     stops_ahead_for_match,
 )
-from .timetable import LINE_TYPE_S_BAHN, PlannedDeparture, TimetableBoard
+from .timetable import PlannedDeparture, TimetableBoard
 
 if TYPE_CHECKING:
     from .batch import BatchResult, MonitorBatchGroup

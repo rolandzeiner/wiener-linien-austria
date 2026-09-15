@@ -23,6 +23,7 @@ from custom_components.wiener_linien_austria.const import (
     CONF_DIVA,
     CONF_LINES,
     DOMAIN,
+    LINE_TYPE_S_BAHN,
     ROUTING_DEPARTURE_ENDPOINT,
 )
 from custom_components.wiener_linien_austria.coordinator import (
@@ -32,7 +33,6 @@ from custom_components.wiener_linien_austria.coordinator import (
 )
 from custom_components.wiener_linien_austria.routing import RoutingError
 from custom_components.wiener_linien_austria.timetable import (
-    LINE_TYPE_S_BAHN,
     PlannedDeparture,
     TimetableBoard,
     async_fetch_planned_departures,

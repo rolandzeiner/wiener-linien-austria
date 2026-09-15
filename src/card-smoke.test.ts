@@ -239,6 +239,66 @@ describe("rendering", () => {
   });
 });
 
+/** A stop with a live U3 on either side of a planned S-Bahn train. */
+function timetableHass(): HomeAssistant {
+  const hass = busyHass();
+  const attrs = hass.states[ENTITY]!.attributes as Record<string, unknown>;
+  const [u3] = attrs.departures as Array<Record<string, unknown>>;
+  attrs.departures = [
+    u3,
+    {
+      line: "S2",
+      direction: "R",
+      towards: "Wolkersdorf",
+      type: "ptTrainS",
+      countdown: 5,
+      time_planned: "2026-09-09T16:40:00+02:00",
+      time_real: null,
+      realtime: false,
+      barrier_free: false,
+      traffic_jam: false,
+      platform: "4",
+      timetable: true,
+    },
+    { ...u3, countdown: 9, time_planned: "2026-09-09T16:44:00.000+0200" },
+  ];
+  return hass;
+}
+
+describe("planned S-Bahn rows", () => {
+  it("the modern card labels the timetable row and only that row", async () => {
+    const el = await mount(MODERN, timetableHass(), CARDS[0]![1]);
+    const root = shadow(el);
+    const marks = root.querySelectorAll(".timetable-note, .hero-timetable");
+    expect(marks).toHaveLength(1);
+    expect(marks[0]!.textContent?.trim()).toBe("nur Fahrplan");
+    expect(marks[0]!.getAttribute("title")).toBe("Fahrplanzeit, keine Echtzeitdaten");
+  });
+
+  it("the retro card marks the row and says so in its label", async () => {
+    // The retro panel shows one line in one direction; point it at the S2.
+    const el = await mount(RETRO, timetableHass(), {
+      ...CARDS[1]![1],
+      line: "S2",
+      direction: "R",
+    });
+    const root = shadow(el);
+    expect(root.querySelectorAll(".retro-timetable")).toHaveLength(1);
+    const labels = [...root.querySelectorAll(".retro-row")].map((row) =>
+      row.getAttribute("aria-label"),
+    );
+    expect(labels.filter((label) => label?.includes("keine Echtzeitdaten"))).toHaveLength(1);
+  });
+
+  it("the flap card marks the row with a cream-faced tile", async () => {
+    const el = await mount(FLAP, timetableHass(), CARDS[2]![1]);
+    const root = shadow(el);
+    const tiles = root.querySelectorAll(".flap-tile--pictogram-plain");
+    expect(tiles).toHaveLength(1);
+    expect(tiles[0]!.getAttribute("aria-label")).toBe("Fahrplanzeit, keine Echtzeitdaten");
+  });
+});
+
 describe("tab-scoped alert banner", () => {
   const OTHER = "sensor.taubstummengasse_abfahrten";
 

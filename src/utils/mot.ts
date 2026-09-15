@@ -11,6 +11,9 @@ export const LINE_TYPE_METRO = "ptMetro";
 const LINE_TYPE_TRAM = "ptTram";
 const LINE_TYPE_BUS_DAY = "ptBusCity";
 const LINE_TYPE_BUS_NIGHT = "ptBusNight";
+// Not a `/monitor` type: planned S-Bahn rows the integration adds to a board
+// from the timetable. Those rows also carry `timetable: true`.
+export const LINE_TYPE_S_BAHN = "ptTrainS";
 
 /**
  * Resolve the MDI icon name for a `/monitor`-published vehicle type, or
@@ -29,6 +32,8 @@ export function lineTypeIcon(type: string | undefined): string | null {
     case LINE_TYPE_BUS_DAY:
     case LINE_TYPE_BUS_NIGHT:
       return "mdi:bus";
+    case LINE_TYPE_S_BAHN:
+      return "mdi:train";
     default:
       return null;
   }
