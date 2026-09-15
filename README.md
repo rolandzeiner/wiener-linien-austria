@@ -587,10 +587,11 @@ logger:
 
 ## Known Limitations
 
-- **Vienna only.** ÖBB, VOR, and regional services are out of scope.
+- **Wiener Linien stops only.** Departure boards, and a route's start and destination, use stops from the Wiener Linien stop list. A station served only by the S-Bahn can't be picked.
+- **S-Bahn appears in routes, not on departure boards.** The trip planner knows S-Bahn and other ÖBB trains, so a route can include them. Departure boards show only Wiener Linien lines: at Praterstern you see the U1, U2, trams and buses, but no S-Bahn. S-Bahn and train rides on a route keep their timetable times, with no live time.
 - **The card's last pick stays on that device.** It's saved in the browser, not in Home Assistant, so a phone and a wall tablet each remember their own. Two route cards without a route on the same device share that pick.
 - **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
-- **Live times on routes come from the departure boards.** The trip planner sends none, so a ride gets its live time from `/monitor`, which lists about the next hour. S-Bahn and train rides, and rides more than about an hour away, stay on the timetable. `/monitor` has no arrival times, so a ride's arrival moves by its departure delay.
+- **Live times on routes come from the departure boards.** The trip planner sends none, so a ride gets its live time from `/monitor`, which lists about the next hour. Rides more than about an hour away stay on the timetable. `/monitor` has no arrival times, so a ride's arrival moves by its departure delay.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
 - **Stops-ahead is best-effort.** Short-turn services may show the full scheduled path. Replacement buses (SEV) and unscheduled detours produce no panel — the row stays as it is, with no chevron.
 
