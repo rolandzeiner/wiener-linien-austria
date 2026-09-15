@@ -21,12 +21,19 @@ import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { live } from "lit/directives/live.js";
 
-import type { RetroHeaderExit, RetroHeaderSide } from "../types.js";
+import type {
+  HaFormSchema,
+  HomeAssistant,
+  RetroHeaderExit,
+  RetroHeaderSide,
+} from "../types.js";
 import {
   RETRO_HEADER_MDI_EXIT_KEYS,
   RETRO_HEADER_MDI_EXITS,
 } from "../utils/retro-station-icons.js";
 import { swallowEditorKeys } from "../editor-shared.js";
+import { patchHeaderSide } from "./editor-common.js";
+import { renderSection } from "./editor-shell.js";
 import {
   HEADER_MAX_CHIPS,
   HEADER_MAX_CHIP_LEN,
@@ -371,4 +378,63 @@ function removeAt<T>(list: ReadonlyArray<T>, index: number): T[] | undefined {
   // Tidy state on empty — drop the key rather than persist `[]`, so saved YAML
   // stays free of orphan empty arrays.
   return next.length ? next : undefined;
+}
+
+export interface HeaderSectionOptions {
+  hass: HomeAssistant | undefined;
+  showHeader: boolean;
+  left: RetroHeaderSide | undefined;
+  right: RetroHeaderSide | undefined;
+  selected: HeaderSideKey;
+  et(key: string): string;
+  computeLabel: (field: { name: string }) => string;
+  computeHelper: (field: { name: string }) => string | undefined;
+  /** The side as the editor holds it right now. Read at patch time, not
+   *  captured at render, so two edits landing before Lit re-renders both
+   *  merge onto the latest config instead of the second dropping the first. */
+  currentSide(side: HeaderSideKey): RetroHeaderSide | undefined;
+  /** Merge a partial config value: `{ show_header }` or one whole side. */
+  onChange(value: Record<string, unknown>): void;
+  selectSide(side: HeaderSideKey): void;
+}
+
+/** The "Header" section of the retro and flap editors: the `show_header`
+ *  toggle, and the strip beneath it while the header is on. Both editors
+ *  render it identically; only where they keep `_headerSide` differs. */
+export function renderHeaderSection(opts: HeaderSectionOptions): TemplateResult {
+  return renderSection(
+    { title: opts.et("section_header"), hint: opts.et("section_header_hint") },
+    html`
+      <ha-form
+        .hass=${opts.hass}
+        .data=${{ show_header: opts.showHeader }}
+        .schema=${[
+          { name: "show_header", selector: { boolean: {} } },
+        ] satisfies ReadonlyArray<HaFormSchema>}
+        .computeLabel=${opts.computeLabel}
+        .computeHelper=${opts.computeHelper}
+        @value-changed=${(ev: CustomEvent<{ value: Record<string, unknown> }>) => {
+          ev.stopPropagation();
+          opts.onChange(ev.detail.value);
+        }}
+      ></ha-form>
+      ${opts.showHeader
+        ? renderHeaderStrip(
+            {
+              left: opts.left,
+              right: opts.right,
+              selected: opts.selected,
+              et: opts.et,
+            },
+            {
+              selectSide: opts.selectSide,
+              patch: (side, field, value) =>
+                opts.onChange({
+                  [side]: patchHeaderSide(opts.currentSide(side), field, value),
+                }),
+            },
+          )
+        : nothing}
+    `,
+  );
 }

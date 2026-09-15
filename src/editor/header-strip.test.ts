@@ -18,7 +18,9 @@ import { render } from "lit";
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import {
+  renderHeaderSection,
   renderHeaderStrip,
+  type HeaderSectionOptions,
   type HeaderSideKey,
   type HeaderStripCallbacks,
 } from "./header-strip.js";
@@ -371,5 +373,59 @@ describe("chips and icons", () => {
     const el = strip({}, callbacks());
     const input = one<HTMLInputElement>(el, '.wl-text[aria-label="text"]');
     expect(Number(input.getAttribute("maxlength"))).toBe(HEADER_MAX_TEXT_LEN);
+  });
+});
+
+describe("renderHeaderSection — the retro and flap editors' header block", () => {
+  function section(over: Partial<HeaderSectionOptions> = {}): {
+    el: HTMLElement;
+    onChange: Mock<HeaderSectionOptions["onChange"]>;
+  } {
+    const onChange = vi.fn<HeaderSectionOptions["onChange"]>();
+    render(
+      renderHeaderSection({
+        hass: undefined,
+        showHeader: true,
+        left: undefined,
+        right: undefined,
+        selected: "header_left",
+        et,
+        computeLabel: (f) => f.name,
+        computeHelper: () => undefined,
+        currentSide: () => undefined,
+        onChange,
+        selectSide: vi.fn(),
+        ...over,
+      }),
+      host,
+    );
+    return { el: host, onChange };
+  }
+
+  it("shows the strip only while the header is on", () => {
+    expect(zones(section({ showHeader: true }).el)).toHaveLength(2);
+    expect(zones(section({ showHeader: false }).el)).toHaveLength(0);
+  });
+
+  it("forwards the show_header toggle as a config patch", () => {
+    const { el, onChange } = section();
+    one<HTMLElement>(el, "ha-form").dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { show_header: false } } }),
+    );
+    expect(onChange).toHaveBeenCalledWith({ show_header: false });
+  });
+
+  it("merges a strip edit onto the side as it is at patch time", () => {
+    // The render captured an empty side; the editor has since gained show_wc.
+    // The patch must build on the latest side, not the rendered one.
+    const latest = { show_wc: true } as RetroHeaderSide;
+    const { el, onChange } = section({ currentSide: () => latest });
+    one<HTMLButtonElement>(
+      el,
+      '.wl-pict[aria-label="header_exit_accessible"]',
+    ).click();
+    expect(onChange).toHaveBeenCalledWith({
+      header_left: { show_wc: true, exit: "accessible" },
+    });
   });
 });

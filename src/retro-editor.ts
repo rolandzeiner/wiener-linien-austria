@@ -33,11 +33,10 @@ import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.
 import {
   renderFormSection,
   renderPanel,
-  renderSection,
   renderTabs,
   type TabKey,
 } from "./editor/editor-shell.js";
-import { renderHeaderStrip, type HeaderSideKey } from "./editor/header-strip.js";
+import { renderHeaderSection, type HeaderSideKey } from "./editor/header-strip.js";
 import {
   renderStopBlock,
   type StopBlockCallbacks,
@@ -47,7 +46,6 @@ import type {
   HaFormSchema,
   HomeAssistant,
   LovelaceCardEditor,
-  RetroHeaderSide,
   WienerLinienAttrs,
   WienerLinienRetroCardConfig,
 } from "./types.js";
@@ -55,7 +53,6 @@ import { fireEvent } from "./utils.js";
 import {
   editorHelper,
   editorLabel,
-  patchHeaderSide,
 } from "./editor/editor-common.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { directionSurface, linesForDirection } from "./utils/departures.js";
@@ -283,40 +280,21 @@ export class WienerLinienAustriaRetroCardEditor
     };
 
     return html`
-      ${renderSection(
-        { title: et("section_header"), hint: et("section_header_hint") },
-        html`
-          <ha-form
-            .hass=${this.hass}
-            .data=${{ show_header: cfg.show_header }}
-            .schema=${[
-              { name: "show_header", selector: { boolean: {} } },
-            ] satisfies ReadonlyArray<HaFormSchema>}
-            .computeLabel=${this._computeLabel}
-            .computeHelper=${this._computeHelper}
-            @value-changed=${(ev: CustomEvent<{ value: Record<string, unknown> }>) => {
-              ev.stopPropagation();
-              this._patch(ev.detail.value);
-            }}
-          ></ha-form>
-          ${cfg.show_header
-            ? renderHeaderStrip(
-                {
-                  left: cfg.header_left,
-                  right: cfg.header_right,
-                  selected: this._headerSide,
-                  et,
-                },
-                {
-                  selectSide: (side) => {
-                    this._headerSide = side;
-                  },
-                  patch: (side, field, value) => this._patchHeaderSide(side, field, value),
-                },
-              )
-            : nothing}
-        `,
-      )}
+      ${renderHeaderSection({
+        hass: this.hass,
+        showHeader: cfg.show_header,
+        left: cfg.header_left,
+        right: cfg.header_right,
+        selected: this._headerSide,
+        et,
+        computeLabel: this._computeLabel,
+        computeHelper: this._computeHelper,
+        currentSide: (side) => this._config?.[side],
+        onChange: (v) => this._patch(v),
+        selectSide: (side) => {
+          this._headerSide = side;
+        },
+      })}
       ${renderFormSection({
         ...common,
         title: et("section_station"),
@@ -448,15 +426,6 @@ export class WienerLinienAustriaRetroCardEditor
         ],
       })}
     `;
-  }
-
-  private _patchHeaderSide(
-    side: HeaderSideKey,
-    field: keyof RetroHeaderSide,
-    value: unknown,
-  ): void {
-    if (!this._config) return;
-    this._patch({ [side]: patchHeaderSide(this._config[side], field, value) });
   }
 
   /** Directions tracked at `entity`. Tracked-line keys win — once the user has
