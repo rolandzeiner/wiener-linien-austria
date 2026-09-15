@@ -1052,6 +1052,8 @@ def test_s_bahn_chip_colours_meet_wcag_aa() -> None:
     """White S-Bahn chip text clears 4.5:1 on every fill (see const.py)."""
     for bg in (S_BAHN_DEFAULT_COLOR, *S_BAHN_COLORS.values()):
         assert _contrast(bg, S_BAHN_TEXT_COLOR) >= 4.5, bg
+    # The flap card writes its cream (--flap-on-color-fg) on every tile.
+    assert _contrast(S_BAHN_COLORS["S45"], "F3EACD") >= 4.5
 
 
 async def test_line_colors_cover_s_bahn_without_catalogue(hass: HomeAssistant) -> None:
@@ -1059,7 +1061,7 @@ async def test_line_colors_cover_s_bahn_without_catalogue(hass: HomeAssistant) -
     colors = line_colors_for(hass, {"S80", "S45", "s7", "U1", "SEV"})
     assert colors == {
         "S80": {"bg": "107AA8", "fg": "FFFFFF"},
-        "S45": {"bg": "607B22", "fg": "FFFFFF"},
+        "S45": {"bg": "566F1F", "fg": "FFFFFF"},
         "s7": {"bg": "107AA8", "fg": "FFFFFF"},
     }
 
@@ -1071,5 +1073,5 @@ async def test_line_colors_merge_s_bahn_with_gtfs(
     mock_static_catalogue.trip_patterns.colors_by_line["U1"] = "E3000F"
     hass.data.setdefault(DOMAIN, {})["static_catalogue"] = mock_static_catalogue
     colors = line_colors_for(hass, {"S45", "U1"})
-    assert colors["S45"] == {"bg": "607B22", "fg": "FFFFFF"}
+    assert colors["S45"] == {"bg": "566F1F", "fg": "FFFFFF"}
     assert colors["U1"]["bg"] == "E3000F"

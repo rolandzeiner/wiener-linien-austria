@@ -368,14 +368,16 @@ S_BAHN_NETWORK_CHECK_INTERVAL: Final = timedelta(hours=24)
 # until white text clears AA, and every S-Bahn chip keeps white text like
 # the signage (Roland, 2026-09-15):
 #   * S-Bahn: #107AA8, 4.80:1, APCA Lc -78.
-#   * S45: #607B22, 4.82:1, APCA Lc -79. Reads olive rather than light
-#     green; dark text on the light green (10.33:1) was tried and rejected
-#     for making the S45 the only chip with dark text.
+#   * S45: #566F1F, 5.69:1, APCA Lc -84. Darker than white alone needs
+#     (#607B22 was 4.82:1) so the flap card's cream tile text (#F3EACD)
+#     clears AA on it too, at 4.73:1. Dark text on the light green
+#     (10.33:1) was tried and rejected for making the S45 the only chip
+#     with dark text.
 # Black on the blue was rejected although WCAG 2 passes it (6.97:1): APCA
 # rates it below white (Lc 47 vs 62), and it reads that way. test_route.py
 # checks every colour stays at 4.5:1 or above.
 S_BAHN_DEFAULT_COLOR: Final = "107AA8"
-S_BAHN_COLORS: Final[dict[str, str]] = {"S45": "607B22"}
+S_BAHN_COLORS: Final[dict[str, str]] = {"S45": "566F1F"}
 S_BAHN_TEXT_COLOR: Final = "FFFFFF"
 
 # Response attribution (CC-BY mandated)
