@@ -1,16 +1,10 @@
-// The per-stop block — the single most duplicated thing in the v1 editors.
-//
-// v1 shipped three near-copies of "line chips + direction + walk times":
-// modern's `_renderStopFilter` (coloured chips with MoT icons, terminus-
-// labelled direction buttons, per-line overrides), flap's `_renderStopSection`
-// (plain buttons referencing CSS classes that were never defined, so they
-// rendered unstyled) and retro's `_renderWalkTimeSection` (walk times only,
-// direction picked from an ha-form dropdown instead). Same job, three
-// affordances, one of them broken.
+// The per-stop block: line chips, direction and walk times, shared by the
+// three departure-board editors. Three separate copies of this drifted apart
+// once (one rendered unstyled), which is why there is only one.
 //
 // This module owns the whole thing: derivation from live sensor attributes AND
 // render. The editors supply a view of the saved stop plus mutation callbacks;
-// they no longer decide what a direction button looks like.
+// they don't decide what a direction button looks like.
 //
 // Retro is the constrained case: one line, one direction. It passes
 // `singleLine: true`, which turns the chip row into radio behaviour (picking a

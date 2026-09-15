@@ -7,7 +7,7 @@
 
 /** Single entity in `hass.states`. The attributes bag is open-ended —
  *  the integration's coordinator emits the keys these cards read
- *  (`departures`, `traffic_info`, `attribution`, `lift_info`, …). */
+ *  (`departures`, `traffic_info`, `elevator_info`, `attribution`, …). */
 export interface HassEntity {
   state: string;
   attributes: Record<string, unknown>;

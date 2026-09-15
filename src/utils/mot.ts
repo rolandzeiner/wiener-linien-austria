@@ -1,9 +1,9 @@
 // Single source of truth for Wiener Linien MeansOfTransport values
 // + their card-side icon mapping. Mirrors `LINE_TYPE_*` in
 // `custom_components/wiener_linien_austria/const.py` byte-for-byte;
-// test_line_type_constants_match_python_and_ts pins the four names.
+// test_line_type_constants_match_python_and_ts pins the five names.
 //
-// Duplicated rather than published as a sensor attribute: the four strings
+// Duplicated rather than published as a sensor attribute: the strings
 // are stable upstream constants, and an icon map on every state write would
 // cost ~80 bytes to surface data that never changes.
 

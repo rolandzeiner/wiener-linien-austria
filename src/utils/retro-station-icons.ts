@@ -20,8 +20,8 @@
 // `exit` glyph's arrow points LEFT; `exit-access` glyph's arrow
 // points RIGHT. The card's render auto-flips them via the
 // `--flip-x` class so the arrow always points outward from the side
-// of the strip the icon sits on — see `_renderStationHeader` in
-// `wiener-linien-austria-retro-card.ts`.
+// of the strip the icon sits on — see `renderStationHeader` in
+// `utils/station-header.ts`.
 
 import { html, svg, type SVGTemplateResult, type TemplateResult } from "lit";
 

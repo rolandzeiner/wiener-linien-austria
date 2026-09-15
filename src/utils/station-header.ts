@@ -60,7 +60,7 @@ function renderHeaderSide(
       side.exit === "regular" ? "exit" : "exit-access";
     exitNode = renderRetroHeaderIcon(key, {
       ariaLabel: t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
-      // Glyph's native direction is `pointsTo`. Flip when the side it
+      // Glyph's native direction is `glyphPointsTo`. Flip when the side it
       // sits on doesn't match — e.g. `exit` (points left) on the right
       // side flips to point right.
       flipX: RETRO_HEADER_ICONS[key].glyphPointsTo !== pos,

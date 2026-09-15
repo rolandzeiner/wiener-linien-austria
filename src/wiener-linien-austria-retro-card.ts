@@ -723,10 +723,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   //      home stretch.
   //   4. Pick a swap pattern matching that constraint (the pattern
   //      still drives mid-race overtakes for visual storytelling).
-  //   5. Measure each wheelchair's natural start x (cqw).
+  //   5. Measure each wheelchair's natural start x and the finish line
+  //      (cqw; RACE_FINISH_X_FALLBACK_CQW when the finish can't be measured).
   //   6. Compute absolute target x at each checkpoint per racer.
-  //   7. Solve for each racer's exit position so they cross
-  //      RACE_FINISH_X_CQW at their target time. Clamped — extremes
+  //   7. Solve for each racer's exit position so they cross the
+  //      finish line at their target time. Clamped — extremes
   //      just under-/overshoot the intended margin.
   //   8. Recompute actual cross times from the clamped trajectories
   //      and assign _raceWinner from those, so announced == visible.

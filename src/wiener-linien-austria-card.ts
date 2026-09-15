@@ -1907,7 +1907,7 @@ export class WienerLinienAustriaCard extends LitElement {
     return result;
   }
 
-  // Single source of truth for the cross-render row identity. `rowStableId`
+  // Single source of truth for the cross-render row identity. The stable id
   // uses `time_planned` so panels stay open across polls (countdown ticks
   // every minute and would re-key the row, snapping the panel closed).
   // The hero, hero-companion and row-list paths all key by exactly this

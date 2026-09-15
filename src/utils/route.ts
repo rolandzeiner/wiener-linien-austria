@@ -176,10 +176,6 @@ export function catchableDeparture(
   return (departing.next_departures ?? []).find((iso) => Date.parse(iso) >= ready) ?? null;
 }
 
-/** The planned and the expected clock time of a stop that runs late, or null
- *  when it doesn't (or the two print as the same minute). The expected time
- *  rounds to the nearest minute: a live estimate carries seconds, and a
- *  vehicle 40 s late shouldn't show "09:22 → 09:22". */
 /** Whether a ride's arrival and the next ride's boarding are one stop: the
  *  same DIVA, or the same coordinates. The trip planner names one stop
  *  differently by platform area ("Ottakring" / "Ottakring (Huttengasse)"),
@@ -198,6 +194,10 @@ export function sameStop(
   );
 }
 
+/** The planned and the expected clock time of a stop that runs late, or null
+ *  when it doesn't (or the two print as the same minute). The expected time
+ *  rounds to the nearest minute: a live estimate carries seconds, and a
+ *  vehicle 40 s late shouldn't show "09:22 → 09:22". */
 export function delayedClock(
   stop: Pick<RouteStopAttr, "planned" | "estimated">,
 ): { planned: string; expected: string } | null {

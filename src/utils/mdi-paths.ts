@@ -4,7 +4,7 @@
 // needs literal SVG path data, so HA's <ha-icon> / <ha-svg-icon> cannot
 // serve this call site — only the raw `d` attribute will do. Depending on
 // `@mdi/js` for four constants meant a 6.3 MB, 7,447-icon package that
-// rollup already tree-shook to exactly the four it had then, so vendoring changes no
+// the bundler already tree-shook to exactly those four, so vendoring changes no
 // icon and no rendered pixel; it drops install-time and supply-chain
 // weight. Same precedent as utils/retro-station-icons.ts: icon path data
 // is content, not an API.
