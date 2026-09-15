@@ -16,6 +16,20 @@ export function lineDirKey(line: string, direction: string): string {
   return `${line}|${direction}`;
 }
 
+/** The direction a stub config (card picker) starts on: `R` only when the
+ *  stop has live departures and none of them run `H`, else `H`. Prefers the
+ *  side with data right now so the picker preview isn't an empty board.
+ *
+ *  Deliberately reads live departures only, not `directionSurface`: the
+ *  preview is about what renders this minute, not what the stop serves. */
+export function stubDirection(departures: unknown): "H" | "R" {
+  if (!Array.isArray(departures)) return "H";
+  const deps = departures as DepartureAttr[];
+  const hasH = deps.some((d) => d.direction === "H");
+  const hasR = deps.some((d) => d.direction === "R");
+  return !hasH && hasR ? "R" : "H";
+}
+
 export interface Triplet {
   line: string;
   direction: string;

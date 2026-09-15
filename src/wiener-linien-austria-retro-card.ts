@@ -22,7 +22,7 @@ import type {
   WienerLinienRetroCardConfig,
 } from "./types.js";
 import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
-import { filterDepartures } from "./utils/departures.js";
+import { filterDepartures, stubDirection } from "./utils/departures.js";
 import { deriveRetroView } from "./utils/retro-view.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
@@ -235,15 +235,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const first = entities[0] || "";
     // Default direction: prefer whichever side has departures right now so
     // the Lovelace preview renders with data instead of an empty LED board.
-    let direction: "H" | "R" = "H";
-    const deps = hass?.states?.[first]?.attributes?.departures as
-      | DepartureAttr[]
-      | undefined;
-    if (Array.isArray(deps)) {
-      const hasH = deps.some((d) => d.direction === "H");
-      const hasR = deps.some((d) => d.direction === "R");
-      if (!hasH && hasR) direction = "R";
-    }
+    const direction = stubDirection(hass?.states?.[first]?.attributes?.departures);
     return {
       entity: first,
       direction,

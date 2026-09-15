@@ -6,6 +6,7 @@ import {
   filterDepartures,
   lineDirKey,
   shouldShowStopsAhead,
+  stubDirection,
   walkTimePairs,
 } from "./departures.js";
 import type { DepartureAttr, WienerLinienAttrs } from "../types.js";
@@ -371,5 +372,22 @@ describe("effectiveLines — a configured line is never silently dropped", () =>
 
   it("does not duplicate a pick that is already in the list", () => {
     expect(effectiveLines(["U1"], new Set(["U1"]))).toEqual(["U1"]);
+  });
+});
+
+describe("stubDirection — the picker preview starts where departures are", () => {
+  it("defaults to H without a departures array", () => {
+    expect(stubDirection(undefined)).toBe("H");
+    expect(stubDirection("nope")).toBe("H");
+    expect(stubDirection([])).toBe("H");
+  });
+
+  it("picks R only when every live departure runs R", () => {
+    expect(stubDirection([dep({ direction: "R" }), dep({ direction: "R" })])).toBe("R");
+  });
+
+  it("stays on H as soon as one departure runs H", () => {
+    expect(stubDirection([dep({ direction: "R" }), dep({ direction: "H" })])).toBe("H");
+    expect(stubDirection([dep({ direction: "H" })])).toBe("H");
   });
 });

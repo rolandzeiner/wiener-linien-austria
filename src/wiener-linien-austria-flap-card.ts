@@ -39,7 +39,7 @@ import type {
 } from "./types.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
-import { filterDepartures } from "./utils/departures.js";
+import { filterDepartures, stubDirection } from "./utils/departures.js";
 import {
   findWienerLinienEntities,
   mergeLineColorsMaps,
@@ -262,15 +262,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     const entities = findWienerLinienEntities(hass);
     const first = entities[0];
     if (!first) return {};
-    let direction: "H" | "R" = "H";
-    const deps = hass?.states?.[first]?.attributes?.departures as
-      | DepartureAttr[]
-      | undefined;
-    if (Array.isArray(deps)) {
-      const hasH = deps.some((d) => d.direction === "H");
-      const hasR = deps.some((d) => d.direction === "R");
-      if (!hasH && hasR) direction = "R";
-    }
+    const direction = stubDirection(hass?.states?.[first]?.attributes?.departures);
     return { entity: first, direction };
   }
 
