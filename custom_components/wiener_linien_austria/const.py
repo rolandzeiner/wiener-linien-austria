@@ -277,6 +277,33 @@ MAX_ROUTE_POLL_SECONDS: Final = 1800
 # Never schedule the "departure just passed" refresh sooner than this.
 MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
 
+# Planned S-Bahn departures on a departure board (timetable.py), from the
+# same routing server's departure monitor.
+# --- Upstream capabilities, measured 2026-09-15 -------------------
+#   XML_DM_REQUEST (outputFormat=JSON), Praterstern, S-Bahn only, 12 rows:
+#   20 KB identity, ~0.2-0.4 s. Same backend and caching story as the trip
+#   request above: no ETag, no Last-Modified, `Cache-Control: no-cache`.
+#   No realtime (`realtime: "0"` on every row). The only trains in the data
+#   are S-Bahn (no REX / R / CJX at Meidling, Hauptbahnhof or Floridsdorf),
+#   and the Stammstrecke between Praterstern and Hauptbahnhof (Wien Mitte,
+#   Rennweg, Quartier Belvedere) has none at all. Timetable period in the
+#   answer: 2025-12-14 to 2026-12-12.
+# ----------------------------------------------------------------
+ROUTING_DEPARTURE_ENDPOINT: Final = "/XML_DM_REQUEST"
+# Rows per board refresh. At Handelskai, the busiest S-Bahn stop on the
+# boards, 30 trains reach about 75 minutes ahead.
+TIMETABLE_DEPARTURES_REQUESTED: Final = 30
+# Rows the line picker asks for, enough to see every line and direction
+# at a stop even where some run only every 30 minutes.
+TIMETABLE_PICKER_DEPARTURES: Final = 100
+# A board's planned rows are refetched when this old…
+TIMETABLE_MAX_AGE: Final = timedelta(minutes=30)
+# …or when fewer than this many are still ahead, but never sooner than
+# TIMETABLE_RETRY_AFTER after the last attempt, which also spaces out
+# retries after a failure.
+TIMETABLE_MIN_UPCOMING: Final = 6
+TIMETABLE_RETRY_AFTER: Final = timedelta(minutes=5)
+
 # The timetable server speaks Vienna wall-clock time with no offset, no
 # matter which zone Home Assistant itself is configured in.
 ROUTING_TIME_ZONE: Final = "Europe/Vienna"

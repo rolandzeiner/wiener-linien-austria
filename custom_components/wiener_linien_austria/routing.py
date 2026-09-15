@@ -450,15 +450,19 @@ async def async_fetch_trip_body(
     session: aiohttp.ClientSession,
     params: Sequence[tuple[str, str]],
     user_agent: str,
+    *,
+    endpoint: str = ROUTING_TRIP_ENDPOINT,
 ) -> dict[str, Any]:
-    """GET one trip request and return the decoded JSON body.
+    """GET one request from the routing server and return the decoded JSON body.
 
-    The server labels its JSON `text/html`, so `content_type=None` is
-    required, not defensive. Raises `RoutingError` for every failure so
-    callers map one exception type onto their own surface (UpdateFailed
-    for the coordinator, HomeAssistantError for the action).
+    A trip request by default; timetable.py passes the departure-monitor
+    endpoint, which answers in the same envelope. The server labels its
+    JSON `text/html`, so `content_type=None` is required, not defensive.
+    Raises `RoutingError` for every failure so callers map one exception
+    type onto their own surface (UpdateFailed for the coordinator,
+    HomeAssistantError for the action).
     """
-    url = f"{ROUTING_BASE_URL}{ROUTING_TRIP_ENDPOINT}"
+    url = f"{ROUTING_BASE_URL}{endpoint}"
     try:
         async with session.get(
             url,

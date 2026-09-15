@@ -116,8 +116,10 @@ from .static import (
     Station,
     async_get_catalogue,
     canonical_line_key,
+    is_s_bahn_label,
 )
 from .stops import stop_options, trackable_station
+from .timetable import LINE_TYPE_S_BAHN, async_probe_picker_rows
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,6 +129,12 @@ _LOGGER = logging.getLogger(__name__)
 _SEARCH_AGAIN_LABELS: dict[str, str] = {
     "en": "↩ Search again",
     "de": "↩ Erneut suchen",
+}
+# Suffix on S-Bahn options: they get planned times only, and the picker is
+# where someone decides whether that is worth tracking.
+_TIMETABLE_SUFFIXES: dict[str, str] = {
+    "en": "timetable only",
+    "de": "nur Fahrplan",
 }
 
 
@@ -556,6 +564,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     translation_key="catalogue_unavailable",
                 )
                 self._lines = await _probe_monitor_lines(self.hass, station.rbls)
+            if self._lines:
+                self._lines.extend(
+                    await _s_bahn_picker_rows(
+                        self.hass, station.diva, self._reconfigure_entry
+                    )
+                )
             if not self._lines:
                 return self.async_show_form(
                     step_id="select_lines",
@@ -596,7 +610,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         line_options: list[SelectOptionDict] = [
             SelectOptionDict(
                 value=row["key"],
-                label=_line_label(row),
+                label=_line_label(row, self.hass.config.language),
             )
             for row in self._lines
         ]
@@ -997,9 +1011,49 @@ class WienerLinienAustriaOptionsFlow(OptionsFlow):
         )
 
 
-def _line_label(row: dict[str, str]) -> str:
-    """Render a line selection label: 'U1 → Leopoldau'."""
-    return f"{row['line']} → {row['towards']}"
+async def _s_bahn_picker_rows(
+    hass: HomeAssistant, diva: int, existing: ConfigEntry | None
+) -> list[dict[str, str]]:
+    """The S-Bahn lines at a stop, for the picker, from the timetable.
+
+    On reconfigure, S-Bahn lines the entry already tracks are kept as
+    options even when the probe fails or doesn't see them right now:
+    a selected value missing from the options would be dropped from the
+    user's selection without a word.
+    """
+    rows = await async_probe_picker_rows(hass, diva)
+    if existing is None:
+        return rows
+    offered = {row["key"] for row in rows}
+    for key in {**existing.data, **existing.options}.get(CONF_LINES, []):
+        line, _, direction = str(key).partition("|")
+        direction = direction.split("|", 1)[0]
+        if is_s_bahn_label(line) and direction and f"{line}|{direction}" not in offered:
+            offered.add(f"{line}|{direction}")
+            rows.append(
+                {
+                    "key": f"{line}|{direction}",
+                    "line": line,
+                    "towards": "",
+                    "direction": direction,
+                    "type": LINE_TYPE_S_BAHN,
+                }
+            )
+    return rows
+
+
+def _line_label(row: dict[str, str], language: str) -> str:
+    """Render a line selection label: 'U1 → Leopoldau'.
+
+    S-Bahn rows add that they carry planned times only, and one kept for
+    a reconfigure without a known terminus shows its direction code.
+    """
+    towards = row["towards"] or row["direction"]
+    label = f"{row['line']} → {towards}"
+    if row.get("type") == LINE_TYPE_S_BAHN:
+        suffix = _TIMETABLE_SUFFIXES.get(language, _TIMETABLE_SUFFIXES["en"])
+        label = f"{label} ({suffix})"
+    return label
 
 
 def _route_interval_selector() -> NumberSelector:

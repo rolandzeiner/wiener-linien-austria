@@ -439,6 +439,21 @@ def mock_static_catalogue():
         yield catalogue
 
 
+@pytest.fixture(autouse=True)
+def mock_s_bahn_picker_probe():
+    """Stub the line picker's S-Bahn probe so config-flow tests stay offline.
+
+    Returns no S-Bahn lines, which is what most stops have. Tests that
+    exercise the S-Bahn options set `return_value` on the yielded mock.
+    """
+    with patch(
+        "custom_components.wiener_linien_austria.config_flow.async_probe_picker_rows",
+        new_callable=AsyncMock,
+        return_value=[],
+    ) as probe:
+        yield probe
+
+
 @pytest.fixture
 def monitor_fixture() -> dict:
     """Canonical monitor response captured against the live API."""

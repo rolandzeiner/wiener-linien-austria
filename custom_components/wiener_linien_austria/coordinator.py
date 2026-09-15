@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -34,8 +36,10 @@ from .static import (
     StaticCatalogue,
     async_get_catalogue,
     canonical_line_key,
+    is_s_bahn_label,
     stops_ahead_for_match,
 )
+from .timetable import LINE_TYPE_S_BAHN, PlannedDeparture, TimetableBoard
 
 if TYPE_CHECKING:
     from .batch import BatchResult, MonitorBatchGroup
@@ -79,6 +83,10 @@ class Departure:
     # matches the row (replacement service, short-turn variant, etc.). The
     # card treats None and missing-key as identical: render no chevron.
     stops_ahead: list[dict[str, Any]] | None = None
+    # A planned S-Bahn row from the timetable (timetable.py), not a live
+    # `/monitor` row. The cards mark these so a planned time isn't read as
+    # a live one.
+    timetable: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Render as a plain dict for HA attributes / diagnostics."""
@@ -98,6 +106,8 @@ class Departure:
         }
         if self.stops_ahead is not None:
             out["stops_ahead"] = self.stops_ahead
+        if self.timetable:
+            out["timetable"] = True
         return out
 
 
@@ -137,6 +147,13 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
                 translation_placeholders={"received": repr(raw_rbls)},
             )
         self._selected_lines: set[str] | None = _normalise_lines(config.get(CONF_LINES))
+        # The S-Bahn lines picked for this stop, as (line, direction). Empty
+        # for most stops, which then never ask the timetable for anything.
+        self._timetable_pairs: frozenset[tuple[str, str]] = frozenset(
+            (parts[0], parts[1])
+            for key in self._selected_lines or ()
+            if len(parts := key.split("|", 2)) >= 2 and is_s_bahn_label(parts[0])
+        )
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
@@ -161,6 +178,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
                 translation_placeholders={"received": repr(config.get(CONF_DIVA))},
             )
         self._diva: int = diva_int
+        self._timetable: TimetableBoard | None = (
+            TimetableBoard(hass, diva_int) if self._timetable_pairs else None
+        )
+        # The last `/monitor` slice before the timetable rows were merged in,
+        # so a timetable refresh landing between ticks can re-merge.
+        self._last_monitor: MonitorData | None = None
         self._latitude: float | None = None
         self._longitude: float | None = None
         # De-dupe stops_ahead matcher exceptions per line label so a
@@ -174,6 +197,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # The shared batch group that owns this entry's fetching. Assigned by
         # `attach_batch` during entry setup, before the first refresh.
         self._batch: MonitorBatchGroup | None = None
+        self._timetable_task: asyncio.Task[None] | None = None
 
         super().__init__(
             hass,
@@ -266,6 +290,11 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
     def scan_interval(self) -> timedelta:
         """User-configured polling cadence; the batch group is keyed on this."""
         return self._scan_interval
+
+    @property
+    def timetable(self) -> TimetableBoard | None:
+        """This stop's S-Bahn timetable, or None when no S-Bahn line is picked."""
+        return self._timetable
 
     @property
     def latitude(self) -> float | None:
@@ -380,7 +409,47 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             warned_lines=self._stops_ahead_warned_lines,
         )
         self._note_stale_departures(data)
-        return data
+        self._last_monitor = data
+        self._schedule_timetable_refresh()
+        return self._with_timetable(data)
+
+    def _with_timetable(self, data: MonitorData) -> MonitorData:
+        """Merge the picked S-Bahn lines' planned departures into a slice."""
+        if self._timetable is None:
+            return data
+        planned = timetable_departures(
+            self._timetable.departures, self._timetable_pairs, dt_util.utcnow()
+        )
+        if not planned:
+            return data
+        merged = [*data.departures, *planned]
+        merged.sort(key=_departure_sort_key)
+        return replace(data, departures=merged)
+
+    def _schedule_timetable_refresh(self) -> None:
+        """Start a timetable refresh in the background when one is due.
+
+        Background, because `batch_apply` is synchronous and a slow routing
+        server must not hold up the live rows. The refresh pushes its own
+        update when it lands.
+        """
+        board = self._timetable
+        if board is None or not board.is_due(dt_util.utcnow()):
+            return
+        if self._timetable_task is not None and not self._timetable_task.done():
+            return
+        self._timetable_task = self._entry.async_create_background_task(
+            self.hass,
+            self._async_refresh_timetable(board),
+            name=f"{DOMAIN} timetable {self._diva}",
+        )
+
+    async def _async_refresh_timetable(self, board: TimetableBoard) -> None:
+        """Refetch the timetable and re-publish the last slice with it."""
+        if not await board.async_refresh() or self._last_monitor is None:
+            return
+        self._invalidate_attrs_cache()
+        self.async_set_updated_data(self._with_timetable(self._last_monitor))
 
     def _note_stale_departures(self, data: MonitorData) -> None:
         """Log an upstream freeze once per episode, not once per poll.
@@ -694,13 +763,59 @@ def _parse_monitor_body(
                     )
                 )
 
-    departures.sort(key=lambda d: (d.countdown, d.line, d.towards))
+    departures.sort(key=_departure_sort_key)
     return MonitorData(
         departures=departures,
         server_time=server_time,
         stale_dropped=stale_dropped,
         stale_since=stale_since.isoformat() if stale_since is not None else None,
     )
+
+
+def timetable_departures(
+    planned: tuple[PlannedDeparture, ...],
+    pairs: frozenset[tuple[str, str]],
+    now: datetime,
+) -> list[Departure]:
+    """Board rows for the picked S-Bahn lines that haven't left yet.
+
+    A train drops off the moment its planned time has passed: there is no
+    live time to say it's still at the platform. The countdown is whole
+    minutes rounded down, as `/monitor` counts, so a train due within the
+    minute reads 0.
+
+    `barrier_free` stays False because the timetable doesn't say. The
+    cards only render the positive case, so that shows nothing rather
+    than a false "not step-free".
+    """
+    rows: list[Departure] = []
+    for dep in planned:
+        if (dep.line, dep.direction) not in pairs:
+            continue
+        seconds = (dep.planned - now).total_seconds()
+        if seconds < 0:
+            continue
+        rows.append(
+            Departure(
+                line=dep.line,
+                towards=dep.towards,
+                direction=dep.direction,
+                type=LINE_TYPE_S_BAHN,
+                countdown=math.floor(seconds / 60),
+                time_planned=dep.planned.isoformat(),
+                time_real=None,
+                realtime=False,
+                barrier_free=False,
+                traffic_jam=False,
+                platform=dep.platform,
+                timetable=True,
+            )
+        )
+    return rows
+
+
+def _departure_sort_key(dep: Departure) -> tuple[int, str, str]:
+    return (dep.countdown, dep.line, dep.towards)
 
 
 def _parse_iso(value: Any) -> datetime | None:

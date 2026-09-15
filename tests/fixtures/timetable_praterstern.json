@@ -1,0 +1,1267 @@
+{
+ "parameters": [
+  {
+   "name": "serverID",
+   "value": "VOR-OGD02-PR"
+  },
+  {
+   "name": "requestID",
+   "value": "0"
+  },
+  {
+   "name": "sessionID",
+   "value": "0"
+  },
+  {
+   "name": "calcTime",
+   "value": "79.599"
+  },
+  {
+   "name": "serverTime",
+   "value": "2026-09-15T15:13:54"
+  },
+  {
+   "name": "logRequestId",
+   "value": "f1a4fe181285b4ca"
+  }
+ ],
+ "dm": {
+  "input": {
+   "input": "60201040"
+  },
+  "points": {
+   "point": {
+    "usage": "dm",
+    "type": "stop",
+    "name": "Wien, Praterstern",
+    "stateless": "60201040",
+    "ref": {
+     "id": "60201040",
+     "gid": "at:49:1040",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163921518.00,482189085.00"
+    }
+   }
+  }
+ },
+ "arr": {
+  "input": {
+   "input": ""
+  },
+  "points": null
+ },
+ "dateTime": {
+  "deparr": "dep",
+  "ttpFrom": "20251214",
+  "ttpTo": "20261212",
+  "year": "2026",
+  "month": "9",
+  "day": "15",
+  "hour": "15",
+  "minute": "13"
+ },
+ "dateRange": [
+  {
+   "day": "15",
+   "month": "09",
+   "year": "2026",
+   "weekday": "3"
+  },
+  {
+   "day": "16",
+   "month": "09",
+   "year": "2026",
+   "weekday": "4"
+  },
+  {
+   "day": "17",
+   "month": "09",
+   "year": "2026",
+   "weekday": "5"
+  },
+  {
+   "day": "18",
+   "month": "09",
+   "year": "2026",
+   "weekday": "6"
+  },
+  {
+   "day": "19",
+   "month": "09",
+   "year": "2026",
+   "weekday": "7"
+  },
+  {
+   "day": "20",
+   "month": "09",
+   "year": "2026",
+   "weekday": "1"
+  },
+  {
+   "day": "21",
+   "month": "09",
+   "year": "2026",
+   "weekday": "2"
+  },
+  {
+   "day": "22",
+   "month": "09",
+   "year": "2026",
+   "weekday": "3"
+  },
+  {
+   "day": "23",
+   "month": "09",
+   "year": "2026",
+   "weekday": "4"
+  },
+  {
+   "day": "24",
+   "month": "09",
+   "year": "2026",
+   "weekday": "5"
+  },
+  {
+   "day": "25",
+   "month": "09",
+   "year": "2026",
+   "weekday": "6"
+  },
+  {
+   "day": "26",
+   "month": "09",
+   "year": "2026",
+   "weekday": "7"
+  },
+  {
+   "day": "27",
+   "month": "09",
+   "year": "2026",
+   "weekday": "1"
+  },
+  {
+   "day": "28",
+   "month": "09",
+   "year": "2026",
+   "weekday": "2"
+  },
+  {
+   "day": "29",
+   "month": "09",
+   "year": "2026",
+   "weekday": "3"
+  }
+ ],
+ "option": {
+  "ptOption": {
+   "active": "-1",
+   "maxChanges": "9",
+   "maxTime": "360",
+   "maxWait": "120",
+   "routeType": "LEASTTIME",
+   "changeSpeed": "normal",
+   "lineRestriction": "400",
+   "useProxFootSearch": "0",
+   "useProxFootSearchOrigin": "0",
+   "useProxFootSearchDestination": "0",
+   "bike": "0",
+   "plane": "0",
+   "noCrowded": "0",
+   "noSolidStairs": "0",
+   "noEscalators": "0",
+   "noElevators": "0",
+   "lowPlatformVhcl": "0",
+   "wheelchair": "0",
+   "needElevatedPlt": "0",
+   "assistance": "0",
+   "SOSAvail": "0",
+   "noLonelyTransfer": "0",
+   "illumTransfer": "0",
+   "overgroundTransfer": "0",
+   "noInsecurePlaces": "0",
+   "privateTransport": "0",
+   "excludedMeans": [
+    {
+     "means": "Zug",
+     "value": "0",
+     "selected": "1"
+    },
+    {
+     "means": "S-Bahn",
+     "value": "1",
+     "selected": "0"
+    },
+    {
+     "means": "U-Bahn",
+     "value": "2",
+     "selected": "1"
+    },
+    {
+     "means": "Stadtbahn",
+     "value": "3",
+     "selected": "1"
+    },
+    {
+     "means": "Straßen-/Trambahn",
+     "value": "4",
+     "selected": "1"
+    },
+    {
+     "means": "Stadtbus",
+     "value": "5",
+     "selected": "1"
+    },
+    {
+     "means": "Regionalbus",
+     "value": "6",
+     "selected": "1"
+    },
+    {
+     "means": "Schnellbus",
+     "value": "7",
+     "selected": "1"
+    },
+    {
+     "means": "Seil-/Zahnradbahn",
+     "value": "8",
+     "selected": "1"
+    },
+    {
+     "means": "Schiff",
+     "value": "9",
+     "selected": "1"
+    },
+    {
+     "means": "AST (flächengebunde",
+     "value": "10",
+     "selected": "1"
+    },
+    {
+     "means": "Sonstige",
+     "value": "11",
+     "selected": "1"
+    },
+    {
+     "means": "Flugzeug",
+     "value": "12",
+     "selected": "0"
+    },
+    {
+     "means": "Zug (Nahverkehr)",
+     "value": "13",
+     "selected": "1"
+    },
+    {
+     "means": "Zug (Fernverkehr)",
+     "value": "14",
+     "selected": "1"
+    },
+    {
+     "means": "Zug Fernv m Zuschlag",
+     "value": "15",
+     "selected": "1"
+    },
+    {
+     "means": "Zug Fernv m spez Fpr",
+     "value": "16",
+     "selected": "1"
+    },
+    {
+     "means": "SEV Schienenersatzv",
+     "value": "17",
+     "selected": "0"
+    },
+    {
+     "means": "Zug Shuttle",
+     "value": "18",
+     "selected": "0"
+    },
+    {
+     "means": "Bürgerbus",
+     "value": "19",
+     "selected": "0"
+    },
+    {
+     "means": "Rufbus (liniengeb.)",
+     "value": "20",
+     "selected": "0"
+    },
+    {
+     "means": "Fernbus",
+     "value": "21",
+     "selected": "0"
+    }
+   ],
+   "activeImp": "-1",
+   "activeCom": "-1",
+   "activeSec": "-1"
+  }
+ },
+ "servingLines": {
+  "lines": [
+   {
+    "mode": {
+     "name": "S-Bahn S1",
+     "number": "S1",
+     "product": "S-Bahn",
+     "productId": "1",
+     "type": "1",
+     "code": "2",
+     "destination": "Marchegg Bahnhof",
+     "destID": "60204132",
+     "desc": "Lindau - Bregenz - Bludenz - Innsbruck - Kufstein - Salzburg - Wien",
+     "timetablePeriod": "Fahrplanprojekt 2025/26",
+     "diva": {
+      "branch": "01",
+      "line": "010S1",
+      "supplement": "W",
+      "dir": "R",
+      "project": "j26",
+      "network": "obb",
+      "stateless": "obb:010S1:W:R:j26",
+      "tripCode": "0",
+      "operator": "OEBB Personenverkehr AG Kundenservice",
+      "opCode": "01",
+      "vF": "20251214",
+      "vTo": "20261212",
+      "lineDisplay": "line",
+      "attrs": [
+       {
+        "name": "OperatorURL",
+        "value": "https://www.oebb.at"
+       }
+      ]
+     }
+    },
+    "index": "1:0"
+   },
+   {
+    "mode": {
+     "name": "S-Bahn S2",
+     "number": "S2",
+     "product": "S-Bahn",
+     "productId": "1",
+     "type": "1",
+     "code": "2",
+     "destination": "Mistelbach Bahnhof",
+     "destID": "60204202",
+     "desc": "Lindau - Bregenz - Bludenz - Innsbruck - Kufstein - Salzburg - Wien",
+     "timetablePeriod": "Fahrplanprojekt 2025/26",
+     "diva": {
+      "branch": "01",
+      "line": "010S2",
+      "supplement": "W",
+      "dir": "R",
+      "project": "j26",
+      "network": "obb",
+      "stateless": "obb:010S2:W:R:j26",
+      "tripCode": "0",
+      "operator": "OEBB Personenverkehr AG Kundenservice",
+      "opCode": "01",
+      "vF": "20251214",
+      "vTo": "20261212",
+      "lineDisplay": "line",
+      "attrs": [
+       {
+        "name": "OperatorURL",
+        "value": "https://www.oebb.at"
+       }
+      ]
+     }
+    },
+    "index": "1:1"
+   },
+   {
+    "mode": {
+     "name": "S-Bahn S3",
+     "number": "S3",
+     "product": "S-Bahn",
+     "productId": "1",
+     "type": "1",
+     "code": "2",
+     "destination": "Hollabrunn Bahnhof",
+     "destID": "60203780",
+     "desc": "Lindau - Bregenz - Bludenz - Innsbruck - Kufstein - Salzburg - Wien",
+     "timetablePeriod": "Fahrplanprojekt 2025/26",
+     "diva": {
+      "branch": "01",
+      "line": "010S3",
+      "supplement": "W",
+      "dir": "R",
+      "project": "j26",
+      "network": "obb",
+      "stateless": "obb:010S3:W:R:j26",
+      "tripCode": "0",
+      "operator": "OEBB Personenverkehr AG Kundenservice",
+      "opCode": "01",
+      "vF": "20251214",
+      "vTo": "20261212",
+      "lineDisplay": "line",
+      "attrs": [
+       {
+        "name": "OperatorURL",
+        "value": "https://www.oebb.at"
+       }
+      ]
+     }
+    },
+    "index": "1:2"
+   },
+   {
+    "mode": {
+     "name": "S-Bahn S4",
+     "number": "S4",
+     "product": "S-Bahn",
+     "productId": "1",
+     "type": "1",
+     "code": "2",
+     "destination": "Absdorf-Hippersdorf Bahnhof",
+     "destID": "60203004",
+     "desc": "Lindau - Bregenz - Bludenz - Innsbruck - Kufstein - Salzburg - Wien",
+     "timetablePeriod": "Fahrplanprojekt 2025/26",
+     "diva": {
+      "branch": "01",
+      "line": "010S4",
+      "supplement": "W",
+      "dir": "R",
+      "project": "j26",
+      "network": "obb",
+      "stateless": "obb:010S4:W:R:j26",
+      "tripCode": "0",
+      "operator": "OEBB Personenverkehr AG Kundenservice",
+      "opCode": "01",
+      "vF": "20251214",
+      "vTo": "20261212",
+      "lineDisplay": "line",
+      "attrs": [
+       {
+        "name": "OperatorURL",
+        "value": "https://www.oebb.at"
+       }
+      ]
+     }
+    },
+    "index": "1:3"
+   },
+   {
+    "mode": {
+     "name": "S-Bahn S7",
+     "number": "S7",
+     "product": "S-Bahn",
+     "productId": "1",
+     "type": "1",
+     "code": "2",
+     "destination": "Absdorf-Hippersdorf Bahnhof",
+     "destID": "60204884",
+     "desc": "Lindau - Bregenz - Bludenz - Innsbruck - Kufstein - Salzburg - Wien",
+     "timetablePeriod": "Fahrplanprojekt 2025/26",
+     "diva": {
+      "branch": "01",
+      "line": "010S7",
+      "supplement": "W",
+      "dir": "R",
+      "project": "j26",
+      "network": "obb",
+      "stateless": "obb:010S7:W:R:j26",
+      "tripCode": "0",
+      "operator": "OEBB Personenverkehr AG Kundenservice",
+      "opCode": "01",
+      "vF": "20251214",
+      "vTo": "20261212",
+      "lineDisplay": "line",
+      "attrs": [
+       {
+        "name": "OperatorURL",
+        "value": "https://www.oebb.at"
+       }
+      ]
+     }
+    },
+    "index": "1:4"
+   },
+   {
+    "mode": {
+     "name": "S-Bahn S80",
+     "number": "S80",
+     "product": "S-Bahn",
+     "productId": "1",
+     "type": "1",
+     "code": "2",
+     "destination": "Wien Floridsdorf",
+     "destID": "60200334",
+     "desc": "Lindau - Bregenz - Bludenz - Innsbruck - Kufstein - Salzburg - Wien",
+     "timetablePeriod": "Fahrplanprojekt 2025/26",
+     "diva": {
+      "branch": "01",
+      "line": "01S80",
+      "supplement": "W",
+      "dir": "R",
+      "project": "j26",
+      "network": "obb",
+      "stateless": "obb:01S80:W:R:j26",
+      "tripCode": "0",
+      "operator": "OEBB Personenverkehr AG Kundenservice",
+      "opCode": "01",
+      "vF": "20251214",
+      "vTo": "20261212",
+      "lineDisplay": "line",
+      "attrs": [
+       {
+        "name": "OperatorURL",
+        "value": "https://www.oebb.at"
+       }
+      ]
+     }
+    },
+    "index": "1:5"
+   }
+  ]
+ },
+ "departureList": [
+  {
+   "stopID": "60201040",
+   "x": "1824799",
+   "y": "5856660",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G4",
+   "platformName": "4",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "1",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "14"
+   },
+   "servingLine": {
+    "key": "131",
+    "code": "2",
+    "number": "S2",
+    "symbol": "S2",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Wolkersdorf Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23494",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S2: nur 2.Kl."
+     },
+     {
+      "content": "Linie S2: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S2",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S2:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824799",
+   "y": "5856660",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G4",
+   "platformName": "4",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "7",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "20"
+   },
+   "servingLine": {
+    "key": "43",
+    "code": "2",
+    "number": "S1",
+    "symbol": "S1",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Gänserndorf Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23850",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S1: nur 2.Kl."
+     },
+     {
+      "content": "Linie S1: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S1",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S1:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824774",
+   "y": "5856661",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G3",
+   "platformName": "3",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "13",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "26"
+   },
+   "servingLine": {
+    "key": "132",
+    "code": "2",
+    "number": "S2",
+    "symbol": "S2",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Mistelbach Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23496",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S2: nur 2.Kl."
+     },
+     {
+      "content": "Linie S2: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S2",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S2:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824774",
+   "y": "5856661",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G3",
+   "platformName": "3",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "25",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "38"
+   },
+   "servingLine": {
+    "key": "61",
+    "code": "2",
+    "number": "S3",
+    "symbol": "S3",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Hollabrunn Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23268",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S3: nur 2.Kl."
+     },
+     {
+      "content": "Linie S3: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S3",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S3:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824774",
+   "y": "5856661",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G3",
+   "platformName": "3",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "37",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "50"
+   },
+   "servingLine": {
+    "key": "46",
+    "code": "2",
+    "number": "S1",
+    "symbol": "S1",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Marchegg Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23858",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S1: nur 2.Kl."
+     },
+     {
+      "content": "Linie S1: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S1",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S1:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824799",
+   "y": "5856660",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G4",
+   "platformName": "4",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "43",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "56"
+   },
+   "servingLine": {
+    "key": "133",
+    "code": "2",
+    "number": "S2",
+    "symbol": "S2",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Wolkersdorf Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23504",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S2: nur 2.Kl."
+     },
+     {
+      "content": "Linie S2: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S2",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S2:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824799",
+   "y": "5856660",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G4",
+   "platformName": "4",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "55",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "16",
+    "minute": "8"
+   },
+   "servingLine": {
+    "key": "15",
+    "code": "2",
+    "number": "S4",
+    "symbol": "S4",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Absdorf-Hippersdorf Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23052",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S4: nur 2.Kl."
+     },
+     {
+      "content": "Linie S4: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S4",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S4:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   },
+   "hiddenLines": {
+    "origin": {
+     "stopKey": {
+      "key": "60203709",
+      "area": "",
+      "point": "",
+      "gid": "at:43:3709",
+      "gidArea": "",
+      "pointGid": ""
+     }
+    },
+    "destination": {
+     "stopKey": {
+      "key": "60203004",
+      "area": "",
+      "point": "",
+      "gid": "at:43:3004",
+      "gidArea": "",
+      "pointGid": ""
+     }
+    },
+    "line": {
+     "mode": {
+      "name": "S-Bahn S40",
+      "number": "S40",
+      "symbol": "S40",
+      "product": "S-Bahn",
+      "productId": "1",
+      "type": "2",
+      "code": "1",
+      "destination": "Absdorf-Hippersdorf Bahnhof",
+      "destID": "60203004",
+      "desc": "Wien - Salzburg - Kufstein - Innsbruck - Bludenz - Bregenz - Lindau",
+      "timetablePeriod": "Fahrplanprojekt 2025/26",
+      "realtime": "0",
+      "diva": {
+       "branch": "01",
+       "line": "01S40",
+       "supplement": "W",
+       "dir": "H",
+       "project": "j26",
+       "network": "obb",
+       "stateless": "obb:01S40:W:H:j26",
+       "tripCode": "261",
+       "operator": "OEBB Personenverkehr AG Kundenservice",
+       "opCode": "01",
+       "vF": "20251214",
+       "vTo": "20261212",
+       "lineDisplay": "line",
+       "attrs": [
+        {
+         "name": "OperatorURL",
+         "value": "https://www.oebb.at"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824799",
+   "y": "5856660",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G4",
+   "platformName": "4",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "61",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "16",
+    "minute": "14"
+   },
+   "servingLine": {
+    "key": "135",
+    "code": "2",
+    "number": "S2",
+    "symbol": "S2",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Wolkersdorf Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23506",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S2: nur 2.Kl."
+     },
+     {
+      "content": "Linie S2: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S2",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S2:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824799",
+   "y": "5856660",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G4",
+   "platformName": "4",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "67",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "16",
+    "minute": "20"
+   },
+   "servingLine": {
+    "key": "47",
+    "code": "2",
+    "number": "S1",
+    "symbol": "S1",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Gänserndorf Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23866",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S1: nur 2.Kl."
+     },
+     {
+      "content": "Linie S1: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S1",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S1:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824774",
+   "y": "5856661",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G3",
+   "platformName": "3",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "73",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "16",
+    "minute": "26"
+   },
+   "servingLine": {
+    "key": "137",
+    "code": "2",
+    "number": "S2",
+    "symbol": "S2",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Mistelbach Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23508",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S2: nur 2.Kl."
+     },
+     {
+      "content": "Linie S2: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S2",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S2:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824774",
+   "y": "5856661",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G3",
+   "platformName": "3",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "85",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "16",
+    "minute": "38"
+   },
+   "servingLine": {
+    "key": "64",
+    "code": "2",
+    "number": "S3",
+    "symbol": "S3",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Hollabrunn Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23280",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S3: nur 2.Kl."
+     },
+     {
+      "content": "Linie S3: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S3",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S3:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  },
+  {
+   "stopID": "60201040",
+   "x": "1824774",
+   "y": "5856661",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G3",
+   "platformName": "3",
+   "stopName": "Wien Praterstern",
+   "nameWO": "Praterstern",
+   "pointType": "Gleis",
+   "countdown": "97",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "16",
+    "minute": "50"
+   },
+   "servingLine": {
+    "key": "50",
+    "code": "2",
+    "number": "S1",
+    "symbol": "S1",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Marchegg Bahnhof",
+    "directionFrom": "Wien Praterstern",
+    "trainNum": "23874",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S1: nur 2.Kl."
+     },
+     {
+      "content": "Linie S1: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S1",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S1:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   }
+  }
+ ]
+}

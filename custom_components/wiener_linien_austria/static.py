@@ -1522,6 +1522,11 @@ def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
 _S_BAHN_LABEL = re.compile(r"^S\d+$", re.IGNORECASE)
 
 
+def is_s_bahn_label(label: str) -> bool:
+    """Whether a line label is an S-Bahn line ("S" + number)."""
+    return _S_BAHN_LABEL.match(label) is not None
+
+
 def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str, str]]:
     """Return the GTFS palette for `labels`, as `{label: {bg, fg}}`.
 
