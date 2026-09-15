@@ -54,6 +54,7 @@ import {
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
 import { mdiPathForIcon } from "./utils/mdi-paths.js";
+import { arrowStep, revealOffset, tabEdges, type TabEdges } from "./utils/tab-scroll.js";
 import { formatTime } from "./utils/time.js";
 import { deriveRowState } from "./utils/row-state.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
@@ -101,6 +102,11 @@ import "./editor.js";
 
 // Unknown vehicle types fall back to the bus prefix — most Wien stops
 // are bus stops.
+/** Space kept between a revealed tab and the strip's edge: the width of
+ *  the edge fade the scroll arrow sits in. Matches `--wl-tab-fade` in
+ *  card-styles.ts. */
+const TAB_FADE_INSET_PX = 56;
+
 function platformLabelKey(type: string | undefined): string {
   if (type === LINE_TYPE_METRO || type === LINE_TYPE_S_BAHN) {
     return "platform_short_rail";
@@ -136,6 +142,11 @@ export class WienerLinienAustriaCard extends LitElement {
 
   @state() private _config?: NormalisedModernConfig;
   @state() private _activeTab = 0;
+  // Which ends of the tab strip hide more tabs; drives the edge fades and
+  // the scroll arrows. Both false while the tabs fit.
+  @state() private _tabEdges: TabEdges = { start: false, end: false };
+  private _tabResize: ResizeObserver | null = null;
+  private _observedTabs: HTMLElement | null = null;
   @state() private _versionMismatch: string | null = null;
   @state() private _expandedTraffic = new Set<string>();
   @state() private _expandedElevator = new Set<string>();
@@ -295,7 +306,15 @@ export class WienerLinienAustriaCard extends LitElement {
   private _resolvedStopsMemo: NormalisedModernStop[] | null = null;
   private _nightlineHourMemo: boolean | null = null;
 
+  public override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._tabResize?.disconnect();
+    this._tabResize = null;
+    this._observedTabs = null;
+  }
+
   protected override updated(changed: PropertyValues): void {
+    this._syncTabStrip(changed);
     // Re-render the QR canvas only on changes that could flip the
     // target URL: panel-open transition, hass change (late-arriving
     // catalogue coords swap the OSM fallback for a `geo:lat,lon`
@@ -590,9 +609,36 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private _renderTabs(stops: NormalisedModernStop[], activeIndex: number): TemplateResult {
+    const edges = this._tabEdges;
+    // The arrows are a pointer shortcut. Keyboard users already move
+    // through the tablist with the arrow keys, Home and End, and selecting
+    // a tab scrolls it into view, so the buttons stay out of the tab order
+    // and away from screen readers rather than adding two stops that
+    // repeat what the tabs do.
+    const arrow = (side: "start" | "end"): TemplateResult => html`<button
+      type="button"
+      class=${classMap({
+        "tab-scroll": true,
+        [`tab-scroll--${side}`]: true,
+        visible: edges[side],
+      })}
+      tabindex="-1"
+      aria-hidden="true"
+      @click=${() => this._scrollTabs(side)}
+    >
+      <ha-icon icon=${side === "start" ? "mdi:chevron-left" : "mdi:chevron-right"}></ha-icon>
+    </button>`;
     return html`
       <div class="tabbar">
-        <div class="tabs" role="tablist">
+        <div
+          class=${classMap({
+            "tabs-viewport": true,
+            "fade-start": edges.start,
+            "fade-end": edges.end,
+          })}
+        >
+        ${arrow("start")}
+        <div class="tabs" role="tablist" @scroll=${this._measureTabs}>
         ${stops.map((s, i) => {
           const attrs = this._attrs(s.entity);
           const label = attrs.stop_name || attrs.friendly_name || s.entity;
@@ -606,11 +652,14 @@ export class WienerLinienAustriaCard extends LitElement {
             class=${classMap(classes)}
             aria-selected=${selected ? "true" : "false"}
             tabindex=${selected ? "0" : "-1"}
+            title=${label}
             @click=${() => this._setActiveTab(i)}
             @keydown=${(ev: KeyboardEvent) =>
               this._onTabKeydown(ev, i, stops.length)}
           >${label}</button>`;
         })}
+        </div>
+        ${arrow("end")}
         </div>
         ${this._renderTabActions(stops, activeIndex)}
       </div>
@@ -679,6 +728,76 @@ export class WienerLinienAustriaCard extends LitElement {
       this._qrOpenFor = nextEntity;
     }
     this._activeTab = clamped;
+  }
+
+  /** Keep the tab strip's edge state current and the active tab in view.
+   *
+   *  Runs after every render. The strip element can come and go (a
+   *  config switching layouts, the stop list dropping below two), so the
+   *  observer follows whichever `.tabs` is in the DOM now. Measuring on
+   *  each render as well catches a stop name changing length, which
+   *  changes the content width without resizing the strip itself. */
+  private _syncTabStrip(changed: PropertyValues): void {
+    const tabs = this.renderRoot.querySelector<HTMLElement>(".tabs");
+    const appeared = tabs !== this._observedTabs;
+    if (appeared) {
+      this._tabResize?.disconnect();
+      this._observedTabs = tabs;
+      if (tabs && typeof ResizeObserver !== "undefined") {
+        this._tabResize ??= new ResizeObserver(() => this._measureTabs());
+        this._tabResize.observe(tabs);
+      }
+    }
+    if (!tabs) return;
+    this._measureTabs();
+    if (appeared || changed.has("_activeTab")) {
+      this._revealActiveTab(tabs, !appeared);
+    }
+  }
+
+  private _measureTabs = (): void => {
+    const tabs = this._observedTabs;
+    if (!tabs) return;
+    const next = tabEdges(tabs.scrollLeft, tabs.clientWidth, tabs.scrollWidth);
+    if (next.start !== this._tabEdges.start || next.end !== this._tabEdges.end) {
+      this._tabEdges = next;
+    }
+  };
+
+  /** Scroll the strip just far enough to show the active tab clear of
+   *  the edge fade. Sets `scrollLeft` directly rather than calling
+   *  `scrollIntoView`, which would also scroll the dashboard to bring
+   *  the card on screen: on first render the card may well be below
+   *  the fold, and the page must not jump to it. */
+  private _revealActiveTab(tabs: HTMLElement, smooth: boolean): void {
+    if (getComputedStyle(tabs).direction === "rtl") return;
+    const tab = tabs.querySelectorAll<HTMLElement>('[role="tab"]')[this._activeTab];
+    if (!tab) return;
+    const target = revealOffset(
+      tab.offsetLeft,
+      tab.offsetWidth,
+      tabs.scrollLeft,
+      tabs.clientWidth,
+      tabs.scrollWidth,
+      TAB_FADE_INSET_PX,
+    );
+    if (target === null) return;
+    tabs.scrollTo({ left: target, behavior: smooth ? this._scrollBehavior() : "auto" });
+  }
+
+  private _scrollTabs(side: "start" | "end"): void {
+    const tabs = this._observedTabs;
+    if (!tabs) return;
+    const rtl = getComputedStyle(tabs).direction === "rtl";
+    const toStart = side === "start" !== rtl;
+    const step = arrowStep(tabs.clientWidth);
+    tabs.scrollBy({ left: toStart ? -step : step, behavior: this._scrollBehavior() });
+  }
+
+  private _scrollBehavior(): ScrollBehavior {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+      ? "auto"
+      : "smooth";
   }
 
   private _onTabKeydown(ev: KeyboardEvent, index: number, count: number): void {

@@ -170,12 +170,103 @@ export const cardStyles = css`
     padding: 0 14px;
     border-bottom: 1px solid var(--divider-color, rgba(255, 255, 255, 0.12));
   }
+  /* Holds the scroller and the two arrows laid over its ends. The arrows
+     are absolutely positioned, so one appearing never changes the width
+     the tabs get and nothing re-flows while scrolling. */
+  .tabs-viewport {
+    /* The arrow's own width is fully clear, so its chevron never sits on
+       top of letters; the fade runs from there to --wl-tab-fade. */
+    --wl-tab-clear: 26px;
+    --wl-tab-fade: 56px;
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
   .tabs {
+    position: relative;
     display: flex;
     flex: 1;
     min-width: 0;
     overflow-x: auto;
     scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    /* The fade is the "more this way" signal; it only exists on a side
+       that hides tabs. A 0px stop is a hard edge, i.e. no fade. */
+    --wl-clear-start: 0px;
+    --wl-clear-end: 0px;
+    --wl-fade-start: 0px;
+    --wl-fade-end: 0px;
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      transparent var(--wl-clear-start),
+      #000 var(--wl-fade-start),
+      #000 calc(100% - var(--wl-fade-end)),
+      transparent calc(100% - var(--wl-clear-end)),
+      transparent 100%
+    );
+  }
+  .fade-start .tabs {
+    --wl-clear-start: var(--wl-tab-clear);
+    --wl-fade-start: var(--wl-tab-fade);
+  }
+  .fade-end .tabs {
+    --wl-clear-end: var(--wl-tab-clear);
+    --wl-fade-end: var(--wl-tab-fade);
+  }
+  .tabs:dir(rtl) {
+    mask-image: linear-gradient(
+      to left,
+      transparent 0,
+      transparent var(--wl-clear-start),
+      #000 var(--wl-fade-start),
+      #000 calc(100% - var(--wl-fade-end)),
+      transparent calc(100% - var(--wl-clear-end)),
+      transparent 100%
+    );
+  }
+  .tab-scroll {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity var(--ha-animation-duration-fast, 150ms) ease, background-color var(--ha-animation-duration-fast, 150ms) ease, color var(--ha-animation-duration-fast, 150ms) ease;
+  }
+  .tab-scroll--start {
+    inset-inline-start: -6px;
+  }
+  .tab-scroll--end {
+    inset-inline-end: -6px;
+  }
+  .tab-scroll.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .tab-scroll:hover {
+    background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+    color: var(--primary-text-color);
+  }
+  .tab-scroll ha-icon {
+    --mdc-icon-size: 20px;
+    display: flex;
+  }
+  .tab-scroll--start ha-icon:dir(rtl),
+  .tab-scroll--end ha-icon:dir(rtl) {
+    transform: scaleX(-1);
   }
   .tabs::-webkit-scrollbar {
     display: none;
@@ -1821,6 +1912,9 @@ export const cardStyles = css`
     border-radius: 50%;
   }
   @media (forced-colors: active) {
+    .tab-scroll {
+      color: ButtonText;
+    }
     .icon-tile,
     .line-badge,
     .alert,

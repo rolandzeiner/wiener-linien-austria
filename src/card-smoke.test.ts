@@ -265,6 +265,35 @@ function timetableHass(): HomeAssistant {
   return hass;
 }
 
+describe("tab strip", () => {
+  it("renders inert scroll arrows while the tabs fit", async () => {
+    const hass = busyHass();
+    hass.states["sensor.second"] = {
+      ...hass.states[ENTITY]!,
+      entity_id: "sensor.second",
+      attributes: { ...hass.states[ENTITY]!.attributes, stop_name: "Taubstummengasse" },
+    };
+    const el = await mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      layout: "tabs",
+      entities: [{ entity: ENTITY }, { entity: "sensor.second" }],
+    });
+    const root = shadow(el);
+    const arrows = [...root.querySelectorAll<HTMLButtonElement>(".tab-scroll")];
+    expect(arrows).toHaveLength(2);
+    for (const arrow of arrows) {
+      // A pointer shortcut only: keyboard users move through the tablist.
+      expect(arrow.getAttribute("tabindex")).toBe("-1");
+      expect(arrow.getAttribute("aria-hidden")).toBe("true");
+      // happy-dom has no layout, so the strip reports no overflow.
+      expect(arrow.classList.contains("visible")).toBe(false);
+    }
+    expect(root.querySelector(".tabs-viewport")!.className).not.toContain("fade");
+    const tabs = root.querySelectorAll<HTMLElement>('[role="tab"]');
+    expect(tabs[1]!.getAttribute("title")).toBe("Taubstummengasse");
+  });
+});
+
 describe("planned S-Bahn rows", () => {
   it("the modern card labels the timetable row and only that row", async () => {
     const el = await mount(MODERN, timetableHass(), CARDS[0]![1]);
