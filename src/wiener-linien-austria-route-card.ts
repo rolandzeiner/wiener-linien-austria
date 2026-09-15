@@ -44,6 +44,7 @@ import type {
   RouteAttrs,
   RouteAccessStepAttr,
   RouteLegAttr,
+  RouteStopAttr,
   RouteTransferAttr,
   RouteTripAttr,
   WienerLinienRouteCardConfig,
@@ -63,6 +64,7 @@ import {
   adhocRetryDelay,
   type AdhocTimeMode,
   clockOf,
+  delayedClock,
   findRouteEntities,
   isInputDateTime,
   legTypeIcon,
@@ -1061,9 +1063,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           ? html`
               <li class="stop stop--end">
                 <span class="node node--end" aria-hidden="true"></span>
-                <time datetime=${last.destination.estimated ?? last.destination.planned ?? ""}
-                  >${clockOf(last.destination.estimated ?? last.destination.planned)}</time
-                >
+                ${this._renderStopTime(last.destination)}
                 <span class="stop-name">${last.destination.name}</span>
                 ${this._renderAccess(walkAccess(trip, "end"), attrs)}
               </li>
@@ -1081,7 +1081,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     beforeTransfer: boolean,
     accessBefore?: RouteAccessStepAttr[],
   ): TemplateResult {
-    const departs = leg.origin.estimated ?? leg.origin.planned;
     const icon = legTypeIcon(leg.type, leg.line);
     const stops =
       leg.stop_count === 1
@@ -1099,7 +1098,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       >
         <div class="stop">
           <span class=${first ? "node node--start" : "node"} aria-hidden="true"></span>
-          <time datetime=${departs ?? ""}>${clockOf(departs)}</time>
+          ${this._renderStopTime(leg.origin)}
           ${this._renderLiveMark(leg)}
           <span class="stop-name">${leg.origin.name}</span>
           ${platform ? html`<span class="platform">${platform}</span>` : nothing}
@@ -1166,17 +1165,27 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._openRides = next;
   }
 
-  /** Live state belongs to the time it qualifies: "09:19 +2" for a late
-   *  ride, a small live icon for one running on time. Screen readers hear
-   *  "2 min später" or "Echtzeit". The delay is a tinted chip with body-text
-   *  colour, so the number, not the hue, carries it. */
+  /** A stop's time. Running late, it reads the way DB Navigator and Google
+   *  Maps show it: the planned time struck through, then the expected time
+   *  in red. The strike and the second time carry the delay, not the colour
+   *  alone, and screen readers hear "geplant 09:22, 3 min später". */
+  private _renderStopTime(stop: RouteStopAttr): TemplateResult {
+    const shown = stop.estimated ?? stop.planned;
+    const delayed = delayedClock(stop);
+    if (!delayed) return html`<time datetime=${shown ?? ""}>${clockOf(shown)}</time>`;
+    return html`<span class="time-change">
+      <s class="time-planned" aria-hidden="true">${delayed.planned}</s>
+      <time class="time-late" datetime=${stop.estimated ?? ""}>${delayed.expected}</time>
+      <span class="sr-only"
+        >${this._t("planned_late", { time: delayed.planned, n: stop.delay_minutes ?? 0 })}</span
+      >
+    </span>`;
+  }
+
+  /** A small live icon after the time of a ride running on time. A late one
+   *  already says so through its struck-through time. */
   private _renderLiveMark(leg: RouteLegAttr): TemplateResult | typeof nothing {
-    const late = leg.origin.delay_minutes ?? 0;
-    if (late > 0) {
-      return html`<span class="delay" aria-hidden="true">+${late}</span
-        ><span class="sr-only">${this._t("late", { n: late })}</span>`;
-    }
-    if (!leg.realtime) return nothing;
+    if (!leg.realtime || delayedClock(leg.origin)) return nothing;
     return html`<ha-icon class="live-mark" icon="mdi:access-point" aria-hidden="true"></ha-icon
       ><span class="sr-only">${this._t("live")}</span>`;
   }
@@ -1527,10 +1536,22 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       margin-inline-start: auto;
     }
     /* A delay is a plain number beside the time it moves. */
-    .delay {
-      font-weight: 700;
+    .time-change {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .time-planned {
+      font-weight: 400;
+      color: var(--secondary-text-color);
+      text-decoration-thickness: 1.5px;
       font-variant-numeric: tabular-nums;
-      color: var(--primary-text-color);
+    }
+    /* The error red mixed a quarter toward the body text: lighter on a dark
+       card, darker on a light one, so the time keeps its contrast in both
+       themes where the raw token would fall short of 4.5:1. */
+    .stop .time-late {
+      color: color-mix(in srgb, var(--wl-error) 75%, var(--primary-text-color));
     }
     .live-mark {
       --mdc-icon-size: 16px;

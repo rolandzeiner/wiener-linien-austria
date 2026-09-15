@@ -24,6 +24,7 @@ import {
   viennaInputValue,
   ADHOC_PLANNED_REFRESH_MS,
   rideFrequency,
+  delayedClock,
   isInputDateTime,
   windowDays,
   windowRange,
@@ -329,5 +330,28 @@ describe("rideFrequency", () => {
     expect(rideFrequency(leg(7, next))).toEqual({ then: ["08:07", "08:14"] });
     expect(rideFrequency(leg(12))).toEqual({ every: 12 });
     expect(rideFrequency(leg(null))).toBeNull();
+  });
+});
+
+describe("delayedClock", () => {
+  const at = (time: string) => `2026-09-14T${time}+02:00`;
+
+  it("pairs the planned time with the expected one, rounded to the minute", () => {
+    expect(delayedClock({ planned: at("09:22:00"), estimated: at("09:25:10") })).toEqual({
+      planned: "09:22",
+      expected: "09:25",
+    });
+    expect(delayedClock({ planned: at("09:22:00"), estimated: at("09:24:40") })).toEqual({
+      planned: "09:22",
+      expected: "09:25",
+    });
+  });
+
+  it("stays quiet for on-time, early, sub-minute or missing times", () => {
+    expect(delayedClock({ planned: at("09:22:00"), estimated: at("09:22:00") })).toBeNull();
+    expect(delayedClock({ planned: at("09:22:00"), estimated: at("09:22:20") })).toBeNull();
+    expect(delayedClock({ planned: at("09:22:00"), estimated: at("09:21:00") })).toBeNull();
+    expect(delayedClock({ planned: at("09:22:00"), estimated: null })).toBeNull();
+    expect(delayedClock({ planned: null, estimated: at("09:25:00") })).toBeNull();
   });
 });

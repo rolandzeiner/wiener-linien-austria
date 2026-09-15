@@ -35,6 +35,13 @@ function stop(name: string, time: string, platform: string | null = "1") {
   return { name, stop_id: null, platform, planned: iso, estimated: iso, delay_minutes: 0 };
 }
 
+/** "07:57" plus `minutes`, as "07:59". */
+function later(time: string, minutes: number): string {
+  const [h, m] = time.split(":").map(Number);
+  const total = h! * 60 + m! + minutes;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 function trip(dep: string, arr: string, risk: RouteTripAttr["risk"] = "tight"): RouteTripAttr {
   return {
     departure: `2026-09-14T${dep}:00+02:00`,
@@ -46,7 +53,12 @@ function trip(dep: string, arr: string, risk: RouteTripAttr["risk"] = "tight"): 
     legs: [
       {
         walk: false, line: "U3", type: "ptMetro", product: "U-Bahn", towards: "Simmering",
-        origin: { ...stop("Westbahnhof", dep), stop_id: "60201468", delay_minutes: 2 },
+        origin: {
+          ...stop("Westbahnhof", dep),
+          stop_id: "60201468",
+          estimated: stop("Westbahnhof", later(dep, 2)).planned,
+          delay_minutes: 2,
+        },
         destination: stop("Stephansplatz", "08:04"),
         direction: "H",
         stops: [
@@ -176,7 +188,7 @@ describe("live state and frequency", () => {
     const onTime = {
       ...base,
       legs: [
-        { ...base.legs[0]!, origin: { ...base.legs[0]!.origin, delay_minutes: 0 }, headway_minutes: 3,
+        { ...base.legs[0]!, origin: { ...base.legs[0]!.origin, estimated: base.legs[0]!.origin.planned, delay_minutes: 0 }, headway_minutes: 3,
           next_departures: ["2026-09-14T08:00:00+02:00"] },
         base.legs[1]!,
       ],
@@ -309,11 +321,14 @@ describe("rendering", () => {
     expect(t).toContain("Gleis 1");
     expect(t).toContain("Richtung Simmering");
     expect(t).toContain("5 Stationen");
-    // Live state sits at the time: a late ride shows "+2" there, and a
-    // screen reader hears the words.
-    const delay = root(el).querySelector(".strand .stop .delay");
-    expect(delay?.textContent).toBe("+2");
-    expect(delay?.nextElementSibling?.textContent).toBe("2 min später");
+    // A late ride strikes the planned time through and shows the expected
+    // one beside it; a screen reader hears both in words.
+    const change = root(el).querySelector(".strand .stop .time-change")!;
+    expect(change.querySelector("s.time-planned")?.textContent).toBe("07:57");
+    expect(change.querySelector("time.time-late")?.textContent).toBe("07:59");
+    expect(change.querySelector(".sr-only")?.textContent).toBe("geplant 07:57, 2 min später");
+    // The strike already says it's live, so no live icon on top.
+    expect(root(el).querySelector(".strand .leg .live-mark")).toBeNull();
     // Every 10 min is not frequent, so the next departures are shown instead.
     expect(t).toContain("danach 08:18, 08:28");
     expect(t).not.toContain("alle 10 min");

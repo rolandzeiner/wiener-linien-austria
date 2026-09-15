@@ -12,6 +12,7 @@ import type {
   RouteAttrs,
   RouteLegAttr,
   RouteRisk,
+  RouteStopAttr,
   RouteTripAttr,
   WienerLinienRouteCardConfig,
 } from "../types.js";
@@ -147,6 +148,24 @@ export function upcomingTrips(
     const ts = trip.departure ? Date.parse(trip.departure) : Number.NaN;
     return !Number.isFinite(ts) || ts >= nowMs - 30_000;
   });
+}
+
+/** The planned and the expected clock time of a stop that runs late, or null
+ *  when it doesn't (or the two print as the same minute). The expected time
+ *  rounds to the nearest minute: a live estimate carries seconds, and a
+ *  vehicle 40 s late shouldn't show "09:22 → 09:22". */
+export function delayedClock(
+  stop: Pick<RouteStopAttr, "planned" | "estimated">,
+): { planned: string; expected: string } | null {
+  if (!stop.planned || !stop.estimated) return null;
+  const planned = Date.parse(stop.planned);
+  const estimated = Date.parse(stop.estimated);
+  if (!Number.isFinite(planned) || !Number.isFinite(estimated) || estimated <= planned) {
+    return null;
+  }
+  const expected = viennaClock(new Date(Math.round(estimated / 60_000) * 60_000).toISOString());
+  const plannedClock = clockOf(stop.planned);
+  return expected && expected !== plannedClock ? { planned: plannedClock, expected } : null;
 }
 
 /** Up to this headway a line counts as frequent: "alle 3 min" says all
