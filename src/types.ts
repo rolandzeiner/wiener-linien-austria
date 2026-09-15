@@ -756,6 +756,9 @@ export interface RouteAttrs {
   elevator_info?: Array<{ station?: string; description?: string; stop_ids?: string[] }>;
   /** Planned step-free. */
   step_free?: boolean;
+  /** Route entities, late evening: the night's last connection without a
+   *  bus, or null. */
+  last_connection?: RouteTripAttr | null;
   attribution?: string;
   /** Ad-hoc only: an older plan served because the request budget is spent. */
   stale?: boolean;

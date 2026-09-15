@@ -170,6 +170,26 @@ describe("registration + config", () => {
   });
 });
 
+describe("last connection", () => {
+  it("shows the night's last connection until it leaves", async () => {
+    const attrs = {
+      ...ACTIVE,
+      trips: [...ACTIVE.trips, trip("08:10", "08:25")],
+      last_connection: trip("08:03", "08:19"),
+    };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", attrs), { entity: ENTITY });
+    const line = root(el).querySelector(".last-connection");
+    expect(line?.textContent?.replace(/\s+/g, " ")).toContain(
+      "Letzte Verbindung ohne Nachtbus 08:03 U3N31",
+    );
+    // 08:03 has left; the later connections keep the trip list on screen.
+    vi.setSystemTime(new Date("2026-09-14T08:03:40+02:00"));
+    await vi.advanceTimersByTimeAsync(15_000);
+    await el.updateComplete;
+    expect(root(el).querySelector(".last-connection")).toBeNull();
+  });
+});
+
 describe("stops along a ride", () => {
   it("opens a ride's stops on its rail and keeps them open through a refresh", async () => {
     const h = hass("2026-09-14T05:50:00+00:00", ACTIVE);

@@ -12,6 +12,12 @@
         "state": {
           "on": "mdi:alert-circle-outline"
         }
+      },
+      "route_leave_now": {
+        "default": "mdi:walk",
+        "state": {
+          "on": "mdi:run-fast"
+        }
       }
     },
     "sensor": {

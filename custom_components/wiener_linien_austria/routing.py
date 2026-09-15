@@ -850,6 +850,43 @@ def assess_transfers(
     return transfers
 
 
+def last_connection(
+    trips: Iterable[Trip],
+    now: datetime,
+    arrive_by: datetime,
+    max_wait: timedelta,
+) -> Trip | None:
+    """The latest usable trip from an arrive-by query for the small hours.
+
+    Asked to arrive by 04:00, the server also offers trips that wait out the
+    night at a stop and catch the first morning train (verified 2026-09-15:
+    00:50 S45, then 41 to 01:16, then U6 at 04:43, arriving 04:59). Those
+    are dropped: any wait between two rides longer than `max_wait`, or an
+    arrival after `arrive_by`. Of the rest, the one leaving last still ahead.
+    """
+    usable = [
+        trip
+        for trip in trips
+        if not trip.cancelled
+        and trip.departure is not None
+        and trip.arrival is not None
+        and trip.departure >= now - timedelta(minutes=1)
+        and trip.arrival <= arrive_by
+        and _longest_wait(trip) <= max_wait
+    ]
+    return max(usable, key=lambda trip: trip.departure or now, default=None)
+
+
+def _longest_wait(trip: Trip) -> timedelta:
+    """The longest gap between one leg arriving and the next leaving."""
+    longest = timedelta(0)
+    for previous, leg in zip(trip.legs, trip.legs[1:], strict=False):
+        arrival, departure = previous.destination.effective, leg.origin.effective
+        if arrival is not None and departure is not None:
+            longest = max(longest, departure - arrival)
+    return longest
+
+
 def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
     """Keep the useful connections, soonest first.
 

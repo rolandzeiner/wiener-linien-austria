@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.binary_sensor import (
@@ -10,10 +11,13 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import (
+    async_track_point_in_utc_time,
+    async_track_time_interval,
+)
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
@@ -24,6 +28,7 @@ from .route_coordinator import (
     WienerLinienRouteCoordinator,
     route_device_info,
 )
+from .routing import Trip
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +43,12 @@ async def async_setup_entry(
     """Set up the staleness sensor, or the at-risk sensor for a route."""
     coordinator = entry.runtime_data
     if isinstance(coordinator, WienerLinienRouteCoordinator):
-        async_add_entities([WienerLinienRouteRiskBinarySensor(coordinator, entry)])
+        async_add_entities(
+            [
+                WienerLinienRouteRiskBinarySensor(coordinator, entry),
+                WienerLinienRouteLeaveBinarySensor(coordinator, entry),
+            ]
+        )
         return
     async_add_entities([WienerLinienStaleBinarySensor(coordinator, entry)])
 
@@ -242,9 +252,9 @@ class WienerLinienRouteRiskBinarySensor(
     notification is worth sending. The finer grading stays available in the
     `risk` attribute.
 
-    The routing backend supplied no realtime times at all as of 2026-09-14
-    (see routing.py), so in practice this grades timetable times: a delay
-    can't turn it on until the upstream starts sending them.
+    The trip planner sends no live times, but live.py applies the departure
+    boards' ones to U-Bahn, tram and bus rides, so a late vehicle can turn it
+    on. S-Bahn and train rides are graded on the timetable.
     """
 
     _attr_has_entity_name = True
@@ -285,3 +295,118 @@ class WienerLinienRouteRiskBinarySensor(
             "transfer_at": tightest.at if tightest is not None else None,
             "slack_minutes": tightest.slack_minutes if tightest is not None else None,
         }
+
+
+class WienerLinienRouteLeaveBinarySensor(
+    CoordinatorEntity[WienerLinienRouteCoordinator], BinarySensorEntity
+):
+    """On from `leave_minutes` before the best connection leaves until it does.
+
+    Built for a notification: an automation triggering on `on` sends "time
+    to leave" once per connection. The connection is the first one still
+    ahead, counted from its first departure (on a step-free route, the walk
+    to the platform). The state flips on two timers, at the leave time and at
+    the departure, rather than by polling; a refresh or a live-time update
+    re-arms them. When connections run more often than `leave_minutes`, the
+    next one is already inside the window as one leaves, and the sensor
+    stays on.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "route_leave_now"
+    _attr_attribution = ATTRIBUTION
+
+    def __init__(
+        self,
+        coordinator: WienerLinienRouteCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialise the entity — unique_id format is frozen."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_route_leave_now"
+        self._attr_device_info = route_device_info(entry)
+        self._lead = timedelta(minutes=coordinator.leave_minutes)
+        self._unsub_timer: CALLBACK_TYPE | None = None
+
+    async def async_added_to_hass(self) -> None:
+        """Arm the timer for the first change."""
+        await super().async_added_to_hass()
+        self._arm()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Drop the pending timer."""
+        self._cancel()
+        await super().async_will_remove_from_hass()
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Re-arm for whatever connection now leads, then write state."""
+        self._arm()
+        super()._handle_coordinator_update()
+
+    def _next_trip(self, now: datetime) -> Trip | None:
+        data = self.coordinator.data
+        if data is None:
+            return None
+        return next(
+            (
+                trip
+                for trip in data.trips
+                if not trip.cancelled
+                and trip.departure is not None
+                and trip.departure > now
+            ),
+            None,
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """True inside the leave window of the next connection."""
+        if self.coordinator.data is None:
+            return None
+        now = dt_util.utcnow()
+        trip = self._next_trip(now)
+        return (
+            trip is not None
+            and trip.departure is not None
+            and trip.departure - self._lead <= now
+        )
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """When to leave for the next connection, and what it is."""
+        trip = self._next_trip(dt_util.utcnow())
+        departure = trip.departure if trip is not None else None
+        return {
+            "leave_minutes": int(self._lead.total_seconds() // 60),
+            "leave_at": (departure - self._lead).isoformat() if departure else None,
+            "departure": departure.isoformat() if departure else None,
+            "lines": [leg.line for leg in trip.legs if leg.line and not leg.walk]
+            if trip is not None
+            else [],
+        }
+
+    def _cancel(self) -> None:
+        if self._unsub_timer is not None:
+            self._unsub_timer()
+            self._unsub_timer = None
+
+    @callback
+    def _arm(self) -> None:
+        """Schedule the next moment the state can change."""
+        self._cancel()
+        now = dt_util.utcnow()
+        trip = self._next_trip(now)
+        if trip is None or trip.departure is None:
+            return
+        leave_at = trip.departure - self._lead
+        when = leave_at if leave_at > now else trip.departure
+        self._unsub_timer = async_track_point_in_utc_time(
+            self.hass, self._on_timer, when
+        )
+
+    @callback
+    def _on_timer(self, _now: datetime) -> None:
+        self._unsub_timer = None
+        self._arm()
+        self.async_write_ha_state()

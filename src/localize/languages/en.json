@@ -425,6 +425,7 @@
     "lift_out_notice": "Lift out of service: {station}",
     "low_floor": "Low-floor vehicle",
     "stops_between": "Stops in between, {line}",
+    "last_connection": "Last connection without night bus {time}",
     "editor": {
       "entity": "Route",
       "entity_helper": "Leave empty to pick origin and destination right on the card. Only routes you've set up are listed.",

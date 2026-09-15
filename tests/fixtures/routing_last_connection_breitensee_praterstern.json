@@ -1,0 +1,1196 @@
+{
+ "itdMessageList": [],
+ "trips": [
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "23:50",
+        "timeSec": "23:50:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "23:50",
+        "rtTimeSec": "23:50:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Handelskai",
+       "platformName": "12",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:10",
+        "timeSec": "00:10:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:10",
+        "rtTimeSec": "00:10:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Handelskai",
+      "realtime": "0",
+      "diva": {
+       "dir": "R"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Handelskai",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:15",
+        "timeSec": "00:15:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:15",
+        "rtTimeSec": "00:15:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:20",
+        "timeSec": "00:20:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:20",
+        "rtTimeSec": "00:20:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S3",
+      "number": "S3",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Praterstern",
+      "realtime": "0",
+      "diva": {
+       "dir": "H"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "platformName": "",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "23:53",
+        "timeSec": "23:53:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "23:53",
+        "rtTimeSec": "23:53:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Hütteldorfer Straße",
+       "platformName": "",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "23:55",
+        "timeSec": "23:55:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "23:55",
+        "rtTimeSec": "23:55:00"
+       },
+       "ref": {
+        "id": "60201035"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 49",
+      "number": "49",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Ring/Volkstheater",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Hütteldorfer Straße",
+       "platformName": "1",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "23:58",
+        "timeSec": "23:58:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "23:58",
+        "rtTimeSec": "23:58:00"
+       },
+       "ref": {
+        "id": "60201035"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:07",
+        "timeSec": "00:07:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:07",
+        "rtTimeSec": "00:07:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "realtime": "0",
+      "diva": {
+       "dir": "H",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:12",
+        "timeSec": "00:12:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:12",
+        "rtTimeSec": "00:12:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:20",
+        "timeSec": "00:20:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:20",
+        "rtTimeSec": "00:20:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Aspernstraße",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "platformName": "",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "23:53",
+        "timeSec": "23:53:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "23:53",
+        "rtTimeSec": "23:53:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Volkstheater (Burggasse)",
+       "platformName": "",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:12",
+        "timeSec": "00:12:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:12",
+        "rtTimeSec": "00:12:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 49",
+      "number": "49",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Ring/Volkstheater",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:20",
+        "timeSec": "00:20:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:20",
+        "rtTimeSec": "00:20:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:27",
+        "timeSec": "00:27:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:27",
+        "rtTimeSec": "00:27:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:05",
+        "timeSec": "00:05:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:05",
+        "rtTimeSec": "00:05:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Ottakring",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:07",
+        "timeSec": "00:07:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:07",
+        "rtTimeSec": "00:07:00"
+       },
+       "ref": {
+        "id": "60200981"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Handelskai",
+      "realtime": "0",
+      "diva": {
+       "dir": "R"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "4"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Ottakring",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:11",
+        "timeSec": "00:11:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:11",
+        "rtTimeSec": "00:11:00"
+       },
+       "ref": {
+        "id": "60200981"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:22",
+        "timeSec": "00:22:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:22",
+        "rtTimeSec": "00:22:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "realtime": "0",
+      "diva": {
+       "dir": "H",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:27",
+        "timeSec": "00:27:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:27",
+        "rtTimeSec": "00:27:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:35",
+        "timeSec": "00:35:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:35",
+        "rtTimeSec": "00:35:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Aspernstraße",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:05",
+        "timeSec": "00:05:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:05",
+        "rtTimeSec": "00:05:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Handelskai",
+       "platformName": "12",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:25",
+        "timeSec": "00:25:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:25",
+        "rtTimeSec": "00:25:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Handelskai",
+      "realtime": "0",
+      "diva": {
+       "dir": "R"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Handelskai",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:33",
+        "timeSec": "00:33:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:33",
+        "rtTimeSec": "00:33:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:37",
+        "timeSec": "00:37:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:37",
+        "rtTimeSec": "00:37:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S1",
+      "number": "S1",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Praterstern",
+      "realtime": "0",
+      "diva": {
+       "dir": "H"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee (Hütteldorfer Straße)",
+       "platformName": "",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:09",
+        "timeSec": "00:09:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:09",
+        "rtTimeSec": "00:09:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Volkstheater (Burggasse)",
+       "platformName": "",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:28",
+        "timeSec": "00:28:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:28",
+        "rtTimeSec": "00:28:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 49",
+      "number": "49",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Ring/Volkstheater",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:33",
+        "timeSec": "00:33:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:33",
+        "rtTimeSec": "00:33:00"
+       },
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:41",
+        "timeSec": "00:41:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:41",
+        "rtTimeSec": "00:41:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:20",
+        "timeSec": "00:20:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:20",
+        "rtTimeSec": "00:20:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Handelskai",
+       "platformName": "12",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:40",
+        "timeSec": "00:40:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:40",
+        "rtTimeSec": "00:40:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Handelskai",
+      "realtime": "0",
+      "diva": {
+       "dir": "R"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Handelskai",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:45",
+        "timeSec": "00:45:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:45",
+        "rtTimeSec": "00:45:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:50",
+        "timeSec": "00:50:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:50",
+        "rtTimeSec": "00:50:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S7",
+      "number": "S7",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Praterstern",
+      "realtime": "0",
+      "diva": {
+       "dir": "H"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:50",
+        "timeSec": "00:50:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:50",
+        "rtTimeSec": "00:50:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Gersthof",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:57",
+        "timeSec": "00:57:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:57",
+        "rtTimeSec": "00:57:00"
+       },
+       "ref": {
+        "id": "60200393"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Heiligenstadt",
+      "realtime": "0",
+      "diva": {
+       "dir": "R"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "4"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Gersthof (Gentzgasse)",
+       "platformName": "",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "01:09",
+        "timeSec": "01:09:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "01:09",
+        "rtTimeSec": "01:09:00"
+       },
+       "ref": {
+        "id": "60200393"
+       }
+      },
+      {
+       "name": "Wien Währinger Straße-Volksoper (Äußerer Gürtel)",
+       "platformName": "",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "01:16",
+        "timeSec": "01:16:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "01:16",
+        "rtTimeSec": "01:16:00"
+       },
+       "ref": {
+        "id": "60201510"
+       }
+      }
+     ],
+     "mode": {
+      "name": "Straßenbahn 41",
+      "number": "41",
+      "product": "Straßenbahn",
+      "type": "4",
+      "code": "4",
+      "destination": "Wien Sternwartestraße",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Währinger Str.-Volksoper",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "04:43",
+        "timeSec": "04:43:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "04:43",
+        "rtTimeSec": "04:43:00"
+       },
+       "ref": {
+        "id": "60201510"
+       }
+      },
+      {
+       "name": "Wien Handelskai",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "04:50",
+        "timeSec": "04:50:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "04:50",
+        "rtTimeSec": "04:50:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U6",
+      "number": "U6",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Floridsdorf",
+      "realtime": "0",
+      "diva": {
+       "dir": "H",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "4"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Handelskai",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "04:55",
+        "timeSec": "04:55:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "04:55",
+        "rtTimeSec": "04:55:00"
+       },
+       "ref": {
+        "id": "60201705"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "04:59",
+        "timeSec": "04:59:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "04:59",
+        "rtTimeSec": "04:59:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S2",
+      "number": "S2",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Praterstern",
+      "realtime": "0",
+      "diva": {
+       "dir": "H"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Breitensee",
+       "platformName": "1",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "00:50",
+        "timeSec": "00:50:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "00:50",
+        "rtTimeSec": "00:50:00"
+       },
+       "ref": {
+        "id": "60200166"
+       }
+      },
+      {
+       "name": "Wien Heiligenstadt",
+       "platformName": "4",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "01:05",
+        "timeSec": "01:05:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "01:05",
+        "rtTimeSec": "01:05:00"
+       },
+       "ref": {
+        "id": "60200491"
+       }
+      }
+     ],
+     "mode": {
+      "name": "S-Bahn S45",
+      "number": "S45",
+      "product": "S-Bahn",
+      "type": "2",
+      "code": "1",
+      "destination": "Wien Heiligenstadt",
+      "realtime": "0",
+      "diva": {
+       "dir": "R"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "2"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Heiligenstadt",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "04:45",
+        "timeSec": "04:45:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "04:45",
+        "rtTimeSec": "04:45:00"
+       },
+       "ref": {
+        "id": "60200491"
+       }
+      },
+      {
+       "name": "Wien Schottenring",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "04:51",
+        "timeSec": "04:51:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "04:51",
+        "rtTimeSec": "04:51:00"
+       },
+       "ref": {
+        "id": "60201182"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U4",
+      "number": "U4",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Hütteldorf",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     },
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Schottenring",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "05:10",
+        "timeSec": "05:10:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "05:10",
+        "rtTimeSec": "05:10:00"
+       },
+       "ref": {
+        "id": "60201182"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "dateTime": {
+        "date": "16.09.2026",
+        "time": "05:12",
+        "timeSec": "05:12:00",
+        "rtDate": "16.09.2026",
+        "rtTime": "05:12",
+        "rtTimeSec": "05:12:00"
+       },
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "realtime": "0",
+      "diva": {
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

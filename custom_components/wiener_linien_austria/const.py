@@ -207,6 +207,12 @@ CONF_EXCLUDED_MEANS: Final = "excluded_means"
 # escalators, and low-floor vehicles. Absent on routes saved before the
 # option existed, which reads as off, so no migration is needed.
 CONF_STEP_FREE: Final = "step_free"
+# Minutes before the best connection leaves that the "Time to leave" binary
+# sensor turns on. Counted to the first departure of the trip, which on a
+# step-free route is the walk to the platform, not the vehicle.
+CONF_LEAVE_MINUTES: Final = "leave_minutes"
+DEFAULT_LEAVE_MINUTES: Final = 5
+MAX_LEAVE_MINUTES: Final = 30
 CONF_ACTIVE_FROM: Final = "active_from"
 CONF_ACTIVE_TO: Final = "active_to"
 CONF_ACTIVE_DAYS: Final = "active_days"

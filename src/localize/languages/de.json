@@ -425,6 +425,7 @@
     "lift_out_notice": "Aufzug außer Betrieb: {station}",
     "low_floor": "Niederflurfahrzeug",
     "stops_between": "Stationen dazwischen, {line}",
+    "last_connection": "Letzte Verbindung ohne Nachtbus {time}",
     "editor": {
       "entity": "Verbindung",
       "entity_helper": "Leer lassen, um Start und Ziel direkt auf der Karte zu wählen. Zur Wahl stehen nur eingerichtete Verbindungen.",

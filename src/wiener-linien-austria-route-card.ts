@@ -850,6 +850,23 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       ${this._renderNotices(best, attrs)}
       ${this._renderStrand(best, attrs)}
       ${alternatives.length ? this._renderAlternatives(alternatives, attrs) : nothing}
+      ${this._renderLastConnection(attrs)}
+    `;
+  }
+
+  /** "Letzte Verbindung ohne Nachtbus 00:20" with its lines, late in the
+   *  evening. Gone once it has left, like any other connection. */
+  private _renderLastConnection(attrs: RouteAttrs): TemplateResult | typeof nothing {
+    const last = attrs.last_connection;
+    if (!last || !upcomingTrips({ trips: [last] }, this._now).length) return nothing;
+    return html`
+      <p class="last-connection">
+        <ha-icon icon="mdi:weather-night" aria-hidden="true"></ha-icon>
+        <span>${this._t("last_connection", { time: clockOf(last.departure) })}</span>
+        <span class="alt-lines">
+          ${transitLegs(last).map((leg) => this._renderBadge(leg, attrs))}
+        </span>
+      </p>
     `;
   }
 
@@ -1715,6 +1732,18 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--secondary-text-color);
     }
 
+    .last-connection {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 8px;
+      font-size: 0.85rem;
+      color: var(--primary-text-color);
+    }
+    .last-connection ha-icon {
+      --mdc-icon-size: 18px;
+      color: var(--secondary-text-color);
+    }
     .empty {
       display: flex;
       flex-direction: column;

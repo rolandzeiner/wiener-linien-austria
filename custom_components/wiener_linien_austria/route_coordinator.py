@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta, tzinfo
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -25,8 +25,10 @@ from .const import (
     CONF_ACTIVE_TO,
     CONF_DESTINATION_DIVA,
     CONF_DESTINATION_NAME,
+    CONF_LEAVE_MINUTES,
     CONF_ORIGIN_DIVA,
     CONF_ORIGIN_NAME,
+    DEFAULT_LEAVE_MINUTES,
     DEFAULT_ROUTE_SCAN_INTERVAL,
     DOMAIN,
     MIN_ROUTE_ROLLOVER_SECONDS,
@@ -49,6 +51,7 @@ from .routing import (
     Trip,
     async_fetch_trip_body,
     build_trip_params,
+    last_connection,
     parse_time_option,
     parse_trip_body,
     rank_trips,
@@ -62,6 +65,19 @@ _LOGGER = logging.getLogger(__name__)
 # expanded plus a few alternatives; more than this is payload nothing renders.
 MAX_TRIPS_PUBLISHED = 4
 
+# The last connection without a bus, looked up once a night per route (one
+# extra trip-planner request, agreed 2026-09-15). Only between these times,
+# and only while the route refreshes anyway, so its window bounds it too.
+LAST_CONNECTION_FROM = time(22, 0)
+LAST_CONNECTION_UNTIL = time(3, 0)
+# Asked as "arrive by 04:00": the U-Bahn has stopped by then on a weeknight,
+# and the first morning trains don't arrive yet.
+LAST_CONNECTION_ARRIVE_BY = time(4, 0)
+LAST_CONNECTION_MAX_WAIT = timedelta(minutes=60)
+# City, regional and express buses (EFA motType 5, 6, 7). Night buses are
+# city buses to the trip planner, so leaving them out means all buses.
+LAST_CONNECTION_EXCLUDED_MEANS = ("5", "6", "7")
+
 type WienerLinienRouteConfigEntry = ConfigEntry[WienerLinienRouteCoordinator]
 
 
@@ -74,6 +90,9 @@ class RouteData:
     # the empty trip list means "not looking", not "no connection".
     active: bool = True
     fetched_at: datetime | None = None
+    # The night's last connection without a bus, once looked up; None
+    # outside the evening or when there is none.
+    last_connection: Trip | None = None
 
 
 class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
@@ -116,6 +135,13 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         # adjusted copy.
         self._timetable: list[Trip] = []
         self._unsub_live: CALLBACK_TYPE | None = None
+        self.leave_minutes = (
+            _safe_int(config.get(CONF_LEAVE_MINUTES)) or DEFAULT_LEAVE_MINUTES
+        )
+        # The service day the last connection was looked up for, success or
+        # not: one request a night, never a retry loop.
+        self._last_connection_day: date | None = None
+        self._last_connection: Trip | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -223,7 +249,60 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
             cooldown=True,
         )
         self._note_success(published)
-        return RouteData(trips=published, active=True, fetched_at=dt_util.utcnow())
+        return RouteData(
+            trips=published,
+            active=True,
+            fetched_at=dt_util.utcnow(),
+            last_connection=await self._async_last_connection(now),
+        )
+
+    async def _async_last_connection(self, now: datetime) -> Trip | None:
+        """Tonight's last connection without a bus, fetched once a night.
+
+        Failures are logged at debug and not retried until the next night:
+        this is an extra, and the route itself already answered.
+        """
+        local = now.astimezone(self._tz)
+        if local.time() >= LAST_CONNECTION_FROM:
+            service_day = local.date()
+        elif local.time() < LAST_CONNECTION_UNTIL:
+            service_day = local.date() - timedelta(days=1)
+        else:
+            return None
+        arrive_by = datetime.combine(
+            service_day + timedelta(days=1), LAST_CONNECTION_ARRIVE_BY, self._tz
+        )
+        if self._last_connection_day != service_day:
+            self._last_connection_day = service_day
+            self._last_connection = None
+            options = replace(
+                self.options,
+                excluded_means=tuple(
+                    sorted(
+                        {*self.options.excluded_means, *LAST_CONNECTION_EXCLUDED_MEANS}
+                    )
+                ),
+            )
+            await async_enforce_routing_cooldown(self.hass)
+            try:
+                trips = await async_plan_trips(
+                    self.hass,
+                    options,
+                    arrive_by,
+                    self._tz,
+                    arrive_by=True,
+                    planned=True,
+                )
+            except RoutingError as err:
+                _LOGGER.debug("No last connection tonight: %s", err.translation_key)
+            else:
+                self._last_connection = last_connection(
+                    trips, now, arrive_by, LAST_CONNECTION_MAX_WAIT
+                )
+        trip = self._last_connection
+        if trip is None or trip.departure is None:
+            return None
+        return trip if trip.departure >= now - timedelta(minutes=1) else None
 
     async def async_plan(
         self, when: datetime, *, arrive_by: bool = False

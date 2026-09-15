@@ -68,6 +68,7 @@ from .const import (
     CONF_DIVA,
     CONF_ENTRY_TYPE,
     CONF_EXCLUDED_MEANS,
+    CONF_LEAVE_MINUTES,
     CONF_LINES,
     CONF_MAX_CHANGES,
     CONF_MIN_TRANSFER_MINUTES,
@@ -78,6 +79,7 @@ from .const import (
     CONF_STEP_FREE,
     CONF_STOP_NAME,
     CONF_WALK_SPEED,
+    DEFAULT_LEAVE_MINUTES,
     DEFAULT_MIN_TRANSFER_MINUTES,
     DEFAULT_ROUTE_SCAN_INTERVAL,
     DEFAULT_SCAN_INTERVAL,
@@ -88,6 +90,7 @@ from .const import (
     EXCLUDABLE_MEANS,
     MAX_CHANGES_ANY,
     MAX_CHANGES_CHOICES,
+    MAX_LEAVE_MINUTES,
     MAX_MIN_TRANSFER_MINUTES,
     MAX_POLL_SECONDS,
     MAX_ROUTE_POLL_SECONDS,
@@ -757,6 +760,9 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                         if str(x) in EXCLUDABLE_MEANS
                     ],
                     CONF_STEP_FREE: bool(user_input.get(CONF_STEP_FREE, False)),
+                    CONF_LEAVE_MINUTES: int(
+                        user_input.get(CONF_LEAVE_MINUTES, DEFAULT_LEAVE_MINUTES)
+                    ),
                     CONF_SCAN_INTERVAL: int(
                         user_input.get(CONF_SCAN_INTERVAL, DEFAULT_ROUTE_SCAN_INTERVAL)
                     ),
@@ -852,6 +858,20 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_STEP_FREE,
                     default=defaults.get(CONF_STEP_FREE) is True,
                 ): BooleanSelector(),
+                vol.Required(
+                    CONF_LEAVE_MINUTES,
+                    default=int(
+                        defaults.get(CONF_LEAVE_MINUTES, DEFAULT_LEAVE_MINUTES)
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=1,
+                        max=MAX_LEAVE_MINUTES,
+                        step=1,
+                        unit_of_measurement="min",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                ),
                 vol.Optional(
                     CONF_ACTIVE_FROM,
                     description={"suggested_value": defaults.get(CONF_ACTIVE_FROM)},

@@ -85,6 +85,7 @@ Change tracked lines via **Reconfigure**, the polling interval via **Configure**
    - **Walking speed** — how long the trip planner allows for walking between platforms.
    - **Transfer buffer** — changes with less time to spare are marked tight. Default 2 min.
    - **Step-free** *(2.0.0)* — plan only with lifts or ramps instead of stairs and escalators, and with low-floor vehicles.
+   - **Time-to-leave alert** *(2.0.0)* — how many minutes before the best connection leaves the **Time to leave** sensor turns on. Default 5.
 4. Optionally set a refresh window, such as weekdays 06:30–09:00. Outside it the route makes no requests.
 5. Save. The integration plans the route once first, so a pair of stops the trip planner can't route is caught right away.
 
@@ -158,6 +159,7 @@ What the card shows:
 - **Disruptions** for the lines the trip uses.
 - **Lifts and stairs** *(2.0.0)* — on a step-free trip, each lift on the way to the platform, at a change and at the destination, for example *Lift down*. A lift at a station with an outage says *out of service*, and a warning names the station. Rides planned with a low-floor vehicle show a wheelchair icon.
 - **More connections** — up to three later options, folded away until you open them.
+- **Last connection** *(2.0.0)* — for a route, from 22:00: the night's last connection without a night bus, for example *Last connection without night bus 00:20*.
 - **Last updated** (*Zuletzt aktualisiert* on a German install) — the time the trip planner last answered, next to the heading, so a plan kept on screen can't pass for a fresh one.
 
 Picking stops without a route:
@@ -207,14 +209,19 @@ Each stop gets two entities, and Home Assistant names both in your interface lan
 | Departure board | `sensor.<stop>_departures` | `sensor.<stop>_abfahrten` |
 | Stale-data flag | `binary_sensor.<stop>_departure_data_stale` | `binary_sensor.<stop>_abfahrtsdaten_veraltet` |
 
-Each route gets two entities too:
+Each route gets three entities:
 
 | | English install | German install |
 |---|---|---|
 | Next connection | `sensor.<route>_next_connection` | `sensor.<route>_nachste_verbindung` |
 | Connection at risk | `binary_sensor.<route>_connection_at_risk` | `binary_sensor.<route>_anschluss_gefahrdet` |
+| Time to leave *(2.0.0)* | `binary_sensor.<route>_time_to_leave` | `binary_sensor.<route>_zeit_zu_gehen` |
 
 The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
+
+From 22:00 to 03:00 the sensor also carries `last_connection`: the latest connection that night without a bus, in the same shape as a trip, or `null`. It's asked as "arrive by 04:00" with buses left out, and trips that wait out the night for the first morning train are dropped. On nights the U-Bahn runs through (Friday, Saturday and before public holidays) it can be a U-Bahn shortly before 04:00.
+
+The time-to-leave sensor turns on the set number of minutes before the next connection leaves, and off when it leaves. Its attributes are `leave_at`, `departure`, `leave_minutes` and `lines`. When connections run more often than the set minutes, the next one is already due as one leaves, so the sensor stays on.
 
 Step-free routes add `step_free: true` and `elevator_info`: lift outages at the stations whose lifts the trips use, each with `stop_ids` naming those stations. Every leg carries `low_floor` and `access`, a list of the lifts and stairs on its walk (`kind` such as `elevator` or `stairs`, `level` `up` or `down`, and the station's `stop_id`); each change in `transfers` has an `access` list too. An outage is matched by station, so it can concern a different lift at the same station.
 
@@ -270,6 +277,7 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
 | Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`: every 120 s while visible, paused after 30 min idle; answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
+| Last connection of the night *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | One request per route per night, at its first refresh between 22:00 and 03:00. Not retried if it fails |
 | Live times on connections *(experimental)* | `/monitor?stopId=…` | Rides in the departure boards' request. A request of its own only for a stop that has no answer yet, or when no departure board is set up (then once per route refresh, shared by all routes for 1 min) |
 
 **The polling interval is per entry; the request is not.** Every entry configured
@@ -392,6 +400,44 @@ A request that doesn't match the schema gets Home Assistant's own `invalid_forma
 - **Commute check** *(experimental)* — a route with a weekday morning window, and a notification when a delay puts your change at risk.
 
 ## Automation Examples
+
+Notify your phone when it's time to leave, as a blueprint. Save it as `blueprints/automation/wiener_linien_austria/time_to_leave.yaml` in your configuration folder, reload automations, then create an automation from it under **Settings → Automations & scenes → Blueprints**:
+
+```yaml
+blueprint:
+  name: Wiener Linien — time to leave
+  description: Notifies a phone when a route's Time to leave sensor turns on.
+  domain: automation
+  input:
+    leave_sensor:
+      name: Time to leave sensor
+      selector:
+        entity:
+          filter:
+            - integration: wiener_linien_austria
+              domain: binary_sensor
+    notify_device:
+      name: Phone
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+mode: single
+variables:
+  leave_sensor: !input leave_sensor
+triggers:
+  - trigger: state
+    entity_id: !input leave_sensor
+    to: "on"
+actions:
+  - domain: mobile_app
+    type: notify
+    device_id: !input notify_device
+    title: Time to leave
+    message: >-
+      {{ state_attr(leave_sensor, 'lines') | join(' → ') }} leaves at
+      {{ as_timestamp(state_attr(leave_sensor, 'departure')) | timestamp_custom('%H:%M') }}.
+```
 
 Notify when the next train is close:
 

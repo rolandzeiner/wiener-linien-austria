@@ -67,6 +67,7 @@
           "min_transfer_minutes": "Umsteigepuffer",
           "excluded_means": "Vermeiden",
           "step_free": "Stufenlos",
+          "leave_minutes": "Losgehen-Hinweis",
           "active_from": "Aktualisieren ab",
           "active_to": "Aktualisieren bis",
           "active_days": "Aktualisieren an",
@@ -75,6 +76,7 @@
         "data_description": {
           "min_transfer_minutes": "Umstiege mit weniger Zeitreserve werden als knapp markiert.",
           "step_free": "Nur Verbindungen mit Aufzug oder Rampe statt Stiegen und Rolltreppen, und mit Niederflurfahrzeugen planen.",
+          "leave_minutes": "So viele Minuten vor Abfahrt der besten Verbindung schaltet der Sensor „Zeit zu gehen“ ein.",
           "active_from": "Optional. Außerhalb dieses Zeitfensters wird nicht aktualisiert. Beide Zeiten setzen oder keine.",
           "active_days": "Leer lassen für jeden Tag.",
           "scan_interval": "Mindestens 120 Sekunden. Zusätzlich wird direkt nach Abfahrt der besten Verbindung aktualisiert."
@@ -120,6 +122,9 @@
       },
       "route_at_risk": {
         "name": "Anschluss gefährdet"
+      },
+      "route_leave_now": {
+        "name": "Zeit zu gehen"
       }
     },
     "sensor": {
