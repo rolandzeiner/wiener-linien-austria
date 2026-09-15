@@ -55,18 +55,14 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
       <br/><em>Modern</em>
     </td>
     <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-2.webp" width="264" alt="Retro LED card" />
+      <br/>
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-3.webp" width="264" alt="Split-flap card" />
+      <br/><em>Retro LED · Split-flap</em>
+    </td>
+    <td align="center" valign="top">
       <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-4.webp" height="320" alt="Route card" />
       <br/><em>Route</em>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-2.webp" width="264" alt="Retro LED card" />
-      <br/><em>Retro LED</em>
-    </td>
-    <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-3.webp" width="264" alt="Split-flap card" />
-      <br/><em>Split-flap</em>
     </td>
   </tr>
 </table>
@@ -76,12 +72,16 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 <table>
   <tr>
     <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="320" alt="Card editor" />
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="260" alt="Card editor" />
       <br/><em>Card editor</em>
     </td>
     <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="320" alt="Integration setup dialog" />
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="260" alt="Integration setup dialog" />
       <br/><em>Config flow</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/action-editor.webp" height="260" alt="Plan trip action in the action editor" />
+      <br/><em>Action editor</em>
     </td>
   </tr>
 </table>
