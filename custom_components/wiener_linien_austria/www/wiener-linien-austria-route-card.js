@@ -710,8 +710,8 @@ cursor: pointer;
 .leg-stops {
 --stops-ahead-dot-size: 8px;
 list-style: none;
-margin: 0 0 12px;
-padding: 0;
+margin: 0;
+padding: 0 0 12px;
 display: flex;
 flex-direction: column;
 gap: 6px;

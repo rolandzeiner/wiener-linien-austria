@@ -1565,8 +1565,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .leg-stops {
       --stops-ahead-dot-size: 8px;
       list-style: none;
-      margin: 0 0 12px;
-      padding: 0;
+      margin: 0;
+      /* Padding, not margin: a bottom margin collapses through the ride's
+         <li>, which ends the ride's box early and leaves a gap before the
+         dotted transfer walk (or the end node) picks the line up. */
+      padding: 0 0 12px;
       display: flex;
       flex-direction: column;
       gap: 6px;
