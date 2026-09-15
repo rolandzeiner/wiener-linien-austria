@@ -686,7 +686,8 @@ color: var(--secondary-text-color);
 text-decoration-thickness: 1.5px;
 font-variant-numeric: tabular-nums;
 }
-.time-late {
+.time-change .time-late,
+.alt-times .time-late {
 color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
 font-weight: 700;
 }
