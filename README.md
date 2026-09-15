@@ -39,6 +39,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Four Lovelace cards** — modern board, retro LED panel, Solari split-flap and a route card — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared by the modern, retro and flap cards *(2.0.0)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
+- **S-Bahn on departure boards** *(2.0.0)* — track a stop's S-Bahn lines next to its Wiener Linien lines. They show timetable times only, since no live data exists for them, and every card marks those rows *Timetable only*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
 - **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live departure times for Wiener Linien rides and a buffer grade on every change. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants, for a route or between any two stops by name. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
@@ -113,7 +114,7 @@ Copy `custom_components/wiener_linien_austria/` into your HA `config/custom_comp
 
 1. **Settings → Devices & Services → + Add Integration**, search **Wiener Linien Austria**, and choose **Departure board for a stop**.
 2. Start typing in **Stop** (e.g. `Stephans`) and pick a suggestion. The list opens on the stops nearest your Home Assistant location, with distances shown. Submit a partial name instead to see every stop that matches.
-3. Pick the lines to track. Off-service lines — nightlines during the day, day-only lines after midnight — stay selectable.
+3. Pick the lines to track. Off-service lines — nightlines during the day, day-only lines after midnight — stay selectable. At a stop the S-Bahn serves, its lines are listed too, marked *timetable only*.
 4. Set a polling interval (default 60 s, range 30–600 s) and save.
 
 Change tracked lines via **Reconfigure**, the polling interval via **Configure**.
@@ -309,6 +310,8 @@ Use it instead of the departure sensor's availability. The departure sensor stay
 
 Each entry in `departures` carries the service (`line`, `towards`, `direction` `"H"` / `"R"`, `type` — `ptMetro` / `ptTram` / `ptBusCity` / `ptBusNight`), the timing (`countdown`, `time_planned` and `time_real` as ISO strings, `realtime`), and the vehicle and stop context (`barrier_free`, `traffic_jam`, `platform`, `cooling`).
 
+An S-Bahn departure has `type` `ptTrainS` and `timetable: true`. Its `countdown` runs off `time_planned`, `time_real` is `null`, and it leaves the list once its planned time has passed. Live departures don't carry `timetable` at all.
+
 When the static schedule resolves a matching trip, `stops_ahead` adds an ordered list of `{name, is_terminus?, lines?}` down to the terminus. `lines` holds the *other* lines passing through each stop, which the card renders as transfer chips.
 
 ## Data Updates
@@ -322,6 +325,7 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
+| Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 30 trains, fetched again after 30 min or when fewer than 6 are left, never more often than every 5 min. Counted down locally in between, and shares the routes' 15 s cooldown slot |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
 | Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`: every 120 s while visible, paused after 30 min idle; answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
 | Last connection of the night *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | One request per route per night, at its first refresh between 22:00 and 03:00. Not retried if it fails |
@@ -633,7 +637,8 @@ logger:
 ## Known Limitations
 
 - **Wiener Linien stops only.** Departure boards, and a route's start and destination, use stops from the Wiener Linien stop list. A station served only by the S-Bahn can't be picked.
-- **S-Bahn appears in routes, not on departure boards.** The trip planner knows S-Bahn and other ÖBB trains, so a route can include them. Departure boards show only Wiener Linien lines: at Praterstern you see the U1, U2, trams and buses, but no S-Bahn. S-Bahn and train rides on a route keep their timetable times, with no live time.
+- **S-Bahn shows timetable times, not live ones.** There is no live data for the S-Bahn, so a departure board can't show delays, cancellations or platform changes for it, and a late train leaves the board at its planned time. On a route, S-Bahn and train rides keep their timetable times too.
+- **No S-Bahn between Praterstern and Hauptbahnhof.** The timetable data has no S-Bahn at Wien Mitte, Rennweg or Quartier Belvedere, so boards there show no S-Bahn lines to pick, and routes don't use that stretch. Regional trains (REX, R, CJX) aren't in the departure data at all.
 - **The card's last pick stays on that device.** It's saved in the browser, not in Home Assistant, so a phone and a wall tablet each remember their own. Two route cards without a route on the same device share that pick.
 - **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
 - **Live times on routes come from the departure boards.** The trip planner sends none, so a ride gets its live time from `/monitor`, which lists about the next hour. Rides more than about an hour away stay on the timetable. `/monitor` has no arrival times, so a ride's arrival moves by its departure delay.
