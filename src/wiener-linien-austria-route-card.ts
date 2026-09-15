@@ -1135,7 +1135,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               ? html` <span class="platform">${platform}</span>`
               : nothing}</span
           >
-          ${this._renderFrequency(leg)}
         </div>
         <div class="ride-detail">
           ${between.length
@@ -1153,6 +1152,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 ></ha-icon>
               </button>`
             : html`<span class="ride-meta">${stops}</span>`}
+          ${this._renderFrequency(leg)}
         </div>
         ${between.length
           ? html`<ol
@@ -1639,13 +1639,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.8rem;
       color: var(--secondary-text-color);
     }
-    /* A ride reads in two lines: what you board here (badge, direction,
-       platform, how often it runs), then the stops it passes. The texts share
-       one baseline, the badge's; the icons, which have none, centre on it. */
+    /* A ride reads in two lines: what you board (badge, direction), then
+       the quieter detail (stop list, how often it runs). */
     .ride {
       display: flex;
       flex-wrap: wrap;
-      align-items: baseline;
+      align-items: center;
       gap: 4px 8px;
       padding-block: 6px 2px;
       font-size: 0.9rem;
@@ -1665,9 +1664,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .type-icon {
       --mdc-icon-size: 18px;
     }
-    .ride > ha-icon {
-      align-self: center;
-    }
     .towards {
       color: var(--primary-text-color);
     }
@@ -1682,7 +1678,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .ride-frequency {
       margin-inline-start: auto;
-      font-size: 0.85rem;
     }
     /* A delay is a plain number beside the time it moves. */
     .time-change {
