@@ -133,9 +133,10 @@ Change tracked lines via **Reconfigure**, the polling interval via **Configure**
    - **Step-free** *(2.0.0)* — plan only with lifts or ramps instead of stairs and escalators, and with low-floor vehicles.
    - **Time-to-leave alert** *(2.0.0)* — how many minutes before the best connection leaves the **Time to leave** sensor turns on. Default 5.
 4. Optionally set a refresh window, such as weekdays 06:30–09:00. Outside it the route makes no requests.
-5. Save. The integration plans the route once first, so a pair of stops the trip planner can't route is caught right away.
+5. Set an update interval (default 300 s, range 120–1800 s). The route also refreshes right after its best connection leaves.
+6. Save. The integration plans the route once first, so a pair of stops the trip planner can't route is caught right away.
 
-Change the planning options via **Reconfigure**. Start and destination can't change, because they identify the route: add a new route instead.
+Change the planning options via **Reconfigure**, the update interval via **Configure**. Start and destination can't change, because they identify the route: add a new route instead.
 
 ## Lovelace Cards
 
@@ -161,6 +162,46 @@ The everyday departure board. Themed to your HA palette; each stop auto-tints to
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria".
 
+#### Card configuration
+
+```yaml
+type: custom:wiener-linien-austria-card
+entities:
+  - entity: sensor.stephansplatz_departures
+    lines: [U1, U3]
+    line_directions:
+      U3: R
+    walk_times:
+      "U1|H": 4
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `entities` | first stop found | The stops to show. Each entry is a departure sensor, or an object with the options below. |
+| `entities[].entity` | required | A stop's departure sensor. |
+| `entities[].lines` | all | Lines to show at this stop, such as `[U1, U3]`. |
+| `entities[].direction` | both | `H` or `R` to show one direction only. |
+| `entities[].line_directions` | none | A direction per line, such as `{U3: R}`. Overrides `direction` for that line. |
+| `entities[].walk_times` | none | Minutes it takes you to reach each line, keyed `"line\|direction"`, `0`–`120`. Departures you can't catch are hidden. |
+| `max_departures` | `6` | Departures per stop, `0`–`20`. `0` shows only the large next departure. |
+| `layout` | `stacked` | `stacked` or `tabs`. Only matters with two or more stops. |
+| `line_colors` | none | Your own colour per line, such as `{U1: "#e20d17"}`. Without one, the official line colour applies. |
+| `show_hero_metric` | `true` | Shows the next departure large. |
+| `show_departures` | `true` | Shows the departure list. |
+| `show_stops_ahead` | `true` | Lets you expand a departure into its stops ahead. |
+| `show_platform` | `true` | Shows the platform or track. |
+| `show_type_icon` | `false` | Shows the vehicle-type icon. |
+| `show_delay` | `true` | Shows delays. |
+| `show_delay_colors` | `true` | Colours the countdown red when late and green when early. Needs `show_delay`. |
+| `show_accessibility` | `false` | Shows the step-free icon. |
+| `accessibility_only` | `false` | Shows only step-free departures. Needs `show_accessibility`. |
+| `show_cooling` | `false` | Shows a snowflake for air-conditioned vehicles. |
+| `show_traffic_info` | `true` | Shows disruption alerts. |
+| `show_elevator_info` | `true` | Shows elevator outages. |
+| `show_qr_button` | `true` | Shows the QR-code button. |
+| `hide_header` | `false` | Hides the card's title bar. |
+| `hide_attribution` | `false` | Hides the data-source credit. |
+
 ### Retro card — `wiener-linien-austria-retro-card`
 
 A focused LED panel, modelled on the amber-on-violet signs hanging from Wiener Linien platforms. The station-name tile picks up the configured line's colour (nightline blue + yellow on N-lines).
@@ -172,6 +213,54 @@ A focused LED panel, modelled on the amber-on-violet signs hanging from Wiener L
 - **Scrolling message** — custom text scrolls every 5 min, then hands back to live departures.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Retro".
+
+#### Card configuration
+
+```yaml
+type: custom:wiener-linien-austria-retro-card
+entity: sensor.stephansplatz_departures
+line: U1
+direction: R
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `entity` | first stop found | A stop's departure sensor. |
+| `line` | all lines | The line to show. |
+| `direction` | `H` | `H` or `R`. |
+| `walk_times` | none | Minutes it takes you to reach the line, keyed `"line\|direction"`, `0`–`120`. Departures you can't catch are hidden. |
+| `size` | `regular` | `small`, `medium` or `regular`. |
+| `style` | `classic` | `classic`, `warm` or `pixel` (dot matrix). |
+| `show_platform` | `true` | Shows the GLEIS / STEIG tile. |
+| `platform_side` | `auto` | `auto` (platform 2 on the left, otherwise right), `left` or `right`. |
+| `show_station_name` | `false` | Shows the station-name band. |
+| `station_bg` | `default` | Station-name background: `default` (the line's colour), `white` or `black`. |
+| `accessibility_only` | `false` | Shows only step-free departures. |
+| `wheelchair_race` | `false` | Turns on the wheelchair race. |
+| `flicker` | `false` | Simulates LED flicker. |
+| `message_ticker` | `false` | Scrolls `message_text` across the panel every 5 min. |
+| `message_text` | none | The scrolling message, up to 160 characters. |
+| `show_line_pill` | `false` | Shows the line as a badge in its line colour. |
+| `line_stripe` | `false` | Adds a thin bar in the line colour at the left of each row. |
+| `housing` | `false` | Adds a dark frame around the LED panel. |
+| `show_unit` | `false` | Adds "min" after each countdown. |
+| `show_header` | `false` | Shows the station sign above the station name. |
+| `header_left`, `header_right` | none | What each side of the station sign shows. See [Station sign options](#station-sign-options). |
+
+#### Station sign options
+
+`header_left` and `header_right` take the same options, on the retro and the flap card:
+
+| Option | Default | Description |
+|---|---|---|
+| `exit` | `none` | `none`, `regular` (exit), `accessible` (step-free exit), or one of `mdi:exit-run`, `mdi:exit-to-app`, `mdi:door-open`, `mdi:stairs`. |
+| `text` | none | Sign text, such as the next station, up to 64 characters. |
+| `show_wc`, `show_escalator`, `show_elevator` | `false` | Show the WC, escalator and elevator tiles. |
+| `show_clock` | `false` | Shows the time. |
+| `show_date` | `false` | Shows the date. |
+| `date_format` | `d.m.Y` | Date format, in PHP style (`d`, `m`, `Y`, `D`, `M` and so on). |
+| `chips` | none | Short text labels, up to 6, each up to 16 characters. |
+| `extra_icons` | none | Up to 3 MDI icons, such as `mdi:parking`. |
 
 ### Flap card — `wiener-linien-austria-flap-card`
 
@@ -185,6 +274,34 @@ A Solari split-flap board — characters cascade one tile at a time toward the t
 - **Compact mode** — hide the line column on single-line boards, or drop the cabinet for a flush mount.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Flap Board".
+
+#### Card configuration
+
+```yaml
+type: custom:wiener-linien-austria-flap-card
+entities:
+  - sensor.stephansplatz_departures
+  - entity: sensor.karlsplatz_departures
+    lines: [U4]
+max_rows: 4
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `entities` | first stop found | The stops to merge onto the board. Each entry is a departure sensor, or an object with `entity`, `lines`, `direction`, `line_directions` and `walk_times`, as on the [modern card](#modern-card--wiener-linien-austria-card). |
+| `max_rows` | `2` | Departure rows, `1`–`8`, sorted by countdown across all stops. |
+| `size` | `small` | `small`, `medium` or `regular`. The editor calls `small` *Normal*. |
+| `show_platform` | `true` | Shows a GLEIS / STEIG tile per row. |
+| `show_station_name` | `true` | Shows the station-name band. |
+| `station_bg` | `line` | Station-name background: `line` (the first tracked line's colour), `line:U3` for a specific line, `white` or `black`. |
+| `show_min_unit` | `true` | Adds "min" after each countdown. |
+| `show_accessibility` | `true` | Shows the step-free tile. |
+| `accessibility_only` | `false` | Shows only step-free departures. Needs `show_accessibility`. |
+| `show_line_column` | `true` | Shows the line column. Turn it off on single-line boards. |
+| `housing` | `true` | Shows the cabinet around the board. Off mounts the board flush. |
+| `show_header` | `false` | Shows the station sign above the station name. |
+| `header_left`, `header_right` | none | What each side of the station sign shows. See [Station sign options](#station-sign-options). |
+| `hide_attribution` | `false` | Hides the data-source credit. |
 
 ### Route card — `wiener-linien-austria-route-card`
 
@@ -265,19 +382,50 @@ Each route gets three entities:
 | Connection at risk | `binary_sensor.<route>_connection_at_risk` | `binary_sensor.<route>_anschluss_gefahrdet` |
 | Time to leave *(2.0.0)* | `binary_sensor.<route>_time_to_leave` | `binary_sensor.<route>_zeit_zu_gehen` |
 
-The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
+The next-connection sensor's state is the departure time of the best connection. Its attributes:
+
+| Attribute | Notes |
+|---|---|
+| `origin`, `destination` | Stop names. |
+| `active` | `false` outside the refresh window. |
+| `active_window` | The window you set: `from`, `to` and `days`, each `null` when unset. |
+| `fetched_at` | When the trip planner last answered. |
+| `arrival`, `duration_minutes`, `interchanges`, `risk` | The best connection's arrival, length, number of changes and worst change (`ok`, `tight` or `at_risk`). |
+| `min_transfer_minutes`, `step_free` | The route's transfer buffer and step-free setting. |
+| `trips` | Up to four ranked connections. See [Trip shape](#trip-shape). |
+| `last_connection` | From 22:00 to 03:00, the night's last connection without a bus. See below. |
+| `line_colors` | Official colours for the lines the trips use. |
+| `traffic_info` | Disruptions for those lines, in the same shape as on the departure sensor. |
+| `elevator_info` | Lift outages at stations whose lifts the trips use, each with `stop_ids` naming those stations. Empty unless a trip lists lifts, which step-free trips do. |
+
+`trips`, `last_connection`, `line_colors`, `traffic_info` and `elevator_info` aren't recorded in history.
 
 From 22:00 to 03:00 the sensor also carries `last_connection`: the latest connection that night without a bus, in the same shape as a trip, or `null`. It's asked as "arrive by 04:00" with buses left out, and trips that wait out the night for the first morning train are dropped. On nights the U-Bahn runs through (Friday, Saturday and before public holidays) it can be a U-Bahn shortly before 04:00.
 
 The time-to-leave sensor turns on the set number of minutes before the next connection leaves, and off when it leaves. Its attributes are `leave_at`, `departure`, `leave_minutes` and `lines`. When connections run more often than the set minutes, the next one is already due as one leaves, so the sensor stays on.
 
-Step-free routes add `step_free: true` and `elevator_info`: lift outages at the stations whose lifts the trips use, each with `stop_ids` naming those stations. Every leg carries `low_floor` and `access`, a list of the lifts and stairs on its walk (`kind` such as `elevator` or `stairs`, `level` `up` or `down`, and the station's `stop_id`); each change in `transfers` has an `access` list too. An outage is matched by station, so it can concern a different lift at the same station.
+The at-risk sensor turns on only when the current times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day. Live times count for U-Bahn, tram and bus rides; they come from the departure boards, because the trip planner itself sends none. Its attributes are `risk` (the best connection's grade), `transfer_at` and `slack_minutes` (where its tightest change is, and how many minutes it leaves).
 
-Each ride also lists `stops`: the stops between boarding and alighting, each with `name`, `stop_id` and `time`. A stop in the Wiener Linien stop list, whether a ride's `origin`, its `destination` or one of its `stops`, also carries `latitude` and `longitude`. Other stops, such as S-Bahn-only stations, have neither.
+### Trip shape
 
-Each ride in `trips` also carries `direction` (`H` or `R`), `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line typically runs there). A ride with a live time has `realtime: true` and a live `estimated` departure; its arrival moves by the same delay.
+Each connection in `trips`, `last_connection` and the `plan_trip` response has:
 
-The at-risk sensor turns on only when the current times say a change no longer fits. A `tight` change doesn't turn it on: the trip planner plans changes with no time to spare all the time, so that would keep the sensor on most of the day. Live times count for U-Bahn, tram and bus rides; they come from the departure boards, because the trip planner itself sends none.
+- `departure`, `arrival` (ISO times), `duration_minutes`, `interchanges`, `risk` and `cancelled`.
+- `legs`: every ride and walk, in order.
+- `transfers`: every change between two rides, with `at` (the stop), `walk_minutes`, `slack_minutes`, `risk` and `access`.
+
+Each leg has:
+
+- `walk` (`true` for a walk), `line`, `type` (such as `ptMetro` or `ptTrainS`), `product`, `towards` and `direction` (`H` or `R`).
+- `origin` and `destination`, each with `name`, `stop_id`, `platform`, `planned`, `estimated` and `delay_minutes`.
+- `stop_count`, `duration_minutes`, `walk_after_minutes` (the walk to the next ride) and `cancelled`.
+- `stops`: the stops between boarding and alighting, each with `name`, `stop_id` and `time`.
+- `realtime`: `true` when the ride has a live time. Its `estimated` departure is then live, and its arrival and `stops` times move by the same delay.
+- `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line typically runs there), from the departure boards.
+- `low_floor`: planned with a low-floor vehicle.
+- `access`: the lifts and stairs on the leg's own walk, each with `kind` (such as `elevator` or `stairs`), `level` (`up` or `down`) and the station's `stop_id`. A change's `access` lists the ones between two rides. A lift outage in `elevator_info` is matched by station, so it can concern a different lift at the same station.
+
+In `trips` and the `plan_trip` response, a stop in the Wiener Linien stop list, whether a leg's `origin`, its `destination` or one of its `stops`, also carries `latitude` and `longitude`. Other stops, such as S-Bahn-only stations, have neither.
 
 ### Stale-data sensor
 
@@ -306,6 +454,8 @@ Use it instead of the departure sensor's availability. The departure sensor stay
 | `traffic_info` | list[dict] | Service disruptions. `category` says which feed a notice came from: `stoerunglang` matches your tracked lines. `stoerungkurz` is the stop's own display text. It needs one of this stop's RBLs plus one of your tracked lines — named in the notice or, if it names none, calling at that platform per the timetable. A notice with no lines of its own lists those tracked lines in `inferred_lines`, which the card shows as badges. Every `stoerungkurz` notice has the platform's station name in `location`. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `inferred_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
+`departures`, `next_by_line`, `line_colors`, `lines_at_stop`, `tracked_lines`, `tracked_line_keys`, `traffic_info` and `elevator_info` aren't recorded in history, since they are large at busy stops.
+
 ### Departure shape
 
 Each entry in `departures` carries the service (`line`, `towards`, `direction` `"H"` / `"R"`, `type` — `ptMetro` / `ptTram` / `ptBusCity` / `ptBusNight`), the timing (`countdown`, `time_planned` and `time_real` as ISO strings, `realtime`), and the vehicle and stop context (`barrier_free`, `traffic_jam`, `platform`, `cooling`).
@@ -316,7 +466,7 @@ When the static schedule resolves a matching trip, `stops_ahead` adds an ordered
 
 ## Data Updates
 
-Three live endpoints and three static catalogues, on separate cadences:
+Four live endpoints and five static files, on separate cadences:
 
 | What | Endpoint | Cadence |
 |---|---|---|
@@ -326,8 +476,8 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 30 trains with their stops, fetched again after 2 h or when fewer than 6 are left, never more often than every 5 min. Counted down locally in between, and shares the routes' 15 s cooldown slot |
-| Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
-| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`: every 120 s while visible, paused after 30 min idle; answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
+| Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window. Pulled forward to 30 s after the best connection leaves, but never sooner than 60 s after the last refresh |
+| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`. The card refreshes every 120 s while visible, sooner right after the best connection leaves (never within 60 s), every 10 min for a plan at a chosen time, and pauses after 30 min idle. Answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
 | Last connection of the night *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | One request per route per night, at its first refresh between 22:00 and 03:00. Not retried if it fails |
 | Live times on connections *(experimental)* | `/monitor?stopId=…` | Rides in the departure boards' request. A request of its own only for a stop that has no answer yet, or when no departure board is set up (then once per route refresh, shared by all routes for 1 min) |
 
@@ -338,12 +488,13 @@ cadence costs no extra requests. The five static files likewise refresh as one
 weekly burst, not five schedules.
 
 Recurring calls share a **15 s domain-wide cooldown** plus a 30 s per-entry
-floor — that is the departure poll, the alerts refresh, and the weekly static
-burst (which takes one slot for all five files rather than stalling a
-background refresh five times over). The one exception is the live probe the
-config flow runs while you pick lines: it is user-initiated, happens at most
-twice in an entry's life, and making it wait would stall the setup dialog for
-no meaningful saving. The floor sits at or above the 15-second minimum interval
+floor — that is the departure poll, the alerts refresh, the live-times request
+a route makes on its own, and the weekly static burst (which takes one slot for
+all five files rather than stalling a background refresh five times over). The
+exceptions are the probes the setup dialog runs while you pick lines or save a
+route: the `/monitor` line probe, the S-Bahn line probe and the route test plan.
+Someone is watching the dialog, each runs once per step, and making them wait
+would stall it for no meaningful saving. The floor sits at or above the 15-second minimum interval
 conventionally cited for the OGD real-time endpoint — Wiener Linien publish no
 numeric cap, so the figure is convention rather than rule.
 
@@ -444,7 +595,7 @@ The action skips the request cooldown, because someone is waiting for the answer
 | `arrive_by` | no | `true` treats `datetime` as the latest arrival instead. Default `false`. |
 | `step_free` | no | `true` plans only step-free connections. Default `false`. |
 
-The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `trips` (up to four), `line_colors`, `traffic_info` and `attribution`. `planned_for` echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan for a chosen time keeps every connection it found, even ones that already left. Two more fields cover a used-up allowance. `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
+The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `step_free`, `trips` (up to four), `line_colors`, `traffic_info`, `elevator_info` and `attribution`. `planned_for` echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan for a chosen time keeps every connection it found, even ones that already left. Two more fields cover a used-up allowance. `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
 
 `plan` shares the limits described under [Data Updates](#data-updates): answers reused for a minute, and at most 60 requests an hour per user and 120 for all users together.
 
@@ -608,7 +759,7 @@ To try it, open Assist from the top of the Overview page and type *wie komme ich
 
 ## Troubleshooting
 
-**"Cannot reach the Wiener Linien real-time API" during setup.** The integration probes `/monitor` before saving. Either the API is down or outbound HTTPS from your HA host is blocked. Retry in a minute.
+**"Cannot reach the Wiener Linien real-time API" during setup.** The integration asks `/monitor` which lines serve the stop before it lists them. Either the API is down or outbound HTTPS from your HA host is blocked. Retry in a minute.
 
 **"Can't reach the Wiener Linien trip planner" when adding a route.** The integration plans the route once before saving. The trip planner runs separately from the departure API, so one can be down while the other works. Retry in a minute.
 
