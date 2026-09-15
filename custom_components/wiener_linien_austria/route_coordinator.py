@@ -33,6 +33,8 @@ from .const import (
     DEFAULT_LEAVE_MINUTES,
     DEFAULT_ROUTE_SCAN_INTERVAL,
     DOMAIN,
+    MAX_ROUTE_POLL_SECONDS,
+    MIN_ROUTE_POLL_SECONDS,
     MIN_ROUTE_ROLLOVER_SECONDS,
     ROUTING_TIME_ZONE,
     USER_AGENT,
@@ -126,9 +128,11 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         self._active_days: list[str] | None = (
             [str(d) for d in days] if isinstance(days, list) and days else None
         )
+        # Clamped here as well as in the form, for an entry edited by hand.
         seconds = (
             _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_ROUTE_SCAN_INTERVAL
         )
+        seconds = min(max(seconds, MIN_ROUTE_POLL_SECONDS), MAX_ROUTE_POLL_SECONDS)
         self.scan_interval = timedelta(seconds=seconds)
         self._failures = 0
         self._tz: tzinfo = dt_util.UTC
@@ -348,20 +352,41 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         out of date, so refresh shortly after it rather than waiting out
         the full interval — but never sooner than the rollover floor, so a
         connection leaving in ten seconds can't turn into a tight loop.
+
+        Only a connection still ahead counts, the same rule the route card
+        uses. `rank_trips` keeps one for a minute after it leaves, and the
+        refresh just after a departure gets it back from the planner, so
+        timing from it scheduled a second refresh 60 s later on every
+        rollover: 24 requests an hour instead of 12 on a line every 5 minutes.
         """
         self._failures = 0
         interval = self.scan_interval
-        departure = trips[0].departure if trips else None
+        now = dt_util.utcnow()
+        departure = next(
+            (
+                trip.departure
+                for trip in trips
+                if trip.departure is not None
+                and (trip.departure - now).total_seconds() + 30 > 0
+            ),
+            None,
+        )
         if departure is not None:
-            until = (departure - dt_util.utcnow()).total_seconds() + 30
+            until = (departure - now).total_seconds() + 30
             rollover = timedelta(seconds=max(MIN_ROUTE_ROLLOVER_SECONDS, until))
             interval = min(interval, rollover)
         self.update_interval = interval
 
     def _note_failure(self) -> None:
-        """Stretch the interval from the second consecutive failure on."""
+        """Stretch the interval from the second consecutive failure on.
+
+        The first failure goes back to the configured interval: the last
+        success may have pulled the next refresh up to a departure, and a
+        retry shouldn't inherit that.
+        """
         self._failures += 1
         if self._failures < 2:
+            self.update_interval = self.scan_interval
             return
         stretched = self.scan_interval.total_seconds() * 2 ** (self._failures - 1)
         seconds = min(stretched, BACKOFF_CAP_SECONDS)

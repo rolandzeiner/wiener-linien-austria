@@ -325,7 +325,7 @@ Three live endpoints and three static catalogues, on separate cadences:
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
-| Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 30 trains with their stops, fetched again after 30 min or when fewer than 6 are left, never more often than every 5 min. Counted down locally in between, and shares the routes' 15 s cooldown slot |
+| Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 30 trains with their stops, fetched again after 2 h or when fewer than 6 are left, never more often than every 5 min. Counted down locally in between, and shares the routes' 15 s cooldown slot |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window |
 | Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`: every 120 s while visible, paused after 30 min idle; answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
 | Last connection of the night *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | One request per route per night, at its first refresh between 22:00 and 03:00. Not retried if it fails |

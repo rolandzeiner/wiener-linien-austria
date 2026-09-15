@@ -28,6 +28,7 @@ from custom_components.wiener_linien_austria.const import (
     LINE_TYPE_S_BAHN,
     MAX_STOPS_AHEAD,
     ROUTING_DEPARTURE_ENDPOINT,
+    TIMETABLE_MAX_AGE,
 )
 from custom_components.wiener_linien_austria.coordinator import (
     Departure,
@@ -241,7 +242,7 @@ async def test_board_refresh_policy(
     # Fresh and plenty ahead.
     assert not board.is_due(now + timedelta(minutes=10))
     # Too old.
-    assert board.is_due(now + timedelta(minutes=30))
+    assert board.is_due(now + TIMETABLE_MAX_AGE)
     # Running low: at 16:15 only four trains are still ahead. Pretend the
     # batch was fetched a minute earlier so the age rule stays out of it.
     board._fetched_at = FIRST_TRAIN + timedelta(minutes=60)
@@ -639,8 +640,10 @@ async def test_short_answer_is_complete_and_not_refetched_early(
     fetched = board.fetched_at
     assert fetched is not None
     assert not board.is_due(fetched + timedelta(minutes=6))
-    assert not board.is_due(fetched + timedelta(minutes=29))
-    assert board.is_due(fetched + timedelta(minutes=30))
+    # Two hours, not the 30 minutes that cost a busy stop 48 requests a day.
+    assert not board.is_due(fetched + timedelta(minutes=30))
+    assert not board.is_due(fetched + TIMETABLE_MAX_AGE - timedelta(minutes=1))
+    assert board.is_due(fetched + TIMETABLE_MAX_AGE)
 
 
 async def test_refresh_does_not_hide_a_monitor_failure(hass: HomeAssistant) -> None:

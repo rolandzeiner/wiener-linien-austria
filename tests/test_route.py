@@ -327,6 +327,45 @@ async def test_rollover_never_drops_below_the_floor(
     assert entry.runtime_data.update_interval == timedelta(seconds=60)
 
 
+async def test_a_connection_that_left_does_not_time_the_rollover(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    # 07:57:30: the 07:57 connection left 30 s ago but is still in the list
+    # (rank_trips keeps it for a minute). The refresh waits for the 08:00 one
+    # rather than coming back in 60 s, which doubled the trip requests on a
+    # frequent line.
+    freezer.move_to("2026-09-14 05:57:30+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+    assert str(coordinator.data.trips[0].departure).startswith("2026-09-14 07:57")
+    assert coordinator.update_interval == timedelta(seconds=180)
+
+
+async def test_first_failure_does_not_keep_a_pulled_up_refresh(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    freezer.move_to("2026-09-14 05:55:00+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+    assert coordinator.update_interval == timedelta(seconds=150)
+    fetch.side_effect = RoutingError("api_timeout", {"seconds": "20"})
+    await coordinator.async_refresh()
+    assert coordinator.update_interval == timedelta(seconds=300)
+
+
+@pytest.mark.parametrize(("stored", "effective"), [(10, 120), (99999, 1800)])
+async def test_route_interval_is_clamped_to_its_range(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, stored: int, effective: int
+) -> None:
+    """A hand-edited entry never skips the form's range."""
+    coordinator = WienerLinienRouteCoordinator(
+        hass, route_entry(**{CONF_SCAN_INTERVAL: stored})
+    )
+    assert coordinator.scan_interval == timedelta(seconds=effective)
+
+
 async def test_backoff_stretches_and_resets(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:

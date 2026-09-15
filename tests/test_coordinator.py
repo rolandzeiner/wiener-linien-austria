@@ -842,6 +842,17 @@ async def test_scan_interval_reflects_config(hass: HomeAssistant) -> None:
     assert coordinator.update_interval is None
 
 
+@pytest.mark.parametrize(("stored", "effective"), [(5, 30), (99999, 600)])
+async def test_scan_interval_is_clamped_to_its_range(
+    hass: HomeAssistant, stored: int, effective: int
+) -> None:
+    """A hand-edited entry can't put its batch group below the 30 s floor."""
+    entry = _make_entry({CONF_SCAN_INTERVAL: stored})
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    assert coordinator.scan_interval == timedelta(seconds=effective)
+
+
 # ---------------------------------------------------------------------------
 # Upstream staleness (issue #103)
 # ---------------------------------------------------------------------------

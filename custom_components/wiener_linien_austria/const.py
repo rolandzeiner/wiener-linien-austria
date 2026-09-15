@@ -299,7 +299,11 @@ TIMETABLE_DEPARTURES_REQUESTED: Final = 30
 # at a stop even where some run only every 30 minutes.
 TIMETABLE_PICKER_DEPARTURES: Final = 100
 # A board's planned rows are refetched when this old…
-TIMETABLE_MAX_AGE: Final = timedelta(minutes=30)
+# Two hours, not 30 minutes: the running-low rule below already refetches
+# a busy stop about once an hour, so the age only has to catch a replacement
+# timetable published within the day. At 30 minutes it made 48 requests a
+# day per stop at ~280 KB each before gzip (measured 2026-09-15, Meidling).
+TIMETABLE_MAX_AGE: Final = timedelta(hours=2)
 # …or when fewer than this many are still ahead, but never sooner than
 # TIMETABLE_RETRY_AFTER after the last attempt, which also spaces out
 # retries after a failure.

@@ -26,7 +26,9 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     LINE_TYPE_S_BAHN,
+    MAX_POLL_SECONDS,
     MAX_STOPS_AHEAD,
+    MIN_POLL_SECONDS,
     STALE_DEPARTURE_MAX_AGE,
 )
 
@@ -194,7 +196,11 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._stops_ahead_warned_lines: set[str] = set()
         # Latch for the stale-feed warning; see _note_stale_departures.
         self._stale_warned: bool = False
+        # Clamped here as well as in the forms: an entry edited by hand in
+        # `.storage` never passes the selector, and the batch group polls at
+        # whatever this says.
         scan_secs = _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_SCAN_INTERVAL
+        scan_secs = min(max(scan_secs, MIN_POLL_SECONDS), MAX_POLL_SECONDS)
         self._scan_interval = timedelta(seconds=scan_secs)
         # The shared batch group that owns this entry's fetching. Assigned by
         # `attach_batch` during entry setup, before the first refresh.
