@@ -61,26 +61,19 @@ ROUTING_COOLDOWN_SECONDS = 15
 async def async_enforce_routing_cooldown(hass: HomeAssistant) -> None:
     """Serialise unattended routing requests under their own 15 s floor.
 
-    Same lock-then-sleep shape as `async_enforce_domain_cooldown`, on
-    separate keys. Only the unattended callers take it (route coordinators
+    Shares `_async_enforce_cooldown` with `async_enforce_domain_cooldown`,
+    on separate keys. Only the unattended callers take it (route coordinators
     and the S-Bahn `TimetableBoard`); the user-initiated `plan_trip` action
     and the route card's ad-hoc mode do not, for the same reason the config-flow line probe skips the realtime
     slot — someone is waiting. adhoc.py's budget bounds those instead.
     """
-    domain_data = hass.data.setdefault(DOMAIN, {})
-    current_loop = asyncio.get_running_loop()
-    if domain_data.get(ROUTING_LOCK_LOOP_KEY) is not current_loop:
-        domain_data[ROUTING_LOCK_KEY] = asyncio.Lock()
-        domain_data[ROUTING_LOCK_LOOP_KEY] = current_loop
-    lock: asyncio.Lock = domain_data[ROUTING_LOCK_KEY]
-    async with lock:
-        last: datetime | None = domain_data.get(ROUTING_LAST_CALL_KEY)
-        now = dt_util.utcnow()
-        if last is not None:
-            elapsed = (now - last).total_seconds()
-            if elapsed < ROUTING_COOLDOWN_SECONDS:
-                await asyncio.sleep(ROUTING_COOLDOWN_SECONDS - elapsed)
-        domain_data[ROUTING_LAST_CALL_KEY] = dt_util.utcnow()
+    await _async_enforce_cooldown(
+        hass,
+        lock_key=ROUTING_LOCK_KEY,
+        loop_key=ROUTING_LOCK_LOOP_KEY,
+        last_call_key=ROUTING_LAST_CALL_KEY,
+        seconds=ROUTING_COOLDOWN_SECONDS,
+    )
 
 
 async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
@@ -97,6 +90,29 @@ async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
     5-min cadence through ONE combined /trafficInfoList request. Adding stops
     doesn't lengthen the queue — see batch.py's module docstring.
     """
+    await _async_enforce_cooldown(
+        hass,
+        lock_key=LOCK_KEY,
+        loop_key=LOCK_LOOP_KEY,
+        last_call_key=DOMAIN_LAST_CALL_KEY,
+        seconds=DOMAIN_COOLDOWN_SECONDS,
+    )
+
+
+async def _async_enforce_cooldown(
+    hass: HomeAssistant,
+    *,
+    lock_key: str,
+    loop_key: str,
+    last_call_key: str,
+    seconds: float,
+) -> None:
+    """Wait out `seconds` since the last call on these keys, under their lock.
+
+    Both public cooldowns are this body on their own keys. The callers pass
+    the module-level seconds constant at call time, not as a default, so
+    tests that patch those constants still take effect.
+    """
     domain_data = hass.data.setdefault(DOMAIN, {})
     # Loop-pin the lock — `asyncio.Lock()` lazy-binds to the running
     # loop on first use, so a lock created on a torn-down loop (test
@@ -106,19 +122,19 @@ async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
     # against the current loop. The cooldown timestamp survives the
     # swap so we don't lose rate-limit state across the boundary.
     current_loop = asyncio.get_running_loop()
-    cached_loop = domain_data.get(LOCK_LOOP_KEY)
+    cached_loop = domain_data.get(loop_key)
     if cached_loop is not current_loop:
-        domain_data[LOCK_KEY] = asyncio.Lock()
-        domain_data[LOCK_LOOP_KEY] = current_loop
-    lock: asyncio.Lock = domain_data[LOCK_KEY]
+        domain_data[lock_key] = asyncio.Lock()
+        domain_data[loop_key] = current_loop
+    lock: asyncio.Lock = domain_data[lock_key]
     async with lock:
-        last: datetime | None = domain_data.get(DOMAIN_LAST_CALL_KEY)
+        last: datetime | None = domain_data.get(last_call_key)
         now = dt_util.utcnow()
         if last is not None:
             elapsed = (now - last).total_seconds()
-            if elapsed < DOMAIN_COOLDOWN_SECONDS:
-                await asyncio.sleep(DOMAIN_COOLDOWN_SECONDS - elapsed)
-        domain_data[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
+            if elapsed < seconds:
+                await asyncio.sleep(seconds - elapsed)
+        domain_data[last_call_key] = dt_util.utcnow()
 
 
 def backoff_delay(base: timedelta, failures: int, *, jitter: bool = False) -> timedelta:
