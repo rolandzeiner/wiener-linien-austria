@@ -9,6 +9,30 @@
 
 Vienna public transport departures for Home Assistant. Start typing your stop, choose the lines you care about — done. Uses the official [Wiener Linien OGD real-time API](https://www.wienerlinien.at/open-data): no API key, no YAML, no RBL lookups.
 
+<!-- toc -->
+
+## Contents
+
+- [Supported Functions](#supported-functions)
+- [Screenshots](#screenshots)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Setup](#setup)
+- [Lovelace Cards](#lovelace-cards)
+- [Sensor Attributes](#sensor-attributes)
+- [Data Updates](#data-updates)
+- [Actions](#actions)
+- [Use Cases](#use-cases)
+- [Automation Examples](#automation-examples)
+- [Troubleshooting](#troubleshooting)
+- [Known Limitations](#known-limitations)
+- [Removal](#removal)
+- [Attribution](#attribution)
+- [License](#license)
+- [Disclaimer](#disclaimer)
+
+<!-- tocstop -->
+
 ## Supported Functions
 
 - **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; the state is the next-departure countdown, attributes carry the full board.

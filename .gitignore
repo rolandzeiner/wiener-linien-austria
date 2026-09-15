@@ -152,6 +152,7 @@ config/
 scripts/*
 !scripts/strip-css-comments.mjs
 !scripts/check_module_coverage.py
+!scripts/readme_toc.py
 dev-push.sh
 dev/
 test/

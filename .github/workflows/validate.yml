@@ -28,6 +28,16 @@ jobs:
             exit 1
           fi
 
+  readme-toc:
+    # The table of contents is generated from the `##` headings. The
+    # pre-commit hook keeps it current; this catches a commit made without
+    # the hook. Standard library only, so no Python setup step.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: README table of contents is up to date
+        run: python3 scripts/readme_toc.py --check
+
   compile-floor-python:
     # Every other job runs the CI interpreter (3.14). `hacs.json` promises
     # Home Assistant >= 2025.6.0, which runs on Python 3.13 — so the whole
