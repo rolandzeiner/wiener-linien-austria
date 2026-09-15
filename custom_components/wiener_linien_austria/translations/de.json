@@ -37,14 +37,6 @@
           "scan_interval": "Mindestens 30 Sekunden — doppelter Sicherheitsabstand zum konventionellen 15-Sekunden-Mindestintervall, das für die OGD-Schnittstelle zirkuliert. Bietet Reserve, wenn mehrere HA-Instanzen dieselbe Ausgangs-IP nutzen."
         }
       },
-      "reconfigure": {
-        "title": "{stop_name} neu konfigurieren",
-        "description": "Verfolgte Linien oder Intervall anpassen. Entitäten bleiben erhalten.",
-        "data": {
-          "lines": "Linien verfolgen",
-          "scan_interval": "Aktualisierungsintervall (Sekunden)"
-        }
-      },
       "route": {
         "title": "Verbindung",
         "description": "Start und Ziel der Fahrt wählen.",

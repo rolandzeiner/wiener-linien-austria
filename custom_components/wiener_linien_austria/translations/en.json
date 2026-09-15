@@ -37,14 +37,6 @@
           "scan_interval": "Minimum 30 seconds — twice the conventional 15-second floor circulated for the OGD endpoint, for safety margin under shared-IP scenarios."
         }
       },
-      "reconfigure": {
-        "title": "Reconfigure {stop_name}",
-        "description": "Update the tracked lines or the polling interval. Entities are preserved.",
-        "data": {
-          "lines": "Lines to track",
-          "scan_interval": "Update interval (seconds)"
-        }
-      },
       "route": {
         "title": "Route",
         "description": "Pick where your trip starts and ends.",

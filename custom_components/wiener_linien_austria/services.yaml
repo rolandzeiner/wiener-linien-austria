@@ -20,7 +20,7 @@ plan_trip:
       selector:
         datetime:
     arrive_by:
-      required: true
+      required: false
       default: false
       selector:
         boolean:
