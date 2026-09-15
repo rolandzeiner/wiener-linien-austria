@@ -51,7 +51,6 @@ function schema(
       ? [
           { name: "from", selector: stopSelector },
           { name: "to", selector: stopSelector },
-          { name: "step_free", selector: { boolean: {} } },
         ]
       : []),
     {
@@ -60,6 +59,8 @@ function schema(
         number: { min: 0, max: MAX_ALTERNATIVES, step: 1, mode: "slider" },
       },
     },
+    // Toggles last, in one run.
+    ...(adhoc && stopSelector ? [{ name: "step_free", selector: { boolean: {} } }] : []),
     { name: "show_map_pins", selector: { boolean: {} } },
     { name: "hide_attribution", selector: { boolean: {} } },
   ] as unknown as ReadonlyArray<HaFormSchema>;

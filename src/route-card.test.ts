@@ -1287,7 +1287,7 @@ describe("editor", () => {
       schema: Array<{ name: string; required?: boolean }>;
     };
     expect(form.schema.map((f) => f.name)).toEqual([
-      "entity", "title", "from", "to", "step_free", "alternatives", "show_map_pins", "hide_attribution",
+      "entity", "title", "from", "to", "alternatives", "step_free", "show_map_pins", "hide_attribution",
     ]);
     expect(form.schema[0]?.required).toBeUndefined();
 
