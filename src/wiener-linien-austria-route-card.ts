@@ -67,6 +67,7 @@ import {
   catchableDeparture,
   clockOf,
   delayedClock,
+  sameStop,
   findRouteEntities,
   isInputDateTime,
   legTypeIcon,
@@ -1057,7 +1058,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               i === 0,
               attrs,
               !!transfer && i < legs.length - 1,
-              i < legs.length - 1,
+              legs[i + 1],
               i === 0 ? walkAccess(trip, "start") : undefined,
             )}
             ${transfer && i < legs.length - 1
@@ -1086,7 +1087,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     first: boolean,
     attrs: RouteAttrs,
     beforeTransfer: boolean,
-    showArrival: boolean,
+    nextLeg: RouteLegAttr | undefined,
     accessBefore?: RouteAccessStepAttr[],
   ): TemplateResult {
     const icon = legTypeIcon(leg.type, leg.line);
@@ -1171,13 +1172,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               )}
             </ol>`
           : nothing}
-        ${showArrival
+        ${nextLeg
           ? html`<div class="stop stop--arrive">
               <span class="node" aria-hidden="true"></span>
               <span class="sr-only">${this._t("arrival")}</span>
               ${this._renderStopTime(leg.destination)}
               <span class="stop-name">${leg.destination.name}</span>
-              ${this._renderMapLink(leg.destination)}
+              ${sameStop(leg.destination, nextLeg.origin)
+                ? nothing
+                : this._renderMapLink(leg.destination)}
             </div>`
           : nothing}
       </li>
@@ -1186,8 +1189,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   /** A pin after a stop name that opens the stop on the city map, or searches
    *  for it by name where the catalogue gave no coordinates. The label says
-   *  which of the two it does. Boarding stops, arrivals and the destination get
-   *  one; the stops in between sit too close together for a 24px target each. */
+   *  which of the two it does. Boarding stops and the destination get one, and
+   *  an arrival only where the next ride leaves from a different stop (the
+   *  boarding pin below it already covers the same one). The stops in between
+   *  sit too close together for a 24px target each. */
   private _renderMapLink(stop: RouteStopAttr): TemplateResult | typeof nothing {
     if (this._config?.show_map_pins === false) return nothing;
     const url = stopMapUrl(stop.name, stop.latitude, stop.longitude);
@@ -1280,7 +1285,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return html`
       <li class="transfer" data-risk=${transfer.risk}>
         <span class="node node--transfer" aria-hidden="true"></span>
-        <span class="transfer-at">${this._t("transfer_at", { at: transfer.at })}</span>
+        <span class="transfer-at">${this._t("transfer")}</span>
         ${transfer.walk_minutes > 0
           ? html`<span class="walk">
               <ha-icon icon="mdi:walk" aria-hidden="true"></ha-icon>

@@ -380,6 +380,26 @@ describe("map links", () => {
     expect(root(el).querySelector(".stops-toggle a, .leg-stop a")).toBeNull();
   });
 
+  it("leaves the pin off an arrival at the stop the next ride leaves from", async () => {
+    const base = trip("07:57", "08:11");
+    const [first, second] = base.legs as [RouteTripAttr["legs"][0], RouteTripAttr["legs"][0]];
+    const change = (sameDiva: boolean) => ({
+      ...base,
+      legs: [
+        { ...first, destination: { ...first.destination, stop_id: "60201320" } },
+        { ...second, origin: { ...second.origin, stop_id: sameDiva ? "60201320" : "60201198" } },
+      ],
+    });
+    for (const [sameDiva, pins] of [[true, 3], [false, 4]] as const) {
+      document.body.innerHTML = "";
+      const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [change(sameDiva)] }), {
+        entity: ENTITY,
+      });
+      expect(links(el)).toHaveLength(pins);
+      expect(root(el).querySelector(".stop--arrive .map-link") !== null).toBe(!sameDiva);
+    }
+  });
+
   it("gives walks no pin of their own", async () => {
     const base = trip("07:57", "08:11");
     const walk = {
@@ -496,7 +516,7 @@ describe("rendering", () => {
     const legRow = root(el).querySelector(".strand .leg")!;
     expect(legRow.querySelector(".ride .towards")?.textContent).toContain("Richtung Simmering");
     expect(legRow.querySelector(".ride-detail .stops-toggle")).not.toBeNull();
-    expect(t).toContain("Umstieg Stephansplatz");
+    expect(root(el).querySelector(".transfer-at")?.textContent).toBe("Umstieg");
     expect(t).toContain("4 min Fußweg");
     expect(t).toContain("Knapp: 0 min Puffer");
     expect(t).toContain("U3: Verspätungen");
@@ -711,7 +731,7 @@ describe("ad-hoc mode", () => {
       { type: "wiener_linien_austria/plan", origin: 60201468, destination: 60201040 },
     ]);
     expect(text(el)).toContain("Abfahrt in");
-    expect(text(el)).toContain("Umstieg Stephansplatz");
+    expect(root(el).querySelector(".transfer-at")?.textContent).toBe("Umstieg");
     expect(text(el)).toContain("Zuletzt aktualisiert 07:49");
     // A plan that wasn't asked for right now isn't announced.
     expect(root(el).querySelector('p[role="status"]')?.textContent).toBe("");

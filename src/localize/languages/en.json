@@ -348,7 +348,7 @@
     "risk_ok": "{n} min to spare",
     "risk_tight": "Tight: {n} min to spare",
     "risk_at_risk": "Connection at risk: {n} min short",
-    "transfer_at": "Change at {at}",
+    "transfer": "Change",
     "alternatives": "More connections ({n})",
     "disruption": "Disruption",
     "inactive": "Outside the refresh window",

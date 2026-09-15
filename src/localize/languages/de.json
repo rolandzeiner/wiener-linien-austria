@@ -348,7 +348,7 @@
     "risk_ok": "{n} min Puffer",
     "risk_tight": "Knapp: {n} min Puffer",
     "risk_at_risk": "Anschluss gefährdet: {n} min zu wenig",
-    "transfer_at": "Umstieg {at}",
+    "transfer": "Umstieg",
     "alternatives": "Weitere Verbindungen ({n})",
     "disruption": "Störung",
     "inactive": "Außerhalb des Zeitfensters",

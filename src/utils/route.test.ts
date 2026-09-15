@@ -17,6 +17,7 @@ import {
   legTypeIcon,
   minutesUntil,
   normaliseRouteConfig,
+  sameStop,
   transitLegs,
   upcomingTrips,
   viennaClock,
@@ -385,5 +386,23 @@ describe("catchableDeparture", () => {
 
   it("only speaks up for a change at risk", () => {
     expect(catchableDeparture(arriving, transfer("tight"), departing)).toBeNull();
+  });
+});
+
+describe("sameStop", () => {
+  const stop = (stop_id: string | null, latitude?: number, longitude?: number) => ({
+    stop_id,
+    ...(latitude === undefined ? {} : { latitude }),
+    ...(longitude === undefined ? {} : { longitude }),
+  });
+
+  it("matches one DIVA under two names, or the same coordinates", () => {
+    expect(sameStop(stop("60200981"), stop("60200981"))).toBe(true);
+    expect(sameStop(stop(null, 48.212, 16.3117), stop("1", 48.212, 16.3117))).toBe(true);
+  });
+
+  it("tells different stops apart, and never guesses without data", () => {
+    expect(sameStop(stop("60201206", 48.2066, 16.3851), stop("60200657", 48.2053, 16.3854))).toBe(false);
+    expect(sameStop(stop(null), stop(null))).toBe(false);
   });
 });

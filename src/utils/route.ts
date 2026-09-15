@@ -184,6 +184,24 @@ export function catchableDeparture(
  *  when it doesn't (or the two print as the same minute). The expected time
  *  rounds to the nearest minute: a live estimate carries seconds, and a
  *  vehicle 40 s late shouldn't show "09:22 → 09:22". */
+/** Whether a ride's arrival and the next ride's boarding are one stop: the
+ *  same DIVA, or the same coordinates. The trip planner names one stop
+ *  differently by platform area ("Ottakring" / "Ottakring (Huttengasse)"),
+ *  so names don't count. Without either to compare, they are not known to be
+ *  the same. */
+export function sameStop(
+  a: Pick<RouteStopAttr, "stop_id" | "latitude" | "longitude">,
+  b: Pick<RouteStopAttr, "stop_id" | "latitude" | "longitude">,
+): boolean {
+  if (a.stop_id && b.stop_id && a.stop_id === b.stop_id) return true;
+  return (
+    typeof a.latitude === "number" &&
+    typeof a.longitude === "number" &&
+    a.latitude === b.latitude &&
+    a.longitude === b.longitude
+  );
+}
+
 export function delayedClock(
   stop: Pick<RouteStopAttr, "planned" | "estimated">,
 ): { planned: string; expected: string } | null {
