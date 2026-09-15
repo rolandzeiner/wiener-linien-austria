@@ -453,6 +453,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         """Refetch the timetable and re-publish the last slice with it."""
         if not await board.async_refresh() or self._last_monitor is None:
             return
+        # A `/monitor` failure may have landed while the refresh was waiting
+        # (it queues behind the routing cooldown). Republishing the last good
+        # slice now would mark the coordinator successful and hide the
+        # outage; the next good tick merges the new timetable anyway.
+        if not self.last_update_success:
+            return
         self._invalidate_attrs_cache()
         self.async_set_updated_data(self._with_timetable(self._last_monitor))
 

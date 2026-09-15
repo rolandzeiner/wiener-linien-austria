@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Any
 
+import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -17,6 +18,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from . import static
 from .alerts import get_alerts_for
 from .const import (
     BACKOFF_CAP_SECONDS,
@@ -151,10 +153,29 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         )
 
     async def _async_setup(self) -> None:
-        """Resolve the timetable zone without blocking the event loop."""
+        """Resolve the timetable zone and load the stop catalogue.
+
+        The catalogue matches rides to the RBLs `/monitor` answers for, and
+        gives stops their coordinates and lift outages. A departure board's
+        coordinator loads it too, but an install with only routes has no
+        such coordinator, and without this would run on the bare timetable
+        until someone opened the card's planner or the weekly refresh came
+        round. A failure isn't fatal: the route still plans, without those.
+        """
         zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE)
         if zone is not None:
             self._tz = zone
+        try:
+            await static.async_get_catalogue(self.hass)
+        except (
+            TimeoutError,
+            aiohttp.ClientError,
+            KeyError,
+            TypeError,
+            ValueError,
+            RuntimeError,
+        ) as err:
+            _LOGGER.debug("Stop catalogue unavailable for routes: %s", err)
         self._unsub_live = async_get_live_board(self.hass).async_add_listener(
             self._on_live_times
         )

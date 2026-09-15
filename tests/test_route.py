@@ -56,6 +56,7 @@ from custom_components.wiener_linien_austria.const import (
 from custom_components.wiener_linien_austria.diagnostics import (
     async_get_config_entry_diagnostics,
 )
+from custom_components.wiener_linien_austria.live import async_get_live_board
 from custom_components.wiener_linien_austria.route_coordinator import (
     WienerLinienRouteCoordinator,
     route_trip_attributes,
@@ -204,6 +205,56 @@ async def test_upstream_failure_retries_setup(
         entry = route_entry()
         await async_setup_entry_and_wait(hass, entry)
     assert entry.state is ConfigEntryState.SETUP_RETRY
+
+
+async def test_failed_setup_leaves_no_live_listener_behind(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory
+) -> None:
+    """Each setup retry builds a new coordinator; the failed one lets go.
+
+    `_async_setup` registers with the shared live board before the first
+    refresh. Nothing here shuts a failed coordinator down: HA does, since
+    `DataUpdateCoordinator` registers `async_shutdown` on the entry's
+    unload callbacks (present since at least the 2025.6.0 floor), and those
+    run on SETUP_RETRY too. Pinned because the leak it would be is silent.
+    """
+    board = async_get_live_board(hass)
+    with patch(
+        ROUTE_FETCH,
+        new_callable=AsyncMock,
+        side_effect=RoutingError("api_timeout", {"seconds": "20"}),
+    ):
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert board._listeners == []
+
+
+async def test_route_setup_loads_the_stop_catalogue(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """An install with only routes still gets live times and coordinates."""
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_get_catalogue",
+        new_callable=AsyncMock,
+    ) as load:
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
+    assert entry.state is ConfigEntryState.LOADED
+    load.assert_awaited_with(hass)
+
+
+async def test_route_setup_survives_a_missing_catalogue(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    with patch(
+        "custom_components.wiener_linien_austria.static.async_get_catalogue",
+        new_callable=AsyncMock,
+        side_effect=TimeoutError,
+    ):
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
+    assert entry.state is ConfigEntryState.LOADED
 
 
 async def test_invalid_diva_is_a_setup_error(

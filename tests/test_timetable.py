@@ -17,6 +17,7 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.config_flow import _line_label
@@ -225,12 +226,16 @@ async def test_board_refresh_policy(
     now = FIRST_TRAIN - timedelta(minutes=1)
     assert board.is_due(now)
 
+    # A full answer: as many trains as asked for, so the server may have
+    # more. The fixture's 12, padded with copies of its first train.
+    full = _body()
+    full["departureList"] += [full["departureList"][0]] * 18
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
-        patch(_FETCH, new_callable=AsyncMock, return_value=_body()),
+        patch(_FETCH, new_callable=AsyncMock, return_value=full),
     ):
         assert await board.async_refresh() is True
-    assert len(board.departures) == 12
+    assert len(board.departures) == 30
     assert board.fetched_at is not None
 
     # Fresh and plenty ahead.
@@ -618,3 +623,47 @@ def test_terminus_ignores_a_bracketed_qualifier() -> None:
         {"name": "Hauptbahnhof (S-Bahn-Station)", "is_terminus": True}
     ]
     assert rows[1].stops_ahead == [{"name": "Hauptbahnhof Süd"}]
+
+
+async def test_short_answer_is_complete_and_not_refetched_early(
+    hass: HomeAssistant,
+) -> None:
+    """Fewer trains than asked for is all there is; only age triggers a refetch."""
+    board = TimetableBoard(hass, PRATERSTERN)
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value={"departureList": None}),
+    ):
+        await board.async_refresh()
+    assert board.departures == ()
+    fetched = board.fetched_at
+    assert fetched is not None
+    assert not board.is_due(fetched + timedelta(minutes=6))
+    assert not board.is_due(fetched + timedelta(minutes=29))
+    assert board.is_due(fetched + timedelta(minutes=30))
+
+
+async def test_refresh_does_not_hide_a_monitor_failure(hass: HomeAssistant) -> None:
+    """A timetable landing after a failed poll must not flip the board back."""
+    entry = make_entry({CONF_LINES: ["S1|R"]})
+    entry.add_to_hass(hass)
+    coordinator = WienerLinienAustriaCoordinator(hass, entry)
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value={"departureList": None}),
+    ):
+        coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
+        await hass.async_block_till_done()
+    assert coordinator.last_update_success
+
+    coordinator.batch_set_error(UpdateFailed("down"))
+    assert not coordinator.last_update_success
+    board = coordinator.timetable
+    assert board is not None
+    with (
+        patch.object(board, "async_refresh", new_callable=AsyncMock, return_value=True),
+        patch.object(coordinator, "async_set_updated_data") as push,
+    ):
+        await coordinator._async_refresh_timetable(board)
+    push.assert_not_called()
+    assert not coordinator.last_update_success

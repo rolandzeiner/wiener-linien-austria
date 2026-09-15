@@ -505,10 +505,62 @@ def test_malformed_rows_are_skipped() -> None:
     assert rows[0].real is None
 
 
+def _age_rows(board: live.LiveBoard, seconds: float) -> None:
+    now = board._hass.loop.time()
+    board._rows = {rbl: (now - seconds, rows) for rbl, (_, rows) in board._rows.items()}
+
+
+async def test_rows_stay_live_for_a_slow_board_cadence(hass: HomeAssistant) -> None:
+    """At a 600 s board cadence a 400 s old row is the newest there is.
+
+    Leased stops only refresh on the fastest batch group's tick, so the
+    fixed 180 s limit put routes on the timetable for most of each cycle.
+    """
+    board = async_get_live_board(hass)
+    board.ingest(_monitor_body())
+    _age_rows(board, 400)
+    assert board.rows_for({TRAM_49_R}) == []  # no board running: 180 s rule
+
+    group = MonitorBatchGroup(hass, 600)
+    group.add_member(_member(hass, data={CONF_RBLS: [1]}, unique_id="slow"))
+    hass.data.setdefault(DOMAIN, {})[BATCH_REGISTRY_KEY] = {600: group}
+    assert board.rows_for({TRAM_49_R}) != []
+    _age_rows(board, 600 + live.LIVE_ROW_GRACE_SECONDS + 1)
+    assert board.rows_for({TRAM_49_R}) == []
+
+
+async def test_rows_age_by_the_fastest_board(hass: HomeAssistant) -> None:
+    """The fastest group carries the leases, so its cadence sets the limit."""
+    fast = MonitorBatchGroup(hass, 60)
+    fast.add_member(_member(hass, data={CONF_RBLS: [1]}, unique_id="fast"))
+    slow = MonitorBatchGroup(hass, 600)
+    slow.add_member(_member(hass, data={CONF_RBLS: [2]}, unique_id="slow"))
+    hass.data.setdefault(DOMAIN, {})[BATCH_REGISTRY_KEY] = {60: fast, 600: slow}
+    board = async_get_live_board(hass)
+    board.ingest(_monitor_body())
+    _age_rows(board, 400)
+    assert board.rows_for({TRAM_49_R}) == []
+
+
+async def test_rows_outlive_their_live_window_before_purge(hass: HomeAssistant) -> None:
+    """A purged leased stop looks unanswered and earns a request of its own."""
+    group = MonitorBatchGroup(hass, 600)
+    group.add_member(_member(hass, data={CONF_RBLS: [1]}, unique_id="slow"))
+    hass.data.setdefault(DOMAIN, {})[BATCH_REGISTRY_KEY] = {600: group}
+    board = async_get_live_board(hass)
+    board.ingest(_monitor_body())
+    _age_rows(board, 700)
+    board.ingest({"data": {"monitors": []}}, [U2_R])
+    assert TRAM_49_R in board._rows
+
+
 async def test_old_rows_are_purged(hass: HomeAssistant) -> None:
     board = async_get_live_board(hass)
     board.ingest(_monitor_body())
-    with patch.object(live, "LIVE_PURGE_SECONDS", 0):
+    with (
+        patch.object(live, "LIVE_PURGE_SECONDS", 0),
+        patch.object(live, "LIVE_ROW_MAX_AGE_SECONDS", 0),
+    ):
         board.ingest({"data": {"monitors": []}}, [U2_R])
     assert board.rows_for({TRAM_49_R}) == []
 

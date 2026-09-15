@@ -65,8 +65,14 @@ _LOGGER = logging.getLogger(__name__)
 LIVE_BOARD_KEY: Final = "live_board"
 
 # Rows older than this don't count as live. Two missed batch ticks at the
-# default 60 s cadence; any older and a delay could have moved on.
+# default 60 s cadence; any older and a delay could have moved on. A slower
+# batch cadence raises it (`_row_max_age`): leased stops are only refreshed
+# once per tick of the fastest group, so at 600 s a fixed 180 s would put
+# routes on the timetable for most of every cycle.
 LIVE_ROW_MAX_AGE_SECONDS: Final = 180
+# Slack on top of that cadence, so a tick delayed by the domain cooldown or
+# a slow answer doesn't drop its stops to the timetable for a moment.
+LIVE_ROW_GRACE_SECONDS: Final = 60
 # Without a batch group, an answer this fresh serves every caller, so routes
 # refreshing a few seconds apart share one request.
 LIVE_REUSE_SECONDS: Final = 60
@@ -365,10 +371,13 @@ class LiveBoard:
             self._rows[rbl] = (now, tuple(answered.pop(rbl, ())))
         for rbl, rows in answered.items():
             self._rows[rbl] = (now, tuple(rows))
+        # Purge well after rows stop counting as live: with a batch running,
+        # a purged stop looks unanswered and earns a request of its own.
+        purge_after = max(LIVE_PURGE_SECONDS, 2 * _row_max_age(self._hass))
         stale = [
             rbl
             for rbl, (stored, _rows) in self._rows.items()
-            if now - stored >= LIVE_PURGE_SECONDS
+            if now - stored >= purge_after
         ]
         for rbl in stale:
             del self._rows[rbl]
@@ -382,10 +391,11 @@ class LiveBoard:
     def rows_for(self, rbls: Iterable[int]) -> list[LiveRow]:
         """Rows recent enough to count as live, for these stops."""
         now = self._hass.loop.time()
+        max_age = _row_max_age(self._hass)
         rows: list[LiveRow] = []
         for rbl in rbls:
             stored = self._rows.get(rbl)
-            if stored is not None and now - stored[0] <= LIVE_ROW_MAX_AGE_SECONDS:
+            if stored is not None and now - stored[0] <= max_age:
                 rows.extend(stored[1])
         return rows
 
@@ -513,6 +523,24 @@ async def async_live_trips(
         return list(trips)
     await board.async_ensure(rbls, cooldown=cooldown)
     return apply_live(trips, board.rows_for(rbls), min_transfer_minutes)
+
+
+def _row_max_age(hass: HomeAssistant) -> float:
+    """How old a row may be and still count as live.
+
+    `LIVE_ROW_MAX_AGE_SECONDS`, or the fastest running batch group's
+    cadence plus `LIVE_ROW_GRACE_SECONDS` when that is longer, since that
+    group is the one refreshing leased stops.
+    """
+    registry = hass.data.get(DOMAIN, {}).get(BATCH_REGISTRY_KEY)
+    running: list[int] = (
+        [group.interval_seconds for group in registry.values() if group.has_members]
+        if isinstance(registry, dict)
+        else []
+    )
+    if not running:
+        return LIVE_ROW_MAX_AGE_SECONDS
+    return max(LIVE_ROW_MAX_AGE_SECONDS, min(running) + LIVE_ROW_GRACE_SECONDS)
 
 
 def _batch_running(hass: HomeAssistant) -> bool:

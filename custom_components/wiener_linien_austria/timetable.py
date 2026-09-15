@@ -233,6 +233,9 @@ class TimetableBoard:
         self._departures: tuple[PlannedDeparture, ...] = ()
         self._fetched_at: datetime | None = None
         self._attempted_at: datetime | None = None
+        # The last answer held every train the server had, not just the
+        # first TIMETABLE_DEPARTURES_REQUESTED of them.
+        self._complete = False
         # Latch so a lasting failure logs once, not every five minutes.
         self._failing = False
 
@@ -253,9 +256,11 @@ class TimetableBoard:
         not. Otherwise when nothing was fetched yet, when the batch is older
         than `TIMETABLE_MAX_AGE` (a replacement timetable can be published
         within the day), or when fewer than `TIMETABLE_MIN_UPCOMING` rows are
-        still ahead. A short batch at night keeps asking every few minutes;
-        the server returns the next morning's trains by then, so that ends
-        after one request.
+        still ahead. That last rule only applies to a batch the server cut
+        at the requested size: a shorter answer was already everything it
+        had, and asking again in five minutes wouldn't add a train. A stop
+        whose picked lines stopped running (a closure) would otherwise
+        refetch all day.
         """
         if (
             self._attempted_at is not None
@@ -264,6 +269,8 @@ class TimetableBoard:
             return False
         if self._fetched_at is None or now - self._fetched_at >= TIMETABLE_MAX_AGE:
             return True
+        if self._complete:
+            return False
         upcoming = sum(1 for dep in self._departures if dep.planned >= now)
         return upcoming < TIMETABLE_MIN_UPCOMING
 
@@ -298,6 +305,7 @@ class TimetableBoard:
             _LOGGER.info("S-Bahn timetable for stop %s is back", self._diva)
         self._fetched_at = self._attempted_at
         self._departures = tuple(departures)
+        self._complete = len(departures) < TIMETABLE_DEPARTURES_REQUESTED
         return True
 
 
