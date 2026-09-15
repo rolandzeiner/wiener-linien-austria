@@ -54,7 +54,6 @@ from .const import (
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
     S_BAHN_TEXT_COLOR,
-    S_BAHN_TEXT_COLORS,
     STATIC_FILES,
     USER_AGENT,
 )
@@ -1537,7 +1536,7 @@ def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str
     only the S-Bahn entries when the catalogue isn't loaded yet or the
     routes payload hasn't landed — the cards have their own fallbacks
     (nightline rule + neutral default), which is also what an omitted label
-    gets. S-Bahn lines ("S" + number) come from `S_BAHN_COLORS` / `S_BAHN_TEXT_COLORS`, since the
+    gets. S-Bahn lines ("S" + number) come from `S_BAHN_COLORS`, since the
     GTFS feed only covers Wiener Linien's own lines.
     """
     out: dict[str, dict[str, str]] = {}
@@ -1546,7 +1545,7 @@ def line_colors_for(hass: HomeAssistant, labels: set[str]) -> dict[str, dict[str
         if _S_BAHN_LABEL.match(label):
             out[label] = {
                 "bg": S_BAHN_COLORS.get(label.upper(), S_BAHN_DEFAULT_COLOR),
-                "fg": S_BAHN_TEXT_COLORS.get(label.upper(), S_BAHN_TEXT_COLOR),
+                "fg": S_BAHN_TEXT_COLOR,
             }
     catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
     if not isinstance(catalogue, StaticCatalogue):
