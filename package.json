@@ -13,11 +13,11 @@
     "test:coverage:gate": "vitest run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts --coverage.thresholds.statements=55 --coverage.thresholds.branches=47 --coverage.thresholds.functions=51 --coverage.thresholds.lines=57"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "4.1.11",
+    "@vitest/coverage-v8": "5.0.1",
     "happy-dom": "20.14.5",
     "rolldown": "1.2.8",
     "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "vitest": "5.0.1"
   },
   "dependencies": {
     "lit": "^3.3.3",

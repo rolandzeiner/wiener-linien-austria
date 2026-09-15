@@ -96,26 +96,28 @@ npm run test:coverage                     # cards
 what CI enforces. Both carry their whole configuration as CLI flags rather than
 a vitest config file, for the reason in **Card tests** below.
 
-**`--coverage.include` does not make vitest report a file no test imports.**
-That was true under vitest 3's `coverage.all`; vitest 4 removed it, and the v8
-provider instruments only modules a run actually loads. An earlier revision of
-this file claimed the opposite. Verify it in one command rather than believing
-either version:
+**Whether `--coverage.include` reports a file no test imports depends on the
+vitest major, and it has flipped twice.** Vitest 3 did, through `coverage.all`.
+Vitest 4 removed that, and the v8 provider instrumented only modules a run
+actually loaded. Vitest 5 (current) reports them again, as 0% rows. Verify it in
+one command rather than believing this paragraph:
 
 ```bash
-npx vitest run --coverage --coverage.provider=v8 \
-  --coverage.reporter=text --coverage.include='src/some-unimported-file.ts'
-# -> empty table, "100% (0/0)" — not a 0% row
+npx vitest run src/utils/time.test.ts --coverage --coverage.provider=v8 \
+  --coverage.reporter=text --coverage.include='src/stop-combobox.ts'
+# vitest 5 -> a 0% row for stop-combobox.ts; vitest 4 printed an empty table
 ```
 
-This is why the three departure-board card entrypoints, then the largest files
-in the tree, were absent from the coverage report until `src/card-smoke.test.ts`
-existed, rather than listed at 0%. The headline percentage was computed over a
-denominator that excluded the largest files in the tree. Adding the smoke tests
-moved covered statements from 833 to 1480 and the reported percentage *down*
-from 56.35% to 52.59%. **A falling number here can mean the denominator got
-honest**; read the covered/total counts, not the percentage, before concluding
-anything about a coverage change.
+Under vitest 4 that is why the three departure-board card entrypoints, then the
+largest files in the tree, were absent from the coverage report until
+`src/card-smoke.test.ts` existed, rather than listed at 0%. The headline
+percentage was computed over a denominator that excluded them. Adding the smoke
+tests moved covered statements from 833 to 1480 and the reported percentage
+*down* from 56.35% to 52.59%. **A falling number here can mean the denominator
+got honest**; read the covered/total counts, not the percentage, before
+concluding anything about a coverage change. Every card source is imported by
+some test today, so the move to vitest 5 left the totals where they were
+(68.14% to 68.15% statements).
 
 The thresholds are a ratchet, not a target: they sit a few points under the
 measured number so a legitimate refactor doesn't trip them while a chunk of
