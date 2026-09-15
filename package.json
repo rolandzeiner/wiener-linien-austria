@@ -14,8 +14,8 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "4.1.11",
-    "happy-dom": "20.14.0",
-    "rolldown": "1.2.7",
+    "happy-dom": "20.14.5",
+    "rolldown": "1.2.8",
     "typescript": "7.0.2",
     "vitest": "4.1.11"
   },
