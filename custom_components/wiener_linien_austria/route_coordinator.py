@@ -21,7 +21,6 @@ from homeassistant.util import dt as dt_util
 from . import static
 from .alerts import get_alerts_for
 from .const import (
-    BACKOFF_CAP_SECONDS,
     CONF_ACTIVE_DAYS,
     CONF_ACTIVE_FROM,
     CONF_ACTIVE_TO,
@@ -48,7 +47,7 @@ from .live import (
     current_catalogue,
     rbls_for_trips,
 )
-from .rate_limit import async_enforce_routing_cooldown
+from .rate_limit import async_enforce_routing_cooldown, backoff_delay
 from .routing import (
     RouteOptions,
     RoutingError,
@@ -388,8 +387,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         if self._failures < 2:
             self.update_interval = self.scan_interval
             return
-        stretched = self.scan_interval.total_seconds() * 2 ** (self._failures - 1)
-        seconds = min(stretched, BACKOFF_CAP_SECONDS)
+        seconds = backoff_delay(self.scan_interval, self._failures).total_seconds()
         if self.update_interval != timedelta(seconds=seconds):
             _LOGGER.info(
                 "Route %s → %s failing %d times in a row; next try in %d s",

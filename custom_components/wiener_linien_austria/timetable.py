@@ -42,7 +42,7 @@ from .const import (
     TIMETABLE_RETRY_AFTER,
     USER_AGENT,
 )
-from .rate_limit import async_enforce_routing_cooldown
+from .rate_limit import async_enforce_routing_cooldown, backoff_delay
 from .routing import RoutingError, async_fetch_trip_body
 
 _LOGGER = logging.getLogger(__name__)
@@ -283,8 +283,11 @@ class TimetableBoard:
         # The last answer held every train the server had, not just the
         # first TIMETABLE_DEPARTURES_REQUESTED of them.
         self._complete = False
-        # Latch so a lasting failure logs once, not every five minutes.
-        self._failing = False
+        # Failures since the last answer; each one widens `_retry_spacing`.
+        # Its non-zero value is also the latch that logs a lasting failure
+        # once rather than on every retry.
+        self._failures = 0
+        self._retry_spacing = TIMETABLE_RETRY_AFTER
 
     @property
     def departures(self) -> tuple[PlannedDeparture, ...]:
@@ -299,8 +302,9 @@ class TimetableBoard:
     def is_due(self, now: datetime) -> bool:
         """Whether the batch should be refetched at `now`.
 
-        Never within `TIMETABLE_RETRY_AFTER` of the last attempt, success or
-        not. Otherwise when nothing was fetched yet, when the batch is older
+        Never within the retry spacing of the last attempt: `TIMETABLE_RETRY_AFTER`
+        after an answer, doubling with each failure in a row up to the shared
+        backoff cap (`rate_limit.backoff_delay`). Otherwise when nothing was fetched yet, when the batch is older
         than `TIMETABLE_MAX_AGE` (a replacement timetable can be published
         within the day), or when fewer than `TIMETABLE_MIN_UPCOMING` rows are
         still ahead. That last rule only applies to a batch the server cut
@@ -311,7 +315,7 @@ class TimetableBoard:
         """
         if (
             self._attempted_at is not None
-            and now - self._attempted_at < TIMETABLE_RETRY_AFTER
+            and now - self._attempted_at < self._retry_spacing
         ):
             return False
         if self._fetched_at is None or now - self._fetched_at >= TIMETABLE_MAX_AGE:
@@ -337,18 +341,22 @@ class TimetableBoard:
                 with_stops=True,
             )
         except RoutingError as err:
-            if not self._failing:
-                self._failing = True
+            self._failures += 1
+            self._retry_spacing = backoff_delay(
+                TIMETABLE_RETRY_AFTER, self._failures, jitter=True
+            )
+            if self._failures == 1:
                 _LOGGER.warning(
                     "S-Bahn timetable for stop %s unavailable: %s %s. "
-                    "Retrying quietly until it answers again.",
+                    "Retrying quietly, less often the longer it lasts.",
                     self._diva,
                     err.translation_key,
                     err.placeholders,
                 )
             return False
-        if self._failing:
-            self._failing = False
+        if self._failures:
+            self._failures = 0
+            self._retry_spacing = TIMETABLE_RETRY_AFTER
             _LOGGER.info("S-Bahn timetable for stop %s is back", self._diva)
         self._fetched_at = self._attempted_at
         self._departures = tuple(departures)

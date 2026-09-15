@@ -18,6 +18,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.update_coordinator import UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.config_flow import _line_label
@@ -341,6 +342,56 @@ async def test_board_failure_keeps_rows_and_logs_once(
         assert await board.async_refresh() is True
     assert board.departures == ()
     assert "is back" in caplog.text
+
+
+async def test_board_backs_off_while_failing(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    """5, 10, 20, then 30 min between retries; an answer resets it."""
+    start = FIRST_TRAIN - timedelta(minutes=1)
+    freezer.move_to(start)
+    board = TimetableBoard(hass, PRATERSTERN)
+    failing = patch(
+        _FETCH, new_callable=AsyncMock, side_effect=RoutingError("api_timeout")
+    )
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch("random.uniform", return_value=1.0),
+        failing,
+    ):
+        for minutes in (5, 10, 20, 30, 30):
+            assert board.is_due(dt_util.utcnow())
+            assert await board.async_refresh() is False
+            attempted = dt_util.utcnow()
+            assert not board.is_due(attempted + timedelta(minutes=minutes - 1))
+            assert board.is_due(attempted + timedelta(minutes=minutes))
+            freezer.tick(timedelta(minutes=minutes))
+
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value=_body()),
+    ):
+        assert await board.async_refresh() is True
+    answered = dt_util.utcnow()
+    # Back to the normal spacing (only the age and running-low rules now).
+    board._departures = ()
+    assert not board.is_due(answered + timedelta(minutes=4))
+    assert board.is_due(answered + TIMETABLE_MAX_AGE)
+
+
+async def test_board_retry_spacing_is_jittered(hass: HomeAssistant) -> None:
+    board = TimetableBoard(hass, PRATERSTERN)
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, side_effect=RoutingError("api_timeout")),
+        patch("random.uniform", return_value=1.1) as uniform,
+    ):
+        await board.async_refresh()
+    uniform.assert_called_once_with(0.9, 1.1)
+    attempted = board._attempted_at
+    assert attempted is not None
+    assert not board.is_due(attempted + timedelta(minutes=5, seconds=29))
+    assert board.is_due(attempted + timedelta(minutes=5, seconds=30))
 
 
 # ---------------------------------------------------------------------------

@@ -305,9 +305,13 @@ TIMETABLE_PICKER_DEPARTURES: Final = 100
 # day per stop at ~280 KB each before gzip (measured 2026-09-15, Meidling).
 TIMETABLE_MAX_AGE: Final = timedelta(hours=2)
 # …or when fewer than this many are still ahead, but never sooner than
-# TIMETABLE_RETRY_AFTER after the last attempt, which also spaces out
-# retries after a failure.
+# TIMETABLE_RETRY_AFTER after the last attempt.
 TIMETABLE_MIN_UPCOMING: Final = 6
+# After a failure the spacing doubles with each further failure (5, 10, 20,
+# then BACKOFF_CAP_SECONDS) with +/-10% jitter, and resets on the next
+# answer. A fixed 5 min kept a routing outage at 12 requests an hour per
+# S-Bahn stop for as long as it lasted. The board keeps counting down the
+# rows it has meanwhile, so a slower retry costs nothing visible.
 TIMETABLE_RETRY_AFTER: Final = timedelta(minutes=5)
 
 # The timetable server speaks Vienna wall-clock time with no offset, no

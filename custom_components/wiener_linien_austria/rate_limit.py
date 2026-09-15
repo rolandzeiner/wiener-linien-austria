@@ -31,12 +31,18 @@ budget bounds what people ask for.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, DOMAIN_COOLDOWN_SECONDS, DOMAIN_LAST_CALL_KEY
+from .const import (
+    BACKOFF_CAP_SECONDS,
+    DOMAIN,
+    DOMAIN_COOLDOWN_SECONDS,
+    DOMAIN_LAST_CALL_KEY,
+)
 
 LOCK_KEY = "cooldown_lock"
 LOCK_LOOP_KEY = "cooldown_lock_loop"
@@ -113,3 +119,17 @@ async def async_enforce_domain_cooldown(hass: HomeAssistant) -> None:
             if elapsed < DOMAIN_COOLDOWN_SECONDS:
                 await asyncio.sleep(DOMAIN_COOLDOWN_SECONDS - elapsed)
         domain_data[DOMAIN_LAST_CALL_KEY] = dt_util.utcnow()
+
+
+def backoff_delay(base: timedelta, failures: int, *, jitter: bool = False) -> timedelta:
+    """The wait after `failures` failures in a row: `base`, doubling per failure.
+
+    One failure waits `base`, two wait twice that, three four times, capped
+    at `BACKOFF_CAP_SECONDS`. `jitter` spreads the result by +/-10% so
+    installs that failed on the same tick don't all retry on the same one.
+    The monitor batch, the route coordinators and the S-Bahn timetable share
+    this curve; each decides for itself what a first failure does.
+    """
+    doubled = base * (1 << max(failures - 1, 0))
+    delay = min(doubled, timedelta(seconds=BACKOFF_CAP_SECONDS))
+    return delay * random.uniform(0.9, 1.1) if jitter else delay

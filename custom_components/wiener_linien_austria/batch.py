@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import random
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -45,7 +44,6 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import (
     API_BASE_URL,
-    BACKOFF_CAP_SECONDS,
     BATCH_REGISTRY_KEY,
     DOMAIN,
     ERR_RATE_LIMIT,
@@ -56,7 +54,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .live import async_get_live_board
-from .rate_limit import async_enforce_domain_cooldown
+from .rate_limit import async_enforce_domain_cooldown, backoff_delay
 
 if TYPE_CHECKING:
     from .coordinator import WienerLinienAustriaCoordinator
@@ -388,17 +386,16 @@ class MonitorBatchGroup:
         self._consecutive_failures += 1
         if self._consecutive_failures < 2 and not rate_limited:
             return
-        # A 316 on the very first failure has nothing to exponentiate yet;
-        # floor the exponent at 1 so it still halves the request rate rather
-        # than rescheduling to the cadence it already has.
-        exponent = max(self._consecutive_failures - 1, 1)
-        normal_secs = self._normal_interval.total_seconds()
-        backoff_secs = min(
-            normal_secs * (2**exponent),
-            BACKOFF_CAP_SECONDS,
+        # A 316 on the very first failure has nothing to double yet; count
+        # it as the second so it still halves the request rate rather than
+        # rescheduling to the cadence it already has.
+        self._reschedule(
+            backoff_delay(
+                self._normal_interval,
+                max(self._consecutive_failures, 2),
+                jitter=True,
+            )
         )
-        jittered = backoff_secs * random.uniform(0.9, 1.1)
-        self._reschedule(timedelta(seconds=jittered))
 
 
 def _unexpected_failure(err: Exception) -> UpdateFailed:
