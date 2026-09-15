@@ -326,6 +326,9 @@ describe("rendering", () => {
     const change = root(el).querySelector(".strand .stop .time-change")!;
     expect(change.querySelector("s.time-planned")?.textContent).toBe("07:57");
     expect(change.querySelector("time.time-late")?.textContent).toBe("07:59");
+    // The red must survive `.stop time`, which colours every stop time as
+    // body text; a selector that loses to it paints the late time white.
+    expect(routeCardSource).toMatch(/\.time-change \.time-late,\s*\.alt-times \.time-late \{\s*color: color-mix\(in srgb, var\(--wl-error\)/);
     expect(change.querySelector(".sr-only")?.textContent).toBe("geplant 07:57, 2 min später");
     // Alternatives show the same, so an at-risk change there has its reason.
     const alt = root(el).querySelector(".alt-times")!;

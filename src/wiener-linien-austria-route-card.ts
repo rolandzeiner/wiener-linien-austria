@@ -1576,7 +1576,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
        theme's error red with 15% of the body text mixed in: barely visible
        as a shift, but enough to lift it to 4.5:1 on a dark card (the raw
        token measures 4.0:1 there) and past 5:1 on a light one. */
-    .time-late {
+    /* Two classes, so it outranks `.stop time`, which sets every stop time to
+       body text and would otherwise paint a late time white again. */
+    .time-change .time-late,
+    .alt-times .time-late {
       color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
       font-weight: 700;
     }
