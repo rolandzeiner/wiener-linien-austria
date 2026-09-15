@@ -367,7 +367,7 @@ Names don't have to match the stop list exactly, since speech recognition rarely
 - One wrong letter is fine: `Karlsplats` finds Karlsplatz.
 - If two stops share a name in the same place, such as Schottenring, the busier one is used.
 
-The response's `origin` and `destination` hold the stop names that were picked, so a reply can say them back. If no stop matches, or a name fits several different stops, the action fails with a message listing them. Use a longer name or the DIVA number then. A departure sensor shows its stop's DIVA in the `diva` attribute.
+The response's `origin` and `destination` hold the stop names that were picked, so a reply can say them back. If no stop matches, or a name fits several different stops, the action fails with a message listing them. Use a longer name or the DIVA number then. A departure sensor shows its stop's DIVA in the `diva` attribute. To ask for a trip by voice, see [Ask Assist for a trip](#ask-assist-for-a-trip).
 
 The action skips the request cooldown, because someone is waiting for the answer, and shares the route card's limits instead. Calling it again for the same route and time within a minute returns the same answer without a new request. A script can make 5 requests in a row, then about one a minute; beyond that the action fails with a message saying when to try again. Automations, which run without a user, share one allowance. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
 
@@ -420,6 +420,7 @@ A request that doesn't match the schema gets Home Assistant's own `invalid_forma
 - **Line-triggered automations** — turn on the entrance light when the tram is approaching.
 - **Travel-time comparison** — track two stops and take whichever leaves sooner.
 - **Commute check** *(experimental)* — a route with a weekday morning window, and a notification when a delay puts your change at risk.
+- **Ask by voice** *(experimental)* — "wie komme ich von Stephansplatz nach Westbahnhof" to Assist, and it tells you which line to take *(2.0.0)*.
 
 ## Automation Examples
 
@@ -509,6 +510,52 @@ action:
         {{ state_attr('binary_sensor.home_work_connection_at_risk', 'transfer_at') }}:
         {{ state_attr('binary_sensor.home_work_connection_at_risk', 'slack_minutes') }} min to spare
 ```
+
+### Ask Assist for a trip
+
+Ask Home Assistant's Assist for a connection between any two stops, typed or spoken. This works with the built-in conversation agent, so you don't need an AI service. Create an automation, switch to **Edit in YAML** and paste:
+
+```yaml
+alias: "Assist: plan a trip"
+mode: parallel
+triggers:
+  - trigger: conversation
+    command:
+      - "wie komme ich von {von} nach {nach}"
+      - "[nächste] (Verbindung|Fahrt) von {von} nach {nach}"
+actions:
+  - action: wiener_linien_austria.plan_trip
+    data:
+      origin: "{{ trigger.slots.von }}"
+      destination: "{{ trigger.slots.nach }}"
+    response_variable: plan
+    continue_on_error: true
+  - if:
+      - condition: template
+        value_template: "{{ plan is defined and plan.trips | count > 0 }}"
+    then:
+      - variables:
+          trip: "{{ plan.trips[0] }}"
+          ride: "{{ trip.legs | rejectattr('walk') | first | default(none) }}"
+      - set_conversation_response: >-
+          Von {{ plan.origin }} nach {{ plan.destination }}:
+          {% if ride %}{% set t = ride.origin.estimated or ride.origin.planned %}Nimm um
+          {{ as_timestamp(t) | timestamp_custom('%H:%M') }} die {{ ride.line }}
+          Richtung {{ ride.towards }}.{% endif %}
+          Du bist um {{ as_timestamp(trip.arrival) | timestamp_custom('%H:%M') }} da
+          {%- if trip.interchanges %}, mit {{ trip.interchanges }}-mal Umsteigen{% endif %}.
+    else:
+      - set_conversation_response: >-
+          Dafür habe ich keine Verbindung gefunden. Probier die Haltestellen
+          etwas genauer, zum Beispiel „Wien Mitte“ statt „Mitte“.
+```
+
+To try it, open Assist from the top of the Overview page and type *wie komme ich von Stephansplatz nach Westbahnhof*. The answer reads like *Von Stephansplatz nach Westbahnhof: Nimm um 14:32 die U3 Richtung Ottakring. Du bist um 14:41 da.*
+
+- **Language:** the sentences are German, so set your Assist language to German, or write the sentences and replies in your own language.
+- **Live times:** the reply gives the live departure time when there is one, otherwise the timetable time.
+- **When a stop isn't found:** if a name matches no stop or several, Assist gives the fallback reply. The automation's **Traces** show the action's message, including which stops a name matched.
+- **Speaking instead of typing:** results depend on your speech-to-text. Name matching allows for small mistakes, like a wrong letter or a missing accent, but not a misheard word.
 
 ## Troubleshooting
 
