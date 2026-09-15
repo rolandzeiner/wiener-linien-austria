@@ -1125,7 +1125,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           ${leg.low_floor && attrs.step_free
             ? html`<ha-icon
                   class="type-icon"
-                  icon="mdi:wheelchair-accessible"
+                  icon="mdi:wheelchair-accessibility"
                   aria-hidden="true"
                 ></ha-icon
                 ><span class="sr-only">${this._t("low_floor")}</span>`

@@ -330,6 +330,10 @@ describe("step-free", () => {
     expect(t).toContain("Aufzug nach oben · außer Betrieb");
     expect(t).toContain("Aufzug außer Betrieb: Stephansplatz");
     expect(t).toContain("Niederflurfahrzeug");
+    // An icon name MDI doesn't have renders as an empty 24px box, which
+    // showed up as a gap before "Richtung …" on every low-floor ride.
+    const ride = root(el).querySelector(".ride")!;
+    expect(ride.querySelector('ha-icon[icon="mdi:wheelchair-accessibility"]')).not.toBeNull();
     // A step kind the card has no words for is left out, not shown raw.
     expect(t).not.toContain("teleporter");
     expect(root(el).querySelectorAll(".access--out")).toHaveLength(1);

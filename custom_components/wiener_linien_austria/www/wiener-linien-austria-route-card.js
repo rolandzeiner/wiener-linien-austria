@@ -354,7 +354,7 @@ const Me={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
           ${s?O`<ha-icon class="type-icon" icon=${s} aria-hidden="true"></ha-icon>`:A}
           ${e.low_floor&&r.step_free?O`<ha-icon
                   class="type-icon"
-                  icon="mdi:wheelchair-accessible"
+                  icon="mdi:wheelchair-accessibility"
                   aria-hidden="true"
                 ></ha-icon
                 ><span class="sr-only">${this._t(`low_floor`)}</span>`:A}
