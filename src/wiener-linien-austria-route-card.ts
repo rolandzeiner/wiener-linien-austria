@@ -42,6 +42,7 @@ import type {
   HomeAssistant,
   LovelaceCardEditor,
   RouteAttrs,
+  RouteAccessStepAttr,
   RouteLegAttr,
   RouteTransferAttr,
   RouteTripAttr,
@@ -52,6 +53,8 @@ import { chipPalette } from "./utils/config.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { safeDomId } from "./utils/html.js";
 import {
+  ACCESS_ICON,
+  accessKey,
   ADHOC_DEBOUNCE_MS,
   ADHOC_IDLE_MS,
   ADHOC_RETRY_MS,
@@ -70,7 +73,9 @@ import {
   ROUTE_CARD_TYPE,
   saveAdhocSelection,
   transitLegs,
+  tripAccessSteps,
   upcomingTrips,
+  walkAccess,
   viennaClock,
   viennaDayOffset,
   viennaInputValue,
@@ -184,7 +189,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     // A changed default in the editor is the editor's intent: apply it now.
     const cfg = this._config;
-    if (this._adhocStarted && previous && (previous.from !== cfg.from || previous.to !== cfg.to)) {
+    if (
+      this._adhocStarted &&
+      previous &&
+      (previous.from !== cfg.from || previous.to !== cfg.to || previous.step_free !== cfg.step_free)
+    ) {
       if (cfg.from) this._from = cfg.from;
       if (cfg.to) this._to = cfg.to;
       this._requestPlan(false);
@@ -433,6 +442,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         origin: Number(from),
         destination: Number(to),
         ...(planned ? { datetime: this._when, arrive_by: this._timeMode === "arrive" } : {}),
+        ...(this._config?.step_free ? { step_free: true } : {}),
       });
       if (seq !== this._planSeq) return;
       this._plan = plan;
@@ -472,7 +482,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  never stands in for the current one. */
   private _queryKey(): string {
     const when = this._timeMode === "now" ? "now" : `${this._timeMode}@${this._when}`;
-    return `${this._from}>${this._to}|${when}`;
+    return `${this._from}>${this._to}|${when}|${this._config?.step_free ? "step-free" : ""}`;
   }
 
   private _onTimeMode(mode: AdhocTimeMode): void {
@@ -926,9 +936,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   private _renderNotices(trip: RouteTripAttr, attrs: RouteAttrs): TemplateResult | typeof nothing {
     const lines = new Set(transitLegs(trip).map((leg) => leg.line ?? ""));
-    const notices = (attrs.traffic_info ?? [])
-      .filter((n) => (n.related_lines ?? []).some((line) => lines.has(line)))
-      .slice(0, MAX_NOTICES);
+    const lifts = this._liftOutages(trip, attrs).map((outage) => ({
+      title: this._t("lift_out_notice", { station: outage.station ?? "" }),
+    }));
+    const notices = [
+      ...lifts,
+      ...(attrs.traffic_info ?? []).filter((n) =>
+        (n.related_lines ?? []).some((line) => lines.has(line)),
+      ),
+    ].slice(0, MAX_NOTICES + lifts.length);
     if (!notices.length) return nothing;
     return html`
       <ul class="notices">
@@ -944,6 +960,39 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         )}
       </ul>
     `;
+  }
+
+  /** Lift outages at a station this trip takes a lift at. */
+  private _liftOutages(trip: RouteTripAttr, attrs: RouteAttrs): NonNullable<RouteAttrs["elevator_info"]> {
+    const stations = new Set(
+      tripAccessSteps(trip)
+        .filter((step) => step.kind === "elevator" && step.stop_id)
+        .map((step) => step.stop_id!),
+    );
+    return (attrs.elevator_info ?? []).filter((outage) =>
+      (outage.stop_ids ?? []).some((id) => stations.has(id)),
+    );
+  }
+
+  /** "Aufzug nach unten" and friends, with "außer Betrieb" on a lift at a
+   *  station that has an outage. Words and an icon, never colour alone. */
+  private _renderAccess(
+    steps: RouteAccessStepAttr[] | undefined,
+    attrs: RouteAttrs,
+  ): TemplateResult | typeof nothing {
+    const known = (steps ?? []).filter((step) => accessKey(step));
+    if (!known.length) return nothing;
+    const broken = new Set((attrs.elevator_info ?? []).flatMap((outage) => outage.stop_ids ?? []));
+    return html`${known.map((step) => {
+      const out = step.kind === "elevator" && !!step.stop_id && broken.has(step.stop_id);
+      return html`<span class=${out ? "access access--out" : "access"}>
+        <ha-icon
+          icon=${out ? "mdi:alert-outline" : ACCESS_ICON[step.kind] ?? "mdi:walk"}
+          aria-hidden="true"
+        ></ha-icon>
+        ${this._t(accessKey(step)!)}${out ? html` · ${this._t("lift_out")}` : nothing}
+      </span>`;
+    })}`;
   }
 
   private _lineStyle(line: string, attrs: RouteAttrs): { background: string; color?: string } {
@@ -975,8 +1024,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           const colour = this._lineStyle(leg.line ?? "", attrs).background;
           const transfer: RouteTransferAttr | undefined = trip.transfers[i];
           return html`
-            ${this._renderLeg(leg, colour, i === 0, attrs, !!transfer && i < legs.length - 1)}
-            ${transfer && i < legs.length - 1 ? this._renderTransfer(transfer) : nothing}
+            ${this._renderLeg(
+              leg,
+              colour,
+              i === 0,
+              attrs,
+              !!transfer && i < legs.length - 1,
+              i === 0 ? walkAccess(trip, "start") : undefined,
+            )}
+            ${transfer && i < legs.length - 1 ? this._renderTransfer(transfer, attrs) : nothing}
           `;
         })}
         ${last
@@ -987,6 +1043,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                   >${clockOf(last.destination.estimated ?? last.destination.planned)}</time
                 >
                 <span class="stop-name">${last.destination.name}</span>
+                ${this._renderAccess(walkAccess(trip, "end"), attrs)}
               </li>
             `
           : nothing}
@@ -1000,6 +1057,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     first: boolean,
     attrs: RouteAttrs,
     beforeTransfer: boolean,
+    accessBefore?: RouteAccessStepAttr[],
   ): TemplateResult {
     const departs = leg.origin.estimated ?? leg.origin.planned;
     const late = leg.origin.delay_minutes ?? 0;
@@ -1019,11 +1077,20 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           <time datetime=${departs ?? ""}>${clockOf(departs)}</time>
           <span class="stop-name">${leg.origin.name}</span>
           ${platform ? html`<span class="platform">${platform}</span>` : nothing}
+          ${first ? this._renderAccess(accessBefore, attrs) : nothing}
         </div>
         <div class="ride">
           ${this._renderBadge(leg, attrs)}
           ${icon
             ? html`<ha-icon class="type-icon" icon=${icon} aria-hidden="true"></ha-icon>`
+            : nothing}
+          ${leg.low_floor && attrs.step_free
+            ? html`<ha-icon
+                  class="type-icon"
+                  icon="mdi:wheelchair-accessible"
+                  aria-hidden="true"
+                ></ha-icon
+                ><span class="sr-only">${this._t("low_floor")}</span>`
             : nothing}
           <span class="towards">
             ${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}
@@ -1081,7 +1148,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
-  private _renderTransfer(transfer: RouteTransferAttr): TemplateResult {
+  private _renderTransfer(transfer: RouteTransferAttr, attrs: RouteAttrs): TemplateResult {
     return html`
       <li class="transfer" data-risk=${transfer.risk}>
         <span class="node node--transfer" aria-hidden="true"></span>
@@ -1092,6 +1159,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               ${this._t("walk", { n: transfer.walk_minutes })}
             </span>`
           : nothing}
+        ${this._renderAccess(transfer.access, attrs)}
         ${this._renderRisk(transfer)}
       </li>
     `;
@@ -1396,6 +1464,23 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .live ha-icon {
       --mdc-icon-size: 16px;
       color: var(--wl-rt);
+    }
+    .access {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color);
+    }
+    .access ha-icon {
+      --mdc-icon-size: 16px;
+    }
+    .access--out {
+      font-weight: 600;
+      color: var(--primary-text-color);
+    }
+    .access--out ha-icon {
+      color: var(--wl-error);
     }
     .late ha-icon {
       --mdc-icon-size: 16px;

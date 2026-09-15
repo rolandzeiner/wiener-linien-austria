@@ -309,7 +309,7 @@ async def async_plan_trips(
 
 
 def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[str, Any]:
-    """`trips`, `line_colors` and `traffic_info` for a list of connections.
+    """`trips`, `line_colors`, `traffic_info` and `elevator_info` for connections.
 
     Shared by the route sensor and the route card's ad-hoc answer
     (websocket.py), so both modes of the card read the same shape.
@@ -324,7 +324,49 @@ def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[st
         "trips": [trip.to_dict() for trip in trips],
         "line_colors": line_colors_for(hass, labels),
         "traffic_info": [t.to_dict() for t in traffic],
+        "elevator_info": _lift_outages(hass, trips),
     }
+
+
+def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, Any]]:
+    """Lift outages at the stations whose lifts these trips rely on.
+
+    The trip names each lift by its station (DIVA); the outage feed names the
+    platforms (RBLs) it affects. The catalogue joins the two, so this is
+    station-level: an outage anywhere at a station a planned lift belongs to
+    counts, and `stop_ids` says which of the trip's stations it is about.
+    """
+    stations = {
+        diva
+        for trip in trips
+        for leg in trip.legs
+        for step in (*leg.access, *leg.access_after)
+        if step.kind == "elevator" and (diva := _safe_int(step.stop_id)) is not None
+    }
+    catalogue = current_catalogue(hass)
+    if not stations or catalogue is None:
+        return []
+    rbl_to_diva = {
+        rbl: diva
+        for diva in stations
+        if (station := catalogue.stations_by_diva.get(diva)) is not None
+        for rbl in station.rbls
+    }
+    _traffic, outages = get_alerts_for(hass, None, set(rbl_to_diva))
+    return [
+        {
+            **outage.to_dict(),
+            "stop_ids": sorted(
+                {
+                    str(rbl_to_diva[rbl])
+                    for rbl in outage.related_stops
+                    if rbl in rbl_to_diva
+                }
+            ),
+        }
+        for outage in outages
+        if outage.related_stops_set & rbl_to_diva.keys()
+    ]
 
 
 def route_device_info(entry: ConfigEntry) -> DeviceInfo:

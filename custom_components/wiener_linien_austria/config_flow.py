@@ -46,6 +46,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -74,6 +75,7 @@ from .const import (
     CONF_ORIGIN_NAME,
     CONF_RBLS,
     CONF_ROUTE_TYPE,
+    CONF_STEP_FREE,
     CONF_STOP_NAME,
     CONF_WALK_SPEED,
     DEFAULT_MIN_TRANSFER_MINUTES,
@@ -754,6 +756,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                         for x in user_input.get(CONF_EXCLUDED_MEANS, [])
                         if str(x) in EXCLUDABLE_MEANS
                     ],
+                    CONF_STEP_FREE: bool(user_input.get(CONF_STEP_FREE, False)),
                     CONF_SCAN_INTERVAL: int(
                         user_input.get(CONF_SCAN_INTERVAL, DEFAULT_ROUTE_SCAN_INTERVAL)
                     ),
@@ -845,6 +848,10 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                         mode=SelectSelectorMode.LIST,
                     )
                 ),
+                vol.Optional(
+                    CONF_STEP_FREE,
+                    default=defaults.get(CONF_STEP_FREE) is True,
+                ): BooleanSelector(),
                 vol.Optional(
                     CONF_ACTIVE_FROM,
                     description={"suggested_value": defaults.get(CONF_ACTIVE_FROM)},

@@ -12,7 +12,8 @@ user.
   the time the timetable and the station signs speak. Answers in the shape
   of the route sensor's attributes so the card renders both through one
   path. It also takes a route entry's trip options (`route_type`,
-  `max_changes`, `walk_speed`, `excluded_means`, `min_transfer_minutes`)
+  `max_changes`, `walk_speed`, `excluded_means`, `min_transfer_minutes`,
+  `step_free`)
   with the same defaults. The card sends none of them yet; each distinct
   combination is its own cache entry.
 
@@ -163,6 +164,7 @@ async def _websocket_stops(
         ): vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_MIN_TRANSFER_MINUTES)),
         vol.Optional("datetime"): vol.Any(None, cv.datetime),
         vol.Optional("arrive_by", default=False): cv.boolean,
+        vol.Optional("step_free", default=False): cv.boolean,
     }
 )
 @async_response
@@ -249,6 +251,7 @@ async def _websocket_plan(
             "destination": destination.name,
             "fetched_at": plan.fetched_at.isoformat(),
             "min_transfer_minutes": options.min_transfer_minutes,
+            "step_free": options.step_free,
             "planned_for": when.isoformat() if when is not None else None,
             "arrive_by": arrive_by,
             **route_trip_attributes(hass, plan.trips[:MAX_TRIPS_PUBLISHED]),

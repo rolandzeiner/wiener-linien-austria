@@ -77,6 +77,7 @@ describe("normaliseRouteConfig", () => {
       title: "",
       alternatives: 3,
       hide_attribution: false,
+      step_free: false,
     });
     expect(normaliseRouteConfig({ type: "x", alternatives: -1 }).alternatives).toBe(0);
     expect(normaliseRouteConfig({ type: "x", alternatives: "no" as never }).alternatives).toBe(2);

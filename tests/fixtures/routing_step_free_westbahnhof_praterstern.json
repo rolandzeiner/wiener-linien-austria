@@ -1,0 +1,357 @@
+{
+ "itdMessageList": [],
+ "option": {
+  "ptOption": {
+   "wheelchair": "1",
+   "noSolidStairs": "1",
+   "noEscalators": "1",
+   "lowPlatformVhcl": "1"
+  }
+ },
+ "trips": [
+  {
+   "legs": [
+    {
+     "points": [
+      {
+       "name": "Wien Westbahnhof",
+       "platformName": "",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:40",
+        "timeSec": "06:40:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:40",
+        "rtTimeSec": "06:40:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": ""
+       }
+      },
+      {
+       "name": "Wien Westbahnhof",
+       "platformName": "1",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:43",
+        "timeSec": "06:43:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:43",
+        "rtTimeSec": "06:43:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": "U3-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "",
+      "number": "",
+      "product": "Fussweg",
+      "type": "99",
+      "code": "-1",
+      "destination": "",
+      "realtime": "0",
+      "diva": {
+       "line": "",
+       "dir": " "
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "IDEST",
+       "duration": "3",
+       "footpathElem": [
+        {
+         "type": "ELEVATOR",
+         "level": "DOWN",
+         "lF": "0",
+         "lT": "-3",
+         "orig": {
+          "stopID": "60201468",
+          "area": "15"
+         }
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Westbahnhof",
+       "platformName": "1",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:43",
+        "timeSec": "06:43:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:43",
+        "rtTimeSec": "06:43:00"
+       },
+       "ref": {
+        "id": "60201468",
+        "platform": "U3-H"
+       }
+      },
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "1",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:47",
+        "timeSec": "06:47:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:47",
+        "rtTimeSec": "06:47:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U3-H"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U3",
+      "number": "U3",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Simmering",
+      "realtime": "0",
+      "diva": {
+       "line": "210U3",
+       "dir": "H",
+       "opPublicCode": "WL"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Westbahnhof",
+       "ref": {
+        "id": "60201468"
+       }
+      },
+      {
+       "name": "Wien Zieglergasse",
+       "ref": {
+        "id": "60201530"
+       }
+      },
+      {
+       "name": "Wien Neubaugasse",
+       "ref": {
+        "id": "60200056"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "AFTER",
+       "duration": "3",
+       "footpathElem": [
+        {
+         "type": "ELEVATOR",
+         "level": "UP",
+         "lF": "-2",
+         "lT": "-1",
+         "orig": {
+          "stopID": "60201430",
+          "area": "3"
+         }
+        }
+       ]
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Volkstheater",
+       "platformName": "2",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "06:53",
+        "timeSec": "06:53:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "06:53",
+        "rtTimeSec": "06:53:00"
+       },
+       "ref": {
+        "id": "60201430",
+        "platform": "U2-R"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "07:00",
+        "timeSec": "07:00:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "07:00",
+        "rtTimeSec": "07:00:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": "U2-R"
+       }
+      }
+     ],
+     "mode": {
+      "name": "U-Bahn U2",
+      "number": "U2",
+      "product": "U-Bahn",
+      "type": "1",
+      "code": "2",
+      "destination": "Wien Seestadt",
+      "realtime": "0",
+      "diva": {
+       "line": "210U2",
+       "dir": "R",
+       "opPublicCode": "WL"
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Volkstheater",
+       "ref": {
+        "id": "60201430"
+       }
+      },
+      {
+       "name": "Wien Rathaus",
+       "ref": {
+        "id": "60201072"
+       }
+      },
+      {
+       "name": "Wien Schottentor",
+       "ref": {
+        "id": "60201184"
+       }
+      }
+     ],
+     "attrs": [
+      {
+       "name": "PlanLowFloorVehicle",
+       "value": "1"
+      }
+     ]
+    },
+    {
+     "points": [
+      {
+       "name": "Wien Praterstern",
+       "platformName": "2",
+       "usage": "departure",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "07:00",
+        "timeSec": "07:00:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "07:00",
+        "rtTimeSec": "07:00:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": "U2-R"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "platformName": "",
+       "usage": "arrival",
+       "dateTime": {
+        "date": "15.09.2026",
+        "time": "07:03",
+        "timeSec": "07:03:00",
+        "rtDate": "15.09.2026",
+        "rtTime": "07:03",
+        "rtTimeSec": "07:03:00"
+       },
+       "ref": {
+        "id": "60201040",
+        "platform": ""
+       }
+      }
+     ],
+     "mode": {
+      "name": "",
+      "number": "",
+      "product": "Fussweg",
+      "type": "99",
+      "code": "-1",
+      "destination": "",
+      "realtime": "0",
+      "diva": {
+       "line": "",
+       "dir": " "
+      }
+     },
+     "stopSeq": [
+      {
+       "name": "Wien Praterstern",
+       "ref": {
+        "id": "60201040"
+       }
+      },
+      {
+       "name": "Wien Praterstern",
+       "ref": {
+        "id": "60201040"
+       }
+      }
+     ],
+     "footpath": [
+      {
+       "position": "IDEST",
+       "duration": "3",
+       "footpathElem": [
+        {
+         "type": "ELEVATOR",
+         "level": "UP",
+         "lF": "-3",
+         "lT": "0",
+         "orig": {
+          "stopID": "60201040",
+          "area": "15"
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

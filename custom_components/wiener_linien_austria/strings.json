@@ -66,6 +66,7 @@
           "walk_speed": "Walking speed",
           "min_transfer_minutes": "Transfer buffer",
           "excluded_means": "Avoid",
+          "step_free": "Step-free",
           "active_from": "Refresh from",
           "active_to": "Refresh until",
           "active_days": "Refresh on",
@@ -73,6 +74,7 @@
         },
         "data_description": {
           "min_transfer_minutes": "Changes with less time to spare than this are marked tight.",
+          "step_free": "Plan only with lifts or ramps instead of stairs and escalators, and with low-floor vehicles.",
           "active_from": "Optional. Outside this window the route doesn't refresh. Set both times or neither.",
           "active_days": "Leave empty for every day.",
           "scan_interval": "Minimum 120 seconds. The route also refreshes right after the best connection leaves."

@@ -409,6 +409,21 @@
     "live": "Live",
     "every_minutes": "every {n} min",
     "then_at": "then {times}",
+    "access_elevator": "Lift",
+    "access_elevator_up": "Lift up",
+    "access_elevator_down": "Lift down",
+    "access_stairs": "Stairs",
+    "access_stairs_up": "Stairs up",
+    "access_stairs_down": "Stairs down",
+    "access_escalator": "Escalator",
+    "access_escalator_up": "Escalator up",
+    "access_escalator_down": "Escalator down",
+    "access_ramp": "Ramp",
+    "access_ramp_up": "Ramp up",
+    "access_ramp_down": "Ramp down",
+    "lift_out": "out of service",
+    "lift_out_notice": "Lift out of service: {station}",
+    "low_floor": "Low-floor vehicle",
     "editor": {
       "entity": "Route",
       "entity_helper": "Leave empty to pick origin and destination right on the card. Only routes you've set up are listed.",
@@ -423,7 +438,9 @@
       "from": "Preselected origin",
       "from_helper": "Applies until someone picks another stop on this device.",
       "to": "Preselected destination",
-      "to_helper": "Applies until someone picks another stop on this device."
+      "to_helper": "Applies until someone picks another stop on this device.",
+      "step_free": "Step-free",
+      "step_free_helper": "Only connections with lifts or ramps instead of stairs and escalators, and with low-floor vehicles."
     }
   }
 }

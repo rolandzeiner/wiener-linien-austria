@@ -364,7 +364,9 @@ class WienerLinienRouteSensor(
     _attr_translation_key = "route"
     _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.TIMESTAMP
-    _unrecorded_attributes = frozenset({"trips", "line_colors", "traffic_info"})
+    _unrecorded_attributes = frozenset(
+        {"trips", "line_colors", "traffic_info", "elevator_info"}
+    )
 
     def __init__(
         self,
@@ -406,5 +408,6 @@ class WienerLinienRouteSensor(
             "interchanges": best.interchanges if best else None,
             "risk": best.risk if best else None,
             "min_transfer_minutes": coordinator.options.min_transfer_minutes,
+            "step_free": coordinator.options.step_free,
             **route_trip_attributes(coordinator.hass, trips),
         }

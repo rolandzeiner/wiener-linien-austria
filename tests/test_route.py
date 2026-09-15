@@ -37,6 +37,7 @@ from custom_components.wiener_linien_austria.const import (
     CONF_MIN_TRANSFER_MINUTES,
     CONF_ORIGIN_DIVA,
     CONF_ROUTE_TYPE,
+    CONF_STEP_FREE,
     CONF_WALK_SPEED,
     DOMAIN,
     ENTRY_TYPE_ROUTE,
@@ -499,6 +500,7 @@ OPTIONS_INPUT: dict[str, Any] = {
     CONF_WALK_SPEED: "slow",
     CONF_MIN_TRANSFER_MINUTES: 3,
     CONF_EXCLUDED_MEANS: ["bus"],
+    CONF_STEP_FREE: True,
     CONF_ACTIVE_DAYS: ["mon", "fri"],
     CONF_SCAN_INTERVAL: 240,
 }
@@ -535,6 +537,7 @@ async def test_route_flow_creates_entry(hass: HomeAssistant) -> None:
     assert data[CONF_DESTINATION_NAME] == "Schwarzenbergplatz"
     assert data[CONF_ROUTE_TYPE] == "leastinterchange"
     assert data[CONF_EXCLUDED_MEANS] == ["bus"]
+    assert data[CONF_STEP_FREE] is True
     assert data[CONF_ACTIVE_DAYS] == ["mon", "fri"]
     assert data[CONF_ACTIVE_FROM] == "06:30:00"
     assert result["result"].unique_id == "route_60201012_60200123"

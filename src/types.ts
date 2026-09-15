@@ -695,6 +695,17 @@ export interface RouteLegAttr {
   next_departures?: string[];
   /** Typical minutes between departures here, from `/monitor`. */
   headway_minutes?: number | null;
+  /** Planned with a low-floor vehicle. */
+  low_floor?: boolean;
+  /** Lifts and stairs on this leg's own walk. */
+  access?: RouteAccessStepAttr[];
+}
+
+/** A lift, stairs or ramp on the way to, from or between platforms. */
+export interface RouteAccessStepAttr {
+  kind: string;
+  level: string | null;
+  stop_id: string | null;
 }
 
 export interface RouteTransferAttr {
@@ -702,6 +713,8 @@ export interface RouteTransferAttr {
   walk_minutes: number;
   slack_minutes: number;
   risk: RouteRisk;
+  /** Lifts and stairs on the way from one vehicle to the next. */
+  access?: RouteAccessStepAttr[];
 }
 
 export interface RouteTripAttr {
@@ -731,6 +744,10 @@ export interface RouteAttrs {
   trips?: RouteTripAttr[];
   line_colors?: LineColorsMap;
   traffic_info?: Array<{ title?: string; description?: string; related_lines?: string[] }>;
+  /** Lift outages at stations whose lifts the trips use; `stop_ids` names them. */
+  elevator_info?: Array<{ station?: string; description?: string; stop_ids?: string[] }>;
+  /** Planned step-free. */
+  step_free?: boolean;
   attribution?: string;
   /** Ad-hoc only: an older plan served because the request budget is spent. */
   stale?: boolean;
@@ -770,4 +787,6 @@ export interface WienerLinienRouteCardConfig extends LovelaceCardConfig {
   /** How many further connections the disclosure lists. 0 hides it. */
   alternatives?: number | undefined;
   hide_attribution?: boolean | undefined;
+  /** Ad-hoc mode: plan step-free connections. */
+  step_free?: boolean | undefined;
 }

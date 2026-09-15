@@ -66,6 +66,7 @@
           "walk_speed": "Gehtempo",
           "min_transfer_minutes": "Umsteigepuffer",
           "excluded_means": "Vermeiden",
+          "step_free": "Stufenlos",
           "active_from": "Aktualisieren ab",
           "active_to": "Aktualisieren bis",
           "active_days": "Aktualisieren an",
@@ -73,6 +74,7 @@
         },
         "data_description": {
           "min_transfer_minutes": "Umstiege mit weniger Zeitreserve werden als knapp markiert.",
+          "step_free": "Nur Verbindungen mit Aufzug oder Rampe statt Stiegen und Rolltreppen, und mit Niederflurfahrzeugen planen.",
           "active_from": "Optional. Außerhalb dieses Zeitfensters wird nicht aktualisiert. Beide Zeiten setzen oder keine.",
           "active_days": "Leer lassen für jeden Tag.",
           "scan_interval": "Mindestens 120 Sekunden. Zusätzlich wird direkt nach Abfahrt der besten Verbindung aktualisiert."

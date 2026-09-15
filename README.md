@@ -84,6 +84,7 @@ Change tracked lines via **Reconfigure**, the polling interval via **Configure**
    - **Most changes** and **Avoid** — limit changes, or leave out trains, S-Bahn, U-Bahn, trams or buses.
    - **Walking speed** — how long the trip planner allows for walking between platforms.
    - **Transfer buffer** — changes with less time to spare are marked tight. Default 2 min.
+   - **Step-free** *(2.0.0)* — plan only with lifts or ramps instead of stairs and escalators, and with low-floor vehicles.
 4. Optionally set a refresh window, such as weekdays 06:30–09:00. Outside it the route makes no requests.
 5. Save. The integration plans the route once first, so a pair of stops the trip planner can't route is caught right away.
 
@@ -154,6 +155,7 @@ What the card shows:
 - **Live times and frequency** *(2.0.0)* — U-Bahn, tram and bus rides show **Live** when the departure boards have a live time, plus how often the line runs and the next two departures (for example *every 5 min · then 06:23, 06:29*). S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
+- **Lifts and stairs** *(2.0.0)* — on a step-free trip, each lift on the way to the platform, at a change and at the destination, for example *Lift down*. A lift at a station with an outage says *out of service*, and a warning names the station. Rides planned with a low-floor vehicle show a wheelchair icon.
 - **More connections** — up to three later options, folded away until you open them.
 - **Last updated** (*Zuletzt aktualisiert* on a German install) — the time the trip planner last answered, next to the heading, so a plan kept on screen can't pass for a fresh one.
 
@@ -191,6 +193,7 @@ to: "60200421"
 | `title` | see note | Heading text. Without it the card shows the route's start and destination, or "Plan a trip" when you pick stops on the card. |
 | `alternatives` | `2` | Later connections to offer, `0`–`3`. |
 | `hide_attribution` | `false` | Hides the data-source line. |
+| `step_free` | `false` | Plans step-free connections when there's no `entity`. A route uses its own **Step-free** setting. |
 
 **How the card plans between any two stops.** Requests go through Home Assistant, never from the browser to Wiener Linien. The card refreshes every 2 minutes while it's on screen and the browser tab is visible, and shortly after the best connection leaves. After 30 minutes without a tap or key press it pauses until someone touches it, so a wall tablet left open stops asking. Home Assistant reuses an answer for up to a minute, whichever dashboard asks. Each Home Assistant user gets up to 60 trip-planner requests an hour, and all users together up to 120.
 
@@ -211,6 +214,8 @@ Each route gets two entities too:
 | Connection at risk | `binary_sensor.<route>_connection_at_risk` | `binary_sensor.<route>_anschluss_gefahrdet` |
 
 The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
+
+Step-free routes add `step_free: true` and `elevator_info`: lift outages at the stations whose lifts the trips use, each with `stop_ids` naming those stations. Every leg carries `low_floor` and `access`, a list of the lifts and stairs on its walk (`kind` such as `elevator` or `stairs`, `level` `up` or `down`, and the station's `stop_id`); each change in `transfers` has an `access` list too. An outage is matched by station, so it can concern a different lift at the same station.
 
 Each ride in `trips` also carries `direction` (`H` or `R`), `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line typically runs there). A ride with a live time has `realtime: true` and a live `estimated` departure; its arrival moves by the same delay.
 
@@ -355,6 +360,7 @@ The action skips the request cooldown, because someone is waiting for the answer
 | `min_transfer_minutes` | no | `0`–`15`, default `2`. |
 | `datetime` | no | When to leave, as an ISO date and time. Without an offset it's Vienna time. Leave out for now. |
 | `arrive_by` | no | `true` treats `datetime` as the latest arrival instead. Default `false`. |
+| `step_free` | no | `true` plans only step-free connections. Default `false`. |
 
 The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `trips` (up to four), `line_colors`, `traffic_info` and `attribution`. `planned_for` echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan for a chosen time keeps every connection it found, even ones that already left. Two more fields cover a used-up allowance. `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
 

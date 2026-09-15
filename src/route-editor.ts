@@ -49,6 +49,7 @@ function schema(
       ? [
           { name: "from", selector: stopSelector },
           { name: "to", selector: stopSelector },
+          { name: "step_free", selector: { boolean: {} } },
         ]
       : []),
     { name: "title", selector: { text: {} } },
@@ -101,6 +102,7 @@ export class WienerLinienAustriaRouteCardEditor
     if (next.entity || !next.from) delete next.from;
     if (next.entity || !next.to) delete next.to;
     if (!next.title) delete next.title;
+    if (next.entity || next.step_free !== true) delete next.step_free;
     if (next.hide_attribution !== true) delete next.hide_attribution;
     this._config = normaliseRouteConfig(next as WienerLinienRouteCardConfig);
     fireEvent(this, "config-changed", { config: next });

@@ -19,7 +19,7 @@ import "./wiener-linien-austria-route-card.js";
 import "./route-editor.js";
 
 import { ROUTE_CARD_VERSION } from "./const.js";
-import type { HomeAssistant, RouteTripAttr } from "./types.js";
+import type { HomeAssistant, RouteAccessStepAttr, RouteTripAttr } from "./types.js";
 
 const TAG = "wiener-linien-austria-route-card";
 const ENTITY = "sensor.westbahnhof_praterstern_naechste_verbindung";
@@ -162,6 +162,60 @@ describe("registration + config", () => {
     expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow();
     expect(() => el.setConfig({ type: TAG, from: "Westbahnhof" })).toThrow(/stop number/);
     expect(() => el.setConfig({ type: TAG, from: 60201468, to: "60201040" })).not.toThrow();
+  });
+});
+
+describe("step-free", () => {
+  function stepFreeTrip(): RouteTripAttr {
+    const base = trip("07:57", "08:11");
+    const lift = (level: string, stop: string): RouteAccessStepAttr => ({
+      kind: "elevator",
+      level,
+      stop_id: stop,
+    });
+    const walk = (at: string, access: RouteAccessStepAttr[]) => ({
+      ...base.legs[0]!, walk: true, line: null, type: "walk", towards: null,
+      origin: stop("Westbahnhof", at), destination: stop("Westbahnhof", at),
+      realtime: false, stop_count: 0, headway_minutes: null, next_departures: [],
+      low_floor: false, access,
+    });
+    return {
+      ...base,
+      legs: [
+        walk("07:54", [lift("down", "60201468")]),
+        { ...base.legs[0]!, low_floor: true },
+        { ...base.legs[1]!, low_floor: true },
+        walk("08:11", [lift("up", "60201040"), { kind: "teleporter", level: null, stop_id: null }]),
+      ],
+      transfers: [{ ...base.transfers[0]!, access: [lift("up", "60201320")] }],
+    };
+  }
+
+  it("names every lift, flags an outage and marks low-floor rides", async () => {
+    const attrs = {
+      ...ACTIVE,
+      step_free: true,
+      trips: [stepFreeTrip()],
+      traffic_info: [],
+      elevator_info: [{ station: "Stephansplatz", stop_ids: ["60201320"] }],
+    };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", attrs), { entity: ENTITY });
+    const t = text(el);
+    expect(t).toContain("Aufzug nach unten");
+    expect(t).toContain("Aufzug nach oben · außer Betrieb");
+    expect(t).toContain("Aufzug außer Betrieb: Stephansplatz");
+    expect(t).toContain("Niederflurfahrzeug");
+    // A step kind the card has no words for is left out, not shown raw.
+    expect(t).not.toContain("teleporter");
+    expect(root(el).querySelectorAll(".access--out")).toHaveLength(1);
+  });
+
+  it("sends step_free from the card config in ad-hoc mode", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass();
+    const el = await mount(h, { step_free: true });
+    await settle(el);
+    expect(planCalls(callWS)[0]).toMatchObject({ step_free: true });
   });
 });
 
@@ -944,7 +998,7 @@ describe("editor", () => {
       schema: Array<{ name: string; required?: boolean }>;
     };
     expect(form.schema.map((f) => f.name)).toEqual([
-      "entity", "from", "to", "title", "alternatives", "hide_attribution",
+      "entity", "from", "to", "step_free", "title", "alternatives", "hide_attribution",
     ]);
     expect(form.schema[0]?.required).toBeUndefined();
 
@@ -958,6 +1012,11 @@ describe("editor", () => {
     );
     expect(config).toEqual({ type: `custom:${TAG}`, from: WESTBAHNHOF, alternatives: 2 });
 
+    formEl.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { step_free: true } } }),
+    );
+    expect(config).toMatchObject({ from: WESTBAHNHOF, step_free: true });
+    // A route brings its own options; step-free only applies without one.
     formEl.dispatchEvent(
       new CustomEvent("value-changed", { detail: { value: { entity: ENTITY, from: WESTBAHNHOF } } }),
     );

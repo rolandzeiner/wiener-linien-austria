@@ -203,6 +203,10 @@ CONF_MAX_CHANGES: Final = "max_changes"
 CONF_WALK_SPEED: Final = "walk_speed"
 CONF_MIN_TRANSFER_MINUTES: Final = "min_transfer_minutes"
 CONF_EXCLUDED_MEANS: Final = "excluded_means"
+# Plan only step-free connections: lifts or ramps instead of stairs and
+# escalators, and low-floor vehicles. Absent on routes saved before the
+# option existed, which reads as off, so no migration is needed.
+CONF_STEP_FREE: Final = "step_free"
 CONF_ACTIVE_FROM: Final = "active_from"
 CONF_ACTIVE_TO: Final = "active_to"
 CONF_ACTIVE_DAYS: Final = "active_days"

@@ -7,6 +7,7 @@ import { lineTypeIcon } from "./mot.js";
 import type {
   AdhocStopOption,
   HomeAssistant,
+  RouteAccessStepAttr,
   RouteActiveWindow,
   RouteAttrs,
   RouteLegAttr,
@@ -27,6 +28,7 @@ const ROUTE_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "title",
   "alternatives",
   "hide_attribution",
+  "step_free",
 ]);
 export const MAX_ALTERNATIVES = 3;
 
@@ -63,6 +65,8 @@ export interface NormalisedRouteConfig {
   title: string;
   alternatives: number;
   hide_attribution: boolean;
+  /** Ad-hoc only: plan step-free. Ignored while `entity` is set. */
+  step_free: boolean;
 }
 
 /** Validate + default a route card config. Throws the messages Lovelace shows
@@ -96,6 +100,7 @@ export function normaliseRouteConfig(
     title: typeof config.title === "string" ? config.title : "",
     alternatives,
     hide_attribution: config.hide_attribution === true,
+    step_free: config.step_free === true,
   };
 }
 
@@ -146,6 +151,49 @@ export function upcomingTrips(
 
 export function transitLegs(trip: RouteTripAttr): RouteLegAttr[] {
   return trip.legs.filter((leg) => !leg.walk && !!leg.line);
+}
+
+/** Lifts and stairs on the walk before the first ride ("start") or after
+ *  the last one ("end"): the way to and from the platform. */
+export function walkAccess(trip: RouteTripAttr, where: "start" | "end"): RouteAccessStepAttr[] {
+  const legs = where === "start" ? trip.legs : [...trip.legs].reverse();
+  const steps: RouteAccessStepAttr[] = [];
+  for (const leg of legs) {
+    if (!leg.walk) break;
+    steps.push(...(leg.access ?? []));
+  }
+  return where === "start" ? steps : steps.reverse();
+}
+
+/** Every lift and stairs step the trip takes, walks and changes alike. */
+export function tripAccessSteps(trip: RouteTripAttr): RouteAccessStepAttr[] {
+  return [
+    ...trip.legs.flatMap((leg) => leg.access ?? []),
+    ...trip.transfers.flatMap((transfer) => transfer.access ?? []),
+  ];
+}
+
+export const ACCESS_ICON: Record<string, string> = {
+  elevator: "mdi:elevator-passenger",
+  stairs: "mdi:stairs",
+  escalator: "mdi:escalator",
+  ramp: "mdi:slope-uphill",
+};
+
+/** Written out rather than built from parts, so every key is findable. */
+const ACCESS_KEYS: Record<string, { any: string; up: string; down: string }> = {
+  elevator: { any: "access_elevator", up: "access_elevator_up", down: "access_elevator_down" },
+  stairs: { any: "access_stairs", up: "access_stairs_up", down: "access_stairs_down" },
+  escalator: { any: "access_escalator", up: "access_escalator_up", down: "access_escalator_down" },
+  ramp: { any: "access_ramp", up: "access_ramp_up", down: "access_ramp_down" },
+};
+
+/** The `route.` localisation key for a step, or null for a kind the card
+ *  has no words for (it is then left out rather than shown raw). */
+export function accessKey(step: RouteAccessStepAttr): string | null {
+  const keys = ACCESS_KEYS[step.kind];
+  if (!keys) return null;
+  return step.level === "up" ? keys.up : step.level === "down" ? keys.down : keys.any;
 }
 
 export const RISK_ICON: Record<RouteRisk, string> = {

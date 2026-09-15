@@ -44,6 +44,7 @@ from .const import (
     CONF_MAX_CHANGES,
     CONF_MIN_TRANSFER_MINUTES,
     CONF_ROUTE_TYPE,
+    CONF_STEP_FREE,
     CONF_WALK_SPEED,
     DEFAULT_MIN_TRANSFER_MINUTES,
     DEFAULT_ROUTE_TYPE,
@@ -87,6 +88,18 @@ _MOT_TYPES: Final[dict[str, str]] = {
 # the arriving leg instead — but handled so a changed answer shape degrades
 # into a walk leg rather than a nameless vehicle.
 _WALK_MODE_TYPES: Final = frozenset({"99", "100", "105"})
+
+# The impaired-mobility options that make the server plan step-free
+# (verified 2026-09-14 and 2026-09-15: the answer reroutes, echoes the flags
+# in `option.ptOption`, and adds walk legs whose footpath elements name the
+# lifts). `noElevators` stays off, since lifts are the point.
+_STEP_FREE_PARAMS: Final = (
+    ("imparedOptionsActive", "1"),
+    ("wheelchair", "on"),
+    ("noSolidStairs", "on"),
+    ("noEscalators", "on"),
+    ("lowPlatformVhcl", "on"),
+)
 
 # Error codes seen from the live service (2026-09-14) and the interface
 # description. Anything else still raises, with the raw code shown.
@@ -138,6 +151,7 @@ class RouteOptions:
     walk_speed: str = DEFAULT_WALK_SPEED
     excluded_means: tuple[str, ...] = ()
     min_transfer_minutes: int = DEFAULT_MIN_TRANSFER_MINUTES
+    step_free: bool = False
 
     @classmethod
     def from_config(
@@ -170,6 +184,7 @@ class RouteOptions:
                 if name in EXCLUDABLE_MEANS
             ),
             min_transfer_minutes=min_transfer,
+            step_free=config.get(CONF_STEP_FREE) is True,
         )
 
 
@@ -208,6 +223,25 @@ class RouteStop:
 
 
 @dataclass(slots=True, frozen=True)
+class AccessStep:
+    """A lift, stairs or ramp on the way to, from or between platforms.
+
+    From the EFA `footpathElem` list. `kind` is the upstream `type`
+    lower-cased (`elevator`, `stairs`, `escalator`, `ramp`, …), `level` is
+    `up` or `down` where the server says, and `stop_id` the DIVA of the
+    station it belongs to, which is how a lift outage is matched to it.
+    """
+
+    kind: str
+    level: str | None
+    stop_id: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Render for sensor attributes and action responses."""
+        return {"kind": self.kind, "level": self.level, "stop_id": self.stop_id}
+
+
+@dataclass(slots=True, frozen=True)
 class RouteLeg:
     """A ride on one vehicle, or a walk."""
 
@@ -233,6 +267,13 @@ class RouteLeg:
     # minutes apart the line typically runs here.
     next_departures: tuple[datetime, ...] = ()
     headway_minutes: int | None = None
+    # The server plans this ride with a low-floor vehicle
+    # (`attrs: PlanLowFloorVehicle`).
+    low_floor: bool = False
+    # Lifts and stairs on this leg's own walk (a walk leg's footpath), and on
+    # the transfer walk after it (a ride's `AFTER` footpath).
+    access: tuple[AccessStep, ...] = ()
+    access_after: tuple[AccessStep, ...] = ()
 
     @property
     def duration_minutes(self) -> int | None:
@@ -260,6 +301,8 @@ class RouteLeg:
             "direction": self.direction,
             "next_departures": [_iso(value) for value in self.next_departures],
             "headway_minutes": self.headway_minutes,
+            "low_floor": self.low_floor,
+            "access": [step.to_dict() for step in self.access],
         }
 
 
@@ -271,6 +314,8 @@ class Transfer:
     walk_minutes: int
     slack_minutes: int
     risk: RiskLevel
+    # Lifts and stairs on the way from one vehicle to the next.
+    access: tuple[AccessStep, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Render for sensor attributes and action responses."""
@@ -279,6 +324,7 @@ class Transfer:
             "walk_minutes": self.walk_minutes,
             "slack_minutes": self.slack_minutes,
             "risk": self.risk,
+            "access": [step.to_dict() for step in self.access],
         }
 
 
@@ -379,6 +425,8 @@ def build_trip_params(
     if options.excluded_means:
         params.append(("excludedMeans", "checkbox"))
         params.extend((f"exclMOT_{code}", "1") for code in options.excluded_means)
+    if options.step_free:
+        params.extend(_STEP_FREE_PARAMS)
     return params
 
 
@@ -552,6 +600,9 @@ def _parse_leg(raw: Mapping[str, Any], tz: Any) -> RouteLeg | None:
         cancelled=_is_cancelled(raw, mode),
         direction=None if walk else _text(diva.get("dir")),
         wiener_linien=not walk and _text(diva.get("opPublicCode")) == "WL",
+        low_floor=not walk and _has_attr(raw.get("attrs"), "PlanLowFloorVehicle"),
+        access=_access_steps(raw.get("footpath"), after=False),
+        access_after=_access_steps(raw.get("footpath"), after=True),
     )
 
 
@@ -593,6 +644,48 @@ def _walk_after(footpath: Any) -> int:
         except ValueError:
             continue
     return total
+
+
+def _access_steps(footpath: Any, *, after: bool) -> tuple[AccessStep, ...]:
+    """Lifts and stairs from the footpath blocks at (or not at) `AFTER`.
+
+    A transfer walk arrives as `position: AFTER` on the ride before it; the
+    walk to or from a platform arrives on a walk leg of its own (seen as
+    `IDEST`). Elements without a type are skipped.
+    """
+    steps: list[AccessStep] = []
+    for block in footpath if isinstance(footpath, list) else []:
+        if (
+            not isinstance(block, Mapping)
+            or (block.get("position") == "AFTER") != after
+        ):
+            continue
+        elements = block.get("footpathElem")
+        for element in elements if isinstance(elements, list) else []:
+            if not isinstance(element, Mapping):
+                continue
+            kind = _text(element.get("type"))
+            if kind is None:
+                continue
+            level = _text(element.get("level"))
+            steps.append(
+                AccessStep(
+                    kind=kind.lower(),
+                    level=level.lower() if level else None,
+                    stop_id=_text(_mapping(element.get("orig")).get("stopID")),
+                )
+            )
+    return tuple(steps)
+
+
+def _has_attr(attrs: Any, name: str) -> bool:
+    """Whether an EFA name/value attribute list carries `name` set."""
+    return isinstance(attrs, list) and any(
+        isinstance(item, Mapping)
+        and item.get("name") == name
+        and str(item.get("value", "1")) not in ("0", "false")
+        for item in attrs
+    )
 
 
 def _is_cancelled(raw: Mapping[str, Any], mode: Mapping[str, Any]) -> bool:
@@ -670,9 +763,11 @@ def assess_transfers(
     transfers: list[Transfer] = []
     previous: RouteLeg | None = None
     walk = 0
+    walk_access: list[AccessStep] = []
     for leg in legs:
         if leg.walk:
             walk += leg.duration_minutes or 0
+            walk_access.extend(leg.access)
             continue
         if previous is not None:
             arrival = previous.destination.effective
@@ -694,10 +789,12 @@ def assess_transfers(
                         walk_minutes=total_walk,
                         slack_minutes=slack,
                         risk=risk,
+                        access=(*previous.access_after, *walk_access),
                     )
                 )
         previous = leg
         walk = 0
+        walk_access = []
     return transfers
 
 
