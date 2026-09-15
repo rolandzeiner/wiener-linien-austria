@@ -17,7 +17,7 @@ import {
   checkCardVersionWS,
   renderVersionBanner,
 } from "./shared-render.js";
-import { deText, safeHttpsUri } from "./utils.js";
+import { deText } from "./utils.js";
 import {
   LINE_TYPE_METRO,
   headerIconForType,
@@ -45,6 +45,7 @@ import {
 } from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeDomId, toggleInSet } from "./utils/html.js";
+import { stopMapUrl } from "./utils/map-url.js";
 import {
   iconForElevatorReason,
   parseTrafficNotice,
@@ -640,7 +641,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const attrs = this._attrs(active.entity);
     const title = attrs.stop_name || attrs.friendly_name || active.entity;
-    const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
+    const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     const geoUri = this._stopGeoUri(title, attrs.latitude, attrs.longitude);
     const qrConfigured = this._config!.show_qr_button !== false;
     const showQrButton = qrConfigured && geoUri !== null;
@@ -822,7 +823,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const elevatorInfos: ElevatorInfoAttr[] = [...realElevator, ...debugElevator];
     const showElevator = this._config!.show_elevator_info && elevatorInfos.length > 0;
 
-    const mapUrl = this._stopMapUrl(title, attrs.latitude, attrs.longitude);
+    const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     // Phone-first QR target: geo: URI hands off to the user's default
     // maps app (Apple Maps, Organic Maps, OsmAnd, …), no Google preference.
     // Stays null when coords are missing — falling back to the OSM web
@@ -1811,35 +1812,6 @@ export class WienerLinienAustriaCard extends LitElement {
    *  through this so the `|`-delimited grammar lives in one place. */
   private _transferKey(rowKey: string, stopIndex: number): string {
     return `${rowKey}|${stopIndex}`;
-  }
-
-  /**
-   * Official Vienna city map (beta viewer) — stadtplan.wien.gv.at,
-   * maintained by Magistrat der Stadt Wien. Built on basemap.at
-   * tiles, renders the Wiener-Linien stop network natively, and
-   * exposes a hash-based permalink with a stable WGS84 contract:
-   *
-   *   #/@<lon>,<lat>,<zoom>,<rotation>,<tilt>,<basemap>/<theme>
-   *
-   * Used by the header map button and the dialog "open in maps" link.
-   * Falls back to OpenStreetMap search when the sensor doesn't expose
-   * coordinates (rare — the integration normally seeds them from the
-   * Wiener Linien static catalogue at config-flow time).
-   */
-  private _stopMapUrl(
-    stopName: string | undefined,
-    lat: number | null | undefined,
-    lon: number | null | undefined,
-  ): string | null {
-    let url: string | null = null;
-    if (typeof lat === "number" && typeof lon === "number") {
-      // 17.5 is street-level zoom — close enough that the stop and its
-      // platforms read clearly without losing the surrounding block.
-      url = `https://stadtplan.wien.gv.at/#/@${lon},${lat},17.5,0,0,standard/themes`;
-    } else if (stopName) {
-      url = `https://www.openstreetmap.org/search?query=${encodeURIComponent(`${stopName}, Wien`)}`;
-    }
-    return url ? safeHttpsUri(url) || null : null;
   }
 
   /**

@@ -674,6 +674,9 @@ export interface RouteStopAttr {
   planned: string | null;
   estimated: string | null;
   delay_minutes: number | null;
+  /** From the stop catalogue by DIVA; absent for stops it doesn't hold. */
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface RouteLegAttr {
@@ -707,6 +710,8 @@ export interface RouteLegStopAttr {
   name: string;
   stop_id: string | null;
   time: string | null;
+  latitude?: number;
+  longitude?: number;
 }
 
 /** A lift, stairs or ramp on the way to, from or between platforms. */

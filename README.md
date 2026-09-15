@@ -153,6 +153,7 @@ What the card shows:
 
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time. For a trip at a chosen time, the departure time and day instead.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
+- **Stops on the map** *(2.0.0)* — a pin after each boarding stop and the destination opens that stop in Vienna's city map. For a stop the map can't place, such as an S-Bahn-only station, the pin searches for it on OpenStreetMap.
 - **Stops along each ride** *(2.0.0)* — tap the number of stops to see every stop in between with its time, on the ride's own line. Live delays move these times too.
 - **Live times and frequency** *(2.0.0)* — a U-Bahn, tram or bus ride with a live time gets a live icon next to its departure; a late one shows its planned time struck through and the expected time in red (for example ~~09:22~~ 09:25). A line running every 5 min or more often shows *every 3 min*; a less frequent one shows its next two departures instead. S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
@@ -225,7 +226,7 @@ The time-to-leave sensor turns on the set number of minutes before the next conn
 
 Step-free routes add `step_free: true` and `elevator_info`: lift outages at the stations whose lifts the trips use, each with `stop_ids` naming those stations. Every leg carries `low_floor` and `access`, a list of the lifts and stairs on its walk (`kind` such as `elevator` or `stairs`, `level` `up` or `down`, and the station's `stop_id`); each change in `transfers` has an `access` list too. An outage is matched by station, so it can concern a different lift at the same station.
 
-Each ride also lists `stops`: the stops between boarding and alighting, each with `name`, `stop_id` and `time`.
+Each ride also lists `stops`: the stops between boarding and alighting, each with `name`, `stop_id` and `time`. A stop in the Wiener Linien stop list, whether a ride's `origin`, its `destination` or one of its `stops`, also carries `latitude` and `longitude`. Other stops, such as S-Bahn-only stations, have neither.
 
 Each ride in `trips` also carries `direction` (`H` or `R`), `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line typically runs there). A ride with a live time has `realtime: true` and a live `estimated` departure; its arrival moves by the same delay.
 

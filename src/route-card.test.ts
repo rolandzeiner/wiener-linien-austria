@@ -328,6 +328,66 @@ describe("step-free", () => {
   });
 });
 
+describe("map links", () => {
+  const links = (el: HTMLElement): HTMLAnchorElement[] => [
+    ...root(el).querySelectorAll<HTMLAnchorElement>(".strand a.map-link"),
+  ];
+
+  it("links each boarding stop and the destination to the city map, or a search without coordinates", async () => {
+    const base = trip("07:57", "08:11");
+    const first = base.legs[0]!;
+    const located = {
+      ...base,
+      legs: [
+        { ...first, origin: { ...first.origin, latitude: 48.1966562, longitude: 16.3376511 } },
+        base.legs[1]!,
+      ],
+    };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [located] }), {
+      entity: ENTITY,
+    });
+    const [westbahnhof, stephansplatz, praterstern, ...rest] = links(el);
+    expect(rest).toEqual([]);
+    expect(westbahnhof!.getAttribute("href")).toBe(
+      "https://stadtplan.wien.gv.at/#/@16.3376511,48.1966562,17.5,0,0,standard/themes",
+    );
+    expect(westbahnhof!.getAttribute("aria-label")).toBe("Im Stadtplan öffnen: Westbahnhof");
+    expect(westbahnhof!.getAttribute("target")).toBe("_blank");
+    expect(westbahnhof!.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(stephansplatz!.getAttribute("aria-label")).toBe("In Karte suchen: Stephansplatz");
+    expect(praterstern!.getAttribute("href")).toBe(
+      "https://www.openstreetmap.org/search?query=Praterstern%2C%20Wien",
+    );
+    expect(praterstern!.closest("li")!.classList.contains("stop--end")).toBe(true);
+    // Not inside the stop list's toggle, and not on the stops in between.
+    expect(root(el).querySelector(".stops-toggle a, .leg-stop a")).toBeNull();
+  });
+
+  it("gives walks no pin of their own", async () => {
+    const base = trip("07:57", "08:11");
+    const walk = {
+      ...base.legs[0]!, walk: true, line: null, type: "walk", towards: null,
+      origin: stop("Wohnung", "07:50"), destination: stop("Westbahnhof", "07:55"),
+      stops: [], stop_count: 0,
+    };
+    const walking = { ...base, legs: [walk, ...base.legs, { ...walk, origin: stop("Praterstern", "08:11") }] };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [walking] }), {
+      entity: ENTITY,
+    });
+    const labels = links(el).map((a) => a.getAttribute("aria-label"));
+    expect(labels).toEqual([
+      "In Karte suchen: Westbahnhof",
+      "In Karte suchen: Stephansplatz",
+      "In Karte suchen: Praterstern",
+    ]);
+  });
+
+  it("speaks English when HA does", async () => {
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE, "en"), { entity: ENTITY });
+    expect(links(el)[0]!.getAttribute("aria-label")).toBe("Find on map: Westbahnhof");
+  });
+});
+
 describe("rendering", () => {
   it("renders the best connection, its transfer and the alternatives", async () => {
     const el = await mount(hass("2026-09-14T05:57:00+00:00", ACTIVE), { entity: ENTITY });

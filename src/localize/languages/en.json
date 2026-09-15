@@ -322,6 +322,8 @@
   },
   "route": {
     "heading_fallback": "Route",
+    "open_in_city_map": "Open in city map",
+    "find_on_map": "Find on map",
     "leave_in": "Leave in",
     "now": "Now",
     "minutes": "{n} min",

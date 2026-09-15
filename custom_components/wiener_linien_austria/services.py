@@ -20,7 +20,11 @@ from homeassistant.util import dt as dt_util
 
 from .adhoc import AdhocRateLimited, async_get_planner
 from .const import DOMAIN
-from .route_coordinator import MAX_TRIPS_PUBLISHED, WienerLinienRouteCoordinator
+from .route_coordinator import (
+    MAX_TRIPS_PUBLISHED,
+    WienerLinienRouteCoordinator,
+    add_stop_coordinates,
+)
 from .routing import RoutingError
 
 SERVICE_PLAN_TRIP = "plan_trip"
@@ -108,9 +112,11 @@ async def _async_plan_trip(call: ServiceCall) -> ServiceResponse:
             translation_key=err.translation_key,
             translation_placeholders=err.placeholders,
         ) from err
+    trips = [trip.to_dict() for trip in plan.trips[:MAX_TRIPS_PUBLISHED]]
+    add_stop_coordinates(call.hass, trips)
     response: dict[str, Any] = {
         "origin": coordinator.origin_name,
         "destination": coordinator.destination_name,
-        "trips": [trip.to_dict() for trip in plan.trips[:MAX_TRIPS_PUBLISHED]],
+        "trips": trips,
     }
     return response

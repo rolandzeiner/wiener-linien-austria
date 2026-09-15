@@ -322,6 +322,8 @@
   },
   "route": {
     "heading_fallback": "Verbindung",
+    "open_in_city_map": "Im Stadtplan öffnen",
+    "find_on_map": "In Karte suchen",
     "leave_in": "Abfahrt in",
     "now": "Jetzt",
     "minutes": "{n} min",

@@ -53,6 +53,7 @@ import type {
 import { chipPalette } from "./utils/config.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { safeDomId } from "./utils/html.js";
+import { stopMapUrl } from "./utils/map-url.js";
 import {
   ACCESS_ICON,
   accessKey,
@@ -1069,6 +1070,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 <span class="node node--end" aria-hidden="true"></span>
                 ${this._renderStopTime(last.destination)}
                 <span class="stop-name">${last.destination.name}</span>
+                ${this._renderMapLink(last.destination)}
                 ${this._renderAccess(walkAccess(trip, "end"), attrs)}
               </li>
             `
@@ -1107,6 +1109,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           ${this._renderStopTime(leg.origin)}
           ${this._renderLiveMark(leg)}
           <span class="stop-name">${leg.origin.name}</span>
+          ${this._renderMapLink(leg.origin)}
           ${platform ? html`<span class="platform">${platform}</span>` : nothing}
           ${first ? this._renderAccess(accessBefore, attrs) : nothing}
         </div>
@@ -1165,6 +1168,29 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           : nothing}
       </li>
     `;
+  }
+
+  /** A pin after a stop name that opens the stop on the city map, or searches
+   *  for it by name where the catalogue gave no coordinates. The label says
+   *  which of the two it does. Only boarding stops and the destination get
+   *  one: the stops in between sit too close together for a 24px target each. */
+  private _renderMapLink(stop: RouteStopAttr): TemplateResult | typeof nothing {
+    const url = stopMapUrl(stop.name, stop.latitude, stop.longitude);
+    if (!url) return nothing;
+    const label = this._t(
+      typeof stop.latitude === "number" && typeof stop.longitude === "number"
+        ? "open_in_city_map"
+        : "find_on_map",
+    );
+    return html`<a
+      class="map-link"
+      href=${url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title=${label}
+      aria-label="${label}: ${stop.name}"
+      ><ha-icon icon="mdi:map-marker" aria-hidden="true"></ha-icon
+    ></a>`;
   }
 
   private _toggleRide(key: string): void {
@@ -1532,6 +1558,29 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .stop-name {
       font-weight: 600;
       color: var(--primary-text-color);
+    }
+    /* The map pin after a stop name: an icon in the quiet text colour, no box.
+       The 16px icon keeps the row at its height; the ::before reaches the
+       24px target (WCAG 2.5.8) around it without taking up layout space. */
+    .map-link {
+      position: relative;
+      display: inline-flex;
+      align-self: center;
+      margin-inline-start: -4px;
+      border-radius: var(--wl-radius-sm);
+      color: var(--secondary-text-color);
+      --mdc-icon-size: 16px;
+    }
+    .map-link::before {
+      content: "";
+      position: absolute;
+      inset: -4px;
+    }
+    .map-link:hover {
+      color: var(--primary-text-color);
+    }
+    .map-link ha-icon {
+      display: block;
     }
     .platform {
       font-size: 0.8rem;
@@ -2153,6 +2202,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
     .alt-toggle:focus-visible,
     .stops-toggle:focus-visible,
+    .map-link:focus-visible,
     .combo-field input:focus-visible,
     .when-field input:focus-visible,
     button:focus-visible {

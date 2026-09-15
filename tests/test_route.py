@@ -9,6 +9,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pytest
 from freezegun.api import FrozenDateTimeFactory
@@ -44,6 +45,7 @@ from custom_components.wiener_linien_austria.const import (
     ENTRY_TYPE_ROUTE,
     MAX_CHANGES_CHOICES,
     ROUTE_TYPES,
+    ROUTING_TIME_ZONE,
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
     S_BAHN_TEXT_COLOR,
@@ -54,9 +56,18 @@ from custom_components.wiener_linien_austria.diagnostics import (
 )
 from custom_components.wiener_linien_austria.route_coordinator import (
     WienerLinienRouteCoordinator,
+    route_trip_attributes,
 )
-from custom_components.wiener_linien_austria.routing import RoutingError
-from custom_components.wiener_linien_austria.static import line_colors_for
+from custom_components.wiener_linien_austria.routing import (
+    RoutingError,
+    parse_trip_body,
+)
+from custom_components.wiener_linien_austria.static import (
+    CATALOGUE_KEY,
+    StaticCatalogue,
+    Station,
+    line_colors_for,
+)
 
 from .conftest import (
     ROUTE_DATA,
@@ -360,6 +371,31 @@ async def test_plan_trip_returns_connections(
     assert response["origin"] == "Westbahnhof"
     assert len(response["trips"]) == 4
     assert dict(fetch.call_args.args[1])["itdTripDateTimeDepArr"] == "arr"
+    # The same shape as the sensor's trips, so no catalogue means no coordinates.
+    assert "latitude" not in response["trips"][0]["legs"][0]["origin"]
+
+    hass.data[DOMAIN][CATALOGUE_KEY] = StaticCatalogue(
+        stations_by_diva={
+            60201468: Station(
+                diva=60201468,
+                name="Westbahnhof",
+                municipality="Wien",
+                longitude=16.3376511,
+                latitude=48.1966562,
+                rbls=[],
+            )
+        },
+        last_fetched="2026-09-15T00:00:00+00:00",
+    )
+    response = await hass.services.async_call(
+        DOMAIN,
+        "plan_trip",
+        {"config_entry_id": entry.entry_id, "arrive_by": True},
+        blocking=True,
+        return_response=True,
+    )
+    assert response is not None
+    assert response["trips"][0]["legs"][0]["origin"]["latitude"] == 48.1966562
 
 
 async def test_plan_trip_at_a_given_time(
@@ -731,6 +767,52 @@ async def test_probe_route_outcomes(
         assert await _probe_route(hass, data) == expected
     params = dict(mock.call_args.args[1])
     assert params["exclMOT_4"] == "1"
+
+
+# ---------------------------------------------------------------------------
+# Stop coordinates
+# ---------------------------------------------------------------------------
+
+
+async def test_route_stops_carry_catalogue_coordinates(hass: HomeAssistant) -> None:
+    """Stops the catalogue knows get its coordinates; the rest get no keys."""
+    trips = parse_trip_body(routing_body(), ZoneInfo(ROUTING_TIME_ZONE))[:1]
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    domain_data[CATALOGUE_KEY] = StaticCatalogue(
+        stations_by_diva={
+            diva: Station(
+                diva=diva,
+                name=name,
+                municipality="Wien",
+                longitude=longitude,
+                latitude=latitude,
+                rbls=[],
+            )
+            for diva, name, latitude, longitude in (
+                (60201468, "Westbahnhof", 48.1966562, 16.3376511),
+                (60200056, "Neubaugasse", 48.1982909, 16.3502006),
+            )
+        },
+        last_fetched="2026-09-15T00:00:00+00:00",
+    )
+
+    ride = route_trip_attributes(hass, trips)["trips"][0]["legs"][0]
+    assert ride["origin"]["stop_id"] == "60201468"
+    assert (ride["origin"]["latitude"], ride["origin"]["longitude"]) == (
+        48.1966562,
+        16.3376511,
+    )
+    neubaugasse = next(s for s in ride["stops"] if s["stop_id"] == "60200056")
+    assert neubaugasse["latitude"] == 48.1982909
+    # Stephansplatz isn't in this catalogue: no keys, not nulls.
+    assert "latitude" not in ride["destination"]
+    assert "longitude" not in ride["destination"]
+
+    # No catalogue loaded yet: the same shape as before, no coordinates.
+    del domain_data[CATALOGUE_KEY]
+    ride = route_trip_attributes(hass, trips)["trips"][0]["legs"][0]
+    assert "latitude" not in ride["origin"]
+    assert all("latitude" not in stop for stop in ride["stops"])
 
 
 # ---------------------------------------------------------------------------

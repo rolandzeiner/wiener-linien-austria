@@ -399,12 +399,37 @@ def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[st
     # `get_alerts_for` reads an empty line set as "every line". A plan with
     # no ride in it has no disruption of its own to show.
     traffic = get_alerts_for(hass, labels, set())[0] if labels else []
+    rendered = [trip.to_dict() for trip in trips]
+    add_stop_coordinates(hass, rendered)
     return {
-        "trips": [trip.to_dict() for trip in trips],
+        "trips": rendered,
         "line_colors": line_colors_for(hass, labels),
         "traffic_info": [t.to_dict() for t in traffic],
         "elevator_info": _lift_outages(hass, trips),
     }
+
+
+def add_stop_coordinates(hass: HomeAssistant, trips: list[dict[str, Any]]) -> None:
+    """Give each rendered stop the catalogue's `latitude` and `longitude`.
+
+    The card links a stop to the city map with them. A stop's `stop_id` is
+    its DIVA, the catalogue's key. Stops the catalogue doesn't hold (an
+    S-Bahn-only station) and every stop while it is still loading get no
+    keys, and the card falls back to a search by name.
+    """
+    catalogue = current_catalogue(hass)
+    if catalogue is None:
+        return
+    for trip in trips:
+        for leg in trip["legs"]:
+            for stop in (leg["origin"], leg["destination"], *leg["stops"]):
+                diva = _safe_int(stop.get("stop_id"))
+                station = (
+                    catalogue.stations_by_diva.get(diva) if diva is not None else None
+                )
+                if station is not None:
+                    stop["latitude"] = station.latitude
+                    stop["longitude"] = station.longitude
 
 
 def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, Any]]:
