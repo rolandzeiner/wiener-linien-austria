@@ -23,7 +23,7 @@ npm run build           # Rolldown builds four bundles into
 ## Branching & releases
 
 - Work on `dev`. PRs target `dev`.
-- Releases are tagged from `main` after merging `dev → main`.
+- A release is a `dev → main` PR, squash-merged. The tag is cut from `main` after the merge, and `dev` is then reset to `main` so the two don't diverge.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
 
 ## Card-version sync
@@ -38,15 +38,14 @@ Because the TS literals are asserted equal to the manifest, none of the four can
 
 - `pyproject.toml` — source of truth for ruff (target-version, line-length), mypy (strict, ignore_missing_imports, files), and coverage config. Change rules here, not in CI flags.
   - **`target-version` tracks the oldest Python we support, never the one CI runs.** `hacs.json` promises HA ≥ 2025.6.0, which runs on Python 3.13, so `target-version = "py313"` — even though the venv and CI are on 3.14. Pointing it at the CI interpreter lets ruff rewrite code into syntax our users cannot parse and then stay silent about it; that is how v1.7.1 shipped a SyntaxError (issue #91). The `compile-floor-python` CI job byte-compiles the shipped package on 3.13 as an independent backstop. Raise all three together or not at all.
-- `scripts/strip-css-comments.mjs` — a Rollup-API `transform` plugin that removes
-  comments and indentation from Lit ``css`` templates in production builds. A
-  minifier only minifies JavaScript, and a tagged template's contents are string
-  data, so without this every explanatory CSS comment shipped to users; it was
-  17.8% of the modern bundle. Comments stay intact in `npm run dev`. It carried
-  over to `rolldown.config.mjs` unchanged — rolldown implements the Rollup plugin
-  API — and still runs *after* the transpile step, which is the ordering it needs.
-- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.12% on 2026-09-14).
-  - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the other twelve carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
+- `scripts/strip-css-comments.mjs` — a `transform` plugin (Rolldown speaks the
+  Rollup plugin API) that removes comments and indentation from Lit ``css``
+  templates in production builds. A minifier only minifies JavaScript, and a
+  tagged template's contents are string data, so without this every explanatory
+  CSS comment shipped to users; it was 17.8% of the modern bundle. Comments stay
+  intact in `npm run dev`. It has to run *after* the transpile step.
+- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.54% on 2026-09-15).
+  - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the others carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
 
     ```bash
     .venv/bin/python -m pytest tests/ -q
@@ -77,14 +76,14 @@ Bumping an exact pin is a deliberate act — say why in the commit message. Depe
 
 **Two output options are load-bearing and fail silently.** The banner must be a **legal** comment — `/*! ... */` — with `comments: { legal: true }`; a `//` banner is stripped by the minifier and only the built file's first bytes reveal it. And **`dropConsole` stays `false`**: rolldown's option is a boolean rather than terser's per-method array, so it is all-or-nothing, and most `console.*` calls in these cards sit in `catch` blocks where dropping them turns a caught error into a silent one.
 
-**The card bundles are excluded from the `end-of-file-fixer` / `trailing-whitespace` pre-commit hooks.** The exclude pattern, `^custom_components/.*/www/.*\.js$`, covers all four. Rolldown emits no trailing newline where Rollup did, so a hook that "fixes" the file *after* the build leaves the committed bundle out of sync with a fresh one — exactly what `validate.yml` asserts byte-for-byte. `output.footer: "\n"` does not work around it; the minifier strips trailing whitespace.
+**The card bundles are excluded from the `end-of-file-fixer` / `trailing-whitespace` pre-commit hooks.** The exclude pattern, `^custom_components/.*/www/.*\.js$`, covers all four. Rolldown emits no trailing newline, so a hook that "fixes" the file *after* the build leaves the committed bundle out of sync with a fresh one — exactly what `validate.yml` asserts byte-for-byte. `output.footer: "\n"` does not work around it; the minifier strips trailing whitespace.
 
-**The bundler does not type-check, and `tsc` is the only type-checker.** This has been true since the move off `@rollup/plugin-typescript` (TypeScript 7 is the Go-native compiler and its npm package no longer ships the JS compiler API, so that plugin dies at load). swc filled the gap for one release cycle; rolldown does the transpile now. `npx tsc --noEmit` still type-checks. Two consequences worth knowing:
+**The bundler does not type-check, and `tsc` is the only type-checker.** Rolldown strips types without checking them, and TypeScript 7's npm package ships no JS compiler API a bundler plugin could drive. `npx tsc --noEmit` type-checks. Two consequences worth knowing:
 
 - **The bundler checks nothing.** A type error will not fail `npm run build`. `tsc --noEmit` is the single gate between a type error and a shipped bundle, which is why `validate.yml` runs it as its own step.
-- **Decorator settings are no longer restated anywhere.** Lit 3's `@customElement` / `@property` are legacy decorators that need `useDefineForClassFields: false`. swc needed that spelled out, and `rollup.config.mjs` derived it from `tsconfig.json` to stop the two drifting; rolldown reads `tsconfig.json` itself, so there is only one copy now. If it ever regresses, class fields overwrite Lit's accessors and reactivity dies silently while the build stays green — diff the Lit reactive-property list of a built bundle to catch it.
+- **Decorator settings live only in `tsconfig.json`.** Lit 3's `@customElement` / `@property` are legacy decorators that need `useDefineForClassFields: false`. Rolldown reads `tsconfig.json` itself, so don't restate them in `rolldown.config.mjs`. If it ever regresses, class fields overwrite Lit's accessors and reactivity dies silently while the build stays green — diff the Lit reactive-property list of a built bundle to catch it.
 
-`tslib` went with `@rollup/plugin-typescript`. Nothing imports it from source and the bundles contain zero references to it — `tsconfig.json` sets no `importHelpers`, so `__decorate` is inlined. It was only ever a hard preflight check inside that plugin, which is why it read as dead weight for so long. Its `.fallowrc.json` `ignoreDependencies` entry went with it.
+There is no `tslib`: `tsconfig.json` sets no `importHelpers`, so `__decorate` is inlined into the bundles.
 
 View per-file coverage locally:
 
@@ -129,8 +128,10 @@ coverage instead of its estimate cut the findings above threshold from 128 to
 100 and the criticals from 53 to 36 — the difference was all false alarms on
 covered code. The three card files used to report as `estimated` there because
 no test imported them, leaving V8 to emit a stub entry with an empty `fnMap`;
-the smoke tests fixed that at the source. `coverage/` is gitignored, and
-excluded from `scripts/dev-push.sh` — `.gitignore` does not filter rsync.
+the smoke tests fixed that at the source. `coverage/` is gitignored and sits
+outside `custom_components/`, so `scripts/dev-push.sh` never ships it (a file
+inside `custom_components/` would ship regardless: `.gitignore` does not filter
+rsync).
 
 ## Card tests
 
@@ -142,7 +143,7 @@ picks between them per file:
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
 - **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
-  file's leading comment, for anything that needs a DOM. Six of the 18 test
+  file's leading comment, for anything that needs a DOM. Six of the 24 test
   files today: `card-smoke.test.ts` mounts the three departure-board cards,
   `editor-smoke.test.ts` mounts their three editors and asserts the
   `config-changed` payload, `route-card.test.ts` covers the route card, its
