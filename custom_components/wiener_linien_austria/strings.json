@@ -294,13 +294,13 @@
           "name": "To",
           "description": "Destination stop, by name or DIVA number. Use with From instead of a route."
         },
-        "datetime": {
-          "name": "Time",
-          "description": "When to leave, or when to arrive with Arrive by. Leave empty for now."
-        },
         "arrive_by": {
           "name": "Arrive by",
           "description": "Treat the time as the latest arrival instead of the departure."
+        },
+        "datetime": {
+          "name": "Time",
+          "description": "When to leave, or when to arrive with Arrive by. Leave empty for now."
         }
       }
     }

@@ -280,7 +280,7 @@
   "services": {
     "plan_trip": {
       "name": "Fahrt planen",
-      "description": "Plant Verbindungen für eine eingerichtete Route oder zwischen zwei Haltestellen und gibt sie zurück, früheste zuerst.",
+      "description": "Plant Verbindungen für eine eingerichtete Verbindung oder zwischen zwei Haltestellen und gibt sie zurück, früheste zuerst.",
       "fields": {
         "config_entry_id": {
           "name": "Verbindung",
@@ -294,13 +294,13 @@
           "name": "Nach",
           "description": "Zielhaltestelle als Name oder DIVA-Nummer. Zusammen mit „Von“ statt einer Verbindung."
         },
-        "datetime": {
-          "name": "Zeit",
-          "description": "Abfahrtszeit, mit „Ankunft bis“ die späteste Ankunft. Leer lassen für jetzt."
-        },
         "arrive_by": {
           "name": "Ankunft bis",
           "description": "Die Zeit als späteste Ankunft statt als Abfahrt verwenden."
+        },
+        "datetime": {
+          "name": "Zeit",
+          "description": "Abfahrtszeit, mit „Ankunft bis“ die späteste Ankunft. Leer lassen für jetzt."
         }
       }
     }

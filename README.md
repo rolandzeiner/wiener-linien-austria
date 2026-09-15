@@ -338,8 +338,8 @@ Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monit
 |---|---|---|
 | `config_entry_id` | one of the two | The route to plan. |
 | `origin`, `destination` | one of the two | Two stops, by name or DIVA number, instead of a route. *(2.0.0)* |
+| `arrive_by` | no | Treat `datetime` as the latest arrival instead. Default `false`. |
 | `datetime` | no | When to leave. Leave empty for now. |
-| `arrive_by` | no | Treat `datetime` as the latest arrival instead. |
 
 ```yaml
 action: wiener_linien_austria.plan_trip
