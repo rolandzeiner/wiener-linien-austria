@@ -852,13 +852,24 @@ def _timetable_stops_ahead(
     last = len(dep.stops) - 1
     for index, stop in enumerate(dep.stops[:MAX_STOPS_AHEAD]):
         entry: dict[str, Any] = {"name": stop.name}
-        if index == last and stop.name == dep.towards:
+        if index == last and _same_stop_name(stop.name, dep.towards):
             entry["is_terminus"] = True
         transfers = lines_at_diva.get(stop.stop_id) if stop.stop_id else None
         if transfers:
             entry["lines"] = list(transfers)
         out.append(entry)
     return out
+
+
+def _same_stop_name(stop_name: str, towards: str) -> bool:
+    """Whether a stop is the terminus a train is signed for.
+
+    The stop sequence can qualify a name the direction doesn't: an S1
+    towards "Hauptbahnhof" lists its last stop as "Hauptbahnhof
+    (S-Bahn-Station)" (seen 2026-09-15), so a trailing bracket is ignored.
+    """
+    base, bracket, _ = stop_name.partition(" (")
+    return stop_name == towards or (bool(bracket) and base == towards)
 
 
 def _departure_sort_key(dep: Departure) -> tuple[int, str, str]:

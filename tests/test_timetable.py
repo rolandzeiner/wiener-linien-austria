@@ -591,3 +591,30 @@ def test_timetable_trail_is_capped_without_a_terminus() -> None:
     assert trail is not None
     assert len(trail) == MAX_STOPS_AHEAD
     assert all("is_terminus" not in stop for stop in trail)
+
+
+def test_terminus_ignores_a_bracketed_qualifier() -> None:
+    """An S1 towards Hauptbahnhof ends at "Hauptbahnhof (S-Bahn-Station)"."""
+    dep = PlannedDeparture(
+        line="S1",
+        towards="Hauptbahnhof",
+        direction="H",
+        platform=None,
+        planned=FIRST_TRAIN + timedelta(minutes=5),
+        stops=(PlannedStop(name="Hauptbahnhof (S-Bahn-Station)", stop_id=None),),
+    )
+    lookalike = PlannedDeparture(
+        line="S2",
+        towards="Hauptbahnhof",
+        direction="R",
+        platform=None,
+        planned=FIRST_TRAIN + timedelta(minutes=6),
+        stops=(PlannedStop(name="Hauptbahnhof Süd", stop_id=None),),
+    )
+    rows = timetable_departures(
+        (dep, lookalike), frozenset({("S1", "H"), ("S2", "R")}), FIRST_TRAIN
+    )
+    assert rows[0].stops_ahead == [
+        {"name": "Hauptbahnhof (S-Bahn-Station)", "is_terminus": True}
+    ]
+    assert rows[1].stops_ahead == [{"name": "Hauptbahnhof Süd"}]
