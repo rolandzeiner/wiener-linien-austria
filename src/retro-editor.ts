@@ -467,7 +467,6 @@ export class WienerLinienAustriaRetroCardEditor
         if (!next.line || !linesNow.includes(next.line)) next.line = linesNow[0];
         // Silently rewriting saved config is user-meaningful — their direction
         // just changed under them.
-        // eslint-disable-next-line no-console
         console.info(
           `[wiener-linien-austria-retro-card-editor] direction autocorrected to "${target}" for entity "${next.entity ?? ""}" — only one direction has live data`,
         );

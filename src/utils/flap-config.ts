@@ -171,7 +171,6 @@ export function normaliseFlapConfig(
   const maxRowsRaw = Number(raw.max_rows);
   const max_rowsValid = Number.isFinite(maxRowsRaw);
   if (raw.max_rows !== undefined && !max_rowsValid) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[wiener-linien-austria-flap-card] max_rows ${JSON.stringify(raw.max_rows)} is not a number — falling back to 2`,
     );
@@ -212,7 +211,6 @@ export function normaliseFlapConfig(
   for (const r of rawEntities) {
     const stop = normaliseStopEntry(r);
     if (!stop) {
-      // eslint-disable-next-line no-console
       console.warn(
         "[wiener-linien-austria-flap-card] dropping malformed stop entry",
         r,
@@ -232,7 +230,6 @@ export function normaliseFlapConfig(
   // `show_station_header` so configs from before the rename keep
   // working. Existing field wins only if explicitly set; otherwise
   // fall through to the new name's default (true).
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const legacyStation = raw.show_station_header;
   const show_station_name =
     typeof raw.show_station_name === "boolean"

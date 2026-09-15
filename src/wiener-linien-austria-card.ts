@@ -503,7 +503,6 @@ export class WienerLinienAustriaCard extends LitElement {
       if (!this._fallbackWarned && (this._config?.entities?.length ?? 0) > 0) {
         this._fallbackWarned = true;
         const requested = this._config?.entities.map((s) => s.entity).join(", ");
-        // eslint-disable-next-line no-console
         console.warn(
           `[wiener-linien-austria-card] configured entity "${requested}" not in hass.states; falling back to "${first}"`,
         );
@@ -821,7 +820,6 @@ export class WienerLinienAustriaCard extends LitElement {
         tabs?.[next]?.focus();
       })
       .catch((err) => {
-        // eslint-disable-next-line no-console
         console.warn("[wiener-linien-austria-card] tab focus skipped", err);
       });
   }

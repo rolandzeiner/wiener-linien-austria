@@ -28,7 +28,6 @@ export function coerceWalkTime(raw: string, context: string): number | null {
   const trimmed = raw.trim();
   const n = trimmed === "" ? NaN : Number(trimmed);
   if (trimmed !== "" && !Number.isFinite(n)) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[wiener-linien-austria] walk-time "${raw}" for ${context} is not a number — clearing`,
     );

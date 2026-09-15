@@ -184,7 +184,6 @@ export function normaliseWalkTimes(raw: unknown): WalkTimes | undefined {
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
     const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
     if (!Number.isFinite(n) || n < 0 || n > 120) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[wiener-linien-austria] walk_times["${k}"] = ${JSON.stringify(v)} is not a finite number in 0..120 — dropping`,
       );
@@ -230,7 +229,6 @@ export function normaliseLineDirections(
     // so the user can fix it rather than wondering why their override
     // is ignored.
     if (v !== undefined && v !== "" && v !== "Both") {
-      // eslint-disable-next-line no-console
       console.warn(
         `[wiener-linien-austria] line_directions["${k}"] = ${JSON.stringify(v)} is not "H" / "R" / "Both" — dropping`,
       );
@@ -242,14 +240,12 @@ export function normaliseLineDirections(
 function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   if (typeof raw === "string") {
     if (raw.startsWith("sensor.")) return { entity: raw };
-    // eslint-disable-next-line no-console
     console.warn(
       `[wiener-linien-austria] entities[] entry ${JSON.stringify(raw)} is not a sensor.* entity — dropping`,
     );
     return null;
   }
   if (!raw || typeof raw !== "object") {
-    // eslint-disable-next-line no-console
     console.warn(
       `[wiener-linien-austria] entities[] entry ${JSON.stringify(raw)} is not a string or object — dropping`,
     );
@@ -258,7 +254,6 @@ function normaliseStopEntry(raw: unknown): NormalisedModernStop | null {
   const r = raw as Record<string, unknown>;
   const entity = typeof r.entity === "string" ? r.entity : null;
   if (!entity?.startsWith("sensor.")) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[wiener-linien-austria] entities[] entry has missing or non-sensor.* entity field`,
       raw,

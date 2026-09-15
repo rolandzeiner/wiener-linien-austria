@@ -259,14 +259,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       document.fonts.ready
         .then(() => {
           if (!document.fonts.check('700 16px "WL Mono"')) {
-            // eslint-disable-next-line no-console
             console.warn(
               '[wiener-linien-austria-retro-card] "WL Mono" 700 not loaded — falling back to Courier New (less authentic). Check /wiener-linien-austria/fonts/ is served by the integration.',
             );
           }
         })
         .catch((err) => {
-          // eslint-disable-next-line no-console
           console.warn(
             "[wiener-linien-austria-retro-card] document.fonts.ready rejected",
             err,
@@ -420,7 +418,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       // fallback keeps the card useful, but make the swap auditable so
       // the user notices their dashboard is now showing a different stop.
       this._fallbackWarned = true;
-      // eslint-disable-next-line no-console
       console.warn(
         `[wiener-linien-austria-retro-card] configured entity "${configured}" not in hass.states; falling back to "${first}"`,
       );

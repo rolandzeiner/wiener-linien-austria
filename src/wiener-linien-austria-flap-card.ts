@@ -475,7 +475,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     if (out.length === 0 && stops.length > 0 && !this._fallbackWarned) {
       this._fallbackWarned = true;
-      // eslint-disable-next-line no-console
       console.warn(
         `[wiener-linien-austria-flap-card] none of the configured entities exist in hass.states (${stops.map((s) => s.entity).join(", ")})`,
       );
