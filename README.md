@@ -72,15 +72,15 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 <table>
   <tr>
     <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="260" alt="Card editor" />
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="300" alt="Card editor" />
       <br/><em>Card editor</em>
     </td>
     <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="260" alt="Integration setup dialog" />
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="300" alt="Integration setup dialog" />
       <br/><em>Config flow</em>
     </td>
     <td align="center" valign="top">
-      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/action-editor.webp" height="260" alt="Plan trip action in the action editor" />
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/action-editor.webp" height="300" alt="Plan trip action in the action editor" />
       <br/><em>Action editor</em>
     </td>
   </tr>
