@@ -759,7 +759,7 @@ color: var(--wl-rt);
 }
 .access {
 display: inline-flex;
-align-items: center;
+align-items: baseline;
 gap: 2px;
 font-size: 0.8rem;
 color: var(--secondary-text-color);
@@ -767,6 +767,7 @@ color: var(--secondary-text-color);
 .access ha-icon {
 --mdc-icon-size: 16px;
 display: flex;
+align-self: center;
 width: var(--mdc-icon-size);
 height: var(--mdc-icon-size);
 }

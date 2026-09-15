@@ -1707,9 +1707,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       align-self: center;
       color: var(--wl-rt);
     }
+    /* The label's text carries the box's baseline, so on the baseline-aligned
+       stop rows it lines up with the stop name. Centring every item instead
+       handed the baseline to the icon's bottom edge: the label rode 3-4px
+       high and pushed the whole end row, name and pin, down off its node. */
     .access {
       display: inline-flex;
-      align-items: center;
+      align-items: baseline;
       gap: 2px;
       font-size: 0.8rem;
       color: var(--secondary-text-color);
@@ -1720,6 +1724,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .access ha-icon {
       --mdc-icon-size: 16px;
       display: flex;
+      align-self: center;
       width: var(--mdc-icon-size);
       height: var(--mdc-icon-size);
     }
