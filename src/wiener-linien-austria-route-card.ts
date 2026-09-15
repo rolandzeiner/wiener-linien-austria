@@ -1216,10 +1216,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     </span>`;
   }
 
-  /** A small live icon after the time of a ride running on time. A late one
-   *  already says so through its struck-through time. */
+  /** A small live icon after the time of every ride with a live time, late or
+   *  not. Leaving it off a late ride made that ride look like the one on the
+   *  timetable when the ride before it carried the icon. */
   private _renderLiveMark(leg: RouteLegAttr): TemplateResult | typeof nothing {
-    if (!leg.realtime || delayedClock(leg.origin)) return nothing;
+    if (!leg.realtime) return nothing;
     return html`<ha-icon class="live-mark" icon="mdi:access-point" aria-hidden="true"></ha-icon
       ><span class="sr-only">${this._t("live")}</span>`;
   }

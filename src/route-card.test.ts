@@ -417,8 +417,8 @@ describe("rendering", () => {
     expect(alt.querySelector("s.time-planned")?.textContent).toBe("08:00");
     expect(alt.querySelector(".time-late")?.textContent).toBe("08:02");
     expect(alt.querySelector(".sr-only")?.textContent).toContain("geplant 08:00, 2 min später");
-    // The strike already says it's live, so no live icon on top.
-    expect(root(el).querySelector(".strand .leg .live-mark")).toBeNull();
+    // A late ride is live too, so it keeps the live icon beside its strike.
+    expect(root(el).querySelector(".strand .leg .stop .live-mark")).not.toBeNull();
     // Every 10 min is not frequent, so the next departures are shown instead.
     expect(t).toContain("danach 08:18, 08:28");
     expect(t).not.toContain("alle 10 min");
