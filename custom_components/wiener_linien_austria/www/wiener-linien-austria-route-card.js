@@ -361,6 +361,7 @@ const Me={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
           <span class="towards"
             >${e.towards?this._t(`towards`,{towards:e.towards}):``}${m?O` <span class="platform">${m}</span>`:A}</span
           >
+          ${this._renderFrequency(e)}
         </div>
         <div class="ride-detail">
           ${l.length?O`<button
@@ -376,7 +377,6 @@ const Me={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
                   aria-hidden="true"
                 ></ha-icon>
               </button>`:O`<span class="ride-meta">${c}</span>`}
-          ${this._renderFrequency(e)}
         </div>
         ${l.length?O`<ol
               class="leg-stops"
@@ -699,7 +699,7 @@ color: var(--secondary-text-color);
 .ride {
 display: flex;
 flex-wrap: wrap;
-align-items: center;
+align-items: baseline;
 gap: 4px 8px;
 padding-block: 6px 2px;
 font-size: 0.9rem;
@@ -719,6 +719,9 @@ forced-color-adjust: none;
 .type-icon {
 --mdc-icon-size: 18px;
 }
+.ride > ha-icon {
+align-self: center;
+}
 .towards {
 color: var(--primary-text-color);
 }
@@ -733,6 +736,7 @@ color: var(--secondary-text-color);
 }
 .ride-frequency {
 margin-inline-start: auto;
+font-size: 0.85rem;
 }
 .time-change {
 display: inline-flex;

@@ -214,7 +214,9 @@ describe("live state and frequency", () => {
     expect(first.querySelector(".stop .live-mark")).not.toBeNull();
     expect(first.querySelector(".stop .delay")).toBeNull();
     expect(first.querySelector(".stop")?.textContent).toContain("Echtzeit");
-    expect(first.querySelector(".ride-frequency")?.textContent?.trim()).toBe("alle 3 min");
+    expect(first.querySelector(".ride .ride-frequency")?.textContent?.trim()).toBe("alle 3 min");
+    // With the line's direction, not under the stops it passes.
+    expect(first.querySelector(".ride-detail .ride-frequency")).toBeNull();
     // A ride that isn't live gets neither mark.
     const second = root(el).querySelectorAll(".strand .leg")[1]!;
     expect(second.querySelector(".live-mark, .delay")).toBeNull();
