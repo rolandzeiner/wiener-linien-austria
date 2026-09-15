@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { HomeAssistant, RouteTripAttr } from "../types.js";
 import {
+  accessIcon,
   ADHOC_REFRESH_MS,
   ADHOC_ROLLOVER_FLOOR_MS,
   adhocPlanRefreshDelay,
@@ -404,5 +405,17 @@ describe("sameStop", () => {
   it("tells different stops apart, and never guesses without data", () => {
     expect(sameStop(stop("60201206", 48.2066, 16.3851), stop("60200657", 48.2053, 16.3854))).toBe(false);
     expect(sameStop(stop(null), stop(null))).toBe(false);
+  });
+});
+
+describe("accessIcon", () => {
+  it("gives a ramp down the downhill slope and every other step one icon", () => {
+    expect(accessIcon({ kind: "ramp", level: "up", stop_id: null })).toBe("mdi:slope-uphill");
+    expect(accessIcon({ kind: "ramp", level: null, stop_id: null })).toBe("mdi:slope-uphill");
+    expect(accessIcon({ kind: "ramp", level: "down", stop_id: null })).toBe("mdi:slope-downhill");
+    expect(accessIcon({ kind: "elevator", level: "down", stop_id: null })).toBe(
+      "mdi:elevator-passenger",
+    );
+    expect(accessIcon({ kind: "teleporter", level: null, stop_id: null })).toBe("mdi:walk");
   });
 });

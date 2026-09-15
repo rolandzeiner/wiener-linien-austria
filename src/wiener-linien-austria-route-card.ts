@@ -55,7 +55,7 @@ import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { safeDomId } from "./utils/html.js";
 import { stopMapUrl } from "./utils/map-url.js";
 import {
-  ACCESS_ICON,
+  accessIcon,
   accessKey,
   ADHOC_DEBOUNCE_MS,
   ADHOC_IDLE_MS,
@@ -1015,7 +1015,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       const out = step.kind === "elevator" && !!step.stop_id && broken.has(step.stop_id);
       return html`<span class=${out ? "access access--out" : "access"}>
         <ha-icon
-          icon=${out ? "mdi:alert-outline" : ACCESS_ICON[step.kind] ?? "mdi:walk"}
+          class=${!out && step.kind === "ramp" ? "access-icon--ramp" : ""}
+          icon=${out ? "mdi:alert-outline" : accessIcon(step)}
           aria-hidden="true"
         ></ha-icon>
         ${this._t(accessKey(step)!)}${out ? html` · ${this._t("lift_out")}` : nothing}
@@ -1715,8 +1716,19 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.8rem;
       color: var(--secondary-text-color);
     }
+    /* Flex box of exactly the glyph's size: an inline ha-icon sits on the
+       text baseline and reserves descender space, which drops the glyph
+       below the label's centre. Same fix as the modern card's buttons. */
     .access ha-icon {
       --mdc-icon-size: 16px;
+      display: flex;
+      width: var(--mdc-icon-size);
+      height: var(--mdc-icon-size);
+    }
+    /* The slope glyphs draw their solid wedge in the lower half of the
+       24-unit box (y 13 to 22), so centred they still read low. */
+    .access ha-icon.access-icon--ramp {
+      transform: translateY(-2px);
     }
     .access--out {
       padding: 2px 6px;

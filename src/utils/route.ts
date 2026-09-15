@@ -264,12 +264,19 @@ export function tripAccessSteps(trip: RouteTripAttr): RouteAccessStepAttr[] {
   ];
 }
 
-export const ACCESS_ICON: Record<string, string> = {
+const ACCESS_ICON: Record<string, string> = {
   elevator: "mdi:elevator-passenger",
   stairs: "mdi:stairs",
   escalator: "mdi:escalator",
   ramp: "mdi:slope-uphill",
 };
+
+/** The icon for a step. A ramp down gets the downhill slope; the other
+ *  kinds have no up/down pair in MDI and keep one icon either way. */
+export function accessIcon(step: RouteAccessStepAttr): string {
+  if (step.kind === "ramp" && step.level === "down") return "mdi:slope-downhill";
+  return ACCESS_ICON[step.kind] ?? "mdi:walk";
+}
 
 /** Written out rather than built from parts, so every key is findable. */
 const ACCESS_KEYS: Record<string, { any: string; up: string; down: string }> = {
