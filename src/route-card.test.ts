@@ -327,6 +327,11 @@ describe("rendering", () => {
     expect(change.querySelector("s.time-planned")?.textContent).toBe("07:57");
     expect(change.querySelector("time.time-late")?.textContent).toBe("07:59");
     expect(change.querySelector(".sr-only")?.textContent).toBe("geplant 07:57, 2 min später");
+    // Alternatives show the same, so an at-risk change there has its reason.
+    const alt = root(el).querySelector(".alt-times")!;
+    expect(alt.querySelector("s.time-planned")?.textContent).toBe("08:00");
+    expect(alt.querySelector(".time-late")?.textContent).toBe("08:02");
+    expect(alt.querySelector(".sr-only")?.textContent).toContain("geplant 08:00, 2 min später");
     // The strike already says it's live, so no live icon on top.
     expect(root(el).querySelector(".strand .leg .live-mark")).toBeNull();
     // Every 10 min is not frequent, so the next departures are shown instead.

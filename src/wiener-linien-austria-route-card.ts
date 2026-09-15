@@ -1270,11 +1270,29 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       (acc, t) => (acc === undefined || t.slack_minutes < acc.slack_minutes ? t : acc),
       undefined,
     );
+    // A late first ride explains an at-risk change further on, so it shows
+    // here the same way as on the strand. A trip starting with a walk leaves
+    // at the walk's time, which no delay moves.
+    const first = trip.legs[0];
+    const delayed = first && !first.walk ? delayedClock(first.origin) : null;
     return html`
       <li class="alt">
         <span class="alt-times">
-          <span aria-hidden="true">${clockOf(trip.departure)} – ${clockOf(trip.arrival)}</span>
-          <span class="sr-only">${this._tripSummary(trip)}</span>
+          <span aria-hidden="true"
+            >${delayed
+              ? html`<s class="time-planned">${delayed.planned}</s>
+                  <span class="time-late">${delayed.expected}</span>`
+              : clockOf(trip.departure)}
+            – ${clockOf(trip.arrival)}</span
+          >
+          <span class="sr-only"
+            >${this._tripSummary(trip)}${delayed
+              ? `, ${this._t("planned_late", {
+                  time: delayed.planned,
+                  n: first?.origin.delay_minutes ?? 0,
+                })}`
+              : ""}</span
+          >
         </span>
         <span class="alt-lines">
           ${transitLegs(trip).map((leg) => this._renderBadge(leg, attrs))}
@@ -1554,11 +1572,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       text-decoration-thickness: 1.5px;
       font-variant-numeric: tabular-nums;
     }
-    .stop .time-late {
-      padding: 1px 6px;
-      border-radius: var(--wl-radius-sm);
-      background: var(--wl-alarm);
-      color: var(--wl-on-alarm);
+    /* A late time is red type, not a chip, so the row keeps its height. The
+       theme's error red with 15% of the body text mixed in: barely visible
+       as a shift, but enough to lift it to 4.5:1 on a dark card (the raw
+       token measures 4.0:1 there) and past 5:1 on a light one. */
+    .time-late {
+      color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+      font-weight: 700;
     }
     .live-mark {
       --mdc-icon-size: 16px;
@@ -2117,7 +2137,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     @media (forced-colors: active) {
-      .time-late,
       .access--out {
         outline: 1px solid CanvasText;
       }
