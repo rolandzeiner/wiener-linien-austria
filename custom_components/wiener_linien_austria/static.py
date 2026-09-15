@@ -377,6 +377,21 @@ class StaticCatalogue:
         return self._rbl_index
 
 
+# What `async_get_catalogue` can raise when neither the cache nor the network
+# can produce a catalogue: a download timeout or transport error, a malformed
+# CSV (KeyError / TypeError / ValueError), or the RuntimeError the loader
+# raises when both sources are out. Coordinators that treat the catalogue as
+# optional catch exactly this set, so a new failure mode is added here once.
+CATALOGUE_LOAD_ERRORS: tuple[type[Exception], ...] = (
+    TimeoutError,
+    aiohttp.ClientError,
+    KeyError,
+    TypeError,
+    ValueError,
+    RuntimeError,
+)
+
+
 async def async_get_catalogue(hass: HomeAssistant) -> StaticCatalogue:
     """Return a process-wide memoized catalogue, sharing across all callers.
 

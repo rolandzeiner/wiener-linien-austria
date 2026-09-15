@@ -8,7 +8,6 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, tzinfo
 from typing import Any
 
-import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
@@ -166,14 +165,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         self._tz = await async_routing_zone()
         try:
             await static.async_get_catalogue(self.hass)
-        except (
-            TimeoutError,
-            aiohttp.ClientError,
-            KeyError,
-            TypeError,
-            ValueError,
-            RuntimeError,
-        ) as err:
+        except static.CATALOGUE_LOAD_ERRORS as err:
             _LOGGER.debug("Stop catalogue unavailable for routes: %s", err)
         self._unsub_live = async_get_live_board(self.hass).async_add_listener(
             self._on_live_times

@@ -10,7 +10,6 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
-import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -36,6 +35,7 @@ from .parsing import as_int
 from .s_bahn_network import current_lines_at_diva as current_s_bahn_lines
 from .s_bahn_network import merge_transfer_lines
 from .static import (
+    CATALOGUE_LOAD_ERRORS,
     StaticCatalogue,
     async_get_catalogue,
     canonical_line_key,
@@ -247,14 +247,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         """
         try:
             catalogue = await async_get_catalogue(self.hass)
-        except (
-            TimeoutError,
-            aiohttp.ClientError,
-            KeyError,
-            TypeError,
-            ValueError,
-            RuntimeError,
-        ) as err:
+        except CATALOGUE_LOAD_ERRORS as err:
             _LOGGER.debug("Could not load static catalogue for coords: %s", err)
             return
         station = catalogue.stations_by_diva.get(self._diva)
