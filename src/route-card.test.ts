@@ -403,6 +403,13 @@ describe("map links", () => {
     expect(links(el)[0]!.getAttribute("aria-label")).toBe("Find on map: Westbahnhof");
   });
 
+  it("puts the platform with the ride's direction, not the stop name", async () => {
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), { entity: ENTITY });
+    const leg = root(el).querySelector(".strand .leg")!;
+    expect(leg.querySelector(".stop .platform")).toBeNull();
+    expect(leg.querySelector(".ride .towards + .platform")?.textContent).toBe("Gleis 1");
+  });
+
   it("shows no pins when turned off", async () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), {
       entity: ENTITY,

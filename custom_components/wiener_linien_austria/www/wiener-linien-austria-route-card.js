@@ -347,7 +347,6 @@ const Ne={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
           ${this._renderLiveMark(e)}
           <span class="stop-name">${e.origin.name}</span>
           ${this._renderMapLink(e.origin)}
-          ${p?D`<span class="platform">${p}</span>`:k}
           ${n?this._renderAccess(a,r):k}
         </div>
         <div class="ride">
@@ -362,6 +361,7 @@ const Ne={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
           <span class="towards">
             ${e.towards?this._t(`towards`,{towards:e.towards}):``}
           </span>
+          ${p?D`<span class="platform">${p}</span>`:k}
         </div>
         <div class="ride-detail">
           ${c.length?D`<button

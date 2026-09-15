@@ -1098,6 +1098,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const key = rideKey(leg);
     const open = between.length > 0 && this._openRides.has(key);
     const listId = safeDomId(`route-stops-${key}`);
+    // Shown with the ride, not the stop: the platform belongs to this line's
+    // direction, and one stop serves several lines from different platforms.
     const platform = this._platformText(leg);
     return html`
       <li
@@ -1110,7 +1112,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           ${this._renderLiveMark(leg)}
           <span class="stop-name">${leg.origin.name}</span>
           ${this._renderMapLink(leg.origin)}
-          ${platform ? html`<span class="platform">${platform}</span>` : nothing}
           ${first ? this._renderAccess(accessBefore, attrs) : nothing}
         </div>
         <div class="ride">
@@ -1129,6 +1130,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           <span class="towards">
             ${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}
           </span>
+          ${platform ? html`<span class="platform">${platform}</span>` : nothing}
         </div>
         <div class="ride-detail">
           ${between.length
