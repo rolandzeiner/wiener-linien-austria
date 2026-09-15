@@ -649,6 +649,9 @@ forced-color-adjust: none;
 .type-icon {
 --mdc-icon-size: 18px;
 }
+.towards {
+color: var(--primary-text-color);
+}
 .ride-detail {
 display: flex;
 flex-wrap: wrap;
@@ -662,23 +665,90 @@ color: var(--secondary-text-color);
 margin-inline-start: auto;
 }
 .delay {
-align-self: center;
-padding: 2px 6px;
-border-radius: var(--wl-radius-sm);
-background: color-mix(in srgb, var(--wl-error) 22%, transparent);
-color: var(--primary-text-color);
-font-size: 0.8rem;
 font-weight: 700;
-line-height: 1;
 font-variant-numeric: tabular-nums;
+color: var(--primary-text-color);
 }
 .live-mark {
 --mdc-icon-size: 16px;
 align-self: center;
 color: var(--wl-rt);
 }
-.towards {
+.access {
+display: inline-flex;
+align-items: center;
+gap: 2px;
+font-size: 0.8rem;
+color: var(--secondary-text-color);
+}
+.access ha-icon {
+--mdc-icon-size: 16px;
+}
+.access--out {
+font-weight: 600;
 color: var(--primary-text-color);
+}
+.access--out ha-icon {
+color: var(--wl-error);
+}
+.stops-toggle {
+display: inline-flex;
+align-items: center;
+gap: 2px;
+min-height: 32px;
+padding: 0 4px;
+margin-inline-start: -4px;
+border: none;
+border-radius: var(--wl-radius-sm);
+background: none;
+color: inherit;
+font: inherit;
+cursor: pointer;
+}
+.stops-toggle ha-icon {
+--mdc-icon-size: 18px;
+}
+.leg-stops {
+--stops-ahead-dot-size: 8px;
+list-style: none;
+margin: 0;
+padding: 0 0 12px;
+display: flex;
+flex-direction: column;
+gap: 6px;
+font-size: 0.85rem;
+color: var(--secondary-text-color);
+}
+.leg-stops[hidden] {
+display: none;
+}
+.leg-stop {
+position: relative;
+display: flex;
+align-items: baseline;
+gap: 8px;
+}
+.leg-stop time {
+font-variant-numeric: tabular-nums;
+}
+.leg-stop-name {
+color: var(--primary-text-color);
+}
+.leg-stop-dot {
+position: absolute;
+inset-inline-start: calc(
+var(--strand-x) + var(--node-size) / 2 - var(--stops-ahead-dot-size) / 2 -
+(var(--strand-x) * 2 + var(--node-size))
+);
+top: 50%;
+width: var(--stops-ahead-dot-size);
+height: var(--stops-ahead-dot-size);
+box-sizing: border-box;
+transform: translateY(-50%);
+border-radius: 50%;
+background: var(--card-background-color, var(--ha-card-background, #fff));
+border: 2px solid var(--leg-colour);
+z-index: 1;
 }
 .transfer {
 display: flex;
