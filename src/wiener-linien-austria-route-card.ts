@@ -1369,6 +1369,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
          tint or a red text colour read as decoration, not as an alarm. */
       --wl-alarm: color-mix(in srgb, var(--wl-error) 88%, #000);
       --wl-on-alarm: #fff;
+      /* The two calmer transfer grades take the same solid shape, so the
+         three read as one set: a fresh green for enough buffer (white text
+         4.7:1) and anthracite for a tight change (10:1). Fixed values, not
+         theme tokens: the theme's success green needs so much darkening to
+         carry white text that it turns olive, and a tint of it or of the
+         warning amber looked muddy on the dark card. */
+      --wl-ok: #16853f;
+      --wl-tight: #3d434a;
       --wl-radius-sm: var(--ha-border-radius-sm, 4px);
       --wl-radius-md: var(--ha-border-radius-md, 8px);
       --wl-pad-x: var(--ha-space-4, 16px);
@@ -1766,18 +1774,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       gap: 2px 8px;
     }
 
-    /* Transfer grade: a flat tint of the semantic token, text in the theme's
-       body colour. The 18% mix keeps body-text contrast on both the light and
-       the dark card ground. */
+    /* Transfer grade: a solid chip with white text, green for enough buffer,
+       anthracite for tight, the alarm red for a change that no longer fits.
+       The words carry the grade; the colour only backs them up. */
     .risk {
-      --risk: var(--wl-rt);
       display: inline-flex;
       align-items: center;
       gap: 4px;
       padding: 4px 8px;
       border-radius: var(--wl-radius-sm);
-      background: color-mix(in srgb, var(--risk) 18%, transparent);
-      color: var(--primary-text-color);
+      background: var(--wl-ok);
+      color: var(--wl-on-alarm);
       font-size: 0.8rem;
       font-weight: 600;
       /* The inherited line box carries the font's tall ascender, which sat
@@ -1791,7 +1798,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       display: block;
     }
     .risk[data-risk="tight"] {
-      --risk: var(--wl-warning);
+      background: var(--wl-tight);
+      /* Anthracite sits close to a dark card's ground; a faint light edge
+         keeps it a chip there and is invisible on a light card. */
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.14);
     }
     .risk[data-risk="at_risk"] {
       background: var(--wl-alarm);
