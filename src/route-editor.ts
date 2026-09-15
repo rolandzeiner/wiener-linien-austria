@@ -45,6 +45,8 @@ function schema(
       name: "entity",
       selector: { entity: { include_entities: routes } },
     },
+    // Second, like the siblings' editors: what the card is, then what it's called.
+    { name: "title", selector: { text: {} } },
     ...(adhoc && stopSelector
       ? [
           { name: "from", selector: stopSelector },
@@ -52,13 +54,13 @@ function schema(
           { name: "step_free", selector: { boolean: {} } },
         ]
       : []),
-    { name: "title", selector: { text: {} } },
     {
       name: "alternatives",
       selector: {
         number: { min: 0, max: MAX_ALTERNATIVES, step: 1, mode: "slider" },
       },
     },
+    { name: "show_map_pins", selector: { boolean: {} } },
     { name: "hide_attribution", selector: { boolean: {} } },
   ] as unknown as ReadonlyArray<HaFormSchema>;
 }
@@ -103,6 +105,7 @@ export class WienerLinienAustriaRouteCardEditor
     if (next.entity || !next.to) delete next.to;
     if (!next.title) delete next.title;
     if (next.entity || next.step_free !== true) delete next.step_free;
+    if (next.show_map_pins !== false) delete next.show_map_pins;
     if (next.hide_attribution !== true) delete next.hide_attribution;
     this._config = normaliseRouteConfig(next as WienerLinienRouteCardConfig);
     fireEvent(this, "config-changed", { config: next });

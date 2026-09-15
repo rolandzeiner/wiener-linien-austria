@@ -442,6 +442,8 @@
       "title_helper": "Leer lassen für „Start → Ziel“.",
       "alternatives": "Weitere Verbindungen",
       "alternatives_helper": "Wie viele spätere Verbindungen unter der besten stehen. 0 blendet sie aus.",
+      "show_map_pins": "Karten-Pins anzeigen",
+      "show_map_pins_helper": "Ein Pin nach jeder Einstiegshaltestelle und nach dem Ziel öffnet die Haltestelle im Stadtplan.",
       "hide_attribution": "Datenquelle ausblenden",
       "hide_attribution_helper": "Die OGD-Lizenz der Wiener Linien verlangt eine sichtbare Quellenangabe, sofern sie nicht an anderer Stelle im Dashboard steht.",
       "no_routes": "Noch keine Verbindung eingerichtet. Start und Ziel lassen sich direkt auf der Karte wählen, oder du richtest eine feste Verbindung ein.",

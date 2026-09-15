@@ -402,6 +402,15 @@ describe("map links", () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE, "en"), { entity: ENTITY });
     expect(links(el)[0]!.getAttribute("aria-label")).toBe("Find on map: Westbahnhof");
   });
+
+  it("shows no pins when turned off", async () => {
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), {
+      entity: ENTITY,
+      show_map_pins: false,
+    });
+    expect(links(el)).toEqual([]);
+    expect(text(el)).toContain("Westbahnhof");
+  });
 });
 
 describe("rendering", () => {
@@ -1156,10 +1165,17 @@ describe("editor", () => {
     });
     form?.dispatchEvent(
       new CustomEvent("value-changed", {
-        detail: { value: { entity: ENTITY, title: "", alternatives: 1, hide_attribution: false } },
+        detail: {
+          value: { entity: ENTITY, title: "", alternatives: 1, show_map_pins: true, hide_attribution: false },
+        },
       }),
     );
+    // Defaults stay out of the YAML; only turning the pins off is written.
     expect(config).toEqual({ type: `custom:${TAG}`, entity: ENTITY, alternatives: 1 });
+    form?.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { show_map_pins: false } } }),
+    );
+    expect(config).toMatchObject({ show_map_pins: false });
 
     const labels = (form as unknown as { computeLabel(f: { name: string }): string }).computeLabel;
     expect(labels({ name: "alternatives" })).toBe("Weitere Verbindungen");
@@ -1206,7 +1222,7 @@ describe("editor", () => {
       schema: Array<{ name: string; required?: boolean }>;
     };
     expect(form.schema.map((f) => f.name)).toEqual([
-      "entity", "from", "to", "step_free", "title", "alternatives", "hide_attribution",
+      "entity", "title", "from", "to", "step_free", "alternatives", "show_map_pins", "hide_attribution",
     ]);
     expect(form.schema[0]?.required).toBeUndefined();
 

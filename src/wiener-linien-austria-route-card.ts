@@ -1175,6 +1175,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  which of the two it does. Only boarding stops and the destination get
    *  one: the stops in between sit too close together for a 24px target each. */
   private _renderMapLink(stop: RouteStopAttr): TemplateResult | typeof nothing {
+    if (this._config?.show_map_pins === false) return nothing;
     const url = stopMapUrl(stop.name, stop.latitude, stop.longitude);
     if (!url) return nothing;
     const label = this._t(

@@ -805,4 +805,6 @@ export interface WienerLinienRouteCardConfig extends LovelaceCardConfig {
   hide_attribution?: boolean | undefined;
   /** Ad-hoc mode: plan step-free connections. */
   step_free?: boolean | undefined;
+  /** The map pin after each boarding stop and the destination. Default true. */
+  show_map_pins?: boolean | undefined;
 }

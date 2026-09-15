@@ -196,6 +196,7 @@ to: "60200421"
 | `from` / `to` | none | Stops to preselect when there's no `entity`, as DIVA numbers. A departure sensor shows its stop's DIVA in the `diva` attribute, and the card editor lists stops by name. A pick remembered on a device wins there, until you change these options. |
 | `title` | see note | Heading text. Without it the card shows the route's start and destination, or "Plan a trip" when you pick stops on the card. |
 | `alternatives` | `2` | Later connections to offer, `0`–`3`. |
+| `show_map_pins` | `true` | Shows the map pin after each boarding stop and the destination. |
 | `hide_attribution` | `false` | Hides the data-source line. |
 | `step_free` | `false` | Plans step-free connections when there's no `entity`. A route uses its own **Step-free** setting. |
 

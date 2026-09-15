@@ -442,6 +442,8 @@
       "title_helper": "Leave empty for “Start → Destination”.",
       "alternatives": "More connections",
       "alternatives_helper": "How many later connections to list under the best one. 0 hides them.",
+      "show_map_pins": "Show map pins",
+      "show_map_pins_helper": "A pin after each boarding stop and the destination opens that stop on the city map.",
       "hide_attribution": "Hide data source",
       "hide_attribution_helper": "The Wiener Linien OGD licence requires a visible credit unless it appears elsewhere on the dashboard.",
       "no_routes": "No route set up yet. You can pick origin and destination right on the card, or set up a fixed route.",
