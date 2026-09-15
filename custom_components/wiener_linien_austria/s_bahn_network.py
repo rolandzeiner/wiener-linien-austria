@@ -41,6 +41,7 @@ from .const import (
     S_BAHN_NETWORK_SAMPLE_HOUR,
     USER_AGENT,
 )
+from .parsing import s_bahn_number
 from .rate_limit import async_enforce_routing_cooldown
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .timetable import build_departure_params, parse_calling_points
@@ -95,7 +96,7 @@ class SBahnNetwork:
 
 def sort_s_bahn_labels(labels: Iterable[str]) -> tuple[str, ...]:
     """`S2` before `S45`: by line number, then by label."""
-    return tuple(sorted(labels, key=lambda label: (_line_number(label), label)))
+    return tuple(sorted(labels, key=lambda label: (s_bahn_number(label), label)))
 
 
 def merge_transfer_lines(
@@ -296,8 +297,3 @@ def _network_from_store(raw: Mapping[str, Any]) -> SBahnNetwork:
 
 def _is_metro(label: str) -> bool:
     return len(label) >= 2 and label[0] == "U" and label[1].isdigit()
-
-
-def _line_number(label: str) -> int:
-    digits = label[1:]
-    return int(digits) if digits.isdigit() else 0

@@ -54,6 +54,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .live import async_get_live_board
+from .parsing import as_int
 from .rate_limit import async_enforce_domain_cooldown, backoff_delay
 
 if TYPE_CHECKING:
@@ -293,7 +294,7 @@ class MonitorBatchGroup:
                     )
 
                 message = body.get("message") or {}
-                code = _safe_int(message.get("messageCode"))
+                code = as_int(message.get("messageCode"))
                 server_time = message.get("serverTime")
                 # Propagate the latest server-time / error-code to every member
                 # before any raise, so diagnostics reflect the last observed
@@ -412,13 +413,3 @@ def _unexpected_failure(err: Exception) -> UpdateFailed:
             "error": f"{type(err).__name__}: {err}",
         },
     )
-
-
-def _safe_int(value: Any) -> int | None:
-    """Best-effort integer coercion; returns None on failure."""
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None

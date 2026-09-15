@@ -61,6 +61,7 @@ from .const import (
     WEEKDAYS,
 )
 from .http import base_request_headers
+from .parsing import as_mapping, as_text
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -611,26 +612,28 @@ def _parse_leg(raw: Mapping[str, Any], tz: Any) -> RouteLeg | None:
     start, end = points[0], points[-1]
     if not isinstance(start, Mapping) or not isinstance(end, Mapping):
         return None
-    mode = _mapping(raw.get("mode"))
-    diva = _mapping(mode.get("diva"))
+    mode = as_mapping(raw.get("mode"))
+    diva = as_mapping(mode.get("diva"))
     walk = str(mode.get("type") or "") in _WALK_MODE_TYPES
     stop_seq = raw.get("stopSeq")
     # stopSeq includes both the boarding and the alighting stop.
     stop_count = max(0, len(stop_seq) - 1) if isinstance(stop_seq, list) else 0
     return RouteLeg(
         walk=walk,
-        line=None if walk else (_text(mode.get("number")) or _text(mode.get("name"))),
+        line=None
+        if walk
+        else (as_text(mode.get("number")) or as_text(mode.get("name"))),
         type="walk" if walk else _vehicle_type(mode),
-        product=_text(mode.get("product")),
-        towards=None if walk else _strip_place(_text(mode.get("destination"))),
+        product=as_text(mode.get("product")),
+        towards=None if walk else _strip_place(as_text(mode.get("destination"))),
         origin=_parse_point(start, tz),
         destination=_parse_point(end, tz),
         realtime=str(mode.get("realtime") or "0") == "1",
         stop_count=stop_count,
         walk_after_minutes=_walk_after(raw.get("footpath")),
         cancelled=_is_cancelled(raw, mode),
-        direction=None if walk else _text(diva.get("dir")),
-        wiener_linien=not walk and _text(diva.get("opPublicCode")) == "WL",
+        direction=None if walk else as_text(diva.get("dir")),
+        wiener_linien=not walk and as_text(diva.get("opPublicCode")) == "WL",
         low_floor=not walk and _has_attr(raw.get("attrs"), "PlanLowFloorVehicle"),
         access=_access_steps(raw.get("footpath"), after=False),
         access_after=_access_steps(raw.get("footpath"), after=True),
@@ -640,12 +643,12 @@ def _parse_leg(raw: Mapping[str, Any], tz: Any) -> RouteLeg | None:
 
 def _parse_point(raw: Mapping[str, Any], tz: Any) -> RouteStop:
     """A leg end point: name, platform and the two times."""
-    stamp = _mapping(raw.get("dateTime"))
-    ref = _mapping(raw.get("ref"))
+    stamp = as_mapping(raw.get("dateTime"))
+    ref = as_mapping(raw.get("ref"))
     return RouteStop(
-        name=_strip_place(_text(raw.get("name"))) or "",
-        stop_id=_text(ref.get("id")),
-        platform=_text(raw.get("platformName")),
+        name=_strip_place(as_text(raw.get("name"))) or "",
+        stop_id=as_text(ref.get("id")),
+        platform=as_text(raw.get("platformName")),
         planned=_parse_stamp(stamp.get("date"), stamp.get("time"), tz),
         estimated=_parse_stamp(stamp.get("rtDate"), stamp.get("rtTime"), tz),
     )
@@ -691,12 +694,12 @@ def _intermediate_stops(stop_seq: Any, tz: Any) -> tuple[LegStop, ...]:
     for raw in stop_seq[1:-1]:
         if not isinstance(raw, Mapping):
             continue
-        ref = _mapping(raw.get("ref"))
+        ref = as_mapping(raw.get("ref"))
         stamp = ref.get("depDateTime") or ref.get("arrDateTime")
         stops.append(
             LegStop(
-                name=_strip_place(_text(raw.get("name"))) or "",
-                stop_id=_text(ref.get("id")),
+                name=_strip_place(as_text(raw.get("name"))) or "",
+                stop_id=as_text(ref.get("id")),
                 time=_parse_compact_stamp(stamp, tz),
             )
         )
@@ -731,15 +734,15 @@ def _access_steps(footpath: Any, *, after: bool) -> tuple[AccessStep, ...]:
         for element in elements if isinstance(elements, list) else []:
             if not isinstance(element, Mapping):
                 continue
-            kind = _text(element.get("type"))
+            kind = as_text(element.get("type"))
             if kind is None:
                 continue
-            level = _text(element.get("level"))
+            level = as_text(element.get("level"))
             steps.append(
                 AccessStep(
                     kind=kind.lower(),
                     level=level.lower() if level else None,
-                    stop_id=_text(_mapping(element.get("orig")).get("stopID")),
+                    stop_id=as_text(as_mapping(element.get("orig")).get("stopID")),
                 )
             )
     return tuple(steps)
@@ -775,19 +778,6 @@ def _vehicle_type(mode: Mapping[str, Any]) -> str:
     if mapped == "ptBusCity" and "nacht" in product:
         return "ptBusNight"
     return mapped
-
-
-def _mapping(value: Any) -> Mapping[str, Any]:
-    """The value when it is a mapping, else an empty one."""
-    return value if isinstance(value, Mapping) else {}
-
-
-def _text(value: Any) -> str | None:
-    """Stripped string, or None for missing / blank."""
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None
 
 
 def _strip_place(name: str | None) -> str | None:

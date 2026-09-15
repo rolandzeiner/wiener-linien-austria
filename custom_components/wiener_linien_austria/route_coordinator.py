@@ -45,6 +45,7 @@ from .live import (
     async_live_trips,
     rbls_for_trips,
 )
+from .parsing import as_int
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
 from .routing import (
     RouteOptions,
@@ -103,8 +104,8 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Read the route options off the entry."""
         config = {**entry.data, **entry.options}
-        origin = _safe_int(config.get(CONF_ORIGIN_DIVA))
-        destination = _safe_int(config.get(CONF_DESTINATION_DIVA))
+        origin = as_int(config.get(CONF_ORIGIN_DIVA))
+        destination = as_int(config.get(CONF_DESTINATION_DIVA))
         for value, raw in (
             (origin, config.get(CONF_ORIGIN_DIVA)),
             (destination, config.get(CONF_DESTINATION_DIVA)),
@@ -127,9 +128,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
             [str(d) for d in days] if isinstance(days, list) and days else None
         )
         # Clamped here as well as in the form, for an entry edited by hand.
-        seconds = (
-            _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_ROUTE_SCAN_INTERVAL
-        )
+        seconds = as_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_ROUTE_SCAN_INTERVAL
         seconds = min(max(seconds, MIN_ROUTE_POLL_SECONDS), MAX_ROUTE_POLL_SECONDS)
         self.scan_interval = timedelta(seconds=seconds)
         self._failures = 0
@@ -140,7 +139,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         self._timetable: list[Trip] = []
         self._unsub_live: CALLBACK_TYPE | None = None
         self.leave_minutes = (
-            _safe_int(config.get(CONF_LEAVE_MINUTES)) or DEFAULT_LEAVE_MINUTES
+            as_int(config.get(CONF_LEAVE_MINUTES)) or DEFAULT_LEAVE_MINUTES
         )
         # The service day the last connection was looked up for, success or
         # not: one request a night, never a retry loop.
@@ -464,7 +463,7 @@ def add_stop_coordinates(hass: HomeAssistant, trips: list[dict[str, Any]]) -> No
     for trip in trips:
         for leg in trip["legs"]:
             for stop in (leg["origin"], leg["destination"], *leg["stops"]):
-                diva = _safe_int(stop.get("stop_id"))
+                diva = as_int(stop.get("stop_id"))
                 station = (
                     catalogue.stations_by_diva.get(diva) if diva is not None else None
                 )
@@ -486,7 +485,7 @@ def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, 
         for trip in trips
         for leg in trip.legs
         for step in (*leg.access, *leg.access_after)
-        if step.kind == "elevator" and (diva := _safe_int(step.stop_id)) is not None
+        if step.kind == "elevator" and (diva := as_int(step.stop_id)) is not None
     }
     catalogue = current_catalogue(hass)
     if not stations or catalogue is None:
@@ -523,13 +522,3 @@ def route_device_info(entry: ConfigEntry) -> DeviceInfo:
         model="Verbindung",
         configuration_url="https://www.wienerlinien.at/",
     )
-
-
-def _safe_int(value: Any) -> int | None:
-    """Best-effort integer coercion; returns None on failure."""
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None

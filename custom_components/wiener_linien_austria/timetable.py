@@ -41,6 +41,7 @@ from .const import (
     TIMETABLE_RETRY_AFTER,
     USER_AGENT,
 )
+from .parsing import as_mapping, as_text, s_bahn_number
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 
@@ -139,11 +140,11 @@ def parse_departure_body(
     for row in raw:
         if not isinstance(row, Mapping):
             continue
-        stop_id = _text(row.get("stopID"))
+        stop_id = as_text(row.get("stopID"))
         if stop_id is not None and stop_id != str(diva):
             continue
-        line = _mapping(row.get("servingLine"))
-        label = _text(line.get("number"))
+        line = as_mapping(row.get("servingLine"))
+        label = as_text(line.get("number"))
         if label is None or str(line.get("motType") or "") != _MOT_S_BAHN:
             continue
         planned = _parse_date_time(row.get("dateTime"), tz)
@@ -152,10 +153,10 @@ def parse_departure_body(
         departures.append(
             PlannedDeparture(
                 line=label,
-                towards=_towards(_text(line.get("direction"))),
-                direction=_text(_mapping(line.get("liErgRiProj")).get("direction"))
+                towards=_towards(as_text(line.get("direction"))),
+                direction=as_text(as_mapping(line.get("liErgRiProj")).get("direction"))
                 or "",
-                platform=_text(row.get("platformName")),
+                platform=as_text(row.get("platformName")),
                 planned=planned,
                 stops=_onward_stops(row.get("onwardStopSeq")),
             )
@@ -183,8 +184,8 @@ def parse_calling_points(body: Mapping[str, Any]) -> dict[int, set[str]]:
     for row in raw:
         if not isinstance(row, Mapping):
             continue
-        line = _mapping(row.get("servingLine"))
-        label = _text(line.get("number"))
+        line = as_mapping(row.get("servingLine"))
+        label = as_text(line.get("number"))
         if label is None or str(line.get("motType") or "") != _MOT_S_BAHN:
             continue
         stop_ids = [
@@ -192,7 +193,7 @@ def parse_calling_points(body: Mapping[str, Any]) -> dict[int, set[str]]:
             for sequence in ("prevStopSeq", "onwardStopSeq")
             for stop in _onward_stops(row.get(sequence))
         ]
-        own = _text(row.get("stopID"))
+        own = as_text(row.get("stopID"))
         if own is not None and own.isdigit():
             stop_ids.append(int(own))
         for stop_id in stop_ids:
@@ -222,7 +223,7 @@ def picker_rows(departures: list[PlannedDeparture]) -> list[dict[str, str]]:
         }
         for (line, direction), counts in termini.items()
     ]
-    rows.sort(key=lambda row: (_line_number(row["line"]), row["line"], row["towards"]))
+    rows.sort(key=lambda row: (s_bahn_number(row["line"]), row["line"], row["towards"]))
     return rows
 
 
@@ -386,10 +387,10 @@ def _onward_stops(raw: Any) -> tuple[PlannedStop, ...]:
     for point in raw:
         if not isinstance(point, Mapping):
             continue
-        name = _towards(_text(point.get("name")))
+        name = _towards(as_text(point.get("name")))
         if not name:
             continue
-        stop_id = _text(_mapping(point.get("ref")).get("id"))
+        stop_id = as_text(as_mapping(point.get("ref")).get("id"))
         stops.append(
             PlannedStop(
                 name=name,
@@ -429,20 +430,3 @@ def _towards(direction: str | None) -> str:
     if name.startswith("Wien ") and len(name) > len("Wien "):
         name = name[len("Wien ") :]
     return name.removesuffix(" Bahnhof")
-
-
-def _line_number(label: str) -> int:
-    """`S45` → 45, so the picker lists S2 before S45."""
-    digits = label[1:]
-    return int(digits) if digits.isdigit() else 0
-
-
-def _mapping(value: Any) -> Mapping[str, Any]:
-    return value if isinstance(value, Mapping) else {}
-
-
-def _text(value: Any) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    return text or None

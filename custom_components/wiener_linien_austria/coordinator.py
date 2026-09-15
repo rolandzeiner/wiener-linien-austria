@@ -32,6 +32,7 @@ from .const import (
     MIN_POLL_SECONDS,
     STALE_DEPARTURE_MAX_AGE,
 )
+from .parsing import as_int
 from .s_bahn_network import current_lines_at_diva as current_s_bahn_lines
 from .s_bahn_network import merge_transfer_lines
 from .static import (
@@ -141,7 +142,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # generic KeyError / ValueError from __init__.
         raw_rbls = config.get(CONF_RBLS) or []
         self._rbls: list[int] = [
-            rbl for rbl in (_safe_int(x) for x in raw_rbls) if rbl is not None
+            rbl for rbl in (as_int(x) for x in raw_rbls) if rbl is not None
         ]
         if not self._rbls:
             raise ConfigEntryError(
@@ -175,7 +176,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # those for why the pair is not two plain public attributes.
         self._attrs_cache: dict[str, Any] | None = None
         self._attrs_cache_alerts_seq: int | None = None
-        diva_int = _safe_int(config.get(CONF_DIVA))
+        diva_int = as_int(config.get(CONF_DIVA))
         if diva_int is None:
             raise ConfigEntryError(
                 translation_domain=DOMAIN,
@@ -200,7 +201,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         # Clamped here as well as in the forms: an entry edited by hand in
         # `.storage` never passes the selector, and the batch group polls at
         # whatever this says.
-        scan_secs = _safe_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_SCAN_INTERVAL
+        scan_secs = as_int(config.get(CONF_SCAN_INTERVAL)) or DEFAULT_SCAN_INTERVAL
         scan_secs = min(max(scan_secs, MIN_POLL_SECONDS), MAX_POLL_SECONDS)
         self._scan_interval = timedelta(seconds=scan_secs)
         # The shared batch group that owns this entry's fetching. Assigned by
@@ -658,7 +659,7 @@ def _parse_monitor_body(
 
     for monitor in monitors:
         if rbl_filter is not None:
-            monitor_rbl = _safe_int(
+            monitor_rbl = as_int(
                 (monitor.get("locationStop") or {})
                 .get("properties", {})
                 .get("attributes", {})
@@ -675,7 +676,7 @@ def _parse_monitor_body(
             # going through the label — which the two sources do not
             # always spell the same way (issue #110: the Badner Bahn is
             # "WLB" live and "LB" in the CSV).
-            line_id = _safe_int(line.get("lineId"))
+            line_id = as_int(line.get("lineId"))
             line_towards = str(line.get("towards") or "").strip()
             direction = str(line.get("direction") or "").strip()
             line_type = str(line.get("type") or "").strip()
@@ -695,7 +696,7 @@ def _parse_monitor_body(
 
             for entry in (line.get("departures") or {}).get("departure") or []:
                 dep_time = entry.get("departureTime") or {}
-                countdown = _safe_int(dep_time.get("countdown"))
+                countdown = as_int(dep_time.get("countdown"))
                 if countdown is None:
                     continue
                 # Drop records the upstream feed has stopped advancing.
@@ -929,13 +930,3 @@ def _parse_iso(value: Any) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=dt_util.get_default_time_zone())
     return parsed
-
-
-def _safe_int(value: Any) -> int | None:
-    """Best-effort integer coercion; returns None on failure."""
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None

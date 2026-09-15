@@ -56,6 +56,7 @@ from .const import (
     USER_AGENT,
 )
 from .http import base_request_headers
+from .parsing import as_int, as_mapping
 from .rate_limit import async_enforce_domain_cooldown
 from .routing import Trip, assess_transfers
 from .static import StaticCatalogue, current_catalogue
@@ -112,8 +113,10 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
     for monitor in monitors if isinstance(monitors, list) else []:
         if not isinstance(monitor, Mapping):
             continue
-        properties = _mapping(_mapping(monitor.get("locationStop")).get("properties"))
-        rbl = _int(_mapping(properties.get("attributes")).get("rbl"))
+        properties = as_mapping(
+            as_mapping(monitor.get("locationStop")).get("properties")
+        )
+        rbl = as_int(as_mapping(properties.get("attributes")).get("rbl"))
         diva = str(properties.get("name") or "").strip()
         if rbl is None or not diva:
             continue
@@ -125,9 +128,9 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
             direction = str(line.get("direction") or "").strip()
             if not name or not direction:
                 continue
-            departures = _mapping(line.get("departures")).get("departure")
+            departures = as_mapping(line.get("departures")).get("departure")
             for departure in departures if isinstance(departures, list) else []:
-                stamps = _mapping(_mapping(departure).get("departureTime"))
+                stamps = as_mapping(as_mapping(departure).get("departureTime"))
                 planned = _parse_stamp(stamps.get("timePlanned"))
                 if planned is None:
                     continue
@@ -170,7 +173,7 @@ def rbls_for_trips(
                 or not now - timedelta(minutes=5) <= departure <= now + LIVE_HORIZON
             ):
                 continue
-            diva = _int(leg.origin.stop_id)
+            diva = as_int(leg.origin.stop_id)
             station = catalogue.stations_by_diva.get(diva) if diva is not None else None
             if station is None or not station.rbls:
                 continue
@@ -482,7 +485,7 @@ async def async_fetch_monitor_body(
         body = await resp.json()
     if not isinstance(body, dict):
         raise ValueError(f"expected an object, got {type(body).__name__}")
-    code = _int(_mapping(body.get("message")).get("messageCode"))
+    code = as_int(as_mapping(body.get("message")).get("messageCode"))
     if code is not None and code != 1:
         raise ValueError(f"monitor answered messageCode {code}")
     return body
@@ -555,14 +558,3 @@ def _parse_stamp(value: Any) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo is not None else None
-
-
-def _mapping(value: Any) -> Mapping[str, Any]:
-    return value if isinstance(value, Mapping) else {}
-
-
-def _int(value: Any) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
