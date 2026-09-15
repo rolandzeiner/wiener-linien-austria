@@ -210,7 +210,7 @@
       "message": "Start und Ziel sind dieselbe Haltestelle. Wähle ein anderes Ziel."
     },
     "plan_trip_route_or_stops": {
-      "message": "Gib entweder eine Verbindung an oder Start- und Zielhaltestelle."
+      "message": "Gib eine Verbindung an oder fülle Von und Nach aus."
     },
     "plan_trip_stop_not_found": {
       "message": "Keine Haltestelle passt zu „{stop}“. Prüfe den Namen oder gib die DIVA-Nummer der Haltestelle an."
@@ -280,27 +280,27 @@
   "services": {
     "plan_trip": {
       "name": "Fahrt planen",
-      "description": "Plant Verbindungen für eine eingerichtete Verbindung oder zwischen zwei Haltestellen und gibt sie zurück, früheste zuerst.",
+      "description": "Sucht Fahrten für eine eingerichtete Verbindung oder zwischen zwei Haltestellen, die früheste zuerst.",
       "fields": {
         "config_entry_id": {
           "name": "Verbindung",
-          "description": "Die zu planende Verbindung. Leer lassen, um stattdessen Start- und Zielhaltestelle anzugeben."
+          "description": "Eine eingerichtete Verbindung. Leer lassen, wenn du stattdessen Von und Nach ausfüllst."
         },
         "origin": {
           "name": "Von",
-          "description": "Starthaltestelle als Name oder DIVA-Nummer, etwa Stephansplatz. Zusammen mit „Nach“ statt einer Verbindung."
+          "description": "Wo die Fahrt beginnt: Name oder DIVA-Nummer der Haltestelle, etwa Stephansplatz."
         },
         "destination": {
           "name": "Nach",
-          "description": "Zielhaltestelle als Name oder DIVA-Nummer. Zusammen mit „Von“ statt einer Verbindung."
+          "description": "Wo die Fahrt endet: Name oder DIVA-Nummer der Haltestelle, etwa Westbahnhof."
         },
         "datetime": {
           "name": "Zeit",
-          "description": "Abfahrtszeit, mit „Ankunft bis“ die späteste Ankunft. Leer lassen für jetzt."
+          "description": "Leer lassen für jetzt. Ob das die Abfahrt oder die Ankunft ist, legt „Als Ankunftszeit“ fest."
         },
         "arrive_by": {
-          "name": "Ankunft bis",
-          "description": "Die Zeit als späteste Ankunft statt als Abfahrt verwenden."
+          "name": "Als Ankunftszeit",
+          "description": "Aus: Du fährst zu dieser Zeit los. Ein: Du kommst spätestens zu dieser Zeit an."
         }
       }
     }

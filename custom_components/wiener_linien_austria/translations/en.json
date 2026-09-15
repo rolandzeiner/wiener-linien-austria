@@ -210,7 +210,7 @@
       "message": "Origin and destination are the same stop. Pick a different destination."
     },
     "plan_trip_route_or_stops": {
-      "message": "Give either a route or both a start and a destination stop."
+      "message": "Pick a route, or fill in both From and To."
     },
     "plan_trip_stop_not_found": {
       "message": "No stop matches “{stop}”. Check the name, or use the stop's DIVA number."
@@ -280,27 +280,27 @@
   "services": {
     "plan_trip": {
       "name": "Plan trip",
-      "description": "Plans connections for a configured route, or between two stops, and returns them, soonest first.",
+      "description": "Finds trips for a configured route or between two stops, soonest first.",
       "fields": {
         "config_entry_id": {
           "name": "Route",
-          "description": "The route to plan. Leave empty to give a start and a destination stop instead."
+          "description": "A route you've set up. Leave empty if you fill in From and To instead."
         },
         "origin": {
           "name": "From",
-          "description": "Start stop, by name or DIVA number, such as Stephansplatz. Use with To instead of a route."
+          "description": "Where the trip starts: the stop's name or DIVA number, such as Stephansplatz."
         },
         "destination": {
           "name": "To",
-          "description": "Destination stop, by name or DIVA number. Use with From instead of a route."
+          "description": "Where the trip ends: the stop's name or DIVA number, such as Westbahnhof."
         },
         "datetime": {
           "name": "Time",
-          "description": "When to leave, or when to arrive with Arrive by. Leave empty for now."
+          "description": "Leave empty for now. Arrive by decides whether this is when you leave or when you arrive."
         },
         "arrive_by": {
           "name": "Arrive by",
-          "description": "Treat the time as the latest arrival instead of the departure."
+          "description": "Off: you leave at this time. On: you arrive by this time at the latest."
         }
       }
     }
