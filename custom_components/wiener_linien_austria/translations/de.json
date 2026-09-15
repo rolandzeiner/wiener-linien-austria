@@ -209,6 +209,15 @@
     "adhoc_same_stop": {
       "message": "Start und Ziel sind dieselbe Haltestelle. Wähle ein anderes Ziel."
     },
+    "plan_trip_route_or_stops": {
+      "message": "Gib entweder eine Verbindung an oder Start- und Zielhaltestelle."
+    },
+    "plan_trip_stop_not_found": {
+      "message": "Keine Haltestelle passt zu „{stop}“. Prüfe den Namen oder gib die DIVA-Nummer der Haltestelle an."
+    },
+    "plan_trip_stop_ambiguous": {
+      "message": "„{stop}“ passt zu mehreren Haltestellen: {candidates}. Gib einen längeren Namen oder die DIVA-Nummer an."
+    },
     "adhoc_rate_limited": {
       "message": "Gerade zu viele Verbindungsabfragen. Versuche es in {retry_after} s erneut."
     }
@@ -271,11 +280,19 @@
   "services": {
     "plan_trip": {
       "name": "Fahrt planen",
-      "description": "Plant Verbindungen für eine eingerichtete Route und gibt sie zurück, früheste zuerst.",
+      "description": "Plant Verbindungen für eine eingerichtete Route oder zwischen zwei Haltestellen und gibt sie zurück, früheste zuerst.",
       "fields": {
         "config_entry_id": {
           "name": "Verbindung",
-          "description": "Die zu planende Verbindung."
+          "description": "Die zu planende Verbindung. Leer lassen, um stattdessen Start- und Zielhaltestelle anzugeben."
+        },
+        "origin": {
+          "name": "Von",
+          "description": "Starthaltestelle als Name oder DIVA-Nummer, etwa Stephansplatz. Zusammen mit „Nach“ statt einer Verbindung."
+        },
+        "destination": {
+          "name": "Nach",
+          "description": "Zielhaltestelle als Name oder DIVA-Nummer. Zusammen mit „Von“ statt einer Verbindung."
         },
         "datetime": {
           "name": "Zeit",

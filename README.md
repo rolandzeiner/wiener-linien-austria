@@ -17,7 +17,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
-- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live departure times for Wiener Linien rides and a buffer grade on every change. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
+- **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live departure times for Wiener Linien rides and a buffer grade on every change. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants, for a route or between any two stops by name. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
 
 ## Screenshots
@@ -332,11 +332,12 @@ Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monit
 
 ### `wiener_linien_austria.plan_trip`
 
-*Experimental.* Plans connections for a route entry and returns them, soonest first — the same shape as the sensor's `trips` attribute.
+*Experimental.* Plans connections for a route you've set up, or between any two stops, and returns them soonest first — the same shape as the sensor's `trips` attribute.
 
 | Field | Required | Description |
 |---|---|---|
-| `config_entry_id` | yes | The route to plan. |
+| `config_entry_id` | one of the two | The route to plan. |
+| `origin`, `destination` | one of the two | Two stops, by name or DIVA number, instead of a route. *(2.0.0)* |
 | `datetime` | no | When to leave. Leave empty for now. |
 | `arrive_by` | no | Treat `datetime` as the latest arrival instead. |
 
@@ -348,6 +349,25 @@ data:
   arrive_by: true
 response_variable: plan
 ```
+
+**Planning between two stops.** Give `origin` and `destination` instead of a route, for example from a voice assistant sentence like "how do I get from Stephansplatz to Westbahnhof". Trip options such as walking speed use their defaults.
+
+```yaml
+action: wiener_linien_austria.plan_trip
+data:
+  origin: Stephansplatz
+  destination: Westbahnhof
+response_variable: plan
+```
+
+Names don't have to match the stop list exactly, since speech recognition rarely does:
+
+- Case, accents and punctuation don't matter: `schoenbrunn` finds Schönbrunn.
+- The everyday name works: `Hütteldorf` finds *Bhf. Hütteldorf*, `Wien Mitte` finds *Mitte-Landstraße*.
+- One wrong letter is fine: `Karlsplats` finds Karlsplatz.
+- If two stops share a name in the same place, such as Schottenring, the busier one is used.
+
+The response's `origin` and `destination` hold the stop names that were picked, so a reply can say them back. If no stop matches, or a name fits several different stops, the action fails with a message listing them. Use a longer name or the DIVA number then. A departure sensor shows its stop's DIVA in the `diva` attribute.
 
 The action skips the request cooldown, because someone is waiting for the answer, and shares the route card's limits instead. Calling it again for the same route and time within a minute returns the same answer without a new request. A script can make 5 requests in a row, then about one a minute; beyond that the action fails with a message saying when to try again. Automations, which run without a user, share one allowance. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
 

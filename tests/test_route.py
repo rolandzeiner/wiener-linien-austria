@@ -11,6 +11,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
+import aiohttp
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant import config_entries
@@ -21,6 +22,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
+from homeassistant.setup import async_setup_component
 from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -513,6 +515,127 @@ async def test_plan_trip_in_a_loop_hits_the_budget(
     assert err.value.translation_key == "adhoc_rate_limited"
     assert int(err.value.translation_placeholders["retry_after"]) > 0
     assert fetch.await_count >= adhoc.ADHOC_USER_BURST
+
+
+async def test_plan_trip_between_two_stops_by_name(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await async_setup_entry_and_wait(hass, route_entry())
+    response = await hass.services.async_call(
+        DOMAIN,
+        "plan_trip",
+        # As a voice assistant hands it over: lower case, no accents needed.
+        {"origin": "stephansplatz", "destination": "60200123", "arrive_by": True},
+        blocking=True,
+        return_response=True,
+    )
+    assert response is not None
+    assert response["origin"] == "Stephansplatz"
+    assert response["destination"] == "Schwarzenbergplatz"
+    assert len(response["trips"]) == 4
+    params = dict(fetch.call_args.args[1])
+    assert params["name_origin"] == "60201012"
+    assert params["name_destination"] == "60200123"
+    assert params["itdTripDateTimeDepArr"] == "arr"
+
+
+async def test_plan_trip_needs_a_route_or_two_stops(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    for data in (
+        {},
+        {"origin": "Stephansplatz"},
+        {"destination": "Stephansplatz"},
+        {"config_entry_id": entry.entry_id, "origin": "Stephansplatz"},
+        {
+            "config_entry_id": entry.entry_id,
+            "origin": "Stephansplatz",
+            "destination": "Schwarzenbergplatz",
+        },
+    ):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN, "plan_trip", data, blocking=True, return_response=True
+            )
+        assert err.value.translation_key == "plan_trip_route_or_stops", data
+
+
+async def test_plan_trip_explains_stops_it_cannot_use(
+    hass: HomeAssistant,
+    frozen: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+) -> None:
+    await async_setup_entry_and_wait(hass, route_entry())
+    for municipality in ("Schwechat", "Groß-Enzersdorf"):
+        diva = 60203000 + len(mock_static_catalogue.stations_by_diva)
+        mock_static_catalogue.stations_by_diva[diva] = Station(
+            diva=diva,
+            name="Hauptplatz",
+            municipality=municipality,
+            longitude=16.47,
+            latitude=48.14,
+            rbls=[diva],
+        )
+    before = fetch.await_count
+
+    for origin, destination, key in (
+        ("Xyzzy", "Stephansplatz", "plan_trip_stop_not_found"),
+        ("Stephansplatz", "Hauptplatz", "plan_trip_stop_ambiguous"),
+        ("Stephansplatz", "60201012", "adhoc_same_stop"),
+    ):
+        with pytest.raises(ServiceValidationError) as err:
+            await hass.services.async_call(
+                DOMAIN,
+                "plan_trip",
+                {"origin": origin, "destination": destination},
+                blocking=True,
+                return_response=True,
+            )
+        assert err.value.translation_key == key
+    # Nothing was planned for a stop pair that didn't resolve.
+    assert fetch.await_count == before
+
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN,
+            "plan_trip",
+            {"origin": "Hauptplatz", "destination": "Stephansplatz"},
+            blocking=True,
+            return_response=True,
+        )
+    placeholders = err.value.translation_placeholders
+    assert placeholders is not None
+    assert placeholders["stop"] == "Hauptplatz"
+    assert "Hauptplatz (Schwechat)" in placeholders["candidates"]
+    assert "Hauptplatz (Groß-Enzersdorf)" in placeholders["candidates"]
+
+
+async def test_plan_trip_between_stops_needs_the_integration_and_its_catalogue(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await async_setup_component(hass, DOMAIN, {})
+    stops = {"origin": "Stephansplatz", "destination": "Schwarzenbergplatz"}
+    with pytest.raises(ServiceValidationError) as err:
+        await hass.services.async_call(
+            DOMAIN, "plan_trip", stops, blocking=True, return_response=True
+        )
+    assert err.value.translation_key == "adhoc_not_loaded"
+
+    await async_setup_entry_and_wait(hass, route_entry())
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.static.async_get_catalogue",
+            side_effect=aiohttp.ClientError,
+        ),
+        pytest.raises(HomeAssistantError) as err,
+    ):
+        await hass.services.async_call(
+            DOMAIN, "plan_trip", stops, blocking=True, return_response=True
+        )
+    assert err.value.translation_key == "adhoc_catalogue_unavailable"
 
 
 # ---------------------------------------------------------------------------

@@ -3,13 +3,17 @@
 The setup dialog (config_flow.py) and the route card's ad-hoc mode
 (websocket.py) offer the same list and accept the same stops: only a stop
 with platforms can be tracked or planned from, since `/monitor` is queried
-per RBL.
+per RBL. The `plan_trip` action accepts the same stops, by name as well
+(`match_stops`).
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
+import re
+import unicodedata
+from difflib import SequenceMatcher
+from typing import Any, Final
 
 from homeassistant.helpers.selector import SelectOptionDict
 from homeassistant.util.location import distance
@@ -152,6 +156,143 @@ def trackable_station(catalogue: StaticCatalogue, value: Any) -> Station | None:
     if station is None or not station.rbls:
         return None
     return station
+
+
+# A spoken or typed name that is this close to a stop name counts as that stop
+# when nothing matches more exactly: "Schoenbrunn" for "Schönbrunn", a letter
+# lost to speech recognition. Low enough for one wrong letter in a ten-letter
+# name, high enough that a different street with the same ending doesn't match.
+FUZZY_STOP_CUTOFF: Final = 0.85
+# How many stops an ambiguous name lists, so the error stays readable aloud.
+MAX_STOP_CANDIDATES: Final = 5
+
+# Abbreviations the stop list uses, spelled out: "Bösendorfer Str., Karlsplatz"
+# and "Bhf. Hütteldorf" are said as "Straße" and "Bahnhof".
+_ABBREVIATIONS: Final = (
+    (re.compile(r"str\.", re.IGNORECASE), "strasse "),
+    (re.compile(r"\bbhf\b\.?", re.IGNORECASE), "bahnhof "),
+)
+_NON_WORD: Final = re.compile(r"[^0-9a-z]+")
+
+
+def _normalise_stop_name(text: str) -> str:
+    """Fold a stop name to what matching compares: 'bahnhof hutteldorf'.
+
+    Case, accents, `ß`, punctuation and spacing don't tell stops apart, and
+    are exactly what speech recognition and typing get wrong.
+    """
+    for pattern, replacement in _ABBREVIATIONS:
+        text = pattern.sub(replacement, text)
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return _NON_WORD.sub(" ", stripped).strip()
+
+
+def _station_rank(catalogue: StaticCatalogue, station: Station) -> tuple[int, int]:
+    """Busier stops first: more lines, then more platforms."""
+    lines = (
+        catalogue.trip_patterns.lines_at_diva.get(station.diva, ())
+        if catalogue.trip_patterns is not None
+        else ()
+    )
+    return (len(lines), len(station.rbls))
+
+
+def match_stops(catalogue: StaticCatalogue, query: str) -> list[Station]:
+    """Resolve a stop given by name or DIVA; exactly one result is a match.
+
+    For the `plan_trip` action, where the stop comes from a script or a voice
+    assistant rather than a picker. Tried in order, the first tier that finds
+    anything wins:
+
+    1. A DIVA number.
+    2. The name, ignoring case, accents and punctuation, optionally followed
+       by the municipality ("Westbahnhof Wien"). "Bahnhof" in front may be
+       left out, so "Hütteldorf" finds "Bhf. Hütteldorf".
+    3. The start of a name, on a word boundary, optionally after the
+       municipality: "Wien Mitte" finds "Mitte-Landstraße".
+    4. Every word of the query appearing in one stop's name and municipality
+       ("Hauptbahnhof Süd").
+    5. The closest name by spelling, at `FUZZY_STOP_CUTOFF` or above.
+
+    A few names repeat within one municipality ("Schottenring" is the U2/U4
+    hub and a nightline-only stop nearby). Those resolve to the busiest of
+    them instead of asking, since the trip planner walks between the two
+    anyway. The same name in different municipalities, or different names
+    matched equally well, returns them all, busiest first, capped at
+    `MAX_STOP_CANDIDATES`. No match returns an empty list.
+    """
+    text = query.strip()
+    if text.isdigit():
+        station = trackable_station(catalogue, text)
+        return [station] if station is not None else []
+    wanted = _normalise_stop_name(text)
+    if not wanted:
+        return []
+
+    stations = [s for s in catalogue.stations_by_diva.values() if s.rbls]
+    names = {s.diva: _normalise_stop_name(s.name) for s in stations}
+    places = {s.diva: _normalise_stop_name(s.municipality) for s in stations}
+
+    def aliases(station: Station) -> set[str]:
+        name = names[station.diva]
+        found = {name, f"{name} {places[station.diva]}"}
+        if name.startswith("bahnhof "):
+            short = name.removeprefix("bahnhof ")
+            found |= {short, f"{short} {places[station.diva]}"}
+        return found
+
+    matches = [s for s in stations if wanted in aliases(s)]
+    if not matches:
+        # "Wien Mitte" is how people say "Mitte-Landstraße (Wien)".
+        prefix = f"{wanted} "
+        matches = [
+            s
+            for s in stations
+            if any(
+                alias.startswith(prefix)
+                for alias in (names[s.diva], f"{places[s.diva]} {names[s.diva]}")
+            )
+        ]
+    if not matches:
+        words = set(wanted.split())
+        matches = [
+            s
+            for s in stations
+            if words <= set(f"{names[s.diva]} {places[s.diva]}".split())
+        ]
+        if len(matches) > 1:
+            # "Hauptbahnhof" also finds "Hauptbahnhof Süd": the fewest extra
+            # words is the stop that was meant.
+            fewest = min(len(names[s.diva].split()) for s in matches)
+            matches = [s for s in matches if len(names[s.diva].split()) == fewest]
+    if not matches:
+        # The matcher caches what it learns about `wanted`, and the cheap upper
+        # bounds skip most of the ~2,000 names before the full comparison.
+        matcher = SequenceMatcher(None)
+        matcher.set_seq2(wanted)
+        best = FUZZY_STOP_CUTOFF
+        for station in stations:
+            score = 0.0
+            for alias in aliases(station):
+                matcher.set_seq1(alias)
+                if matcher.real_quick_ratio() >= best and matcher.quick_ratio() >= best:
+                    score = max(score, matcher.ratio())
+            if score > best:
+                best, matches = score, [station]
+            elif score == best:
+                matches.append(station)
+
+    matches.sort(key=lambda s: _station_rank(catalogue, s), reverse=True)
+    if len({(names[s.diva], places[s.diva]) for s in matches}) == 1:
+        return matches[:1]
+    return matches[:MAX_STOP_CANDIDATES]
+
+
+def stop_candidate_labels(catalogue: StaticCatalogue, stations: list[Station]) -> str:
+    """Name ambiguous stops so they can be told apart: 'A (Wien), B (Schwechat)'."""
+    labels = _unique_stop_labels(catalogue)
+    return ", ".join(labels.get(s.diva, _stop_label(s)) for s in stations)
 
 
 def _stop_label(station: Station) -> str:

@@ -209,6 +209,15 @@
     "adhoc_same_stop": {
       "message": "Origin and destination are the same stop. Pick a different destination."
     },
+    "plan_trip_route_or_stops": {
+      "message": "Give either a route or both a start and a destination stop."
+    },
+    "plan_trip_stop_not_found": {
+      "message": "No stop matches “{stop}”. Check the name, or use the stop's DIVA number."
+    },
+    "plan_trip_stop_ambiguous": {
+      "message": "“{stop}” matches more than one stop: {candidates}. Use a longer name or the stop's DIVA number."
+    },
     "adhoc_rate_limited": {
       "message": "Too many route requests right now. Try again in {retry_after} s."
     }
@@ -271,11 +280,19 @@
   "services": {
     "plan_trip": {
       "name": "Plan trip",
-      "description": "Plans connections for a configured route and returns them, soonest first.",
+      "description": "Plans connections for a configured route, or between two stops, and returns them, soonest first.",
       "fields": {
         "config_entry_id": {
           "name": "Route",
-          "description": "The route to plan."
+          "description": "The route to plan. Leave empty to give a start and a destination stop instead."
+        },
+        "origin": {
+          "name": "From",
+          "description": "Start stop, by name or DIVA number, such as Stephansplatz. Use with To instead of a route."
+        },
+        "destination": {
+          "name": "To",
+          "description": "Destination stop, by name or DIVA number. Use with From instead of a route."
         },
         "datetime": {
           "name": "Time",
