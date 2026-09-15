@@ -1642,12 +1642,21 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 2px 8px;
+      padding: 4px 8px;
       border-radius: var(--wl-radius-sm);
       background: color-mix(in srgb, var(--risk) 18%, transparent);
       color: var(--primary-text-color);
       font-size: 0.8rem;
       font-weight: 600;
+      /* The inherited line box carries the font's tall ascender, which sat
+         the words visibly below the icon's centre. */
+      line-height: 1;
+    }
+    .risk > span {
+      text-box: trim-both cap alphabetic;
+    }
+    .risk ha-icon {
+      display: block;
     }
     .risk[data-risk="tight"] {
       --risk: var(--wl-warning);
@@ -1943,8 +1952,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .when-mode span {
       display: inline-flex;
       align-items: center;
-      min-height: 44px;
-      padding: 0 14px;
+      /* 32px keeps the chips compact beside the pickers and still clears
+         the 24px target minimum (WCAG 2.5.8); the radio covers the chip. */
+      min-height: 32px;
+      padding: 0 12px;
       box-sizing: border-box;
       border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.5));
       border-radius: 999px;
@@ -1967,7 +1978,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .when-field input {
       width: 100%;
-      min-height: 44px;
+      min-height: 32px;
       box-sizing: border-box;
       padding: 0 12px;
       border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.5));
