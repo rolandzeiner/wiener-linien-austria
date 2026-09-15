@@ -31,7 +31,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { ROUTE_CARD_VERSION } from "./const.js";
 import { registerWlFonts } from "./font-face.js";
-import { translate } from "./localize/localize.js";
+import { pickerText, translate } from "./localize/localize.js";
 import "./route-editor.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
 import "./stop-combobox.js";
@@ -130,7 +130,7 @@ const TIME_MODES: readonly AdhocTimeMode[] = ["now", "depart", "arrive"];
     win.customCards.push({
       type: ROUTE_CARD_TYPE,
       name: "Wiener Linien Austria — Route",
-      description: "Next connection from A to B, with transfer buffers",
+      description: pickerText("picker_route"),
       preview: true,
       getEntitySuggestion: (hass: HomeAssistant, entityId: string) => {
         if (!entityId.startsWith("sensor.")) return null;

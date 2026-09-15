@@ -1,5 +1,11 @@
 {
   "common": {
+    "picker": {
+      "picker_modern": "Abfahrten mit Störungen und Aufzugsinfos",
+      "picker_retro": "LED-Anzeige wie in den Wiener-Linien-Stationen",
+      "picker_flap": "Abfahrten als Fallblattanzeige",
+      "picker_route": "Nächste Verbindung von A nach B, mit Puffer beim Umsteigen"
+    },
     "editor": {
       "add_chip": "Chip hinzufügen",
       "add_icon": "Symbol hinzufügen",

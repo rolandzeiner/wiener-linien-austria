@@ -11,7 +11,7 @@ import type {
 
 import { RETRO_CARD_VERSION } from "./const.js";
 import { deText } from "./utils.js";
-import { translate } from "./localize/localize.js";
+import { pickerText, translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
   renderVersionBanner,
@@ -84,7 +84,7 @@ const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
     win.customCards.push({
       type: "wiener-linien-austria-retro-card",
       name: "Wiener Linien Austria — Retro",
-      description: "LED-Anzeige im Stil der Wiener-Linien-Stationen",
+      description: pickerText("picker_retro"),
       preview: true,
       // HA 2026.6 entity-first picker: only suggest this card for
       // sensors owned by this integration. Older HA ignores the key.

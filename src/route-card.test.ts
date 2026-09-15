@@ -19,6 +19,7 @@ import "./wiener-linien-austria-route-card.js";
 import "./route-editor.js";
 
 import { ROUTE_CARD_VERSION } from "./const.js";
+import { pickerText } from "./localize/localize.js";
 import type { HomeAssistant, RouteAccessStepAttr, RouteTripAttr } from "./types.js";
 
 const TAG = "wiener-linien-austria-route-card";
@@ -179,6 +180,21 @@ describe("registration + config", () => {
     expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow();
     expect(() => el.setConfig({ type: TAG, from: "Westbahnhof" })).toThrow(/stop number/);
     expect(() => el.setConfig({ type: TAG, from: 60201468, to: "60201040" })).not.toThrow();
+  });
+});
+
+describe("card picker text", () => {
+  it("follows the page language HA sets, then the stored pick", () => {
+    document.documentElement.lang = "de-AT";
+    expect(pickerText("picker_route")).toBe("Nächste Verbindung von A nach B, mit Puffer beim Umsteigen");
+    document.documentElement.lang = "en";
+    expect(pickerText("picker_route")).toBe("Next connection from A to B, with time to spare at each change");
+    document.documentElement.lang = "";
+    window.localStorage.setItem("selectedLanguage", JSON.stringify("de"));
+    expect(pickerText("picker_modern")).toBe("Abfahrten mit Störungen und Aufzugsinfos");
+    // A corrupt stored value falls through to the browser language, never throws.
+    window.localStorage.setItem("selectedLanguage", "{");
+    expect(() => pickerText("picker_flap")).not.toThrow();
   });
 });
 

@@ -1,5 +1,11 @@
 {
   "common": {
+    "picker": {
+      "picker_modern": "Departures with disruptions and lift status",
+      "picker_retro": "LED display like the ones at Wiener Linien stations",
+      "picker_flap": "Departures on a split-flap board",
+      "picker_route": "Next connection from A to B, with time to spare at each change"
+    },
     "editor": {
       "add_chip": "Add chip",
       "add_icon": "Add icon",

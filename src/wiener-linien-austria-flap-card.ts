@@ -21,7 +21,7 @@ import { styleMap } from "lit/directives/style-map.js";
 
 import { FLAP_CARD_VERSION } from "./const.js";
 import { registerWlFonts } from "./font-face.js";
-import { translate } from "./localize/localize.js";
+import { pickerText, translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
   renderVersionBanner,
@@ -145,7 +145,7 @@ function padCountdown(countdown: number | undefined | null): string {
     win.customCards.push({
       type: "wiener-linien-austria-flap-card",
       name: "Wiener Linien Austria — Flap Board",
-      description: "Solari-style split-flap departure board",
+      description: pickerText("picker_flap"),
       preview: true,
       // HA 2026.6 entity-first picker: only suggest this card for
       // sensors owned by this integration. Older HA ignores the key.

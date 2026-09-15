@@ -12,7 +12,7 @@ import type {
 import { cardStyles } from "./card-styles.js";
 import { registerWlFonts } from "./font-face.js";
 import { CARD_VERSION, NIGHTLINE_BG } from "./const.js";
-import { translate } from "./localize/localize.js";
+import { pickerText, translate } from "./localize/localize.js";
 import {
   checkCardVersionWS,
   renderVersionBanner,
@@ -78,7 +78,7 @@ import "./editor.js";
     win.customCards.push({
       type: "wiener-linien-austria-card",
       name: "Wiener Linien Austria",
-      description: "Abfahrtsmonitor mit Störungen und Aufzugsinfo",
+      description: pickerText("picker_modern"),
       preview: true,
       // HA 2026.6 entity-first picker: only suggest this card for
       // sensors owned by this integration. Older HA ignores the key.
