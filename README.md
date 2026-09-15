@@ -149,7 +149,7 @@ The card works in one of two ways:
 
 What the card shows:
 
-- **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time.
+- **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time. For a trip at a chosen time, the departure time and day instead.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
@@ -161,6 +161,7 @@ Picking stops without a route:
 - **Type to narrow the list.** Case and accents don't matter, so `wahringer strasse` finds Währinger Straße. Or open the list and pick. The nearest stops to your Home Assistant location come first.
 - **Swap** start and destination with one tap.
 - The connections appear as soon as both stops are set.
+- **Now, Depart at or Arrive by** *(2.0.0)* — plan for right now, or pick a date and time to leave at or arrive by. Times are Vienna time, like the signs at the stop. The card starts at **Now** again after a reload.
 - The card remembers your last pick on each device. In the card editor you can also preselect a start and destination.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
@@ -330,7 +331,7 @@ The action skips the request cooldown, because someone is waiting for the answer
 {"stops": [{"value": "60201349", "label": "Hauptbahnhof (Wien) — 450 m"}]}
 ```
 
-**`wiener_linien_austria/plan`** plans connections between two stops, leaving now.
+**`wiener_linien_austria/plan`** plans connections between two stops, leaving now or at a chosen time.
 
 | Field | Required | Values |
 |---|---|---|
@@ -340,8 +341,10 @@ The action skips the request cooldown, because someone is waiting for the answer
 | `walk_speed` | no | `slow`, `normal` (default) or `fast`. |
 | `excluded_means` | no | Any of `train`, `sbahn`, `metro`, `tram`, `bus`. Default: none. |
 | `min_transfer_minutes` | no | `0`–`15`, default `2`. |
+| `datetime` | no | When to leave, as an ISO date and time. Without an offset it's Vienna time. Leave out for now. |
+| `arrive_by` | no | `true` treats `datetime` as the latest arrival instead. Default `false`. |
 
-The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `trips` (up to four), `line_colors`, `traffic_info` and `attribution`. Two more fields cover a used-up allowance. `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
+The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `trips` (up to four), `line_colors`, `traffic_info` and `attribution`. `planned_for` echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan for a chosen time keeps every connection it found, even ones that already left. Two more fields cover a used-up allowance. `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
 
 `plan` shares the limits described under [Data Updates](#data-updates): answers reused for a minute, and at most 60 requests an hour per user and 120 for all users together.
 
