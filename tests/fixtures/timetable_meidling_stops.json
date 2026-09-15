@@ -1,0 +1,1366 @@
+{
+ "parameters": [
+  {
+   "name": "serverID",
+   "value": "VOR-OGD02-PR"
+  },
+  {
+   "name": "requestID",
+   "value": "0"
+  },
+  {
+   "name": "sessionID",
+   "value": "0"
+  },
+  {
+   "name": "calcTime",
+   "value": "81.770"
+  },
+  {
+   "name": "serverTime",
+   "value": "2026-09-15T15:39:19"
+  },
+  {
+   "name": "logRequestId",
+   "value": "f1a4fe181285b915"
+  }
+ ],
+ "dm": {
+  "input": {
+   "input": "60201015"
+  },
+  "points": {
+   "point": {
+    "usage": "dm",
+    "type": "stop",
+    "name": "Wien, Meidling",
+    "stateless": "60201015",
+    "ref": {
+     "id": "60201015",
+     "gid": "at:49:1015",
+     "omc": "49000001",
+     "placeID": "50",
+     "place": "Wien",
+     "coords": "163319018.00,481742743.00"
+    }
+   }
+  }
+ },
+ "arr": {
+  "input": {
+   "input": ""
+  },
+  "points": null
+ },
+ "dateTime": {
+  "deparr": "dep",
+  "ttpFrom": "20251214",
+  "ttpTo": "20261212",
+  "year": "2026",
+  "month": "9",
+  "day": "15",
+  "hour": "15",
+  "minute": "39"
+ },
+ "dateRange": [
+  {
+   "day": "15",
+   "month": "09",
+   "year": "2026",
+   "weekday": "3"
+  },
+  {
+   "day": "16",
+   "month": "09",
+   "year": "2026",
+   "weekday": "4"
+  },
+  {
+   "day": "17",
+   "month": "09",
+   "year": "2026",
+   "weekday": "5"
+  },
+  {
+   "day": "18",
+   "month": "09",
+   "year": "2026",
+   "weekday": "6"
+  },
+  {
+   "day": "19",
+   "month": "09",
+   "year": "2026",
+   "weekday": "7"
+  },
+  {
+   "day": "20",
+   "month": "09",
+   "year": "2026",
+   "weekday": "1"
+  },
+  {
+   "day": "21",
+   "month": "09",
+   "year": "2026",
+   "weekday": "2"
+  },
+  {
+   "day": "22",
+   "month": "09",
+   "year": "2026",
+   "weekday": "3"
+  },
+  {
+   "day": "23",
+   "month": "09",
+   "year": "2026",
+   "weekday": "4"
+  },
+  {
+   "day": "24",
+   "month": "09",
+   "year": "2026",
+   "weekday": "5"
+  },
+  {
+   "day": "25",
+   "month": "09",
+   "year": "2026",
+   "weekday": "6"
+  },
+  {
+   "day": "26",
+   "month": "09",
+   "year": "2026",
+   "weekday": "7"
+  },
+  {
+   "day": "27",
+   "month": "09",
+   "year": "2026",
+   "weekday": "1"
+  },
+  {
+   "day": "28",
+   "month": "09",
+   "year": "2026",
+   "weekday": "2"
+  },
+  {
+   "day": "29",
+   "month": "09",
+   "year": "2026",
+   "weekday": "3"
+  }
+ ],
+ "option": {
+  "ptOption": {
+   "active": "-1",
+   "maxChanges": "9",
+   "maxTime": "360",
+   "maxWait": "120",
+   "routeType": "LEASTTIME",
+   "changeSpeed": "normal",
+   "lineRestriction": "400",
+   "useProxFootSearch": "0",
+   "useProxFootSearchOrigin": "0",
+   "useProxFootSearchDestination": "0",
+   "bike": "0",
+   "plane": "0",
+   "noCrowded": "0",
+   "noSolidStairs": "0",
+   "noEscalators": "0",
+   "noElevators": "0",
+   "lowPlatformVhcl": "0",
+   "wheelchair": "0",
+   "needElevatedPlt": "0",
+   "assistance": "0",
+   "SOSAvail": "0",
+   "noLonelyTransfer": "0",
+   "illumTransfer": "0",
+   "overgroundTransfer": "0",
+   "noInsecurePlaces": "0",
+   "privateTransport": "0",
+   "excludedMeans": [
+    {
+     "means": "Zug",
+     "value": "0",
+     "selected": "1"
+    },
+    {
+     "means": "S-Bahn",
+     "value": "1",
+     "selected": "0"
+    },
+    {
+     "means": "U-Bahn",
+     "value": "2",
+     "selected": "1"
+    },
+    {
+     "means": "Stadtbahn",
+     "value": "3",
+     "selected": "1"
+    },
+    {
+     "means": "Straßen-/Trambahn",
+     "value": "4",
+     "selected": "1"
+    },
+    {
+     "means": "Stadtbus",
+     "value": "5",
+     "selected": "1"
+    },
+    {
+     "means": "Regionalbus",
+     "value": "6",
+     "selected": "1"
+    },
+    {
+     "means": "Schnellbus",
+     "value": "7",
+     "selected": "1"
+    },
+    {
+     "means": "Seil-/Zahnradbahn",
+     "value": "8",
+     "selected": "1"
+    },
+    {
+     "means": "Schiff",
+     "value": "9",
+     "selected": "1"
+    },
+    {
+     "means": "AST (flächengebunde",
+     "value": "10",
+     "selected": "1"
+    },
+    {
+     "means": "Sonstige",
+     "value": "11",
+     "selected": "1"
+    },
+    {
+     "means": "Flugzeug",
+     "value": "12",
+     "selected": "0"
+    },
+    {
+     "means": "Zug (Nahverkehr)",
+     "value": "13",
+     "selected": "1"
+    },
+    {
+     "means": "Zug (Fernverkehr)",
+     "value": "14",
+     "selected": "1"
+    },
+    {
+     "means": "Zug Fernv m Zuschlag",
+     "value": "15",
+     "selected": "1"
+    },
+    {
+     "means": "Zug Fernv m spez Fpr",
+     "value": "16",
+     "selected": "1"
+    },
+    {
+     "means": "SEV Schienenersatzv",
+     "value": "17",
+     "selected": "0"
+    },
+    {
+     "means": "Zug Shuttle",
+     "value": "18",
+     "selected": "0"
+    },
+    {
+     "means": "Bürgerbus",
+     "value": "19",
+     "selected": "0"
+    },
+    {
+     "means": "Rufbus (liniengeb.)",
+     "value": "20",
+     "selected": "0"
+    },
+    {
+     "means": "Fernbus",
+     "value": "21",
+     "selected": "0"
+    }
+   ],
+   "activeImp": "-1",
+   "activeCom": "-1",
+   "activeSec": "-1"
+  }
+ },
+ "departureList": [
+  {
+   "stopID": "60201015",
+   "x": "1818260",
+   "y": "5864035",
+   "mapName": "MRCV",
+   "area": "1",
+   "platform": "G2",
+   "platformName": "2",
+   "stopName": "Wien Meidling",
+   "nameWO": "Meidling",
+   "pointType": "Gleis",
+   "countdown": "0",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "39"
+   },
+   "servingLine": {
+    "key": "311",
+    "code": "2",
+    "number": "S80",
+    "symbol": "S80",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Leobersdorf Bahnhof",
+    "directionFrom": "Wien Aspern Nord",
+    "trainNum": "25043",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S80: nur 2.Kl."
+     },
+     {
+      "content": "Linie S80: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     },
+     {
+      "content": "Linie S80: WLAN verfügbar"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "01S80",
+     "project": "j26",
+     "direction": "H",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:01S80:W:H:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Hetzendorf",
+     "nameWO": "Hetzendorf",
+     "place": "Wien",
+     "nameWithPlace": "",
+     "omc": "49000001",
+     "placeID": "50",
+     "platformName": "",
+     "desc": "",
+     "ref": {
+      "id": "60200511",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:49:511",
+      "areaGid": "at:49:511:1",
+      "pointGid": "at:49:511:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 15:42",
+      "arrDateTimeSec": "20260915 15:42:00",
+      "depDateTime": "20260915 15:42",
+      "depDateTimeSec": "20260915 15:42:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Wien Atzgersdorf",
+     "nameWO": "Atzgersdorf",
+     "place": "Wien",
+     "nameWithPlace": "",
+     "omc": "49000001",
+     "placeID": "50",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60200094",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:49:94",
+      "areaGid": "at:49:94:1",
+      "pointGid": "at:49:94:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 15:45",
+      "arrDateTimeSec": "20260915 15:45:00",
+      "depDateTime": "20260915 15:45",
+      "depDateTimeSec": "20260915 15:45:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Wien Liesing",
+     "nameWO": "Liesing",
+     "place": "Wien",
+     "nameWithPlace": "",
+     "omc": "49000001",
+     "placeID": "50",
+     "platformName": "",
+     "desc": "",
+     "ref": {
+      "id": "60200788",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:49:788",
+      "areaGid": "at:49:788:1",
+      "pointGid": "at:49:788:0:8",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 15:47",
+      "arrDateTimeSec": "20260915 15:47:00",
+      "depDateTime": "20260915 15:48",
+      "depDateTimeSec": "20260915 15:48:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Perchtoldsdorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Perchtoldsdorf",
+     "nameWithPlace": "",
+     "omc": "43017019",
+     "placeID": "1",
+     "platformName": "",
+     "desc": "",
+     "ref": {
+      "id": "60204500",
+      "area": "4",
+      "platform": "G2",
+      "gid": "at:43:4500",
+      "areaGid": "at:43:4500:4",
+      "pointGid": "at:43:4500:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "-1"
+       }
+      ],
+      "niveau": "-1",
+      "arrDateTime": "20260915 15:49",
+      "arrDateTimeSec": "20260915 15:49:00",
+      "depDateTime": "20260915 15:50",
+      "depDateTimeSec": "20260915 15:50:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Brunn-Maria Enzersdorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Brunn-Maria Enzersdorf",
+     "nameWithPlace": "",
+     "omc": "43017004",
+     "placeID": "99",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60203255",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:3255",
+      "areaGid": "at:43:3255:1",
+      "pointGid": "at:43:3255:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 15:52",
+      "arrDateTimeSec": "20260915 15:52:00",
+      "depDateTime": "20260915 15:52",
+      "depDateTimeSec": "20260915 15:52:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Mödling Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Mödling",
+     "nameWithPlace": "",
+     "omc": "43017017",
+     "placeID": "1",
+     "platformName": "",
+     "desc": "",
+     "ref": {
+      "id": "60204239",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:4239",
+      "areaGid": "at:43:4239:1",
+      "pointGid": "at:43:4239:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "-1"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "-1",
+      "arrDateTime": "20260915 15:55",
+      "arrDateTimeSec": "20260915 15:55:00",
+      "depDateTime": "20260915 16:00",
+      "depDateTimeSec": "20260915 16:00:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Guntramsdorf Thallern Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Guntramsdorf-Thallern",
+     "nameWithPlace": "",
+     "omc": "43017009",
+     "placeID": "3",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60203616",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:3616",
+      "areaGid": "at:43:3616:1",
+      "pointGid": "at:43:3616:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:04",
+      "arrDateTimeSec": "20260915 16:04:00",
+      "depDateTime": "20260915 16:04",
+      "depDateTimeSec": "20260915 16:04:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Gumpoldskirchen Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Gumpoldskirchen",
+     "nameWithPlace": "",
+     "omc": "43017009",
+     "placeID": "1",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60203602",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:3602",
+      "areaGid": "at:43:3602:1",
+      "pointGid": "at:43:3602:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:06",
+      "arrDateTimeSec": "20260915 16:06:00",
+      "depDateTime": "20260915 16:07",
+      "depDateTimeSec": "20260915 16:07:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Pfaffstätten Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Pfaffstätten",
+     "nameWithPlace": "",
+     "omc": "43006025",
+     "placeID": "1",
+     "platformName": "",
+     "desc": "",
+     "ref": {
+      "id": "60204533",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:4533",
+      "areaGid": "at:43:4533:1",
+      "pointGid": "at:43:4533:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:09",
+      "arrDateTimeSec": "20260915 16:09:00",
+      "depDateTime": "20260915 16:17",
+      "depDateTimeSec": "20260915 16:17:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Baden Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Baden bei Wien",
+     "nameWithPlace": "",
+     "omc": "43006004",
+     "placeID": "1",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60203101",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:3101",
+      "areaGid": "at:43:3101:1",
+      "pointGid": "at:43:3101:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 16:20",
+      "arrDateTimeSec": "20260915 16:20:00",
+      "depDateTime": "20260915 16:20",
+      "depDateTimeSec": "20260915 16:20:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Bad Vöslau Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Bad Vöslau",
+     "nameWithPlace": "",
+     "omc": "43006003",
+     "placeID": "1",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60203090",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:3090",
+      "areaGid": "at:43:3090:1",
+      "pointGid": "at:43:3090:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:24",
+      "arrDateTimeSec": "20260915 16:24:00",
+      "depDateTime": "20260915 16:26",
+      "depDateTimeSec": "20260915 16:26:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Kottingbrunn Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Kottingbrunn",
+     "nameWithPlace": "",
+     "omc": "43006018",
+     "placeID": "1",
+     "platformName": "",
+     "desc": "",
+     "ref": {
+      "id": "60203989",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:3989",
+      "areaGid": "at:43:3989:1",
+      "pointGid": "at:43:3989:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:28",
+      "arrDateTimeSec": "20260915 16:28:00",
+      "depDateTime": "20260915 16:29",
+      "depDateTimeSec": "20260915 16:29:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Leobersdorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Leobersdorf",
+     "nameWithPlace": "",
+     "omc": "43006020",
+     "placeID": "1",
+     "platformName": "2",
+     "desc": "",
+     "ref": {
+      "id": "60204084",
+      "area": "1",
+      "platform": "G2",
+      "gid": "at:43:4084",
+      "areaGid": "at:43:4084:1",
+      "pointGid": "at:43:4084:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       },
+       {
+        "name": "RealtimeTripId",
+        "value": "81____-25043--6"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:31",
+      "arrDateTimeSec": "20260915 16:31:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    }
+   ],
+   "hiddenLines": {
+    "origin": {
+     "stopKey": {
+      "key": "60203255",
+      "area": "",
+      "point": "",
+      "gid": "at:43:3255",
+      "gidArea": "",
+      "pointGid": ""
+     }
+    },
+    "destination": {
+     "stopKey": {
+      "key": "60204084",
+      "area": "",
+      "point": "",
+      "gid": "at:43:4084",
+      "gidArea": "",
+      "pointGid": ""
+     }
+    },
+    "line": {
+     "mode": {
+      "name": "S-Bahn S4",
+      "number": "S4",
+      "symbol": "S4",
+      "product": "S-Bahn",
+      "productId": "1",
+      "type": "2",
+      "code": "1",
+      "destination": "Wiener Neustadt Hauptbahnhof",
+      "destID": "60205210",
+      "desc": "Wien - Salzburg - Kufstein - Innsbruck - Bludenz - Bregenz - Lindau",
+      "timetablePeriod": "Fahrplanprojekt 2025/26",
+      "realtime": "0",
+      "diva": {
+       "branch": "01",
+       "line": "010S4",
+       "supplement": "W",
+       "dir": "H",
+       "project": "j26",
+       "network": "obb",
+       "stateless": "obb:010S4:W:H:j26",
+       "tripCode": "158",
+       "operator": "OEBB Personenverkehr AG Kundenservice",
+       "opCode": "01",
+       "vF": "20251214",
+       "vTo": "20261212",
+       "lineDisplay": "line",
+       "attrs": [
+        {
+         "name": "OperatorURL",
+         "value": "https://www.oebb.at"
+        }
+       ]
+      }
+     }
+    }
+   }
+  },
+  {
+   "stopID": "60201015",
+   "x": "1818276",
+   "y": "5864086",
+   "mapName": "MRCV",
+   "area": "15",
+   "platform": "G6",
+   "platformName": "6",
+   "stopName": "Wien Meidling",
+   "nameWO": "Meidling",
+   "pointType": "Gleis",
+   "countdown": "1",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "40"
+   },
+   "servingLine": {
+    "key": "65",
+    "code": "2",
+    "number": "S2",
+    "symbol": "S2",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Wolfsthal",
+    "directionFrom": "Mödling Bahnhof",
+    "trainNum": "22751",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S2: nur 2.Kl."
+     },
+     {
+      "content": "Linie S2: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "010S2",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:010S2:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   },
+   "onwardStopSeq": {
+    "name": "Wien Hauptbahnhof",
+    "nameWO": "Hauptbahnhof",
+    "place": "Wien",
+    "nameWithPlace": "",
+    "omc": "49000001",
+    "placeID": "50",
+    "platformName": "9C-E",
+    "desc": "",
+    "ref": {
+     "id": "60201349",
+     "area": "28",
+     "platform": "G9",
+     "gid": "at:49:1349",
+     "areaGid": "at:49:1349:28",
+     "pointGid": "at:49:1349:0:28",
+     "attrs": [
+      {
+       "name": "AREA_NIVEAU_DIVA",
+       "value": "1"
+      }
+     ],
+     "niveau": "1",
+     "arrDateTime": "20260915 15:45",
+     "arrDateTimeSec": "20260915 15:45:00",
+     "arrDelay": "0",
+     "arrValid": "0",
+     "depDelay": "0",
+     "depValid": "0"
+    }
+   }
+  },
+  {
+   "stopID": "60201015",
+   "x": "1818284",
+   "y": "5864112",
+   "mapName": "MRCV",
+   "area": "16",
+   "platform": "G8",
+   "platformName": "8",
+   "stopName": "Wien Meidling",
+   "nameWO": "Meidling",
+   "pointType": "Gleis",
+   "countdown": "5",
+   "dateTime": {
+    "year": "2026",
+    "month": "9",
+    "day": "15",
+    "weekday": "3",
+    "hour": "15",
+    "minute": "44"
+   },
+   "servingLine": {
+    "key": "106",
+    "code": "2",
+    "number": "S60",
+    "symbol": "S60",
+    "motType": "1",
+    "mtSubcode": "0",
+    "realtime": "0",
+    "direction": "Bruck/Leitha Bahnhof",
+    "directionFrom": "Wiener Neustadt Hauptbahnhof",
+    "trainNum": "26053",
+    "name": "S-Bahn",
+    "hints": [
+     {
+      "content": "Linie S60: WLAN verfügbar"
+     },
+     {
+      "content": "Linie S60: nur 2.Kl."
+     },
+     {
+      "content": "Linie S60: Zustieg im Nahverkehr (REX, R, CJX, S-Bahn) nur mit gültiger Fahrkarte"
+     }
+    ],
+    "liErgRiProj": {
+     "line": "01S60",
+     "project": "j26",
+     "direction": "R",
+     "supplement": "W",
+     "network": "obb"
+    },
+    "destID": "-1",
+    "stateless": "obb:01S60:W:R:j26",
+    "lineDisplay": "line"
+   },
+   "operator": {
+    "code": "01",
+    "name": "OEBB Personenverkehr AG Kundenservice",
+    "publicCode": ""
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Hauptbahnhof",
+     "nameWO": "Hauptbahnhof",
+     "place": "Wien",
+     "nameWithPlace": "",
+     "omc": "49000001",
+     "placeID": "50",
+     "platformName": "11A-B",
+     "desc": "",
+     "ref": {
+      "id": "60201349",
+      "area": "29",
+      "platform": "G11",
+      "gid": "at:49:1349",
+      "areaGid": "at:49:1349:29",
+      "pointGid": "at:49:1349:0:9",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 15:49",
+      "arrDateTimeSec": "20260915 15:49:00",
+      "depDateTime": "20260915 15:51",
+      "depDateTimeSec": "20260915 15:51:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Wien Grillgasse",
+     "nameWO": "Grillgasse",
+     "place": "Wien",
+     "nameWithPlace": "",
+     "omc": "49000001",
+     "placeID": "50",
+     "platformName": "2",
+     "desc": "",
+     "ref": {
+      "id": "60201257",
+      "area": "1",
+      "platform": "G2",
+      "gid": "at:49:1257",
+      "areaGid": "at:49:1257:1",
+      "pointGid": "at:49:1257:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 15:54",
+      "arrDateTimeSec": "20260915 15:54:00",
+      "depDateTime": "20260915 15:55",
+      "depDateTimeSec": "20260915 15:55:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Kledering Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Kledering",
+     "nameWithPlace": "",
+     "omc": "43007040",
+     "placeID": "1",
+     "platformName": "2",
+     "desc": "",
+     "ref": {
+      "id": "60203895",
+      "area": "1",
+      "platform": "G2",
+      "gid": "at:43:3895",
+      "areaGid": "at:43:3895:1",
+      "pointGid": "at:43:3895:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 15:59",
+      "arrDateTimeSec": "20260915 15:59:00",
+      "depDateTime": "20260915 15:59",
+      "depDateTimeSec": "20260915 15:59:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Lanzendorf-Rannersdorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Lanzendorf-Rannersdorf",
+     "nameWithPlace": "",
+     "omc": "43007034",
+     "placeID": "99",
+     "platformName": "2",
+     "desc": "",
+     "ref": {
+      "id": "60204054",
+      "area": "1",
+      "platform": "G2",
+      "gid": "at:43:4054",
+      "areaGid": "at:43:4054:1",
+      "pointGid": "at:43:4054:0:4",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "1"
+       }
+      ],
+      "niveau": "1",
+      "arrDateTime": "20260915 16:01",
+      "arrDateTimeSec": "20260915 16:01:00",
+      "depDateTime": "20260915 16:02",
+      "depDateTimeSec": "20260915 16:02:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Gramatneusiedl Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Gramatneusiedl",
+     "nameWithPlace": "",
+     "omc": "43007031",
+     "placeID": "1",
+     "platformName": "2",
+     "desc": "",
+     "ref": {
+      "id": "60203538",
+      "area": "6",
+      "platform": "G2",
+      "gid": "at:43:3538",
+      "areaGid": "at:43:3538:6",
+      "pointGid": "at:43:3538:0:3",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:10",
+      "arrDateTimeSec": "20260915 16:10:00",
+      "depDateTime": "20260915 16:11",
+      "depDateTimeSec": "20260915 16:11:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Götzendorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Götzendorf/Leitha",
+     "nameWithPlace": "",
+     "omc": "43007009",
+     "placeID": "1",
+     "platformName": "2",
+     "desc": "",
+     "ref": {
+      "id": "60203655",
+      "area": "1",
+      "platform": "G2",
+      "gid": "at:43:3655",
+      "areaGid": "at:43:3655:1",
+      "pointGid": "at:43:3655:0:3",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:15",
+      "arrDateTimeSec": "20260915 16:15:00",
+      "depDateTime": "20260915 16:16",
+      "depDateTimeSec": "20260915 16:16:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Trautmannsdorf/Leitha Bhf.",
+     "nameWO": "Bahnhof",
+     "place": "Trautmannsdorf/Leitha",
+     "nameWithPlace": "",
+     "omc": "43007026",
+     "placeID": "4",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60205013",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:5013",
+      "areaGid": "at:43:5013:1",
+      "pointGid": "at:43:5013:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:19",
+      "arrDateTimeSec": "20260915 16:19:00",
+      "depDateTime": "20260915 16:20",
+      "depDateTimeSec": "20260915 16:20:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Sarasdorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Sarasdorf",
+     "nameWithPlace": "",
+     "omc": "43007026",
+     "placeID": "2",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60204688",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:4688",
+      "areaGid": "at:43:4688:1",
+      "pointGid": "at:43:4688:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:22",
+      "arrDateTimeSec": "20260915 16:22:00",
+      "depDateTime": "20260915 16:23",
+      "depDateTimeSec": "20260915 16:23:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Wilfleinsdorf Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Wilfleinsdorf",
+     "nameWithPlace": "",
+     "omc": "43007004",
+     "placeID": "2",
+     "platformName": "1",
+     "desc": "",
+     "ref": {
+      "id": "60205239",
+      "area": "1",
+      "platform": "G1",
+      "gid": "at:43:5239",
+      "areaGid": "at:43:5239:1",
+      "pointGid": "at:43:5239:0:1",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:25",
+      "arrDateTimeSec": "20260915 16:25:00",
+      "depDateTime": "20260915 16:26",
+      "depDateTimeSec": "20260915 16:26:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    },
+    {
+     "name": "Bruck/Leitha Bahnhof",
+     "nameWO": "Bahnhof",
+     "place": "Bruck an der Leitha",
+     "nameWithPlace": "",
+     "omc": "43007004",
+     "placeID": "1",
+     "platformName": "4A",
+     "desc": "",
+     "ref": {
+      "id": "60203209",
+      "area": "8",
+      "platform": "G4",
+      "gid": "at:43:3209",
+      "areaGid": "at:43:3209:8",
+      "pointGid": "at:43:3209:0:6",
+      "attrs": [
+       {
+        "name": "AREA_NIVEAU_DIVA",
+        "value": "0"
+       }
+      ],
+      "niveau": "0",
+      "arrDateTime": "20260915 16:31",
+      "arrDateTimeSec": "20260915 16:31:00",
+      "arrDelay": "0",
+      "arrValid": "0",
+      "depDelay": "0",
+      "depValid": "0"
+     }
+    }
+   ]
+  }
+ ]
+}

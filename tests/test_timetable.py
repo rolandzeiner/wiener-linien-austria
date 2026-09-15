@@ -6,6 +6,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, patch
 from zoneinfo import ZoneInfo
@@ -24,6 +25,7 @@ from custom_components.wiener_linien_austria.const import (
     CONF_LINES,
     DOMAIN,
     LINE_TYPE_S_BAHN,
+    MAX_STOPS_AHEAD,
     ROUTING_DEPARTURE_ENDPOINT,
 )
 from custom_components.wiener_linien_austria.coordinator import (
@@ -34,6 +36,7 @@ from custom_components.wiener_linien_austria.coordinator import (
 from custom_components.wiener_linien_austria.routing import RoutingError
 from custom_components.wiener_linien_austria.timetable import (
     PlannedDeparture,
+    PlannedStop,
     TimetableBoard,
     async_fetch_planned_departures,
     async_probe_picker_rows,
@@ -478,3 +481,113 @@ async def test_reconfigure_keeps_tracked_s_bahn_lines_offered(
     assert offered["S7|H"] == "S7 → H (timetable only)"
     assert "U1|R" in offered
     mock_s_bahn_picker_probe.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# Stops ahead
+# ---------------------------------------------------------------------------
+
+MEIDLING = 60201015
+STOPS_FIXTURE = Path(__file__).parent / "fixtures" / "timetable_meidling_stops.json"
+# The fixture's first train, the S80 at 15:39 towards Leobersdorf.
+S80_AT = datetime(2026, 9, 15, 15, 39, tzinfo=VIENNA)
+
+
+def _stops_body() -> dict[str, Any]:
+    return json.loads(STOPS_FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_board_request_asks_for_stops_and_the_picker_does_not() -> None:
+    assert ("includeCompleteStopSeq", "1") in build_departure_params(
+        MEIDLING, 30, with_stops=True
+    )
+    assert ("includeCompleteStopSeq", "1") not in build_departure_params(MEIDLING, 100)
+
+
+async def test_board_refresh_fetches_with_stops(hass: HomeAssistant) -> None:
+    board = TimetableBoard(hass, MEIDLING)
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value=_stops_body()) as fetch,
+    ):
+        await board.async_refresh()
+    params = fetch.await_args.args[1]
+    assert ("includeCompleteStopSeq", "1") in params
+
+
+def test_parse_onward_stops() -> None:
+    """Names read like a board; a single onward stop arrives as a bare point."""
+    s80, s2, s60 = parse_departure_body(_stops_body(), MEIDLING, VIENNA)
+
+    assert s80.towards == "Leobersdorf"
+    assert [stop.name for stop in s80.stops[:4]] == [
+        "Hetzendorf",
+        "Atzgersdorf",
+        "Liesing",
+        "Perchtoldsdorf",
+    ]
+    assert s80.stops[0].stop_id == 60200511
+    assert s80.stops[-1].name == "Leobersdorf"
+    # EFA collapses the S2's one onward stop into a mapping.
+    assert [stop.name for stop in s2.stops] == ["Hauptbahnhof"]
+    assert len(s60.stops) == 10
+
+
+def test_parse_onward_stops_skips_nameless_points() -> None:
+    body = _stops_body()
+    row = body["departureList"][0]
+    row["onwardStopSeq"][0] = {"name": "", "ref": {"id": "1"}}
+    row["onwardStopSeq"][1]["ref"] = {"id": "not-a-number"}
+    row["onwardStopSeq"].append("garbage")
+    stops = parse_departure_body(body, MEIDLING, VIENNA)[0].stops
+    assert stops[0].name == "Atzgersdorf"
+    assert stops[0].stop_id is None
+
+
+def test_timetable_rows_carry_stops_ahead() -> None:
+    """Terminus only when the last stop is the destination; WL transfers by DIVA."""
+    s80, s2, _ = parse_departure_body(_stops_body(), MEIDLING, VIENNA)
+    catalogue = SimpleNamespace(
+        trip_patterns=SimpleNamespace(lines_at_diva={60200788: ("60A", "U6")})
+    )
+    rows = timetable_departures(
+        (s80, s2),
+        frozenset({("S80", "H"), ("S2", "R")}),
+        S80_AT - timedelta(minutes=2),
+        catalogue=catalogue,  # type: ignore[arg-type]
+    )
+    by_line = {row.line: row for row in rows}
+
+    trail = by_line["S80"].stops_ahead
+    assert trail is not None
+    assert trail[2] == {"name": "Liesing", "lines": ["60A", "U6"]}
+    assert trail[-1] == {"name": "Leobersdorf", "is_terminus": True}
+    assert all("is_terminus" not in stop for stop in trail[:-1])
+    # The S2's sequence stops at Hauptbahnhof but the train runs on to
+    # Wolfsthal: no terminus flag on a stop that isn't one.
+    assert by_line["S2"].stops_ahead == [{"name": "Hauptbahnhof"}]
+
+
+def test_timetable_rows_without_stops_have_no_trail() -> None:
+    rows = timetable_departures(
+        (_planned(),), frozenset({("S1", "R")}), FIRST_TRAIN, catalogue=None
+    )
+    assert rows[0].stops_ahead is None
+    assert "stops_ahead" not in rows[0].to_dict()
+
+
+def test_timetable_trail_is_capped_without_a_terminus() -> None:
+    stops = tuple(PlannedStop(name=f"Stop {i}", stop_id=None) for i in range(40))
+    dep = PlannedDeparture(
+        line="S1",
+        towards="Stop 39",
+        direction="R",
+        platform=None,
+        planned=FIRST_TRAIN + timedelta(minutes=5),
+        stops=stops,
+    )
+    rows = timetable_departures((dep,), frozenset({("S1", "R")}), FIRST_TRAIN)
+    trail = rows[0].stops_ahead
+    assert trail is not None
+    assert len(trail) == MAX_STOPS_AHEAD
+    assert all("is_terminus" not in stop for stop in trail)

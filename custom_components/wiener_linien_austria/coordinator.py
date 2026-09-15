@@ -26,6 +26,7 @@ from .const import (
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     LINE_TYPE_S_BAHN,
+    MAX_STOPS_AHEAD,
     STALE_DEPARTURE_MAX_AGE,
 )
 
@@ -419,7 +420,10 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         if self._timetable is None:
             return data
         planned = timetable_departures(
-            self._timetable.departures, self._timetable_pairs, dt_util.utcnow()
+            self._timetable.departures,
+            self._timetable_pairs,
+            dt_util.utcnow(),
+            catalogue=self._current_catalogue(),
         )
         if not planned:
             return data
@@ -777,6 +781,8 @@ def timetable_departures(
     planned: tuple[PlannedDeparture, ...],
     pairs: frozenset[tuple[str, str]],
     now: datetime,
+    *,
+    catalogue: StaticCatalogue | None = None,
 ) -> list[Departure]:
     """Board rows for the picked S-Bahn lines that haven't left yet.
 
@@ -788,6 +794,11 @@ def timetable_departures(
     `barrier_free` stays False because the timetable doesn't say. The
     cards only render the positive case, so that shows nothing rather
     than a false "not step-free".
+
+    `stops_ahead` comes from the timetable's own stop sequence rather than
+    the Wiener Linien trip patterns, which don't know the S-Bahn. Same
+    shape as `/monitor` rows get; `catalogue` adds the Wiener Linien lines
+    at each stop as transfers.
     """
     rows: list[Departure] = []
     for dep in planned:
@@ -809,10 +820,45 @@ def timetable_departures(
                 barrier_free=False,
                 traffic_jam=False,
                 platform=dep.platform,
+                stops_ahead=_timetable_stops_ahead(dep, catalogue),
                 timetable=True,
             )
         )
     return rows
+
+
+def _timetable_stops_ahead(
+    dep: PlannedDeparture, catalogue: StaticCatalogue | None
+) -> list[dict[str, Any]] | None:
+    """A planned train's onward stops as a `stops_ahead` list.
+
+    None without a stop sequence, so the row shows no chevron. Capped at
+    `MAX_STOPS_AHEAD` like the `/monitor` trail. The last stop is flagged
+    as the terminus only when it is the train's destination: a capped list
+    isn't, and neither is a sequence the server ends early (seen
+    2026-09-15: an S2 towards Wolfsthal listing only Hauptbahnhof, where
+    the run continues under another number). Transfer lines
+    are the Wiener Linien lines at the stop's DIVA; the S-Bahn lines
+    passing through aren't known here, so none are listed.
+    """
+    if not dep.stops:
+        return None
+    lines_at_diva = (
+        catalogue.trip_patterns.lines_at_diva
+        if catalogue is not None and catalogue.trip_patterns is not None
+        else {}
+    )
+    out: list[dict[str, Any]] = []
+    last = len(dep.stops) - 1
+    for index, stop in enumerate(dep.stops[:MAX_STOPS_AHEAD]):
+        entry: dict[str, Any] = {"name": stop.name}
+        if index == last and stop.name == dep.towards:
+            entry["is_terminus"] = True
+        transfers = lines_at_diva.get(stop.stop_id) if stop.stop_id else None
+        if transfers:
+            entry["lines"] = list(transfers)
+        out.append(entry)
+    return out
 
 
 def _departure_sort_key(dep: Departure) -> tuple[int, str, str]:

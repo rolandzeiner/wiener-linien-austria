@@ -55,6 +55,16 @@ _EXCLUDED_MOTS = ("0", *(str(code) for code in range(2, 12)))
 
 
 @dataclass(slots=True, frozen=True)
+class PlannedStop:
+    """A stop a train calls at after this one."""
+
+    name: str
+    # The stop's DIVA, which joins it to the Wiener Linien catalogue for
+    # transfer lines. None when the server sends none.
+    stop_id: int | None
+
+
+@dataclass(slots=True, frozen=True)
 class PlannedDeparture:
     """One S-Bahn departure from the timetable."""
 
@@ -64,10 +74,21 @@ class PlannedDeparture:
     direction: str
     platform: str | None
     planned: datetime
+    # The stops still ahead, down to the terminus. Empty when the request
+    # didn't ask for them (the line picker's probe).
+    stops: tuple[PlannedStop, ...] = ()
 
 
-def build_departure_params(diva: int, limit: int) -> list[tuple[str, str]]:
-    """Query string for the next `limit` S-Bahn departures at a stop."""
+def build_departure_params(
+    diva: int, limit: int, *, with_stops: bool = False
+) -> list[tuple[str, str]]:
+    """Query string for the next `limit` S-Bahn departures at a stop.
+
+    `with_stops` adds each train's stop sequence (`includeCompleteStopSeq`),
+    for the stops-ahead trail. It costs about 10 KB per train before gzip,
+    because the server sends the stops already passed too, so the line
+    picker's probe, which only needs the lines, leaves it off.
+    """
     params: list[tuple[str, str]] = [
         ("outputFormat", "JSON"),
         ("language", "de"),
@@ -80,6 +101,8 @@ def build_departure_params(diva: int, limit: int) -> list[tuple[str, str]]:
         ("excludedMeans", "checkbox"),
     ]
     params.extend((f"exclMOT_{code}", "1") for code in _EXCLUDED_MOTS)
+    if with_stops:
+        params.append(("includeCompleteStopSeq", "1"))
     return params
 
 
@@ -125,6 +148,7 @@ def parse_departure_body(
                 or "",
                 platform=_text(row.get("platformName")),
                 planned=planned,
+                stops=_onward_stops(row.get("onwardStopSeq")),
             )
         )
     departures.sort(key=lambda dep: (dep.planned, dep.line))
@@ -157,7 +181,7 @@ def picker_rows(departures: list[PlannedDeparture]) -> list[dict[str, str]]:
 
 
 async def async_fetch_planned_departures(
-    hass: HomeAssistant, diva: int, limit: int
+    hass: HomeAssistant, diva: int, limit: int, *, with_stops: bool = False
 ) -> list[PlannedDeparture]:
     """Fetch and parse one stop's upcoming S-Bahn departures.
 
@@ -169,7 +193,7 @@ async def async_fetch_planned_departures(
     zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),
-        build_departure_params(diva, limit),
+        build_departure_params(diva, limit, with_stops=with_stops),
         USER_AGENT,
         endpoint=ROUTING_DEPARTURE_ENDPOINT,
     )
@@ -253,7 +277,10 @@ class TimetableBoard:
         self._attempted_at = dt_util.utcnow()
         try:
             departures = await async_fetch_planned_departures(
-                self._hass, self._diva, TIMETABLE_DEPARTURES_REQUESTED
+                self._hass,
+                self._diva,
+                TIMETABLE_DEPARTURES_REQUESTED,
+                with_stops=True,
             )
         except RoutingError as err:
             if not self._failing:
@@ -282,6 +309,32 @@ def _has_stop_invalid(message: Any) -> bool:
         and str(item.get("value")) == "-2000"
         for item in message
     )
+
+
+def _onward_stops(raw: Any) -> tuple[PlannedStop, ...]:
+    """The stops after this one, named the way the boards name a terminus.
+
+    A single onward stop arrives as a bare point, not a one-element list.
+    """
+    if isinstance(raw, Mapping):
+        raw = [raw]
+    if not isinstance(raw, list):
+        return ()
+    stops: list[PlannedStop] = []
+    for point in raw:
+        if not isinstance(point, Mapping):
+            continue
+        name = _towards(_text(point.get("name")))
+        if not name:
+            continue
+        stop_id = _text(_mapping(point.get("ref")).get("id"))
+        stops.append(
+            PlannedStop(
+                name=name,
+                stop_id=int(stop_id) if stop_id and stop_id.isdigit() else None,
+            )
+        )
+    return tuple(stops)
 
 
 def _parse_date_time(raw: Any, tz: tzinfo) -> datetime | None:
