@@ -284,10 +284,12 @@ MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
 #   20 KB identity, ~0.2-0.4 s. Same backend and caching story as the trip
 #   request above: no ETag, no Last-Modified, `Cache-Control: no-cache`.
 #   No realtime (`realtime: "0"` on every row). The only trains in the data
-#   are S-Bahn (no REX / R / CJX at Meidling, Hauptbahnhof or Floridsdorf),
-#   and the Stammstrecke between Praterstern and Hauptbahnhof (Wien Mitte,
-#   Rennweg, Quartier Belvedere) has none at all. Timetable period in the
-#   answer: 2025-12-14 to 2026-12-12.
+#   are S-Bahn (no REX / R / CJX at Meidling, Hauptbahnhof or Floridsdorf).
+#   Wien Mitte, Rennweg and Quartier Belvedere answer empty: ÖBB closed the
+#   Stammstrecke between Praterstern and Hauptbahnhof from 2026-09-07 to the
+#   end of October 2027 (wien.gv.at/verkehr/sperre-stammstrecke), and the
+#   timetable reflects it. Timetable period in the answer: 2025-12-14 to
+#   2026-12-12.
 # ----------------------------------------------------------------
 ROUTING_DEPARTURE_ENDPOINT: Final = "/XML_DM_REQUEST"
 # Rows per board refresh. At Handelskai, the busiest S-Bahn stop on the
