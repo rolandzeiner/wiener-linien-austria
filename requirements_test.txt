@@ -1,7 +1,7 @@
 # Test/lint dependencies. PHACC governs the whole test stack; this file
 # declares only what PHACC does NOT pin.
 #
-# THE RULE — never declare anything PHACC pins with `==`. As of 0.13.361
+# THE RULE — never declare anything PHACC pins with `==`. As of 0.13.365
 # that covers pytest, pytest-asyncio, pytest-cov, pytest-timeout, syrupy
 # and freezegun. A floor for any of them has exactly one candidate to
 # resolve against, so it either matches (dead weight) or contradicts it
@@ -18,13 +18,13 @@
 # fault. Fix with a temporary exact `==` pin carrying its removal
 # condition — never by widening the range.
 #
-# PHACC 0.13.361 wraps HA core 2026.9.0b4 and needs Python >=3.14; CI
+# PHACC 0.13.365 wraps HA core 2026.9.2 and needs Python >=3.14; CI
 # tracks 3.14 in lockstep (validate.yml, tests job).
-pytest-homeassistant-custom-component>=0.13.361,<0.14
+pytest-homeassistant-custom-component>=0.13.365,<0.14
 
 # Not pinned by PHACC, so ours to govern. Exact by design: the `rev:`
 # values in .pre-commit-config.yaml must equal these or the local gate
 # lints with a different ruleset than CI. Dependabot ignores both hook
 # repos; bump pin and rev in the same commit.
 mypy==2.3.1
-ruff==0.16.5
+ruff==0.16.7

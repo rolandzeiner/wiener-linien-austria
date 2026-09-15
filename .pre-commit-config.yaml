@@ -12,7 +12,7 @@
 exclude: ^custom_components/wiener_linien_austria/www/fonts/
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.5 # keep in sync with ruff== in requirements_test.txt
+    rev: v0.16.7 # keep in sync with ruff== in requirements_test.txt
     hooks:
       - id: ruff
         args: [--fix]
