@@ -294,13 +294,13 @@
           "name": "Nach",
           "description": "Zielhaltestelle als Name oder DIVA-Nummer. Zusammen mit „Von“ statt einer Verbindung."
         },
-        "arrive_by": {
-          "name": "Ankunft bis",
-          "description": "Die Zeit als späteste Ankunft statt als Abfahrt verwenden."
-        },
         "datetime": {
           "name": "Zeit",
           "description": "Abfahrtszeit, mit „Ankunft bis“ die späteste Ankunft. Leer lassen für jetzt."
+        },
+        "arrive_by": {
+          "name": "Ankunft bis",
+          "description": "Die Zeit als späteste Ankunft statt als Abfahrt verwenden."
         }
       }
     }
