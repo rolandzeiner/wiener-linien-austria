@@ -46,8 +46,13 @@ function trip(dep: string, arr: string, risk: RouteTripAttr["risk"] = "tight"): 
     legs: [
       {
         walk: false, line: "U3", type: "ptMetro", product: "U-Bahn", towards: "Simmering",
-        origin: { ...stop("Westbahnhof", dep), delay_minutes: 2 },
+        origin: { ...stop("Westbahnhof", dep), stop_id: "60201468", delay_minutes: 2 },
         destination: stop("Stephansplatz", "08:04"),
+        direction: "H",
+        stops: [
+          { name: "Zieglergasse", stop_id: "60201530", time: `2026-09-14T${dep}:00+02:00` },
+          { name: "Neubaugasse", stop_id: "60200056", time: "2026-09-14T07:59:00+02:00" },
+        ],
         realtime: true, stop_count: 5, duration_minutes: 7, walk_after_minutes: 4, cancelled: false,
       },
       {
@@ -162,6 +167,36 @@ describe("registration + config", () => {
     expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow();
     expect(() => el.setConfig({ type: TAG, from: "Westbahnhof" })).toThrow(/stop number/);
     expect(() => el.setConfig({ type: TAG, from: 60201468, to: "60201040" })).not.toThrow();
+  });
+});
+
+describe("stops along a ride", () => {
+  it("opens a ride's stops on its rail and keeps them open through a refresh", async () => {
+    const h = hass("2026-09-14T05:50:00+00:00", ACTIVE);
+    const el = await mount(h, { entity: ENTITY });
+    const toggle = root(el).querySelector<HTMLButtonElement>(".strand .stops-toggle")!;
+    expect(toggle.textContent).toContain("5 Stationen");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    const list = root(el).getElementById(toggle.getAttribute("aria-controls")!)!;
+    expect(list.hidden).toBe(true);
+    expect(list.getAttribute("aria-label")).toBe("Stationen dazwischen, U3");
+
+    toggle.click();
+    await el.updateComplete;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(list.hidden).toBe(false);
+    expect(
+      [...list.querySelectorAll(".leg-stop")].map((li) => li.textContent?.replace(/\s+/g, " ").trim()),
+    ).toEqual(["07:57 Zieglergasse", "07:59 Neubaugasse"]);
+
+    // A new plan for the same ride keeps the list open.
+    el.hass = hass("2026-09-14T05:51:00+00:00", { ...ACTIVE, fetched_at: "2026-09-14T05:51:00+00:00" });
+    await el.updateComplete;
+    expect(root(el).querySelector(".strand .stops-toggle")?.getAttribute("aria-expanded")).toBe("true");
+
+    // A ride without a stop list keeps its plain count.
+    expect(root(el).querySelectorAll(".strand .stops-toggle")).toHaveLength(1);
+    expect(text(el)).toContain("1 Station");
   });
 });
 

@@ -67,6 +67,7 @@ import {
   isInputDateTime,
   legTypeIcon,
   loadAdhocSelection,
+  rideKey,
   minutesUntil,
   normaliseRouteConfig,
   RISK_ICON,
@@ -145,6 +146,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _versionMismatch: string | null = null;
   @state() private _now = Date.now();
   @state() private _alternativesOpen = false;
+  /** Rides whose stops are open, by `rideKey`. Survives refreshes, so a list
+   *  someone opened doesn't snap shut when the plan updates under it. */
+  @state() private _openRides: ReadonlySet<string> = new Set();
 
   // --- Ad-hoc mode (no `entity`) ---------------------------------------
   @state() private _stops: AdhocStopOption[] | null = null;
@@ -1066,6 +1070,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       leg.stop_count === 1
         ? this._t("stops_one")
         : this._t("stops_many", { n: leg.stop_count });
+    const between = leg.stops ?? [];
+    const key = rideKey(leg);
+    const open = between.length > 0 && this._openRides.has(key);
+    const listId = safeDomId(`route-stops-${key}`);
     const platform = this._platformText(leg);
     return html`
       <li
@@ -1095,7 +1103,21 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           <span class="towards">
             ${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}
           </span>
-          <span class="ride-meta">${stops}</span>
+          ${between.length
+            ? html`<button
+                type="button"
+                class="stops-toggle"
+                aria-expanded=${open ? "true" : "false"}
+                aria-controls=${listId}
+                @click=${() => this._toggleRide(key)}
+              >
+                ${stops}
+                <ha-icon
+                  icon=${open ? "mdi:chevron-up" : "mdi:chevron-down"}
+                  aria-hidden="true"
+                ></ha-icon>
+              </button>`
+            : html`<span class="ride-meta">${stops}</span>`}
           ${this._renderFrequency(leg)}
           ${late > 0
             ? html`<span class="late">
@@ -1104,8 +1126,30 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               </span>`
             : nothing}
         </div>
+        ${between.length
+          ? html`<ol
+              class="leg-stops"
+              id=${listId}
+              aria-label=${this._t("stops_between", { line: leg.line ?? "" })}
+              ?hidden=${!open}
+            >
+              ${between.map(
+                (stop) => html`<li class="leg-stop">
+                  <span class="leg-stop-dot" aria-hidden="true"></span>
+                  <time datetime=${stop.time ?? ""}>${clockOf(stop.time)}</time>
+                  <span class="leg-stop-name">${stop.name}</span>
+                </li>`,
+              )}
+            </ol>`
+          : nothing}
       </li>
     `;
+  }
+
+  private _toggleRide(key: string): void {
+    const next = new Set(this._openRides);
+    if (!next.delete(key)) next.add(key);
+    this._openRides = next;
   }
 
   /** "Echtzeit · alle 5 min · danach 06:23, 06:29": what the departure
@@ -1481,6 +1525,68 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .access--out ha-icon {
       color: var(--wl-error);
+    }
+    /* Stops along a ride: the departure board's stops-ahead dots, sat on
+       this ride's own rail so they read as stations the line passes. */
+    .stops-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      min-height: 32px;
+      padding: 0 4px;
+      margin-inline-start: -4px;
+      border: none;
+      border-radius: var(--wl-radius-sm);
+      background: none;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+    .stops-toggle ha-icon {
+      --mdc-icon-size: 18px;
+    }
+    .leg-stops {
+      --stops-ahead-dot-size: 8px;
+      list-style: none;
+      margin: 0 0 12px;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.85rem;
+      color: var(--secondary-text-color);
+    }
+    .leg-stops[hidden] {
+      display: none;
+    }
+    .leg-stop {
+      position: relative;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .leg-stop time {
+      font-variant-numeric: tabular-nums;
+    }
+    .leg-stop-name {
+      color: var(--primary-text-color);
+    }
+    /* Centred on the rail: back out of the row's indent to the strand. */
+    .leg-stop-dot {
+      position: absolute;
+      inset-inline-start: calc(
+        var(--strand-x) + var(--node-size) / 2 - var(--stops-ahead-dot-size) / 2 -
+          (var(--strand-x) * 2 + var(--node-size))
+      );
+      top: 50%;
+      width: var(--stops-ahead-dot-size);
+      height: var(--stops-ahead-dot-size);
+      box-sizing: border-box;
+      transform: translateY(-50%);
+      border-radius: 50%;
+      background: var(--card-background-color, var(--ha-card-background, #fff));
+      border: 2px solid var(--leg-colour);
+      z-index: 1;
     }
     .late ha-icon {
       --mdc-icon-size: 16px;
@@ -1922,6 +2028,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     .alt-toggle:focus-visible,
+    .stops-toggle:focus-visible,
     .combo-field input:focus-visible,
     .when-field input:focus-visible,
     button:focus-visible {
@@ -1951,6 +2058,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         outline-offset: -2px;
       }
       .leg::before,
+      .leg-stop-dot,
       .node {
         forced-color-adjust: none;
         background: CanvasText;

@@ -424,6 +424,7 @@
     "lift_out": "außer Betrieb",
     "lift_out_notice": "Aufzug außer Betrieb: {station}",
     "low_floor": "Niederflurfahrzeug",
+    "stops_between": "Stationen dazwischen, {line}",
     "editor": {
       "entity": "Verbindung",
       "entity_helper": "Leer lassen, um Start und Ziel direkt auf der Karte zu wählen. Zur Wahl stehen nur eingerichtete Verbindungen.",

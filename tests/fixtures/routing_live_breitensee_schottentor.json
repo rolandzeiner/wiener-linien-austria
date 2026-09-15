@@ -59,79 +59,129 @@
       {
        "name": "Wien Breitensee (Hütteldorfer Straße)",
        "ref": {
-        "id": "60200166"
+        "id": "60200166",
+        "depDateTime": "20260915 06:11",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Hütteldorfer Straße",
        "ref": {
-        "id": "60201035"
+        "id": "60201035",
+        "arrDateTime": "20260915 06:13",
+        "depDateTime": "20260915 06:13",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Johnstraße (Hütteldorfer Straße)",
        "ref": {
-        "id": "60200606"
+        "id": "60200606",
+        "arrDateTime": "20260915 06:15",
+        "depDateTime": "20260915 06:15",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Huglgasse",
        "ref": {
-        "id": "60200556"
+        "id": "60200556",
+        "arrDateTime": "20260915 06:17",
+        "depDateTime": "20260915 06:17",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Schweglerstraße (Märzstraße)",
        "ref": {
-        "id": "60201200"
+        "id": "60201200",
+        "arrDateTime": "20260915 06:19",
+        "depDateTime": "20260915 06:19",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Beingasse",
        "ref": {
-        "id": "60200458"
+        "id": "60200458",
+        "arrDateTime": "20260915 06:20",
+        "depDateTime": "20260915 06:20",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Urban-Loritz-Platz",
        "ref": {
-        "id": "60201413"
+        "id": "60201413",
+        "arrDateTime": "20260915 06:22",
+        "depDateTime": "20260915 06:22",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Kaiserstraße",
        "ref": {
-        "id": "60200646"
+        "id": "60200646",
+        "arrDateTime": "20260915 06:23",
+        "depDateTime": "20260915 06:23",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Westbahnstraße/Zieglergasse",
        "ref": {
-        "id": "60201533"
+        "id": "60201533",
+        "arrDateTime": "20260915 06:24",
+        "depDateTime": "20260915 06:24",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Siebensterngasse",
        "ref": {
-        "id": "60201088"
+        "id": "60201088",
+        "arrDateTime": "20260915 06:26",
+        "depDateTime": "20260915 06:26",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Kirchengasse",
        "ref": {
-        "id": "60201237"
+        "id": "60201237",
+        "arrDateTime": "20260915 06:27",
+        "depDateTime": "20260915 06:27",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Stiftgasse",
        "ref": {
-        "id": "60201325"
+        "id": "60201325",
+        "arrDateTime": "20260915 06:28",
+        "depDateTime": "20260915 06:28",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Volkstheater (Burggasse)",
        "ref": {
-        "id": "60201430"
+        "id": "60201430",
+        "arrDateTime": "20260915 06:30",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       }
      ],
@@ -257,19 +307,29 @@
       {
        "name": "Wien Volkstheater",
        "ref": {
-        "id": "60201430"
+        "id": "60201430",
+        "depDateTime": "20260915 06:34",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Rathaus",
        "ref": {
-        "id": "60201072"
+        "id": "60201072",
+        "arrDateTime": "20260915 06:36",
+        "depDateTime": "20260915 06:36",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Schottentor",
        "ref": {
-        "id": "60201184"
+        "id": "60201184",
+        "arrDateTime": "20260915 06:38",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       }
      ],
@@ -339,13 +399,19 @@
       {
        "name": "Wien Breitensee",
        "ref": {
-        "id": "60200166"
+        "id": "60200166",
+        "depDateTime": "20260915 06:16",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Ottakring",
        "ref": {
-        "id": "60200981"
+        "id": "60200981",
+        "arrDateTime": "20260915 06:18",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       }
      ],
@@ -465,73 +531,119 @@
       {
        "name": "Wien Ottakring (Thaliastraße)",
        "ref": {
-        "id": "60200981"
+        "id": "60200981",
+        "depDateTime": "20260915 06:25",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Redtenbachergasse",
        "ref": {
-        "id": "60201080"
+        "id": "60201080",
+        "arrDateTime": "20260915 06:26",
+        "depDateTime": "20260915 06:26",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Familienplatz (Ottakringer Straße)",
        "ref": {
-        "id": "60200669"
+        "id": "60200669",
+        "arrDateTime": "20260915 06:27",
+        "depDateTime": "20260915 06:27",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Johann-Nepomuk-Berger-Platz (Ottakringer Str.)",
        "ref": {
-        "id": "60200602"
+        "id": "60200602",
+        "arrDateTime": "20260915 06:29",
+        "depDateTime": "20260915 06:29",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Frauengasse",
        "ref": {
-        "id": "60200977"
+        "id": "60200977",
+        "arrDateTime": "20260915 06:30",
+        "depDateTime": "20260915 06:30",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Yppengasse",
        "ref": {
-        "id": "60200124"
+        "id": "60200124",
+        "arrDateTime": "20260915 06:32",
+        "depDateTime": "20260915 06:32",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Hernalser Gürtel (Ottakringer Straße)",
        "ref": {
-        "id": "60200507"
+        "id": "60200507",
+        "arrDateTime": "20260915 06:33",
+        "depDateTime": "20260915 06:33",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Brünnlbadgasse",
        "ref": {
-        "id": "60200178"
+        "id": "60200178",
+        "arrDateTime": "20260915 06:34",
+        "depDateTime": "20260915 06:34",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Skodagasse",
        "ref": {
-        "id": "60201267"
+        "id": "60201267",
+        "arrDateTime": "20260915 06:36",
+        "depDateTime": "20260915 06:36",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Lange Gasse",
        "ref": {
-        "id": "60200747"
+        "id": "60200747",
+        "arrDateTime": "20260915 06:37",
+        "depDateTime": "20260915 06:37",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Landesgerichtsstraße",
        "ref": {
-        "id": "60200742"
+        "id": "60200742",
+        "arrDateTime": "20260915 06:38",
+        "depDateTime": "20260915 06:38",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Schottentor",
        "ref": {
-        "id": "60201184"
+        "id": "60201184",
+        "arrDateTime": "20260915 06:40",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       }
      ],
@@ -602,79 +714,129 @@
       {
        "name": "Wien Breitensee (Hütteldorfer Straße)",
        "ref": {
-        "id": "60200166"
+        "id": "60200166",
+        "depDateTime": "20260915 06:17",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Hütteldorfer Straße",
        "ref": {
-        "id": "60201035"
+        "id": "60201035",
+        "arrDateTime": "20260915 06:19",
+        "depDateTime": "20260915 06:19",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Johnstraße (Hütteldorfer Straße)",
        "ref": {
-        "id": "60200606"
+        "id": "60200606",
+        "arrDateTime": "20260915 06:22",
+        "depDateTime": "20260915 06:22",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Huglgasse",
        "ref": {
-        "id": "60200556"
+        "id": "60200556",
+        "arrDateTime": "20260915 06:23",
+        "depDateTime": "20260915 06:23",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Schweglerstraße (Märzstraße)",
        "ref": {
-        "id": "60201200"
+        "id": "60201200",
+        "arrDateTime": "20260915 06:25",
+        "depDateTime": "20260915 06:25",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Beingasse",
        "ref": {
-        "id": "60200458"
+        "id": "60200458",
+        "arrDateTime": "20260915 06:26",
+        "depDateTime": "20260915 06:26",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Urban-Loritz-Platz",
        "ref": {
-        "id": "60201413"
+        "id": "60201413",
+        "arrDateTime": "20260915 06:28",
+        "depDateTime": "20260915 06:28",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Kaiserstraße",
        "ref": {
-        "id": "60200646"
+        "id": "60200646",
+        "arrDateTime": "20260915 06:29",
+        "depDateTime": "20260915 06:29",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Westbahnstraße/Zieglergasse",
        "ref": {
-        "id": "60201533"
+        "id": "60201533",
+        "arrDateTime": "20260915 06:31",
+        "depDateTime": "20260915 06:31",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Siebensterngasse",
        "ref": {
-        "id": "60201088"
+        "id": "60201088",
+        "arrDateTime": "20260915 06:32",
+        "depDateTime": "20260915 06:32",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Kirchengasse",
        "ref": {
-        "id": "60201237"
+        "id": "60201237",
+        "arrDateTime": "20260915 06:33",
+        "depDateTime": "20260915 06:33",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Stiftgasse",
        "ref": {
-        "id": "60201325"
+        "id": "60201325",
+        "arrDateTime": "20260915 06:34",
+        "depDateTime": "20260915 06:34",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Volkstheater (Burggasse)",
        "ref": {
-        "id": "60201430"
+        "id": "60201430",
+        "arrDateTime": "20260915 06:36",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       }
      ],
@@ -800,19 +962,29 @@
       {
        "name": "Wien Volkstheater",
        "ref": {
-        "id": "60201430"
+        "id": "60201430",
+        "depDateTime": "20260915 06:39",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Rathaus",
        "ref": {
-        "id": "60201072"
+        "id": "60201072",
+        "arrDateTime": "20260915 06:41",
+        "depDateTime": "20260915 06:41",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       },
       {
        "name": "Wien Schottentor",
        "ref": {
-        "id": "60201184"
+        "id": "60201184",
+        "arrDateTime": "20260915 06:43",
+        "arrDelay": "0",
+        "depDelay": "0"
        }
       }
      ],

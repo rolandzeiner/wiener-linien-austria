@@ -152,6 +152,7 @@ What the card shows:
 
 - **Leave-in countdown** — minutes until the best connection departs, with departure and arrival time. For a trip at a chosen time, the departure time and day instead.
 - **Line-coloured trip** — each ride is a segment in its line's colour, with platform, direction and number of stops.
+- **Stops along each ride** *(2.0.0)* — tap the number of stops to see every stop in between with its time, on the ride's own line. Live delays move these times too.
 - **Live times and frequency** *(2.0.0)* — U-Bahn, tram and bus rides show **Live** when the departure boards have a live time, plus how often the line runs and the next two departures (for example *every 5 min · then 06:23, 06:29*). S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
@@ -216,6 +217,8 @@ Each route gets two entities too:
 The next-connection sensor's state is the departure time of the best connection. Its attributes carry `origin`, `destination`, `arrival`, `duration_minutes`, `interchanges`, `risk` (`ok`, `tight` or `at_risk`), `active` (false outside the refresh window) and `trips` — up to four ranked connections with every leg and change.
 
 Step-free routes add `step_free: true` and `elevator_info`: lift outages at the stations whose lifts the trips use, each with `stop_ids` naming those stations. Every leg carries `low_floor` and `access`, a list of the lifts and stairs on its walk (`kind` such as `elevator` or `stairs`, `level` `up` or `down`, and the station's `stop_id`); each change in `transfers` has an `access` list too. An outage is matched by station, so it can concern a different lift at the same station.
+
+Each ride also lists `stops`: the stops between boarding and alighting, each with `name`, `stop_id` and `time`.
 
 Each ride in `trips` also carries `direction` (`H` or `R`), `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line typically runs there). A ride with a live time has `realtime: true` and a live `estimated` departure; its arrival moves by the same delay.
 

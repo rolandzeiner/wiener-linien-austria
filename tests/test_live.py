@@ -565,3 +565,39 @@ async def test_on_demand_plans_lease_their_stops_and_reuse_the_rows(
     assert fetch.await_count == trips_before
     assert live_fetch.await_count == 1
     assert again.trips == first.trips
+
+
+def test_stops_along_a_ride_carry_their_times_and_follow_a_delay() -> None:
+    tram = _trips()[2].legs[0]
+    # Breitensee and Volkstheater are the ride's own ends; 11 stops between.
+    assert len(tram.stops) == 11
+    first, last = tram.stops[0], tram.stops[-1]
+    assert (first.name, first.stop_id) == ("Hütteldorfer Straße", "60201035")
+    assert first.time == datetime(2026, 9, 15, 6, 19, tzinfo=VIENNA)
+    assert last.name == "Stiftgasse"
+    assert tram.to_dict()["stops"][0] == {
+        "name": "Hütteldorfer Straße",
+        "stop_id": "60201035",
+        "time": "2026-09-15T06:19:00+02:00",
+    }
+    late = _delay(
+        _monitor_body(), TRAM_49_R, "2026-09-15T06:17", "2026-09-15T06:20:30.000+0200"
+    )
+    live_tram = apply_live(_trips(), _rows(late), 2)[2].legs[0]
+    assert live_tram.stops[0].time == datetime(2026, 9, 15, 6, 22, tzinfo=VIENNA)
+
+
+def test_a_short_or_malformed_stop_list_gives_no_stops() -> None:
+    body = routing_body("routing_live_breitensee_schottentor.json")
+    leg = body["trips"][2]["legs"][0]
+    seq = leg["stopSeq"]
+    leg["stopSeq"] = [
+        seq[0],
+        "junk",
+        {"name": "Wien X", "ref": {"depDateTime": "soon"}},
+        seq[-1],
+    ]
+    stops = parse_trip_body(body, VIENNA)[2].legs[0].stops
+    assert [(stop.name, stop.time) for stop in stops] == [("X", None)]
+    leg["stopSeq"] = seq[:2]
+    assert parse_trip_body(body, VIENNA)[2].legs[0].stops == ()

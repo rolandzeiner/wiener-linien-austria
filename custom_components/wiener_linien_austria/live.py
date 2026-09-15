@@ -216,12 +216,19 @@ def apply_live(
                 continue
             match = _match(group, planned)
             origin, destination, realtime = leg.origin, leg.destination, leg.realtime
+            stops = leg.stops
             if match is not None and match.real is not None:
                 # The delay, not the raw real time: `/monitor` plans to the
                 # second (06:17:30) and the planner to the minute (06:17), so
                 # a tram 1 s late would otherwise read as a minute late.
                 delay = match.real - match.planned
                 origin = replace(origin, estimated=planned + delay)
+                stops = tuple(
+                    replace(stop, time=stop.time + delay)
+                    if stop.time is not None
+                    else stop
+                    for stop in stops
+                )
                 if destination.planned is not None:
                     destination = replace(
                         destination, estimated=destination.planned + delay
@@ -238,6 +245,7 @@ def apply_live(
                     origin=origin,
                     destination=destination,
                     realtime=realtime,
+                    stops=stops,
                     next_departures=tuple(
                         (row.real or row.planned).astimezone(planned.tzinfo)
                         for row in later[:MAX_NEXT_DEPARTURES]

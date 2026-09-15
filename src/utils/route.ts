@@ -149,6 +149,12 @@ export function upcomingTrips(
   });
 }
 
+/** A ride's identity across refreshes: line, direction and boarding stop
+ *  and time, all of which a new plan for the same vehicle repeats. */
+export function rideKey(leg: RouteLegAttr): string {
+  return [leg.line, leg.direction, leg.origin.stop_id, leg.origin.planned].join("|");
+}
+
 export function transitLegs(trip: RouteTripAttr): RouteLegAttr[] {
   return trip.legs.filter((leg) => !leg.walk && !!leg.line);
 }

@@ -699,6 +699,14 @@ export interface RouteLegAttr {
   low_floor?: boolean;
   /** Lifts and stairs on this leg's own walk. */
   access?: RouteAccessStepAttr[];
+  /** The stops between boarding and alighting. */
+  stops?: RouteLegStopAttr[];
+}
+
+export interface RouteLegStopAttr {
+  name: string;
+  stop_id: string | null;
+  time: string | null;
 }
 
 /** A lift, stairs or ramp on the way to, from or between platforms. */

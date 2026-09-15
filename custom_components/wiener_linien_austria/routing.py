@@ -223,6 +223,19 @@ class RouteStop:
 
 
 @dataclass(slots=True, frozen=True)
+class LegStop:
+    """A stop a ride passes between boarding and alighting."""
+
+    name: str
+    stop_id: str | None
+    time: datetime | None
+
+    def to_dict(self) -> dict[str, Any]:
+        """Render compactly: four trips of these sit in one attribute."""
+        return {"name": self.name, "stop_id": self.stop_id, "time": _iso(self.time)}
+
+
+@dataclass(slots=True, frozen=True)
 class AccessStep:
     """A lift, stairs or ramp on the way to, from or between platforms.
 
@@ -274,6 +287,8 @@ class RouteLeg:
     # the transfer walk after it (a ride's `AFTER` footpath).
     access: tuple[AccessStep, ...] = ()
     access_after: tuple[AccessStep, ...] = ()
+    # The stops in between, from `stopSeq` without its two ends.
+    stops: tuple[LegStop, ...] = ()
 
     @property
     def duration_minutes(self) -> int | None:
@@ -303,6 +318,7 @@ class RouteLeg:
             "headway_minutes": self.headway_minutes,
             "low_floor": self.low_floor,
             "access": [step.to_dict() for step in self.access],
+            "stops": [stop.to_dict() for stop in self.stops],
         }
 
 
@@ -603,6 +619,7 @@ def _parse_leg(raw: Mapping[str, Any], tz: Any) -> RouteLeg | None:
         low_floor=not walk and _has_attr(raw.get("attrs"), "PlanLowFloorVehicle"),
         access=_access_steps(raw.get("footpath"), after=False),
         access_after=_access_steps(raw.get("footpath"), after=True),
+        stops=() if walk else _intermediate_stops(stop_seq, tz),
     )
 
 
@@ -644,6 +661,41 @@ def _walk_after(footpath: Any) -> int:
         except ValueError:
             continue
     return total
+
+
+def _intermediate_stops(stop_seq: Any, tz: Any) -> tuple[LegStop, ...]:
+    """The stops between boarding and alighting, each with its time.
+
+    `stopSeq` lists both ends too; the leg's own points already carry
+    those. A stop's time is its departure (`ref.depDateTime`,
+    `20260915 06:19`), or its arrival where the server gives no departure.
+    """
+    if not isinstance(stop_seq, list) or len(stop_seq) < 3:
+        return ()
+    stops: list[LegStop] = []
+    for raw in stop_seq[1:-1]:
+        if not isinstance(raw, Mapping):
+            continue
+        ref = _mapping(raw.get("ref"))
+        stamp = ref.get("depDateTime") or ref.get("arrDateTime")
+        stops.append(
+            LegStop(
+                name=_strip_place(_text(raw.get("name"))) or "",
+                stop_id=_text(ref.get("id")),
+                time=_parse_compact_stamp(stamp, tz),
+            )
+        )
+    return tuple(stops)
+
+
+def _parse_compact_stamp(value: Any, tz: Any) -> datetime | None:
+    """`20260915 06:19` in the server's zone → aware datetime."""
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.strptime(value, "%Y%m%d %H:%M").replace(tzinfo=tz)
+    except ValueError:
+        return None
 
 
 def _access_steps(footpath: Any, *, after: bool) -> tuple[AccessStep, ...]:
