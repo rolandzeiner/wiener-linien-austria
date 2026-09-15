@@ -34,7 +34,6 @@ from homeassistant.util import dt as dt_util
 from .const import (
     LINE_TYPE_S_BAHN,
     ROUTING_DEPARTURE_ENDPOINT,
-    ROUTING_TIME_ZONE,
     TIMETABLE_DEPARTURES_REQUESTED,
     TIMETABLE_MAX_AGE,
     TIMETABLE_MIN_UPCOMING,
@@ -43,7 +42,7 @@ from .const import (
     USER_AGENT,
 )
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
-from .routing import RoutingError, async_fetch_trip_body
+from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -237,7 +236,7 @@ async def async_fetch_planned_departures(
     flow's picker probe doesn't, for the reason given at
     `config_flow._probe_monitor_lines`.
     """
-    zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
+    zone = await async_routing_zone()
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),
         build_departure_params(diva, limit, with_stops=with_stops),

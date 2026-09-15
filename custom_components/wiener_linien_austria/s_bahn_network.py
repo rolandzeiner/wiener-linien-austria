@@ -35,7 +35,6 @@ from .const import (
     DOMAIN,
     ENTRY_COUNT_KEY,
     ROUTING_DEPARTURE_ENDPOINT,
-    ROUTING_TIME_ZONE,
     S_BAHN_NETWORK_DEPARTURES,
     S_BAHN_NETWORK_HUBS,
     S_BAHN_NETWORK_MAX_AGE,
@@ -43,7 +42,7 @@ from .const import (
     USER_AGENT,
 )
 from .rate_limit import async_enforce_routing_cooldown
-from .routing import RoutingError, async_fetch_trip_body
+from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .timetable import build_departure_params, parse_calling_points
 
 _LOGGER = logging.getLogger(__name__)
@@ -159,7 +158,7 @@ async def async_update_network(hass: HomeAssistant) -> SBahnNetwork:
     if not stale:
         return network
 
-    zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
+    zone = await async_routing_zone()
     at = sample_time(dt_util.utcnow(), zone)
     hubs = dict(network.hubs)
     failed: list[str] = []

@@ -55,7 +55,7 @@ from typing import Final
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, ROUTING_TIME_ZONE
+from .const import DOMAIN
 from .live import (
     ADHOC_LEASE_SECONDS,
     apply_live,
@@ -65,7 +65,7 @@ from .live import (
     rbls_for_trips,
 )
 from .route_coordinator import async_plan_trips
-from .routing import RouteOptions, RoutingError, Trip
+from .routing import RouteOptions, RoutingError, Trip, async_routing_zone
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -352,9 +352,7 @@ class AdhocPlanner:
 
     async def _async_tz(self) -> tzinfo:
         if self._tz is None:
-            self._tz = (
-                await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
-            )
+            self._tz = await async_routing_zone()
         return self._tz
 
 

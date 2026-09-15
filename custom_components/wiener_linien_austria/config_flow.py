@@ -101,7 +101,6 @@ from .const import (
     MIN_ROUTE_POLL_SECONDS,
     MONITOR_ENDPOINT,
     ROUTE_TYPES,
-    ROUTING_TIME_ZONE,
     USER_AGENT,
     WALK_SPEEDS,
     WEEKDAYS,
@@ -112,6 +111,7 @@ from .routing import (
     ROUTE_STOP_ERRORS,
     RouteOptions,
     RoutingError,
+    async_routing_zone,
     route_type_option,
 )
 from .static import (
@@ -1109,7 +1109,7 @@ async def _probe_route(hass: HomeAssistant, data: dict[str, Any]) -> str | None:
     options = RouteOptions.from_config(
         int(data[CONF_ORIGIN_DIVA]), int(data[CONF_DESTINATION_DIVA]), data
     )
-    zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
+    zone = await async_routing_zone()
     try:
         await async_plan_trips(hass, options, dt_util.utcnow(), zone)
     except RoutingError as err:

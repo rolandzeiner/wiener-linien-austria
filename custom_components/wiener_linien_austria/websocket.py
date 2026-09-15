@@ -37,7 +37,6 @@ from homeassistant.components.websocket_api.decorators import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
-from homeassistant.util import dt as dt_util
 
 from . import static
 from .adhoc import AdhocRateLimited, async_get_planner
@@ -52,11 +51,15 @@ from .const import (
     MAX_CHANGES_CHOICES,
     MAX_MIN_TRANSFER_MINUTES,
     ROUTE_TYPES,
-    ROUTING_TIME_ZONE,
     WALK_SPEEDS,
 )
 from .route_coordinator import MAX_TRIPS_PUBLISHED, route_trip_attributes
-from .routing import ROUTE_QUERY_ERRORS, RouteOptions, RoutingError
+from .routing import (
+    ROUTE_QUERY_ERRORS,
+    RouteOptions,
+    RoutingError,
+    async_routing_zone,
+)
 from .static import StaticCatalogue
 from .stops import stop_options, trackable_station
 
@@ -270,5 +273,5 @@ async def _async_vienna_time(value: datetime | None) -> datetime | None:
     """
     if value is None or value.tzinfo is not None:
         return value
-    zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
+    zone = await async_routing_zone()
     return value.replace(tzinfo=zone)

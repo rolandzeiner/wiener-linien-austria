@@ -35,7 +35,6 @@ from .const import (
     MAX_ROUTE_POLL_SECONDS,
     MIN_ROUTE_POLL_SECONDS,
     MIN_ROUTE_ROLLOVER_SECONDS,
-    ROUTING_TIME_ZONE,
     USER_AGENT,
 )
 from .live import (
@@ -53,6 +52,7 @@ from .routing import (
     RoutingError,
     Trip,
     async_fetch_trip_body,
+    async_routing_zone,
     build_trip_params,
     last_connection,
     parse_time_option,
@@ -165,9 +165,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         until someone opened the card's planner or the weekly refresh came
         round. A failure isn't fatal: the route still plans, without those.
         """
-        zone = await dt_util.async_get_time_zone(ROUTING_TIME_ZONE)
-        if zone is not None:
-            self._tz = zone
+        self._tz = await async_routing_zone()
         try:
             await static.async_get_catalogue(self.hass)
         except (

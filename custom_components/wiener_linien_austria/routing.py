@@ -34,10 +34,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, tzinfo
 from typing import Any, Final, Literal
 
 import aiohttp
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_EXCLUDED_MEANS,
@@ -54,6 +55,7 @@ from .const import (
     ROUTE_TYPES,
     ROUTING_BASE_URL,
     ROUTING_REQUEST_TIMEOUT_SECONDS,
+    ROUTING_TIME_ZONE,
     ROUTING_TRIP_ENDPOINT,
     ROUTING_TRIPS_REQUESTED,
     WEEKDAYS,
@@ -444,6 +446,15 @@ def build_trip_params(
     if options.step_free:
         params.extend(_STEP_FREE_PARAMS)
     return params
+
+
+async def async_routing_zone() -> tzinfo:
+    """The routing server's zone, `ROUTING_TIME_ZONE`; UTC if it can't load.
+
+    Every query and parse that speaks the server's wall clock resolves the
+    zone through here, so the fallback is decided once.
+    """
+    return await dt_util.async_get_time_zone(ROUTING_TIME_ZONE) or dt_util.UTC
 
 
 async def async_fetch_trip_body(
