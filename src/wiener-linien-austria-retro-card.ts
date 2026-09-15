@@ -1022,18 +1022,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const line = d.line || "?";
     const towards = d.towards || "";
     const via = typeof d.via === "string" && d.via.trim() ? d.via.trim() : null;
-    const cdLabel =
-      cd === null
-        ? this._t("no_data")
-        : isAtPlatform
-          ? this._t("at_platform")
-          : this._t("countdown_minutes", { n: String(cd) });
-    const a11yLabel = d.barrier_free ? this._t("barrier_free_title") : "";
-    const timetableLabel = d.timetable ? this._t("timetable_title") : "";
-    const viaA11y = via ? `${this._t("via_prefix")} ${via}` : "";
-    const rowLabel = [line, towards, viaA11y, cdLabel, timetableLabel, a11yLabel]
-      .filter(Boolean)
-      .join(" — ");
+    const rowLabel = this._rowLabel(d, line, towards, via);
     // Resolve the line's WL palette through the same precedence ladder
     // chips use elsewhere: GTFS routes.txt first, then the nightline
     // override, then a CSS-var fallback that doesn't read well on the
@@ -1115,6 +1104,29 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         </div>
       </li>
     `;
+  }
+
+  /** What a screen reader hears for a row, since the LED cells themselves
+   *  are hidden from it: line, destination, via, countdown, then the
+   *  timetable and step-free notes where they apply. */
+  private _rowLabel(d: DepartureAttr, line: string, towards: string, via: string | null): string {
+    const cd = Number.isFinite(d.countdown) ? d.countdown : null;
+    const cdLabel =
+      cd === null
+        ? this._t("no_data")
+        : cd <= 0
+          ? this._t("at_platform")
+          : this._t("countdown_minutes", { n: String(cd) });
+    return [
+      line,
+      towards,
+      via ? `${this._t("via_prefix")} ${via}` : "",
+      cdLabel,
+      d.timetable ? this._t("timetable_title") : "",
+      d.barrier_free ? this._t("barrier_free_title") : "",
+    ]
+      .filter(Boolean)
+      .join(" — ");
   }
 
   private _renderGleis(platform: string, label: string): TemplateResult {

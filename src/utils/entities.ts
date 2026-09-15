@@ -15,18 +15,30 @@ import type { WienerLinienAttrs } from "../types.js";
 // sensor's `extra_state_attributes` property (sensor.py) and are unique
 // to our sensor shape.
 export function findWienerLinienEntities(hass: HomeAssistant | undefined): string[] {
+  return findSensors<WienerLinienAttrs>(
+    hass,
+    (attrs) =>
+      typeof attrs.diva === "number" &&
+      Array.isArray(attrs.departures) &&
+      !!attrs.next_by_line &&
+      typeof attrs.next_by_line === "object",
+  );
+}
+
+/** Sensor entity ids whose attributes pass `matches`, sorted. The walk the
+ *  stop and route cards share; each supplies its own fingerprint, which is
+ *  the part that must keep the two from picking up each other's sensors. */
+export function findSensors<Attrs>(
+  hass: HomeAssistant | undefined,
+  matches: (attrs: Partial<Attrs>) => boolean,
+): string[] {
   if (!hass) return [];
-  const matches: string[] = [];
+  const found: string[] = [];
   for (const [eid, state] of Object.entries(hass.states ?? {})) {
     if (!eid.startsWith("sensor.")) continue;
-    const attrs = (state?.attributes ?? {}) as WienerLinienAttrs;
-    if (typeof attrs.diva !== "number") continue;
-    if (!Array.isArray(attrs.departures)) continue;
-    if (!attrs.next_by_line || typeof attrs.next_by_line !== "object") continue;
-    matches.push(eid);
+    if (matches((state?.attributes ?? {}) as Partial<Attrs>)) found.push(eid);
   }
-  matches.sort();
-  return matches;
+  return found.sort();
 }
 
 // `line_colors` map for a single entity; empty `{}` when missing or

@@ -1409,11 +1409,6 @@ export class WienerLinienAustriaCard extends LitElement {
       this._config!.line_colors,
       lineColorsFor(this.hass, entityId),
     );
-    const platform =
-      this._config!.show_platform && d.platform ? String(d.platform) : null;
-    const isBarrierFree =
-      !!d.barrier_free && this._config!.show_accessibility;
-    const isCooled = !!d.cooling && this._config!.show_cooling;
     const typeIcon = this._config!.show_type_icon ? lineTypeIcon(d.type) : null;
 
     const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
@@ -1454,43 +1449,7 @@ export class WienerLinienAustriaCard extends LitElement {
             ></ha-icon>`
           : nothing}
         <span class="hero-direction">${deText(d.towards)}</span>
-        ${platform
-          ? html`<span class="hero-platform"
-              >${this._t(platformLabelKey(d.type))} ${platform}</span
-            >`
-          : nothing}
-        ${d.timetable
-          ? html`<span
-              class="hero-timetable"
-              title=${this._t("timetable_title")}
-            >
-              <ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon>
-              ${this._t("timetable_only")}
-            </span>`
-          : nothing}
-        ${isBarrierFree
-          ? html`<span
-              class="hero-a11y"
-              role="img"
-              aria-label=${this._t("barrier_free_title")}
-              title=${this._t("barrier_free_title")}
-            >
-              <ha-icon
-                icon="mdi:wheelchair-accessibility"
-                aria-hidden="true"
-              ></ha-icon>
-            </span>`
-          : nothing}
-        ${isCooled
-          ? html`<span
-              class="hero-cooling"
-              role="img"
-              aria-label=${this._t("cooling_title")}
-              title=${this._t("cooling_title")}
-            >
-              <ha-icon icon="mdi:snowflake" aria-hidden="true"></ha-icon>
-            </span>`
-          : nothing}
+        ${this._renderHeroBadges(d)}
         ${hasStopsAhead
           ? html`<ha-icon
               class="hero-chevron"
@@ -1499,6 +1458,41 @@ export class WienerLinienAustriaCard extends LitElement {
             ></ha-icon>`
           : nothing}
       </div>
+    `;
+  }
+
+  /** The pills after a hero entry's direction: platform, timetable-only,
+   *  step-free and air-conditioned, each only when it applies and (for the
+   *  last two) the user turned it on. */
+  private _renderHeroBadges(d: DepartureAttr): TemplateResult {
+    const cfg = this._config!;
+    const platform = cfg.show_platform && d.platform ? String(d.platform) : null;
+    const flag = (cls: string, title: string, icon: string): TemplateResult => html`<span
+      class=${cls}
+      role="img"
+      aria-label=${title}
+      title=${title}
+    >
+      <ha-icon icon=${icon} aria-hidden="true"></ha-icon>
+    </span>`;
+    return html`
+      ${platform
+        ? html`<span class="hero-platform"
+            >${this._t(platformLabelKey(d.type))} ${platform}</span
+          >`
+        : nothing}
+      ${d.timetable
+        ? html`<span class="hero-timetable" title=${this._t("timetable_title")}>
+            <ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon>
+            ${this._t("timetable_only")}
+          </span>`
+        : nothing}
+      ${d.barrier_free && cfg.show_accessibility
+        ? flag("hero-a11y", this._t("barrier_free_title"), "mdi:wheelchair-accessibility")
+        : nothing}
+      ${d.cooling && cfg.show_cooling
+        ? flag("hero-cooling", this._t("cooling_title"), "mdi:snowflake")
+        : nothing}
     `;
   }
 

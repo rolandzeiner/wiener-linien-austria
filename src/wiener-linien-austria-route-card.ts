@@ -902,6 +902,16 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     });
   }
 
+  /** "26 min, 1 Umstieg": the line under either hero. */
+  private _heroSub(trip: RouteTripAttr): string {
+    return [
+      trip.duration_minutes !== null ? this._t("minutes", { n: trip.duration_minutes }) : "",
+      this._changesText(trip),
+    ]
+      .filter(Boolean)
+      .join(", ");
+  }
+
   private _renderHero(trip: RouteTripAttr, attrs: RouteAttrs): TemplateResult {
     if (attrs.planned_for) return this._renderPlannedHero(trip);
     const minutes = minutesUntil(trip.departure, this._now);
@@ -909,14 +919,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const spoken = isNow
       ? this._t("now")
       : this._t("minutes_long", { n: minutes ?? 0 });
-    const sub = [
-      trip.duration_minutes !== null
-        ? this._t("minutes", { n: trip.duration_minutes })
-        : "",
-      this._changesText(trip),
-    ]
-      .filter(Boolean)
-      .join(", ");
+    const sub = this._heroSub(trip);
     return html`
       <div class="hero">
         <p class="hero-count">
@@ -942,12 +945,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   /** A plan for a chosen time answers "when do I leave?" with a clock time
    *  and its day; a countdown to tomorrow morning would say nothing useful. */
   private _renderPlannedHero(trip: RouteTripAttr): TemplateResult {
-    const sub = [
-      trip.duration_minutes !== null ? this._t("minutes", { n: trip.duration_minutes }) : "",
-      this._changesText(trip),
-    ]
-      .filter(Boolean)
-      .join(", ");
+    const sub = this._heroSub(trip);
     return html`
       <div class="hero">
         <p class="hero-count">

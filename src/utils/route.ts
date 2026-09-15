@@ -3,6 +3,7 @@
 // how a transfer is graded — is testable without rendering a card.
 
 import { filterPassthrough } from "./config.js";
+import { findSensors } from "./entities.js";
 import { lineTypeIcon } from "./mot.js";
 import type {
   AdhocStopOption,
@@ -19,7 +20,7 @@ import type {
 } from "../types.js";
 
 export const ROUTE_CARD_TYPE = "wiener-linien-austria-route-card";
-export const DEFAULT_ALTERNATIVES = 2;
+const DEFAULT_ALTERNATIVES = 2;
 
 /** Keys `normaliseRouteConfig` validates; everything else passes through. */
 const ROUTE_VALIDATED_KEYS: ReadonlySet<string> = new Set([
@@ -41,19 +42,14 @@ export const MAX_ALTERNATIVES = 3;
 // none of them on a stop sensor — so neither card's discovery can pick up the
 // other's entities.
 export function findRouteEntities(hass: HomeAssistant | undefined): string[] {
-  if (!hass) return [];
-  const matches: string[] = [];
-  for (const [eid, state] of Object.entries(hass.states ?? {})) {
-    if (!eid.startsWith("sensor.")) continue;
-    const attrs = (state?.attributes ?? {}) as RouteAttrs;
-    if (!Array.isArray(attrs.trips)) continue;
-    if (typeof attrs.origin !== "string" || typeof attrs.destination !== "string") {
-      continue;
-    }
-    if (typeof attrs.active !== "boolean") continue;
-    matches.push(eid);
-  }
-  return matches.sort();
+  return findSensors<RouteAttrs>(
+    hass,
+    (attrs) =>
+      Array.isArray(attrs.trips) &&
+      typeof attrs.origin === "string" &&
+      typeof attrs.destination === "string" &&
+      typeof attrs.active === "boolean",
+  );
 }
 
 export interface NormalisedRouteConfig {
@@ -218,7 +214,7 @@ export function delayedClock(
 
 /** Up to this headway a line counts as frequent: "alle 3 min" says all
  *  anyone needs, and the next exact times would only add reading. */
-export const FREQUENT_HEADWAY_MINUTES = 5;
+const FREQUENT_HEADWAY_MINUTES = 5;
 
 export type RideFrequency = { every: number } | { then: string[] } | null;
 
@@ -633,7 +629,7 @@ export function foldStopLabels(stops: readonly AdhocStopOption[]): string[] {
 
 /** How many suggestions the stop combobox lists at once. Enough to scroll
  *  through, few enough that each keystroke re-renders instantly. */
-export const STOP_SUGGESTION_LIMIT = 50;
+const STOP_SUGGESTION_LIMIT = 50;
 
 /** Stops matching `query`, best first, capped at `limit`.
  *
