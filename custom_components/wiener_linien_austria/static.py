@@ -433,15 +433,26 @@ def async_set_cached_catalogue(hass: HomeAssistant, catalogue: StaticCatalogue) 
     No-op when the integration has been torn down (no entries left). A
     background refresh task spawned earlier may otherwise complete
     after `async_unload_entry` ran and re-poison `hass.data[DOMAIN]`
-    with a catalogue we just deliberately dropped. Checks the *value*
-    of `ENTRY_COUNT_KEY`, not just its presence — last-unload sets it
-    to 0 (rather than popping it) so a presence-only check would
-    silently let the race through.
+    with a catalogue we just deliberately dropped; see `domain_is_live`.
+    """
+    if not domain_is_live(hass):
+        return
+    hass.data[DOMAIN][CATALOGUE_KEY] = catalogue
+
+
+@callback
+def domain_is_live(hass: HomeAssistant) -> bool:
+    """True while at least one config entry of this integration is loaded.
+
+    The guard for background work that finishes after an unload: a task
+    must not write into `hass.data[DOMAIN]` once the last entry is gone, or
+    it re-creates state the teardown just dropped. Checks the *value* of
+    `ENTRY_COUNT_KEY`, not just its presence — last-unload sets it to 0
+    (rather than popping it) so a presence-only check would silently let
+    the race through.
     """
     domain_data = hass.data.get(DOMAIN)
-    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
-        return
-    domain_data[CATALOGUE_KEY] = catalogue
+    return bool(domain_data and domain_data.get(ENTRY_COUNT_KEY))
 
 
 @callback

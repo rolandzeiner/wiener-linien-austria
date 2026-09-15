@@ -49,14 +49,18 @@ from .const import (
     API_BASE_URL,
     DOMAIN,
     ELEVATOR_INFO_KEY,
-    ENTRY_COUNT_KEY,
     TRAFFIC_INFO_ENDPOINT,
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
 from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
-from .static import StaticCatalogue, canonical_line_label, current_catalogue
+from .static import (
+    StaticCatalogue,
+    canonical_line_label,
+    current_catalogue,
+    domain_is_live,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -313,8 +317,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     re-poison `hass.data[DOMAIN]` with the alerts we just deliberately
     dropped.
     """
-    domain_data = hass.data.get(DOMAIN)
-    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
+    if not domain_is_live(hass):
         return
 
     result = await _fetch_info_lists(hass)
@@ -322,9 +325,9 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     # Re-check after the fetch — `await` boundaries are cancellation
     # points, and unload may have run while we were waiting on the
     # network. Same risk as the entry guard above.
-    domain_data = hass.data.get(DOMAIN)
-    if not domain_data or not domain_data.get(ENTRY_COUNT_KEY):
+    if not domain_is_live(hass):
         return
+    domain_data = hass.data[DOMAIN]
 
     # Fetch/parse failure → leave both caches exactly as they were. Only an
     # actual successful 200 (possibly empty) overwrites — a legitimately
