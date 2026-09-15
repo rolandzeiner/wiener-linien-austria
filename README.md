@@ -48,25 +48,43 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 ### Cards
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card.webp" width="49%" alt="Modern card" />
-  <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-4.webp" width="49%" alt="Route card" />
-</p>
-<p align="center"><em>Modern · Route</em></p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-2.webp" width="49%" alt="Retro LED card" />
-  <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-3.webp" width="49%" alt="Split-flap card" />
-</p>
-<p align="center"><em>Retro LED · Split-flap</em></p>
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card.webp" height="320" alt="Modern card" />
+      <br/><em>Modern</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-4.webp" height="320" alt="Route card" />
+      <br/><em>Route</em>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-2.webp" width="264" alt="Retro LED card" />
+      <br/><em>Retro LED</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-3.webp" width="264" alt="Split-flap card" />
+      <br/><em>Split-flap</em>
+    </td>
+  </tr>
+</table>
 
 ### Setup
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" width="49%" alt="Card editor" />
-  <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" width="49%" alt="Integration setup dialog" />
-</p>
-<p align="center"><em>Card editor · Config flow</em></p>
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="320" alt="Card editor" />
+      <br/><em>Card editor</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="320" alt="Integration setup dialog" />
+      <br/><em>Config flow</em>
+    </td>
+  </tr>
+</table>
 
 ## Requirements
 
