@@ -445,7 +445,7 @@ describe("map links", () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), { entity: ENTITY });
     const leg = root(el).querySelector(".strand .leg")!;
     expect(leg.querySelector(".stop .platform")).toBeNull();
-    expect(leg.querySelector(".ride .towards + .platform")?.textContent).toBe("Gleis 1");
+    expect(leg.querySelector(".ride .towards > .platform")?.textContent).toBe("Gleis 1");
   });
 
   it("shows no pins when turned off", async () => {

@@ -1129,10 +1129,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 ></ha-icon
                 ><span class="sr-only">${this._t("low_floor")}</span>`
             : nothing}
-          <span class="towards">
-            ${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}
-          </span>
-          ${platform ? html`<span class="platform">${platform}</span>` : nothing}
+          <span class="towards"
+            >${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}${platform
+              ? html` <span class="platform">${platform}</span>`
+              : nothing}</span
+          >
         </div>
         <div class="ride-detail">
           ${between.length
@@ -1601,10 +1602,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     /* The map pin after a stop name: an icon in the quiet text colour, no box.
        The 16px icon keeps the row at its height; the ::before reaches the
        24px target (WCAG 2.5.8) around it without taking up layout space. */
+    /* On the text baseline, not centred: the row is taller than its line of
+       text, so centring sat the pin below the name. The pin's tip on the
+       baseline reads as marking the word. */
     .map-link {
       position: relative;
       display: inline-flex;
-      align-self: center;
+      align-self: baseline;
       margin-inline-start: -4px;
       border-radius: var(--wl-radius-sm);
       color: var(--secondary-text-color);
@@ -1620,6 +1624,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .map-link ha-icon {
       display: block;
+    }
+    /* Inside the direction text, so the two share one baseline. A real space
+       separates them for screen readers; the margin tops it up to the gap. */
+    .towards .platform {
+      margin-inline-start: 4px;
     }
     .platform {
       font-size: 0.8rem;

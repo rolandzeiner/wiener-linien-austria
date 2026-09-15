@@ -358,10 +358,9 @@ const Fe={ATTRIBUTE:1,CHILD:2,PROPERTY:3,BOOLEAN_ATTRIBUTE:4,EVENT:5,ELEMENT:6},
                   aria-hidden="true"
                 ></ha-icon
                 ><span class="sr-only">${this._t(`low_floor`)}</span>`:k}
-          <span class="towards">
-            ${e.towards?this._t(`towards`,{towards:e.towards}):``}
-          </span>
-          ${p?D`<span class="platform">${p}</span>`:k}
+          <span class="towards"
+            >${e.towards?this._t(`towards`,{towards:e.towards}):``}${p?D` <span class="platform">${p}</span>`:k}</span
+          >
         </div>
         <div class="ride-detail">
           ${l.length?D`<button
@@ -673,7 +672,7 @@ color: var(--primary-text-color);
 .map-link {
 position: relative;
 display: inline-flex;
-align-self: center;
+align-self: baseline;
 margin-inline-start: -4px;
 border-radius: var(--wl-radius-sm);
 color: var(--secondary-text-color);
@@ -689,6 +688,9 @@ color: var(--primary-text-color);
 }
 .map-link ha-icon {
 display: block;
+}
+.towards .platform {
+margin-inline-start: 4px;
 }
 .platform {
 font-size: 0.8rem;
