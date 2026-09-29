@@ -12,64 +12,25 @@
 // from live departures), and the station-header strip, whose whole point is
 // that you edit it on a picture of the bar.
 //
-// `_commit` assigns `this._config` BEFORE firing `config-changed` — see
-// editor/editor-common.ts for why that ordering is load-bearing.
+// The element plumbing and the multi-stop Stops tab come from
+// editor/board-editor.ts, shared with the modern and retro editors.
 
-import {
-  LitElement,
-  html,
-  nothing,
-  type CSSResultGroup,
-  type PropertyValues,
-  type TemplateResult,
-} from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, type CSSResultGroup, type TemplateResult } from "lit";
+import { customElement } from "lit/decorators.js";
 
 import { editorStyles } from "./editor/editor-styles.js";
 import { editorTokens } from "./editor/editor-tokens.js";
 import { headerStripStyles } from "./editor/header-strip-styles.js";
-import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
-import {
-  renderFormSection,
-  renderPanel,
-  renderTabs,
-  type TabKey,
-} from "./editor/editor-shell.js";
-import { renderHeaderSection, type HeaderSideKey } from "./editor/header-strip.js";
-import { renderStopsTab, type StopBlockCallbacks } from "./editor/stop-block.js";
-import {
-  editorHelper,
-  editorLabel,
-  multiStopCallbacks,
-  rebuildStops,
-} from "./editor/editor-common.js";
-import type {
-  HomeAssistant,
-  LovelaceCardEditor,
-  WienerLinienAttrs,
-  WienerLinienFlapCardConfig,
-} from "./types.js";
-import { fireEvent } from "./utils.js";
-import {
-  normaliseFlapConfig,
-  type NormalisedFlapConfig,
-  type NormalisedFlapStop,
-} from "./utils/flap-config.js";
+import { renderFormSection } from "./editor/editor-shell.js";
+import { MultiStopEditor } from "./editor/board-editor.js";
+import type { WienerLinienAttrs, WienerLinienFlapCardConfig } from "./types.js";
+import { normaliseFlapConfig, type NormalisedFlapConfig } from "./utils/flap-config.js";
 
 @customElement("wiener-linien-austria-flap-card-editor")
-export class WienerLinienAustriaFlapCardEditor
-  extends LitElement
-  implements LovelaceCardEditor
-{
-  @property({ attribute: false }) public hass?: HomeAssistant;
+export class WienerLinienAustriaFlapCardEditor extends MultiStopEditor<NormalisedFlapConfig> {
+  protected readonly _namespace = "flap";
 
-  @state() private _config?: NormalisedFlapConfig;
-  @state() private _tab: TabKey = "stops";
-  /** Which header side the slot panel is editing. Editor-local UI state — it
-   *  never reaches the config, and resetting it on dialog reopen is fine. */
-  @state() private _headerSide: HeaderSideKey = "header_left";
-
-  public setConfig(config: WienerLinienFlapCardConfig): void {
+  public override setConfig(config: WienerLinienFlapCardConfig): void {
     // Mirror the card's setConfig guards. Without them malformed YAML silently
     // becomes an empty config in the editor — the user opens it, sees defaults,
     // and may overwrite a broken-but-recoverable file.
@@ -83,162 +44,32 @@ export class WienerLinienAustriaFlapCardEditor
         "wiener-linien-austria-flap-card-editor: 'entity' must be a string",
       );
     }
-    this._config = normaliseFlapConfig(config);
+    super.setConfig(config);
   }
 
-  protected override shouldUpdate(changed: PropertyValues): boolean {
-    if (!this._config) return false;
-    if (changed.has("_config") || changed.has("_tab") || changed.has("_headerSide")) {
-      return true;
-    }
-    // hass fires for every state tick across HA — only re-render when one of
-    // the configured entities actually changed.
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    const eids = this._config.entities.map((s) => s.entity);
-    if (eids.length === 0) return true;
-    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
+  protected override _normalise(raw: WienerLinienFlapCardConfig): NormalisedFlapConfig {
+    return normaliseFlapConfig(raw);
   }
 
-  private get _i18n(): EditorTranslators {
-    return editorTranslators("flap", this.hass?.language);
-  }
-
-  private _commit(next: NormalisedFlapConfig): void {
-    this._config = next;
-    fireEvent(this, "config-changed", { config: next });
-  }
-
-  /** Merge one section form's partial value into the config. Sections emit
-   *  only their own fields, so this is a merge, never a replace. */
-  private _patch(value: Record<string, unknown>): void {
-    if (!this._config) return;
-    this._commit(
-      normaliseFlapConfig({
-        ...this._config,
-        ...(value as Partial<WienerLinienFlapCardConfig>),
-      } as WienerLinienFlapCardConfig),
-    );
-  }
-
-  private get _stopCallbacks(): StopBlockCallbacks {
-    return multiStopCallbacks<NormalisedFlapStop>(
-      () => this._config?.entities,
-      (entities) => {
-        if (this._config) this._commit({ ...this._config, entities });
-      },
-    );
+  protected override _helperOverrides(
+    cfg: NormalisedFlapConfig,
+  ): Record<string, string | undefined> {
+    const { et } = this._i18n;
+    return cfg.show_accessibility
+      ? {}
+      : { accessibility_only: et("accessibility_only_requires") };
   }
 
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
 
-  protected override render(): TemplateResult | typeof nothing {
-    if (!this._config) return nothing;
+  protected override _renderDisplay(cfg: NormalisedFlapConfig): TemplateResult {
     const { et } = this._i18n;
     return html`
-      <div class="wl-editor">
-        ${renderTabs(
-          [
-            { key: "stops", label: et("tab_stops") },
-            { key: "display", label: et("tab_display") },
-            { key: "tweaks", label: et("tab_tweaks") },
-          ],
-          this._tab,
-          (key) => {
-            this._tab = key;
-          },
-        )}
-        ${renderPanel(this._tab, this._renderActiveTab())}
-      </div>
-    `;
-  }
-
-  private _renderActiveTab(): TemplateResult | typeof nothing {
-    switch (this._tab) {
-      case "stops":
-        return this._renderStops();
-      case "display":
-        return this._renderDisplay();
-      case "tweaks":
-        return this._renderTweaks();
-    }
-  }
-
-  private _renderStops(): TemplateResult {
-    const cfg = this._config!;
-    const { t, et } = this._i18n;
-    return renderStopsTab({
-      hass: this.hass,
-      stops: cfg.entities,
-      lineColorOverrides: {},
-      t,
-      et,
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onEntitiesChanged: this._onEntitiesChanged,
-      callbacks: this._stopCallbacks,
-    });
-  }
-
-  private _onEntitiesChanged = (
-    ev: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
-    ev.stopPropagation();
-    if (!this._config) return;
-    // Re-normalise, matching the modern editor: a bare `{ entity }` placeholder
-    // is a raw stop entry, and the normaliser is what validates and dedupes it.
-    this._commit(
-      normaliseFlapConfig({
-        ...this._config,
-        entities: rebuildStops(this._config.entities, ev.detail.value["entities"]),
-      } as WienerLinienFlapCardConfig),
-    );
-  };
-
-  private _renderDisplay(): TemplateResult {
-    const cfg = this._config!;
-    const { et } = this._i18n;
-    const common = {
-      hass: this.hass,
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onChange: (v: Record<string, unknown>) => this._patch(v),
-    };
-
-    return html`
-      ${renderHeaderSection({
-        hass: this.hass,
-        showHeader: cfg.show_header,
-        left: cfg.header_left,
-        right: cfg.header_right,
-        selected: this._headerSide,
-        et,
-        computeLabel: this._computeLabel,
-        computeHelper: this._computeHelper,
-        currentSide: (side) => this._config?.[side],
-        onChange: (v) => this._patch(v),
-        selectSide: (side) => {
-          this._headerSide = side;
-        },
-      })}
+      ${this._renderStationBand(cfg, this._stationBgOptions())}
       ${renderFormSection({
-        ...common,
-        title: et("section_station"),
-        data: { show_station_name: cfg.show_station_name, station_bg: cfg.station_bg },
-        schema: [
-          { name: "show_station_name", selector: { boolean: {} } },
-          {
-            name: "station_bg",
-            selector: {
-              select: { mode: "dropdown", options: this._stationBgOptions() },
-            },
-          },
-        ],
-      })}
-      ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_departure_row"),
         hint: et("section_board"),
         data: {
@@ -264,18 +95,11 @@ export class WienerLinienAustriaFlapCardEditor
     `;
   }
 
-  private _renderTweaks(): TemplateResult {
-    const cfg = this._config!;
+  protected override _renderTweaks(cfg: NormalisedFlapConfig): TemplateResult {
     const { et } = this._i18n;
-    const common = {
-      hass: this.hass,
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onChange: (v: Record<string, unknown>) => this._patch(v),
-    };
     return html`
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_board"),
         data: {
           size: cfg.size,
@@ -303,7 +127,7 @@ export class WienerLinienAustriaFlapCardEditor
         ],
       })}
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_footer"),
         data: { hide_attribution: cfg.hide_attribution },
         schema: [{ name: "hide_attribution", selector: { boolean: {} } }],
@@ -347,20 +171,6 @@ export class WienerLinienAustriaFlapCardEditor
     options.push({ value: "black", label: et("station_bg_black") });
     return options;
   }
-
-  private _computeLabel = (field: { name: string }): string =>
-    editorLabel(this.hass, this._i18n, field.name);
-
-  private _computeHelper = (field: { name: string }): string | undefined => {
-    const { et } = this._i18n;
-    // The dependency reason belongs on the field it gates, not in a note the
-    // user has to associate by eye.
-    return editorHelper(this._i18n, field.name, {
-      ...(this._config?.show_accessibility
-        ? {}
-        : { accessibility_only: et("accessibility_only_requires") }),
-    });
-  };
 
   static override styles: CSSResultGroup = [
     editorTokens,

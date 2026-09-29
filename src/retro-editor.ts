@@ -11,107 +11,62 @@
 //
 // Direction choices are not autocorrected from live departures: a direction
 // with no current service can still be a deliberate configuration.
+//
+// The element plumbing and the header strip / station band sections come from
+// editor/board-editor.ts, shared with the modern and flap editors.
 
-import {
-  LitElement,
-  html,
-  nothing,
-  type CSSResultGroup,
-  type PropertyValues,
-  type TemplateResult,
-} from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, nothing, type CSSResultGroup, type TemplateResult } from "lit";
+import { customElement } from "lit/decorators.js";
 
 import { editorStyles } from "./editor/editor-styles.js";
 import { editorTokens } from "./editor/editor-tokens.js";
 import { headerStripStyles } from "./editor/header-strip-styles.js";
-import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
-import {
-  renderFormSection,
-  renderPanel,
-  renderTabs,
-  type TabKey,
-} from "./editor/editor-shell.js";
-import { renderHeaderSection, type HeaderSideKey } from "./editor/header-strip.js";
+import { renderFormSection } from "./editor/editor-shell.js";
+import { BoardEditor } from "./editor/board-editor.js";
 import {
   renderStopBlock,
   type StopBlockCallbacks,
   type StopView,
 } from "./editor/stop-block.js";
-import type {
-  HaFormSchema,
-  HomeAssistant,
-  LovelaceCardEditor,
-  WienerLinienRetroCardConfig,
-} from "./types.js";
-import { fireEvent } from "./utils.js";
-import {
-  editorHelper,
-  editorLabel,
-} from "./editor/editor-common.js";
+import type { HaFormSchema, WienerLinienRetroCardConfig } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { departureBoardOptions } from "./utils/entities.js";
 
 @customElement("wiener-linien-austria-retro-card-editor")
-export class WienerLinienAustriaRetroCardEditor
-  extends LitElement
-  implements LovelaceCardEditor
-{
-  @property({ attribute: false }) public hass?: HomeAssistant;
+export class WienerLinienAustriaRetroCardEditor extends BoardEditor<NormalisedRetroConfig> {
+  protected readonly _namespace = "retro";
+  // Singular: this card shows one stop.
+  protected override readonly _stopsTabLabel = "tab_stop";
 
-  @state() private _config?: NormalisedRetroConfig;
-  @state() private _tab: TabKey = "stops";
-  @state() private _headerSide: HeaderSideKey = "header_left";
-
-  public setConfig(config: WienerLinienRetroCardConfig): void {
-    this._config = normaliseRetroConfig(config);
+  protected override _normalise(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
+    return normaliseRetroConfig(raw);
   }
 
-  protected override shouldUpdate(changed: PropertyValues): boolean {
-    if (!this._config) return false;
-    if (changed.has("_config") || changed.has("_tab") || changed.has("_headerSide")) {
-      return true;
-    }
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    const eid = this._config.entity;
-    if (!eid) return true;
-    return prev.states[eid] !== this.hass.states[eid];
+  protected override _watchedEntities(cfg: NormalisedRetroConfig): readonly string[] {
+    return cfg.entity ? [cfg.entity] : [];
   }
 
-  private get _i18n(): EditorTranslators {
-    return editorTranslators("retro", this.hass?.language);
-  }
-
-  /** Assign `_config` BEFORE dispatching — see editor/editor-common.ts.
-   *  Centralised so the write paths cannot drift on the invariant. */
-  private _commit(next: NormalisedRetroConfig): void {
-    this._config = next;
-    fireEvent(this, "config-changed", { config: next });
-  }
-
-  private _patch(value: Record<string, unknown>): void {
-    if (!this._config) return;
-    this._commit(
-      normaliseRetroConfig({
-        ...this._config,
-        ...(value as Partial<WienerLinienRetroCardConfig>),
-      }),
-    );
+  protected override _helperOverrides(
+    cfg: NormalisedRetroConfig,
+  ): Record<string, string | undefined> {
+    const { et } = this._i18n;
+    return {
+      ...(cfg.message_ticker ? {} : { message_text: et("message_text_requires") }),
+      ...(cfg.show_platform ? {} : { platform_side: et("platform_side_requires") }),
+    };
   }
 
   // ------------------------------------------------------------------
   // Stop block adapter — retro's flat config into the shared shape
   // ------------------------------------------------------------------
 
-  private get _stopView(): StopView {
-    const cfg = this._config!;
+  private _stopView(cfg: NormalisedRetroConfig): StopView {
     return {
       entity: cfg.entity ?? "",
       lines: cfg.lines,
       // The block spells "both directions" as absence, the same as it does
       // for the modern and flap editors. Our config spells it "both": this
-      // getter maps "both" to absence, and setDirections below maps it back.
+      // adapter maps "both" to absence, and setDirections below maps it back.
       direction: cfg.direction === "both" ? undefined : cfg.direction,
       line_directions: cfg.line_directions,
       walk_times: cfg.walk_times,
@@ -168,40 +123,7 @@ export class WienerLinienAustriaRetroCardEditor
   // Render
   // ------------------------------------------------------------------
 
-  protected override render(): TemplateResult | typeof nothing {
-    if (!this._config) return nothing;
-    const { et } = this._i18n;
-    return html`
-      <div class="wl-editor">
-        ${renderTabs(
-          [
-            { key: "stops", label: et("tab_stop") },
-            { key: "display", label: et("tab_display") },
-            { key: "tweaks", label: et("tab_tweaks") },
-          ],
-          this._tab,
-          (key) => {
-            this._tab = key;
-          },
-        )}
-        ${renderPanel(this._tab, this._renderActiveTab())}
-      </div>
-    `;
-  }
-
-  private _renderActiveTab(): TemplateResult | typeof nothing {
-    switch (this._tab) {
-      case "stops":
-        return this._renderStop();
-      case "display":
-        return this._renderDisplay();
-      case "tweaks":
-        return this._renderTweaks();
-    }
-  }
-
-  private _renderStop(): TemplateResult {
-    const cfg = this._config!;
+  protected override _renderStops(cfg: NormalisedRetroConfig): TemplateResult {
     const { t, et } = this._i18n;
     return html`
       <ha-form
@@ -228,7 +150,7 @@ export class WienerLinienAustriaRetroCardEditor
       ${cfg.entity
         ? renderStopBlock(
             this.hass,
-            this._stopView,
+            this._stopView(cfg),
             {
               index: 1,
               total: 1,
@@ -258,55 +180,16 @@ export class WienerLinienAustriaRetroCardEditor
     this._commit(next);
   };
 
-  private _renderDisplay(): TemplateResult {
-    const cfg = this._config!;
+  protected override _renderDisplay(cfg: NormalisedRetroConfig): TemplateResult {
     const { et } = this._i18n;
-    const common = {
-      hass: this.hass,
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onChange: (v: Record<string, unknown>) => this._patch(v),
-    };
-
     return html`
-      ${renderHeaderSection({
-        hass: this.hass,
-        showHeader: cfg.show_header,
-        left: cfg.header_left,
-        right: cfg.header_right,
-        selected: this._headerSide,
-        et,
-        computeLabel: this._computeLabel,
-        computeHelper: this._computeHelper,
-        currentSide: (side) => this._config?.[side],
-        onChange: (v) => this._patch(v),
-        selectSide: (side) => {
-          this._headerSide = side;
-        },
-      })}
+      ${this._renderStationBand(cfg, [
+        { value: "default", label: et("station_bg_default") },
+        { value: "white", label: et("station_bg_white") },
+        { value: "black", label: et("station_bg_black") },
+      ])}
       ${renderFormSection({
-        ...common,
-        title: et("section_station"),
-        data: { show_station_name: cfg.show_station_name, station_bg: cfg.station_bg },
-        schema: [
-          { name: "show_station_name", selector: { boolean: {} } },
-          {
-            name: "station_bg",
-            selector: {
-              select: {
-                mode: "dropdown",
-                options: [
-                  { value: "default", label: et("station_bg_default") },
-                  { value: "white", label: et("station_bg_white") },
-                  { value: "black", label: et("station_bg_black") },
-                ],
-              },
-            },
-          },
-        ],
-      })}
-      ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_departure_row"),
         hint: et("section_led_panel"),
         data: {
@@ -334,7 +217,7 @@ export class WienerLinienAustriaRetroCardEditor
         ],
       })}
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_extras"),
         hint: et("section_extras_hint"),
         data: {
@@ -355,18 +238,11 @@ export class WienerLinienAustriaRetroCardEditor
     `;
   }
 
-  private _renderTweaks(): TemplateResult {
-    const cfg = this._config!;
+  protected override _renderTweaks(cfg: NormalisedRetroConfig): TemplateResult {
     const { et } = this._i18n;
-    const common = {
-      hass: this.hass,
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onChange: (v: Record<string, unknown>) => this._patch(v),
-    };
     return html`
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_led_panel"),
         // size and style lead: they are the coarse choices the rest of the
         // section refines, and they used to sit a tab away from the tweaks
@@ -416,21 +292,6 @@ export class WienerLinienAustriaRetroCardEditor
       })}
     `;
   }
-
-  private _computeLabel = (field: { name: string }): string =>
-    editorLabel(this.hass, this._i18n, field.name);
-
-  private _computeHelper = (field: { name: string }): string | undefined => {
-    const { et } = this._i18n;
-    return editorHelper(this._i18n, field.name, {
-      ...(this._config?.message_ticker
-        ? {}
-        : { message_text: et("message_text_requires") }),
-      ...(this._config?.show_platform
-        ? {}
-        : { platform_side: et("platform_side_requires") }),
-    });
-  };
 
   static override styles: CSSResultGroup = [
     editorTokens,

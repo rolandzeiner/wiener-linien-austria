@@ -12,6 +12,7 @@ import modernEditor from "../editor.ts?raw";
 import retroEditor from "../retro-editor.ts?raw";
 import flapEditor from "../flap-editor.ts?raw";
 import routeEditor from "../route-editor.ts?raw";
+import boardEditor from "../editor/board-editor.ts?raw";
 import stopBlock from "../editor/stop-block.ts?raw";
 import headerStrip from "../editor/header-strip.ts?raw";
 import editorCommon from "../editor/editor-common.ts?raw";
@@ -56,6 +57,7 @@ const SOURCES: Record<string, string> = {
   retroEditor,
   flapEditor,
   routeEditor,
+  boardEditor,
   stopBlock,
   headerStrip,
   editorCommon,
@@ -153,6 +155,9 @@ describe("every key the code asks for resolves", () => {
     ["retro", retroEditor],
     ["flap", flapEditor],
     ["route", routeEditor],
+    // The base class renders the station band for exactly these two cards.
+    ["flap", boardEditor],
+    ["retro", boardEditor],
   ])("%s editor et() keys and ha-form field labels exist", (ns, src) => {
     const keys = [...literals(src, ET_CALL), ...literals(src, FORM_FIELD)];
     expect(keys.filter((k) => !editorKeyResolves(ns, k))).toEqual([]);
