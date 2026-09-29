@@ -106,6 +106,15 @@ function flipKey(rowIdx: number, kind: FlipFieldKind): string {
   return `row${rowIdx}-${kind}`;
 }
 
+/** Re-fit an on-screen flip string to `width` tiles, adding or dropping
+ *  them on the side its field pads: the start for the right-aligned line
+ *  and countdown, the end for the left-aligned destination. */
+function fitFlipWidth(s: string, width: number, padSide: "start" | "end"): string {
+  if (padSide === "end") return s.padEnd(width, " ").slice(0, width);
+  const padded = s.padStart(width, " ");
+  return padded.slice(padded.length - width);
+}
+
 // Tile widths per size variant. Mirrors `.flap-tile { width: … }` in
 // the stylesheet below; kept here so the column-header layout can pin
 // labels to actual content coordinates (e.g. STUFENLOS hugs the
@@ -344,6 +353,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       this._diffFlipField(
         flipKey(i, "dest"),
         (row.towards ?? "").toUpperCase().padEnd(maxDestLen, " "),
+        "end",
       );
       this._diffFlipField(flipKey(i, "cd"), padCountdown(row.countdown));
     }
@@ -376,8 +386,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
    *  value without marching (initial paint shouldn't flap from
    *  emptiness through the whole alphabet). Subsequent calls set
    *  the target and arm the march timer; the tick handler advances
-   *  the displayed string toward the target one char at a time. */
-  private _diffFlipField(key: string, currentValue: string | null): void {
+   *  the displayed string toward the target one char at a time.
+   *  `padSide` is the side the caller padded the value on. */
+  private _diffFlipField(
+    key: string,
+    currentValue: string | null,
+    padSide: "start" | "end" = "start",
+  ): void {
     if (currentValue === null) {
       // Drop via rest-spread so the @state Records get fresh refs —
       // an in-place `delete` would mutate the previous-cycle value
@@ -397,13 +412,26 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       }
       return;
     }
-    if (this._displayed[key] === undefined) {
+    const shown = this._displayed[key];
+    if (shown === undefined) {
       // First sighting — adopt instantly.
       this._displayed = { ...this._displayed, [key]: currentValue };
       this._target = { ...this._target, [key]: currentValue };
       return;
     }
     if (this._target[key] === currentValue) return;
+    if (shown.length !== currentValue.length) {
+      // The column changed width: a longer entry arrived or the longest
+      // one left. The march pairs characters from the left, so without
+      // this a right-aligned line slides across its column and strands a
+      // blank tile on the far side, for good — the stranded tile keeps
+      // the displayed string longer than every later target. Re-fit on
+      // the side the field pads, so only the content flips.
+      this._displayed = {
+        ...this._displayed,
+        [key]: fitFlipWidth(shown, currentValue.length, padSide),
+      };
+    }
     this._target = { ...this._target, [key]: currentValue };
     this._ensureMarchTimer();
   }

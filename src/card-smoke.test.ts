@@ -25,7 +25,7 @@
 // defined. An unknown element is inert in the DOM and Lit renders straight
 // through it, which is why this costs a docblock rather than a test harness.
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./wiener-linien-austria-card.js";
 import "./wiener-linien-austria-retro-card.js";
@@ -585,5 +585,69 @@ describe("stops_ahead_modes", () => {
       (n) => n.textContent?.trim(),
     );
     expect(names).toContain("Zieglergasse");
+  });
+});
+
+describe("flap board column width", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function boardHass(rows: ReadonlyArray<[string, string, number]>): HomeAssistant {
+    const hass = busyHass();
+    hass.states[ENTITY]!.attributes.departures = rows.map(([line, towards, countdown]) => ({
+      line,
+      direction: "H",
+      towards,
+      type: "ptMetro",
+      countdown,
+      time_planned: null,
+      time_real: null,
+      realtime: true,
+      barrier_free: true,
+      traffic_jam: false,
+    }));
+    return hass;
+  }
+
+  /** Each row's tiles in one column, as a string with blanks as "_". */
+  function column(el: CardElement, cell: "line" | "dest"): string[] {
+    return [...shadow(el).querySelectorAll(".flap-row")].map((row) =>
+      [...row.querySelectorAll(`.flap-cell--${cell} .flap-tiles > .flap-tile`)]
+        .map((tile) =>
+          tile.classList.contains("flap-tile--blank")
+            ? "_"
+            : tile.querySelector(".flap-tile__glyph")?.textContent,
+        )
+        .join(""),
+    );
+  }
+
+  it("re-fits both columns when their widest entry leaves", async () => {
+    vi.useFakeTimers();
+    const el = await mount(
+      FLAP,
+      boardHass([
+        ["48A", "Dornbach", 1],
+        ["U1", "Leopoldau", 3],
+        ["U1", "Oberlaa", 5],
+      ]),
+      { ...CARDS[2]![1], max_rows: 3 },
+    );
+    expect(column(el, "line")).toEqual(["48A", "_U1", "_U1"]);
+
+    el.hass = boardHass([
+      ["U1", "Leopoldau", 3],
+      ["U1", "Oberlaa", 5],
+      ["U6", "Siebenhirten", 8],
+    ]);
+    await el.updateComplete;
+    await vi.advanceTimersByTimeAsync(30_000);
+    await el.updateComplete;
+
+    // The lines stay right-aligned, next to the destination, with no
+    // blank tile stranded where the 48A's third character was.
+    expect(column(el, "line")).toEqual(["U1", "U1", "U6"]);
+    expect(column(el, "dest").map((d) => d.length)).toEqual([12, 12, 12]);
   });
 });
