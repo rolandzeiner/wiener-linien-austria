@@ -146,7 +146,7 @@ Four cards ship with the integration. All four register themselves as Lovelace r
 | Card | Best for | Stops | Style |
 |---|---|---|---|
 | **Modern** | Everyday dashboard, full feature set | Multi-stop | Themed HA card |
-| **Retro** | Wall-tablet kiosks, entryway displays | Single stop / direction | Wiener Linien LED platform sign |
+| **Retro** | Wall-tablet kiosks, entryway displays | Single stop | Wiener Linien LED platform sign |
 | **Flap** | Decorative boards, signage walls | Multi-stop | Solari split-flap mechanical board |
 | **Route** *(experimental)* | "When do I leave?" at a glance | One route, or any two stops | Themed HA card |
 
