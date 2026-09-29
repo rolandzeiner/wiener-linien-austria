@@ -490,7 +490,7 @@ async def test_coordinator_without_s_bahn_never_fetches(hass: HomeAssistant) -> 
 
     with patch(_FETCH, new_callable=AsyncMock) as fetch:
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
 
     fetch.assert_not_awaited()
     assert [dep.line for dep in coordinator.data.departures] == ["U1", "U1"]
@@ -517,7 +517,7 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
     ):
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
         # The refresh lands and re-publishes the tick with the S-Bahn in it.
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
         rows = coordinator.data.departures
         assert [(dep.line, dep.countdown) for dep in rows[:3]] == [
             ("U1", 2),
@@ -529,7 +529,7 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
         # A tick one minute later counts the train down without refetching.
         freezer.tick(timedelta(minutes=1))
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
         assert fetch.await_count == 1
         s2 = [dep for dep in coordinator.data.departures if dep.line == "S2"]
         assert s2[0].countdown == 4
@@ -539,7 +539,7 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
         # Once the train's time has passed it is gone.
         freezer.move_to(FIRST_TRAIN + timedelta(seconds=1))
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
         planned = {
             dep.time_planned for dep in coordinator.data.departures if dep.line == "S2"
         }
@@ -557,7 +557,7 @@ async def test_coordinator_failed_refresh_pushes_nothing(hass: HomeAssistant) ->
         patch.object(coordinator, "async_set_updated_data") as push,
     ):
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
     assert push.call_count == 1  # the tick itself, not the refresh
 
 
@@ -962,7 +962,7 @@ async def test_refresh_does_not_hide_a_monitor_failure(hass: HomeAssistant) -> N
         patch(_FETCH, new_callable=AsyncMock, return_value={"departureList": None}),
     ):
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
     assert coordinator.last_update_success
 
     coordinator.batch_set_error(UpdateFailed("down"))
