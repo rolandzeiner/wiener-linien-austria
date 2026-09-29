@@ -3,9 +3,9 @@
 // Component-level coverage for the three departure-board card entrypoints.
 // The route card and its editor have their own suite, route-card.test.ts.
 //
-// These three files are 6,568 lines — the entire user-visible surface of the
-// integration — and until this test existed not one of them was ever loaded by
-// the suite. That is worse than it sounds: v8 coverage instruments only what a
+// These three files were 6,568 lines when this suite was added — the entire
+// user-visible surface of the integration — and until this test existed not
+// one of them was ever loaded by the suite. That is worse than it sounds: v8 coverage instruments only what a
 // run imports, so the cards were not merely uncovered, they were absent from
 // the coverage report altogether, and the headline percentage was computed
 // over a denominator that excluded the largest files in the tree.
@@ -25,7 +25,7 @@
 // defined. An unknown element is inert in the DOM and Lit renders straight
 // through it, which is why this costs a docblock rather than a test harness.
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import "./wiener-linien-austria-card.js";
 import "./wiener-linien-austria-retro-card.js";
@@ -237,6 +237,37 @@ describe("rendering", () => {
     const el = await mount(tag, busyHass(), config);
     expect(el.getCardSize()).toBeGreaterThan(0);
   });
+
+  it("the retro card blames the line filter, not the direction, on a both-directions board", async () => {
+    // With no per-line override, a board set to every direction filters
+    // nothing by direction, so an empty result comes from the line filter.
+    // Reading "both" as a value to compare each departure against matched
+    // nothing, which sent every empty both-directions board to "wrong
+    // direction" instead.
+    const el = await mount(RETRO, busyHass(), {
+      type: `custom:${RETRO}`,
+      entity: ENTITY,
+      lines: ["U6"],
+      direction: "both",
+    });
+    const empty = shadow(el).querySelector(".retro-empty");
+    expect(empty?.textContent?.trim()).toBe("Keine Abfahrten für diese Linie");
+  });
+
+  it("the retro card blames the direction when a picked line only runs the other way", async () => {
+    // The U3 runs only towards Simmering (H) here, but the board wants it R.
+    // The 52 still running must not turn that into "wrong line".
+    const el = await mount(RETRO, busyHass(), {
+      type: `custom:${RETRO}`,
+      entity: ENTITY,
+      lines: ["U3"],
+      direction: "both",
+      line_directions: { U3: "R" },
+    });
+    const empty = shadow(el).querySelector(".retro-empty");
+    expect(empty?.textContent?.trim()).toBe("Keine Abfahrten in dieser Richtung");
+  });
+
 });
 
 /** A stop with a live U3 on either side of a planned S-Bahn train. */
@@ -305,7 +336,8 @@ describe("planned S-Bahn rows", () => {
   });
 
   it("the retro card marks the row and says so in its label", async () => {
-    // The retro panel shows one line in one direction; point it at the S2.
+    // The retro board defaults to direction H and paints only two rows;
+    // filter it to the S2 towards R so the planned row is on it.
     const el = await mount(RETRO, timetableHass(), {
       ...CARDS[1]![1],
       line: "S2",
@@ -354,6 +386,11 @@ describe("tab-scoped alert banner", () => {
     return base;
   }
 
+  const alertBadges = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".alert-line-badge")].map(
+      (n) => n.textContent?.trim() ?? "",
+    );
+
   const tabsConfig = {
     type: `custom:${MODERN}`,
     layout: "tabs",
@@ -363,12 +400,15 @@ describe("tab-scoped alert banner", () => {
 
   it("shows only the open tab's disruptions", async () => {
     const el = await mount(MODERN, twoStopHass(), tabsConfig);
+    // The title drops the line list its badge already carries, so the line
+    // is asserted on the badge and the fault on the title.
+    expect(alertBadges(el)).toEqual(["U3"]);
     const text = shadow(el).textContent ?? "";
-    expect(text).toContain("U3: Verspätungen");
+    expect(text).toContain("Verspätungen");
     // The bug this pins: the banner is rendered outside the tab panel, so
     // it used to pool traffic_info across every configured stop and
     // announce a Taubstummengasse fault under the Westbahnhof tab.
-    expect(text).not.toContain("U1: Gleisschaden");
+    expect(text).not.toContain("Gleisschaden");
   });
 
   it("follows the tab the reader switches to", async () => {
@@ -377,9 +417,10 @@ describe("tab-scoped alert banner", () => {
     expect(tabs.length).toBe(2);
     tabs[1]!.click();
     await el.updateComplete;
+    expect(alertBadges(el)).toEqual(["U1"]);
     const text = shadow(el).textContent ?? "";
-    expect(text).toContain("U1: Gleisschaden");
-    expect(text).not.toContain("U3: Verspätungen");
+    expect(text).toContain("Gleisschaden");
+    expect(text).not.toContain("Verspätungen");
   });
 
   it("badges a line-less stop notice with its inferred lines", async () => {
@@ -416,8 +457,314 @@ describe("tab-scoped alert banner", () => {
       ...tabsConfig,
       layout: "stacked",
     });
+    expect(alertBadges(el)).toEqual(["U3", "U1"]);
     const text = shadow(el).textContent ?? "";
-    expect(text).toContain("U3: Verspätungen");
-    expect(text).toContain("U1: Gleisschaden");
+    expect(text).toContain("Verspätungen");
+    expect(text).toContain("Gleisschaden");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// stops_ahead_modes — which transfer categories get a chip in the trail.
+// ---------------------------------------------------------------------------
+
+/** One stop with a transfer from each of the six categories. `43` is the
+ *  tram, `WLB` the Badner Bahn, `13A` the city bus, `N38` the NightLine. */
+function trailHass(): HomeAssistant {
+  return {
+    language: "de",
+    themes: { darkMode: false },
+    localize: (key: string) => key,
+    states: {
+      [ENTITY]: {
+        entity_id: ENTITY,
+        state: "1",
+        attributes: {
+          stop_name: "Westbahnhof",
+          diva: 60200959,
+          server_time: "2026-09-09T16:35:58.000+0200",
+          line_colors: {},
+          lines_at_stop: ["U3"],
+          departures: [
+            {
+              line: "U3",
+              direction: "H",
+              towards: "Simmering",
+              type: "ptMetro",
+              countdown: 3,
+              time_planned: "2026-09-09T16:38:00.000+0200",
+              time_real: "2026-09-09T16:38:30.000+0200",
+              realtime: true,
+              stops_ahead: [
+                {
+                  name: "Zieglergasse",
+                  lines: ["U3", "S45", "43", "WLB", "13A", "N38"],
+                },
+              ],
+            },
+          ],
+          traffic_info: [],
+          elevator_info: [],
+        },
+      },
+    },
+  } as unknown as HomeAssistant;
+}
+
+/** Inline chip labels plus the count behind the `+N` toggle.
+ *
+ *  The two are read together because only the inline half is deterministic:
+ *  U- and S-chips always sit inline, while a NightLine moves between inline
+ *  and the `+N` panel depending on Vienna's clock (`_isNightlineHour`), and
+ *  the `+N` panel's own chips only enter the DOM once expanded. Their SUM is
+ *  stable at any hour, which is what makes `total` safe to assert on. */
+function trailChips(el: CardElement): { inline: string[]; total: number } {
+  const root = shadow(el);
+  const inline = [...root.querySelectorAll(".stops-ahead-line-chip")].map(
+    (n) => n.textContent?.trim() ?? "",
+  );
+  const counter = root.querySelector(".stops-ahead-other-count");
+  const other = counter ? Number(counter.textContent?.replace("+", "") ?? "0") : 0;
+  return { inline, total: inline.length + other };
+}
+
+async function mountTrail(modes?: unknown): Promise<CardElement> {
+  return mount(MODERN, trailHass(), {
+    type: `custom:${MODERN}`,
+    entities: [{ entity: ENTITY }],
+    ...(modes === undefined ? {} : { stops_ahead_modes: modes }),
+  });
+}
+
+describe("stops_ahead_modes", () => {
+  it("chips every category when the key is absent", async () => {
+    const { inline, total } = trailChips(await mountTrail());
+    expect(total).toBe(6);
+    expect(inline).toContain("U3");
+    expect(inline).toContain("S45");
+  });
+
+  // The inline U/S chips and the `+N` panel are two halves of one list, so a
+  // filter applied to only the panel would leave these visible — the bug this
+  // pins is "metro off, U-chip still there".
+  it("drops the U-chips when metro is off", async () => {
+    const { inline, total } = trailChips(
+      await mountTrail(["sbahn", "tram", "badner", "bus", "night"]),
+    );
+    expect(total).toBe(5);
+    expect(inline).not.toContain("U3");
+    expect(inline).toContain("S45");
+  });
+
+  it("drops the S-chips when sbahn is off", async () => {
+    const { inline, total } = trailChips(
+      await mountTrail(["metro", "tram", "badner", "bus", "night"]),
+    );
+    expect(total).toBe(5);
+    expect(inline).not.toContain("S45");
+    expect(inline).toContain("U3");
+  });
+
+  // The Badner Bahn used to fall into `tram`, so this is the case that pins
+  // the split: hiding trams must leave the WLB chip alone, and vice versa.
+  it("hides the Badner Bahn without touching the trams", async () => {
+    const { total } = trailChips(
+      await mountTrail(["metro", "sbahn", "tram", "bus", "night"]),
+    );
+    expect(total).toBe(5);
+  });
+
+  it("hides the trams without touching the Badner Bahn", async () => {
+    const { total } = trailChips(
+      await mountTrail(["metro", "sbahn", "badner", "bus", "night"]),
+    );
+    expect(total).toBe(5);
+  });
+
+  it("keeps only metro and S-Bahn when every other category is off", async () => {
+    const { inline, total } = trailChips(await mountTrail(["metro", "sbahn"]));
+    expect(total).toBe(2);
+    expect(inline.sort()).toEqual(["S45", "U3"]);
+  });
+
+  it("renders no chip and no +N toggle when every category is off", async () => {
+    const el = await mountTrail([]);
+    expect(trailChips(el)).toEqual({ inline: [], total: 0 });
+    expect(shadow(el).querySelector(".stops-ahead-other-toggle")).toBeNull();
+  });
+
+  // The stop itself is not a transfer — hiding every category must not empty
+  // the trail, only strip it of chips.
+  it("still renders the stop name when every category is off", async () => {
+    const el = await mountTrail([]);
+    const names = [...shadow(el).querySelectorAll(".stops-ahead-name")].map(
+      (n) => n.textContent?.trim(),
+    );
+    expect(names).toContain("Zieglergasse");
+  });
+});
+
+describe("flap board column width", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function boardHass(rows: ReadonlyArray<[string, string, number]>): HomeAssistant {
+    const hass = busyHass();
+    hass.states[ENTITY]!.attributes.departures = rows.map(([line, towards, countdown]) => ({
+      line,
+      direction: "H",
+      towards,
+      type: "ptMetro",
+      countdown,
+      time_planned: null,
+      time_real: null,
+      realtime: true,
+      barrier_free: true,
+      traffic_jam: false,
+    }));
+    return hass;
+  }
+
+  /** Each row's tiles in one column, as a string with blanks as "_". */
+  function column(el: CardElement, cell: "line" | "dest"): string[] {
+    return [...shadow(el).querySelectorAll(".flap-row")].map((row) =>
+      [...row.querySelectorAll(`.flap-cell--${cell} .flap-tiles > .flap-tile`)]
+        .map((tile) =>
+          tile.classList.contains("flap-tile--blank")
+            ? "_"
+            : tile.querySelector(".flap-tile__glyph")?.textContent,
+        )
+        .join(""),
+    );
+  }
+
+  it("re-fits both columns when their widest entry leaves", async () => {
+    vi.useFakeTimers();
+    const el = await mount(
+      FLAP,
+      boardHass([
+        ["48A", "Dr.-Karl-Renner-Ring", 1],
+        ["U1", "Leopoldau", 3],
+        ["U1", "Oberlaa", 5],
+      ]),
+      { ...CARDS[2]![1], max_rows: 3 },
+    );
+    expect(column(el, "line")).toEqual(["48A", "_U1", "_U1"]);
+
+    el.hass = boardHass([
+      ["U1", "Leopoldau", 3],
+      ["U1", "Oberlaa", 5],
+      ["U6", "Floridsdorf", 8],
+    ]);
+    await el.updateComplete;
+    await vi.advanceTimersByTimeAsync(30_000);
+    await el.updateComplete;
+
+    // The lines stay right-aligned, next to the destination, with no
+    // blank tile stranded where the 48A's third character was; the
+    // destinations shrink from the Ring's 20 tiles to Floridsdorf's 11.
+    expect(column(el, "line")).toEqual(["U1", "U1", "U6"]);
+    expect(column(el, "dest").map((d) => d.length)).toEqual([11, 11, 11]);
+  });
+});
+
+describe("retro wheelchair race", () => {
+  const animate = vi.fn((_frames: Keyframe[], _timing: KeyframeAnimationOptions) => ({
+    currentTime: 0 as number | null,
+    pause: (): void => {},
+    cancel: (): void => {},
+  }));
+  const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
+  const original = { animate: proto.animate, rect: proto.getBoundingClientRect };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    animate.mockClear();
+    proto.animate = animate;
+    // happy-dom lays nothing out, and the card measures its own width and
+    // each racer's start before it rolls a race.
+    proto.getBoundingClientRect = function (this: HTMLElement): DOMRect {
+      const width = this.classList.contains("retro") ? 580 : 20;
+      const left = this.classList.contains("retro-wheelchair") ? 200 : 0;
+      return { width, height: 20, left, top: 0, right: left + width, bottom: 20, x: left, y: 0, toJSON: () => ({}) };
+    };
+  });
+
+  afterEach(() => {
+    proto.animate = original.animate;
+    proto.getBoundingClientRect = original.rect;
+    vi.useRealTimers();
+  });
+
+  /** Both rows step-free, so both carry a wheelchair to race. */
+  function raceHass(): HomeAssistant {
+    const hass = busyHass();
+    const departures = hass.states[ENTITY]!.attributes.departures as Array<Record<string, unknown>>;
+    for (const d of departures) d.barrier_free = true;
+    return hass;
+  }
+
+  const RACE_CONFIG = { type: `custom:${RETRO}`, entity: ENTITY, direction: "both", wheelchair_race: true };
+
+  it("starts on a tap and plays both racers through the Web Animations API", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    shadow(el).querySelector<HTMLElement>(".retro")!.click();
+    await el.updateComplete;
+    expect(shadow(el).querySelector(".retro--race-countdown")).not.toBeNull();
+
+    await vi.advanceTimersByTimeAsync(2_500); // past the 3-2-1 countdown
+    await el.updateComplete;
+
+    expect(animate).toHaveBeenCalledTimes(2);
+    const [frames, timing] = animate.mock.calls[0]!;
+    // px, not cqw: a container unit keeps the animation off the compositor.
+    expect(frames[0]!.transform).toMatch(/^translate\(-?[\d.]+px, 0\.12em\)$/);
+    expect(timing.duration).toBeGreaterThan(0);
+  });
+
+  it("ignores the tap under prefers-reduced-motion", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+      shadow(el).querySelector<HTMLElement>(".retro")!.click();
+      await el.updateComplete;
+      await vi.advanceTimersByTimeAsync(2_500);
+      expect(shadow(el).querySelector(".retro--race-countdown")).toBeNull();
+      expect(animate).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+});
+
+describe("modern card dev mode", () => {
+  beforeEach(() => window.localStorage.setItem("wl_debug", "1"));
+  afterEach(() => window.localStorage.removeItem("wl_debug"));
+
+  it("injects a test disruption and lift outage, and opens the colour palette", async () => {
+    const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
+    const root = shadow(el);
+    const [traffic, elevator, colours] = root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
+    const alerts = (): number => root.querySelectorAll(".alert-title").length;
+    const before = alerts();
+
+    traffic!.click();
+    await el.updateComplete;
+    expect(alerts()).toBe(before + 1);
+
+    elevator!.click();
+    await el.updateComplete;
+    expect(root.querySelectorAll(".lift-path")).toHaveLength(1);
+
+    colours!.click();
+    await el.updateComplete;
+    expect(root.querySelectorAll(".dev-pal-chip").length).toBeGreaterThan(0);
   });
 });

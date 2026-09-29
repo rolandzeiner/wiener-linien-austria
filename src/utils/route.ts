@@ -33,6 +33,7 @@ const ROUTE_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "hide_attribution",
   "step_free",
   "show_map_pins",
+  "replan_from_change",
 ]);
 export const MAX_ALTERNATIVES = 3;
 
@@ -68,6 +69,10 @@ export interface NormalisedRouteConfig {
   step_free: boolean;
   /** The map pin after each boarding stop and the destination. */
   show_map_pins: boolean;
+  /** Ad-hoc only: offer to search onward again from each change. Off by
+   *  default — it is an extra affordance on every change of every trip, and
+   *  a strand reads better without one until someone wants it. */
+  replan_from_change: boolean;
 }
 
 /** Validate + default a route card config. Throws the messages Lovelace shows
@@ -103,6 +108,7 @@ export function normaliseRouteConfig(
     hide_attribution: config.hide_attribution === true,
     step_free: config.step_free === true,
     show_map_pins: config.show_map_pins !== false,
+    replan_from_change: config.replan_from_change === true,
   };
 }
 
@@ -234,6 +240,16 @@ export function rideFrequency(leg: RouteLegAttr): RideFrequency {
  *  and time, all of which a new plan for the same vehicle repeats. */
 export function rideKey(leg: RouteLegAttr): string {
   return [leg.line, leg.direction, leg.origin.stop_id, leg.origin.planned].join("|");
+}
+
+/** Identifies a connection across refreshes, for the alternatives a user has
+ *  opened. Built from its rides' `rideKey`s, which use planned times, so a
+ *  delay arriving in the next update doesn't close the row under someone
+ *  reading it. A connection with no ride (walk only) falls back to its
+ *  departure time. */
+export function tripKey(trip: RouteTripAttr): string {
+  const rides = transitLegs(trip).map(rideKey);
+  return rides.length ? rides.join(">") : `walk|${trip.departure}`;
 }
 
 export function transitLegs(trip: RouteTripAttr): RouteLegAttr[] {
@@ -399,6 +415,36 @@ export function viennaInputValue(nowMs: number): string {
   const step = 5 * 60_000;
   const p = viennaParts(Math.ceil(nowMs / step) * step);
   return `${p["year"]}-${p["month"]}-${p["day"]}T${p["hour"]}:${p["minute"]}`;
+}
+
+/** A `datetime-local` value for one exact instant on the Vienna clock, with
+ *  no rounding. `viennaInputValue` rounds up to the next five minutes, which
+ *  is right for "pick a time" but wrong for "plan from the minute this ride
+ *  gets in": that would push the query up to five minutes past the arrival
+ *  and hide the connections leaving in between. */
+function viennaInputAt(ms: number): string {
+  const p = viennaParts(ms);
+  return `${p["year"]}-${p["month"]}-${p["day"]}T${p["hour"]}:${p["minute"]}`;
+}
+
+/** When someone standing at a change could realistically board again: the
+ *  ride's arrival there plus the walk between the two platforms. Live time
+ *  where there is one, so a late arrival moves the question with it.
+ *
+ *  Null when the arrival has no usable time — the trip is then still drawn,
+ *  it just can't be re-planned from, since a plan for "now" would offer
+ *  departures from a station nobody has reached yet.
+ */
+export function replanDeparture(
+  arrival: RouteStopAttr,
+  walkMinutes: number,
+  nowMs: number,
+): string | null {
+  const ts = Date.parse(arrival.estimated ?? arrival.planned ?? "");
+  if (!Number.isFinite(ts)) return null;
+  // A change already behind us is a plan for now, not for a past minute:
+  // the upstream would answer with that morning's departures.
+  return viennaInputAt(Math.max(ts + Math.max(walkMinutes, 0) * 60_000, nowMs));
 }
 
 /** A well-formed `datetime-local` value, as the plan command accepts it. */

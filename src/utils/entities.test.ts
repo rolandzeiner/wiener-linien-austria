@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { mergeLineColorsMaps } from "./entities.js";
+import { departureBoardOptions, mergeLineColorsMaps } from "./entities.js";
 import type { HomeAssistant } from "../types.js";
 
 function hassWith(
@@ -81,5 +81,47 @@ describe("mergeLineColorsMaps", () => {
   it("returns an empty map without hass, and for an unknown entity", () => {
     expect(mergeLineColorsMaps(undefined, ["sensor.a"])).toEqual({});
     expect(mergeLineColorsMaps(hassWith({}), ["sensor.missing"])).toEqual({});
+  });
+});
+
+describe("departureBoardOptions — what a board editor's picker offers", () => {
+  /** A stop sensor as the boards fingerprint one, and a route sensor, which
+   *  the same integration owns and which used to show up in these pickers. */
+  function hass(): HomeAssistant {
+    return {
+      states: {
+        "sensor.westbahnhof_abfahrten": {
+          attributes: { diva: 60201468, departures: [], next_by_line: {} },
+        },
+        "sensor.route_nachste_verbindung": {
+          attributes: { trips: [], origin: "A", destination: "B", active: true },
+        },
+        "sensor.unavailable_stop": { state: "unavailable", attributes: {} },
+        "light.not_a_sensor": { attributes: { diva: 1, departures: [], next_by_line: {} } },
+      },
+    } as unknown as HomeAssistant;
+  }
+
+  it("offers stop sensors and leaves route sensors out", () => {
+    expect(departureBoardOptions(hass())).toEqual(["sensor.westbahnhof_abfahrten"]);
+  });
+
+  it("keeps an already-configured entity that publishes no attributes", () => {
+    // An unavailable sensor fingerprints as nothing. Dropping it from its own
+    // picker would make a configured board look unset.
+    expect(departureBoardOptions(hass(), ["sensor.unavailable_stop"])).toEqual([
+      "sensor.unavailable_stop",
+      "sensor.westbahnhof_abfahrten",
+    ]);
+  });
+
+  it("does not repeat an entity that is both configured and live", () => {
+    expect(departureBoardOptions(hass(), ["sensor.westbahnhof_abfahrten"])).toEqual([
+      "sensor.westbahnhof_abfahrten",
+    ]);
+  });
+
+  it("is empty without hass", () => {
+    expect(departureBoardOptions(undefined)).toEqual([]);
   });
 });

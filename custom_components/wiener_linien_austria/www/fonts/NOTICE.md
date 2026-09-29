@@ -18,6 +18,11 @@ the TeX Gyre font family** (maintained by GUST, the Polish TeX Users Group):
   - U+00A0–00FF (Latin-1 Supplement — German diacritics äöüÄÖÜß etc.)
   - U+2013–2014 (en/em dash)
   - U+2019 (right single quotation mark — used in station names)
+  - U+203A (single right-pointing angle quotation mark — the lift-path
+    separator in the modern card). Declaring it also pulls in its
+    partner U+2039 via the `kern` feature's glyph closure, so the
+    subsets carry both; that is pyftsubset's doing, not a second
+    requirement.
   - U+2026 (horizontal ellipsis)
   - U+2192 (rightwards arrow — used in "towards" formatting)
 - OpenType layout features retained: kerning (`kern`) and standard ligatures (`liga`).
@@ -66,7 +71,7 @@ for pair in \
   texgyrecursor-bold.otf:wl-mono-bold.woff2; do
   src="${pair%:*}"; out="${pair##*:}"
   pyftsubset "$src" --output-file="$out" --flavor=woff2 \
-    --unicodes='U+0020-007F,U+00A0-00FF,U+2013-2014,U+2019,U+2026,U+2192' \
+    --unicodes='U+0020-007F,U+00A0-00FF,U+2013-2014,U+2019,U+203A,U+2026,U+2192' \
     --layout-features='kern,liga' \
     --drop-tables+=DSIG,FFTM --desubroutinize
 done

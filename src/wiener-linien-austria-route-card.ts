@@ -72,8 +72,10 @@ import {
   isInputDateTime,
   legTypeIcon,
   loadAdhocSelection,
+  replanDeparture,
   rideFrequency,
   rideKey,
+  tripKey,
   roundedClock,
   minutesUntil,
   normaliseRouteConfig,
@@ -99,6 +101,18 @@ const TICK_MS = 15_000;
 const MAX_NOTICES = 2;
 
 type AdhocPhase = "idle" | "loading" | "ready" | "error" | "paused";
+
+/** The query a "search from here" jump replaced, so the way back is one tap.
+ *  `to` is not in here on purpose: the jump only ever moves the origin, and
+ *  keeping a second copy of the destination would be a second thing to keep
+ *  in step with the picker. */
+interface ReplanOrigin {
+  from: string;
+  timeMode: AdhocTimeMode;
+  when: string;
+  /** What to call the stop we came from, for the button that goes back. */
+  name: string;
+}
 
 /** A backend error as the card keeps it: the WebSocket code, how long the
  *  backend asked to wait, and its translation key where the code alone
@@ -152,9 +166,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _versionMismatch: string | null = null;
   @state() private _now = Date.now();
   @state() private _alternativesOpen = false;
-  /** Rides whose stops are open, by `rideKey`. Survives refreshes, so a list
+  /** Rides whose stops are open, by `rideKey`, prefixed with the
+   *  alternative's scope for a ride drawn inside an opened alternative (see
+   *  `_renderStrand`). Survives refreshes, so a list
    *  someone opened doesn't snap shut when the plan updates under it. */
   @state() private _openRides: ReadonlySet<string> = new Set();
+  /** Alternatives opened to their full strand, by `tripKey`. Same reasoning:
+   *  a refresh must not snap a row shut while someone reads it. */
+  @state() private _openAlternatives: ReadonlySet<string> = new Set();
 
   // --- Ad-hoc mode (no `entity`) ---------------------------------------
   @state() private _stops: AdhocStopOption[] | null = null;
@@ -167,6 +186,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _timeMode: AdhocTimeMode = "now";
   @state() private _when = "";
   @state() private _plan: RouteAttrs | null = null;
+  @state() private _replanFrom: ReplanOrigin | null = null;
   @state() private _phase: AdhocPhase = "idle";
   @state() private _error: AdhocError | null = null;
   @state() private _announcement = "";
@@ -176,6 +196,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _adhocStarted = false;
   private _planKey = "";
   private _planSeq = 0;
+  /** A jump's point is the connections the end-to-end query filtered out, so
+   *  its answer arrives with the disclosure already open. One-shot, not tied
+   *  to `_replanFrom`: a later refresh must not re-open a list the person
+   *  has since collapsed. */
+  private _revealAlternatives = false;
   private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the scheduled refresh is due (epoch ms). Survives a disconnect, so
    *  a card HA re-attaches on a view switch waits out the rest instead of
@@ -422,67 +447,88 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._pendingRefresh = false;
     const { _from: from, _to: to } = this;
     const seq = ++this._planSeq;
-    if (!from || !to) {
-      this._plan = null;
-      this._planKey = "";
-      this._error = null;
-      this._phase = "idle";
-      return;
-    }
-    if (from === to) {
-      this._plan = null;
-      this._planKey = "";
-      this._error = { code: "same_stop", retryAfter: null, translationKey: null };
-      this._phase = "error";
-      if (userInitiated) this._announce(this._adhocError(this._error).title);
-      return;
-    }
-    if (!this.hass?.callWS) return;
+    if (!this._canPlan(from, to, userInitiated) || !this.hass?.callWS) return;
 
     const key = this._queryKey();
     if (this._planKey !== key) {
       this._plan = null;
       this._alternativesOpen = false;
+      this._openAlternatives = new Set();
     }
     if (!this._plan) this._phase = "loading";
     try {
-      const planned = this._timeMode !== "now" && isInputDateTime(this._when);
-      const plan = await this.hass.callWS<RouteAttrs>({
-        type: "wiener_linien_austria/plan",
-        origin: Number(from),
-        destination: Number(to),
-        ...(planned ? { datetime: this._when, arrive_by: this._timeMode === "arrive" } : {}),
-        ...(this._config?.step_free ? { step_free: true } : {}),
-      });
-      if (seq !== this._planSeq) return;
-      this._plan = plan;
-      this._planKey = key;
-      this._error = null;
-      this._phase = "ready";
-      if (userInitiated) this._announce(this._planAnnouncement(plan));
-      this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
+      const plan = await this.hass.callWS<RouteAttrs>(this._planRequest(from, to));
+      if (seq === this._planSeq) this._applyPlan(plan, key, userInitiated);
     } catch (err) {
-      if (seq !== this._planSeq) return;
-      const error = adhocErrorOf(err);
-      this._error = error;
-      // A stale plan through an outage reads as "these still run"; show the
-      // problem instead, as the route sensor does when it goes unavailable.
-      this._plan = null;
-      this._planKey = "";
-      this._phase = "error";
-      if (userInitiated) this._announce(this._adhocError(error).title);
-      const delay = adhocRetryDelay(
-        adhocErrorSpec(error.code, error.translationKey),
-        error.retryAfter,
-      );
-      if (delay !== null) this._schedule(delay);
+      if (seq === this._planSeq) this._applyPlanError(err, userInitiated);
     }
+  }
+
+  /** Whether `from` → `to` is a query at all. When it isn't, the card drops
+   *  its plan and says why: nothing picked yet is idle, one stop picked for
+   *  both ends is an error. */
+  private _canPlan(from: string, to: string, userInitiated: boolean): boolean {
+    if (from && to && from !== to) return true;
+    this._plan = null;
+    this._planKey = "";
+    if (!from || !to) {
+      this._error = null;
+      this._phase = "idle";
+      return false;
+    }
+    this._error = { code: "same_stop", retryAfter: null, translationKey: null };
+    this._phase = "error";
+    if (userInitiated) this._announce(this._adhocError(this._error).title);
+    return false;
+  }
+
+  private _planRequest(from: string, to: string): { type: string; [key: string]: unknown } {
+    const planned = this._timeMode !== "now" && isInputDateTime(this._when);
+    return {
+      type: "wiener_linien_austria/plan",
+      origin: Number(from),
+      destination: Number(to),
+      ...(planned ? { datetime: this._when, arrive_by: this._timeMode === "arrive" } : {}),
+      ...(this._config?.step_free ? { step_free: true } : {}),
+    };
+  }
+
+  private _applyPlan(plan: RouteAttrs, key: string, userInitiated: boolean): void {
+    this._plan = plan;
+    this._planKey = key;
+    this._error = null;
+    this._phase = "ready";
+    if (this._revealAlternatives) {
+      this._alternativesOpen = true;
+      this._revealAlternatives = false;
+    }
+    if (userInitiated) this._announce(this._planAnnouncement(plan));
+    this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
+  }
+
+  private _applyPlanError(err: unknown, userInitiated: boolean): void {
+    const error = adhocErrorOf(err);
+    this._error = error;
+    this._revealAlternatives = false;
+    // A stale plan through an outage reads as "these still run"; show the
+    // problem instead, as the route sensor does when it goes unavailable.
+    this._plan = null;
+    this._planKey = "";
+    this._phase = "error";
+    if (userInitiated) this._announce(this._adhocError(error).title);
+    const delay = adhocRetryDelay(
+      adhocErrorSpec(error.code, error.translationKey),
+      error.retryAfter,
+    );
+    if (delay !== null) this._schedule(delay);
   }
 
   private _onPick(which: Which, value: unknown): void {
     const next = typeof value === "string" || typeof value === "number" ? String(value) : "";
     if (which === "from") this._from = next;
     else this._to = next;
+    this._replanFrom = null;
+    this._revealAlternatives = false;
     saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
@@ -517,11 +563,94 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   private _swap = (): void => {
     [this._from, this._to] = [this._to, this._from];
+    this._replanFrom = null;
+    this._revealAlternatives = false;
     saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
   };
 
+
+  // ------------------------------------------------------------------
+  // Ad-hoc mode: searching again from a change
+  // ------------------------------------------------------------------
+
+  /** Whether this stop can stand in as an origin. Two things have to hold,
+   *  and the backend would answer an error for each of them:
+   *
+   *  - It has to be a stop the catalogue tracks. `stop_id` is the DIVA the
+   *    plan command takes, but the strand also names stops the catalogue
+   *    doesn't hold — an S-Bahn-only station, a Badner Bahn stop past the
+   *    city border — and those come back as `adhoc_invalid_stop`. The picker
+   *    list is the same set the backend accepts, so it is the gate.
+   *  - It can't be the destination itself (`adhoc_same_stop`).
+   */
+  private _canReplanFrom(stop: RouteStopAttr): boolean {
+    // Off by default: an affordance on every change of every trip earns its
+    // place only where someone asked for it. With the disclosure turned off a
+    // jump would answer with the one connection the strand already shows and
+    // nothing behind it, so that switch silences this one too.
+    const cfg = this._config;
+    if (!this._isAdhoc || !this._to || !cfg?.replan_from_change || !cfg.alternatives) {
+      return false;
+    }
+    const diva = stop.stop_id;
+    if (!diva || diva === this._to) return false;
+    return this._stops?.some((option) => option.value === diva) === true;
+  }
+
+  /** The origin the current plan was asked for, named the way the strand
+   *  names it. `legs[0]` rather than the first ride: a trip that starts with
+   *  a walk boards somewhere else, and the button back has to offer the stop
+   *  that was searched for, not the one the first tram leaves from. */
+  private _originName(): string {
+    const trip = this._plan ? upcomingTrips(this._plan, this._now)[0] : undefined;
+    return trip?.legs[0]?.origin.name ?? "";
+  }
+
+  /** Plan the rest of the journey again from a change, for the minute someone
+   *  standing there could actually board.
+   *
+   *  Planning it for "now" would be the wrong question and a convincing wrong
+   *  answer: from the sofa, half an hour before leaving, it would list trains
+   *  out of a station nobody has reached yet. The destination is left alone —
+   *  this only asks "what else goes from here", never where to.
+   *
+   *  Deliberately not written to the saved selection: a look at one change is
+   *  not a change of the journey this dashboard opens on. */
+  private _replanFromHere(stop: RouteStopAttr, when: string): void {
+    const diva = stop.stop_id;
+    if (!diva) return;
+    // Only the first jump records the way back. Hopping from change to change
+    // should still return to where the journey was actually asked about.
+    this._replanFrom ??= {
+      from: this._from,
+      timeMode: this._timeMode,
+      when: this._when,
+      name: this._originName(),
+    };
+    this._from = diva;
+    this._revealAlternatives = true;
+    this._timeMode = "depart";
+    this._when = when;
+    this._lastInteraction = Date.now();
+    // The plan's own announcement follows a second later; this one covers the
+    // debounce and the request, where the card would otherwise sit silent.
+    this._announce(this._t("replan_announce", { stop: stop.name }));
+    this._requestPlan(true);
+  }
+
+  private _backToOrigin = (): void => {
+    const origin = this._replanFrom;
+    if (!origin) return;
+    this._replanFrom = null;
+    this._revealAlternatives = false;
+    this._from = origin.from;
+    this._timeMode = origin.timeMode;
+    this._when = origin.when;
+    this._lastInteraction = Date.now();
+    this._requestPlan(true);
+  };
 
   /** Re-setting identical text wouldn't be announced, so nudge it. */
   private _announce(text: string): void {
@@ -750,9 +879,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         false,
       );
     }
+    const back = this._renderReplanBack();
     if (this._phase === "error" && this._error) {
       const { icon, title, detail } = this._adhocError(this._error);
-      return this._empty(icon, title, detail, false);
+      return html`${back}${this._empty(icon, title, detail, false)}`;
     }
     const paused =
       this._phase === "paused"
@@ -765,8 +895,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const plan = this._plan;
     if (!plan) {
       return this._phase === "paused"
-        ? html`${paused}`
-        : this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false);
+        ? html`${back}${paused}`
+        : html`${back}${this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false)}`;
     }
     // Budget spent: the plan on screen is older than usual. The header's
     // "Zuletzt aktualisiert" already says how old; this says why.
@@ -779,14 +909,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : nothing;
     const trips = upcomingTrips(plan, this._now);
     if (!trips[0]) {
-      return html`${paused}${stale}${this._empty(
+      return html`${back}${paused}${stale}${this._empty(
         "mdi:timetable",
         this._t("adhoc_no_trips"),
         this._t("adhoc_no_trips_detail"),
         false,
       )}`;
     }
-    return html`${paused}${stale}${this._renderTrips(trips, plan, cfg)}`;
+    return html`${back}${paused}${stale}${this._renderTrips(trips, plan, cfg)}`;
   }
 
   // ------------------------------------------------------------------
@@ -958,14 +1088,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   private _renderNotices(trip: RouteTripAttr, attrs: RouteAttrs): TemplateResult | typeof nothing {
     const lines = new Set(transitLegs(trip).map((leg) => leg.line ?? ""));
+    // Which lift, and why. The outage feed names one lift precisely
+    // ("Passage - Zwischengeschoss - Ausgang Innere Mariahilferstraße");
+    // the trip names its lifts by station alone, so the match below can
+    // only ever be station-wide. Printing the location is what lets
+    // someone see the outage is about an exit they never take — without
+    // it the notice reads as "the lift you need is out", which it often
+    // is not. `reason` usually carries the expected end date too.
     const lifts = this._liftOutages(trip, attrs).map((outage) => ({
       title: this._t("lift_out_notice", { station: outage.station ?? "" }),
+      detail: [outage.description, outage.reason]
+        .map((part) => (part ?? "").trim())
+        .filter(Boolean)
+        .join(" · "),
     }));
     const notices = [
       ...lifts,
-      ...(attrs.traffic_info ?? []).filter((n) =>
-        (n.related_lines ?? []).some((line) => lines.has(line)),
-      ),
+      ...(attrs.traffic_info ?? [])
+        .filter((n) => (n.related_lines ?? []).some((line) => lines.has(line)))
+        .map((n) => ({ title: n.title, detail: "" })),
     ].slice(0, MAX_NOTICES + lifts.length);
     if (!notices.length) return nothing;
     return html`
@@ -976,6 +1117,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               <ha-icon icon="mdi:alert-outline" aria-hidden="true"></ha-icon>
               <span>
                 <span class="sr-only">${this._t("disruption")}: </span>${n.title ?? ""}
+                ${n.detail ? html`<span class="notice-detail">${n.detail}</span>` : nothing}
               </span>
             </li>
           `,
@@ -1038,7 +1180,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return this._t(track ? "platform_track" : "platform_stop", { p: platform });
   }
 
-  private _renderStrand(trip: RouteTripAttr, attrs: RouteAttrs): TemplateResult {
+  /** `scope` keeps an alternative's strand apart from the best one's. Two
+   *  connections often share their first ride and differ only at the change,
+   *  and a shared ride would otherwise mean duplicate ids in one shadow root
+   *  and one stops list opening both. The best connection passes none, so its
+   *  open lists keep their keys across refreshes as before. */
+  private _renderStrand(trip: RouteTripAttr, attrs: RouteAttrs, scope = ""): TemplateResult {
     const legs = transitLegs(trip);
     const last = legs[legs.length - 1];
     return html`
@@ -1055,9 +1202,16 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               !!transfer && i < legs.length - 1,
               legs[i + 1],
               i === 0 ? walkAccess(trip, "start") : undefined,
+              scope,
             )}
             ${transfer && i < legs.length - 1
-              ? this._renderTransfer(transfer, attrs, catchableDeparture(leg, transfer, legs[i + 1]!))
+              ? this._renderTransfer(
+                  transfer,
+                  attrs,
+                  catchableDeparture(leg, transfer, legs[i + 1]!),
+                  leg.destination,
+                  legs[i + 1]!.origin,
+                )
               : nothing}
           `;
         })}
@@ -1084,6 +1238,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     beforeTransfer: boolean,
     nextLeg: RouteLegAttr | undefined,
     accessBefore?: RouteAccessStepAttr[],
+    scope = "",
   ): TemplateResult {
     const icon = legTypeIcon(leg.type, leg.line);
     const stops =
@@ -1093,7 +1248,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const between = leg.stops ?? [];
     // The stops in between already carry the ride's delay; show them late too.
     const late = !!delayedClock(leg.origin);
-    const key = rideKey(leg);
+    const key = scope ? `${scope}#${rideKey(leg)}` : rideKey(leg);
     const open = between.length > 0 && this._openRides.has(key);
     const listId = safeDomId(`route-stops-${key}`);
     // Shown with the ride, not the stop: the platform belongs to this line's
@@ -1276,6 +1431,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     transfer: RouteTransferAttr,
     attrs: RouteAttrs,
     catchable: string | null = null,
+    arrival?: RouteStopAttr,
+    boarding?: RouteStopAttr,
   ): TemplateResult {
     return html`
       <li class="transfer" data-risk=${transfer.risk}>
@@ -1294,8 +1451,53 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               ${this._t("next_catchable", { time: roundedClock(catchable) })}
             </span>`
           : nothing}
+        ${this._renderReplan(transfer, arrival, boarding)}
       </li>
     `;
+  }
+
+  /** "Search from here" on a change: the buffer badge beside it says how
+   *  much slack the change has, and when that was tight the card said
+   *  nothing about what to do. This asks the planner the obvious follow-up —
+   *  what else leaves this station for where I'm going — without making
+   *  anyone retype a journey they already entered. Offered on every change
+   *  the catalogue can plan from, whatever its risk.
+   *
+   *  Ad-hoc mode only. A card bound to a route entity is showing that route's
+   *  sensor, and there is no query of its own to redirect. */
+  private _renderReplan(
+    transfer: RouteTransferAttr,
+    arrival: RouteStopAttr | undefined,
+    boarding: RouteStopAttr | undefined,
+  ): TemplateResult | typeof nothing {
+    if (!arrival || !boarding) return nothing;
+    // A change with no usable arrival time can't be planned from: the query
+    // would fall back to "now" and answer for a station nobody has reached.
+    const when = replanDeparture(arrival, transfer.walk_minutes, this._now);
+    if (when === null || !this._canReplanFrom(boarding)) return nothing;
+    return html`<button
+      type="button"
+      class="replan"
+      ?disabled=${this._phase === "loading"}
+      aria-label=${this._t("replan_from_here_label", { stop: boarding.name })}
+      @click=${() => this._replanFromHere(boarding, when)}
+    >
+      <ha-icon icon="mdi:directions-fork" aria-hidden="true"></ha-icon>
+      <span>${this._t("replan_from_here")}</span>
+    </button>`;
+  }
+
+  /** The way back after a jump. The From picker already shows the change as
+   *  the new origin, so this only has to undo it — including the time, which
+   *  the jump moved to the arrival there plus the walk (or to now, if that
+   *  has passed). */
+  private _renderReplanBack(): TemplateResult | typeof nothing {
+    const origin = this._replanFrom;
+    if (!origin) return nothing;
+    return html`<button type="button" class="replan-back" @click=${this._backToOrigin}>
+      <ha-icon icon="mdi:arrow-u-left-top" aria-hidden="true"></ha-icon>
+      <span>${this._t("replan_back", { stop: origin.name })}</span>
+    </button>`;
   }
 
   private _renderAlternatives(trips: RouteTripAttr[], attrs: RouteAttrs): TemplateResult {
@@ -1324,6 +1526,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
+  /** One more connection: a summary row that opens into the same strand the
+   *  best connection shows, from data the plan already carries. No request,
+   *  and it can't turn into a different connection than the one clicked. */
   private _renderAlternative(trip: RouteTripAttr, attrs: RouteAttrs): TemplateResult {
     const worst = trip.transfers.reduce<RouteTransferAttr | undefined>(
       (acc, t) => (acc === undefined || t.slack_minutes < acc.slack_minutes ? t : acc),
@@ -1334,36 +1539,67 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // at the walk's time, which no delay moves.
     const first = trip.legs[0];
     const delayed = first && !first.walk ? delayedClock(first.origin) : null;
+    const key = tripKey(trip);
+    const open = this._openAlternatives.has(key);
+    const detailId = safeDomId(`route-alt-detail-${key}`);
     return html`
-      <li class="alt">
-        <span class="alt-times">
-          <span aria-hidden="true"
-            >${delayed
-              ? html`<s class="time-planned">${delayed.planned}</s>
-                  <span class="time-late">${delayed.expected}</span>`
-              : clockOf(trip.departure)}
-            – ${clockOf(trip.arrival)}</span
-          >
-          <span class="sr-only"
-            >${this._tripSummary(trip)}${delayed
-              ? `, ${this._t("planned_late", {
-                  time: delayed.planned,
-                  n: first?.origin.delay_minutes ?? 0,
-                })}`
-              : ""}</span
-          >
-        </span>
-        <span class="alt-lines">
-          ${transitLegs(trip).map((leg) => this._renderBadge(leg, attrs))}
-        </span>
-        <span class="alt-meta">
-          ${trip.duration_minutes !== null
-            ? this._t("minutes", { n: trip.duration_minutes })
-            : ""}
-        </span>
-        ${worst ? this._renderRisk(worst) : nothing}
+      <li class=${open ? "alt alt--open" : "alt"}>
+        <button
+          type="button"
+          class="alt-summary"
+          aria-expanded=${open ? "true" : "false"}
+          aria-controls=${detailId}
+          @click=${() => this._toggleAlternative(key)}
+        >
+          <span class="alt-times">
+            <span aria-hidden="true"
+              >${delayed
+                ? html`<s class="time-planned">${delayed.planned}</s>
+                    <span class="time-late">${delayed.expected}</span>`
+                : clockOf(trip.departure)}
+              – ${clockOf(trip.arrival)}</span
+            >
+            <span class="sr-only"
+              >${this._tripSummary(trip)}${delayed
+                ? `, ${this._t("planned_late", {
+                    time: delayed.planned,
+                    n: first?.origin.delay_minutes ?? 0,
+                  })}`
+                : ""}</span
+            >
+          </span>
+          <span class="alt-lines">
+            ${transitLegs(trip).map((leg) => this._renderBadge(leg, attrs))}
+          </span>
+          <span class="alt-meta">
+            ${trip.duration_minutes !== null
+              ? this._t("minutes", { n: trip.duration_minutes })
+              : ""}
+          </span>
+          ${worst ? this._renderRisk(worst) : nothing}
+          <ha-icon
+            class="alt-chevron"
+            icon=${open ? "mdi:chevron-up" : "mdi:chevron-down"}
+            aria-hidden="true"
+          ></ha-icon>
+        </button>
+        <!-- Always in the DOM so aria-controls resolves; filled only when open,
+             since every alternative drawing its strand up front would be most
+             of the card's DOM for rows nobody opened. -->
+        <div class="alt-detail" id=${detailId} ?hidden=${!open}>
+          ${open
+            ? html`${this._renderNotices(trip, attrs)}
+              ${this._renderStrand(trip, attrs, `alt-${key}`)}`
+            : nothing}
+        </div>
       </li>
     `;
+  }
+
+  private _toggleAlternative(key: string): void {
+    const next = new Set(this._openAlternatives);
+    if (!next.delete(key)) next.add(key);
+    this._openAlternatives = next;
   }
 
   static override styles = css`
@@ -1698,9 +1934,24 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
       font-weight: 700;
     }
+    /* Centred on the TIME's optical centre, not on the row.
+       align-self: center centred it against the .stop box instead, which
+       min-height: var(--stop-row) makes taller than its line of text — so
+       the text sat baseline-aligned near the top while the icon centred in
+       the whole 22px, and the icon read low. Same trap the map pin above
+       and the .access row below each document.
+       So: explicit width/height for a box of exactly the glyph (no
+       line-height or descender space in it), bottom edge on the text
+       baseline, then down by the difference between that box's centre and
+       the cap-height centre of the text. 0.35em is half a cap height, which
+       keeps this correct if the row's font-size ever changes. */
     .live-mark {
       --mdc-icon-size: 16px;
-      align-self: center;
+      display: flex;
+      align-self: baseline;
+      width: var(--mdc-icon-size);
+      height: var(--mdc-icon-size);
+      transform: translateY(calc(var(--mdc-icon-size) / 2 - 0.35em));
       color: var(--wl-rt);
     }
     /* The label's text carries the box's baseline, so on the baseline-aligned
@@ -1823,6 +2074,70 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .walk ha-icon {
       --mdc-icon-size: 16px;
     }
+
+    /* "Search from here" belongs to the strand's disclosure family — the same
+       borderless text-and-icon shape as "6 Stationen" and "Weitere
+       Verbindungen", because it does the same kind of thing. It carried a
+       border and a tint first, which made the one pressable item in the row
+       heavier than the red badge warning the change won't hold.
+
+       Pushed to the trailing edge, where it lines up with the ride meta
+       ("alle 3 min") above and below it. Three changes then put three of
+       these in one column instead of three blocks against the rail. */
+    .replan {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      /* Clears WCAG 2.5.8's target size without drawing a box to do it. */
+      min-height: 32px;
+      margin-inline-start: auto;
+      padding: 0 6px;
+      border: none;
+      border-radius: var(--wl-radius-sm);
+      background: none;
+      color: var(--primary-color);
+      font: inherit;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .replan ha-icon {
+      display: block;
+      --mdc-icon-size: 16px;
+    }
+    .replan[disabled] {
+      opacity: 0.5;
+      cursor: default;
+    }
+    @media (hover: hover) {
+      .replan:hover:not([disabled]) {
+        background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+      }
+    }
+
+    /* The way back out of a jump. Above the connection rather than beside the
+       pickers: the From field already shows where we ended up, so this is a
+       property of the answer on screen, not of the form. */
+    .replan-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 36px;
+      margin-block-end: 4px;
+      padding: 0 10px 0 6px;
+      border: none;
+      border-radius: var(--wl-radius-md);
+      background: var(--secondary-background-color, rgb(127 127 127 / 0.12));
+      color: var(--primary-text-color);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .replan-back ha-icon {
+      --mdc-icon-size: 18px;
+      color: var(--primary-color);
+    }
     .stop--end {
       display: flex;
       flex-wrap: wrap;
@@ -1889,6 +2204,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 18px;
       flex: none;
     }
+    /* Which lift and why, under the station name. Its own line rather
+       than a longer first line: the station is what's scanned for, the
+       location is what's read once it has been found. */
+    .notice-detail {
+      display: block;
+      margin-top: 2px;
+      font-size: 0.8rem;
+      color: var(--secondary-text-color);
+    }
 
     .alternatives {
       border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
@@ -1916,12 +2240,47 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       display: none;
     }
     .alt {
+      border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+    }
+    /* The whole row is the button. Nothing inside it is interactive (no map
+       pins in the summary), so there is no nested control to fight. The
+       negative margin bleeds the hover wash 8px past the text, keeping the
+       times aligned with the toggle above; the card pads at least 12px and
+       ha-card clips, so the bleed and focus ring stay inside the card. */
+    .alt-summary {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: 6px 10px;
-      padding-block: 8px;
-      border-top: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+      width: calc(100% + 16px);
+      min-height: 44px;
+      margin-inline: -8px;
+      padding: 8px;
+      border: none;
+      border-radius: var(--wl-radius-sm);
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-align: start;
+      cursor: pointer;
+    }
+    .alt-summary:hover {
+      background: color-mix(in srgb, var(--primary-text-color) 6%, transparent);
+    }
+    /* Pushed to the end of the row, so the times stay where the eye looks. */
+    .alt-chevron {
+      --mdc-icon-size: 20px;
+      margin-inline-start: auto;
+      color: var(--secondary-text-color);
+    }
+    .alt-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding-block: 4px 12px;
+    }
+    .alt-detail[hidden] {
+      display: none;
     }
     .alt:first-child {
       border-top: none;
@@ -2267,6 +2626,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
 
     .alt-toggle:focus-visible,
+    .alt-summary:focus-visible,
     .stops-toggle:focus-visible,
     .map-link:focus-visible,
     .combo-field input:focus-visible,

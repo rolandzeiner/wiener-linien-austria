@@ -5,6 +5,9 @@
 // `fireEvent` has one implementation, in utils.ts, which all four
 // editors import.
 
+// Type-only, and mot.ts imports nothing, so this cannot form a cycle.
+import type { TransferMode } from "./utils/mot.js";
+
 /** Single entity in `hass.states`. The attributes bag is open-ended —
  *  the integration's coordinator emits the keys these cards read
  *  (`departures`, `traffic_info`, `elevator_info`, `attribution`, …). */
@@ -341,9 +344,9 @@ export interface WienerLinienAttrs {
   // the integration's config flow. Card editors prefer this so the
   // per-stop pickers only surface lines the user opted into.
   tracked_lines?: string[];
-  // Raw `{line}|{direction}` keys for tracked lines. Used by the retro
-  // card editor to filter the line list by direction without losing
-  // off-service lines.
+  // Raw `{line}|{direction}` keys for tracked lines. Read by the shared
+  // stop block (`directionSurface`) to tell "no live departures right now"
+  // from "not served", so an off-service line keeps its direction buttons.
   tracked_line_keys?: string[];
   // GTFS-derived per-line colours, scoped to the lines at this stop.
   // Empty when the static catalogue hasn't been loaded yet.
@@ -397,6 +400,9 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_hero_metric?: boolean | undefined;
   show_departures?: boolean | undefined;
   show_stops_ahead?: boolean | undefined;
+  /** Vehicle categories that get a transfer chip in the stops-ahead trail.
+   *  Omit the key for every category; an empty array hides every chip. */
+  stops_ahead_modes?: TransferMode[] | undefined;
   show_qr_button?: boolean | undefined;
   hide_header?: boolean | undefined;
   hide_attribution?: boolean | undefined;
@@ -405,7 +411,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Retro card config (single stop, single direction, LED aesthetic).
+// Retro card config (single stop, LED aesthetic).
 // ---------------------------------------------------------------------------
 
 export type RetroSize = "small" | "medium" | "regular";
@@ -417,6 +423,12 @@ export type RetroStyle = "classic" | "warm" | "pixel";
  *  `"right"` are explicit overrides for users who want their card to
  *  mirror a real station view that disagrees with the heuristic. */
 export type RetroPlatformSide = "auto" | "left" | "right";
+
+/** Retro direction filter. "both" is the explicit all-directions choice —
+ *  spelled out rather than encoded as absence, because absence already
+ *  means something else here: a pre-multi-line config that omits
+ *  `direction` has always shown H, and must keep doing so. */
+export type RetroDirection = "H" | "R" | "both";
 
 /** Exit-icon variant for one side of the station header strip.
  *  Either `"none"` (suppresses the icon), one of the two WL-traced
@@ -489,8 +501,14 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   // `?: T | undefined` throughout — see the optionality convention in
   // utils/config.ts.
   entity?: string | undefined;
-  direction?: "H" | "R" | undefined;
+  direction?: RetroDirection | undefined;
+  /** Legacy single-line filter. Still read, so configs written before
+   *  multi-line support keep working, and still written (as `lines[0]`),
+   *  so a config saved now still loads on an older build. `lines` is the
+   *  one to set. */
   line?: string | undefined;
+  lines?: string[] | undefined;
+  line_directions?: Record<string, "H" | "R"> | undefined;
   show_platform?: boolean | undefined;
   platform_side?: RetroPlatformSide | undefined;
   show_station_name?: boolean | undefined;
@@ -761,8 +779,17 @@ export interface RouteAttrs {
   trips?: RouteTripAttr[];
   line_colors?: LineColorsMap;
   traffic_info?: Array<{ title?: string; description?: string; related_lines?: string[] }>;
-  /** Lift outages at stations whose lifts the trips use; `stop_ids` names them. */
-  elevator_info?: Array<{ station?: string; description?: string; stop_ids?: string[] }>;
+  /** Lift outages at stations whose lifts the trips use; `stop_ids` names
+   *  them. `description` is the one lift the outage is about ("Passage -
+   *  Zwischengeschoss - Ausgang Innere Mariahilferstraße"), `reason` the
+   *  cause and usually the expected end date. Both German whatever the
+   *  dashboard's language: the feed publishes no other. */
+  elevator_info?: Array<{
+    station?: string;
+    description?: string;
+    reason?: string;
+    stop_ids?: string[];
+  }>;
   /** Planned step-free. */
   step_free?: boolean;
   /** Route entities, late evening: the night's last connection without a
@@ -811,4 +838,6 @@ export interface WienerLinienRouteCardConfig extends LovelaceCardConfig {
   step_free?: boolean | undefined;
   /** The map pin after each boarding stop and the destination. Default true. */
   show_map_pins?: boolean | undefined;
+  /** Ad-hoc mode: offer a search onward from each change. Default false. */
+  replan_from_change?: boolean | undefined;
 }

@@ -11,15 +11,16 @@
 
 import { LINE_TYPE_METRO } from "./mot.js";
 import { filterDepartures } from "./departures.js";
+import { canonicalLineLabel } from "./line-labels.js";
 import { ROW_CAP } from "./card-vocabulary.js";
 import type { DepartureAttr, WienerLinienAttrs } from "../types.js";
-import type { NormalisedRetroConfig } from "./config.js";
+import { retroDirectionFilter, type NormalisedRetroConfig } from "./config.js";
 
 export interface RetroView {
   /** Departures the panel will paint, already filtered and capped. */
   rows: DepartureAttr[];
-  /** Every departure passing the filters, uncapped — the station-name
-   *  band reads this to colour itself from lines beyond the two shown. */
+  /** Every departure passing the filters, uncapped. With no line
+   *  configured, the station-name band tints from its first entry. */
   matching: DepartureAttr[];
   /** The unfiltered feed, as the sensor reported it. */
   departures: DepartureAttr[];
@@ -41,8 +42,9 @@ export function deriveRetroView(
   const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
 
   const matching = filterDepartures(departures, {
-    direction: cfg.direction,
-    lines: cfg.line ? [cfg.line] : undefined,
+    direction: retroDirectionFilter(cfg.direction),
+    lines: cfg.lines,
+    line_directions: cfg.line_directions,
     walk_times: cfg.walk_times,
     accessibility_only: cfg.accessibility_only,
   });
@@ -83,4 +85,38 @@ export function deriveRetroView(
     platformLabelKey: isMetro ? "gleis" : "steig",
     stopName: attrs.stop_name || attrs.friendly_name || "",
   };
+}
+
+/** Translation key for an empty board, so the user knows whether to flip
+ *  direction, drop the line filter, or just wait for data. */
+export function retroEmptyStateKey(
+  cfg: NormalisedRetroConfig,
+  allDepartures: readonly DepartureAttr[],
+  serverTime: string | null | undefined,
+  staleDropped: number,
+): string {
+  if (allDepartures.length === 0) {
+    // Upstream froze: records arrived but had stopped advancing, so the
+    // coordinator dropped them. Checked before end-of-service — both look
+    // like "nothing left at this stop" from here, and calling a frozen feed
+    // Betriebsschluss is the bug in #103. A stop the API still answers for
+    // (server_time present) with nothing left is end-of-service, not an
+    // outage.
+    if (staleDropped > 0) return "stale_feed";
+    return serverTime ? "betriebsschluss" : "no_data";
+  }
+  // Diagnose against the picked lines only: another line running at the
+  // stop says nothing about why these are missing. Canonicalised the way
+  // filterDepartures does, so a legacy "LB" still finds the WLB.
+  const picked = cfg.lines?.length ? new Set(cfg.lines.map(canonicalLineLabel)) : null;
+  const onLine = picked ? allDepartures.filter((d) => picked.has(d.line)) : allDepartures;
+  if (onLine.length === 0) return "no_data_wrong_line";
+  // Each line's own direction wins, then the stop-wide one. "both" sets no
+  // stop-wide direction, so it is never compared against d.direction.
+  const stopWide = cfg.direction === "both" ? undefined : cfg.direction;
+  const anyInDirection = onLine.some((d) => {
+    const want = cfg.line_directions?.[d.line] ?? stopWide;
+    return !want || d.direction === want;
+  });
+  return anyInDirection ? "no_data" : "no_data_wrong_direction";
 }

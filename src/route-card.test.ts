@@ -20,7 +20,13 @@ import "./route-editor.js";
 
 import { ROUTE_CARD_VERSION } from "./const.js";
 import { pickerText } from "./localize/localize.js";
-import type { HomeAssistant, RouteAccessStepAttr, RouteTripAttr } from "./types.js";
+import type {
+  HomeAssistant,
+  RouteAccessStepAttr,
+  RouteLegAttr,
+  RouteTripAttr,
+} from "./types.js";
+import { ADHOC_DEBOUNCE_MS, ADHOC_REFRESH_MS } from "./utils/route.js";
 
 const TAG = "wiener-linien-austria-route-card";
 const ENTITY = "sensor.westbahnhof_praterstern_naechste_verbindung";
@@ -339,6 +345,43 @@ describe("step-free", () => {
     expect(root(el).querySelectorAll(".access--out")).toHaveLength(1);
   });
 
+  it("names which lift is out and why, not just the station", async () => {
+    // The feed is per lift, the trip names its lifts per station, so the
+    // match is station-wide. Printing the location is what tells someone
+    // the outage is about an exit they never take.
+    const attrs = {
+      ...ACTIVE,
+      step_free: true,
+      trips: [stepFreeTrip()],
+      traffic_info: [],
+      elevator_info: [
+        {
+          station: "Stephansplatz",
+          description: "Passage - Zwischengeschoss - Ausgang Kärntner Straße",
+          reason: "Geplante Wartung wird durchgeführt.",
+          stop_ids: ["60201320"],
+        },
+      ],
+    };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", attrs), { entity: ENTITY });
+    expect(text(el)).toContain(
+      "Aufzug außer Betrieb: Stephansplatz Passage - Zwischengeschoss - Ausgang Kärntner Straße · Geplante Wartung wird durchgeführt.",
+    );
+  });
+
+  it("leaves the notice at the station alone when the feed names no lift", async () => {
+    const attrs = {
+      ...ACTIVE,
+      step_free: true,
+      trips: [stepFreeTrip()],
+      traffic_info: [],
+      elevator_info: [{ station: "Stephansplatz", description: "", reason: "", stop_ids: ["60201320"] }],
+    };
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", attrs), { entity: ENTITY });
+    expect(text(el)).toContain("Aufzug außer Betrieb: Stephansplatz");
+    expect(root(el).querySelector(".notice-detail")).toBeNull();
+  });
+
   it("sends step_free from the card config in ad-hoc mode", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h, callWS } = adhocHass();
@@ -578,6 +621,96 @@ describe("rendering", () => {
     expect(list?.hidden).toBe(false);
     expect(text(el)).toContain("Anschluss gefährdet: 2 min zu wenig");
     expect(text(el)).toContain("08:00 bis 08:16, 1 Umstieg");
+  });
+
+  it("opens an alternative into its own strand, with matching ARIA state", async () => {
+    const el = await mount(hass("x", ACTIVE), { entity: ENTITY });
+    root(el).querySelector<HTMLButtonElement>(".alt-toggle")?.click();
+    await el.updateComplete;
+
+    const row = root(el).querySelector<HTMLButtonElement>(".alt-summary")!;
+    const detail = root(el).querySelector<HTMLElement>(".alt-detail")!;
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(row.getAttribute("aria-controls")).toBe(detail.id);
+    expect(detail.hidden).toBe(true);
+    // Closed rows draw nothing, so the hero's strand is the only one.
+    expect(root(el).querySelectorAll(".strand")).toHaveLength(1);
+
+    row.click();
+    await el.updateComplete;
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    expect(detail.hidden).toBe(false);
+    // The 08:00 connection's own strand, not a copy of the best one's —
+    // and it keeps the ride's delay, struck through as on the hero.
+    const strand = detail.querySelector(".strand")!;
+    expect(strand.querySelector(".stop s.time-planned")?.textContent).toBe("08:00");
+    expect(strand.querySelector(".stop time.time-late")?.textContent).toBe("08:02");
+    expect(strand.textContent).toContain("Richtung Simmering");
+    expect(strand.textContent).toContain("Praterstern");
+
+    row.click();
+    await el.updateComplete;
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(detail.querySelector(".strand")).toBeNull();
+  });
+
+  it("asks nothing of the planner to open an alternative", async () => {
+    const callWS = vi.fn();
+    const h = { ...hass("x", ACTIVE), callWS } as unknown as HomeAssistant;
+    const el = await mount(h, { entity: ENTITY });
+    const before = callWS.mock.calls.filter(([msg]) => msg?.type !== "wiener_linien_austria/card_version").length;
+    root(el).querySelector<HTMLButtonElement>(".alt-toggle")?.click();
+    await el.updateComplete;
+    root(el).querySelector<HTMLButtonElement>(".alt-summary")?.click();
+    await el.updateComplete;
+    const after = callWS.mock.calls.filter(([msg]) => msg?.type !== "wiener_linien_austria/card_version").length;
+    expect(after).toBe(before);
+  });
+
+  it("keeps an opened alternative open through a refresh", async () => {
+    const el = await mount(hass("x", ACTIVE), { entity: ENTITY });
+    root(el).querySelector<HTMLButtonElement>(".alt-toggle")?.click();
+    await el.updateComplete;
+    root(el).querySelector<HTMLButtonElement>(".alt-summary")?.click();
+    await el.updateComplete;
+
+    // A new state object, as the next poll delivers: a delay lands on the
+    // open connection and moves its live time. Its planned times, and so its
+    // key, stay the same.
+    const refreshed = ACTIVE.trips.map((t, i) => {
+      if (i !== 1) return t;
+      const origin = t.legs[0]!.origin;
+      const estimated = new Date(Date.parse(origin.planned!) + 4 * 60_000).toISOString();
+      return { ...t, legs: [{ ...t.legs[0]!, origin: { ...origin, estimated, delay_minutes: 4 } }, t.legs[1]!] };
+    });
+    el.hass = hass("y", { ...ACTIVE, trips: refreshed });
+    await el.updateComplete;
+    expect(root(el).querySelector(".alt-summary")?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  // Two connections that board the same ride and part only at the change are
+  // the ordinary case. Their strands must not share ids, nor one open state.
+  it("keeps a shared ride's stop list apart between the best and an alternative", async () => {
+    const best = trip("07:57", "08:11");
+    const sameStart: RouteTripAttr = {
+      ...best,
+      arrival: "2026-09-14T08:20:00+02:00",
+      legs: [best.legs[0]!, { ...best.legs[1]!, line: "N36", towards: "Kagran" }],
+    };
+    const el = await mount(hass("x", { ...ACTIVE, trips: [best, sameStart] }), { entity: ENTITY });
+    root(el).querySelector<HTMLButtonElement>(".alt-toggle")?.click();
+    await el.updateComplete;
+    root(el).querySelector<HTMLButtonElement>(".alt-summary")?.click();
+    await el.updateComplete;
+
+    const ids = [...root(el).querySelectorAll("[id]")].map((n) => n.id);
+    expect(new Set(ids).size).toBe(ids.length);
+
+    const [heroToggle, altToggle] = [...root(el).querySelectorAll<HTMLButtonElement>(".stops-toggle")];
+    altToggle!.click();
+    await el.updateComplete;
+    expect(altToggle!.getAttribute("aria-expanded")).toBe("true");
+    expect(heroToggle!.getAttribute("aria-expanded")).toBe("false");
   });
 
   it("hides the alternatives and the credit when configured to", async () => {
@@ -1291,7 +1424,8 @@ describe("editor", () => {
       schema: Array<{ name: string; required?: boolean }>;
     };
     expect(form.schema.map((f) => f.name)).toEqual([
-      "entity", "title", "from", "to", "alternatives", "step_free", "show_map_pins", "hide_attribution",
+      "entity", "title", "from", "to", "alternatives", "step_free", "replan_from_change",
+      "show_map_pins", "hide_attribution",
     ]);
     expect(form.schema[0]?.required).toBeUndefined();
 
@@ -1342,5 +1476,135 @@ describe("editor", () => {
     document.body.appendChild(el);
     await el.updateComplete;
     expect(root(el).querySelector("ha-form")).toBeNull();
+  });
+});
+
+describe("searching again from a change", () => {
+  const STEPHANSPLATZ = "60201012";
+
+  /** The shared fixture's change is at a stop with no `stop_id`. Give it the
+   *  DIVA the catalogue knows it by, so the chip has something to plan from. */
+  function trackableChange(diva: string = STEPHANSPLATZ): RouteTripAttr {
+    const base = trip("07:57", "08:11");
+    const [first, second] = base.legs as [RouteLegAttr, RouteLegAttr];
+    return {
+      ...base,
+      legs: [
+        { ...first, destination: { ...first.destination, stop_id: diva } },
+        { ...second, origin: { ...second.origin, stop_id: diva } },
+      ],
+    };
+  }
+
+  const chip = (el: CardElement): HTMLButtonElement | null =>
+    root(el).querySelector<HTMLButtonElement>(".strand .replan");
+
+  async function jumped(
+    trips: RouteTripAttr[] = [trackableChange(), trip("08:00", "08:16", "ok")],
+  ) {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => ({ ...PLAN, trips }));
+    const el = await mount(h, { replan_from_change: true });
+    await settle(el);
+    return { el, callWS };
+  }
+
+  it("plans from the change to the same destination, for the minute you get in", async () => {
+    const { el, callWS } = await jumped();
+    const button = chip(el)!;
+    expect(button.getAttribute("aria-label")).toBe(
+      "Andere Verbindung ab Stephansplatz suchen",
+    );
+
+    button.click();
+    await settle(el, ADHOC_DEBOUNCE_MS);
+
+    // Arrival 08:04 plus the 4 min between platforms — not "now" (07:50),
+    // which would answer for a station nobody has reached yet.
+    expect(planCalls(callWS).at(-1)).toMatchObject({
+      origin: Number(STEPHANSPLATZ),
+      destination: Number(PRATERSTERN),
+      datetime: "2026-09-14T08:08",
+      arrive_by: false,
+    });
+  });
+
+  it("offers the way back and does not rewrite the saved journey", async () => {
+    const { el, callWS } = await jumped();
+    chip(el)!.click();
+    await settle(el, ADHOC_DEBOUNCE_MS);
+
+    // The dashboard still opens on the journey that was actually entered.
+    expect(JSON.parse(window.localStorage.getItem("wiener-linien-austria-route-adhoc")!)).toEqual({
+      from: WESTBAHNHOF,
+      to: PRATERSTERN,
+    });
+
+    const back = root(el).querySelector<HTMLButtonElement>(".replan-back")!;
+    expect(back.textContent).toContain("Zurück zu Westbahnhof");
+
+    back.click();
+    await settle(el, ADHOC_DEBOUNCE_MS);
+    expect(planCalls(callWS).at(-1)).toMatchObject({ origin: Number(WESTBAHNHOF) });
+    expect(planCalls(callWS).at(-1)).not.toHaveProperty("datetime");
+    expect(root(el).querySelector(".replan-back")).toBeNull();
+  });
+
+  it("lands with the alternatives open — they are the whole point", async () => {
+    const { el, callWS } = await jumped();
+    const list = () => root(el).querySelector<HTMLElement>(".alt-list");
+    // The end-to-end query hides onward options the sub-query restores, so
+    // arriving on a collapsed disclosure would answer with what was known.
+    expect(list()!.hasAttribute("hidden")).toBe(true);
+
+    chip(el)!.click();
+    await settle(el, ADHOC_DEBOUNCE_MS);
+    expect(list()!.hasAttribute("hidden")).toBe(false);
+
+    // One-shot: a later refresh must not re-open a list since collapsed.
+    root(el).querySelector<HTMLButtonElement>(".alt-toggle")!.click();
+    await settle(el);
+    expect(list()!.hasAttribute("hidden")).toBe(true);
+    const before = planCalls(callWS).length;
+    await settle(el, ADHOC_REFRESH_MS);
+    expect(planCalls(callWS).length).toBeGreaterThan(before);
+    expect(list()!.hasAttribute("hidden")).toBe(true);
+  });
+
+  it("leaves the chip off a change the disclosure would have nothing to add to", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => ({ ...PLAN, trips: [trackableChange()] }));
+    const el = await mount(h, { alternatives: 0, replan_from_change: true });
+    await settle(el);
+    expect(chip(el)).toBeNull();
+  });
+
+  it("stays off until the dashboard asks for it", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => ({ ...PLAN, trips: [trackableChange()] }));
+    const el = await mount(h, {});
+    await settle(el);
+    expect(chip(el)).toBeNull();
+  });
+
+  it("leaves the chip off a change with no stop id", async () => {
+    const { el } = await jumped([trip("07:57", "08:11")]);
+    expect(chip(el)).toBeNull();
+  });
+
+  it("leaves the chip off a change the catalogue doesn't track", async () => {
+    // A DIVA the picker list doesn't hold — an S-Bahn-only station or a stop
+    // past the city border — which the backend would answer with
+    // `adhoc_invalid_stop`.
+    const { el } = await jumped([trackableChange("60299999")]);
+    expect(chip(el)).toBeNull();
+  });
+
+  it("leaves the chip off a card bound to a route entity", async () => {
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [trackableChange()] }), {
+      entity: ENTITY,
+      replan_from_change: true,
+    });
+    expect(chip(el)).toBeNull();
   });
 });

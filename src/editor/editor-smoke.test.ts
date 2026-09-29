@@ -255,3 +255,181 @@ describe("tablist ARIA matches the DOM it produces", () => {
     expect(labels[0]?.textContent?.trim()).toBe("Haltestellen");
   });
 });
+
+describe("transfer-mode chips (modern, Anzeige tab)", () => {
+  /** Mount the modern editor and switch to the Anzeige tab, where the chips
+   *  live. The tab is private state, so the test drives it the way a user
+   *  does — by clicking. The Anzeige tab's other sections are `ha-form`,
+   *  which is undefined here and renders nothing, so every `.wl-chip` found
+   *  afterwards is a transfer-mode chip. */
+  async function onDisplayTab(
+    config: Record<string, unknown> = {},
+  ): Promise<EditorElement> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    const tabs = shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    tabs[1]?.click();
+    await el.updateComplete;
+    return el;
+  }
+
+  const modeChips = (el: EditorElement): HTMLButtonElement[] => [
+    ...shadow(el).querySelectorAll<HTMLButtonElement>(".wl-chip"),
+  ];
+
+  it("renders one chip per mode, all pressed by default", async () => {
+    const chips = modeChips(await onDisplayTab());
+    expect(chips).toHaveLength(6);
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(
+      Array(6).fill("true"),
+    );
+  });
+
+  it("reflects a saved subset rather than always showing every chip as on", async () => {
+    const chips = modeChips(await onDisplayTab({ stops_ahead_modes: ["metro", "bus"] }));
+    // Chips render in TRANSFER_MODES order, which is the order the Python
+    // side already sorts the chips into: metro, sbahn, tram, badner, bus,
+    // night (_MOT_SORT_RANK in static.py for the Wiener Linien tiers,
+    // merge_transfer_lines in s_bahn_network.py for the S-Bahn behind the
+    // U-Bahn).
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual([
+      "true",
+      "false",
+      "false",
+      "false",
+      "true",
+      "false",
+    ]);
+  });
+
+  it("clicking a chip writes the remaining modes back", async () => {
+    const el = await onDisplayTab();
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+
+    modeChips(el)[0]?.click();
+    await el.updateComplete;
+
+    expect(config?.["stops_ahead_modes"]).toEqual([
+      "sbahn",
+      "tram",
+      "badner",
+      "bus",
+      "night",
+    ]);
+  });
+
+  // Empty must survive the round-trip: the normaliser reads a missing key as
+  // "every mode", so a control that dropped the key here would make "hide
+  // everything" unsaveable.
+  it("switching the last chip off saves an empty array, not an absent key", async () => {
+    const el = await onDisplayTab({ stops_ahead_modes: ["metro"] });
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+
+    modeChips(el)[0]?.click();
+    await el.updateComplete;
+
+    expect(config?.["stops_ahead_modes"]).toEqual([]);
+  });
+
+  it("goes inert — but stays focusable — with the stops trail switched off", async () => {
+    const el = await onDisplayTab({ show_stops_ahead: false });
+    const chips = modeChips(el);
+    expect(chips.map((c) => c.getAttribute("aria-disabled"))).toEqual(
+      Array(6).fill("true"),
+    );
+    // aria-disabled rather than the `disabled` attribute, so a keyboard user
+    // sweeping the group still meets the option and the note explaining it.
+    expect(chips.some((c) => c.hasAttribute("disabled"))).toBe(false);
+
+    let fired = false;
+    el.addEventListener("config-changed", () => {
+      fired = true;
+    });
+    chips[0]?.click();
+    await el.updateComplete;
+    expect(fired).toBe(false);
+  });
+});
+
+describe("retro editor writes back through config-changed", () => {
+  const RETRO_CFG = { type: "custom:wiener-linien-austria-retro-card", entity: ENTITY };
+
+  function lastConfig(el: EditorElement): () => Record<string, unknown> | undefined {
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+    return () => config;
+  }
+
+  it("a line toggle writes lines and the legacy line, and clears both with the last one", async () => {
+    const el = await mount(RETRO, BUSY_STOP, RETRO_CFG);
+    const config = lastConfig(el);
+
+    shadow(el).querySelector<HTMLButtonElement>(".wl-chip")?.click(); // "52"
+    await el.updateComplete;
+    expect(config()).toMatchObject({ lines: ["52"], line: "52" });
+
+    shadow(el).querySelector<HTMLButtonElement>(".wl-chip")?.click();
+    await el.updateComplete;
+    expect(config()?.["lines"]).toBeUndefined();
+    expect(config()?.["line"]).toBeUndefined();
+  });
+
+  it("a walk-time step writes the minutes, and stepping below one clears them", async () => {
+    const el = await mount(RETRO, BUSY_STOP, RETRO_CFG);
+    const config = lastConfig(el);
+    const steppers = () => [...shadow(el).querySelectorAll<HTMLButtonElement>(".wl-step-btn")];
+
+    steppers()[1]!.click(); // the first row's "+"
+    await el.updateComplete;
+    expect(Object.values(config()?.["walk_times"] as Record<string, number>)).toEqual([1]);
+
+    steppers()[0]!.click(); // and back down
+    await el.updateComplete;
+    expect(config()?.["walk_times"]).toBeUndefined();
+  });
+
+  it("a per-line direction writes that line only and keeps the stop-wide 'both'", async () => {
+    const el = await mount(RETRO, BUSY_STOP, { ...RETRO_CFG, lines: ["U3", "52"], direction: "both" });
+    const config = lastConfig(el);
+    const u3 = [...shadow(el).querySelectorAll<HTMLElement>(".wl-override-row")].find(
+      (row) => row.querySelector(".wl-badge")?.textContent?.trim() === "U3",
+    );
+    u3?.querySelectorAll<HTMLButtonElement>(".wl-dir")[1]?.click(); // R
+    await el.updateComplete;
+    expect(config()).toMatchObject({ direction: "both", line_directions: { U3: "R" } });
+  });
+});
+
+describe("helper text names the setting a field depends on", () => {
+  type Form = { computeHelper(field: { name: string }): string | undefined };
+  const form = (el: EditorElement): Form =>
+    shadow(el).querySelector("ha-form") as unknown as Form;
+
+  it("modern: the stop layout only matters from two stops", async () => {
+    const one = await mount(MODERN, BUSY_STOP, EDITORS[0]![1]);
+    expect(form(one).computeHelper({ name: "layout" })).toBe("Wirkt erst ab zwei Haltestellen.");
+    const two = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }, { entity: "sensor.other_abfahrten" }],
+    });
+    expect(form(two).computeHelper({ name: "layout" })).not.toBe("Wirkt erst ab zwei Haltestellen.");
+  });
+
+  it("retro: the marquee text needs the marquee", async () => {
+    const off = await mount(RETRO, BUSY_STOP, EDITORS[1]![1]);
+    expect(form(off).computeHelper({ name: "message_text" })).toBe("Braucht „Lauftext anzeigen“.");
+    const on = await mount(RETRO, BUSY_STOP, { ...EDITORS[1]![1], message_ticker: true });
+    expect(form(on).computeHelper({ name: "message_text" })).not.toBe("Braucht „Lauftext anzeigen“.");
+  });
+});

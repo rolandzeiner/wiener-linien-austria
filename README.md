@@ -38,7 +38,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Live departures** for any U-Bahn, Straßenbahn, Autobus or Nightline stop. One sensor per stop; the state is the next-departure countdown, attributes carry the full board.
 - **Four Lovelace cards** — modern board, retro LED panel, Solari split-flap and a route card — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared by the modern, retro and flap cards *(2.0.0)*.
-- **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*.
+- **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*. Pick which vehicle types get a chip — metro, S-Bahn, tram, Badner Bahn, bus, NightLine — and hide the ones you never change to *(2.1.0)*.
 - **S-Bahn transfers on the stops-ahead trail** *(2.0.0)* — a U-Bahn, tram or bus trail shows S-Bahn chips next to the U-Bahn ones wherever you can change to the S-Bahn. They come from the timetable, so a chip means the S-Bahn stops there, not that a train is due. This works whether or not you track any S-Bahn lines.
 - **S-Bahn on departure boards** *(2.0.0)* — track a stop's S-Bahn lines next to its Wiener Linien lines. They show timetable times only, since no live data exists for them, and every card marks those rows *Timetable only*. On the modern card, an S-Bahn departure expands into its stops ahead like any other, with the lines you can change to.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
@@ -146,7 +146,7 @@ Four cards ship with the integration. All four register themselves as Lovelace r
 | Card | Best for | Stops | Style |
 |---|---|---|---|
 | **Modern** | Everyday dashboard, full feature set | Multi-stop | Themed HA card |
-| **Retro** | Wall-tablet kiosks, entryway displays | Single stop / direction | Wiener Linien LED platform sign |
+| **Retro** | Wall-tablet kiosks, entryway displays | Single stop | Wiener Linien LED platform sign |
 | **Flap** | Decorative boards, signage walls | Multi-stop | Solari split-flap mechanical board |
 | **Route** *(experimental)* | "When do I leave?" at a glance | One route, or any two stops | Themed HA card |
 
@@ -190,6 +190,7 @@ entities:
 | `show_hero_metric` | `true` | Shows the next departure large. |
 | `show_departures` | `true` | Shows the departure list. |
 | `show_stops_ahead` | `true` | Lets you expand a departure into its stops ahead. |
+| `stops_ahead_modes` | all | Which vehicle types get a transfer chip on the trail: `metro`, `sbahn`, `tram`, `badner`, `bus`, `night`. List only the ones you want. Needs `show_stops_ahead`. |
 | `show_platform` | `true` | Shows the platform or track. |
 | `show_type_icon` | `false` | Shows the vehicle-type icon. |
 | `show_delay` | `true` | Shows delays. |
@@ -205,11 +206,12 @@ entities:
 
 ### Retro card — `wiener-linien-austria-retro-card`
 
-A focused LED panel, modelled on the amber-on-violet signs hanging from Wiener Linien platforms. The station-name tile picks up the configured line's colour (nightline blue + yellow on N-lines).
+A focused LED panel, modelled on the amber-on-violet signs hanging from Wiener Linien platforms. Filter it to one line and the station-name tile picks up that line's colour (nightline blue + yellow on N-lines).
 
 - **Three style variants** — *Classic*, *Warm*, *Dot matrix* (screen-door overlay).
 - **GLEIS / STEIG panel** — amber platform tile when the API reports one.
 - **Signage header strip** — exit icon, sign text, clock, date, WC / escalator / elevator tiles, free-form MDI icons and short labels. Per side.
+- **Several lines at once** — track any set of lines on one panel, each with its own direction, or show every direction *(2.1.0)*.
 - **Wheelchair race** — when ≥ 2 departures are step-free, runs a "3, 2, 1" countdown to the trophy finish. Tap to trigger.
 - **Scrolling message** — custom text scrolls every 5 min, then hands back to live departures.
 
@@ -220,15 +222,17 @@ Add via Dashboard → **Add card** → "Wiener Linien Austria — Retro".
 ```yaml
 type: custom:wiener-linien-austria-retro-card
 entity: sensor.stephansplatz_departures
-line: U1
-direction: R
+lines: [U1, U4]
+direction: both
 ```
 
 | Option | Default | Description |
 |---|---|---|
 | `entity` | first stop found | A stop's departure sensor. |
-| `line` | all lines | The line to show. |
-| `direction` | `H` | `H` or `R`. |
+| `lines` | all lines | The lines to show, for example `[U1, U4]`. |
+| `line` | all lines | A single line. The older spelling of `lines`, still read. |
+| `direction` | `H` | `H`, `R`, or `both` for every direction. |
+| `line_directions` | none | One direction per line, for example `{U1: R}`. Beats `direction` for that line. |
 | `walk_times` | none | Minutes it takes you to reach the line, keyed `"line\|direction"`, `0`–`120`. Departures you can't catch are hidden. |
 | `size` | `regular` | `small`, `medium` or `regular`. |
 | `style` | `classic` | `classic`, `warm` or `pixel` (dot matrix). |
@@ -322,8 +326,8 @@ What the card shows:
 - **Live times and frequency** *(2.0.0)* — a U-Bahn, tram or bus ride with a live time gets a live icon next to its departure; a late one also shows its planned time struck through and the expected time in red (for example ~~09:22~~ 09:25). A line running every 5 min or more often shows *every 3 min*; a less frequent one shows its next two departures instead. S-Bahn and train rides stay on the timetable.
 - **Buffer on every change** — walking time plus a grade: enough time, tight, or at risk when the current times say the change no longer fits. The grade is written out, not just coloured.
 - **Disruptions** for the lines the trip uses.
-- **Lifts and stairs** *(2.0.0)* — on a step-free trip, each lift on the way to the platform, at a change and at the destination, for example *Lift down*. A lift at a station with an outage says *out of service*, and a warning names the station. Rides planned with a low-floor vehicle show a wheelchair icon.
-- **More connections** — up to three later options, folded away until you open them.
+- **Lifts and stairs** *(2.0.0)* — on a step-free trip, each lift on the way to the platform, at a change and at the destination, for example *Lift down*. A lift at a station with an outage says *out of service*, and a warning names the station. The warning also names which lift and why — *Passage – Zwischengeschoss – Ausgang Innere Mariahilferstraße · geplante Wartung* — so you can tell an exit you don't use from the one on your way *(2.1.0)*. Rides planned with a low-floor vehicle show a wheelchair icon.
+- **More connections** — up to three later options, folded away until you open them. Tap one to see its rides, stops and changes in full *(2.1.0)*.
 - **Last connection** *(2.0.0)* — for a route, from 22:00: the night's last connection without a night bus, for example *Last connection without night bus 00:20*.
 - **Last updated** (*Zuletzt aktualisiert* on a German install) — the time the trip planner last answered, next to the heading, so a plan kept on screen can't pass for a fresh one.
 
@@ -333,6 +337,7 @@ Picking stops without a route:
 - **Swap** start and destination with one tap.
 - The connections appear as soon as both stops are set.
 - **Now, Depart at or Arrive by** *(2.0.0)* — plan for right now, or pick a date and time to leave at or arrive by. Times are Vienna time, like the signs at the stop. The card starts at **Now** again after a reload.
+- **Search again from a change** *(2.1.0)* — with `replan_from_change` on, each change gets a button that looks up what else goes onward from that station, timed for when you'd actually get there. Worth turning on if your changes are often tight: the planner keeps one onward ride per connection, so the other ways out of that stop never reach the card until you ask. One tap goes back to the journey you entered.
 - The card remembers your last pick on each device. In the card editor you can also preselect a start and destination.
 
 Add via Dashboard → **Add card** → "Wiener Linien Austria — Route".
@@ -363,6 +368,7 @@ to: "60200421"
 | `show_map_pins` | `true` | Shows the map pins after the stop names. |
 | `hide_attribution` | `false` | Hides the data-source line. |
 | `step_free` | `false` | Plans step-free connections when there's no `entity`. A route uses its own **Step-free** setting. |
+| `replan_from_change` | `false` | Adds a **Search from here** button at each change, when there's no `entity`. |
 
 **How the card plans between any two stops.** Requests go through Home Assistant, never from the browser to Wiener Linien. The card refreshes every 2 minutes while it's on screen and the browser tab is visible, and shortly after the best connection leaves. After 30 minutes without a tap or key press it pauses until someone touches it, so a wall tablet left open stops asking. Home Assistant reuses an answer for up to a minute, whichever dashboard asks. Each Home Assistant user gets up to 60 trip-planner requests an hour, and all users together up to 120.
 
@@ -476,7 +482,7 @@ Four live endpoints and five static files, on separate cadences:
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
-| Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 30 trains with their stops, fetched again after 2 h or when fewer than 6 are left, never more often than every 5 min. After a failed request the wait doubles, up to 30 min, until it answers again. Counted down locally in between, and shares the routes' 15 s cooldown slot |
+| Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 60 trains with their stops, fetched again after 2 h or once your picked lines have fewer than 6 trains left, never more often than every 5 min. After a failed request the wait doubles, up to 30 min, until it answers again. Counted down locally in between, and shares the routes' 15 s cooldown slot |
 | S-Bahn lines per stop | `ogd_routing/XML_DM_REQUEST` | Weekly, cached — 40 trains with their stops at each of 7 hub stations, for the S-Bahn transfer chips. Checked daily, so a failed station is retried the next day. Only with a departure board set up; shares the routes' 15 s cooldown slot |
 | Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window. Pulled forward to 30 s after the best connection leaves, but never sooner than 60 s after the last refresh |
 | Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`. The card refreshes every 120 s while visible, sooner right after the best connection leaves (never within 60 s), every 10 min for a plan at a chosen time, and pauses after 30 min idle. Answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |

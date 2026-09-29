@@ -292,20 +292,48 @@ MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
 #   2026-12-12.
 # ----------------------------------------------------------------
 ROUTING_DEPARTURE_ENDPOINT: Final = "/XML_DM_REQUEST"
-# Rows per board refresh. At Handelskai, the busiest S-Bahn stop on the
-# boards, 30 trains reach about 75 minutes ahead.
-TIMETABLE_DEPARTURES_REQUESTED: Final = 30
+# Rows per board refresh. Sized for the lines a board actually shows, not
+# for the rows the answer carries: the request can't filter by line, so a
+# stop served by several S-Bahn lines spends most of its batch on trains
+# the board throws away. Measured 2026-09-20 at Meidling (S1, S2, S3, S60,
+# S80), a board tracking S60|H and S80|R:
+#
+#   limit  rows  of which tracked  horizon   wire
+#      30    30                 6   120 min   31 KB
+#      60    60                12   244 min   60 KB
+#      90    90                18   368 min   90 KB
+#
+# At 30 a fresh batch held exactly six tracked trains — the card's default
+# max_departures, with no slack — so the board was down to two rows about
+# 75 minutes in and stayed there until the running-low rule, which then
+# counted the whole batch, fired at ~94 minutes. At 60 the tracked rows
+# outlast TIMETABLE_MAX_AGE, so the age becomes the binding rule and the
+# board stays full for the whole cycle. The size also arms the running-low
+# rule: a batch holding TIMETABLE_MIN_UPCOMING tracked trains or fewer turns
+# it off (`TimetableBoard._tracked_at_fetch`), so at 30 this board would now
+# drain until the age refetches it.
+# The extra rows cost ~29 KB on the wire and no extra requests: they buy
+# back more than they add by stopping the early running-low refetch.
+TIMETABLE_DEPARTURES_REQUESTED: Final = 60
 # Rows the line picker asks for, enough to see every line and direction
 # at a stop even where some run only every 30 minutes.
 TIMETABLE_PICKER_DEPARTURES: Final = 100
 # A board's planned rows are refetched when this old…
-# Two hours, not 30 minutes: the running-low rule below already refetches
-# a busy stop about once an hour, so the age only has to catch a replacement
-# timetable published within the day. At 30 minutes it made 48 requests a
-# day per stop at ~280 KB each before gzip (measured 2026-09-15, Meidling).
+# Two hours, not 30 minutes: a batch this size is meant to still hold
+# TIMETABLE_MIN_UPCOMING tracked trains when the age expires, so the age is
+# what normally refetches a board and
+# the running-low rule below is the safety net rather than the trigger. It
+# also has to catch a replacement timetable published within the day. At 30
+# minutes it made 48 requests a day per stop at ~280 KB each before gzip
+# (measured 2026-09-15, Meidling).
 TIMETABLE_MAX_AGE: Final = timedelta(hours=2)
-# …or when fewer than this many are still ahead, but never sooner than
-# TIMETABLE_RETRY_AFTER after the last attempt.
+# …or when fewer than this many of the board's picked (line, direction)
+# trains are still ahead, but never sooner than TIMETABLE_RETRY_AFTER after
+# the last attempt. Counted over the tracked lines, not the whole batch
+# (`TimetableBoard._tracked_upcoming`). The rule is off for a batch that
+# already held everything the server had (`_complete`) or arrived with this
+# many tracked trains or fewer (`_tracked_at_fetch`); only the age
+# refetches such a board.
 TIMETABLE_MIN_UPCOMING: Final = 6
 # After a failure the spacing doubles with each further failure (5, 10, 20,
 # then BACKOFF_CAP_SECONDS) with +/-10% jitter, and resets on the next

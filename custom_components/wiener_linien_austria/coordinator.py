@@ -185,7 +185,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             )
         self._diva: int = diva_int
         self._timetable: TimetableBoard | None = (
-            TimetableBoard(hass, diva_int) if self._timetable_pairs else None
+            TimetableBoard(hass, diva_int, self._timetable_pairs)
+            if self._timetable_pairs
+            else None
         )
         # The last `/monitor` slice before the timetable rows were merged in,
         # so a timetable refresh landing between ticks can re-merge.

@@ -1,4 +1,5 @@
 import { NIGHTLINE_BG, NIGHTLINE_FG } from "../const.js";
+import { TRANSFER_MODES, type TransferMode } from "./mot.js";
 import { accentTextColor } from "./color.js";
 import { CARD_DEFAULTS } from "./card-vocabulary.js";
 import { canonicalLineLabel } from "./line-labels.js";
@@ -8,6 +9,7 @@ import type {
   RetroHeaderExit,
   RetroHeaderSide,
   RetroPlatformSide,
+  RetroDirection,
   RetroSize,
   RetroStationBg,
   RetroStyle,
@@ -21,6 +23,11 @@ import type {
  *  untyped config record without trusting its field types. */
 function asBool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
+}
+
+/** `v` when `allowed` holds it, otherwise `fallback`. */
+function oneOf<T extends string>(allowed: ReadonlySet<T>, v: unknown, fallback: T): T {
+  return allowed.has(v as T) ? (v as T) : fallback;
 }
 
 const RETRO_SIZES: ReadonlySet<RetroSize> = new Set(["small", "medium", "regular"] as const);
@@ -120,9 +127,7 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
   const r = raw as Record<string, unknown>;
   const out: RetroHeaderSide = {};
 
-  const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
-    ? (r.exit as RetroHeaderExit)
-    : "none";
+  const exit = oneOf(RETRO_HEADER_EXIT, r.exit, "none");
   if (exit !== "none") out.exit = exit;
 
   const text = boundedText(r.text, HEADER_MAX_TEXT_LEN, true);
@@ -209,7 +214,7 @@ export interface NormalisedModernStop {
   walk_times?: WalkTimes;
 }
 
-export function normaliseLineDirections(
+function normaliseLineDirections(
   raw: unknown,
 ): Record<string, "H" | "R"> | undefined {
   if (!raw || typeof raw !== "object") return undefined;
@@ -311,6 +316,11 @@ export interface NormalisedModernConfigValidated {
   show_hero_metric: boolean;
   show_departures: boolean;
   show_stops_ahead: boolean;
+  /** Which vehicle categories get a transfer chip in the stops-ahead trail.
+   *  Order is irrelevant; membership is the whole meaning. An EMPTY array is
+   *  a real state ("chip nothing"), distinct from the key being absent
+   *  ("chip everything") — see the normaliser. */
+  stops_ahead_modes: TransferMode[];
   show_qr_button: boolean;
   hide_header: boolean;
   hide_attribution: boolean;
@@ -355,13 +365,17 @@ const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_hero_metric",
   "show_departures",
   "show_stops_ahead",
+  "stops_ahead_modes",
   "show_qr_button",
   "hide_header",
   "hide_attribution",
   "layout",
 ]);
 
-const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_colors" | "type"> = {
+const MODERN_DEFAULTS: Omit<
+  NormalisedModernConfigValidated,
+  "entities" | "line_colors" | "type" | "stops_ahead_modes"
+> = {
   max_departures: 6,
   show_accessibility: false,
   accessibility_only: false,
@@ -380,6 +394,23 @@ const MODERN_DEFAULTS: Omit<NormalisedModernConfigValidated, "entities" | "line_
   hide_attribution: false,
   layout: "stacked",
 };
+
+// Absence and emptiness mean different things here, which is why this is not
+// `cleanStringList`. A config written before the feature existed has no key at
+// all and must keep chipping every mode; a user who switched every chip off
+// saves `[]` and must get exactly that. Anything that is not an array — a null,
+// a YAML string, a number — reads as "not configured" and takes the default.
+function normaliseTransferModes(raw: unknown): TransferMode[] {
+  if (!Array.isArray(raw)) return [...TRANSFER_MODES];
+  const valid = new Set<string>(TRANSFER_MODES);
+  const seen = new Set<TransferMode>();
+  for (const v of raw) {
+    if (typeof v === "string" && valid.has(v)) seen.add(v as TransferMode);
+  }
+  // Re-derived from TRANSFER_MODES rather than from insertion order, so the
+  // saved YAML reads in signage order however the user clicked the chips.
+  return TRANSFER_MODES.filter((m) => seen.has(m));
+}
 
 // Accepts a raw, untyped config record: callers pass either a fresh
 // `WienerLinienCardConfig` (card `setConfig`) or an already-normalised
@@ -461,6 +492,7 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
     show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
     show_stops_ahead: asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead),
+    stops_ahead_modes: normaliseTransferModes(raw.stops_ahead_modes),
     show_qr_button: asBool(raw.show_qr_button, MODERN_DEFAULTS.show_qr_button),
     hide_header: asBool(raw.hide_header, MODERN_DEFAULTS.hide_header),
     hide_attribution: asBool(raw.hide_attribution, MODERN_DEFAULTS.hide_attribution),
@@ -480,10 +512,14 @@ export interface NormalisedRetroConfigValidated {
   //     config interface, because user-authored YAML can carry either shape.
   //   `?: T` — the bare form. Used by every NORMALISED interface: the
   //     normalisers only ever produce absence, and absence is what the
-  //     renderers branch on.
+  //     renderers branch on. This interface is the exception:
+  //     `normaliseRetroConfig` assigns `undefined` explicitly for keys it
+  //     didn't get, so the retro shape takes the dual form.
   entity?: string | undefined;
-  direction: "H" | "R";
+  direction: RetroDirection;
   line?: string | undefined;
+  lines?: string[] | undefined;
+  line_directions?: Record<string, "H" | "R"> | undefined;
   show_platform: boolean;
   platform_side: RetroPlatformSide;
   show_station_name: boolean;
@@ -519,6 +555,8 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "entity",
   "direction",
   "line",
+  "lines",
+  "line_directions",
   "show_platform",
   "platform_side",
   "show_station_name",
@@ -544,17 +582,33 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_unit",
 ]);
 
+/** What `filterDepartures` wants for a retro config's direction. The filter
+ *  expresses "every direction" as absence; the config spells it "both", so
+ *  that a saved card can tell a deliberate choice apart from an omission.
+ *  One helper so the card and the view can't answer this differently. */
+export function retroDirectionFilter(
+  direction: RetroDirection,
+): "H" | "R" | undefined {
+  return direction === "both" ? undefined : direction;
+}
+
+/** The retro line filter. `lines` is the filter; `line` is its pre-multi-line
+ *  spelling, accepted on the way in and re-emitted as lines[0] on the way out. */
+function retroLines(raw: WienerLinienRetroCardConfig): string[] | undefined {
+  if (Array.isArray(raw.lines)) {
+    return raw.lines.filter((line): line is string => typeof line === "string" && line.length > 0);
+  }
+  return typeof raw.line === "string" && raw.line ? [raw.line] : undefined;
+}
+
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
-  const direction = raw.direction === "R" ? "R" : "H";
-  const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize)
-    ? (raw.size as RetroSize)
-    : CARD_DEFAULTS.size.retro;
-  const station_bg: RetroStationBg = RETRO_STATION_BG.has(raw.station_bg as RetroStationBg)
-    ? (raw.station_bg as RetroStationBg)
-    : CARD_DEFAULTS.station_bg.retro;
-  const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
-    ? (raw.style as RetroStyle)
-    : "classic";
+  // Anything that isn't an explicit "R" or "both" lands on H — the default
+  // this card has always had. Absence therefore keeps meaning H, and a user
+  // who wants every direction says so with "both".
+  const direction: RetroDirection =
+    raw.direction === "R" || raw.direction === "both" ? raw.direction : "H";
+  const lines = retroLines(raw);
+  const lineDirections = normaliseLineDirections(raw.line_directions);
   const passthrough = filterPassthrough(raw, RETRO_VALIDATED_KEYS);
 
   return {
@@ -562,21 +616,21 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     type: raw.type || "custom:wiener-linien-austria-retro-card",
     entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
-    line: typeof raw.line === "string" && raw.line ? raw.line : undefined,
+    line: lines?.[0],
+    lines: lines?.length ? lines : undefined,
+    line_directions: lineDirections,
     // asBool, not `?? true` — YAML is untyped, and `?? ` passes a
     // non-boolean straight through (`show_platform: 0` yielded `0`,
     // hiding the column, where modern and flap both yield `true`).
     show_platform: asBool(raw.show_platform, CARD_DEFAULTS.show_platform.retro),
-    platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
-      ? (raw.platform_side as RetroPlatformSide)
-      : "auto",
+    platform_side: oneOf(RETRO_PLATFORM_SIDES, raw.platform_side, "auto"),
     show_station_name: asBool(
       raw.show_station_name,
       CARD_DEFAULTS.show_station_name.retro,
     ),
-    station_bg,
-    size,
-    style,
+    station_bg: oneOf(RETRO_STATION_BG, raw.station_bg, CARD_DEFAULTS.station_bg.retro),
+    size: oneOf(RETRO_SIZES, raw.size, CARD_DEFAULTS.size.retro),
+    style: oneOf(RETRO_STYLES, raw.style, "classic"),
     flicker: raw.flicker === true,
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,

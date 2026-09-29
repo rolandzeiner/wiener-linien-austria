@@ -9,6 +9,7 @@ import {
   iconForElevatorReason,
   parseTrafficNotice,
   splitLocationPath,
+  trimTitleLinePrefix,
 } from "./traffic-notice.js";
 
 /** The two live `stoerunglang` entries on 2026-09-08, one per wording. */
@@ -216,5 +217,46 @@ describe("lift helpers", () => {
     expect(splitLocationPath("Franz-Josefs-Bahnhof")).toEqual([
       "Franz-Josefs-Bahnhof",
     ]);
+  });
+});
+
+describe("trimTitleLinePrefix", () => {
+  it("drops a line list the badges already carry", () => {
+    expect(trimTitleLinePrefix("11A, 59A, 48A: Verkehrsüberlastung", ["11A", "48A", "59A"])).toBe(
+      "Verkehrsüberlastung",
+    );
+    expect(trimTitleLinePrefix("U3: Verspätungen", ["U3"])).toBe("Verspätungen");
+    expect(trimTitleLinePrefix("Linien 40, 41: Umleitung", ["40", "41"])).toBe("Umleitung");
+    expect(trimTitleLinePrefix("D und O: Umleitung", ["D", "O"])).toBe("Umleitung");
+  });
+
+  // The whole point of the conservatism: a line with no badge must keep its
+  // mention, or the card silently loses which services are affected.
+  it("keeps the prefix when it names a line no badge shows", () => {
+    expect(trimTitleLinePrefix("11A, 59A: Verkehrsüberlastung", ["11A"])).toBe(
+      "11A, 59A: Verkehrsüberlastung",
+    );
+  });
+
+  it("leaves a colon that is not a line list alone", () => {
+    expect(trimTitleLinePrefix("Achtung: Ersatzverkehr", ["13A"])).toBe(
+      "Achtung: Ersatzverkehr",
+    );
+    expect(trimTitleLinePrefix("Aufzug außer Betrieb", ["U1"])).toBe("Aufzug außer Betrieb");
+  });
+
+  it("keeps a title that is only a line list, leaving something to read", () => {
+    expect(trimTitleLinePrefix("U3:", ["U3"])).toBe("U3:");
+    expect(trimTitleLinePrefix("U3", ["U3"])).toBe("U3");
+  });
+
+  it("does nothing without badges to defer to", () => {
+    expect(trimTitleLinePrefix("U3: Verspätungen", [])).toBe("U3: Verspätungen");
+  });
+
+  // The Badner Bahn is "LB" in the catalogue and "WLB" live (issue #110), so
+  // the two spellings must still recognise each other here.
+  it("matches a legacy spelling against its realtime badge", () => {
+    expect(trimTitleLinePrefix("LB: Umleitung", ["WLB"])).toBe("Umleitung");
   });
 });

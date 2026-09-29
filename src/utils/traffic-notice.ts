@@ -49,6 +49,8 @@
 // would mean either duplicating that table or exporting it just to be
 // re-imported next door.
 
+import { canonicalLineLabel } from "./line-labels.js";
+
 /** Labels the operator uses for trailing facts, longest first so a prefix
  *  can't shadow a longer label. These are matched literally — extending the
  *  list is the intended way to cover new operator wording. */
@@ -409,4 +411,43 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
   }
 
   return { blocks, facts };
+}
+
+/** Line-list prefix on an alert title: "11A, 59A, 48A: Verkehrsüberlastung",
+ *  "U1: Verspätungen", "Linien 40, 41: Umleitung". The operator writes the
+ *  affected lines into the title, and the departure board already shows them
+ *  as coloured badges above it — so on the board the prefix is the same fact
+ *  twice, in the row where space is tightest. */
+const TITLE_LINE_PREFIX_RE = /^(?:Linien?\s+)?([^:]{1,80}):\s*(\S.*)$/;
+
+/**
+ * Drop the leading line list from an alert title when the badges beside it
+ * already carry every line it names.
+ *
+ * Conservative on purpose — it returns the title untouched unless each token
+ * before the colon is one of `lines`:
+ *
+ *   - a title naming a line with no badge ("13A, 59A: …" against a 13A badge
+ *     alone) keeps its prefix, because dropping it would lose the 59A;
+ *   - a colon that isn't a line list ("Achtung: Ersatzverkehr") is left
+ *     alone, since "Achtung" matches no badge;
+ *   - a title that is ONLY a line list keeps it, because the regex needs
+ *     something after the colon and there would otherwise be no title left.
+ *
+ * Labels are compared through `canonicalLineLabel`, so a title written in the
+ * catalogue's spelling still matches a badge carrying the realtime one.
+ */
+export function trimTitleLinePrefix(title: string, lines: readonly string[]): string {
+  const match = TITLE_LINE_PREFIX_RE.exec(title.trim());
+  if (!match) return title;
+  const [, prefix, rest] = match as unknown as [string, string, string];
+  const shown = new Set(lines.map((l) => canonicalLineLabel(l.trim()).toUpperCase()));
+  if (!shown.size) return title;
+  const tokens = prefix
+    .split(/\s*(?:,|\/|\bund\b)\s*/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  if (!tokens.length) return title;
+  const allShown = tokens.every((t) => shown.has(canonicalLineLabel(t).toUpperCase()));
+  return allShown ? rest : title;
 }

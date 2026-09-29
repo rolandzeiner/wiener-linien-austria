@@ -10,8 +10,9 @@ rows rather than passing them off as live.
 
 The rows are planned times, so they don't need `/monitor`'s cadence. A
 board fetches a batch of upcoming trains and counts them down locally on
-every tick, refetching when the batch gets old or runs low (see
-`TimetableBoard.is_due`). A few requests an hour per stop.
+every tick, refetching when the batch gets old or the board's picked
+lines run low (see `TimetableBoard.is_due`). Normally one request per
+`TIMETABLE_MAX_AGE` per stop.
 
 A stop's S-Bahn lines are opted into through the line picker like any
 other line (`S1|R`), which is also what keeps them in `tracked_lines`, the
@@ -273,16 +274,31 @@ async def async_probe_picker_rows(
 class TimetableBoard:
     """One stop's planned S-Bahn departures, refreshed as they run out."""
 
-    def __init__(self, hass: HomeAssistant, diva: int) -> None:
-        """Start empty; the first `is_due` asks for a fetch."""
+    def __init__(
+        self, hass: HomeAssistant, diva: int, pairs: frozenset[tuple[str, str]]
+    ) -> None:
+        """Start empty; the first `is_due` asks for a fetch.
+
+        `pairs` are the (line, direction) keys this stop's board shows,
+        the same set `coordinator.timetable_departures` filters with. The
+        request cannot narrow to them — it selects a mode, not a line — so
+        they are applied here instead, to keep `is_due` counting the trains
+        that reach the board rather than every S-Bahn train at the stop.
+        """
         self._hass = hass
         self._diva = diva
+        self._pairs = pairs
         self._departures: tuple[PlannedDeparture, ...] = ()
         self._fetched_at: datetime | None = None
         self._attempted_at: datetime | None = None
         # The last answer held every train the server had, not just the
         # first TIMETABLE_DEPARTURES_REQUESTED of them.
         self._complete = False
+        # Tracked trains the last answer carried, which is what the board
+        # could show at the moment it was fetched. See `is_due` for why a
+        # batch that started at or below the threshold disables the
+        # running-low rule instead of tripping it immediately.
+        self._tracked_at_fetch = 0
         # Failures since the last answer; each one widens `_retry_spacing`.
         # Its non-zero value is also the latch that logs a lasting failure
         # once rather than on every retry.
@@ -299,19 +315,41 @@ class TimetableBoard:
         """When the current batch was fetched (diagnostics)."""
         return self._fetched_at
 
+    def _tracked_upcoming(self, now: datetime) -> int:
+        """Trains still ahead that this board's picked lines would show."""
+        return sum(
+            1
+            for dep in self._departures
+            if dep.planned >= now and (dep.line, dep.direction) in self._pairs
+        )
+
     def is_due(self, now: datetime) -> bool:
         """Whether the batch should be refetched at `now`.
 
         Never within the retry spacing of the last attempt: `TIMETABLE_RETRY_AFTER`
         after an answer, doubling with each failure in a row up to the shared
-        backoff cap (`rate_limit.backoff_delay`). Otherwise when nothing was fetched yet, when the batch is older
-        than `TIMETABLE_MAX_AGE` (a replacement timetable can be published
-        within the day), or when fewer than `TIMETABLE_MIN_UPCOMING` rows are
-        still ahead. That last rule only applies to a batch the server cut
-        at the requested size: a shorter answer was already everything it
-        had, and asking again in five minutes wouldn't add a train. A stop
-        whose picked lines stopped running (a closure) would otherwise
-        refetch all day.
+        backoff cap (`rate_limit.backoff_delay`). Otherwise when nothing was
+        fetched yet, when the batch is older than `TIMETABLE_MAX_AGE` (a
+        replacement timetable can be published within the day), or when the
+        board is running low.
+
+        Running low counts the picked lines, not the batch. A stop served by
+        several S-Bahn lines spends most of its answer on trains the board
+        discards, so counting the batch measured a pool several times larger
+        than what the user sees and left a board sitting on its last row or
+        two while the batch still looked full.
+
+        Two guards keep that from turning into a refetch every five minutes
+        at a stop that simply has no more to give, since neither a closure
+        nor a line that has finished for the day can be told apart from a
+        drained board by the count alone:
+
+        * `_complete` — the server cut nothing, so it has handed over
+          everything it had and asking again adds no train.
+        * `_tracked_at_fetch` at or below the threshold — the answer was
+          already this thin for these lines when it arrived, so the batch
+          is not what is short, the stop is. Only the age rule refetches
+          such a board.
         """
         if (
             self._attempted_at is not None
@@ -320,10 +358,9 @@ class TimetableBoard:
             return False
         if self._fetched_at is None or now - self._fetched_at >= TIMETABLE_MAX_AGE:
             return True
-        if self._complete:
+        if self._complete or self._tracked_at_fetch <= TIMETABLE_MIN_UPCOMING:
             return False
-        upcoming = sum(1 for dep in self._departures if dep.planned >= now)
-        return upcoming < TIMETABLE_MIN_UPCOMING
+        return self._tracked_upcoming(now) < TIMETABLE_MIN_UPCOMING
 
     async def async_refresh(self) -> bool:
         """Refetch the batch; True when it was replaced.
@@ -361,6 +398,9 @@ class TimetableBoard:
         self._fetched_at = self._attempted_at
         self._departures = tuple(departures)
         self._complete = len(departures) < TIMETABLE_DEPARTURES_REQUESTED
+        self._tracked_at_fetch = sum(
+            1 for dep in departures if (dep.line, dep.direction) in self._pairs
+        )
         return True
 
 

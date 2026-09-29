@@ -23,6 +23,7 @@ import {
   LINE_TYPE_S_BAHN,
   headerIconForType,
   lineTypeIcon,
+  transferModeOf,
 } from "./utils/mot.js";
 import type {
   DepartureAttr,
@@ -51,6 +52,7 @@ import {
   iconForElevatorReason,
   parseTrafficNotice,
   splitLocationPath,
+  trimTitleLinePrefix,
   type TrafficNotice,
 } from "./utils/traffic-notice.js";
 import { mdiPathForIcon } from "./utils/mdi-paths.js";
@@ -1208,8 +1210,8 @@ export class WienerLinienAustriaCard extends LitElement {
    *  English phonetics. */
   private _renderTrafficNotice(notice: TrafficNotice): TemplateResult {
     // A lone heading segments nothing — it just restates the line the
-    // alert title already names ("U1: Verspätungen" followed by "LINIE
-    // U1"). Headings earn their keep only from two upwards, where they
+    // alert's badge already names (a U1 badge followed by "LINIE U1").
+    // Headings earn their keep only from two upwards, where they
     // separate the per-line blocks of a notice covering several lines.
     const headings = notice.blocks.reduce(
       (n, b) => (b.kind === "heading" ? n + 1 : n),
@@ -1294,7 +1296,11 @@ export class WienerLinienAustriaCard extends LitElement {
                   )}
                 </div>`
               : nothing}
-            <div class="alert-title">${t.title ? deText(t.title) : this._t("traffic_label")}</div>
+            <!-- The badges above already name the lines, so the title drops
+                 the line list it repeats (see trimTitleLinePrefix). -->
+            <div class="alert-title">
+              ${t.title ? deText(trimTitleLinePrefix(t.title, lines)) : this._t("traffic_label")}
+            </div>
           </div>
           ${hasDetail
             ? html`<div class="alert-detail">
@@ -1756,7 +1762,14 @@ export class WienerLinienAustriaCard extends LitElement {
     // they're actually running. Outside the night window the N-chips
     // fold back into the +N toggle so the daytime trail stays compact.
     // Night window per `_isNightlineHour`.
-    const allLines = s.lines ?? [];
+    //
+    // `stops_ahead_modes` filters BEFORE the split, so hiding a category
+    // removes it from the inline chips and the +N panel alike — a user who
+    // switches off "Metro" means the U-chips, which are the inline half.
+    const allowedModes = this._config!.stops_ahead_modes;
+    const allLines = (s.lines ?? []).filter((l) =>
+      allowedModes.includes(transferModeOf(l)),
+    );
     const nightActive = this._isNightlineHour();
     const inlineLines: string[] = [];
     const otherLines: string[] = [];

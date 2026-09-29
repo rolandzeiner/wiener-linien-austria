@@ -25,6 +25,26 @@ export function findWienerLinienEntities(hass: HomeAssistant | undefined): strin
   );
 }
 
+/** The entity ids a departure-board editor's picker offers: every stop
+ *  sensor, plus whatever the card already has configured.
+ *
+ *  `include_entities` rather than an integration filter, for the mirror of
+ *  the reason in route-editor.ts: the integration also owns the route
+ *  sensors, and picking one of those gives a board with nothing to show.
+ *  Configured ids are kept even when they no longer fingerprint as a stop —
+ *  an unavailable sensor publishes no attributes, and dropping it from its
+ *  own picker would make the entry look unset. */
+export function departureBoardOptions(
+  hass: HomeAssistant | undefined,
+  selected: readonly string[] = [],
+): string[] {
+  const options = new Set(findWienerLinienEntities(hass));
+  for (const id of selected) {
+    if (id) options.add(id);
+  }
+  return [...options].sort();
+}
+
 /** Sensor entity ids whose attributes pass `matches`, sorted. The walk the
  *  stop and route cards share; each supplies its own fingerprint, which is
  *  the part that must keep the two from picking up each other's sensors. */

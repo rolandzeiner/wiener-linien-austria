@@ -6,17 +6,17 @@
 // render. The editors supply a view of the saved stop plus mutation callbacks;
 // they don't decide what a direction button looks like.
 //
-// Retro is the constrained case: one line, one direction. It passes
-// `singleLine: true`, which turns the chip row into radio behaviour (picking a
-// chip replaces the selection rather than adding to it) and suppresses the
-// per-line override group, which is meaningless with one line.
+// Retro is the single-stop case, not a constrained one: it renders the same
+// multi-line chips and per-line direction rows as the others, and differs only
+// in having no `remove` callback — dropping its only stop would leave an
+// unrenderable card.
 
 import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import type { HomeAssistant, WienerLinienAttrs } from "../types.js";
+import type { HaFormSchema, HomeAssistant, WienerLinienAttrs } from "../types.js";
 import { lineChipColors } from "../utils/config.js";
 import { colorSchemeOf } from "../utils/color.js";
 import {
@@ -30,12 +30,13 @@ import {
   type DirectionSurface,
   type Triplet,
 } from "../utils/departures.js";
+import { departureBoardOptions } from "../utils/entities.js";
 import { lineTypeIcon } from "../utils/mot.js";
 import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
 
 /** The saved shape every card's per-stop config structurally satisfies.
- *  Retro adapts its flat `{entity, line, direction, walk_times}` into this at
- *  the call site. */
+ *  Retro adapts its flat `{entity, lines, direction ("both" → absent),
+ *  line_directions, walk_times}` into this at the call site. */
 export interface StopView {
   entity: string;
   // Dual form (see utils/config.ts): retro passes `cfg.walk_times` straight
@@ -73,8 +74,6 @@ export interface StopBlockOptions {
   /** Total stops — the index pill is suppressed when there is only one, since
    *  numbering a list of one is noise. */
   total: number;
-  /** Retro: chips are radio, no per-line overrides. */
-  singleLine?: boolean;
   /** Per-line colour overrides from the card config. */
   lineColorOverrides: Record<string, string>;
   /** Card-namespaced translator (`dir_h`, `dir_both`, `entity_missing`, …). */
@@ -131,13 +130,10 @@ function terminiFor(
 
 /** Per-line rows replace the stop-wide control once two or more lines are in
  *  play. Below that the stop-wide control is the only direction picker there
- *  is — which is the whole of retro's model, so it can never be dropped
- *  outright. */
+ *  is, so it can never be dropped outright. */
 function showPerLineDirections(
-  opts: StopBlockOptions,
   ctx: { lines: string[]; picked: Set<string> },
 ): boolean {
-  if (opts.singleLine) return false;
   return effectiveLines(ctx.lines, ctx.picked).length >= 2;
 }
 
@@ -197,7 +193,7 @@ export function renderStopBlock(
             // once read as contradicting each other (the stop-wide row says R
             // while a line row says H), and the stop-wide label degrades into
             // soup at a hub because it pools termini across every line.
-            showPerLineDirections(opts, { lines, picked })
+            showPerLineDirections({ lines, picked })
             ? renderOverrides(stop, opts, cb, { attrs, triplets, picked, lines, colorOf, dirStrings })
             : renderDirection(stop, opts, cb, { attrs, triplets, picked, lines, dirStrings })
           : nothing}
@@ -258,12 +254,9 @@ function renderLines(
       ${lines.length
         ? html`<div class="wl-chips">
             ${lines.map((line) => {
-              // Empty selection means "all lines" on multi-line cards, so every
-              // chip reads as active. Retro always has exactly one line
-              // selected, so an empty set there means nothing is chosen yet.
-              const on = opts.singleLine
-                ? picked.has(line)
-                : picked.size === 0 || picked.has(line);
+              // Empty selection means "all lines", so every chip reads as
+              // active — that is what no filter actually shows.
+              const on = picked.size === 0 || picked.has(line);
               const icon = lineTypeIcon(typeByLine.get(line));
               return html`<button
                 type="button"
@@ -313,9 +306,8 @@ function renderDirection(
   const scope = effective.length === 1 ? effective[0] : undefined;
   const dir = stop.direction ?? null;
   // Same three-state surface the per-line rows use — see DirectionSurface.
-  // This control is the ONLY direction picker retro has (singleLine
-  // suppresses "both"), so getting the empty case wrong disabled every
-  // button it owns.
+  // This control is the only direction picker until a second line is in play,
+  // so getting the empty case wrong disabled every button it owns.
   const surface: DirectionSurface = directionSurface(attrs, scope);
   const hasH = surface.available.has("H");
   const hasR = surface.available.has("R");
@@ -372,15 +364,13 @@ function renderDirection(
             : opts.et("direction_unavailable"),
           onClick: () => commit("R"),
         })}
-        ${opts.singleLine
-          ? nothing
-          : dirButton({
-              label: opts.t("dir_both"),
-              active: activeBoth,
-              disabled: onlyOne,
-              title: onlyOne ? opts.et("direction_unavailable") : opts.t("dir_both"),
-              onClick: () => commit(null),
-            })}
+        ${dirButton({
+          label: opts.t("dir_both"),
+          active: activeBoth,
+          disabled: onlyOne,
+          title: onlyOne ? opts.et("direction_unavailable") : opts.t("dir_both"),
+          onClick: () => commit(null),
+        })}
       </div>
       ${note ? html`<span class="wl-note">${note}</span>` : nothing}
     </div>
@@ -647,5 +637,51 @@ function renderWalkTimes(
         })}
       </div>
     </div>
+  `;
+}
+
+export interface StopsTabOptions extends Omit<StopBlockOptions, "index" | "total"> {
+  hass: HomeAssistant | undefined;
+  stops: readonly StopView[];
+  computeLabel(field: { name: string }): string;
+  computeHelper(field: { name: string }): string | undefined;
+  onEntitiesChanged(ev: CustomEvent<{ value: Record<string, unknown> }>): void;
+  callbacks: StopBlockCallbacks;
+}
+
+/** The multi-stop editors' Stops tab: the entity picker, then one stop block
+ *  per picked stop. The retro editor is single-stop and builds its own. */
+export function renderStopsTab(opts: StopsTabOptions): TemplateResult {
+  const entities = opts.stops.map((s) => s.entity);
+  const blockOpts = (index: number): StopBlockOptions => ({
+    index,
+    total: opts.stops.length,
+    lineColorOverrides: opts.lineColorOverrides,
+    t: opts.t,
+    et: opts.et,
+  });
+  return html`
+    <ha-form
+      .hass=${opts.hass}
+      .data=${{ entities }}
+      .schema=${[
+        {
+          name: "entities",
+          required: true,
+          selector: {
+            entity: {
+              multiple: true,
+              include_entities: departureBoardOptions(opts.hass, entities),
+            },
+          },
+        },
+      ] satisfies ReadonlyArray<HaFormSchema>}
+      .computeLabel=${opts.computeLabel}
+      .computeHelper=${opts.computeHelper}
+      @value-changed=${opts.onEntitiesChanged}
+    ></ha-form>
+    ${opts.stops.map((stop, i) =>
+      renderStopBlock(opts.hass, stop, blockOpts(i + 1), opts.callbacks),
+    )}
   `;
 }

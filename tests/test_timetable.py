@@ -29,6 +29,7 @@ from custom_components.wiener_linien_austria.const import (
     LINE_TYPE_S_BAHN,
     MAX_STOPS_AHEAD,
     ROUTING_DEPARTURE_ENDPOINT,
+    TIMETABLE_DEPARTURES_REQUESTED,
     TIMETABLE_MAX_AGE,
 )
 from custom_components.wiener_linien_austria.coordinator import (
@@ -57,6 +58,12 @@ FIXTURE = Path(__file__).parent / "fixtures" / "timetable_praterstern.json"
 # The fixture's first train, the S2 at 15:14 Vienna time.
 FIRST_TRAIN = datetime(2026, 9, 15, 15, 14, tzinfo=VIENNA)
 
+# Every (line, direction) in the Praterstern fixture. Boards built with
+# this count their whole batch as tracked, which is the semantics the tests
+# predating the picked-lines rule were written against; the tests that
+# exercise that rule pass a narrower set.
+ALL_PAIRS = frozenset({("S1", "R"), ("S2", "R"), ("S3", "R"), ("S4", "R")})
+
 _FETCH = "custom_components.wiener_linien_austria.timetable.async_fetch_trip_body"
 _COOLDOWN = (
     "custom_components.wiener_linien_austria.timetable.async_enforce_routing_cooldown"
@@ -65,6 +72,19 @@ _COOLDOWN = (
 
 def _body() -> dict[str, Any]:
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
+
+
+def _padded_body(rows: int) -> dict[str, Any]:
+    """The fixture's 12 trains padded to `rows` with copies of its first one.
+
+    The copies all sit at FIRST_TRAIN, so any `now` past that counts none
+    of them as upcoming: a long batch that is nearly spent, which is the
+    state the running-low rule exists to catch.
+    """
+    body = _body()
+    deps = body["departureList"]
+    body["departureList"] = deps + [deps[0]] * (rows - len(deps))
+    return body
 
 
 def _planned(
@@ -286,20 +306,19 @@ async def test_board_refresh_policy(
 ) -> None:
     """Due when empty, old, or running low; never within five minutes."""
     freezer.move_to(FIRST_TRAIN - timedelta(minutes=1))
-    board = TimetableBoard(hass, PRATERSTERN)
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
     now = FIRST_TRAIN - timedelta(minutes=1)
     assert board.is_due(now)
 
     # A full answer: as many trains as asked for, so the server may have
-    # more. The fixture's 12, padded with copies of its first train.
-    full = _body()
-    full["departureList"] += [full["departureList"][0]] * 18
+    # more.
+    full = _padded_body(TIMETABLE_DEPARTURES_REQUESTED)
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
         patch(_FETCH, new_callable=AsyncMock, return_value=full),
     ):
         assert await board.async_refresh() is True
-    assert len(board.departures) == 30
+    assert len(board.departures) == TIMETABLE_DEPARTURES_REQUESTED
     assert board.fetched_at is not None
 
     # Fresh and plenty ahead.
@@ -318,7 +337,7 @@ async def test_board_refresh_policy(
 async def test_board_failure_keeps_rows_and_logs_once(
     hass: HomeAssistant, caplog: pytest.LogCaptureFixture
 ) -> None:
-    board = TimetableBoard(hass, PRATERSTERN)
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
         patch(_FETCH, new_callable=AsyncMock, return_value=_body()),
@@ -350,7 +369,7 @@ async def test_board_backs_off_while_failing(
     """5, 10, 20, then 30 min between retries; an answer resets it."""
     start = FIRST_TRAIN - timedelta(minutes=1)
     freezer.move_to(start)
-    board = TimetableBoard(hass, PRATERSTERN)
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
     failing = patch(
         _FETCH, new_callable=AsyncMock, side_effect=RoutingError("api_timeout")
     )
@@ -380,7 +399,7 @@ async def test_board_backs_off_while_failing(
 
 
 async def test_board_retry_spacing_is_jittered(hass: HomeAssistant) -> None:
-    board = TimetableBoard(hass, PRATERSTERN)
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
         patch(_FETCH, new_callable=AsyncMock, side_effect=RoutingError("api_timeout")),
@@ -471,7 +490,7 @@ async def test_coordinator_without_s_bahn_never_fetches(hass: HomeAssistant) -> 
 
     with patch(_FETCH, new_callable=AsyncMock) as fetch:
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
 
     fetch.assert_not_awaited()
     assert [dep.line for dep in coordinator.data.departures] == ["U1", "U1"]
@@ -486,6 +505,12 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
     entry.add_to_hass(hass)
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     assert coordinator.timetable is not None
+    # The board counts its running-low rule against these, so it must get
+    # exactly the set `timetable_departures` renders: the S-Bahn pairs the
+    # entry picked. A wider S-Bahn set would bring back the whole-batch
+    # count. The U1 is left out too: a /monitor key would give an entry
+    # with no S-Bahn picked a board that fetches for nothing.
+    assert coordinator.timetable._pairs == frozenset({("S2", "R")})
 
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
@@ -493,7 +518,7 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
     ):
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
         # The refresh lands and re-publishes the tick with the S-Bahn in it.
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
         rows = coordinator.data.departures
         assert [(dep.line, dep.countdown) for dep in rows[:3]] == [
             ("U1", 2),
@@ -505,7 +530,7 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
         # A tick one minute later counts the train down without refetching.
         freezer.tick(timedelta(minutes=1))
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
         assert fetch.await_count == 1
         s2 = [dep for dep in coordinator.data.departures if dep.line == "S2"]
         assert s2[0].countdown == 4
@@ -515,7 +540,7 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
         # Once the train's time has passed it is gone.
         freezer.move_to(FIRST_TRAIN + timedelta(seconds=1))
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
         planned = {
             dep.time_planned for dep in coordinator.data.departures if dep.line == "S2"
         }
@@ -533,7 +558,7 @@ async def test_coordinator_failed_refresh_pushes_nothing(hass: HomeAssistant) ->
         patch.object(coordinator, "async_set_updated_data") as push,
     ):
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
     assert push.call_count == 1  # the tick itself, not the refresh
 
 
@@ -624,7 +649,7 @@ def test_board_request_asks_for_stops_and_the_picker_does_not() -> None:
 
 
 async def test_board_refresh_fetches_with_stops(hass: HomeAssistant) -> None:
-    board = TimetableBoard(hass, MEIDLING)
+    board = TimetableBoard(hass, MEIDLING, ALL_PAIRS)
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
         patch(_FETCH, new_callable=AsyncMock, return_value=_stops_body()) as fetch,
@@ -766,7 +791,7 @@ async def test_short_answer_is_complete_and_not_refetched_early(
     hass: HomeAssistant,
 ) -> None:
     """Fewer trains than asked for is all there is; only age triggers a refetch."""
-    board = TimetableBoard(hass, PRATERSTERN)
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
     with (
         patch(_COOLDOWN, new_callable=AsyncMock),
         patch(_FETCH, new_callable=AsyncMock, return_value={"departureList": None}),
@@ -782,6 +807,152 @@ async def test_short_answer_is_complete_and_not_refetched_early(
     assert board.is_due(fetched + TIMETABLE_MAX_AGE)
 
 
+def _mixed_body(rows: list[tuple[str, int]]) -> dict[str, Any]:
+    """A batch of `(line, minutes after FIRST_TRAIN)` rows, all direction R.
+
+    Built from the fixture's first row so the parser sees the shape it
+    expects, with only the line and the time varied. Lets a test set the
+    share of the answer that belongs to a board's picked lines, which is
+    the whole point of the running-low rule.
+    """
+    body = _body()
+    template = body["departureList"][0]
+    out = []
+    for line, minutes in rows:
+        when = FIRST_TRAIN + timedelta(minutes=minutes)
+        row = json.loads(json.dumps(template))
+        row["servingLine"]["number"] = line
+        row["servingLine"]["symbol"] = line
+        row["dateTime"] |= {
+            "year": str(when.year),
+            "month": str(when.month),
+            "day": str(when.day),
+            "hour": str(when.hour),
+            "minute": str(when.minute),
+        }
+        out.append(row)
+    body["departureList"] = out
+    return body
+
+
+async def test_running_low_counts_the_picked_lines_not_the_batch(
+    hass: HomeAssistant,
+) -> None:
+    """A board refetches when its own rows run out, not the whole answer's.
+
+    The stop here runs S1 every 10 minutes and the board's S2 every 20, so
+    the picked line is a third of a full batch — the shape of a busy
+    interchange where a board tracks one or two of its S-Bahn lines.
+    Counting the batch, the answer still looks full long after the board
+    is down to its last rows, which is exactly the state that left a real
+    Meidling board showing two departures.
+    """
+    board = TimetableBoard(hass, PRATERSTERN, frozenset({("S2", "R")}))
+    rows = [("S1", n * 10) for n in range(40)] + [("S2", n * 20) for n in range(20)]
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value=_mixed_body(rows)),
+    ):
+        assert await board.async_refresh() is True
+    assert board._tracked_at_fetch == 20
+
+    # Far enough in that 15 of the 20 S2 have gone: five left on the board,
+    # under the threshold, while the batch as a whole still holds plenty.
+    now = FIRST_TRAIN + timedelta(minutes=299)
+    board._fetched_at = now - timedelta(minutes=30)
+    board._attempted_at = board._fetched_at
+    assert board._tracked_upcoming(now) == 5
+    assert sum(1 for dep in board.departures if dep.planned >= now) == 15
+    assert board.is_due(now)
+
+
+async def test_a_batch_already_thin_for_the_picked_lines_waits_for_the_age(
+    hass: HomeAssistant,
+) -> None:
+    """Thin on arrival means the stop is short, not the batch.
+
+    A line that has finished for the day, or one closed for works, leaves a
+    board permanently under the threshold. Refetching cannot conjure a
+    train, so only the age rule applies — otherwise the board would ask
+    again every five minutes for the rest of the day.
+    """
+    board = TimetableBoard(hass, PRATERSTERN, frozenset({("S2", "R")}))
+    rows = [("S1", n * 10) for n in range(58)] + [("S2", 5), ("S2", 25)]
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value=_mixed_body(rows)),
+    ):
+        assert await board.async_refresh() is True
+    assert board._complete is False  # the server cut the answer; it has more
+    assert board._tracked_at_fetch == 2
+
+    now = FIRST_TRAIN + timedelta(minutes=60)
+    board._fetched_at = now - timedelta(minutes=30)
+    board._attempted_at = board._fetched_at
+    assert board._tracked_upcoming(now) == 0  # nothing left to show
+    assert not board.is_due(now)
+    assert board.is_due(board._fetched_at + TIMETABLE_MAX_AGE)
+
+
+@pytest.mark.parametrize(
+    ("rows", "complete", "due"),
+    [
+        (TIMETABLE_DEPARTURES_REQUESTED, False, True),
+        (TIMETABLE_DEPARTURES_REQUESTED - 1, True, False),
+    ],
+    ids=["full batch", "one short"],
+)
+async def test_complete_guard_gates_the_running_low_rule(
+    hass: HomeAssistant, rows: int, complete: bool, due: bool
+) -> None:
+    """One row short of the ask turns the running-low rule off.
+
+    Both batches are nearly spent — four trains still ahead, under
+    TIMETABLE_MIN_UPCOMING — so the only thing separating them is whether
+    the server cut the answer at the requested size. A full one may have
+    more behind it and is worth refetching; a short one was everything the
+    server had, and asking again in five minutes would not add a train.
+    """
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
+    with (
+        patch(_COOLDOWN, new_callable=AsyncMock),
+        patch(_FETCH, new_callable=AsyncMock, return_value=_padded_body(rows)),
+    ):
+        assert await board.async_refresh() is True
+    assert len(board.departures) == rows
+    assert board._complete is complete
+
+    # Past the retry spacing and well inside TIMETABLE_MAX_AGE, so the
+    # running-low rule is the only thing left that can answer.
+    board._fetched_at = FIRST_TRAIN + timedelta(minutes=60)
+    board._attempted_at = board._fetched_at
+    now = FIRST_TRAIN + timedelta(minutes=66)
+    assert sum(1 for dep in board.departures if dep.planned >= now) == 4
+    assert board.is_due(now) is due
+    # The age rule outranks the guard either way.
+    assert board.is_due(board._fetched_at + TIMETABLE_MAX_AGE)
+
+
+async def test_refresh_asks_for_the_size_the_complete_guard_compares_against(
+    hass: HomeAssistant,
+) -> None:
+    """The request's `limit` is the number `_complete` is measured against.
+
+    `_complete` reads "the server gave everything it had" out of
+    `len(answer) < TIMETABLE_DEPARTURES_REQUESTED`, which only says that
+    while the same constant is what the request asked for. Were the two to
+    drift, the board would be pinned to one branch of `is_due` forever:
+    a smaller ask never fills, so the running-low rule would be dead; a
+    larger one always fills, so it would fire on every spent batch.
+    """
+    board = TimetableBoard(hass, PRATERSTERN, ALL_PAIRS)
+    fetch = AsyncMock(return_value=_body())
+    with patch(_COOLDOWN, new_callable=AsyncMock), patch(_FETCH, fetch):
+        await board.async_refresh()
+    params = dict(fetch.await_args.args[1])
+    assert params["limit"] == str(TIMETABLE_DEPARTURES_REQUESTED)
+
+
 async def test_refresh_does_not_hide_a_monitor_failure(hass: HomeAssistant) -> None:
     """A timetable landing after a failed poll must not flip the board back."""
     entry = make_entry({CONF_LINES: ["S1|R"]})
@@ -792,7 +963,7 @@ async def test_refresh_does_not_hide_a_monitor_failure(hass: HomeAssistant) -> N
         patch(_FETCH, new_callable=AsyncMock, return_value={"departureList": None}),
     ):
         coordinator.batch_apply(BatchResult(body=_monitor_body(), server_time=None))
-        await hass.async_block_till_done()
+        await hass.async_block_till_done(wait_background_tasks=True)
     assert coordinator.last_update_success
 
     coordinator.batch_set_error(UpdateFailed("down"))

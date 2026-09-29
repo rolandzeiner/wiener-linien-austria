@@ -21,17 +21,24 @@ import type {
   WienerLinienAttrs,
   WienerLinienRetroCardConfig,
 } from "./types.js";
-import { chipPalette, normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
+import {
+  chipPalette,
+  normaliseRetroConfig,
+  retroDirectionFilter,
+  type NormalisedRetroConfig,
+} from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
-import { deriveRetroView } from "./utils/retro-view.js";
+import { deriveRetroView, retroEmptyStateKey } from "./utils/retro-view.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
 import { renderStationHeader } from "./utils/station-header.js";
 import {
+  FREEZE_DELAY_AFTER_WINNER_MS,
   RACE_FINISH_X_FALLBACK_CQW,
   computeRaceParams,
   type Racer,
+  type RacerTrack,
 } from "./utils/race.js";
 
 import "./retro-editor.js";
@@ -44,13 +51,6 @@ const VICTORY_DURATION_MS = 4000;
 // without the row feeling restless. Cross-fade duration lives in the
 // CSS .retro-dest-text transition (0.4 s) — keep them in sync.
 const VIA_TICK_MS = 4000;
-// Hold both wheelchair animations paused for this long after the winner
-// crosses the finish line. Gives the viewer a still frame of the photo
-// finish — winner at the strip, loser caught a step behind — before
-// the trophy badge appears. Delay accounts for the ~30ms drift between
-// the linear cross-time math and the actual cubic-bezier eased motion
-// so the freeze still lands AFTER the wheelchair has visibly crossed.
-const FREEZE_DELAY_AFTER_WINNER_MS = 150;
 const FREEZE_DURATION_MS = 1500;
 const NEXT_RACE_MIN_MS = 60_000;
 const NEXT_RACE_MAX_MS = 180_000;
@@ -72,7 +72,8 @@ const MESSAGE_TICKER_INTERVAL_MS = 5 * 60_000;
 const MESSAGE_TICKER_PREVIEW_DELAY_MS = 1_500;
 const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
 // Race constants and physics live in `utils/race.ts`. The card keeps
-// only the DOM-touching `_measureRaceStartPositions` and the timer
+// only the DOM-touching `_measureRaceStartPositions`, the Web Animations
+// plumbing that plays the trajectories race.ts returns, and the timer
 // state machine; the math is a pure function fed those measurements.
 
 // Dedupe by `type` so a double-load (cache-bust race, HMR, etc.)
@@ -144,9 +145,32 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // hass.states for the fallback path on every tick.
   private _cachedEid: string | null = null;
   private _raceTimers = new Set<ReturnType<typeof setTimeout>>();
+  // Trajectories for the race currently in flight, rolled in
+  // `_startRace` so the winner is decided before the gate opens, and
+  // played by `_syncRaceAnimations` once the countdown clears.
+  private _raceTracks: Readonly<Record<Racer, RacerTrack>> | null = null;
+  // Card width (px) at the moment the trajectories were measured. The
+  // engine works in cqw; the keyframes are emitted in px so the browser
+  // can hand the animation to the compositor instead of re-resolving a
+  // container-relative unit every frame. A resize mid-race therefore
+  // plays out at the old scale — a ~3s window, and the next race
+  // re-measures.
+  private _raceCardWidthPx = 0;
+  // Live wheelchair animations, so freeze can pause the exact frame and
+  // teardown can cancel rather than leaving a filled transform behind.
+  private _raceAnimations: Animation[] = [];
   // Wall-clock target times so state transitions survive the disconnect/
   // reconnect cycles HA triggers during dashboard rebuilds.
   private _countdownStartAt: number | null = null;
+  // When the gate opened. Lets a reconnect mid-race resume the
+  // wheelchair animations at the right frame instead of replaying them
+  // from the start against a freeze timer that is already counting down.
+  private _racingStartedAt: number | null = null;
+  // How far into the run the photo finish caught the racers. Pinned when
+  // the freeze starts so a reconnect during it rebuilds the animations on
+  // that exact frame rather than on wherever the wall clock has since
+  // drifted to.
+  private _freezeAtElapsedMs: number | null = null;
   private _raceEndAt: number | null = null;
   private _freezeEndAt: number | null = null;
   private _victoryEndAt: number | null = null;
@@ -188,11 +212,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // swapping the message text mid-marquee leaves `_tickerActive=true`
     // forever.
     this._clearRaceTimers();
+    this._cancelRaceAnimations();
     this._clearTickerTimer();
     this._clearViaTimer();
     this._raceState = "idle";
     this._countdownDigit = null;
     this._countdownStartAt = null;
+    this._racingStartedAt = null;
+    this._freezeAtElapsedMs = null;
     this._raceEndAt = null;
     this._freezeEndAt = null;
     this._victoryEndAt = null;
@@ -283,9 +310,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (this._raceState !== "idle") {
       if (this._config?.wheelchair_race) {
         this._armStateTransitions();
+        // `updated()` only syncs the animations on a _raceState change,
+        // which a reconnect isn't — rebuild them here, seeked to where
+        // the wall clock says the race has got to.
+        this._syncRaceAnimations();
       } else {
         this._raceState = "idle";
         this._clearRaceTimers();
+        this._cancelRaceAnimations();
       }
     }
     // Re-arm the message ticker after a detach/reattach (HA rebuilds
@@ -303,6 +335,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   public override disconnectedCallback(): void {
     super.disconnectedCallback();
     this._clearRaceTimers();
+    // Animations on a detached element keep running against their own
+    // timeline; cancel so a reconnect rebuilds them from wall-clock
+    // elapsed rather than resuming a stale one.
+    this._cancelRaceAnimations();
     this._clearTickerTimer();
     this._clearViaTimer();
   }
@@ -335,6 +371,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Lit (dev warning + a redundant extra update cycle).
     if (this._anyViaInRows) this._armViaTimer();
     else if (this._viaTimer !== null) this._clearViaTimer();
+    // Start / pause / cancel the wheelchair animations after the render
+    // that carries the matching race class, so the racers are already
+    // stacked above the finish strip on their first painted frame.
+    if (changed.has("_raceState")) this._syncRaceAnimations();
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -350,9 +390,12 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._startRace();
     } else if (!isOn && wasOn) {
       this._clearRaceTimers();
+      this._cancelRaceAnimations();
       this._raceState = "idle";
       this._countdownStartAt = null;
       this._countdownDigit = null;
+      this._racingStartedAt = null;
+      this._freezeAtElapsedMs = null;
       this._raceEndAt = null;
       this._freezeEndAt = null;
       this._victoryEndAt = null;
@@ -570,12 +613,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   private _startRace(): void {
     if (!this._config?.wheelchair_race) return;
-    // Respect `prefers-reduced-motion: reduce` at the scheduler level.
-    // Without this, the CSS animations would be suppressed but the state
-    // machine would still flip briefly to "racing" → "victory" — giving
-    // motion-sensitive users an abrupt checkered-flag appearance instead
-    // of a race. Re-schedule so the loop resumes if the preference
-    // changes later.
+    // The race's reduced-motion gate, with the one in _handleCardClick:
+    // the wheelchairs run on Element.animate(), which the CSS
+    // reduced-motion catch-all doesn't reach, so without this
+    // motion-sensitive users would get the full race. Re-schedule so the
+    // loop resumes if the preference changes later.
     if (
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
@@ -645,11 +687,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._raceState = "racing";
     this._countdownDigit = null;
     this._countdownStartAt = null;
+    this._racingStartedAt = Date.now();
     this._armStateTransitions();
   }
 
   // Measures each wheelchair's natural starting x AND the live finish-
-  // line position, all in cqw relative to the card width. Returns null
+  // line position, in cqw relative to the card width, plus the card
+  // width in px. Returns null
   // if the DOM isn't ready or there aren't two racers — caller falls
   // back to sensible defaults.
   //
@@ -664,6 +708,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     a: number;
     b: number;
     finishCqw: number;
+    cardWidthPx: number;
   } | null {
     const card = this.shadowRoot?.querySelector(".retro") as HTMLElement | null;
     if (!card) return null;
@@ -688,31 +733,31 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       a: (aLeft / cardRect.width) * 100,
       b: (bLeft / cardRect.width) * 100,
       finishCqw,
+      cardWidthPx: cardRect.width,
     };
   }
 
-  // Race-engine: derives every per-racer trajectory parameter from a
-  // chosen "intended winner" + finish-margin + comeback flag, then
-  // reconciles the announced winner from the actual post-clamp
-  // trajectories so the visible cross order can never disagree with the
-  // victory badge.
+  // Race setup: measures the geometry and hands it to `computeRaceParams`,
+  // which does the rolling and returns both trajectories plus the
+  // reconciled winner; they are kept until the gate opens.
   //
-  // Algorithm:
-  //   1. Pick the intended finish-line winner (A or B, 50/50).
-  //   2. Pick a finish margin: close / medium / decisive (weighted).
-  //   3. Pick whether this race is a "comeback" — the swap pattern's
+  // Algorithm (step 1 runs here, the rest inside computeRaceParams):
+  //   1. Measure each wheelchair's natural start x and the finish line
+  //      (cqw; RACE_FINISH_X_FALLBACK_CQW when the finish can't be measured).
+  //   2. Pick the intended finish-line winner (A or B, 50/50).
+  //   3. Pick a finish margin: close / medium / decisive (weighted).
+  //   4. Pick whether this race is a "comeback" — the swap pattern's
   //      75% leader is the LOSER, and the winner pulls ahead in the
   //      home stretch.
-  //   4. Pick a swap pattern matching that constraint (the pattern
-  //      still drives mid-race overtakes for visual storytelling).
-  //   5. Measure each wheelchair's natural start x and the finish line
-  //      (cqw; RACE_FINISH_X_FALLBACK_CQW when the finish can't be measured).
-  //   6. Compute absolute target x at each checkpoint per racer.
-  //   7. Solve for each racer's exit position so they cross the
-  //      finish line at their target time. Clamped — extremes
-  //      just under-/overshoot the intended margin.
-  //   8. Recompute actual cross times from the clamped trajectories
-  //      and assign _raceWinner from those, so announced == visible.
+  //   5. Pick a swap pattern matching that constraint. It only biases
+  //      each racer a few cqw around its own track, so not every race
+  //      shows an overtake.
+  //   6. Build each racer's path from a shared velocity profile over its
+  //      own runway, so speed stays smooth whatever the row geometry.
+  //   7. Solve each racer's duration so it reaches the line at its
+  //      target time, clamped for degenerate starts.
+  //   8. Reconcile the winner from the trajectories that will actually
+  //      play, so announced == visible.
   //
   // Returns the time (ms from race start) at which the WINNER crosses
   // the finish line. The state machine uses that to schedule the
@@ -725,10 +770,89 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       finishCqw: measured?.finishCqw ?? RACE_FINISH_X_FALLBACK_CQW,
     });
     this._raceWinner = params.winner;
-    for (const [name, value] of Object.entries(params.cssVars)) {
-      this.style.setProperty(name, value);
-    }
+    this._raceTracks = params.tracks;
+    // Fall back to the live card width when the measurement failed, so
+    // the cqw -> px conversion still lands somewhere sane.
+    this._raceCardWidthPx =
+      measured?.cardWidthPx ?? this.getBoundingClientRect().width;
     return { winnerCrossT: params.winnerCrossT };
+  }
+
+  // ------------------------------------------------------------------
+  // Wheelchair animations (Web Animations API)
+  // ------------------------------------------------------------------
+
+  /** Drive the racers from `_raceState`. Racing (re)builds them, freeze
+   *  pauses the exact frame they are on, everything else tears them
+   *  down. Safe to call repeatedly. */
+  private _syncRaceAnimations(): void {
+    switch (this._raceState) {
+      case "racing":
+        this._playRaceAnimations();
+        return;
+      case "freeze":
+        // Rebuild first if a reconnect landed us here with no
+        // animations — pausing an empty list would leave the racers
+        // parked at the gate in the photo-finish frame.
+        if (this._raceAnimations.length === 0) this._playRaceAnimations();
+        for (const anim of this._raceAnimations) anim.pause();
+        return;
+      default:
+        this._cancelRaceAnimations();
+    }
+  }
+
+  private _cancelRaceAnimations(): void {
+    for (const anim of this._raceAnimations) anim.cancel();
+    this._raceAnimations = [];
+  }
+
+  /** Build one `Element.animate()` per racer from the sampled
+   *  trajectory, seeked to wherever the wall clock says the race has
+   *  got to. Offsets are emitted in px (not cqw) because a
+   *  container-relative unit forces the browser to re-resolve every
+   *  keyframe against its container each frame, which keeps the
+   *  animation off the compositor. */
+  private _playRaceAnimations(): void {
+    this._cancelRaceAnimations();
+    const tracks = this._raceTracks;
+    if (!tracks || this._raceCardWidthPx <= 0) return;
+    const wheels = this.shadowRoot?.querySelectorAll<HTMLElement>(
+      ".retro-row .retro-wheelchair",
+    );
+    if (!wheels || wheels.length < 2) return;
+    const elapsed =
+      this._raceState === "freeze" && this._freezeAtElapsedMs !== null
+        ? this._freezeAtElapsedMs
+        : this._racingStartedAt === null
+          ? 0
+          : Date.now() - this._racingStartedAt;
+    const racers: ReadonlyArray<readonly [Racer, HTMLElement | undefined]> = [
+      ["A", wheels[0]],
+      ["B", wheels[1]],
+    ];
+    for (const [racer, el] of racers) {
+      // Guard rather than assume: a WebView without the Web Animations
+      // API should degrade to a card whose wheelchairs simply don't
+      // race, not to a TypeError thrown out of updated().
+      if (!el || typeof el.animate !== "function") continue;
+      const track = tracks[racer];
+      const frames: Keyframe[] = track.samples.map((sample) => ({
+        offset: sample.offset,
+        // Y keeps the WL Mono optical-centre nudge from the static rule
+        // so attaching the animation doesn't pop the icon vertically.
+        transform: `translate(${
+          ((sample.xCqw - track.startCqw) * this._raceCardWidthPx) / 100
+        }px, 0.12em)`,
+      }));
+      const anim = el.animate(frames, {
+        duration: track.durationMs,
+        easing: "linear",
+        fill: "forwards",
+      });
+      anim.currentTime = Math.min(Math.max(0, elapsed), track.durationMs);
+      this._raceAnimations.push(anim);
+    }
   }
 
   // Safe to call repeatedly — clears prior timers first. Re-entered
@@ -750,6 +874,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       case "racing":
         if (this._raceEndAt !== null) {
           this._scheduleRaceTimer(() => {
+            this._freezeAtElapsedMs =
+              this._racingStartedAt === null
+                ? null
+                : Date.now() - this._racingStartedAt;
             this._raceState = "freeze";
             this._raceEndAt = null;
             this._armStateTransitions();
@@ -770,6 +898,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           this._scheduleRaceTimer(() => {
             this._raceState = "idle";
             this._victoryEndAt = null;
+            this._racingStartedAt = null;
+            this._freezeAtElapsedMs = null;
+            this._raceTracks = null;
             if (this._config?.wheelchair_race) {
               this._scheduleRace(this._nextRaceDelay());
             }
@@ -794,8 +925,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const attrs = (this.hass.states[eid]?.attributes ?? {}) as WienerLinienAttrs;
     const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
     const matching = filterDepartures(departures, {
-      direction: this._config.direction,
-      lines: this._config.line ? [this._config.line] : undefined,
+      direction: retroDirectionFilter(this._config.direction),
+      lines: this._config.lines,
+      line_directions: this._config.line_directions,
       walk_times: this._config.walk_times,
       accessibility_only: this._config.accessibility_only,
     });
@@ -832,7 +964,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           departures,
           cfg.station_bg,
           attrs.line_colors ?? {},
-          cfg.line,
+          // Only a single-line board has "the" configured line. With several
+          // selected, lines[0] would tint the whole tile for whichever line
+          // happened to be picked first, so defer to the live rows instead.
+          cfg.lines?.length === 1 ? cfg.lines[0] : undefined,
         )
       : nothing;
     // Master gate — when `show_header` is off (the default), the
@@ -968,27 +1103,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   ): TemplateResult {
     if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
-      // Diagnose the empty state so users know whether to flip direction,
-      // drop the line filter, or just wait for data. If the API is still
-      // responding (server_time present) but the stop has nothing left,
-      // that's end-of-service, not a data outage.
-      const dir = this._config!.direction;
-      const lineFilter = this._config!.line;
-      const inDirection = allDepartures.filter((d) => d.direction === dir);
-      let key = "no_data";
-      if (allDepartures.length === 0 && staleDropped > 0) {
-        // Upstream froze: records arrived but had stopped advancing, so
-        // the coordinator dropped them. Checked before the end-of-service
-        // branch — both look like "nothing left at this stop" from here,
-        // and calling a frozen feed Betriebsschluss is the bug in #103.
-        key = "stale_feed";
-      } else if (allDepartures.length === 0 && serverTime) {
-        key = "betriebsschluss";
-      } else if (allDepartures.length > 0 && inDirection.length === 0) {
-        key = "no_data_wrong_direction";
-      } else if (lineFilter && inDirection.length > 0) {
-        key = "no_data_wrong_line";
-      }
+      const key = retroEmptyStateKey(this._config!, allDepartures, serverTime, staleDropped);
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
     }
     return html`
@@ -1146,13 +1261,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       // numerals so N-prefix tiles match the in-station NightLine
       // signage.
       //
-      // Source-line precedence: configured cfg.line wins over live
-      // departures so a nightline configured during the day still
-      // tints the panel in nightline-blue (no live U-Bahn rows would
-      // otherwise overwrite it with U-Bahn-red). Falls back to the
-      // first live departure when no line is configured. Final fall-
-      // through is white — chipPalette's `var(--primary-color)` floor
-      // reads poorly on the LED aesthetic.
+      // Source-line precedence: a board filtered to ONE line uses that
+      // line, so a nightline configured during the day still tints the
+      // panel in nightline-blue (no live U-Bahn rows would otherwise
+      // overwrite it with U-Bahn-red). With no filter or several lines
+      // there is no single right answer, so the first live departure
+      // wins. Final fall-through is white — chipPalette's
+      // `var(--primary-color)` floor reads poorly on the LED aesthetic.
       const pool = matching.length ? matching : allDepartures;
       const sourceLine = configuredLine || pool[0]?.line;
       if (sourceLine) {
@@ -1211,8 +1326,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --retro-pad-r: 22px;
       --retro-pad-l: 22px;
 
-      /* Establish a container so the race exit animation can translate
-         wheelchairs by 100cqw (= full card width) regardless of size. */
+      /* Inline-size container for the @container rules below (< 360px
+         hides the unit caption, < 320px reflows the header per WCAG
+         1.4.10). Removing it silently disables both. */
       container-type: inline-size;
       position: relative;
       display: flex;
@@ -1539,25 +1655,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         animation-delay: -2.4s;
       }
     }
-    /* Wheelchair race — per-race pattern encodes who's ahead at 25/50/
-       75%, so each run has at least one overtake. Per-racer waypoints
-       (--race-x-25/50/75), end offset, and duration come from CSS
-       custom properties that JS sets at race start. Keyframe preserves
-       the 0.18em baseline offset so the icon doesn't jump vertically.
-       Per-keyframe timing-functions: ease-out for the launch (burst
-       out of the gate) and a symmetric cubic-bezier for every middle
-       segment. The cubic-bezier (0.4, 0.2, 0.6, 0.8) has endpoint
-       slopes of ~0.5× the segment's average velocity, peaking ~1.5×
-       in the middle — so when the swap pattern flips lead/trail at a
-       checkpoint, the velocity transition reads as a smooth ease
-       instead of an abrupt lurch. */
-    @keyframes retroWheelExit {
-      0%   { transform: translate(0, 0.18em); animation-timing-function: ease-out; }
-      25%  { transform: translate(var(--race-x-25, 25cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
-      50%  { transform: translate(var(--race-x-50, 50cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
-      75%  { transform: translate(var(--race-x-75, 75cqw), 0.18em); animation-timing-function: cubic-bezier(0.4, 0.2, 0.6, 0.8); }
-      100% { transform: translate(var(--race-end, 110cqw), 0.18em); }
-    }
+    /* Wheelchair race — the motion itself has no CSS: utils/race.ts
+       samples each racer's path and the card plays it through
+       Element.animate() (see _playRaceAnimations). This block only
+       carries the staging that animation needs. The previous
+       @keyframes lived here, pinned at 0/25/50/75/100%, and that fixed
+       grid is exactly what made the motion lurch — unequal distances
+       forced into equal slices of the run. */
     @media (prefers-reduced-motion: no-preference) {
       /* LED prep: countdown, racing, and the photo-finish freeze all
          share the same row-clearing + overflow-visible setup. */
@@ -1578,41 +1682,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       .retro--race-freeze.retro--gleis-right .retro-gleis {
         opacity: 0;
       }
-      /* Animation declarations apply during both active and freeze so
-         the in-flight animation keeps its identity across the state
-         flip — animation-play-state: paused below freezes the frame
-         instead of restarting from 0%. */
-      .retro--race-active .retro-row:nth-child(1) .retro-wheelchair,
-      .retro--race-freeze .retro-row:nth-child(1) .retro-wheelchair {
-        --race-end: var(--race-a-end, 110cqw);
-        --race-x-25: var(--race-a-x-25, 25cqw);
-        --race-x-50: var(--race-a-x-50, 50cqw);
-        --race-x-75: var(--race-a-x-75, 75cqw);
-        animation: retroWheelExit var(--race-a-duration, 3.3s) linear forwards;
-      }
-      .retro--race-active .retro-row:nth-child(2) .retro-wheelchair,
-      .retro--race-freeze .retro-row:nth-child(2) .retro-wheelchair {
-        --race-end: var(--race-b-end, 110cqw);
-        --race-x-25: var(--race-b-x-25, 25cqw);
-        --race-x-50: var(--race-b-x-50, 50cqw);
-        --race-x-75: var(--race-b-x-75, 75cqw);
-        animation: retroWheelExit var(--race-b-duration, 3.3s) linear forwards;
-      }
-      /* Photo-finish freeze: pauses both wheelchair animations at
-         the moment shortly after the winner crosses the finish line.
-         The viewer gets a clear still frame — winner at the strip,
-         loser caught a step behind — before the trophy appears. */
-      .retro--race-freeze .retro-wheelchair {
-        animation-play-state: paused;
-      }
       /* Pass wheelchairs in front of the finish-line strip so the
-         crossing reads as "through" rather than "behind the barrier". */
+         crossing reads as "through" rather than "behind the barrier",
+         and hint the transform so each racer gets its own layer for the
+         run. The photo-finish freeze is Animation.pause() in JS, not a
+         CSS state — it holds the exact frame the racer was on, which no
+         declaration here could express. */
       .retro--race-active .retro-wheelchair,
       .retro--race-freeze .retro-wheelchair {
         position: relative;
         z-index: 4;
+        will-change: transform;
       }
-      /* Victory holds the racers off-screen until the idle reset. */
+      /* Victory hides the racers until the idle reset (their animations
+         are cancelled, so they are back at the gate). */
       .retro--race-victory .retro-wheelchair {
         opacity: 0;
       }

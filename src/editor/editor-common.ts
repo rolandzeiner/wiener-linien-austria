@@ -7,12 +7,14 @@
 // whether to re-normalise, and three `computeLabel`s produced three words for
 // one control.
 //
-// These are plain functions rather than a base class on purpose. The editors
-// differ in config shape (retro is flat and single-stop, modern and flap carry
-// an `entities` array) and in which of these they need at all; a base class
-// would have to be generic over the config type to express that, which buys
-// nothing over passing the two or three values each function actually reads.
-// It also matches how the rest of the editor surface is already factored.
+// These stay plain functions, while the element plumbing the three board
+// editors share (state, shouldUpdate, the tab shell, `_commit` / `_patch`)
+// lives in the base class in board-editor.ts. The split follows what each
+// piece needs: the plumbing owns Lit state, which only a class can hold,
+// whereas these read two or three values each, differ by config shape (retro
+// is flat and single-stop, modern and flap carry an `entities` array), and
+// the label and helper resolvers also serve the route editor, which is not a
+// board editor.
 
 import type { StopBlockCallbacks } from "./stop-block.js";
 import type { EditorTranslators } from "./editor-i18n.js";

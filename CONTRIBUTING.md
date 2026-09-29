@@ -23,7 +23,7 @@ npm run build           # Rolldown builds four bundles into
 ## Branching & releases
 
 - Work on `dev`. PRs target `dev`.
-- A release is a `dev → main` PR, squash-merged. The tag is cut from `main` after the merge, and `dev` is then reset to `main` so the two don't diverge.
+- A release is a `dev → main` PR, squash-merged. The tag is cut from `main` after the merge. `dev` is then rebuilt on top of `main`, keeping any commits that landed on `dev` after the PR, such as a Dependabot bump. A plain reset to `main` would drop them.
 - Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
 
 ## Card-version sync
@@ -44,7 +44,7 @@ Because the TS literals are asserted equal to the manifest, none of the four can
   tagged template's contents are string data, so without this every explanatory
   CSS comment shipped to users; it was 17.8% of the modern bundle. Comments stay
   intact in `npm run dev`. It has to run *after* the transpile step.
-- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.54% on 2026-09-15).
+- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.70% on 2026-09-29).
   - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the others carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
 
     ```bash
@@ -145,10 +145,11 @@ picks between them per file:
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
 - **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
-  file's leading comment, for anything that needs a DOM. Six of the 24 test
+  file's leading comment, for anything that needs a DOM. Seven of the 23 test
   files today: `card-smoke.test.ts` mounts the three departure-board cards,
   `editor-smoke.test.ts` mounts their three editors and asserts the
-  `config-changed` payload, `route-card.test.ts` covers the route card, its
+  `config-changed` payload, `editor/board-editor.test.ts` checks which `hass`
+  updates re-render an editor, `route-card.test.ts` covers the route card, its
   ad-hoc mode and its editor,
   `editor/header-strip.test.ts` drives the signage-strip editor,
   `shared-render.test.ts` covers the stale-cache reload machinery, and
@@ -156,6 +157,11 @@ picks between them per file:
 
 Opt in per file rather than globally: only the suites that need a DOM should pay
 for booting one.
+
+**A new source file that names translation keys must join the list at the top of
+`src/localize/localize.test.ts`.** The catalogue checks find keys by scanning
+that fixed set of files. Keys used only in an unlisted file read as orphaned and
+the test fails, even though they render fine.
 
 The HA components the editors host (`ha-form`, `ha-icon`, `ha-alert`,
 `ha-icon-picker`) are deliberately never defined in tests. An undefined element
@@ -166,6 +172,25 @@ Two things happy-dom gets wrong, so don't chase them: its `outline` shorthand
 parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`.
 Both are fine in every browser HA supports — assert on the source, not on parsed
 `cssText`.
+
+## Card editors
+
+The modern, retro and flap editors share their element plumbing through
+`BoardEditor` in `src/editor/board-editor.ts`: the config and tab state, the
+`hass` filter in `shouldUpdate`, the tab bar, and `_commit` / `_patch`. Modern
+and flap extend `MultiStopEditor`, which adds the entity picker and one stop
+block per stop. Retro shows a single stop and extends `BoardEditor` directly.
+The route editor is one plain form and uses only the label and helper resolvers
+in `src/editor/editor-common.ts`.
+
+**Add a setting in its card's editor**, as a field in one of that card's section
+schemas. The base class holds only what two or more editors render the same
+way. A control that only one card has stays with that card.
+
+**Every config write goes through `_commit`**, which sets `_config` before it
+fires `config-changed`. Home Assistant never calls `setConfig` again after that
+event, so a write that only fires the event leaves the form showing the old
+value.
 
 ## On-demand route planning
 
@@ -248,7 +273,7 @@ python3 scripts/readme_toc.py --check   # README table of contents matches its #
 
 **The README's table of contents is generated.** Don't edit the list between `<!-- toc -->` and `<!-- tocstop -->`: `python3 scripts/readme_toc.py` rebuilds it from the `##` headings, and the `readme-toc` pre-commit hook does that on every commit that touches `README.md`.
 
-CI runs the same checks plus hassfest + HACS validation, the Lit template backtick guard, `npm audit`, and a byte-for-byte check that the committed bundles match a fresh build. Failing locally wastes a push.
+CI runs the same checks plus hassfest + HACS validation, the Lit template backtick guard, `npm audit`, a byte-for-byte check that the committed bundles match a fresh build, a syntax check of each bundle, and a guard that `_dev_fixture.py` is never committed. Failing locally wastes a push.
 
 ## Reporting issues
 

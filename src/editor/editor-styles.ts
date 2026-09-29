@@ -248,6 +248,19 @@ export const editorStyles = css`
     background: color-mix(in srgb, var(--wl-chip-color) 88%, #000);
   }
 
+  /* Dashed rather than merely faded, matching .wl-dir. Declared after the
+     [aria-pressed="true"] rules so a chip that is both on and unavailable
+     reads as unavailable — equal specificity, so source order decides. */
+  .wl-chip[aria-disabled="true"],
+  .wl-chip[aria-disabled="true"]:hover {
+    border-style: dashed;
+    border-color: var(--secondary-text-color);
+    background: transparent;
+    color: var(--secondary-text-color);
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+
   /* Offset outline rather than box-shadow: on a chip filled with its own line
      colour a shadow-based ring disappears into the fill. */
   .wl-chip:focus-visible {

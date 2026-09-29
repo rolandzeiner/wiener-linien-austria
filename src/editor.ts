@@ -9,213 +9,80 @@
 // (Aufbau / Abfahrtszeile / Störungen & Verspätungen), so "hide the platform
 // number" is one tab away rather than twenty-five rows down.
 //
-// Two invariants carried over from v1, both load-bearing:
-//
-// * **Storage-shape translator** at the entities boundary — ha-form's entity
-//   selector with `multiple: true` emits a flat `string[]`, while the saved
-//   config carries per-stop overrides. Without the translator every add/remove
-//   cycle would silently wipe every stop's lines, direction and walk times.
-//
-// * **`_config` before `fireEvent`** — see `multiStopCallbacks` in
-//   editor/editor-common.ts.
+// One invariant carried over from v1, load-bearing: the **storage-shape
+// translator** at the entities boundary. ha-form's entity selector with
+// `multiple: true` emits a flat `string[]`, while the saved config carries
+// per-stop overrides. Without the translator (`rebuildStops`, wired up in
+// MultiStopEditor) every add/remove cycle would silently wipe every stop's
+// lines, direction and walk times.
 
-import {
-  LitElement,
-  html,
-  nothing,
-  type CSSResultGroup,
-  type PropertyValues,
-  type TemplateResult,
-} from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, type TemplateResult } from "lit";
+import { customElement } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { editorStyles } from "./editor/editor-styles.js";
-import { editorTokens } from "./editor/editor-tokens.js";
-import { editorTranslators, type EditorTranslators } from "./editor/editor-i18n.js";
-import {
-  renderFormSection,
-  renderPanel,
-  renderSection,
-  renderTabs,
-  type TabKey,
-} from "./editor/editor-shell.js";
-import { renderStopBlock, type StopBlockCallbacks } from "./editor/stop-block.js";
-import {
-  editorHelper,
-  editorLabel,
-  multiStopCallbacks,
-  rebuildStops,
-} from "./editor/editor-common.js";
-import type {
-  HaFormSchema,
-  HomeAssistant,
-  LovelaceCardEditor,
-  WienerLinienCardConfig,
-} from "./types.js";
-import { fireEvent } from "./utils.js";
+import { MultiStopEditor } from "./editor/board-editor.js";
+import { renderFormSection, renderSection } from "./editor/editor-shell.js";
 import {
   lineChipColors,
   normaliseModernConfig,
   type NormalisedModernConfig,
-  type NormalisedModernStop,
 } from "./utils/config.js";
 import { colorSchemeOf } from "./utils/color.js";
+import {
+  TRANSFER_MODES,
+  TRANSFER_MODE_ICONS,
+  type TransferMode,
+} from "./utils/mot.js";
 import { collectLinesInSelection } from "./utils/departures.js";
 import { mergeLineColorsMaps } from "./utils/entities.js";
 
+/** Editor label key per transfer mode. Spelled out rather than built as
+ *  `mode_${mode}`: the orphaned-key check in localize/localize.test.ts finds a
+ *  string by grepping the source for its leaf, so an interpolated key reads as
+ *  unreferenced and the catalogue entry looks safe to delete. */
+const TRANSFER_MODE_LABEL_KEYS: Readonly<Record<TransferMode, string>> = {
+  metro: "mode_metro",
+  sbahn: "mode_sbahn",
+  tram: "mode_tram",
+  badner: "mode_badner",
+  bus: "mode_bus",
+  night: "mode_night",
+};
+
 @customElement("wiener-linien-austria-card-editor")
-export class WienerLinienAustriaCardEditor
-  extends LitElement
-  implements LovelaceCardEditor
-{
-  @property({ attribute: false }) public hass?: HomeAssistant;
+export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedModernConfig> {
+  protected readonly _namespace = "modern";
 
-  @state() private _config?: NormalisedModernConfig;
-  @state() private _tab: TabKey = "stops";
-
-  public setConfig(config: WienerLinienCardConfig): void {
-    this._config = normaliseModernConfig(config);
+  protected override _normalise(raw: Record<string, unknown>): NormalisedModernConfig {
+    return normaliseModernConfig(raw);
   }
 
-  protected override shouldUpdate(changed: PropertyValues): boolean {
-    if (!this._config) return false;
-    if (changed.has("_config") || changed.has("_tab")) return true;
-    // hass fires for every state change anywhere in HA — only re-render when
-    // one of the configured entities actually changed.
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    const eids = this._config.entities.map((s) => s.entity);
-    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
+  protected override _lineColorOverrides(cfg: NormalisedModernConfig): Record<string, string> {
+    return cfg.line_colors;
   }
 
-  private get _i18n(): EditorTranslators {
-    return editorTranslators("modern", this.hass?.language);
-  }
-
-  private _commit(next: NormalisedModernConfig): void {
-    this._config = next;
-    fireEvent(this, "config-changed", { config: next });
-  }
-
-  private _patch(value: Record<string, unknown>): void {
-    if (!this._config) return;
-    // Spread the existing config first so dashboard passthrough fields AND
-    // `type` survive — ha-form's value carries neither.
-    this._commit(normaliseModernConfig({ ...this._config, ...value }));
-  }
-
-  private get _stopCallbacks(): StopBlockCallbacks {
-    return multiStopCallbacks<NormalisedModernStop>(
-      () => this._config?.entities,
-      (entities) => {
-        if (this._config) this._commit({ ...this._config, entities });
-      },
-    );
+  protected override _helperOverrides(
+    cfg: NormalisedModernConfig,
+  ): Record<string, string | undefined> {
+    const { et } = this._i18n;
+    return {
+      ...(cfg.show_accessibility
+        ? {}
+        : { accessibility_only: et("accessibility_only_requires") }),
+      ...(cfg.show_delay ? {} : { show_delay_colors: et("show_delay_colors_requires") }),
+      ...(cfg.entities.length >= 2 ? {} : { layout: et("layout_requires") }),
+    };
   }
 
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
 
-  protected override render(): TemplateResult | typeof nothing {
-    if (!this._config) return nothing;
+  protected override _renderDisplay(cfg: NormalisedModernConfig): TemplateResult {
     const { et } = this._i18n;
-    return html`
-      <div class="wl-editor">
-        ${renderTabs(
-          [
-            { key: "stops", label: et("tab_stops") },
-            { key: "display", label: et("tab_display") },
-            { key: "tweaks", label: et("tab_tweaks") },
-          ],
-          this._tab,
-          (key) => {
-            this._tab = key;
-          },
-        )}
-        ${renderPanel(this._tab, this._renderActiveTab())}
-      </div>
-    `;
-  }
-
-  private _renderActiveTab(): TemplateResult | typeof nothing {
-    switch (this._tab) {
-      case "stops":
-        return this._renderStops();
-      case "display":
-        return this._renderDisplay();
-      case "tweaks":
-        return this._renderMisc();
-    }
-  }
-
-  private _renderStops(): TemplateResult {
-    const cfg = this._config!;
-    const { t, et } = this._i18n;
-    return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${{ entities: cfg.entities.map((s) => s.entity) }}
-        .schema=${[
-          {
-            name: "entities",
-            required: true,
-            selector: {
-              entity: {
-                multiple: true,
-                filter: { domain: "sensor", integration: "wiener_linien_austria" },
-              },
-            },
-          },
-        ] satisfies ReadonlyArray<HaFormSchema>}
-        .computeLabel=${this._computeLabel}
-        .computeHelper=${this._computeHelper}
-        @value-changed=${this._onEntitiesChanged}
-      ></ha-form>
-      ${cfg.entities.map((stop, i) =>
-        renderStopBlock(
-          this.hass,
-          stop,
-          {
-            index: i + 1,
-            total: cfg.entities.length,
-            lineColorOverrides: cfg.line_colors,
-            t,
-            et,
-          },
-          this._stopCallbacks,
-        ),
-      )}
-    `;
-  }
-
-  private _onEntitiesChanged = (
-    ev: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
-    ev.stopPropagation();
-    if (!this._config) return;
-    this._commit(
-      normaliseModernConfig({
-        ...this._config,
-        entities: rebuildStops(this._config.entities, ev.detail.value["entities"]),
-      }),
-    );
-  };
-
-  private _renderDisplay(): TemplateResult {
-    const cfg = this._config!;
-    const { et } = this._i18n;
-    const common = {
-      hass: this.hass,
-      computeLabel: this._computeLabel,
-      computeHelper: this._computeHelper,
-      onChange: (v: Record<string, unknown>) => this._patch(v),
-    };
-
     return html`
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_layout"),
         hint: et("section_layout_hint"),
         data: {
@@ -254,8 +121,9 @@ export class WienerLinienAustriaCardEditor
           { name: "show_qr_button", selector: { boolean: {} } },
         ],
       })}
+      ${this._renderTransferModes(cfg)}
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_departure_row"),
         hint: et("section_departure_row_hint"),
         data: {
@@ -278,7 +146,7 @@ export class WienerLinienAustriaCardEditor
         ],
       })}
       ${renderFormSection({
-        ...common,
+        ...this._form,
         title: et("section_disruptions"),
         data: {
           show_traffic_info: cfg.show_traffic_info,
@@ -300,19 +168,86 @@ export class WienerLinienAustriaCardEditor
     `;
   }
 
-  private _renderMisc(): TemplateResult {
-    const cfg = this._config!;
+  /** Which vehicle categories get a transfer chip in the stops-ahead trail.
+   *
+   *  A chip row rather than a `boolean` schema row per category: near-
+   *  identical switches distinguish themselves only by their words, whereas a glyph
+   *  reads at a glance — and the row visually rhymes with the chips it
+   *  governs in the card. It reuses `.wl-chip`, the stop block's line-toggle
+   *  idiom, deliberately WITHOUT a colour override: a category is not a line,
+   *  and painting "Metro" in U1's red would assert something untrue. The
+   *  glyph identifies, the accent fill carries state.
+   *
+   *  Bespoke rather than a `select` with `multiple: true` for the same reason
+   *  the line colours are bespoke — this is a set, and ha-form's multi-select
+   *  renders it as a dropdown of words. */
+  private _renderTransferModes(cfg: NormalisedModernConfig): TemplateResult {
+    const { et } = this._i18n;
+    // The chips govern the stops-ahead trail, so with the trail switched off
+    // there is nothing for them to act on.
+    const inert = !cfg.show_stops_ahead;
+    const picked = new Set(cfg.stops_ahead_modes);
+
+    return renderSection(
+      { title: et("section_transfers"), hint: et("section_transfers_hint") },
+      html`<div class="wl-group">
+        <span class="wl-note">
+          ${inert ? et("transfer_modes_requires") : et("transfer_modes_hint")}
+        </span>
+        <div class="wl-chips">
+          ${TRANSFER_MODES.map((mode) => {
+            const on = picked.has(mode);
+            const label = et(TRANSFER_MODE_LABEL_KEYS[mode]);
+            return html`<button
+              type="button"
+              class="wl-chip"
+              aria-pressed=${on ? "true" : "false"}
+              aria-disabled=${inert ? "true" : "false"}
+              aria-label=${et(on ? "mode_shown_aria" : "mode_hidden_aria").replace(
+                "{mode}",
+                label,
+              )}
+              @click=${(ev: Event) => {
+                // aria-disabled, not `disabled` — see dirButton in
+                // editor/stop-block.ts for why the button stays focusable.
+                if (inert) {
+                  ev.preventDefault();
+                  return;
+                }
+                this._toggleTransferMode(mode);
+              }}
+            >
+              <span class="wl-chip-mode"
+                ><ha-icon icon=${TRANSFER_MODE_ICONS[mode]} aria-hidden="true"></ha-icon
+              ></span>
+              ${label}
+            </button>`;
+          })}
+        </div>
+      </div>`,
+    );
+  }
+
+  private _toggleTransferMode(mode: TransferMode): void {
+    const cfg = this._config;
+    if (!cfg) return;
+    const next = cfg.stops_ahead_modes.includes(mode)
+      ? cfg.stops_ahead_modes.filter((m) => m !== mode)
+      : [...cfg.stops_ahead_modes, mode];
+    // Through the normaliser so the saved order stays signage order rather
+    // than click order.
+    this._patch({ stops_ahead_modes: next });
+  }
+
+  protected override _renderTweaks(cfg: NormalisedModernConfig): TemplateResult {
     const { et } = this._i18n;
     return html`
-      ${this._renderColors()}
+      ${this._renderColors(cfg)}
       ${renderFormSection({
-        hass: this.hass,
+        ...this._form,
         title: et("section_footer"),
         data: { hide_attribution: cfg.hide_attribution },
         schema: [{ name: "hide_attribution", selector: { boolean: {} } }],
-        computeLabel: this._computeLabel,
-        computeHelper: this._computeHelper,
-        onChange: (v) => this._patch(v),
       })}
     `;
   }
@@ -322,8 +257,7 @@ export class WienerLinienAustriaCardEditor
    *  ha-form is not meant to model. Only lines currently in the selection get a
    *  row; an override for a line no longer selected stays in the config
    *  untouched rather than being silently dropped. */
-  private _renderColors(): TemplateResult {
-    const cfg = this._config!;
+  private _renderColors(cfg: NormalisedModernConfig): TemplateResult {
     const { et } = this._i18n;
     const eids = cfg.entities.map((s) => s.entity);
     const lines = collectLinesInSelection(this.hass, eids);
@@ -421,21 +355,4 @@ export class WienerLinienAustriaCardEditor
     delete line_colors[line.toUpperCase()];
     this._commit({ ...this._config, line_colors });
   }
-
-  private _computeLabel = (field: { name: string }): string =>
-    editorLabel(this.hass, this._i18n, field.name);
-
-  private _computeHelper = (field: { name: string }): string | undefined => {
-    const { et } = this._i18n;
-    const cfg = this._config;
-    return editorHelper(this._i18n, field.name, {
-      ...(cfg?.show_accessibility
-        ? {}
-        : { accessibility_only: et("accessibility_only_requires") }),
-      ...(cfg?.show_delay ? {} : { show_delay_colors: et("show_delay_colors_requires") }),
-      ...((cfg?.entities.length ?? 0) >= 2 ? {} : { layout: et("layout_requires") }),
-    });
-  };
-
-  static override styles: CSSResultGroup = [editorTokens, editorStyles];
 }
