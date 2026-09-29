@@ -447,22 +447,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._pendingRefresh = false;
     const { _from: from, _to: to } = this;
     const seq = ++this._planSeq;
-    if (!from || !to) {
-      this._plan = null;
-      this._planKey = "";
-      this._error = null;
-      this._phase = "idle";
-      return;
-    }
-    if (from === to) {
-      this._plan = null;
-      this._planKey = "";
-      this._error = { code: "same_stop", retryAfter: null, translationKey: null };
-      this._phase = "error";
-      if (userInitiated) this._announce(this._adhocError(this._error).title);
-      return;
-    }
-    if (!this.hass?.callWS) return;
+    if (!this._canPlan(from, to, userInitiated) || !this.hass?.callWS) return;
 
     const key = this._queryKey();
     if (this._planKey !== key) {
@@ -472,42 +457,70 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     if (!this._plan) this._phase = "loading";
     try {
-      const planned = this._timeMode !== "now" && isInputDateTime(this._when);
-      const plan = await this.hass.callWS<RouteAttrs>({
-        type: "wiener_linien_austria/plan",
-        origin: Number(from),
-        destination: Number(to),
-        ...(planned ? { datetime: this._when, arrive_by: this._timeMode === "arrive" } : {}),
-        ...(this._config?.step_free ? { step_free: true } : {}),
-      });
-      if (seq !== this._planSeq) return;
-      this._plan = plan;
-      this._planKey = key;
-      this._error = null;
-      this._phase = "ready";
-      if (this._revealAlternatives) {
-        this._alternativesOpen = true;
-        this._revealAlternatives = false;
-      }
-      if (userInitiated) this._announce(this._planAnnouncement(plan));
-      this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
+      const plan = await this.hass.callWS<RouteAttrs>(this._planRequest(from, to));
+      if (seq === this._planSeq) this._applyPlan(plan, key, userInitiated);
     } catch (err) {
-      if (seq !== this._planSeq) return;
-      const error = adhocErrorOf(err);
-      this._error = error;
-      this._revealAlternatives = false;
-      // A stale plan through an outage reads as "these still run"; show the
-      // problem instead, as the route sensor does when it goes unavailable.
-      this._plan = null;
-      this._planKey = "";
-      this._phase = "error";
-      if (userInitiated) this._announce(this._adhocError(error).title);
-      const delay = adhocRetryDelay(
-        adhocErrorSpec(error.code, error.translationKey),
-        error.retryAfter,
-      );
-      if (delay !== null) this._schedule(delay);
+      if (seq === this._planSeq) this._applyPlanError(err, userInitiated);
     }
+  }
+
+  /** Whether `from` → `to` is a query at all. When it isn't, the card drops
+   *  its plan and says why: nothing picked yet is idle, one stop picked for
+   *  both ends is an error. */
+  private _canPlan(from: string, to: string, userInitiated: boolean): boolean {
+    if (from && to && from !== to) return true;
+    this._plan = null;
+    this._planKey = "";
+    if (!from || !to) {
+      this._error = null;
+      this._phase = "idle";
+      return false;
+    }
+    this._error = { code: "same_stop", retryAfter: null, translationKey: null };
+    this._phase = "error";
+    if (userInitiated) this._announce(this._adhocError(this._error).title);
+    return false;
+  }
+
+  private _planRequest(from: string, to: string): { type: string; [key: string]: unknown } {
+    const planned = this._timeMode !== "now" && isInputDateTime(this._when);
+    return {
+      type: "wiener_linien_austria/plan",
+      origin: Number(from),
+      destination: Number(to),
+      ...(planned ? { datetime: this._when, arrive_by: this._timeMode === "arrive" } : {}),
+      ...(this._config?.step_free ? { step_free: true } : {}),
+    };
+  }
+
+  private _applyPlan(plan: RouteAttrs, key: string, userInitiated: boolean): void {
+    this._plan = plan;
+    this._planKey = key;
+    this._error = null;
+    this._phase = "ready";
+    if (this._revealAlternatives) {
+      this._alternativesOpen = true;
+      this._revealAlternatives = false;
+    }
+    if (userInitiated) this._announce(this._planAnnouncement(plan));
+    this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
+  }
+
+  private _applyPlanError(err: unknown, userInitiated: boolean): void {
+    const error = adhocErrorOf(err);
+    this._error = error;
+    this._revealAlternatives = false;
+    // A stale plan through an outage reads as "these still run"; show the
+    // problem instead, as the route sensor does when it goes unavailable.
+    this._plan = null;
+    this._planKey = "";
+    this._phase = "error";
+    if (userInitiated) this._announce(this._adhocError(error).title);
+    const delay = adhocRetryDelay(
+      adhocErrorSpec(error.code, error.translationKey),
+      error.retryAfter,
+    );
+    if (delay !== null) this._schedule(delay);
   }
 
   private _onPick(which: Which, value: unknown): void {

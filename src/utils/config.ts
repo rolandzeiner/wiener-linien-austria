@@ -25,6 +25,11 @@ function asBool(v: unknown, fallback: boolean): boolean {
   return typeof v === "boolean" ? v : fallback;
 }
 
+/** `v` when `allowed` holds it, otherwise `fallback`. */
+function oneOf<T extends string>(allowed: ReadonlySet<T>, v: unknown, fallback: T): T {
+  return allowed.has(v as T) ? (v as T) : fallback;
+}
+
 const RETRO_SIZES: ReadonlySet<RetroSize> = new Set(["small", "medium", "regular"] as const);
 const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "default",
@@ -122,9 +127,7 @@ export function normaliseRetroHeaderSide(raw: unknown): RetroHeaderSide | undefi
   const r = raw as Record<string, unknown>;
   const out: RetroHeaderSide = {};
 
-  const exit: RetroHeaderExit = RETRO_HEADER_EXIT.has(r.exit as RetroHeaderExit)
-    ? (r.exit as RetroHeaderExit)
-    : "none";
+  const exit = oneOf(RETRO_HEADER_EXIT, r.exit, "none");
   if (exit !== "none") out.exit = exit;
 
   const text = boundedText(r.text, HEADER_MAX_TEXT_LEN, true);
@@ -589,29 +592,23 @@ export function retroDirectionFilter(
   return direction === "both" ? undefined : direction;
 }
 
+/** The retro line filter. `lines` is the filter; `line` is its pre-multi-line
+ *  spelling, accepted on the way in and re-emitted as lines[0] on the way out. */
+function retroLines(raw: WienerLinienRetroCardConfig): string[] | undefined {
+  if (Array.isArray(raw.lines)) {
+    return raw.lines.filter((line): line is string => typeof line === "string" && line.length > 0);
+  }
+  return typeof raw.line === "string" && raw.line ? [raw.line] : undefined;
+}
+
 export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): NormalisedRetroConfig {
   // Anything that isn't an explicit "R" or "both" lands on H — the default
   // this card has always had. Absence therefore keeps meaning H, and a user
   // who wants every direction says so with "both".
   const direction: RetroDirection =
     raw.direction === "R" || raw.direction === "both" ? raw.direction : "H";
-  // `lines` is the filter; `line` is its pre-multi-line spelling, accepted on
-  // the way in and re-emitted as lines[0] on the way out.
-  const lines = Array.isArray(raw.lines)
-    ? raw.lines.filter((line): line is string => typeof line === "string" && line.length > 0)
-    : typeof raw.line === "string" && raw.line
-      ? [raw.line]
-      : undefined;
+  const lines = retroLines(raw);
   const lineDirections = normaliseLineDirections(raw.line_directions);
-  const size: RetroSize = RETRO_SIZES.has(raw.size as RetroSize)
-    ? (raw.size as RetroSize)
-    : CARD_DEFAULTS.size.retro;
-  const station_bg: RetroStationBg = RETRO_STATION_BG.has(raw.station_bg as RetroStationBg)
-    ? (raw.station_bg as RetroStationBg)
-    : CARD_DEFAULTS.station_bg.retro;
-  const style: RetroStyle = RETRO_STYLES.has(raw.style as RetroStyle)
-    ? (raw.style as RetroStyle)
-    : "classic";
   const passthrough = filterPassthrough(raw, RETRO_VALIDATED_KEYS);
 
   return {
@@ -626,16 +623,14 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     // non-boolean straight through (`show_platform: 0` yielded `0`,
     // hiding the column, where modern and flap both yield `true`).
     show_platform: asBool(raw.show_platform, CARD_DEFAULTS.show_platform.retro),
-    platform_side: RETRO_PLATFORM_SIDES.has(raw.platform_side as RetroPlatformSide)
-      ? (raw.platform_side as RetroPlatformSide)
-      : "auto",
+    platform_side: oneOf(RETRO_PLATFORM_SIDES, raw.platform_side, "auto"),
     show_station_name: asBool(
       raw.show_station_name,
       CARD_DEFAULTS.show_station_name.retro,
     ),
-    station_bg,
-    size,
-    style,
+    station_bg: oneOf(RETRO_STATION_BG, raw.station_bg, CARD_DEFAULTS.station_bg.retro),
+    size: oneOf(RETRO_SIZES, raw.size, CARD_DEFAULTS.size.retro),
+    style: oneOf(RETRO_STYLES, raw.style, "classic"),
     flicker: raw.flicker === true,
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,

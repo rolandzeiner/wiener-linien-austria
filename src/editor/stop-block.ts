@@ -16,7 +16,7 @@ import { classMap } from "lit/directives/class-map.js";
 import { live } from "lit/directives/live.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import type { HomeAssistant, WienerLinienAttrs } from "../types.js";
+import type { HaFormSchema, HomeAssistant, WienerLinienAttrs } from "../types.js";
 import { lineChipColors } from "../utils/config.js";
 import { colorSchemeOf } from "../utils/color.js";
 import {
@@ -30,6 +30,7 @@ import {
   type DirectionSurface,
   type Triplet,
 } from "../utils/departures.js";
+import { departureBoardOptions } from "../utils/entities.js";
 import { lineTypeIcon } from "../utils/mot.js";
 import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
 
@@ -636,5 +637,51 @@ function renderWalkTimes(
         })}
       </div>
     </div>
+  `;
+}
+
+export interface StopsTabOptions extends Omit<StopBlockOptions, "index" | "total"> {
+  hass: HomeAssistant | undefined;
+  stops: readonly StopView[];
+  computeLabel(field: { name: string }): string;
+  computeHelper(field: { name: string }): string | undefined;
+  onEntitiesChanged(ev: CustomEvent<{ value: Record<string, unknown> }>): void;
+  callbacks: StopBlockCallbacks;
+}
+
+/** The multi-stop editors' Stops tab: the entity picker, then one stop block
+ *  per picked stop. The retro editor is single-stop and builds its own. */
+export function renderStopsTab(opts: StopsTabOptions): TemplateResult {
+  const entities = opts.stops.map((s) => s.entity);
+  const blockOpts = (index: number): StopBlockOptions => ({
+    index,
+    total: opts.stops.length,
+    lineColorOverrides: opts.lineColorOverrides,
+    t: opts.t,
+    et: opts.et,
+  });
+  return html`
+    <ha-form
+      .hass=${opts.hass}
+      .data=${{ entities }}
+      .schema=${[
+        {
+          name: "entities",
+          required: true,
+          selector: {
+            entity: {
+              multiple: true,
+              include_entities: departureBoardOptions(opts.hass, entities),
+            },
+          },
+        },
+      ] satisfies ReadonlyArray<HaFormSchema>}
+      .computeLabel=${opts.computeLabel}
+      .computeHelper=${opts.computeHelper}
+      @value-changed=${opts.onEntitiesChanged}
+    ></ha-form>
+    ${opts.stops.map((stop, i) =>
+      renderStopBlock(opts.hass, stop, blockOpts(i + 1), opts.callbacks),
+    )}
   `;
 }

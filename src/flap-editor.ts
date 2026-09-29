@@ -36,7 +36,7 @@ import {
   type TabKey,
 } from "./editor/editor-shell.js";
 import { renderHeaderSection, type HeaderSideKey } from "./editor/header-strip.js";
-import { renderStopBlock, type StopBlockCallbacks } from "./editor/stop-block.js";
+import { renderStopsTab, type StopBlockCallbacks } from "./editor/stop-block.js";
 import {
   editorHelper,
   editorLabel,
@@ -44,14 +44,12 @@ import {
   rebuildStops,
 } from "./editor/editor-common.js";
 import type {
-  HaFormSchema,
   HomeAssistant,
   LovelaceCardEditor,
   WienerLinienAttrs,
   WienerLinienFlapCardConfig,
 } from "./types.js";
 import { fireEvent } from "./utils.js";
-import { departureBoardOptions } from "./utils/entities.js";
 import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
@@ -171,44 +169,17 @@ export class WienerLinienAustriaFlapCardEditor
   private _renderStops(): TemplateResult {
     const cfg = this._config!;
     const { t, et } = this._i18n;
-    return html`
-      <ha-form
-        .hass=${this.hass}
-        .data=${{ entities: cfg.entities.map((s) => s.entity) }}
-        .schema=${[
-          {
-            name: "entities",
-            required: true,
-            selector: {
-              entity: {
-                multiple: true,
-                include_entities: departureBoardOptions(
-                  this.hass,
-                  cfg.entities.map((s) => s.entity),
-                ),
-              },
-            },
-          },
-        ] satisfies ReadonlyArray<HaFormSchema>}
-        .computeLabel=${this._computeLabel}
-        .computeHelper=${this._computeHelper}
-        @value-changed=${this._onEntitiesChanged}
-      ></ha-form>
-      ${cfg.entities.map((stop, i) =>
-        renderStopBlock(
-          this.hass,
-          stop,
-          {
-            index: i + 1,
-            total: cfg.entities.length,
-            lineColorOverrides: {},
-            t,
-            et,
-          },
-          this._stopCallbacks,
-        ),
-      )}
-    `;
+    return renderStopsTab({
+      hass: this.hass,
+      stops: cfg.entities,
+      lineColorOverrides: {},
+      t,
+      et,
+      computeLabel: this._computeLabel,
+      computeHelper: this._computeHelper,
+      onEntitiesChanged: this._onEntitiesChanged,
+      callbacks: this._stopCallbacks,
+    });
   }
 
   private _onEntitiesChanged = (
