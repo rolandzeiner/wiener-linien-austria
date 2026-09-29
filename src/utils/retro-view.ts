@@ -18,8 +18,8 @@ import { retroDirectionFilter, type NormalisedRetroConfig } from "./config.js";
 export interface RetroView {
   /** Departures the panel will paint, already filtered and capped. */
   rows: DepartureAttr[];
-  /** Every departure passing the filters, uncapped — the station-name
-   *  band reads this to colour itself from lines beyond the two shown. */
+  /** Every departure passing the filters, uncapped. With no line
+   *  configured, the station-name band tints from its first entry. */
   matching: DepartureAttr[];
   /** The unfiltered feed, as the sensor reported it. */
   departures: DepartureAttr[];

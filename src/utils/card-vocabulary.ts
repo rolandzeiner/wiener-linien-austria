@@ -29,17 +29,16 @@
 // and are recorded here so a future reader stops re-discovering them as
 // bugs:
 //
-// - Direction. Modern and flap can show BOTH directions (`direction`
-//   unset). The retro card cannot: `normaliseRetroConfig` coerces to
-//   "H" | "R" with no third state, and the editor's shared stop block
-//   no-ops its "both" option to match. The LED panel renders one
-//   direction by design.
+// - Direction. Modern and flap spell "both directions" as absence
+//   (`direction` unset). Retro spells it as an explicit "both", because
+//   absence has always meant H there (see RetroDirection).
 // - Row cap. Modern exposes `max_departures` (default 6), flap exposes
 //   `max_rows` (default 2), and retro exposes nothing at all — it is
 //   fixed at ROW_CAP.retro below. Three names for one idea; retro's is a
 //   constant because the LED panel's layout is built for exactly two rows.
-// - Line filter. Retro takes a single `line`; modern and flap take a
-//   `lines` array per stop. Retro is a single-stop, single-line card.
+// - Line filter. All three take a `lines` array (modern and flap per
+//   stop); retro also reads and writes the legacy single `line`
+//   (= lines[0]). Retro is a single-stop card.
 // - Visibility polarity. Modern words its toggles as `hide_*`
 //   (`hide_header`, `hide_attribution`); retro and flap use `show_*`.
 //   Flap carries both. Frozen: renaming any of them breaks saved YAML.

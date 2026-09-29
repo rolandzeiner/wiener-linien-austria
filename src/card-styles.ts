@@ -863,15 +863,16 @@ export const cardStyles = css`
   }
 
   /* "Linie 43:" / "Linien 40, 41, 42:" — the section header of a per-line
-     block. Signage-style: accent rule, uppercase, tracked out. A notice
+     block. Signage-style: uppercase, tracked out. A notice
      covering seven tram lines is unreadable without these.
 
      Only rendered when a notice has two or more — a lone heading segments
-     nothing and merely restates the line already in the alert title, so
-     _renderTrafficNotice drops it. */
+     nothing and merely restates the line the alert's badge already names,
+     so _renderTrafficNotice drops it. */
   /* No accent rule down the side: the caps, weight and tracking already mark
-     this as a heading, and the bar spent the line colour — which on this card
-     means "this line" — on something carrying no line. Flush left, so the
+     this as a heading, and the bar painted the station's accent — its lead
+     line's colour, which on this card means "this line" — next to a heading
+     naming other lines. Flush left, so the
      per-line blocks share one edge with the prose under them. */
   .alert-desc-heading {
     margin: 14px 0 6px;

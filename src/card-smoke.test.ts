@@ -3,9 +3,9 @@
 // Component-level coverage for the three departure-board card entrypoints.
 // The route card and its editor have their own suite, route-card.test.ts.
 //
-// These three files are 6,568 lines — the entire user-visible surface of the
-// integration — and until this test existed not one of them was ever loaded by
-// the suite. That is worse than it sounds: v8 coverage instruments only what a
+// These three files were 6,568 lines when this suite was added — the entire
+// user-visible surface of the integration — and until this test existed not
+// one of them was ever loaded by the suite. That is worse than it sounds: v8 coverage instruments only what a
 // run imports, so the cards were not merely uncovered, they were absent from
 // the coverage report altogether, and the headline percentage was computed
 // over a denominator that excluded the largest files in the tree.
@@ -239,10 +239,11 @@ describe("rendering", () => {
   });
 
   it("the retro card blames the line filter, not the direction, on a both-directions board", async () => {
-    // A board set to every direction filters nothing by direction, so an empty
-    // result can only be the line filter. Reading "both" as a value to compare
-    // each departure against matches nothing, which sent every empty
-    // multi-line board to "wrong direction" instead.
+    // With no per-line override, a board set to every direction filters
+    // nothing by direction, so an empty result comes from the line filter.
+    // Reading "both" as a value to compare each departure against matched
+    // nothing, which sent every empty both-directions board to "wrong
+    // direction" instead.
     const el = await mount(RETRO, busyHass(), {
       type: `custom:${RETRO}`,
       entity: ENTITY,
@@ -251,6 +252,20 @@ describe("rendering", () => {
     });
     const empty = shadow(el).querySelector(".retro-empty");
     expect(empty?.textContent?.trim()).toBe("Keine Abfahrten für diese Linie");
+  });
+
+  it("the retro card blames the direction when a picked line only runs the other way", async () => {
+    // The U3 runs only towards Simmering (H) here, but the board wants it R.
+    // The 52 still running must not turn that into "wrong line".
+    const el = await mount(RETRO, busyHass(), {
+      type: `custom:${RETRO}`,
+      entity: ENTITY,
+      lines: ["U3"],
+      direction: "both",
+      line_directions: { U3: "R" },
+    });
+    const empty = shadow(el).querySelector(".retro-empty");
+    expect(empty?.textContent?.trim()).toBe("Keine Abfahrten in dieser Richtung");
   });
 
 });
@@ -321,7 +336,8 @@ describe("planned S-Bahn rows", () => {
   });
 
   it("the retro card marks the row and says so in its label", async () => {
-    // The retro panel shows one line in one direction; point it at the S2.
+    // The retro board defaults to direction H and paints only two rows;
+    // filter it to the S2 towards R so the planned row is on it.
     const el = await mount(RETRO, timetableHass(), {
       ...CARDS[1]![1],
       line: "S2",
@@ -528,6 +544,9 @@ describe("stops_ahead_modes", () => {
     expect(inline).toContain("S45");
   });
 
+  // The inline U/S chips and the `+N` panel are two halves of one list, so a
+  // filter applied to only the panel would leave these visible — the bug this
+  // pins is "metro off, U-chip still there".
   it("drops the U-chips when metro is off", async () => {
     const { inline, total } = trailChips(
       await mountTrail(["sbahn", "tram", "badner", "bus", "night"]),
@@ -537,9 +556,6 @@ describe("stops_ahead_modes", () => {
     expect(inline).toContain("S45");
   });
 
-  // The inline U/S chips and the `+N` panel are two halves of one list, so a
-  // filter applied to only the panel would leave these visible — the bug this
-  // pins is "metro off, U-chip still there".
   it("drops the S-chips when sbahn is off", async () => {
     const { inline, total } = trailChips(
       await mountTrail(["metro", "tram", "badner", "bus", "night"]),
@@ -565,7 +581,7 @@ describe("stops_ahead_modes", () => {
     expect(total).toBe(5);
   });
 
-  it("keeps only the rail categories when tram, bus and night are off", async () => {
+  it("keeps only metro and S-Bahn when every other category is off", async () => {
     const { inline, total } = trailChips(await mountTrail(["metro", "sbahn"]));
     expect(total).toBe(2);
     expect(inline.sort()).toEqual(["S45", "U3"]);
@@ -628,7 +644,7 @@ describe("flap board column width", () => {
     const el = await mount(
       FLAP,
       boardHass([
-        ["48A", "Dornbach", 1],
+        ["48A", "Dr.-Karl-Renner-Ring", 1],
         ["U1", "Leopoldau", 3],
         ["U1", "Oberlaa", 5],
       ]),
@@ -639,15 +655,16 @@ describe("flap board column width", () => {
     el.hass = boardHass([
       ["U1", "Leopoldau", 3],
       ["U1", "Oberlaa", 5],
-      ["U6", "Siebenhirten", 8],
+      ["U6", "Floridsdorf", 8],
     ]);
     await el.updateComplete;
     await vi.advanceTimersByTimeAsync(30_000);
     await el.updateComplete;
 
     // The lines stay right-aligned, next to the destination, with no
-    // blank tile stranded where the 48A's third character was.
+    // blank tile stranded where the 48A's third character was; the
+    // destinations shrink from the Ring's 20 tiles to Floridsdorf's 11.
     expect(column(el, "line")).toEqual(["U1", "U1", "U6"]);
-    expect(column(el, "dest").map((d) => d.length)).toEqual([12, 12, 12]);
+    expect(column(el, "dest").map((d) => d.length)).toEqual([11, 11, 11]);
   });
 });

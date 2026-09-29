@@ -34,8 +34,8 @@ import { lineTypeIcon } from "../utils/mot.js";
 import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
 
 /** The saved shape every card's per-stop config structurally satisfies.
- *  Retro adapts its flat `{entity, line, direction, walk_times}` into this at
- *  the call site. */
+ *  Retro adapts its flat `{entity, lines, direction ("both" → absent),
+ *  line_directions, walk_times}` into this at the call site. */
 export interface StopView {
   entity: string;
   // Dual form (see utils/config.ts): retro passes `cfg.walk_times` straight

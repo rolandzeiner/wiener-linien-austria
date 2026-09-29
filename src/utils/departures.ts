@@ -116,33 +116,6 @@ export function formatDirectionPillLabel(
   return `${strings.short}: ${head}${more}`;
 }
 
-// Lines tracked at a stop in one direction. Tracked-line keys (config-flow
-// selection) win — only surface lines the user opted into. Falls back to
-// live departures for older sensor caches that pre-date `tracked_line_keys`.
-// Used by the retro editor's line dropdown and its entity-changed line
-// auto-pick path; one resolver keeps both surfaces in sync.
-export function linesForDirection(
-  attrs: WienerLinienAttrs | undefined,
-  dir: "H" | "R" | undefined,
-): string[] {
-  if (!attrs) return [];
-  const out = new Set<string>();
-  if (attrs.tracked_line_keys?.length) {
-    for (const key of attrs.tracked_line_keys) {
-      const [line, keyDir] = key.split("|", 2);
-      if (!line) continue;
-      if (dir && keyDir !== dir) continue;
-      out.add(line);
-    }
-    if (out.size > 0) return [...out].sort();
-  }
-  for (const d of attrs.departures ?? []) {
-    if (dir && d.direction !== dir) continue;
-    if (d.line) out.add(d.line);
-  }
-  return [...out].sort();
-}
-
 /** What is known about the directions served at a stop, optionally narrowed
  *  to one line.
  *
@@ -152,8 +125,8 @@ export function linesForDirection(
  *  unconfigurable in the afternoon: every direction control read an empty set
  *  as "not served" and disabled itself.
  *
- *  Source precedence mirrors `linesForDirection` — `tracked_line_keys` (what
- *  the user opted into in the config flow) wins, live departures are the
+ *  Source precedence: `tracked_line_keys` (what the user opted into in the
+ *  config flow) wins, live departures are the
  *  fallback for sensor caches that pre-date it. A line the user tracks
  *  therefore keeps its direction buttons alive outside the hours it runs.
  */
@@ -271,8 +244,8 @@ export function filterDepartures(
   filter: ModernStopFilter,
 ): DepartureAttr[] {
   const { lines, direction, line_directions, walk_times, accessibility_only } = filter;
-  // Canonicalised on the way in: the retro card passes its single `line`
-  // config straight here without going through a stop normaliser, so this
+  // Canonicalised on the way in: the retro card passes its `lines` config
+  // straight here without going through a stop normaliser, so this
   // is where a legacy "LB" becomes the "WLB" the departures carry.
   const lineSet = lines && lines.length ? new Set(lines.map(canonicalLineLabel)) : null;
   return departures.filter((d) => {

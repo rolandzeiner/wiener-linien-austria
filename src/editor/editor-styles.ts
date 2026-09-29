@@ -248,8 +248,7 @@ export const editorStyles = css`
     background: color-mix(in srgb, var(--wl-chip-color) 88%, #000);
   }
 
-  /* Dashed rather than merely faded, matching .wl-dir: the border style
-     survives forced-colors mode, where opacity does not. Declared after the
+  /* Dashed rather than merely faded, matching .wl-dir. Declared after the
      [aria-pressed="true"] rules so a chip that is both on and unavailable
      reads as unavailable — equal specificity, so source order decides. */
   .wl-chip[aria-disabled="true"],

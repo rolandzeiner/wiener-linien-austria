@@ -324,8 +324,8 @@ export class WienerLinienAustriaCardEditor
 
   /** Which vehicle categories get a transfer chip in the stops-ahead trail.
    *
-   *  A chip row rather than five `boolean` schema rows: five near-identical
-   *  switches distinguish themselves only by their words, whereas a glyph
+   *  A chip row rather than a `boolean` schema row per category: near-
+   *  identical switches distinguish themselves only by their words, whereas a glyph
    *  reads at a glance — and the row visually rhymes with the chips it
    *  governs in the card. It reuses `.wl-chip`, the stop block's line-toggle
    *  idiom, deliberately WITHOUT a colour override: a category is not a line,

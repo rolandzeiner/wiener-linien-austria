@@ -2,6 +2,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 
 import {
   computeRaceParams,
+  FREEZE_DELAY_AFTER_WINNER_MS,
   RACE_FINISH_X_FALLBACK_CQW,
   type RaceMeasurements,
   type RacerTrack,
@@ -151,6 +152,20 @@ describe("computeRaceParams", () => {
       const gap = Math.abs(p.tracks.A.crossMs - p.tracks.B.crossMs);
       expect(gap).toBeGreaterThan(0);
       expect(gap).toBeLessThan(1500);
+    }
+  });
+
+  it("leaves the loser short of the line in the photo-finish frame", () => {
+    // The card freezes both racers FREEZE_DELAY_AFTER_WINNER_MS after the
+    // winner crosses. A loser crossing sooner than that is already over the
+    // line in the frame meant to show it a step behind.
+    for (const [label, m] of GEOMETRIES) {
+      if (m.a >= m.finishCqw || m.b >= m.finishCqw) continue; // no race to freeze
+      for (let i = 0; i < ROLLS; i += 1) {
+        const p = computeRaceParams(m);
+        const gap = Math.abs(p.tracks.A.crossMs - p.tracks.B.crossMs);
+        expect(gap, label).toBeGreaterThan(FREEZE_DELAY_AFTER_WINNER_MS);
+      }
     }
   });
 

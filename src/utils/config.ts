@@ -394,7 +394,7 @@ const MODERN_DEFAULTS: Omit<
 
 // Absence and emptiness mean different things here, which is why this is not
 // `cleanStringList`. A config written before the feature existed has no key at
-// all and must keep chipping every mode; a user who switched all five chips off
+// all and must keep chipping every mode; a user who switched every chip off
 // saves `[]` and must get exactly that. Anything that is not an array — a null,
 // a YAML string, a number — reads as "not configured" and takes the default.
 function normaliseTransferModes(raw: unknown): TransferMode[] {
@@ -509,7 +509,9 @@ export interface NormalisedRetroConfigValidated {
   //     config interface, because user-authored YAML can carry either shape.
   //   `?: T` — the bare form. Used by every NORMALISED interface: the
   //     normalisers only ever produce absence, and absence is what the
-  //     renderers branch on.
+  //     renderers branch on. This interface is the exception:
+  //     `normaliseRetroConfig` assigns `undefined` explicitly for keys it
+  //     didn't get, so the retro shape takes the dual form.
   entity?: string | undefined;
   direction: RetroDirection;
   line?: string | undefined;

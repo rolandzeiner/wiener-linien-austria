@@ -110,8 +110,8 @@ export class WienerLinienAustriaRetroCardEditor
       entity: cfg.entity ?? "",
       lines: cfg.lines,
       // The block spells "both directions" as absence, the same as it does
-      // for the modern and flap editors. Our config spells it "both", so the
-      // translation happens here and nowhere else.
+      // for the modern and flap editors. Our config spells it "both": this
+      // getter maps "both" to absence, and setDirections below maps it back.
       direction: cfg.direction === "both" ? undefined : cfg.direction,
       line_directions: cfg.line_directions,
       walk_times: cfg.walk_times,

@@ -1210,8 +1210,8 @@ export class WienerLinienAustriaCard extends LitElement {
    *  English phonetics. */
   private _renderTrafficNotice(notice: TrafficNotice): TemplateResult {
     // A lone heading segments nothing — it just restates the line the
-    // alert title already names ("U1: Verspätungen" followed by "LINIE
-    // U1"). Headings earn their keep only from two upwards, where they
+    // alert's badge already names (a U1 badge followed by "LINIE U1").
+    // Headings earn their keep only from two upwards, where they
     // separate the per-line blocks of a notice covering several lines.
     const headings = notice.blocks.reduce(
       (n, b) => (b.kind === "heading" ? n + 1 : n),

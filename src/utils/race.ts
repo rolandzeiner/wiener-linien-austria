@@ -4,10 +4,10 @@
 // natural start x and the finish-line x from the rendered shadow DOM,
 // hands them in here, and gets back one densely sampled trajectory per
 // racer (offset + absolute x, in cqw), a per-racer duration, and the
-// reconciled winner. The caller scales cqw to px and feeds the samples
-// straight to `Element.animate()`.
+// reconciled winner. The caller turns the samples into px offsets from
+// each racer's start and plays them with `Element.animate()`.
 //
-// Why sampled keyframes instead of the four CSS keyframes at 0 / 25 /
+// Why sampled keyframes instead of the five CSS keyframes at 0 / 25 /
 // 50 / 75 / 100 % this used to emit: fixed time fractions force very
 // different distances into equal slices of the run, so a racer's mean
 // speed jumped by up to 15x between segments, the last quarter was
@@ -32,16 +32,20 @@
 //           closer to the line simply travels slower; no racer ever
 //           has to sprint to join a shared track.
 //
-// `amplitude` is solved, not tuned: it is the largest duel that keeps
-// every racer's per-frame step within DUEL_SPEED_BUDGET of its own
-// cruise step. Since that budget is below LAUNCH_FLOOR, the duel can
-// never out-run the base motion, so every trajectory is strictly
-// monotonic by construction — no clamp, no special case.
+// `amplitude` is solved up to a tuned ceiling (DUEL_MAX_CQW): the largest
+// duel whose contribution to every keyframe step stays within
+// DUEL_SPEED_BUDGET of the shorter-runway racer's base step for that same
+// step (see duelAmplitude). With the budget below 1 the duel can never
+// cancel the base motion, so every trajectory is strictly monotonic by
+// construction — no clamp, no special case.
 
 export type Racer = "A" | "B";
 
-// Who leads at each of the three checkpoints. Every pattern contains at
-// least one swap, so no race is a procession.
+// Which racer gets the lead bias around each of the three checkpoints.
+// Every pattern swaps at least once, but the bias is only ±DUEL_MAX_CQW
+// around each racer's own track, so many races show no overtake on
+// screen: about half in simulation, and every one when both racers start
+// close to the strip.
 const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
   ["A", "A", "B"], ["B", "B", "A"],   // single late swap
   ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
@@ -52,10 +56,16 @@ const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
 const RACE_CROSS_BASE_MIN_MS = 2400;
 const RACE_CROSS_BASE_MAX_MS = 2700;
 
+// How long the card holds both racers still after the winner crosses:
+// the photo-finish frame, winner at the strip and loser caught a step
+// behind, before the trophy badge appears. A small cushion, so the freeze
+// lands after the winner has visibly crossed rather than exactly on it.
+export const FREEZE_DELAY_AFTER_WINNER_MS = 150;
+
 // Finish-margin distribution (ms between winner / loser crossings).
-// Close minimum is set high enough that even a photo finish has a
-// visible gap (~6cqw at 580px card width).
-const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [100, 250];
+// The closest finish stays above FREEZE_DELAY_AFTER_WINNER_MS, so the
+// photo-finish frame never catches the loser already over the line.
+const RACE_MARGIN_CLOSE_MS: readonly [number, number] = [200, 250];
 const RACE_MARGIN_MEDIUM_MS: readonly [number, number] = [200, 500];
 const RACE_MARGIN_DECISIVE_MS: readonly [number, number] = [500, 900];
 const RACE_PROB_CLOSE = 0.4;
@@ -83,8 +93,9 @@ const LAUNCH_FLOOR = 0.25;
 const LAUNCH_SPAN = 0.22;
 
 // Duel choreography. DUEL_SPEED_BUDGET caps how far the lead / trail
-// swings may bend a racer's own speed; it MUST stay below LAUNCH_FLOOR,
-// which is what makes every trajectory strictly monotonic (see header).
+// swings may bend a racer's own speed; it MUST stay below 1 —
+// duelAmplitude compares it per step against the base step, which is what
+// keeps every trajectory strictly monotonic (see header).
 const DUEL_MAX_CQW = 3;
 const DUEL_SPEED_BUDGET = 0.35;
 // Each lead change is spread over this much of the run rather than
@@ -98,8 +109,9 @@ const DUEL_FADE_OUT: readonly [number, number] = [0.86, 1];
 const RACE_CHECKPOINTS = [0.25, 0.5, 0.75] as const;
 
 // Keyframe count. The path is smooth, so linear interpolation between
-// 48 samples leaves per-step velocity differences under ~2% — well
-// below what the eye resolves at these speeds.
+// 48 samples keeps the speed change between consecutive keyframe
+// segments within 25% of the mean speed (race.test.ts pins it; ~17%
+// measured).
 const SAMPLE_COUNT = 48;
 
 // Duration is solved from each racer's geometry, so it needs bounds for
@@ -133,7 +145,8 @@ export interface RacerTrack {
   durationMs: number;
   /** When this racer reaches the finish line (ms from the gate). */
   crossMs: number;
-  /** The path, ready to hand to `Element.animate()`. */
+  /** The path in cqw; the card converts it to px offsets for
+   *  `Element.animate()`. */
   samples: readonly RaceSample[];
 }
 

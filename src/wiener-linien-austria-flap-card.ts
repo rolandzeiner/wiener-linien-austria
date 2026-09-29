@@ -62,7 +62,9 @@ const FLAP_MARCH_INTERVAL_MS = 130;
 // (position seq.length) for blanks / punctuation / any non-sequence
 // char; a row growing or shrinking destination text then marches
 // through the drum to / from the wildcard slot rather than 1-step
-// jumping, so a blank tile flipping in or out reads as mechanical.
+// jumping, so a blank tile flipping in or out reads as mechanical. (When
+// the column itself changes width, tiles are added or dropped first; see
+// fitFlipWidth.)
 // True cross-section transitions (letter ↔ digit) still jump in one
 // step — different physical drum, no rotation path between them.
 const FLAP_LETTER_SEQUENCE = "ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÜß";

@@ -292,7 +292,9 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
     const chips = modeChips(await onDisplayTab({ stops_ahead_modes: ["metro", "bus"] }));
     // Chips render in TRANSFER_MODES order, which is the order the Python
     // side already sorts the chips into: metro, sbahn, tram, badner, bus,
-    // night (see _MOT_SORT_RANK in static.py).
+    // night (_MOT_SORT_RANK in static.py for the Wiener Linien tiers,
+    // merge_transfer_lines in s_bahn_network.py for the S-Bahn behind the
+    // U-Bahn).
     expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual([
       "true",
       "false",

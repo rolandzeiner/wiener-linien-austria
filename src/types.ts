@@ -344,9 +344,9 @@ export interface WienerLinienAttrs {
   // the integration's config flow. Card editors prefer this so the
   // per-stop pickers only surface lines the user opted into.
   tracked_lines?: string[];
-  // Raw `{line}|{direction}` keys for tracked lines. Used by the retro
-  // card editor to filter the line list by direction without losing
-  // off-service lines.
+  // Raw `{line}|{direction}` keys for tracked lines. Read by the shared
+  // stop block (`directionSurface`) to tell "no live departures right now"
+  // from "not served", so an off-service line keeps its direction buttons.
   tracked_line_keys?: string[];
   // GTFS-derived per-line colours, scoped to the lines at this stop.
   // Empty when the static catalogue hasn't been loaded yet.
@@ -401,7 +401,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_departures?: boolean | undefined;
   show_stops_ahead?: boolean | undefined;
   /** Vehicle categories that get a transfer chip in the stops-ahead trail.
-   *  Omit the key for all five; an empty array hides every chip. */
+   *  Omit the key for every category; an empty array hides every chip. */
   stops_ahead_modes?: TransferMode[] | undefined;
   show_qr_button?: boolean | undefined;
   hide_header?: boolean | undefined;
@@ -411,7 +411,7 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Retro card config (single stop, single direction, LED aesthetic).
+// Retro card config (single stop, LED aesthetic).
 // ---------------------------------------------------------------------------
 
 export type RetroSize = "small" | "medium" | "regular";
@@ -502,9 +502,10 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   // utils/config.ts.
   entity?: string | undefined;
   direction?: RetroDirection | undefined;
-  /** Legacy single-line filter. Still read (and still written, as
-   *  `lines[0]`) so configs written before multi-line support keep
-   *  working; `lines` is the one to set. */
+  /** Legacy single-line filter. Still read, so configs written before
+   *  multi-line support keep working, and still written (as `lines[0]`),
+   *  so a config saved now still loads on an older build. `lines` is the
+   *  one to set. */
   line?: string | undefined;
   lines?: string[] | undefined;
   line_directions?: Record<string, "H" | "R"> | undefined;
