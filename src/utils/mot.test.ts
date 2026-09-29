@@ -41,9 +41,9 @@ describe("transferModeOf", () => {
     }
   });
 
-  // A NightLine is a bus by vehicle but its own category on the toggle row,
-  // and it matches the bus shape too — so the ordering in transferModeOf is
-  // what decides this, not the regexes in isolation.
+  // A NightLine is a bus by vehicle but its own category on the toggle row.
+  // It doesn't match the city-bus shape (that needs a leading digit), so
+  // without the N branch it would fall into the tram fallback.
   it("classifies NightLines as night rather than bus", () => {
     for (const l of ["N25", "N29", "N60", "N66"]) {
       expect(transferModeOf(l)).toBe("night");
@@ -64,16 +64,17 @@ describe("transferModeOf", () => {
 
   // Its own category, not a tram: linien.csv tags LineID 399 `ptTramWLB`,
   // _MOT_SORT_RANK gives it a dedicated tier, and it carries the palette's
-  // only pure-black colour. The toggle row was the last place calling it
-  // a tram.
+  // only pure-black colour. The toggle row was the last card-side place
+  // calling it a tram.
   it("classifies the Badner Bahn as its own mode", () => {
     expect(transferModeOf("WLB")).toBe("badner");
     expect(transferModeOf("wlb")).toBe("badner");
   });
 
-  // `LB` is the linien.csv spelling; canonicalLineLabel folds it onto WLB
-  // upstream of every classification, so transferModeOf never meets it. If
-  // that ever changes this test is the tripwire.
+  // `LB` is the linien.csv spelling; the integration rewrites it to WLB when
+  // it parses the catalogue, so transferModeOf never meets it. This pins that
+  // transferModeOf doesn't special-case it; it can't detect the upstream
+  // rewrite breaking.
   it("does not special-case the legacy LB spelling, which is folded upstream", () => {
     expect(transferModeOf("LB")).toBe("tram");
   });

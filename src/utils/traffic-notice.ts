@@ -415,9 +415,9 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
 
 /** Line-list prefix on an alert title: "11A, 59A, 48A: Verkehrsüberlastung",
  *  "U1: Verspätungen", "Linien 40, 41: Umleitung". The operator writes the
- *  affected lines into the title, and the card already shows them as coloured
- *  badges beside it — so on the card the prefix is the same fact twice, in the
- *  row where space is tightest. */
+ *  affected lines into the title, and the departure board already shows them
+ *  as coloured badges above it — so on the board the prefix is the same fact
+ *  twice, in the row where space is tightest. */
 const TITLE_LINE_PREFIX_RE = /^(?:Linien?\s+)?([^:]{1,80}):\s*(\S.*)$/;
 
 /**

@@ -675,12 +675,14 @@ describe("rendering", () => {
     await el.updateComplete;
 
     // A new state object, as the next poll delivers: a delay lands on the
-    // open connection. Its planned times, and so its key, stay the same.
-    const refreshed = ACTIVE.trips.map((t, i) =>
-      i === 1
-        ? { ...t, legs: [{ ...t.legs[0]!, origin: { ...t.legs[0]!.origin, delay_minutes: 4 } }, t.legs[1]!] }
-        : t,
-    );
+    // open connection and moves its live time. Its planned times, and so its
+    // key, stay the same.
+    const refreshed = ACTIVE.trips.map((t, i) => {
+      if (i !== 1) return t;
+      const origin = t.legs[0]!.origin;
+      const estimated = new Date(Date.parse(origin.planned!) + 4 * 60_000).toISOString();
+      return { ...t, legs: [{ ...t.legs[0]!, origin: { ...origin, estimated, delay_minutes: 4 } }, t.legs[1]!] };
+    });
     el.hass = hass("y", { ...ACTIVE, trips: refreshed });
     await el.updateComplete;
     expect(root(el).querySelector(".alt-summary")?.getAttribute("aria-expanded")).toBe("true");
@@ -1482,14 +1484,14 @@ describe("searching again from a change", () => {
 
   /** The shared fixture's change is at a stop with no `stop_id`. Give it the
    *  DIVA the catalogue knows it by, so the chip has something to plan from. */
-  function trackableChange(): RouteTripAttr {
+  function trackableChange(diva: string = STEPHANSPLATZ): RouteTripAttr {
     const base = trip("07:57", "08:11");
     const [first, second] = base.legs as [RouteLegAttr, RouteLegAttr];
     return {
       ...base,
       legs: [
-        { ...first, destination: { ...first.destination, stop_id: STEPHANSPLATZ } },
-        { ...second, origin: { ...second.origin, stop_id: STEPHANSPLATZ } },
+        { ...first, destination: { ...first.destination, stop_id: diva } },
+        { ...second, origin: { ...second.origin, stop_id: diva } },
       ],
     };
   }
@@ -1585,11 +1587,16 @@ describe("searching again from a change", () => {
     expect(chip(el)).toBeNull();
   });
 
-  it("leaves the chip off a change the catalogue doesn't track", async () => {
-    // The shared fixture's Stephansplatz carries no `stop_id` — an S-Bahn-only
-    // station or a stop past the city border looks the same, and the backend
-    // would answer `adhoc_invalid_stop`.
+  it("leaves the chip off a change with no stop id", async () => {
     const { el } = await jumped([trip("07:57", "08:11")]);
+    expect(chip(el)).toBeNull();
+  });
+
+  it("leaves the chip off a change the catalogue doesn't track", async () => {
+    // A DIVA the picker list doesn't hold — an S-Bahn-only station or a stop
+    // past the city border — which the backend would answer with
+    // `adhoc_invalid_stop`.
+    const { el } = await jumped([trackableChange("60299999")]);
     expect(chip(el)).toBeNull();
   });
 

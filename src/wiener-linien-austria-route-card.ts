@@ -166,7 +166,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _versionMismatch: string | null = null;
   @state() private _now = Date.now();
   @state() private _alternativesOpen = false;
-  /** Rides whose stops are open, by `rideKey`. Survives refreshes, so a list
+  /** Rides whose stops are open, by `rideKey`, prefixed with the
+   *  alternative's scope for a ride drawn inside an opened alternative (see
+   *  `_renderStrand`). Survives refreshes, so a list
    *  someone opened doesn't snap shut when the plan updates under it. */
   @state() private _openRides: ReadonlySet<string> = new Set();
   /** Alternatives opened to their full strand, by `tripKey`. Same reasoning:
@@ -196,8 +198,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _planSeq = 0;
   /** A jump's point is the connections the end-to-end query filtered out, so
    *  its answer arrives with the disclosure already open. One-shot, not tied
-   *  to `_replanFrom`: a refresh two minutes later must not re-open a list
-   *  the person has since collapsed. */
+   *  to `_replanFrom`: a later refresh must not re-open a list the person
+   *  has since collapsed. */
   private _revealAlternatives = false;
   private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the scheduled refresh is due (epoch ms). Survives a disconnect, so
@@ -560,7 +562,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   // Ad-hoc mode: searching again from a change
   // ------------------------------------------------------------------
 
-  /** Whether this stop can stand in as an origin. Three things have to hold,
+  /** Whether this stop can stand in as an origin. Two things have to hold,
    *  and the backend would answer an error for each of them:
    *
    *  - It has to be a stop the catalogue tracks. `stop_id` is the DIVA the
@@ -1441,11 +1443,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
-  /** "Search from here" on a change: the buffer badge above it says the
-   *  connection is tight, and until now the card said nothing about what to
-   *  do about it. This asks the planner the obvious follow-up — what else
-   *  leaves this station for where I'm going — without making anyone retype
-   *  a journey they already entered.
+  /** "Search from here" on a change: the buffer badge beside it says how
+   *  much slack the change has, and when that was tight the card said
+   *  nothing about what to do. This asks the planner the obvious follow-up —
+   *  what else leaves this station for where I'm going — without making
+   *  anyone retype a journey they already entered. Offered on every change
+   *  the catalogue can plan from, whatever its risk.
    *
    *  Ad-hoc mode only. A card bound to a route entity is showing that route's
    *  sensor, and there is no query of its own to redirect. */
@@ -1473,7 +1476,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   /** The way back after a jump. The From picker already shows the change as
    *  the new origin, so this only has to undo it — including the time, which
-   *  the jump moved to the arrival at that change. */
+   *  the jump moved to the arrival there plus the walk (or to now, if that
+   *  has passed). */
   private _renderReplanBack(): TemplateResult | typeof nothing {
     const origin = this._replanFrom;
     if (!origin) return nothing;
@@ -1921,8 +1925,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
        align-self: center centred it against the .stop box instead, which
        min-height: var(--stop-row) makes taller than its line of text — so
        the text sat baseline-aligned near the top while the icon centred in
-       the whole 22px, and the icon read low. Same trap the map pin and the
-       .access row above each document.
+       the whole 22px, and the icon read low. Same trap the map pin above
+       and the .access row below each document.
        So: explicit width/height for a box of exactly the glyph (no
        line-height or descender space in it), bottom edge on the text
        baseline, then down by the difference between that box's centre and

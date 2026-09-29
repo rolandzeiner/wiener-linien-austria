@@ -3,7 +3,7 @@
 // one schema, no tabs. Leaving the route empty switches the card to ad-hoc
 // mode, and the schema then offers default From / To stops instead.
 //
-// `_commit` assigns `this._config` BEFORE firing `config-changed` — see
+// `_onValueChanged` assigns `this._config` BEFORE firing `config-changed` — see
 // editor/editor-common.ts for why that ordering is load-bearing.
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";

@@ -59,7 +59,7 @@ export function headerIconForType(type: string | undefined): string {
 // heuristic the trail already applies (`/^[US]\d/` for the inline chips,
 // `/^N\d/` for nightlines) keeps one rule rather than two that can disagree.
 
-/** The five categories a user can show or hide, in signage order. */
+/** The categories a user can show or hide, in signage order. */
 export const TRANSFER_MODES = [
   "metro",
   "sbahn",
@@ -84,20 +84,22 @@ export const TRANSFER_MODE_ICONS: Readonly<Record<TransferMode, string>> = {
   night: "mdi:weather-night",
 };
 
-/** The Badner Bahn's realtime label. `LB` is the `linien.csv` spelling and is
- *  folded onto this one by `canonicalLineLabel` before any classification, so
- *  matching the realtime label alone is sufficient here. */
+/** The Badner Bahn's realtime label. `LB` is the `linien.csv` spelling; the
+ *  integration rewrites it to `WLB` when it parses the catalogue
+ *  (`REALTIME_LINE_LABELS` in const.py), so every label that reaches the card
+ *  already carries the realtime spelling. */
 const BADNER_BAHN_LABEL = "WLB";
 
 /**
  * Classify a Wiener Linien line label into one of `TRANSFER_MODES`.
  *
- * Order matters. `N25` is a bus by vehicle but a NightLine by category, and
- * the user toggles it as one — so the N-prefix is tested before the bus
- * shape it would otherwise match. After the three prefixed families, a
- * digits-then-letter label (`13A`, `25B`) is a city bus; everything left is
- * a tram, which correctly catches the numeric lines (`1`, `71`) and the
- * letter lines (`D`, `O`).
+ * `N25` is a bus by vehicle but a NightLine by category, and the user
+ * toggles it as one. An N-prefixed label matches none of the other tests, so
+ * without its own branch it would fall through to `tram`. After the three
+ * prefixed families and the Badner Bahn's exact label, a digits-then-letter
+ * label (`13A`, `25B`) is a city bus; everything left is a tram, which
+ * correctly catches the numeric lines (`1`, `71`) and the letter lines
+ * (`D`, `O`).
  *
  * The Badner Bahn is its own category rather than a tram, matching the rest
  * of the codebase: `linien.csv` tags LineID 399 `ptTramWLB` (not `ptTram`),
