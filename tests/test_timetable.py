@@ -506,9 +506,10 @@ async def test_coordinator_merges_s_bahn_after_background_refresh(
     coordinator = WienerLinienAustriaCoordinator(hass, entry)
     assert coordinator.timetable is not None
     # The board counts its running-low rule against these, so it must get
-    # the S-Bahn pairs the entry picked and nothing else: the U1 is a
-    # /monitor line and never appears in a timetable answer, so including
-    # it would hold the rule permanently below its threshold.
+    # exactly the set `timetable_departures` renders: the S-Bahn pairs the
+    # entry picked. A wider S-Bahn set would bring back the whole-batch
+    # count. The U1 is left out too: a /monitor key would give an entry
+    # with no S-Bahn picked a board that fetches for nothing.
     assert coordinator.timetable._pairs == frozenset({("S2", "R")})
 
     with (

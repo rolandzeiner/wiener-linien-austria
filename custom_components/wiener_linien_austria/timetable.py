@@ -10,8 +10,9 @@ rows rather than passing them off as live.
 
 The rows are planned times, so they don't need `/monitor`'s cadence. A
 board fetches a batch of upcoming trains and counts them down locally on
-every tick, refetching when the batch gets old or runs low (see
-`TimetableBoard.is_due`). A few requests an hour per stop.
+every tick, refetching when the batch gets old or the board's picked
+lines run low (see `TimetableBoard.is_due`). Normally one request per
+`TIMETABLE_MAX_AGE` per stop.
 
 A stop's S-Bahn lines are opted into through the line picker like any
 other line (`S1|R`), which is also what keeps them in `tracked_lines`, the

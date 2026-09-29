@@ -104,7 +104,7 @@ def _heuristic_mot(label: str) -> str | None:
       - `U` + digit → Metro
       - `N` + digit → Nightline bus
       - digits + letter suffix (`7A`, `13A`) → city bus
-      - everything else (digits-only, single letter, two-letter `WLB`) → tram
+      - everything else (digits-only, single letter, the Badner Bahn's `WLB`) → tram
 
     Wiener Linien data is always uppercase, but the heuristic normalises
     via `.upper()` so every branch uses the same case-folding rule —
