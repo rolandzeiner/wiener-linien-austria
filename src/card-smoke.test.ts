@@ -668,3 +668,103 @@ describe("flap board column width", () => {
     expect(column(el, "dest").map((d) => d.length)).toEqual([11, 11, 11]);
   });
 });
+
+describe("retro wheelchair race", () => {
+  const animate = vi.fn((_frames: Keyframe[], _timing: KeyframeAnimationOptions) => ({
+    currentTime: 0 as number | null,
+    pause: (): void => {},
+    cancel: (): void => {},
+  }));
+  const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
+  const original = { animate: proto.animate, rect: proto.getBoundingClientRect };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    animate.mockClear();
+    proto.animate = animate;
+    // happy-dom lays nothing out, and the card measures its own width and
+    // each racer's start before it rolls a race.
+    proto.getBoundingClientRect = function (this: HTMLElement): DOMRect {
+      const width = this.classList.contains("retro") ? 580 : 20;
+      const left = this.classList.contains("retro-wheelchair") ? 200 : 0;
+      return { width, height: 20, left, top: 0, right: left + width, bottom: 20, x: left, y: 0, toJSON: () => ({}) };
+    };
+  });
+
+  afterEach(() => {
+    proto.animate = original.animate;
+    proto.getBoundingClientRect = original.rect;
+    vi.useRealTimers();
+  });
+
+  /** Both rows step-free, so both carry a wheelchair to race. */
+  function raceHass(): HomeAssistant {
+    const hass = busyHass();
+    const departures = hass.states[ENTITY]!.attributes.departures as Array<Record<string, unknown>>;
+    for (const d of departures) d.barrier_free = true;
+    return hass;
+  }
+
+  const RACE_CONFIG = { type: `custom:${RETRO}`, entity: ENTITY, direction: "both", wheelchair_race: true };
+
+  it("starts on a tap and plays both racers through the Web Animations API", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    shadow(el).querySelector<HTMLElement>(".retro")!.click();
+    await el.updateComplete;
+    expect(shadow(el).querySelector(".retro--race-countdown")).not.toBeNull();
+
+    await vi.advanceTimersByTimeAsync(2_500); // past the 3-2-1 countdown
+    await el.updateComplete;
+
+    expect(animate).toHaveBeenCalledTimes(2);
+    const [frames, timing] = animate.mock.calls[0]!;
+    // px, not cqw: a container unit keeps the animation off the compositor.
+    expect(frames[0]!.transform).toMatch(/^translate\(-?[\d.]+px, 0\.12em\)$/);
+    expect(timing.duration).toBeGreaterThan(0);
+  });
+
+  it("ignores the tap under prefers-reduced-motion", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    try {
+      const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+      shadow(el).querySelector<HTMLElement>(".retro")!.click();
+      await el.updateComplete;
+      await vi.advanceTimersByTimeAsync(2_500);
+      expect(shadow(el).querySelector(".retro--race-countdown")).toBeNull();
+      expect(animate).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+});
+
+describe("modern card dev mode", () => {
+  beforeEach(() => window.localStorage.setItem("wl_debug", "1"));
+  afterEach(() => window.localStorage.removeItem("wl_debug"));
+
+  it("injects a test disruption and lift outage, and opens the colour palette", async () => {
+    const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
+    const root = shadow(el);
+    const [traffic, elevator, colours] = root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
+    const alerts = (): number => root.querySelectorAll(".alert-title").length;
+    const before = alerts();
+
+    traffic!.click();
+    await el.updateComplete;
+    expect(alerts()).toBe(before + 1);
+
+    elevator!.click();
+    await el.updateComplete;
+    expect(root.querySelectorAll(".lift-path")).toHaveLength(1);
+
+    colours!.click();
+    await el.updateComplete;
+    expect(root.querySelectorAll(".dev-pal-chip").length).toBeGreaterThan(0);
+  });
+});

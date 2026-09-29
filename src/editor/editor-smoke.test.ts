@@ -359,3 +359,77 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
     expect(fired).toBe(false);
   });
 });
+
+describe("retro editor writes back through config-changed", () => {
+  const RETRO_CFG = { type: "custom:wiener-linien-austria-retro-card", entity: ENTITY };
+
+  function lastConfig(el: EditorElement): () => Record<string, unknown> | undefined {
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+    return () => config;
+  }
+
+  it("a line toggle writes lines and the legacy line, and clears both with the last one", async () => {
+    const el = await mount(RETRO, BUSY_STOP, RETRO_CFG);
+    const config = lastConfig(el);
+
+    shadow(el).querySelector<HTMLButtonElement>(".wl-chip")?.click(); // "52"
+    await el.updateComplete;
+    expect(config()).toMatchObject({ lines: ["52"], line: "52" });
+
+    shadow(el).querySelector<HTMLButtonElement>(".wl-chip")?.click();
+    await el.updateComplete;
+    expect(config()?.["lines"]).toBeUndefined();
+    expect(config()?.["line"]).toBeUndefined();
+  });
+
+  it("a walk-time step writes the minutes, and stepping below one clears them", async () => {
+    const el = await mount(RETRO, BUSY_STOP, RETRO_CFG);
+    const config = lastConfig(el);
+    const steppers = () => [...shadow(el).querySelectorAll<HTMLButtonElement>(".wl-step-btn")];
+
+    steppers()[1]!.click(); // the first row's "+"
+    await el.updateComplete;
+    expect(Object.values(config()?.["walk_times"] as Record<string, number>)).toEqual([1]);
+
+    steppers()[0]!.click(); // and back down
+    await el.updateComplete;
+    expect(config()?.["walk_times"]).toBeUndefined();
+  });
+
+  it("a per-line direction writes that line only and keeps the stop-wide 'both'", async () => {
+    const el = await mount(RETRO, BUSY_STOP, { ...RETRO_CFG, lines: ["U3", "52"], direction: "both" });
+    const config = lastConfig(el);
+    const u3 = [...shadow(el).querySelectorAll<HTMLElement>(".wl-override-row")].find(
+      (row) => row.querySelector(".wl-badge")?.textContent?.trim() === "U3",
+    );
+    u3?.querySelectorAll<HTMLButtonElement>(".wl-dir")[1]?.click(); // R
+    await el.updateComplete;
+    expect(config()).toMatchObject({ direction: "both", line_directions: { U3: "R" } });
+  });
+});
+
+describe("helper text names the setting a field depends on", () => {
+  type Form = { computeHelper(field: { name: string }): string | undefined };
+  const form = (el: EditorElement): Form =>
+    shadow(el).querySelector("ha-form") as unknown as Form;
+
+  it("modern: the stop layout only matters from two stops", async () => {
+    const one = await mount(MODERN, BUSY_STOP, EDITORS[0]![1]);
+    expect(form(one).computeHelper({ name: "layout" })).toBe("Wirkt erst ab zwei Haltestellen.");
+    const two = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }, { entity: "sensor.other_abfahrten" }],
+    });
+    expect(form(two).computeHelper({ name: "layout" })).not.toBe("Wirkt erst ab zwei Haltestellen.");
+  });
+
+  it("retro: the marquee text needs the marquee", async () => {
+    const off = await mount(RETRO, BUSY_STOP, EDITORS[1]![1]);
+    expect(form(off).computeHelper({ name: "message_text" })).toBe("Braucht „Lauftext anzeigen“.");
+    const on = await mount(RETRO, BUSY_STOP, { ...EDITORS[1]![1], message_ticker: true });
+    expect(form(on).computeHelper({ name: "message_text" })).not.toBe("Braucht „Lauftext anzeigen“.");
+  });
+});
