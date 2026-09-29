@@ -28,8 +28,7 @@ import {
   type NormalisedRetroConfig,
 } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
-import { canonicalLineLabel } from "./utils/line-labels.js";
-import { deriveRetroView } from "./utils/retro-view.js";
+import { deriveRetroView, retroEmptyStateKey } from "./utils/retro-view.js";
 import { findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
@@ -1104,38 +1103,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   ): TemplateResult {
     if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
-      // Diagnose the empty state so users know whether to flip direction,
-      // drop the line filter, or just wait for data. If the API is still
-      // responding (server_time present) but the stop has nothing left,
-      // that's end-of-service, not a data outage.
-      const { direction: dir, lines, line_directions } = this._config!;
-      // Diagnose against the picked lines only: another line running at the
-      // stop says nothing about why these are missing. Canonicalised the way
-      // filterDepartures does, so a legacy "LB" still finds the WLB.
-      const picked = lines?.length ? new Set(lines.map(canonicalLineLabel)) : null;
-      const onLine = picked
-        ? allDepartures.filter((d) => picked.has(d.line))
-        : allDepartures;
-      // Each line's own direction wins, then the stop-wide one. "both" sets
-      // no stop-wide direction, so it is never compared against d.direction.
-      const inDirection = onLine.filter((d) => {
-        const want = line_directions?.[d.line] ?? (dir === "both" ? undefined : dir);
-        return !want || d.direction === want;
-      });
-      let key = "no_data";
-      if (allDepartures.length === 0 && staleDropped > 0) {
-        // Upstream froze: records arrived but had stopped advancing, so
-        // the coordinator dropped them. Checked before the end-of-service
-        // branch — both look like "nothing left at this stop" from here,
-        // and calling a frozen feed Betriebsschluss is the bug in #103.
-        key = "stale_feed";
-      } else if (allDepartures.length === 0 && serverTime) {
-        key = "betriebsschluss";
-      } else if (allDepartures.length > 0 && onLine.length === 0) {
-        key = "no_data_wrong_line";
-      } else if (onLine.length > 0 && inDirection.length === 0) {
-        key = "no_data_wrong_direction";
-      }
+      const key = retroEmptyStateKey(this._config!, allDepartures, serverTime, staleDropped);
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
     }
     return html`

@@ -422,7 +422,7 @@ export function viennaInputValue(nowMs: number): string {
  *  is right for "pick a time" but wrong for "plan from the minute this ride
  *  gets in": that would push the query up to five minutes past the arrival
  *  and hide the connections leaving in between. */
-export function viennaInputAt(ms: number): string {
+function viennaInputAt(ms: number): string {
   const p = viennaParts(ms);
   return `${p["year"]}-${p["month"]}-${p["day"]}T${p["hour"]}:${p["minute"]}`;
 }

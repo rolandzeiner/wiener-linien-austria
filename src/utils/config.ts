@@ -211,7 +211,7 @@ export interface NormalisedModernStop {
   walk_times?: WalkTimes;
 }
 
-export function normaliseLineDirections(
+function normaliseLineDirections(
   raw: unknown,
 ): Record<string, "H" | "R"> | undefined {
   if (!raw || typeof raw !== "object") return undefined;
