@@ -70,6 +70,9 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
         ? {}
         : { accessibility_only: et("accessibility_only_requires") }),
       ...(cfg.show_delay ? {} : { show_delay_colors: et("show_delay_colors_requires") }),
+      ...(cfg.show_stops_ahead
+        ? {}
+        : { show_stop_times: et("show_stop_times_requires") }),
       ...(cfg.entities.length >= 2 ? {} : { layout: et("layout_requires") }),
     };
   }
@@ -92,6 +95,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
           show_hero_metric: cfg.show_hero_metric,
           show_departures: cfg.show_departures,
           show_stops_ahead: cfg.show_stops_ahead,
+          show_stop_times: cfg.show_stop_times,
           show_qr_button: cfg.show_qr_button,
         },
         schema: [
@@ -118,6 +122,11 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
           { name: "show_hero_metric", selector: { boolean: {} } },
           { name: "show_departures", selector: { boolean: {} } },
           { name: "show_stops_ahead", selector: { boolean: {} } },
+          {
+            name: "show_stop_times",
+            disabled: !cfg.show_stops_ahead,
+            selector: { boolean: {} },
+          },
           { name: "show_qr_button", selector: { boolean: {} } },
         ],
       })}

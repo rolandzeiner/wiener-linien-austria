@@ -219,6 +219,10 @@ describe("normaliseModernConfig — defaults", () => {
     expect(c.show_hero_metric).toBe(true);
     expect(c.show_departures).toBe(true);
     expect(c.show_stops_ahead).toBe(true);
+    // Off unless asked for: it is the one option that makes the card send a
+    // request of its own.
+    expect(c.show_stop_times).toBe(false);
+    expect(normaliseModernConfig({ show_stop_times: true }).show_stop_times).toBe(true);
     expect(c.stops_ahead_modes).toEqual([
       "metro",
       "sbahn",

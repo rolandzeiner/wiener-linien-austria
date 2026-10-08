@@ -1257,6 +1257,15 @@ export const cardStyles = css`
     z-index: 1;
     forced-color-adjust: none;
   }
+  /* Estimated arrival at the stop (show_stop_times): the departure's own
+     time plus the timetable's minutes to here. Tabular figures and a fixed
+     inline size keep the names in one column, also for a stop the timetable
+     gave no time for, which renders the element empty. */
+  .stops-ahead-time {
+    flex: 0 0 auto;
+    inline-size: 5ch;
+    font-variant-numeric: tabular-nums;
+  }
   .stops-ahead-name {
     color: var(--primary-text-color);
     flex: 0 1 auto;

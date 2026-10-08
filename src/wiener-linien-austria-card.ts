@@ -59,6 +59,16 @@ import { mdiPathForIcon } from "./utils/mdi-paths.js";
 import { arrowStep, revealOffset, tabEdges, type TabEdges } from "./utils/tab-scroll.js";
 import { formatTime } from "./utils/time.js";
 import { deriveRowState } from "./utils/row-state.js";
+import {
+  needsRunTimes,
+  runTimeKey,
+  runTimesAnswered,
+  runTimesFailed,
+  stopEta,
+  type RunTimesAnswer,
+  type RunTimesState,
+  type StopEta,
+} from "./utils/run-times.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
 import {
   accentTextColor,
@@ -165,6 +175,18 @@ export class WienerLinienAustriaCard extends LitElement {
   // tram/bus transfers; collapsing them by default keeps the trail
   // readable, U-Bahn chips always stay inline.
   @state() private _expandedTransfers = new Set<string>();
+  // Scheduled minutes to the stops ahead, per stop (DIVA), for
+  // show_stop_times. Asked for over the run_times WebSocket command the
+  // first time a trail is opened; see utils/run-times.ts. Kept across
+  // setConfig: the editor's preview calls it on every keystroke.
+  @state() private _runTimes: ReadonlyMap<number, RunTimesState> = new Map();
+  // Stops with an ask on the wire, so two trails opened at one stop share it.
+  private _runTimesInFlight = new Set<number>();
+  // The open trails of the current render pass. Collected while rendering
+  // (not reactive, like the memos below) and asked for in updated(), which
+  // covers the first open, an answer running out under an open trail and a
+  // line the answer lacked, all in one place.
+  private _runTimeWants: Array<{ diva: number; line: string; direction: string }> = [];
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
   // QR dialog open state, keyed by stop entity_id. null = closed.
@@ -278,6 +300,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // and threads the cached result through the rest of the pass.
     this._resolvedStopsMemo = null;
     this._nightlineHourMemo = null;
+    this._runTimeWants = [];
     // Bounds-check `_activeTab` *before* render so we don't mutate
     // reactive state from inside render() (which would queue a redundant
     // update + log a Lit warning in dev mode). Only re-evaluate when
@@ -317,6 +340,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
   protected override updated(changed: PropertyValues): void {
     this._syncTabStrip(changed);
+    this._requestRunTimes();
     // Re-render the QR canvas only on changes that could flip the
     // target URL: panel-open transition, hass change (late-arriving
     // catalogue coords swap the OSM fallback for a `geo:lat,lon`
@@ -1377,6 +1401,7 @@ export class WienerLinienAustriaCard extends LitElement {
     currentLine: string,
     rowKey: string,
     entityId: string,
+    times: ((stopName: string) => StopEta | null) | null,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
     const lineColors = lineColorsFor(this.hass, entityId);
@@ -1388,10 +1413,95 @@ export class WienerLinienAustriaCard extends LitElement {
         })}
       >
         ${stops.map((s, idx) =>
-          this._renderStopAhead(s, idx, rowKey, overrides, lineColors),
+          this._renderStopAhead(
+            s,
+            idx,
+            rowKey,
+            overrides,
+            lineColors,
+            times ? times(s.name) : undefined,
+          ),
         )}
       </ol>
     `;
+  }
+
+  /** The estimated arrival per stop of a departure's trail, or null when the
+   *  trail shows no times: the option is off, the stop or the row can't be
+   *  asked for, or the answer has no such line.
+   *
+   *  An open trail is noted in `_runTimeWants` for `updated()` to ask about.
+   *  A closed one is not, but still renders whatever is already held, so
+   *  opening it doesn't pop the times in.
+   *
+   *  Before the first answer for the stop the lookup yields null for every
+   *  stop, which renders the time column empty: the names then sit where
+   *  they will once the times arrive instead of jumping aside. */
+  private _stopTimes(
+    dep: DepartureAttr,
+    entityId: string,
+    open: boolean,
+  ): ((stopName: string) => StopEta | null) | null {
+    if (!this._config!.show_stop_times) return null;
+    const attrs = this.hass?.states[entityId]?.attributes as
+      | WienerLinienAttrs
+      | undefined;
+    const diva = attrs?.diva;
+    const { line, direction } = dep;
+    if (typeof diva !== "number" || !line) return null;
+    // The command takes the two direction codes /monitor uses and nothing else.
+    if (direction !== "H" && direction !== "R") return null;
+    if (open) this._runTimeWants.push({ diva, line, direction });
+    const state = this._runTimes.get(diva);
+    const minutes = state?.runTimes[runTimeKey(line, direction)];
+    if (state && !minutes) return null;
+    const now = Date.now();
+    return (stopName) => stopEta(dep, minutes?.[stopName], now);
+  }
+
+  /** Ask for the run times the open trails need and the card doesn't hold. */
+  private _requestRunTimes(): void {
+    if (!this._runTimeWants.length || !this.hass?.callWS) return;
+    const now = Date.now();
+    for (const { diva, line, direction } of this._runTimeWants) {
+      if (
+        !this._runTimesInFlight.has(diva) &&
+        needsRunTimes(this._runTimes.get(diva), runTimeKey(line, direction), now)
+      ) {
+        void this._fetchRunTimes(diva, line, direction);
+      }
+    }
+    this._runTimeWants = [];
+  }
+
+  private async _fetchRunTimes(
+    diva: number,
+    line: string,
+    direction: string,
+  ): Promise<void> {
+    const key = runTimeKey(line, direction);
+    this._runTimesInFlight.add(diva);
+    let next: RunTimesState;
+    try {
+      const answer = await this.hass!.callWS!<RunTimesAnswer>({
+        type: "wiener_linien_austria/run_times",
+        diva,
+        line,
+        direction,
+      });
+      next = runTimesAnswered(this._runTimes.get(diva), key, answer, Date.now());
+    } catch (err) {
+      // The trail still lists its stops; it only goes without times until
+      // the next ask. Logged because nothing else shows that it failed.
+      console.warn(
+        "[wiener-linien-austria-card] run times unavailable for stop",
+        diva,
+        err,
+      );
+      next = runTimesFailed(this._runTimes.get(diva), key, Date.now());
+    }
+    this._runTimesInFlight.delete(diva);
+    this._runTimes = new Map(this._runTimes).set(diva, next);
   }
 
   /**
@@ -1511,6 +1621,7 @@ export class WienerLinienAustriaCard extends LitElement {
       d.line || "?",
       rowKey,
       entityId,
+      d,
     );
   }
 
@@ -1533,13 +1644,20 @@ export class WienerLinienAustriaCard extends LitElement {
     currentLine: string,
     rowKey: string,
     entityId: string,
+    dep: DepartureAttr,
   ): TemplateResult {
     const base = variant === "hero" ? "hero-detail" : "dep-row-detail";
     const cls = classMap({ [base]: true, expanded });
     const hidden = expanded ? "false" : "true";
     const body = html`
       <div class="${base}-inner">
-        ${this._renderStopsAheadInner(stops, currentLine, rowKey, entityId)}
+        ${this._renderStopsAheadInner(
+          stops,
+          currentLine,
+          rowKey,
+          entityId,
+          this._stopTimes(dep, entityId, expanded),
+        )}
       </div>
     `;
     return variant === "hero"
@@ -1746,6 +1864,7 @@ export class WienerLinienAustriaCard extends LitElement {
         line,
         rowKey,
         entityId,
+        d,
       ),
     ];
   }
@@ -1756,6 +1875,9 @@ export class WienerLinienAustriaCard extends LitElement {
     rowKey: string,
     overrides: Record<string, string>,
     lineColors: LineColorsMap,
+    // undefined: the trail shows no times. null: it does, but not for this
+    // stop, so the column stays and the names keep their alignment.
+    eta?: StopEta | null,
   ): TemplateResult {
     // Inline lines (always shown next to the station name): U-Bahn and
     // S-Bahn at any time, plus night lines (N-prefix + digit) WHEN
@@ -1847,12 +1969,31 @@ export class WienerLinienAustriaCard extends LitElement {
     // stopPropagation) so its dedicated label + ARIA stay intact for
     // screen readers.
     const rowInteractive = otherLines.length > 0;
+    // The label replaces the row's content for assistive tech, so the time
+    // has to be in it or it is only ever seen.
+    const etaLabel = eta ? `${this._t("stop_time_title")} ${eta.clock}` : "";
     const rowAriaLabel = rowInteractive
-      ? this._t(
-          transfersExpanded ? "stops_ahead_other_hide" : "stops_ahead_other_show",
-          { count: otherLines.length, stop: s.name },
-        )
+      ? [
+          this._t(
+            transfersExpanded ? "stops_ahead_other_hide" : "stops_ahead_other_show",
+            { count: otherLines.length, stop: s.name },
+          ),
+          etaLabel,
+        ]
+          .filter(Boolean)
+          .join(" · ")
       : "";
+    const time =
+      eta === undefined
+        ? nothing
+        : eta === null
+          ? html`<span class="stops-ahead-time" aria-hidden="true"></span>`
+          : html`<time
+              class="stops-ahead-time"
+              datetime=${eta.iso}
+              title=${etaLabel}
+              >${eta.clock}</time
+            >`;
 
     return html`
       <li class=${classMap(stopClasses)}>
@@ -1879,6 +2020,7 @@ export class WienerLinienAustriaCard extends LitElement {
             : nothing}
         >
           <span class="stops-ahead-dot" aria-hidden="true"></span>
+          ${time}
           <span class="stops-ahead-name">${deText(s.name)}</span>
           ${metroChips} ${otherToggle}
         </div>

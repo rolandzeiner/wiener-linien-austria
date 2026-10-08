@@ -316,6 +316,7 @@ export interface NormalisedModernConfigValidated {
   show_hero_metric: boolean;
   show_departures: boolean;
   show_stops_ahead: boolean;
+  show_stop_times: boolean;
   /** Which vehicle categories get a transfer chip in the stops-ahead trail.
    *  Order is irrelevant; membership is the whole meaning. An EMPTY array is
    *  a real state ("chip nothing"), distinct from the key being absent
@@ -365,6 +366,7 @@ const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_hero_metric",
   "show_departures",
   "show_stops_ahead",
+  "show_stop_times",
   "stops_ahead_modes",
   "show_qr_button",
   "hide_header",
@@ -389,6 +391,7 @@ const MODERN_DEFAULTS: Omit<
   show_hero_metric: true,
   show_departures: true,
   show_stops_ahead: true,
+  show_stop_times: false,
   show_qr_button: true,
   hide_header: false,
   hide_attribution: false,
@@ -492,6 +495,7 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
     show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
     show_stops_ahead: asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead),
+    show_stop_times: asBool(raw.show_stop_times, MODERN_DEFAULTS.show_stop_times),
     stops_ahead_modes: normaliseTransferModes(raw.stops_ahead_modes),
     show_qr_button: asBool(raw.show_qr_button, MODERN_DEFAULTS.show_qr_button),
     hide_header: asBool(raw.hide_header, MODERN_DEFAULTS.hide_header),

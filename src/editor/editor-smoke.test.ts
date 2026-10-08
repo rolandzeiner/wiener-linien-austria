@@ -360,6 +360,55 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
   });
 });
 
+describe("estimated arrival times switch (modern, Anzeige tab)", () => {
+  type Field = { name: string; disabled?: boolean };
+  type Form = { schema?: Field[]; data?: Record<string, unknown> };
+
+  /** The `ha-form` section holding the switch, with its field. `ha-form` is
+   *  undefined here, so the schema and data Lit set on it are plain
+   *  properties to read back. */
+  async function stopTimes(
+    config: Record<string, unknown> = {},
+  ): Promise<{ field: Field; value: unknown }> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    for (const form of shadow(el).querySelectorAll("ha-form")) {
+      const { schema, data } = form as unknown as Form;
+      const field = schema?.find((f) => f.name === "show_stop_times");
+      if (field) return { field, value: data?.["show_stop_times"] };
+    }
+    throw new Error("no section offers show_stop_times");
+  }
+
+  it("is off until switched on", async () => {
+    expect((await stopTimes()).value).toBe(false);
+    expect((await stopTimes({ show_stop_times: true })).value).toBe(true);
+  });
+
+  it("sits right under the stops trail it depends on", async () => {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    const names = [...shadow(el).querySelectorAll("ha-form")].flatMap(
+      (form) => (form as unknown as Form).schema?.map((f) => f.name) ?? [],
+    );
+    expect(names[names.indexOf("show_stops_ahead") + 1]).toBe("show_stop_times");
+  });
+
+  it("is disabled with the stops trail switched off", async () => {
+    expect((await stopTimes()).field.disabled).toBe(false);
+    expect((await stopTimes({ show_stops_ahead: false })).field.disabled).toBe(true);
+  });
+});
+
 describe("retro editor writes back through config-changed", () => {
   const RETRO_CFG = { type: "custom:wiener-linien-austria-retro-card", entity: ENTITY };
 
@@ -424,6 +473,20 @@ describe("helper text names the setting a field depends on", () => {
       entities: [{ entity: ENTITY }, { entity: "sensor.other_abfahrten" }],
     });
     expect(form(two).computeHelper({ name: "layout" })).not.toBe("Wirkt erst ab zwei Haltestellen.");
+  });
+
+  it("modern: arrival times need the stops trail", async () => {
+    const off = await mount(MODERN, BUSY_STOP, {
+      ...EDITORS[0]![1],
+      show_stops_ahead: false,
+    });
+    expect(form(off).computeHelper({ name: "show_stop_times" })).toBe(
+      "Braucht „Zwischenstationen anzeigen“.",
+    );
+    const on = await mount(MODERN, BUSY_STOP, EDITORS[0]![1]);
+    expect(form(on).computeHelper({ name: "show_stop_times" })).toMatch(
+      /^Zeigt, wann das Fahrzeug/,
+    );
   });
 
   it("retro: the marquee text needs the marquee", async () => {

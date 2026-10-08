@@ -604,6 +604,179 @@ describe("stops_ahead_modes", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// show_stop_times — estimated arrival beside each stop of the trail.
+// ---------------------------------------------------------------------------
+
+type CallWS = NonNullable<HomeAssistant["callWS"]>;
+
+/** The trail stop with three stops ahead and a `callWS` to ask for their run
+ *  times. The U3 leaves at 16:38:30 live. */
+function timesHass(callWS: CallWS): HomeAssistant {
+  const hass = trailHass();
+  const departure = (
+    hass.states[ENTITY]!.attributes as {
+      departures: Array<{ stops_ahead: unknown }>;
+    }
+  ).departures[0]!;
+  departure.stops_ahead = [
+    { name: "Zieglergasse" },
+    { name: "Neubaugasse", lines: ["13A"] },
+    { name: "Simmering", is_terminus: true },
+  ];
+  return { ...hass, callWS };
+}
+
+function runTimesAnswer(runTimes: Record<string, Record<string, number>>): unknown {
+  return {
+    diva: 60200959,
+    fetched_at: "2026-09-09T14:30:00+00:00",
+    valid_until: "2099-01-01T00:00:00+00:00",
+    run_times: runTimes,
+  };
+}
+
+async function mountTimes(
+  callWS: CallWS,
+  config: Record<string, unknown> = { show_stop_times: true },
+): Promise<CardElement> {
+  return mount(MODERN, timesHass(callWS), {
+    type: `custom:${MODERN}`,
+    entities: [{ entity: ENTITY }],
+    ...config,
+  });
+}
+
+/** Let the ask resolve and the render it triggers finish. */
+async function settle(el: CardElement): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve();
+    await el.updateComplete;
+  }
+}
+
+async function openTrail(el: CardElement): Promise<void> {
+  shadow(el).querySelector<HTMLElement>("[aria-controls]")?.click();
+  await settle(el);
+}
+
+const stopTimes = (el: CardElement): string[] =>
+  [...shadow(el).querySelectorAll(".stops-ahead-time")].map(
+    (n) => n.textContent?.trim() ?? "",
+  );
+
+describe("show_stop_times", () => {
+  const U3 = { Zieglergasse: 2, Neubaugasse: 3 };
+  const asked = (callWS: CallWS): number =>
+    (callWS as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("asks nothing and shows no times while the option is off", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS, {});
+    await openTrail(el);
+    expect(callWS).not.toHaveBeenCalled();
+    expect(stopTimes(el)).toEqual([]);
+  });
+
+  it("asks nothing until a trail is opened", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await settle(el);
+    expect(callWS).not.toHaveBeenCalled();
+  });
+
+  it("asks once for the stop when a trail opens, and adds the minutes to the live departure", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(callWS).toHaveBeenCalledTimes(1);
+    expect(callWS).toHaveBeenCalledWith({
+      type: "wiener_linien_austria/run_times",
+      diva: 60200959,
+      line: "U3",
+      direction: "H",
+    });
+    // 16:38:30 + 2 min and + 3 min, to the minute. The terminus has no run
+    // time in the answer and keeps an empty slot, so the names stay aligned.
+    expect(stopTimes(el)).toEqual(["16:41", "16:42", ""]);
+    const time = shadow(el).querySelector("time.stops-ahead-time");
+    expect(time?.getAttribute("datetime")).toBe("2026-09-09T14:41:00.000Z");
+    expect(time?.getAttribute("title")).toBe("Voraussichtliche Ankunft 16:41");
+  });
+
+  it("answers later renders and reopened trails from what it holds", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+    await openTrail(el); // close
+    await openTrail(el); // reopen
+    el.hass = timesHass(callWS); // the next poll
+    await settle(el);
+
+    expect(callWS).toHaveBeenCalledTimes(1);
+    expect(stopTimes(el)).toEqual(["16:41", "16:42", ""]);
+  });
+
+  it("reads the time out on a stop whose row is a button", async () => {
+    // The row's label replaces its content for a screen reader.
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
+    expect(row?.getAttribute("aria-label")).toBe(
+      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:42",
+    );
+  });
+
+  it("drops the time column for a line the answer doesn't know", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "52|R": { Baumgarten: 9 } }));
+    const el = await mountTimes(callWS);
+    // Before the answer the column is held open, empty.
+    expect(stopTimes(el)).toEqual(["", "", ""]);
+    await openTrail(el);
+    expect(stopTimes(el)).toEqual([]);
+    // Asked about once, not on every render that follows.
+    el.hass = timesHass(callWS);
+    await settle(el);
+    expect(callWS).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the trail without times when the ask fails, and doesn't ask again right away", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const callWS = vi.fn().mockRejectedValue({ code: "upstream", message: "api_timeout" });
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(stopTimes(el)).toEqual([]);
+    expect(shadow(el).querySelectorAll(".stops-ahead-name")).toHaveLength(3);
+    expect(warn).toHaveBeenCalledTimes(1);
+    el.hass = timesHass(callWS);
+    await settle(el);
+    expect(asked(callWS)).toBe(1);
+  });
+
+  it("asks nothing for a row whose direction the command doesn't take", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({}));
+    const hass = timesHass(callWS);
+    (
+      hass.states[ENTITY]!.attributes as { departures: Array<{ direction: string }> }
+    ).departures[0]!.direction = "";
+    const el = await mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_stop_times: true,
+    });
+    await openTrail(el);
+    expect(callWS).not.toHaveBeenCalled();
+    expect(stopTimes(el)).toEqual([]);
+  });
+});
+
 describe("flap board column width", () => {
   afterEach(() => {
     vi.useRealTimers();

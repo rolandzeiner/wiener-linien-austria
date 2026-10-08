@@ -400,6 +400,11 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_hero_metric?: boolean | undefined;
   show_departures?: boolean | undefined;
   show_stops_ahead?: boolean | undefined;
+  /** Put an estimated arrival time beside each stop of the trail: the
+   *  departure's own time plus the timetable's minutes to that stop. The
+   *  minutes come over the `run_times` WebSocket command the first time a
+   *  trail is opened. Off by default; needs `show_stops_ahead`. */
+  show_stop_times?: boolean | undefined;
   /** Vehicle categories that get a transfer chip in the stops-ahead trail.
    *  Omit the key for every category; an empty array hides every chip. */
   stops_ahead_modes?: TransferMode[] | undefined;
