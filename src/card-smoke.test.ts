@@ -612,11 +612,11 @@ type CallWS = NonNullable<HomeAssistant["callWS"]>;
 
 /** The trail stop with three stops ahead and a `callWS` to ask for their run
  *  times. The U3 leaves at 16:38:30 live. */
-function timesHass(callWS: CallWS): HomeAssistant {
+function timesHass(callWS: CallWS, timeReal?: string): HomeAssistant {
   const hass = trailHass();
   const departure = (
     hass.states[ENTITY]!.attributes as {
-      departures: Array<{ stops_ahead: unknown }>;
+      departures: Array<{ stops_ahead: unknown; time_real: string }>;
     }
   ).departures[0]!;
   departure.stops_ahead = [
@@ -624,6 +624,7 @@ function timesHass(callWS: CallWS): HomeAssistant {
     { name: "Neubaugasse", lines: ["13A"] },
     { name: "Simmering", is_terminus: true },
   ];
+  if (timeReal) departure.time_real = timeReal;
   return { ...hass, callWS };
 }
 
@@ -774,6 +775,82 @@ describe("show_stop_times", () => {
     await openTrail(el);
     expect(callWS).not.toHaveBeenCalled();
     expect(stopTimes(el)).toEqual([]);
+  });
+});
+
+describe("show_stop_times on a late departure", () => {
+  // Planned 16:38:00, leaving 16:40:30: two and a half minutes behind.
+  const LATE = "2026-09-09T16:40:30.000+0200";
+  const answer = (): unknown =>
+    runTimesAnswer({ "U3|H": { Zieglergasse: 2, Neubaugasse: 3 } });
+
+  async function mountLate(config: Record<string, unknown> = {}): Promise<CardElement> {
+    const callWS = vi.fn().mockResolvedValue(answer());
+    const el = await mount(MODERN, timesHass(callWS, LATE), {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_stop_times: true,
+      ...config,
+    });
+    await openTrail(el);
+    return el;
+  }
+
+  const texts = (el: CardElement, selector: string): string[] =>
+    [...shadow(el).querySelectorAll(selector)].map((n) => n.textContent?.trim() ?? "");
+
+  it("strikes the timetable's arrival through and prints the expected one after it", async () => {
+    const el = await mountLate();
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual(["16:40", "16:41"]);
+    expect(texts(el, "time.stops-ahead-time")).toEqual(["16:42", "16:43"]);
+    // The struck time comes first in each pair, as it reads.
+    const pair = shadow(el).querySelector(".stops-ahead-times");
+    expect(pair?.firstElementChild?.tagName).toBe("S");
+    expect(shadow(el).querySelectorAll("time.stops-ahead-time.late")).toHaveLength(2);
+  });
+
+  it("says the delay in words, since a strike-through isn't read out", async () => {
+    const el = await mountLate();
+    expect(
+      shadow(el).querySelector("s.stops-ahead-time--planned")?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(texts(el, ".stops-ahead-times .sr-only")).toEqual([
+      "geplant 16:40, 2 min später",
+      "geplant 16:41, 2 min später",
+    ]);
+    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
+    expect(row?.getAttribute("aria-label")).toBe(
+      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:43, geplant 16:41, 2 min später",
+    );
+  });
+
+  it("keeps a stop without a time as wide as its neighbours' two", async () => {
+    const el = await mountLate();
+    const slot = shadow(el).querySelector("span.stops-ahead-time[aria-hidden]");
+    expect(slot?.classList.contains("stops-ahead-time--pair")).toBe(true);
+  });
+
+  it("prints only the expected time with delays switched off", async () => {
+    const el = await mountLate({ show_delay: false });
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual([]);
+    expect(texts(el, "time.stops-ahead-time")).toEqual(["16:42", "16:43"]);
+    const slot = shadow(el).querySelector("span.stops-ahead-time[aria-hidden]");
+    expect(slot?.classList.contains("stops-ahead-time--pair")).toBe(false);
+  });
+
+  it("strikes through without the red when delay colours are off", async () => {
+    const el = await mountLate({ show_delay_colors: false });
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual(["16:40", "16:41"]);
+    expect(shadow(el).querySelectorAll(".stops-ahead-time.late")).toHaveLength(0);
+  });
+
+  it("leaves a departure under a minute late alone", async () => {
+    // The trail stop's own live time: 30 s behind.
+    const callWS = vi.fn().mockResolvedValue(answer());
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual([]);
+    expect(shadow(el).querySelectorAll(".stops-ahead-time.late")).toHaveLength(0);
   });
 });
 

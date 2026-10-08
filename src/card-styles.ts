@@ -1266,6 +1266,49 @@ export const cardStyles = css`
     inline-size: 5ch;
     font-variant-numeric: tabular-nums;
   }
+  /* A late departure: the timetable's arrival struck through, then the
+     expected one, the way the route card prints a late boarding time. The
+     strike and the second time carry the delay; the red comes on top only
+     with show_delay_colors. Same mix as the route card's late time: the
+     theme's error red alone measures 4.0:1 on a dark card at this size,
+     and 15% of the body text lifts it past 4.5:1. */
+  .stops-ahead-times {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--ha-space-1, 4px);
+  }
+  .stops-ahead-time--planned {
+    text-decoration-thickness: 1.5px;
+  }
+  .stops-ahead-time.late {
+    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    font-weight: 600;
+  }
+  /* The slot of a stop without a time on a struck-through trail: as wide
+     as the two times its neighbours carry. */
+  .stops-ahead-time--pair {
+    inline-size: calc(10ch + var(--ha-space-1, 4px));
+  }
+  /* On a narrow card the struck time gives its room back to the stop
+     names; the expected time stays, and so does the spoken delay. */
+  @container wlcard (inline-size < 360px) {
+    .stops-ahead-time--planned {
+      display: none;
+    }
+    .stops-ahead-time--pair {
+      inline-size: 5ch;
+    }
+  }
+  /* Read out, not shown. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .stops-ahead-name {
     color: var(--primary-text-color);
     flex: 0 1 auto;

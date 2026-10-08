@@ -134,7 +134,7 @@ describe("stopEta", () => {
 
   it("adds the scheduled minutes to the live departure", () => {
     // 16:40:20 + 7 min = 16:47:20, which is 16:47.
-    expect(stopEta(dep, 7, NOW)).toEqual({
+    expect(stopEta(dep, 7, NOW)).toMatchObject({
       iso: "2026-09-09T14:47:00.000Z",
       clock: "16:47",
     });
@@ -171,6 +171,53 @@ describe("stopEta", () => {
   it("prints Vienna time whatever zone the stamp is written in", () => {
     const utc = { ...dep, time_real: "2026-09-09T14:40:20Z" };
     expect(stopEta(utc, 7, NOW)?.clock).toBe("16:47");
+  });
+
+  describe("a late departure", () => {
+    const at = (real: string | null) => ({
+      time_planned: "2026-09-09T16:38:00.000+0200",
+      time_real: real === null ? null : `2026-09-09T${real}.000+0200`,
+      countdown: 5,
+    });
+
+    it("keeps the arrival the timetable had, and how late the new one is", () => {
+      // 2 min 20 s behind: 16:45 on time, 16:47 as it runs.
+      expect(stopEta(at("16:40:20"), 7, NOW)).toEqual({
+        iso: "2026-09-09T14:47:00.000Z",
+        clock: "16:47",
+        planned: { clock: "16:45", late: 2 },
+      });
+    });
+
+    it("counts as late from a full minute behind", () => {
+      expect(stopEta(at("16:39:00"), 7, NOW)?.planned).toEqual({
+        clock: "16:45",
+        late: 1,
+      });
+      // 59 s behind prints the same minute at this stop and the next one at
+      // others; such a trail isn't struck through at all.
+      expect(stopEta(at("16:38:59"), 7, NOW)?.planned).toBeUndefined();
+    });
+
+    it("is late by the same minutes at every stop of the trail", () => {
+      const lates = [0.5, 1, 2.3, 7, 15.5, 38].map(
+        (minutes) => stopEta(at("16:39:40"), minutes, NOW)?.planned?.late,
+      );
+      // 1 min 40 s behind: one or two printed minutes, never none.
+      expect(lates.every((late) => late === 1 || late === 2)).toBe(true);
+    });
+
+    it("leaves an early or an unreported departure unmarked", () => {
+      expect(stopEta(at("16:36:00"), 7, NOW)).toEqual({
+        iso: "2026-09-09T14:43:00.000Z",
+        clock: "16:43",
+      });
+      expect(stopEta(at(null), 7, NOW)?.planned).toBeUndefined();
+      expect(
+        stopEta({ time_planned: null, time_real: "2026-09-09T16:40:20.000+0200", countdown: 5 }, 7, NOW)
+          ?.planned,
+      ).toBeUndefined();
+    });
   });
 
   it("has no time for a stop the timetable gave none for", () => {

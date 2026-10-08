@@ -119,6 +119,21 @@ export interface StopEta {
   iso: string;
   /** "07:42", Vienna time. */
   clock: string;
+  /** Only when the departure runs late: the arrival the timetable had, which
+   *  `clock` replaces, and how many minutes lie between the two as printed. */
+  planned?: { clock: string; late: number };
+}
+
+/** From this much behind its planned departure a vehicle's arrivals count as
+ *  late. A full minute, not the 30 s that rounds to "1 min late" on the row:
+ *  with less, the planned and the expected arrival print as the same minute
+ *  at some stops of a trail and a minute apart at others, and a trail struck
+ *  through here and there says less than one left alone. From a minute on
+ *  every stop's two times differ. */
+const LATE_FROM_MS = 60_000;
+
+function minuteOf(ms: number): Date {
+  return new Date(Math.floor(ms / 60_000) * 60_000);
 }
 
 /** When a departure should reach a stop `minutes` down the line: its live
@@ -127,7 +142,12 @@ export interface StopEta {
  *  the board at that stop print the same moment: 16:58:10 is 16:58 there, so
  *  rounding it up here would put the two a minute apart. A row without
  *  either time counts from its countdown. Null when there is nothing to
- *  count from. */
+ *  count from.
+ *
+ *  A departure running a minute or more late also gets `planned`, the
+ *  arrival it would have made on time, for the card to strike through. An
+ *  early one doesn't: vehicles wait out an early run at the next stops, so
+ *  the timetable's arrival is no more wrong than the estimate. */
 export function stopEta(
   dep: Pick<DepartureAttr, "time_real" | "time_planned" | "countdown">,
   minutes: number | undefined,
@@ -136,8 +156,19 @@ export function stopEta(
   if (minutes === undefined || !Number.isFinite(minutes)) return null;
   const departs = departureMs(dep, nowMs);
   if (departs === null) return null;
-  const at = new Date(Math.floor((departs + minutes * 60_000) / 60_000) * 60_000);
-  return { iso: at.toISOString(), clock: VIENNA_CLOCK.format(at) };
+  const run = minutes * 60_000;
+  const at = minuteOf(departs + run);
+  const eta: StopEta = { iso: at.toISOString(), clock: VIENNA_CLOCK.format(at) };
+  const planned = dep.time_planned ? Date.parse(dep.time_planned) : Number.NaN;
+  const real = dep.time_real ? Date.parse(dep.time_real) : Number.NaN;
+  if (real - planned >= LATE_FROM_MS) {
+    const was = minuteOf(planned + run);
+    eta.planned = {
+      clock: VIENNA_CLOCK.format(was),
+      late: (at.getTime() - was.getTime()) / 60_000,
+    };
+  }
+  return eta;
 }
 
 function departureMs(

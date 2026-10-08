@@ -1405,6 +1405,12 @@ export class WienerLinienAustriaCard extends LitElement {
   ): TemplateResult {
     const overrides = this._config!.line_colors;
     const lineColors = lineColorsFor(this.hass, entityId);
+    const etas = stops.map((s) => (times ? times(s.name) : undefined));
+    // A late departure is late at every stop, so the trail is struck through
+    // as a whole: one stop without a time then keeps a slot as wide as the
+    // others' two, and the names stay in a column.
+    const struck =
+      this._config!.show_delay && etas.some((eta) => eta?.planned !== undefined);
     return html`
       <ol
         class="stops-ahead"
@@ -1413,14 +1419,7 @@ export class WienerLinienAustriaCard extends LitElement {
         })}
       >
         ${stops.map((s, idx) =>
-          this._renderStopAhead(
-            s,
-            idx,
-            rowKey,
-            overrides,
-            lineColors,
-            times ? times(s.name) : undefined,
-          ),
+          this._renderStopAhead(s, idx, rowKey, overrides, lineColors, etas[idx], struck),
         )}
       </ol>
     `;
@@ -1878,6 +1877,9 @@ export class WienerLinienAustriaCard extends LitElement {
     // undefined: the trail shows no times. null: it does, but not for this
     // stop, so the column stays and the names keep their alignment.
     eta?: StopEta | null,
+    // The trail's departure runs late and delays are shown: a time is the
+    // timetable's arrival struck through, then the expected one.
+    struck = false,
   ): TemplateResult {
     // Inline lines (always shown next to the station name): U-Bahn and
     // S-Bahn at any time, plus night lines (N-prefix + digit) WHEN
@@ -1971,7 +1973,14 @@ export class WienerLinienAustriaCard extends LitElement {
     const rowInteractive = otherLines.length > 0;
     // The label replaces the row's content for assistive tech, so the time
     // has to be in it or it is only ever seen.
-    const etaLabel = eta ? `${this._t("stop_time_title")} ${eta.clock}` : "";
+    const lateLabel = eta?.planned
+      ? this._t("stop_time_late", { time: eta.planned.clock, n: eta.planned.late })
+      : "";
+    const etaLabel = eta
+      ? [`${this._t("stop_time_title")} ${eta.clock}`, lateLabel]
+          .filter(Boolean)
+          .join(", ")
+      : "";
     const rowAriaLabel = rowInteractive
       ? [
           this._t(
@@ -1983,17 +1992,36 @@ export class WienerLinienAustriaCard extends LitElement {
           .filter(Boolean)
           .join(" · ")
       : "";
+    // Late is the strike and the second time, and red only on top of that
+    // (show_delay_colors), the way the row's countdown treats the colour.
+    const expected = eta
+      ? html`<time
+          class=${classMap({
+            "stops-ahead-time": true,
+            late: !!eta.planned && this._config!.show_delay_colors,
+          })}
+          datetime=${eta.iso}
+          title=${etaLabel}
+          >${eta.clock}</time
+        >`
+      : nothing;
     const time =
       eta === undefined
         ? nothing
         : eta === null
-          ? html`<span class="stops-ahead-time" aria-hidden="true"></span>`
-          : html`<time
-              class="stops-ahead-time"
-              datetime=${eta.iso}
-              title=${etaLabel}
-              >${eta.clock}</time
-            >`;
+          ? html`<span
+              class=${classMap({ "stops-ahead-time": true, "stops-ahead-time--pair": struck })}
+              aria-hidden="true"
+            ></span>`
+          : struck && eta.planned
+            ? html`<span class="stops-ahead-times">
+                <s class="stops-ahead-time stops-ahead-time--planned" aria-hidden="true"
+                  >${eta.planned.clock}</s
+                >
+                ${expected}
+                <span class="sr-only">${lateLabel}</span>
+              </span>`
+            : expected;
 
     return html`
       <li class=${classMap(stopClasses)}>
