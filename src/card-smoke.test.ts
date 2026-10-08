@@ -296,6 +296,34 @@ function timetableHass(): HomeAssistant {
   return hass;
 }
 
+describe("step-free-only filter", () => {
+  // busyHass: the U3 is step-free, the 52 is not.
+  const lines = (el: CardElement): string => (shadow(el).textContent ?? "").replace(/\s+/g, "");
+
+  it("hides the departures that aren't step-free", async () => {
+    const el = await mount(MODERN, busyHass(), {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_accessibility: true,
+      accessibility_only: true,
+    });
+    expect(lines(el)).toContain("Simmering");
+    expect(lines(el)).not.toContain("Baumgarten");
+  });
+
+  it("hides nothing once the step-free icon it needs is switched off", async () => {
+    // The editor greys the filter out then; it used to go on filtering.
+    const el = await mount(MODERN, busyHass(), {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_accessibility: false,
+      accessibility_only: true,
+    });
+    expect(lines(el)).toContain("Simmering");
+    expect(lines(el)).toContain("Baumgarten");
+  });
+});
+
 describe("tab strip", () => {
   it("renders inert scroll arrows while the tabs fit", async () => {
     const hass = busyHass();
@@ -834,6 +862,8 @@ describe("show_stop_times on a late departure", () => {
     const el = await mountLate({ show_delay: false });
     expect(texts(el, "s.stops-ahead-time--planned")).toEqual([]);
     expect(texts(el, "time.stops-ahead-time")).toEqual(["16:42", "16:43"]);
+    // The delay colours need delays, so they are off too.
+    expect(shadow(el).querySelectorAll(".stops-ahead-time.late")).toHaveLength(0);
     const slot = shadow(el).querySelector("span.stops-ahead-time[aria-hidden]");
     expect(slot?.classList.contains("stops-ahead-time--pair")).toBe(false);
   });

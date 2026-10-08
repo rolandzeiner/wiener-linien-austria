@@ -360,6 +360,77 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
   });
 });
 
+describe("a switch that needs another one goes off with it (modern, Anzeige tab)", () => {
+  type Field = { name: string; disabled?: boolean };
+  type Form = HTMLElement & { schema?: Field[]; data?: Record<string, unknown> };
+
+  async function onDisplayTab(config: Record<string, unknown> = {}): Promise<EditorElement> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    return el;
+  }
+
+  const formWith = (el: EditorElement, name: string): Form => {
+    const form = [...shadow(el).querySelectorAll<Form>("ha-form")].find((f) =>
+      f.schema?.some((field) => field.name === name),
+    );
+    if (!form) throw new Error(`no section offers ${name}`);
+    return form;
+  };
+
+  /** Flip one switch the way ha-form reports it: the section's whole data
+   *  with that one value changed. */
+  async function flip(el: EditorElement, name: string, value: boolean): Promise<void> {
+    const form = formWith(el, name);
+    form.dispatchEvent(
+      new CustomEvent("value-changed", {
+        detail: { value: { ...form.data, [name]: value } },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await el.updateComplete;
+  }
+
+  it.each([
+    ["show_delay", "show_delay_colors"],
+    ["show_accessibility", "accessibility_only"],
+    ["show_stops_ahead", "show_stop_times"],
+  ])("switching %s off switches %s off, not just grey", async (needed, dependent) => {
+    const el = await onDisplayTab({ [needed]: true, [dependent]: true });
+    expect(formWith(el, dependent).data?.[dependent]).toBe(true);
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+
+    await flip(el, needed, false);
+
+    const form = formWith(el, dependent);
+    expect(form.data?.[dependent]).toBe(false);
+    expect(form.schema?.find((f) => f.name === dependent)?.disabled).toBe(true);
+    // Saved that way too, so the card and the YAML agree with the switch.
+    expect(config).toMatchObject({ [needed]: false, [dependent]: false });
+  });
+
+  it("leaves the dependent switch off, and usable, when the needed one comes back", async () => {
+    const el = await onDisplayTab({ show_delay: true, show_delay_colors: true });
+    await flip(el, "show_delay", false);
+    await flip(el, "show_delay", true);
+
+    const form = formWith(el, "show_delay_colors");
+    expect(form.data?.["show_delay_colors"]).toBe(false);
+    expect(form.schema?.find((f) => f.name === "show_delay_colors")?.disabled).toBe(false);
+    await flip(el, "show_delay_colors", true);
+    expect(formWith(el, "show_delay_colors").data?.["show_delay_colors"]).toBe(true);
+  });
+});
+
 describe("estimated arrival times switch (modern, Anzeige tab)", () => {
   type Field = { name: string; disabled?: boolean };
   type Form = { schema?: Field[]; data?: Record<string, unknown> };

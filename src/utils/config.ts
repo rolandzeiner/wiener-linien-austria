@@ -474,6 +474,20 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
   // versions of validated keys into the result.
   const passthrough = filterPassthrough(raw, MODERN_VALIDATED_KEYS);
 
+  // An option that needs another one is off whenever that one is off. It is
+  // decided here, the one place the card and the editor both read, because
+  // deciding it in only one of them is how a switch ended up greyed out in
+  // the editor while still on, and still acted on by the card: step-free-only
+  // kept hiding departures with the step-free icon switched off, and the
+  // delay colours kept painting with delays switched off. Switching the
+  // needed option back on does not bring the dependent one back.
+  const showAccessibility = asBool(
+    raw.show_accessibility,
+    MODERN_DEFAULTS.show_accessibility,
+  );
+  const showDelay = asBool(raw.show_delay, MODERN_DEFAULTS.show_delay);
+  const showStopsAhead = asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead);
+
   return {
     ...passthrough,
     type:
@@ -483,19 +497,23 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     entities,
     max_departures: maxClamped,
     line_colors: lineColors,
-    show_accessibility: asBool(raw.show_accessibility, MODERN_DEFAULTS.show_accessibility),
-    accessibility_only: asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
+    show_accessibility: showAccessibility,
+    accessibility_only:
+      showAccessibility &&
+      asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
     show_cooling: asBool(raw.show_cooling, MODERN_DEFAULTS.show_cooling),
     show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
     show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
-    show_delay: asBool(raw.show_delay, MODERN_DEFAULTS.show_delay),
-    show_delay_colors: asBool(raw.show_delay_colors, MODERN_DEFAULTS.show_delay_colors),
+    show_delay: showDelay,
+    show_delay_colors:
+      showDelay && asBool(raw.show_delay_colors, MODERN_DEFAULTS.show_delay_colors),
     show_type_icon: asBool(raw.show_type_icon, MODERN_DEFAULTS.show_type_icon),
     show_platform: asBool(raw.show_platform, MODERN_DEFAULTS.show_platform),
     show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
     show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
-    show_stops_ahead: asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead),
-    show_stop_times: asBool(raw.show_stop_times, MODERN_DEFAULTS.show_stop_times),
+    show_stops_ahead: showStopsAhead,
+    show_stop_times:
+      showStopsAhead && asBool(raw.show_stop_times, MODERN_DEFAULTS.show_stop_times),
     stops_ahead_modes: normaliseTransferModes(raw.stops_ahead_modes),
     show_qr_button: asBool(raw.show_qr_button, MODERN_DEFAULTS.show_qr_button),
     hide_header: asBool(raw.hide_header, MODERN_DEFAULTS.hide_header),

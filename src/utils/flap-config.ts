@@ -249,7 +249,10 @@ export function normaliseFlapConfig(
     station_bg,
     show_min_unit: asBool(raw.show_min_unit, CARD_DEFAULTS.unit_caption.flap),
     show_accessibility: asBool(raw.show_accessibility, true),
-    accessibility_only: raw.accessibility_only === true,
+    // Needs the icon switched on, so off without it: see the same rule in
+    // normaliseModernConfig for what a greyed-out switch left on used to do.
+    accessibility_only:
+      asBool(raw.show_accessibility, true) && raw.accessibility_only === true,
     // Master gate for the signage header strip — defaults `false` so
     // pre-feature flap cards render byte-identical. Per-side configs
     // are preserved either way (so toggling back on restores them).

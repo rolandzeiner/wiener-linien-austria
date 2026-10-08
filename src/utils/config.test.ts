@@ -312,6 +312,35 @@ describe("normaliseModernConfig — defaults", () => {
   });
 });
 
+describe("normaliseModernConfig — options that need another one", () => {
+  const PAIRS = [
+    ["accessibility_only", "show_accessibility"],
+    ["show_delay_colors", "show_delay"],
+    ["show_stop_times", "show_stops_ahead"],
+  ] as const;
+
+  // The editor greys such a switch out. Left on underneath, it read as on,
+  // and the card went on acting on it.
+  it.each(PAIRS)("%s is off whenever %s is off", (dependent, needed) => {
+    const withIt = normaliseModernConfig({ [needed]: true, [dependent]: true });
+    expect(withIt[dependent]).toBe(true);
+    const without = normaliseModernConfig({ [needed]: false, [dependent]: true });
+    expect(without[dependent]).toBe(false);
+  });
+
+  it("turns the delay colours off with delays, though they default to on", () => {
+    expect(normaliseModernConfig({ show_delay: false }).show_delay_colors).toBe(false);
+  });
+
+  it("doesn't bring the dependent option back with the one it needs", () => {
+    // What the editor does on the two clicks: it saves the normalised
+    // config, so the first click has already written the dependent one off.
+    const off = normaliseModernConfig({ show_delay: false, show_delay_colors: true });
+    const onAgain = normaliseModernConfig({ ...off, show_delay: true });
+    expect(onAgain.show_delay_colors).toBe(false);
+  });
+});
+
 describe("normaliseRetroHeaderSide", () => {
   it("returns undefined for a non-object or a fully empty side", () => {
     expect(normaliseRetroHeaderSide(undefined)).toBeUndefined();

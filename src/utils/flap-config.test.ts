@@ -37,6 +37,16 @@ describe("normaliseFlapConfig — defaults", () => {
     expect(c.entities).toEqual([]);
   });
 
+  it("shows only step-free departures only while the step-free icon is on", () => {
+    expect(normaliseFlapConfig(flap({ accessibility_only: true })).accessibility_only).toBe(
+      true,
+    );
+    expect(
+      normaliseFlapConfig(flap({ show_accessibility: false, accessibility_only: true }))
+        .accessibility_only,
+    ).toBe(false);
+  });
+
   it("clamps max_rows to 1..8 and falls back to 2 on non-numbers", () => {
     expect(normaliseFlapConfig(flap({ max_rows: 0 })).max_rows).toBe(1);
     expect(normaliseFlapConfig(flap({ max_rows: 99 })).max_rows).toBe(8);
