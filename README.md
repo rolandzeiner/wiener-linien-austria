@@ -481,7 +481,7 @@ Four live endpoints and five static files, on separate cadences:
 |---|---|---|
 | Live departures | `/monitor?stopId=…` | One request per interval group, default 60 s (30–600 s) |
 | Service, stop and elevator alerts | `/trafficInfoList` — `stoerunglang` + `stoerungkurz` + `aufzugsinfo`, all three in one request | Domain-wide, 5 min — shared across all entries |
-| Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
+| Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, counted from the last download; cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 60 trains with their stops, fetched again after 2 h or once your picked lines have fewer than 6 trains left, never more often than every 5 min. After a failed request the wait doubles, up to 30 min, until it answers again. Counted down locally in between, and shares the routes' 15 s cooldown slot |
@@ -496,7 +496,11 @@ Four live endpoints and five static files, on separate cadences:
 with the same interval joins one group that issues a single `/monitor` request
 carrying all their stops, then fans the response out. Adding stops at the same
 cadence costs no extra requests. The five static files likewise refresh as one
-weekly burst, not five schedules.
+weekly burst, not five schedules. The week counts from the last download, not
+from the last restart: their age is checked once a day, and once more 5 to 60
+minutes after Home Assistant starts, at a random moment so installs that
+restart together don't download together. A failed refresh is tried again at
+the next check.
 
 Recurring calls share a **15 s domain-wide cooldown** plus a 30 s per-entry
 floor — that is the departure poll, the alerts refresh, the live-times request

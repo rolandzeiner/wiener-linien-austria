@@ -13,10 +13,15 @@ This file fills in:
 
 from __future__ import annotations
 
+import logging
+from datetime import timedelta
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.core import CoreState, HomeAssistant
+from homeassistant.util import dt as dt_util
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.wiener_linien_austria import (
     _websocket_card_version,
@@ -34,6 +39,13 @@ from custom_components.wiener_linien_austria.const import (
     FLAP_CARD_VERSION,
     RETRO_CARD_VERSION,
     ROUTE_CARD_VERSION,
+    STATIC_CACHE_CHECK_INTERVAL,
+    STATIC_CACHE_FIRST_CHECK_SECONDS,
+    STATIC_CACHE_REFRESH_HOURS,
+)
+from custom_components.wiener_linien_austria.static import (
+    CATALOGUE_KEY,
+    StaticCatalogue,
 )
 
 from .conftest import make_entry as _make_entry
@@ -281,43 +293,56 @@ def _stop_batch_timers(hass: HomeAssistant) -> None:
         group.stop()
 
 
-async def test_static_refresh_timer_publishes_the_new_catalogue(
-    hass: HomeAssistant, mock_fetch, freezer
-) -> None:
-    """A successful weekly refresh swaps the shared catalogue ref."""
-    from datetime import timedelta
+# The static refresh goes by the catalogue's age: checked a few minutes after
+# every start and then daily, fetched once it is a week old. `_static_setup`
+# pins the first check to ten minutes in, so a test can step past it alone.
+_FIRST_CHECK_SECONDS = 600
+_REFRESH = "custom_components.wiener_linien_austria.async_refresh_catalogue"
+_PUBLISH = "custom_components.wiener_linien_austria.async_set_cached_catalogue"
 
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
-    from custom_components.wiener_linien_austria.const import (
-        STATIC_CACHE_REFRESH_HOURS,
-    )
-
+async def _static_setup(hass: HomeAssistant, age: timedelta | None = None) -> Any:
+    """Set an entry up with a catalogue `age` old (none loaded when None)."""
     entry = _make_entry()
     entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    with patch(
+        "custom_components.wiener_linien_austria.random.uniform",
+        return_value=_FIRST_CHECK_SECONDS,
+    ) as uniform:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
     _stop_batch_timers(hass)
+    if age is not None:
+        hass.data[DOMAIN][CATALOGUE_KEY] = StaticCatalogue(
+            stations_by_diva={}, last_fetched=(dt_util.utcnow() - age).isoformat()
+        )
+    return SimpleNamespace(entry=entry, uniform=uniform)
+
+
+async def _advance(hass: HomeAssistant, freezer: Any, by: timedelta) -> None:
+    freezer.tick(by)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+
+async def test_static_refresh_publishes_the_new_catalogue(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """A successful refresh swaps the shared catalogue ref."""
+    await _static_setup(hass)
 
     sentinel = object()
     with (
-        patch(
-            "custom_components.wiener_linien_austria.async_refresh_catalogue",
-            new=AsyncMock(return_value=sentinel),
-        ),
-        patch(
-            "custom_components.wiener_linien_austria.async_set_cached_catalogue"
-        ) as publish,
+        patch(_REFRESH, new=AsyncMock(return_value=sentinel)),
+        patch(_PUBLISH) as publish,
     ):
-        freezer.tick(timedelta(hours=STATIC_CACHE_REFRESH_HOURS + 1))
-        async_fire_time_changed(hass)
-        await hass.async_block_till_done()
+        await _advance(hass, freezer, timedelta(seconds=_FIRST_CHECK_SECONDS + 1))
 
     publish.assert_called_once()
     assert publish.call_args.args[1] is sentinel
 
 
-async def test_static_refresh_timer_swallows_a_store_error(
+async def test_static_refresh_swallows_a_store_error(
     hass: HomeAssistant, mock_fetch, freezer, caplog
 ) -> None:
     """Store I/O can raise past async_refresh_catalogue's own handlers.
@@ -325,71 +350,88 @@ async def test_static_refresh_timer_swallows_a_store_error(
     The refresh helper catches network and parse failures itself; OSError
     and JSONDecodeError from the Store write are what reach this guard.
     """
-    import logging
-    from datetime import timedelta
-
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
-
-    from custom_components.wiener_linien_austria.const import (
-        STATIC_CACHE_REFRESH_HOURS,
-    )
-
     caplog.set_level(logging.WARNING)
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    await _static_setup(hass)
 
-    _stop_batch_timers(hass)
-
-    with patch(
-        "custom_components.wiener_linien_austria.async_refresh_catalogue",
-        new=AsyncMock(side_effect=OSError("disk full")),
-    ):
-        freezer.tick(timedelta(hours=STATIC_CACHE_REFRESH_HOURS + 1))
-        async_fire_time_changed(hass)
-        await hass.async_block_till_done()
+    with patch(_REFRESH, new=AsyncMock(side_effect=OSError("disk full"))):
+        await _advance(hass, freezer, timedelta(seconds=_FIRST_CHECK_SECONDS + 1))
 
     assert "Static-catalogue periodic refresh failed" in caplog.text
 
 
-async def test_static_refresh_timer_ignores_a_failed_refresh(
+async def test_static_refresh_ignores_a_failed_refresh(
     hass: HomeAssistant, mock_fetch, freezer
 ) -> None:
     """`async_refresh_catalogue` returning None must not publish None.
 
     Publishing it would replace a good catalogue with nothing and take
-    stops_ahead and line colours down until the next weekly tick.
+    stops_ahead and line colours down until the next check.
     """
-    from datetime import timedelta
-
-    from pytest_homeassistant_custom_component.common import async_fire_time_changed
-
-    from custom_components.wiener_linien_austria.const import (
-        STATIC_CACHE_REFRESH_HOURS,
-    )
-
-    entry = _make_entry()
-    entry.add_to_hass(hass)
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    _stop_batch_timers(hass)
+    await _static_setup(hass)
 
     with (
-        patch(
-            "custom_components.wiener_linien_austria.async_refresh_catalogue",
-            new=AsyncMock(return_value=None),
-        ),
-        patch(
-            "custom_components.wiener_linien_austria.async_set_cached_catalogue"
-        ) as publish,
+        patch(_REFRESH, new=AsyncMock(return_value=None)) as refresh,
+        patch(_PUBLISH) as publish,
     ):
-        freezer.tick(timedelta(hours=STATIC_CACHE_REFRESH_HOURS + 1))
-        async_fire_time_changed(hass)
-        await hass.async_block_till_done()
+        await _advance(hass, freezer, timedelta(seconds=_FIRST_CHECK_SECONDS + 1))
+        publish.assert_not_called()
+        # Still stale, so the next daily check tries again.
+        await _advance(hass, freezer, STATIC_CACHE_CHECK_INTERVAL)
 
-    publish.assert_not_called()
+    assert refresh.await_count == 2
+
+
+async def test_static_refresh_does_not_wait_for_a_week_of_uptime(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """A stale catalogue is refetched within the hour after a start.
+
+    The refresh was a 168 h timer started with Home Assistant, which an
+    install restarted more often than weekly never reached: 26 days without
+    a refresh on a box restarted most days.
+    """
+    setup = await _static_setup(hass, age=timedelta(days=26))
+    # The first check is drawn from the configured range, per install.
+    setup.uniform.assert_called_once_with(*STATIC_CACHE_FIRST_CHECK_SECONDS)
+
+    with patch(_REFRESH, new=AsyncMock(return_value=None)) as refresh:
+        await _advance(hass, freezer, timedelta(seconds=_FIRST_CHECK_SECONDS - 1))
+        assert refresh.await_count == 0
+        await _advance(hass, freezer, timedelta(seconds=2))
+        assert refresh.await_count == 1
+
+
+async def test_static_check_leaves_a_fresh_catalogue_alone(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """Checking is free: nothing is fetched until the catalogue is a week old."""
+    max_age = timedelta(hours=STATIC_CACHE_REFRESH_HOURS)
+    await _static_setup(hass, age=max_age - timedelta(days=2))
+
+    with patch(_REFRESH, new=AsyncMock(return_value=None)) as refresh:
+        # The check after the start, then the one a day later: five and six
+        # days old.
+        await _advance(hass, freezer, timedelta(seconds=_FIRST_CHECK_SECONDS + 1))
+        await _advance(hass, freezer, STATIC_CACHE_CHECK_INTERVAL)
+        assert refresh.await_count == 0
+        # The next daily check finds it a week old.
+        await _advance(hass, freezer, STATIC_CACHE_CHECK_INTERVAL)
+        assert refresh.await_count == 1
+
+
+async def test_static_checks_stop_with_the_last_entry(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """Neither the first check nor the daily one outlives the integration."""
+    setup = await _static_setup(hass, age=timedelta(days=26))
+    assert await hass.config_entries.async_unload(setup.entry.entry_id)
+    await hass.async_block_till_done()
+
+    with patch(_REFRESH, new=AsyncMock(return_value=None)) as refresh:
+        await _advance(hass, freezer, timedelta(seconds=_FIRST_CHECK_SECONDS + 1))
+        await _advance(hass, freezer, STATIC_CACHE_CHECK_INTERVAL * 2)
+
+    assert refresh.await_count == 0
 
 
 async def test_alerts_refresh_timer_swallows_a_failure(

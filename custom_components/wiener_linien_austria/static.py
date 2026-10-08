@@ -36,6 +36,7 @@ import logging
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any, NamedTuple
 
 import aiohttp
@@ -54,6 +55,7 @@ from .const import (
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
     S_BAHN_TEXT_COLOR,
+    STATIC_CACHE_REFRESH_HOURS,
     STATIC_FILES,
     USER_AGENT,
 )
@@ -482,6 +484,24 @@ def current_catalogue(hass: HomeAssistant) -> StaticCatalogue | None:
     """
     catalogue = hass.data.get(DOMAIN, {}).get(CATALOGUE_KEY)
     return catalogue if isinstance(catalogue, StaticCatalogue) else None
+
+
+def catalogue_is_stale(catalogue: StaticCatalogue | None, now: datetime) -> bool:
+    """Whether the catalogue is due for its weekly refetch.
+
+    Judged by `last_fetched`, so the week runs from the last download and a
+    restart doesn't reset it. No catalogue at all (the load at startup
+    failed, or isn't through yet) is due, and so is one whose `last_fetched`
+    can't be read.
+    """
+    if catalogue is None:
+        return True
+    fetched = dt_util.parse_datetime(catalogue.last_fetched)
+    if fetched is None:
+        return True
+    if fetched.tzinfo is None:
+        fetched = fetched.replace(tzinfo=UTC)
+    return now - fetched >= timedelta(hours=STATIC_CACHE_REFRESH_HOURS)
 
 
 def canonical_line_label(label: str) -> str:

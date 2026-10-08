@@ -69,9 +69,25 @@ DOMAIN_COOLDOWN_SECONDS: Final = 15
 # the integration is broken" and well above any realistic transient hiccup.
 BACKOFF_CAP_SECONDS: Final = 1800
 
-# Static cache refresh interval (weekly is plenty for Wiener Linien's
-# stop catalogue; it changes only when routes do).
+# How old the static catalogue may get before it is refetched (weekly is
+# plenty for Wiener Linien's stop catalogue; it changes only when routes do).
 STATIC_CACHE_REFRESH_HOURS: Final = 24 * 7
+# How often that age is checked. The check costs nothing while the catalogue
+# is fresh; it is what makes "weekly" a week since the last download rather
+# than a week of unbroken uptime. The refresh used to be a 168 h timer
+# started with Home Assistant, which an install restarted more often than
+# weekly never reaches: on a box restarted most days the catalogue was 26
+# days old (measured 2026-10-08), held up only by the cache-format
+# migrations that happened to force a refetch. A failed refresh is retried
+# at the next check, a day later.
+STATIC_CACHE_CHECK_INTERVAL: Final = timedelta(hours=24)
+# The first check after a start comes this many seconds in, picked at random
+# from the range. Needed because the daily timer also restarts with Home
+# Assistant, so an install restarted every day would again never get there.
+# Not at the start itself: it would land on the first departure polls, and a
+# Home Assistant release has a whole user base restarting within the same
+# evening; an hour's spread keeps their five-file downloads from bunching.
+STATIC_CACHE_FIRST_CHECK_SECONDS: Final = (300, 3600)
 
 # Upstream API
 API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"

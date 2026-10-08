@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+import random
 from datetime import timedelta
 from typing import Any
 
@@ -17,11 +18,12 @@ from homeassistant.components.websocket_api.decorators import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
-from homeassistant.core import CoreState, Event, HomeAssistant, callback
+from homeassistant.core import CoreState, Event, HassJob, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .adhoc import ADHOC_PLANNER_KEY, AdhocPlanner
 from .alerts import async_refresh_alerts
@@ -44,7 +46,8 @@ from .const import (
     RETRO_CARD_VERSION,
     ROUTE_CARD_VERSION,
     S_BAHN_NETWORK_CHECK_INTERVAL,
-    STATIC_CACHE_REFRESH_HOURS,
+    STATIC_CACHE_CHECK_INTERVAL,
+    STATIC_CACHE_FIRST_CHECK_SECONDS,
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
@@ -69,6 +72,8 @@ from .static import (
     CATALOGUE_KEY,
     async_refresh_catalogue,
     async_set_cached_catalogue,
+    catalogue_is_stale,
+    current_catalogue,
 )
 from .websocket import STOPS_CACHE_KEY, async_setup_websocket
 
@@ -196,6 +201,11 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
     if STATIC_REFRESH_UNSUB_KEY not in domain_data:
 
         async def _periodic_refresh(_now: Any) -> None:
+            # Checked daily, fetched weekly: the catalogue's own age decides,
+            # so a restart doesn't put the refresh off (see
+            # STATIC_CACHE_CHECK_INTERVAL for what a bare weekly timer did).
+            if not catalogue_is_stale(current_catalogue(hass), dt_util.utcnow()):
+                return
             # Belt-and-braces: async_refresh_catalogue catches the known
             # network / parse errors, but Store I/O can still raise
             # OSError / JSONDecodeError. Without this guard, a refresh
@@ -214,12 +224,30 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
                 # for the next entry reload.
                 async_set_cached_catalogue(hass, refreshed)
 
-        domain_data[STATIC_REFRESH_UNSUB_KEY] = async_track_time_interval(
+        unsub_daily = async_track_time_interval(
             hass,
             _periodic_refresh,
-            timedelta(hours=STATIC_CACHE_REFRESH_HOURS),
+            STATIC_CACHE_CHECK_INTERVAL,
             cancel_on_shutdown=True,
         )
+        # One check soon after the start as well, at a random moment: the
+        # daily timer starts over with Home Assistant too.
+        unsub_first = async_call_later(
+            hass,
+            random.uniform(*STATIC_CACHE_FIRST_CHECK_SECONDS),
+            HassJob(
+                _periodic_refresh,
+                f"{DOMAIN} first static check",
+                cancel_on_shutdown=True,
+            ),
+        )
+
+        @callback
+        def _unsub_static() -> None:
+            unsub_daily()
+            unsub_first()
+
+        domain_data[STATIC_REFRESH_UNSUB_KEY] = _unsub_static
 
     if ALERTS_REFRESH_UNSUB_KEY not in domain_data:
 
