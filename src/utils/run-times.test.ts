@@ -140,9 +140,21 @@ describe("stopEta", () => {
     });
   });
 
-  it("rounds to the minute instead of cutting the seconds off", () => {
+  it("prints the minute the arrival falls in, as the board at that stop does", () => {
     const late = { ...dep, time_real: "2026-09-09T16:40:50.000+0200" };
-    expect(stopEta(late, 1, NOW)?.clock).toBe("16:42");
+    expect(stopEta(late, 1, NOW)?.clock).toBe("16:41");
+  });
+
+  it("carries a run time's half minute into the sum", () => {
+    // The 48A from Neubaugasse to Ottakring, timetabled 15 min 30 s: the
+    // 12:42:30 bus is due 12:58:00 there and the 12:50:00 one 13:05:30.
+    const bus = (time: string) => ({
+      time_planned: `2026-10-08T${time}.000+0200`,
+      time_real: `2026-10-08T${time}.000+0200`,
+      countdown: 6,
+    });
+    expect(stopEta(bus("12:42:30"), 15.5, NOW)?.clock).toBe("12:58");
+    expect(stopEta(bus("12:50:00"), 15.5, NOW)?.clock).toBe("13:05");
   });
 
   it("counts from the planned time when there is no live one", () => {

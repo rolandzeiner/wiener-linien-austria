@@ -89,7 +89,7 @@ class RunTimeSample:
 
     fetched_at: datetime
     # (line, direction) → DIVA → scheduled minutes from departing here.
-    pairs: dict[Pair, dict[int, int]]
+    pairs: dict[Pair, dict[int, float]]
     # Pairs a top-up was already spent on, found or not.
     asked: set[Pair] = field(default_factory=set)
 
@@ -98,7 +98,7 @@ class RunTimeSample:
 class RunTimeAnswer:
     """What a caller gets: the merged run times and how long they hold."""
 
-    pairs: Mapping[Pair, Mapping[int, int]]
+    pairs: Mapping[Pair, Mapping[int, float]]
     # When the current part of the day's sample was fetched; None when the
     # answer rests on the other part's alone.
     fetched_at: datetime | None
@@ -291,7 +291,7 @@ class RunTimes:
         self, state: _StopState, regime: str, now: datetime, zone: tzinfo
     ) -> RunTimeAnswer:
         """The current part's sample laid over the other part's."""
-        merged: dict[Pair, Mapping[int, int]] = {}
+        merged: dict[Pair, Mapping[int, float]] = {}
         for name, held in state.samples.items():
             if name != regime:
                 merged.update(held.pairs)
@@ -401,7 +401,7 @@ def _stops_from_store(raw: Mapping[str, Any]) -> dict[int, _StopState]:
                 fetched_at=fetched_at,
                 pairs={
                     _pair_from_key(key): {
-                        int(stop): int(m) for stop, m in minutes.items()
+                        int(stop): float(m) for stop, m in minutes.items()
                     }
                     for key, minutes in stored["pairs"].items()
                 },

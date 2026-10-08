@@ -331,9 +331,9 @@ async def _websocket_run_times(
     # Keyed by station name, the one thing a trail entry carries. Both
     # sides read it from the same catalogue row, so the join is exact; a
     # DIVA the catalogue doesn't know has no trail entry to join either.
-    run_times: dict[str, dict[str, int]] = {}
+    run_times: dict[str, dict[str, float]] = {}
     for (label, way), minutes_by_diva in answer.pairs.items():
-        named: dict[str, int] = {}
+        named: dict[str, float] = {}
         for stop_diva, minutes in minutes_by_diva.items():
             station = catalogue.stations_by_diva.get(stop_diva)
             if station is not None:
@@ -370,7 +370,7 @@ def _stop_boards(
 
 def _timetable_run_times(
     board: WienerLinienAustriaCoordinator, now: datetime
-) -> dict[str, dict[str, int]]:
+) -> dict[str, dict[str, float]]:
     """Run times of a board's S-Bahn lines, from the rows it already holds.
 
     The run-time request leaves the S-Bahn out; the board's timetable rows
@@ -380,12 +380,12 @@ def _timetable_run_times(
     timetable = board.timetable
     if timetable is None:
         return {}
-    run_times: dict[str, dict[str, int]] = {}
+    run_times: dict[str, dict[str, float]] = {}
     for dep in timetable.departures:
         key = f"{dep.line}|{dep.direction}"
         if key in run_times or dep.planned < now:
             continue
-        named = {
+        named: dict[str, float] = {
             stop.name: stop.minutes for stop in dep.stops if stop.minutes is not None
         }
         if named:

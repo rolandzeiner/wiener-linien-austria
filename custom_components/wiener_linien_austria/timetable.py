@@ -223,15 +223,13 @@ def parse_calling_points(body: Mapping[str, Any]) -> dict[int, set[str]]:
 
 def parse_run_times(
     body: Mapping[str, Any], tz: tzinfo
-) -> dict[tuple[str, str], dict[int, int]]:
+) -> dict[tuple[str, str], dict[int, float]]:
     """Scheduled minutes to every stop ahead, per line and direction.
 
     Out of a departure-monitor answer with stop sequences, for any mode:
-    `(line, direction)` → DIVA → minutes from departing here. Each row is one
-    vehicle's run; the median over a pair's rows evens out the minute the
-    timetable's rounding moves a stop by from one departure to the next. A
-    median of x.5 rounds up: Python's round-half-even would put two stops
-    in a row on the same minute (1.5 and 2.5 both giving 2).
+    `(line, direction)` → DIVA → minutes from departing here, to a tenth.
+    Each row is one vehicle's run, averaged over a pair's rows (see
+    `_typical_minutes` for why an average and not the commonest value).
     Runs that end early (a U1 to Alaudagasse among Oberlaa trains) simply
     contribute fewer stops. A stop a run passes twice counts once, at its
     first call.
@@ -264,10 +262,28 @@ def parse_run_times(
             seen.add(stop.stop_id)
             per_stop.setdefault(stop.stop_id, []).append(stop.minutes)
     return {
-        pair: {diva: int(median(minutes) + 0.5) for diva, minutes in per_stop.items()}
+        pair: {diva: _typical_minutes(minutes) for diva, minutes in per_stop.items()}
         for pair, per_stop in samples.items()
         if per_stop
     }
+
+
+def _typical_minutes(minutes: list[int]) -> float:
+    """One run time out of several vehicles' whole-minute ones, to a tenth.
+
+    The server cuts the seconds off both ends, so a bus timetabled 15.5 min
+    to a stop reads 16 when it leaves at :30 and 15 when it leaves at :00
+    (48A from Neubaugasse to Ottakring, 2026-10-08: 16, 15, 16, 16, 15, 16
+    against 15 min 30 s on both stops' `/monitor` boards). Either whole
+    number is half a minute out, which is the difference between the right
+    and the wrong minute on the card; the mean of the runs lands between.
+
+    Only runs within a minute of the median count, so a vehicle on another
+    stopping pattern under the same line and direction can't drag it.
+    """
+    middle = median(minutes)
+    near = [value for value in minutes if abs(value - middle) <= 1]
+    return round(sum(near) / len(near), 1) if near else float(middle)
 
 
 def picker_rows(departures: list[PlannedDeparture]) -> list[dict[str, str]]:

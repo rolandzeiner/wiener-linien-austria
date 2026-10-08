@@ -647,11 +647,11 @@ A request that doesn't match the schema gets Home Assistant's own `invalid_forma
   "diva": 60201040,
   "fetched_at": "2026-10-08T10:30:00+00:00",
   "valid_until": "2026-10-08T19:00:00+02:00",
-  "run_times": {"U1|H": {"Vorgartenstraße": 1, "Donauinsel": 3}}
+  "run_times": {"U1|H": {"Vorgartenstraße": 1.0, "Donauinsel": 2.6}}
 }
 ```
 
-`run_times` is keyed by line and direction, then by stop name as the stops-ahead trail spells it. Add a stop's minutes to a departure's `time_real`, or `time_planned` without one, to get its estimated arrival there. Ask again after `valid_until`. [Data Updates](#data-updates) says when a call costs a request. It answers `not_loaded`, `catalogue_unavailable` and `upstream` like the commands above, and `invalid_stop` for a DIVA without a departure board.
+`run_times` is keyed by line and direction, then by stop name as the stops-ahead trail spells it. The minutes can carry a decimal. Add a stop's minutes to a departure's `time_real`, or `time_planned` without one, to get its estimated arrival there. Ask again after `valid_until`. [Data Updates](#data-updates) says when a call costs a request. It answers `not_loaded`, `catalogue_unavailable` and `upstream` like the commands above, and `invalid_stop` for a DIVA without a departure board.
 
 ## Use Cases
 

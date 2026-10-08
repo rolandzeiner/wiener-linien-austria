@@ -149,8 +149,9 @@ def test_one_answer_holds_every_line_and_direction_at_the_stop() -> None:
     u1 = pairs[("U1", "H")]
     assert len(u1) == 10
     assert u1[VORGARTENSTRASSE] == 1
-    # Five runs say 14, 14, 15, 15, 14: the timetable's rounding, evened out.
-    assert u1[LEOPOLDAU] == 14
+    # Five runs say 14, 14, 15, 15, 14. The server cuts the seconds off both
+    # ends, so the timetable's own figure lies between the two.
+    assert u1[LEOPOLDAU] == 14.4
     tram = pairs[("5", "H")]
     assert len(tram) == 22
     assert tram[WESTBAHNHOF] == 38
@@ -159,14 +160,23 @@ def test_one_answer_holds_every_line_and_direction_at_the_stop() -> None:
     assert len(pairs[("U1", "R")]) == 13
 
 
-def test_minutes_never_run_backwards_along_a_line() -> None:
-    """A median of x.5 rounds up, so two stops in a row can't swap places."""
+def test_runs_are_averaged_because_the_server_cuts_the_seconds_off() -> None:
+    """Half a minute is the difference between the right minute and the next."""
+    # Nestroyplatz 1, 2, 1, 2 and Schwedenplatz 2, 3, 2, 3 across four runs:
+    # a whole number would be half a minute out for every one of them.
+    u1 = parse_run_times(_captured(), VIENNA)[("U1", "R")]
+    assert (u1[60200916], u1[60201198]) == (1.5, 2.5)
     for stops in parse_run_times(_captured(), VIENNA).values():
         minutes = list(stops.values())
         assert minutes == sorted(minutes)
-    # Nestroyplatz 1, 2, 1, 2 and Schwedenplatz 2, 3, 2, 3 across four runs.
-    u1 = parse_run_times(_captured(), VIENNA)[("U1", "R")]
-    assert (u1[60200916], u1[60201198]) == (2, 3)
+
+
+def test_a_vehicle_on_another_stopping_pattern_does_not_drag_the_average() -> None:
+    rows = [_run("13A", "H", [_point("1", m)]) for m in (5, 5, 6, 20)]
+    assert parse_run_times(_body(*rows), VIENNA) == {("13A", "H"): {1: 5.3}}
+    # Two runs that far apart have no typical value; neither is thrown away.
+    rows = [_run("13A", "H", [_point("1", m)]) for m in (5, 20)]
+    assert parse_run_times(_body(*rows), VIENNA) == {("13A", "H"): {1: 12.5}}
 
 
 def test_badner_bahn_gets_the_label_the_boards_use() -> None:
@@ -306,7 +316,7 @@ async def test_first_ask_fetches_one_sample_for_the_whole_stop(
     assert {name for name, _ in params if name.startswith("exclMOT_")} == {
         f"exclMOT_{code}" for code in (0, 1, 6, 7, 8, 9, 10, 11)
     }
-    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14
+    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14.4
     assert len(answer.pairs) == 10
     assert answer.fetched_at == DAY
     assert answer.valid_until == datetime(2026, 10, 8, 19, 0, tzinfo=VIENNA)
@@ -525,7 +535,7 @@ async def test_a_failure_without_a_sample_raises_and_backs_off(
     with caplog.at_level(logging.INFO):
         answer = await registry.async_get(PRATERSTERN)
     assert dm_fetch.await_count == 3
-    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14
+    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14.4
     assert "Run times for stop 60201040 are back" in caplog.text
     assert registry._stops[PRATERSTERN].retry_spacing == TIMETABLE_RETRY_AFTER
 
@@ -546,7 +556,7 @@ async def test_a_failure_keeps_the_sample_it_was_meant_to_replace(
     answer = await registry.async_get(PRATERSTERN)
 
     assert dm_fetch.await_count == 2
-    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14
+    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14.4
     assert answer.fetched_at == DAY
     # Ask again once a retry is allowed, not at the end of the day.
     wait = answer.valid_until - expired
@@ -555,7 +565,7 @@ async def test_a_failure_keeps_the_sample_it_was_meant_to_replace(
     freezer.move_to(expired + timedelta(minutes=1))
     answer = await registry.async_get(PRATERSTERN)
     assert dm_fetch.await_count == 2
-    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14
+    assert answer.pairs[("U1", "H")][LEOPOLDAU] == 14.4
 
 
 async def test_a_waiter_going_away_leaves_the_request_running(
@@ -611,7 +621,7 @@ async def test_samples_survive_a_restart(
 
     stored = storage[STORE_KEY]["data"]["stops"][str(PRATERSTERN)][REGIME_DAY]
     assert stored["fetched_at"] == before.fetched_at.isoformat()
-    assert stored["pairs"]["U1|H"][str(LEOPOLDAU)] == 14
+    assert stored["pairs"]["U1|H"][str(LEOPOLDAU)] == 14.4
     assert stored["asked"] == ["25B|H"]
 
     hass.data[DOMAIN].pop(RUN_TIMES_KEY)
@@ -799,7 +809,7 @@ async def test_command_answers_by_the_names_the_trail_prints(
     assert response["success"], response
     result = response["result"]
     # Only the stops the catalogue names: nothing else could match a trail.
-    assert result["run_times"]["U1|H"] == {"Vorgartenstraße": 1, "Leopoldau": 14}
+    assert result["run_times"]["U1|H"] == {"Vorgartenstraße": 1, "Leopoldau": 14.4}
     assert result["diva"] == PRATERSTERN
     assert datetime.fromisoformat(result["fetched_at"]) == DAY
     assert datetime.fromisoformat(result["valid_until"]) == datetime(

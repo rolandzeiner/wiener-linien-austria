@@ -9,7 +9,8 @@
 
 import type { DepartureAttr } from "../types.js";
 
-/** `"U1|H"` → stop name as the trail prints it → scheduled minutes. */
+/** `"U1|H"` → stop name as the trail prints it → scheduled minutes, which
+ *  may carry a decimal. */
 export type RunTimesByLine = Record<string, Record<string, number>>;
 
 /** The `wiener_linien_austria/run_times` answer. */
@@ -121,10 +122,12 @@ export interface StopEta {
 }
 
 /** When a departure should reach a stop `minutes` down the line: its live
- *  departure, or the planned one, plus the scheduled run. Rounded to the
- *  minute, because live times carry seconds and cutting them off would print
- *  a 07:41:50 arrival as 07:41. A row without either time counts from its
- *  countdown. Null when there is nothing to count from. */
+ *  departure, or the planned one, plus the scheduled run. Printed as the
+ *  minute the arrival falls in, seconds cut off, which is how a timetable and
+ *  the board at that stop print the same moment: 16:58:10 is 16:58 there, so
+ *  rounding it up here would put the two a minute apart. A row without
+ *  either time counts from its countdown. Null when there is nothing to
+ *  count from. */
 export function stopEta(
   dep: Pick<DepartureAttr, "time_real" | "time_planned" | "countdown">,
   minutes: number | undefined,
@@ -133,7 +136,7 @@ export function stopEta(
   if (minutes === undefined || !Number.isFinite(minutes)) return null;
   const departs = departureMs(dep, nowMs);
   if (departs === null) return null;
-  const at = new Date(Math.round((departs + minutes * 60_000) / 60_000) * 60_000);
+  const at = new Date(Math.floor((departs + minutes * 60_000) / 60_000) * 60_000);
   return { iso: at.toISOString(), clock: VIENNA_CLOCK.format(at) };
 }
 

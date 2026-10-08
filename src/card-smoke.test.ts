@@ -701,12 +701,12 @@ describe("show_stop_times", () => {
       line: "U3",
       direction: "H",
     });
-    // 16:38:30 + 2 min and + 3 min, to the minute. The terminus has no run
+    // 16:38:30 + 2 min and + 3 min, seconds cut off. The terminus has no run
     // time in the answer and keeps an empty slot, so the names stay aligned.
-    expect(stopTimes(el)).toEqual(["16:41", "16:42", ""]);
+    expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
     const time = shadow(el).querySelector("time.stops-ahead-time");
-    expect(time?.getAttribute("datetime")).toBe("2026-09-09T14:41:00.000Z");
-    expect(time?.getAttribute("title")).toBe("Voraussichtliche Ankunft 16:41");
+    expect(time?.getAttribute("datetime")).toBe("2026-09-09T14:40:00.000Z");
+    expect(time?.getAttribute("title")).toBe("Voraussichtliche Ankunft 16:40");
   });
 
   it("answers later renders and reopened trails from what it holds", async () => {
@@ -719,7 +719,7 @@ describe("show_stop_times", () => {
     await settle(el);
 
     expect(callWS).toHaveBeenCalledTimes(1);
-    expect(stopTimes(el)).toEqual(["16:41", "16:42", ""]);
+    expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
   });
 
   it("reads the time out on a stop whose row is a button", async () => {
@@ -729,7 +729,7 @@ describe("show_stop_times", () => {
     await openTrail(el);
     const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
     expect(row?.getAttribute("aria-label")).toBe(
-      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:42",
+      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:41",
     );
   });
 
