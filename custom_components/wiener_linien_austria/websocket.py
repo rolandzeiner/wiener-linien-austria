@@ -1,6 +1,6 @@
-"""WebSocket commands behind the route card's ad-hoc From / To mode.
+"""WebSocket commands the cards call: ad-hoc routes and run times.
 
-Two commands, both open to any signed-in user rather than admins only: the
+Three commands, all open to any signed-in user rather than admins only: the
 dashboard that shows the card is often a wall tablet signed in as a regular
 user.
 
@@ -15,6 +15,11 @@ user.
   `max_changes`, `walk_speed`, `excluded_means`, `min_transfer_minutes`,
   `step_free`) with the same defaults. The card sends only `step_free`; each
   distinct combination is its own cache entry.
+- `wiener_linien_austria/run_times` — the scheduled minutes from a stop to
+  every stop ahead, per line and direction, keyed by the stop names the
+  stops-ahead trail prints. The modern card adds them to a departure's time
+  for an estimated arrival at each stop. Only for a stop with a departure
+  board set up; run_times.py says when it costs a request.
 
 Registered once per HA process in `async_setup`. `websocket_api` has no
 deregister hook, so the handlers outlive a removed integration; each one
@@ -37,6 +42,7 @@ from homeassistant.components.websocket_api.decorators import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.util import dt as dt_util
 
 from . import static
 from .adhoc import AdhocRateLimited, async_get_planner
@@ -53,6 +59,7 @@ from .const import (
     ROUTE_TYPES,
     WALK_SPEEDS,
 )
+from .coordinator import WienerLinienAustriaCoordinator
 from .route_coordinator import MAX_TRIPS_PUBLISHED, route_trip_attributes
 from .routing import (
     ROUTE_QUERY_ERRORS,
@@ -60,6 +67,7 @@ from .routing import (
     RoutingError,
     async_routing_zone,
 )
+from .run_times import async_get_run_times
 from .static import StaticCatalogue
 from .stops import stop_options, trackable_station
 
@@ -82,6 +90,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
     """Register the ad-hoc commands (once per HA process)."""
     async_register_command(hass, _websocket_stops)
     async_register_command(hass, _websocket_plan)
+    async_register_command(hass, _websocket_run_times)
 
 
 def _is_loaded(hass: HomeAssistant) -> bool:
@@ -262,6 +271,126 @@ async def _websocket_plan(
             "retry_after": plan.retry_after,
         },
     )
+
+
+@websocket_command(
+    {
+        vol.Required("type"): "wiener_linien_austria/run_times",
+        vol.Required("diva"): vol.Coerce(int),
+        # The line the card is about to show. Only used to decide whether a
+        # line no sample holds is worth one more request.
+        vol.Optional("line"): cv.string,
+        vol.Optional("direction"): vol.In(("H", "R")),
+    }
+)
+@async_response
+async def _websocket_run_times(
+    hass: HomeAssistant,
+    connection: ActiveConnection,
+    msg: dict[str, Any],
+) -> None:
+    """Scheduled minutes from a stop to the stops ahead, per line and direction."""
+    msg_id: int = msg["id"]
+    if not _is_loaded(hass):
+        _send_not_loaded(connection, msg_id)
+        return
+    diva: int = msg["diva"]
+    boards = _stop_boards(hass, diva)
+    if not boards:
+        # Only stops with a departure board: that is what keeps the stops
+        # this can be asked for to the handful someone set up.
+        connection.send_error(
+            msg_id,
+            ERR_INVALID_STOP,
+            f"No departure board for stop {diva}.",
+            translation_domain=DOMAIN,
+            translation_key="adhoc_invalid_stop",
+            translation_placeholders={"diva": str(diva)},
+        )
+        return
+    catalogue = await _async_catalogue(hass, connection, msg_id)
+    if catalogue is None:
+        return
+
+    line, direction = msg.get("line"), msg.get("direction")
+    try:
+        answer = await async_get_run_times(hass).async_get(
+            diva, (line, direction) if line and direction else None
+        )
+    except RoutingError as err:
+        connection.send_error(
+            msg_id,
+            ERR_UPSTREAM,
+            str(err),
+            translation_domain=DOMAIN,
+            translation_key=err.translation_key,
+            translation_placeholders=err.placeholders,
+        )
+        return
+
+    # Keyed by station name, the one thing a trail entry carries. Both
+    # sides read it from the same catalogue row, so the join is exact; a
+    # DIVA the catalogue doesn't know has no trail entry to join either.
+    run_times: dict[str, dict[str, int]] = {}
+    for (label, way), minutes_by_diva in answer.pairs.items():
+        named: dict[str, int] = {}
+        for stop_diva, minutes in minutes_by_diva.items():
+            station = catalogue.stations_by_diva.get(stop_diva)
+            if station is not None:
+                named.setdefault(station.name, minutes)
+        if named:
+            run_times[f"{label}|{way}"] = named
+    now = dt_util.utcnow()
+    for board in boards:
+        run_times.update(_timetable_run_times(board, now))
+
+    connection.send_result(
+        msg_id,
+        {
+            "diva": diva,
+            "fetched_at": answer.fetched_at.isoformat() if answer.fetched_at else None,
+            "valid_until": answer.valid_until.isoformat(),
+            "run_times": run_times,
+            "attribution": ATTRIBUTION,
+        },
+    )
+
+
+def _stop_boards(
+    hass: HomeAssistant, diva: int
+) -> list[WienerLinienAustriaCoordinator]:
+    """The loaded departure boards at a stop."""
+    return [
+        coordinator
+        for entry in hass.config_entries.async_loaded_entries(DOMAIN)
+        if isinstance(coordinator := entry.runtime_data, WienerLinienAustriaCoordinator)
+        and coordinator.diva == diva
+    ]
+
+
+def _timetable_run_times(
+    board: WienerLinienAustriaCoordinator, now: datetime
+) -> dict[str, dict[str, int]]:
+    """Run times of a board's S-Bahn lines, from the rows it already holds.
+
+    The run-time request leaves the S-Bahn out; the board's timetable rows
+    carry each train's stops with their times, so the next train of every
+    picked line and direction stands for it. No request.
+    """
+    timetable = board.timetable
+    if timetable is None:
+        return {}
+    run_times: dict[str, dict[str, int]] = {}
+    for dep in timetable.departures:
+        key = f"{dep.line}|{dep.direction}"
+        if key in run_times or dep.planned < now:
+            continue
+        named = {
+            stop.name: stop.minutes for stop in dep.stops if stop.minutes is not None
+        }
+        if named:
+            run_times[key] = named
+    return run_times
 
 
 async def _async_vienna_time(value: datetime | None) -> datetime | None:

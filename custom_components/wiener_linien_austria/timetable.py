@@ -17,15 +17,19 @@ lines run low (see `TimetableBoard.is_due`). Normally one request per
 A stop's S-Bahn lines are opted into through the line picker like any
 other line (`S1|R`), which is also what keeps them in `tracked_lines`, the
 list the cards filter departures against.
+
+The same request, asked for other modes, is where the scheduled run times
+to the stops ahead come from (`parse_run_times`, used by run_times.py).
 """
 
 from __future__ import annotations
 
 import logging
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, tzinfo
+from statistics import median
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -33,6 +37,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
 from .const import (
+    GTFS_LINE_LABEL_ALIASES,
     LINE_TYPE_S_BAHN,
     ROUTING_DEPARTURE_ENDPOINT,
     TIMETABLE_DEPARTURES_REQUESTED,
@@ -44,7 +49,12 @@ from .const import (
 )
 from .parsing import as_mapping, as_text, s_bahn_number
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
-from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
+from .routing import (
+    RoutingError,
+    async_fetch_trip_body,
+    async_routing_zone,
+    parse_compact_stamp,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,6 +73,10 @@ class PlannedStop:
     # The stop's DIVA, which joins it to the Wiener Linien catalogue for
     # transfer lines. None when the server sends none.
     stop_id: int | None
+    # Scheduled minutes from this train's departure here to its arrival
+    # there. None when the request didn't say when the train leaves, or the
+    # server sent no time for the stop.
+    minutes: int | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -86,8 +100,12 @@ def build_departure_params(
     *,
     with_stops: bool = False,
     at: datetime | None = None,
+    excluded_mots: Sequence[str] = _EXCLUDED_MOTS,
 ) -> list[tuple[str, str]]:
     """Query string for the next `limit` S-Bahn departures at a stop.
+
+    `excluded_mots` are the EFA mode codes to leave out, by default all but
+    the S-Bahn. run_times.py asks for the U-Bahn, trams and buses instead.
 
     `with_stops` adds each train's stop sequence (`includeCompleteStopSeq`),
     for the stops-ahead trail. It costs about 10 KB per train before gzip,
@@ -108,7 +126,7 @@ def build_departure_params(
         ("depType", "stopEvents"),
         ("excludedMeans", "checkbox"),
     ]
-    params.extend((f"exclMOT_{code}", "1") for code in _EXCLUDED_MOTS)
+    params.extend((f"exclMOT_{code}", "1") for code in excluded_mots)
     if with_stops:
         params.append(("includeCompleteStopSeq", "1"))
     if at is not None:
@@ -159,7 +177,7 @@ def parse_departure_body(
                 or "",
                 platform=as_text(row.get("platformName")),
                 planned=planned,
-                stops=_onward_stops(row.get("onwardStopSeq")),
+                stops=_onward_stops(row.get("onwardStopSeq"), planned),
             )
         )
     departures.sort(key=lambda dep: (dep.planned, dep.line))
@@ -201,6 +219,55 @@ def parse_calling_points(body: Mapping[str, Any]) -> dict[int, set[str]]:
             if stop_id is not None:
                 lines_at.setdefault(stop_id, set()).add(label)
     return lines_at
+
+
+def parse_run_times(
+    body: Mapping[str, Any], tz: tzinfo
+) -> dict[tuple[str, str], dict[int, int]]:
+    """Scheduled minutes to every stop ahead, per line and direction.
+
+    Out of a departure-monitor answer with stop sequences, for any mode:
+    `(line, direction)` → DIVA → minutes from departing here. Each row is one
+    vehicle's run; the median over a pair's rows evens out the minute the
+    timetable's rounding moves a stop by from one departure to the next. A
+    median of x.5 rounds up: Python's round-half-even would put two stops
+    in a row on the same minute (1.5 and 2.5 both giving 2).
+    Runs that end early (a U1 to Alaudagasse among Oberlaa trains) simply
+    contribute fewer stops. A stop a run passes twice counts once, at its
+    first call.
+
+    The label is mapped onto `/monitor`'s where the two differ, so the
+    Badner Bahn comes out as "WLB". Rows without a line, a direction or a
+    readable time are skipped, and so are points without a numeric id.
+    """
+    raw = body.get("departureList")
+    if isinstance(raw, Mapping):
+        raw = [raw.get("departure")]
+    if not isinstance(raw, list):
+        return {}
+    samples: dict[tuple[str, str], dict[int, list[int]]] = {}
+    for row in raw:
+        if not isinstance(row, Mapping):
+            continue
+        line = as_mapping(row.get("servingLine"))
+        label = as_text(line.get("number"))
+        direction = as_text(as_mapping(line.get("liErgRiProj")).get("direction"))
+        departs = _parse_date_time(row.get("dateTime"), tz)
+        if label is None or direction is None or departs is None:
+            continue
+        label = GTFS_LINE_LABEL_ALIASES.get(label, label)
+        per_stop = samples.setdefault((label, direction), {})
+        seen: set[int] = set()
+        for stop in _onward_stops(row.get("onwardStopSeq"), departs):
+            if stop.stop_id is None or stop.minutes is None or stop.stop_id in seen:
+                continue
+            seen.add(stop.stop_id)
+            per_stop.setdefault(stop.stop_id, []).append(stop.minutes)
+    return {
+        pair: {diva: int(median(minutes) + 0.5) for diva, minutes in per_stop.items()}
+        for pair, per_stop in samples.items()
+        if per_stop
+    }
 
 
 def picker_rows(departures: list[PlannedDeparture]) -> list[dict[str, str]]:
@@ -414,10 +481,15 @@ def _has_stop_invalid(message: Any) -> bool:
     )
 
 
-def _onward_stops(raw: Any) -> tuple[PlannedStop, ...]:
+def _onward_stops(raw: Any, departs: datetime | None = None) -> tuple[PlannedStop, ...]:
     """The stops after this one, named the way the boards name a terminus.
 
     A single onward stop arrives as a bare point, not a one-element list.
+
+    With `departs`, the train's departure here, each stop also gets the
+    scheduled minutes until it arrives there (`ref.arrDateTime`, or the
+    departure where the server gives no arrival). A time before `departs`
+    is dropped rather than shown as a negative run.
     """
     if isinstance(raw, Mapping):
         raw = [raw]
@@ -430,14 +502,28 @@ def _onward_stops(raw: Any) -> tuple[PlannedStop, ...]:
         name = _towards(as_text(point.get("name")))
         if not name:
             continue
-        stop_id = as_text(as_mapping(point.get("ref")).get("id"))
+        ref = as_mapping(point.get("ref"))
+        stop_id = as_text(ref.get("id"))
         stops.append(
             PlannedStop(
                 name=name,
                 stop_id=int(stop_id) if stop_id and stop_id.isdigit() else None,
+                minutes=_minutes_after(departs, ref),
             )
         )
     return tuple(stops)
+
+
+def _minutes_after(departs: datetime | None, ref: Mapping[str, Any]) -> int | None:
+    """Whole minutes from `departs` to the arrival a stop's `ref` gives."""
+    if departs is None:
+        return None
+    arrives = parse_compact_stamp(
+        ref.get("arrDateTime") or ref.get("depDateTime"), departs.tzinfo
+    )
+    if arrives is None or arrives < departs:
+        return None
+    return round((arrives - departs).total_seconds() / 60)
 
 
 def _parse_date_time(raw: Any, tz: tzinfo) -> datetime | None:

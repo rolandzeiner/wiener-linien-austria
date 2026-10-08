@@ -342,6 +342,55 @@ TIMETABLE_MIN_UPCOMING: Final = 6
 # rows it has meanwhile, so a slower retry costs nothing visible.
 TIMETABLE_RETRY_AFTER: Final = timedelta(minutes=5)
 
+# Scheduled run times from a stop to the stops ahead (run_times.py), from the
+# same departure monitor. `/monitor` says when a vehicle leaves this stop and
+# nothing about the stops after it; the timetable's stop sequences do, so a
+# card adds the two up into an estimated arrival at each stop.
+# --- Upstream capabilities, measured 2026-10-08 -------------------
+#   XML_DM_REQUEST (outputFormat=JSON), U-Bahn, tram and bus only, 60 rows
+#   with stop sequences: Praterstern 93 KB wire / 769 KB identity, Karlsplatz
+#   104 / 831, ~0.4 s. One answer holds every line and direction at the
+#   stop: 10 pairs at Praterstern across 35 min, 9 at Karlsplatz across 36.
+#   Nearly all of a row is the stops already passed (`prevStopSeq`, 23 KB of
+#   a 24 KB row), which the request can't leave out.
+#   Each onward point carries `ref.arrDateTime` to the minute (the `...Sec`
+#   variants always end in `:00`) and `ref.id`, the catalogue's DIVA.
+#   `liErgRiProj.direction` is `/monitor`'s `H` / `R`. No realtime
+#   (`realtime: "0"`, `arrDelay: "0"`), same as the S-Bahn rows.
+#   The Badner Bahn is `number: "BB"` here, as in GTFS, where `/monitor`
+#   says "WLB"; `GTFS_LINE_LABEL_ALIASES` covers both.
+#   Minutes from Praterstern to the terminus, by time of day (a Friday):
+#
+#     line                 05:30  08:00  12:20  19:00  20:30  23:30
+#     U1  Leopoldau           15     15     14     15     15     15
+#     U2  Seestadt            19     19     19     19     20     19
+#     5   Westbahnhof         35     38     38     36     35     33
+#     O   Raxstraße           32     35     35     33     31     32
+#     80A Schlachthausgasse   15     18     16     16     15     15
+#     5B  Heiligenstadt       25     26     23     23     22     22
+#
+#   The U-Bahn keeps one timetable all day. Trams and buses get two to five
+#   minutes more across a whole line in daytime traffic, and are back on
+#   the faster one by 19:00.
+# ----------------------------------------------------------------
+# Rows per request. The answer can't be narrowed to a line, so the rows have
+# to span enough time for every line at the stop to turn up once; 60 reached
+# 35 minutes at both hubs above. A line that runs less often than that is
+# picked up by the top-up below.
+RUN_TIME_DEPARTURES_REQUESTED: Final = 60
+# A sample is refetched once it is this old, and only when a card asks.
+# Run times change with the timetable, which a week covers.
+RUN_TIME_MAX_AGE: Final = timedelta(days=7)
+# A sample stands for the part of the day it was taken in: these Vienna
+# hours are the daytime timetable, the rest the evening and night one (see
+# the table above). So a stop costs one request a week, and a second only
+# when its trail is opened in the other part too.
+RUN_TIME_DAY_HOURS: Final = (6, 19)
+# A line the card asks about that no sample holds earns one more request,
+# once per line and sample, and no sooner than this after the last one for
+# the stop: a sample minutes old would only return the same rows.
+RUN_TIME_TOP_UP_AFTER: Final = timedelta(hours=1)
+
 # The timetable server speaks Vienna wall-clock time with no offset, no
 # matter which zone Home Assistant itself is configured in.
 ROUTING_TIME_ZONE: Final = "Europe/Vienna"

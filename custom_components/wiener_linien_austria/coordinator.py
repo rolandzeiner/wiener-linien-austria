@@ -287,6 +287,11 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         return list(self._rbls)
 
     @property
+    def diva(self) -> int:
+        """The stop this board is for."""
+        return self._diva
+
+    @property
     def entry_id(self) -> str:
         """The config entry id this coordinator serves (batch member key)."""
         return self._entry.entry_id

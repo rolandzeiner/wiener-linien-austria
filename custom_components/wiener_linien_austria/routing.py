@@ -700,13 +700,13 @@ def _intermediate_stops(stop_seq: Any, tz: Any) -> tuple[LegStop, ...]:
             LegStop(
                 name=_strip_place(as_text(raw.get("name"))) or "",
                 stop_id=as_text(ref.get("id")),
-                time=_parse_compact_stamp(stamp, tz),
+                time=parse_compact_stamp(stamp, tz),
             )
         )
     return tuple(stops)
 
 
-def _parse_compact_stamp(value: Any, tz: Any) -> datetime | None:
+def parse_compact_stamp(value: Any, tz: Any) -> datetime | None:
     """`20260915 06:19` in the server's zone → aware datetime."""
     if not isinstance(value, str):
         return None

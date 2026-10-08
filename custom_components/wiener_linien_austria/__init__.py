@@ -57,6 +57,7 @@ from .rate_limit import (
     ROUTING_LOCK_LOOP_KEY,
 )
 from .route_coordinator import WienerLinienRouteCoordinator, route_device_info
+from .run_times import RUN_TIMES_KEY
 from .s_bahn_network import (
     S_BAHN_NETWORK_KEY,
     S_BAHN_NETWORK_TASK_KEY,
@@ -485,6 +486,9 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         STOPS_CACHE_KEY,
         # Live rows and leases name the stops routes and dashboards use.
         LIVE_BOARD_KEY,
+        # The samples stay in their Store; a request still on the wire
+        # finishes and saves into it.
+        RUN_TIMES_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)

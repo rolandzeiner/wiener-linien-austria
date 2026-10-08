@@ -1,0 +1,3334 @@
+{
+ "departureList": [
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "19"
+   },
+   "servingLine": {
+    "number": "O",
+    "motType": "4",
+    "direction": "Wien Bruno-Marek-Allee",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nordbahnstraße",
+     "ref": {
+      "id": "60200941",
+      "arrDateTime": "20261008 12:22",
+      "depDateTime": "20261008 12:22"
+     }
+    },
+    {
+     "name": "Wien Krakauer Straße",
+     "ref": {
+      "id": "60201918",
+      "arrDateTime": "20261008 12:23",
+      "depDateTime": "20261008 12:23"
+     }
+    },
+    {
+     "name": "Wien Bruno-Marek-Allee (Taborstraße)",
+     "ref": {
+      "id": "60201919",
+      "arrDateTime": "20261008 12:26"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "20"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Karlsplatz",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Taborstraße",
+     "ref": {
+      "id": "60201891",
+      "arrDateTime": "20261008 12:21",
+      "depDateTime": "20261008 12:21"
+     }
+    },
+    {
+     "name": "Wien Schottenring",
+     "ref": {
+      "id": "60201182",
+      "arrDateTime": "20261008 12:22",
+      "depDateTime": "20261008 12:22"
+     }
+    },
+    {
+     "name": "Wien Schottentor",
+     "ref": {
+      "id": "60201184",
+      "arrDateTime": "20261008 12:24",
+      "depDateTime": "20261008 12:24"
+     }
+    },
+    {
+     "name": "Wien Rathaus",
+     "ref": {
+      "id": "60201072",
+      "arrDateTime": "20261008 12:26",
+      "depDateTime": "20261008 12:26"
+     }
+    },
+    {
+     "name": "Wien Volkstheater",
+     "ref": {
+      "id": "60201430",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Museumsquartier",
+     "ref": {
+      "id": "60200835",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:31"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "21"
+   },
+   "servingLine": {
+    "number": "5B",
+    "motType": "5",
+    "direction": "Wien Heiligenstadt",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Rueppgasse",
+     "ref": {
+      "id": "60201130",
+      "arrDateTime": "20261008 12:23",
+      "depDateTime": "20261008 12:23"
+     }
+    },
+    {
+     "name": "Wien Volkertplatz",
+     "ref": {
+      "id": "60201876",
+      "arrDateTime": "20261008 12:24",
+      "depDateTime": "20261008 12:24"
+     }
+    },
+    {
+     "name": "Wien Heinestraße",
+     "ref": {
+      "id": "60200494",
+      "arrDateTime": "20261008 12:26",
+      "depDateTime": "20261008 12:26"
+     }
+    },
+    {
+     "name": "Wien Taborstraße (Obere Augartenstraße)",
+     "ref": {
+      "id": "60201891",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Obere Augartenstraße",
+     "ref": {
+      "id": "60200961",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Gaußplatz (Jägerstraße)",
+     "ref": {
+      "id": "60200380",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Wallensteinplatz",
+     "ref": {
+      "id": "60201443",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Brigittaplatz",
+     "ref": {
+      "id": "60200170",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Jägerstraße",
+     "ref": {
+      "id": "60201667",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Wexstraße (Klosterneuburger Straße)",
+     "ref": {
+      "id": "60201470",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Gürtelbrücke",
+     "ref": {
+      "id": "60200692",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Döblinger Steg",
+     "ref": {
+      "id": "60200254",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Heiligenstädter Brücke",
+     "ref": {
+      "id": "60200493",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Muthgasse",
+     "ref": {
+      "id": "60200897",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Michael-Neumann-Gasse",
+     "ref": {
+      "id": "60201351",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Heiligenstadt (Mooslackengasse)",
+     "ref": {
+      "id": "60200491",
+      "arrDateTime": "20261008 12:44"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "21"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Leopoldau",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vorgartenstraße",
+     "ref": {
+      "id": "60201433",
+      "arrDateTime": "20261008 12:22",
+      "depDateTime": "20261008 12:22"
+     }
+    },
+    {
+     "name": "Wien Donauinsel",
+     "ref": {
+      "id": "60200234",
+      "arrDateTime": "20261008 12:24",
+      "depDateTime": "20261008 12:24"
+     }
+    },
+    {
+     "name": "Wien Kaisermühlen-VIC",
+     "ref": {
+      "id": "60200641",
+      "arrDateTime": "20261008 12:25",
+      "depDateTime": "20261008 12:25"
+     }
+    },
+    {
+     "name": "Wien Alte Donau",
+     "ref": {
+      "id": "60200031",
+      "arrDateTime": "20261008 12:26",
+      "depDateTime": "20261008 12:26"
+     }
+    },
+    {
+     "name": "Wien Kagran",
+     "ref": {
+      "id": "60200627",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Kagraner Platz",
+     "ref": {
+      "id": "60200633",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Rennbahnweg",
+     "ref": {
+      "id": "60201860",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Aderklaaer Straße",
+     "ref": {
+      "id": "60201858",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Großfeldsiedlung",
+     "ref": {
+      "id": "60201859",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Leopoldau",
+     "ref": {
+      "id": "60200769",
+      "arrDateTime": "20261008 12:35"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "22"
+   },
+   "servingLine": {
+    "number": "5",
+    "motType": "4",
+    "direction": "Wien Westbahnhof",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nordbahnstraße",
+     "ref": {
+      "id": "60200941",
+      "arrDateTime": "20261008 12:25",
+      "depDateTime": "20261008 12:25"
+     }
+    },
+    {
+     "name": "Wien Am Tabor",
+     "ref": {
+      "id": "60200051",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Nordwestbahnstraße",
+     "ref": {
+      "id": "60200944",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Rauscherstraße",
+     "ref": {
+      "id": "60201077",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Wallensteinplatz",
+     "ref": {
+      "id": "60201443",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Klosterneuburger Straße/Wallensteinstraße",
+     "ref": {
+      "id": "60201444",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Friedensbrücke",
+     "ref": {
+      "id": "60200357",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Franz-Josefs-Bahnhof (Julius-Tandler-Platz)",
+     "ref": {
+      "id": "60200345",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Alserbachstraße",
+     "ref": {
+      "id": "60200029",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Spitalgasse",
+     "ref": {
+      "id": "60201288",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Lazarettgasse",
+     "ref": {
+      "id": "60200762",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Lange Gasse",
+     "ref": {
+      "id": "60200747",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Laudongasse",
+     "ref": {
+      "id": "60200753",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Florianigasse",
+     "ref": {
+      "id": "60200333",
+      "arrDateTime": "20261008 12:48",
+      "depDateTime": "20261008 12:48"
+     }
+    },
+    {
+     "name": "Wien Albertgasse",
+     "ref": {
+      "id": "60200019",
+      "arrDateTime": "20261008 12:49",
+      "depDateTime": "20261008 12:49"
+     }
+    },
+    {
+     "name": "Wien Blindengasse",
+     "ref": {
+      "id": "60200148",
+      "arrDateTime": "20261008 12:51",
+      "depDateTime": "20261008 12:51"
+     }
+    },
+    {
+     "name": "Wien Lerchenfelder Straße (Blindengasse)",
+     "ref": {
+      "id": "60201558",
+      "arrDateTime": "20261008 12:52",
+      "depDateTime": "20261008 12:52"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße/Neustiftgasse",
+     "ref": {
+      "id": "60200645",
+      "arrDateTime": "20261008 12:54",
+      "depDateTime": "20261008 12:54"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße/Burggasse",
+     "ref": {
+      "id": "60200644",
+      "arrDateTime": "20261008 12:55",
+      "depDateTime": "20261008 12:55"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße",
+     "ref": {
+      "id": "60200646",
+      "arrDateTime": "20261008 12:56",
+      "depDateTime": "20261008 12:56"
+     }
+    },
+    {
+     "name": "Wien Stollgasse",
+     "ref": {
+      "id": "60201328",
+      "arrDateTime": "20261008 12:58",
+      "depDateTime": "20261008 12:58"
+     }
+    },
+    {
+     "name": "Wien Westbahnhof (Neubaugürtel)",
+     "ref": {
+      "id": "60201468",
+      "arrDateTime": "20261008 13:00"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "22"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Aspernstraße",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Messe-Prater",
+     "ref": {
+      "id": "60201892",
+      "arrDateTime": "20261008 12:23",
+      "depDateTime": "20261008 12:23"
+     }
+    },
+    {
+     "name": "Wien Krieau",
+     "ref": {
+      "id": "60201893",
+      "arrDateTime": "20261008 12:25",
+      "depDateTime": "20261008 12:25"
+     }
+    },
+    {
+     "name": "Wien Stadion",
+     "ref": {
+      "id": "60201894",
+      "arrDateTime": "20261008 12:26",
+      "depDateTime": "20261008 12:26"
+     }
+    },
+    {
+     "name": "Wien Donaumarina",
+     "ref": {
+      "id": "60200282",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Donaustadtbrücke",
+     "ref": {
+      "id": "60200290",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Stadlau",
+     "ref": {
+      "id": "60201299",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Hardeggasse",
+     "ref": {
+      "id": "60200473",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Donauspital",
+     "ref": {
+      "id": "60201278",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Aspernstraße",
+     "ref": {
+      "id": "60200299",
+      "arrDateTime": "20261008 12:35"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "22"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Alaudagasse",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nestroyplatz",
+     "ref": {
+      "id": "60200916",
+      "arrDateTime": "20261008 12:23",
+      "depDateTime": "20261008 12:23"
+     }
+    },
+    {
+     "name": "Wien Schwedenplatz",
+     "ref": {
+      "id": "60201198",
+      "arrDateTime": "20261008 12:24",
+      "depDateTime": "20261008 12:24"
+     }
+    },
+    {
+     "name": "Wien Stephansplatz",
+     "ref": {
+      "id": "60201320",
+      "arrDateTime": "20261008 12:25",
+      "depDateTime": "20261008 12:25"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Taubstummengasse",
+     "ref": {
+      "id": "60201366",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Südtiroler Pl. - Hbf.",
+     "ref": {
+      "id": "60201349",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Keplerplatz",
+     "ref": {
+      "id": "60200666",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Reumannplatz",
+     "ref": {
+      "id": "60201095",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Troststraße",
+     "ref": {
+      "id": "60201573",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Altes Landgut",
+     "ref": {
+      "id": "60200033",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Alaudagasse",
+     "ref": {
+      "id": "60200014",
+      "arrDateTime": "20261008 12:37"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "24"
+   },
+   "servingLine": {
+    "number": "80A",
+    "motType": "5",
+    "direction": "Wien Schlachthausgasse",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vivariumstraße",
+     "ref": {
+      "id": "60201427",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Kurzbauergasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200730",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Josef-Gall-Gasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200609",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Wittelsbachstraße (Böcklinstraße)",
+     "ref": {
+      "id": "60201497",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Friedensgasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200359",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Lukschgasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200817",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Rustenschacherallee",
+     "ref": {
+      "id": "60201549",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Wasserwiese",
+     "ref": {
+      "id": "60201568",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Ludwig-Koeßler-Platz (Schnirchgasse)",
+     "ref": {
+      "id": "60200821",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Schlachthausgasse (Markhofgasse)",
+     "ref": {
+      "id": "60201199",
+      "arrDateTime": "20261008 12:40"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "25"
+   },
+   "servingLine": {
+    "number": "O",
+    "motType": "4",
+    "direction": "Wien Raxstraße",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Franzensbrücke",
+     "ref": {
+      "id": "60200348",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Radetzkyplatz (Radetzkystraße)",
+     "ref": {
+      "id": "60201063",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Hintere Zollamtsstraße",
+     "ref": {
+      "id": "60200527",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Marxergasse",
+     "ref": {
+      "id": "60200845",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Mitte-Landstraße (Invalidenstraße)",
+     "ref": {
+      "id": "60200743",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Sechskrügelgasse",
+     "ref": {
+      "id": "60201218",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Ungargasse/Neulinggasse",
+     "ref": {
+      "id": "60200929",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Rennweg (Ungargasse)",
+     "ref": {
+      "id": "60201091",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Kölblgasse",
+     "ref": {
+      "id": "60200736",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Fasangasse",
+     "ref": {
+      "id": "60200300",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Quartier Belvedere (Wiedner Gürtel)",
+     "ref": {
+      "id": "60201346",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Hauptbahnhof (Wiedner Gürtel)",
+     "ref": {
+      "id": "60201349",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Columbusplatz",
+     "ref": {
+      "id": "60200211",
+      "arrDateTime": "20261008 12:50",
+      "depDateTime": "20261008 12:50"
+     }
+    },
+    {
+     "name": "Wien Laxenburger Straße/Gudrunstraße",
+     "ref": {
+      "id": "60200136",
+      "arrDateTime": "20261008 12:52",
+      "depDateTime": "20261008 12:52"
+     }
+    },
+    {
+     "name": "Wien Quellenplatz",
+     "ref": {
+      "id": "60201058",
+      "arrDateTime": "20261008 12:53",
+      "depDateTime": "20261008 12:53"
+     }
+    },
+    {
+     "name": "Wien Arthaberplatz",
+     "ref": {
+      "id": "60200086",
+      "arrDateTime": "20261008 12:54",
+      "depDateTime": "20261008 12:54"
+     }
+    },
+    {
+     "name": "Wien Laxenburger Straße/Troststraße",
+     "ref": {
+      "id": "60200760",
+      "arrDateTime": "20261008 12:56",
+      "depDateTime": "20261008 12:56"
+     }
+    },
+    {
+     "name": "Wien Troststraße/Neilreichgasse",
+     "ref": {
+      "id": "60201393",
+      "arrDateTime": "20261008 12:58",
+      "depDateTime": "20261008 12:58"
+     }
+    },
+    {
+     "name": "Wien Raxstraße (Rudolfshügelgasse)",
+     "ref": {
+      "id": "60201078",
+      "arrDateTime": "20261008 13:00",
+      "depDateTime": "20261008 13:00"
+     }
+    },
+    {
+     "name": "Wien Raxstraße (Migerkastraße)",
+     "ref": {
+      "id": "60201078",
+      "arrDateTime": "20261008 13:01"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "25"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Karlsplatz",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Taborstraße",
+     "ref": {
+      "id": "60201891",
+      "arrDateTime": "20261008 12:26",
+      "depDateTime": "20261008 12:26"
+     }
+    },
+    {
+     "name": "Wien Schottenring",
+     "ref": {
+      "id": "60201182",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Schottentor",
+     "ref": {
+      "id": "60201184",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Rathaus",
+     "ref": {
+      "id": "60201072",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Volkstheater",
+     "ref": {
+      "id": "60201430",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Museumsquartier",
+     "ref": {
+      "id": "60200835",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:36"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "25"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Leopoldau",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vorgartenstraße",
+     "ref": {
+      "id": "60201433",
+      "arrDateTime": "20261008 12:26",
+      "depDateTime": "20261008 12:26"
+     }
+    },
+    {
+     "name": "Wien Donauinsel",
+     "ref": {
+      "id": "60200234",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Kaisermühlen-VIC",
+     "ref": {
+      "id": "60200641",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Alte Donau",
+     "ref": {
+      "id": "60200031",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Kagran",
+     "ref": {
+      "id": "60200627",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Kagraner Platz",
+     "ref": {
+      "id": "60200633",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Rennbahnweg",
+     "ref": {
+      "id": "60201860",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Aderklaaer Straße",
+     "ref": {
+      "id": "60201858",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Großfeldsiedlung",
+     "ref": {
+      "id": "60201859",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Leopoldau",
+     "ref": {
+      "id": "60200769",
+      "arrDateTime": "20261008 12:39"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "26"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Oberlaa",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nestroyplatz",
+     "ref": {
+      "id": "60200916",
+      "arrDateTime": "20261008 12:27",
+      "depDateTime": "20261008 12:27"
+     }
+    },
+    {
+     "name": "Wien Schwedenplatz",
+     "ref": {
+      "id": "60201198",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Stephansplatz",
+     "ref": {
+      "id": "60201320",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Taubstummengasse",
+     "ref": {
+      "id": "60201366",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Südtiroler Pl. - Hbf.",
+     "ref": {
+      "id": "60201349",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Keplerplatz",
+     "ref": {
+      "id": "60200666",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Reumannplatz",
+     "ref": {
+      "id": "60201095",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Troststraße",
+     "ref": {
+      "id": "60201573",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Altes Landgut",
+     "ref": {
+      "id": "60200033",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Alaudagasse",
+     "ref": {
+      "id": "60200014",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Neulaa",
+     "ref": {
+      "id": "60201481",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Oberlaa",
+     "ref": {
+      "id": "60200949",
+      "arrDateTime": "20261008 12:45"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "27"
+   },
+   "servingLine": {
+    "number": "O",
+    "motType": "4",
+    "direction": "Wien Bruno-Marek-Allee",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nordbahnstraße",
+     "ref": {
+      "id": "60200941",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Krakauer Straße",
+     "ref": {
+      "id": "60201918",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Bruno-Marek-Allee (Taborstraße)",
+     "ref": {
+      "id": "60201919",
+      "arrDateTime": "20261008 12:33"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "27"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Seestadt",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Messe-Prater",
+     "ref": {
+      "id": "60201892",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Krieau",
+     "ref": {
+      "id": "60201893",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Stadion",
+     "ref": {
+      "id": "60201894",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Donaumarina",
+     "ref": {
+      "id": "60200282",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Donaustadtbrücke",
+     "ref": {
+      "id": "60200290",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Stadlau",
+     "ref": {
+      "id": "60201299",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Hardeggasse",
+     "ref": {
+      "id": "60200473",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Donauspital",
+     "ref": {
+      "id": "60201278",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Aspernstraße",
+     "ref": {
+      "id": "60200299",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Lina-Loos-Platz",
+     "ref": {
+      "id": "60201973",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Hausfeldstraße",
+     "ref": {
+      "id": "60200487",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Aspern Nord",
+     "ref": {
+      "id": "60200910",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Seestadt",
+     "ref": {
+      "id": "60200942",
+      "arrDateTime": "20261008 12:46"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "27"
+   },
+   "servingLine": {
+    "number": "82A",
+    "motType": "5",
+    "direction": "Wien Krieau",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Joseph-Roth-Gasse",
+     "ref": {
+      "id": "60201747",
+      "arrDateTime": "20261008 12:28",
+      "depDateTime": "20261008 12:28"
+     }
+    },
+    {
+     "name": "Wien Leopold-Moses-Gasse",
+     "ref": {
+      "id": "60201897",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Jakov-Lind-Straße",
+     "ref": {
+      "id": "60200709",
+      "arrDateTime": "20261008 12:30",
+      "depDateTime": "20261008 12:30"
+     }
+    },
+    {
+     "name": "Wien Harkortstraße",
+     "ref": {
+      "id": "60201898",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Erlafstraße",
+     "ref": {
+      "id": "60201901",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Messe-Prater (Wohlmutstraße)",
+     "ref": {
+      "id": "60201892",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Elderschplatz (Vorgartenstraße)",
+     "ref": {
+      "id": "60200274",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Krieau",
+     "ref": {
+      "id": "60201893",
+      "arrDateTime": "20261008 12:38"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "28"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Leopoldau",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vorgartenstraße",
+     "ref": {
+      "id": "60201433",
+      "arrDateTime": "20261008 12:29",
+      "depDateTime": "20261008 12:29"
+     }
+    },
+    {
+     "name": "Wien Donauinsel",
+     "ref": {
+      "id": "60200234",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Kaisermühlen-VIC",
+     "ref": {
+      "id": "60200641",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Alte Donau",
+     "ref": {
+      "id": "60200031",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Kagran",
+     "ref": {
+      "id": "60200627",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Kagraner Platz",
+     "ref": {
+      "id": "60200633",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Rennbahnweg",
+     "ref": {
+      "id": "60201860",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Aderklaaer Straße",
+     "ref": {
+      "id": "60201858",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Großfeldsiedlung",
+     "ref": {
+      "id": "60201859",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Leopoldau",
+     "ref": {
+      "id": "60200769",
+      "arrDateTime": "20261008 12:43"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "29"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Alaudagasse",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nestroyplatz",
+     "ref": {
+      "id": "60200916",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Schwedenplatz",
+     "ref": {
+      "id": "60201198",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Stephansplatz",
+     "ref": {
+      "id": "60201320",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Taubstummengasse",
+     "ref": {
+      "id": "60201366",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Südtiroler Pl. - Hbf.",
+     "ref": {
+      "id": "60201349",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Keplerplatz",
+     "ref": {
+      "id": "60200666",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Reumannplatz",
+     "ref": {
+      "id": "60201095",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Troststraße",
+     "ref": {
+      "id": "60201573",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Altes Landgut",
+     "ref": {
+      "id": "60200033",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Alaudagasse",
+     "ref": {
+      "id": "60200014",
+      "arrDateTime": "20261008 12:45"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "30"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Karlsplatz",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Taborstraße",
+     "ref": {
+      "id": "60201891",
+      "arrDateTime": "20261008 12:31",
+      "depDateTime": "20261008 12:31"
+     }
+    },
+    {
+     "name": "Wien Schottenring",
+     "ref": {
+      "id": "60201182",
+      "arrDateTime": "20261008 12:32",
+      "depDateTime": "20261008 12:32"
+     }
+    },
+    {
+     "name": "Wien Schottentor",
+     "ref": {
+      "id": "60201184",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Rathaus",
+     "ref": {
+      "id": "60201072",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Volkstheater",
+     "ref": {
+      "id": "60201430",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Museumsquartier",
+     "ref": {
+      "id": "60200835",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:41"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "30"
+   },
+   "servingLine": {
+    "number": "5",
+    "motType": "4",
+    "direction": "Wien Westbahnhof",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nordbahnstraße",
+     "ref": {
+      "id": "60200941",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Am Tabor",
+     "ref": {
+      "id": "60200051",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Nordwestbahnstraße",
+     "ref": {
+      "id": "60200944",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Rauscherstraße",
+     "ref": {
+      "id": "60201077",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Wallensteinplatz",
+     "ref": {
+      "id": "60201443",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Klosterneuburger Straße/Wallensteinstraße",
+     "ref": {
+      "id": "60201444",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Friedensbrücke",
+     "ref": {
+      "id": "60200357",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Franz-Josefs-Bahnhof (Julius-Tandler-Platz)",
+     "ref": {
+      "id": "60200345",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Alserbachstraße",
+     "ref": {
+      "id": "60200029",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Spitalgasse",
+     "ref": {
+      "id": "60201288",
+      "arrDateTime": "20261008 12:49",
+      "depDateTime": "20261008 12:49"
+     }
+    },
+    {
+     "name": "Wien Lazarettgasse",
+     "ref": {
+      "id": "60200762",
+      "arrDateTime": "20261008 12:51",
+      "depDateTime": "20261008 12:51"
+     }
+    },
+    {
+     "name": "Wien Lange Gasse",
+     "ref": {
+      "id": "60200747",
+      "arrDateTime": "20261008 12:53",
+      "depDateTime": "20261008 12:53"
+     }
+    },
+    {
+     "name": "Wien Laudongasse",
+     "ref": {
+      "id": "60200753",
+      "arrDateTime": "20261008 12:54",
+      "depDateTime": "20261008 12:54"
+     }
+    },
+    {
+     "name": "Wien Florianigasse",
+     "ref": {
+      "id": "60200333",
+      "arrDateTime": "20261008 12:55",
+      "depDateTime": "20261008 12:55"
+     }
+    },
+    {
+     "name": "Wien Albertgasse",
+     "ref": {
+      "id": "60200019",
+      "arrDateTime": "20261008 12:57",
+      "depDateTime": "20261008 12:57"
+     }
+    },
+    {
+     "name": "Wien Blindengasse",
+     "ref": {
+      "id": "60200148",
+      "arrDateTime": "20261008 12:58",
+      "depDateTime": "20261008 12:58"
+     }
+    },
+    {
+     "name": "Wien Lerchenfelder Straße (Blindengasse)",
+     "ref": {
+      "id": "60201558",
+      "arrDateTime": "20261008 13:00",
+      "depDateTime": "20261008 13:00"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße/Neustiftgasse",
+     "ref": {
+      "id": "60200645",
+      "arrDateTime": "20261008 13:01",
+      "depDateTime": "20261008 13:01"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße/Burggasse",
+     "ref": {
+      "id": "60200644",
+      "arrDateTime": "20261008 13:02",
+      "depDateTime": "20261008 13:02"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße",
+     "ref": {
+      "id": "60200646",
+      "arrDateTime": "20261008 13:04",
+      "depDateTime": "20261008 13:04"
+     }
+    },
+    {
+     "name": "Wien Stollgasse",
+     "ref": {
+      "id": "60201328",
+      "arrDateTime": "20261008 13:06",
+      "depDateTime": "20261008 13:06"
+     }
+    },
+    {
+     "name": "Wien Westbahnhof (Neubaugürtel)",
+     "ref": {
+      "id": "60201468",
+      "arrDateTime": "20261008 13:08"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "31"
+   },
+   "servingLine": {
+    "number": "5B",
+    "motType": "5",
+    "direction": "Wien Heiligenstadt",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Rueppgasse",
+     "ref": {
+      "id": "60201130",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Volkertplatz",
+     "ref": {
+      "id": "60201876",
+      "arrDateTime": "20261008 12:34",
+      "depDateTime": "20261008 12:34"
+     }
+    },
+    {
+     "name": "Wien Heinestraße",
+     "ref": {
+      "id": "60200494",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Taborstraße (Obere Augartenstraße)",
+     "ref": {
+      "id": "60201891",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Obere Augartenstraße",
+     "ref": {
+      "id": "60200961",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Gaußplatz (Jägerstraße)",
+     "ref": {
+      "id": "60200380",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Wallensteinplatz",
+     "ref": {
+      "id": "60201443",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Brigittaplatz",
+     "ref": {
+      "id": "60200170",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Jägerstraße",
+     "ref": {
+      "id": "60201667",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Wexstraße (Klosterneuburger Straße)",
+     "ref": {
+      "id": "60201470",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Gürtelbrücke",
+     "ref": {
+      "id": "60200692",
+      "arrDateTime": "20261008 12:48",
+      "depDateTime": "20261008 12:48"
+     }
+    },
+    {
+     "name": "Wien Döblinger Steg",
+     "ref": {
+      "id": "60200254",
+      "arrDateTime": "20261008 12:49",
+      "depDateTime": "20261008 12:49"
+     }
+    },
+    {
+     "name": "Wien Heiligenstädter Brücke",
+     "ref": {
+      "id": "60200493",
+      "arrDateTime": "20261008 12:50",
+      "depDateTime": "20261008 12:50"
+     }
+    },
+    {
+     "name": "Wien Muthgasse",
+     "ref": {
+      "id": "60200897",
+      "arrDateTime": "20261008 12:51",
+      "depDateTime": "20261008 12:51"
+     }
+    },
+    {
+     "name": "Wien Michael-Neumann-Gasse",
+     "ref": {
+      "id": "60201351",
+      "arrDateTime": "20261008 12:52",
+      "depDateTime": "20261008 12:52"
+     }
+    },
+    {
+     "name": "Wien Heiligenstadt (Mooslackengasse)",
+     "ref": {
+      "id": "60200491",
+      "arrDateTime": "20261008 12:54"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "32"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Leopoldau",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vorgartenstraße",
+     "ref": {
+      "id": "60201433",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Donauinsel",
+     "ref": {
+      "id": "60200234",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Kaisermühlen-VIC",
+     "ref": {
+      "id": "60200641",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Alte Donau",
+     "ref": {
+      "id": "60200031",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Kagran",
+     "ref": {
+      "id": "60200627",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Kagraner Platz",
+     "ref": {
+      "id": "60200633",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Rennbahnweg",
+     "ref": {
+      "id": "60201860",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Aderklaaer Straße",
+     "ref": {
+      "id": "60201858",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Großfeldsiedlung",
+     "ref": {
+      "id": "60201859",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Leopoldau",
+     "ref": {
+      "id": "60200769",
+      "arrDateTime": "20261008 12:47"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "32"
+   },
+   "servingLine": {
+    "number": "80A",
+    "motType": "5",
+    "direction": "Wien Schlachthausgasse",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vivariumstraße",
+     "ref": {
+      "id": "60201427",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Kurzbauergasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200730",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Josef-Gall-Gasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200609",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Wittelsbachstraße (Böcklinstraße)",
+     "ref": {
+      "id": "60201497",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Friedensgasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200359",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Lukschgasse (Böcklinstraße)",
+     "ref": {
+      "id": "60200817",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Rustenschacherallee",
+     "ref": {
+      "id": "60201549",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Wasserwiese",
+     "ref": {
+      "id": "60201568",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Ludwig-Koeßler-Platz (Schnirchgasse)",
+     "ref": {
+      "id": "60200821",
+      "arrDateTime": "20261008 12:46",
+      "depDateTime": "20261008 12:46"
+     }
+    },
+    {
+     "name": "Wien Schlachthausgasse (Markhofgasse)",
+     "ref": {
+      "id": "60201199",
+      "arrDateTime": "20261008 12:48"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "32"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Aspernstraße",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Messe-Prater",
+     "ref": {
+      "id": "60201892",
+      "arrDateTime": "20261008 12:33",
+      "depDateTime": "20261008 12:33"
+     }
+    },
+    {
+     "name": "Wien Krieau",
+     "ref": {
+      "id": "60201893",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Stadion",
+     "ref": {
+      "id": "60201894",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Donaumarina",
+     "ref": {
+      "id": "60200282",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Donaustadtbrücke",
+     "ref": {
+      "id": "60200290",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Stadlau",
+     "ref": {
+      "id": "60201299",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Hardeggasse",
+     "ref": {
+      "id": "60200473",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Donauspital",
+     "ref": {
+      "id": "60201278",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Aspernstraße",
+     "ref": {
+      "id": "60200299",
+      "arrDateTime": "20261008 12:45"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "33"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Oberlaa",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nestroyplatz",
+     "ref": {
+      "id": "60200916",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Schwedenplatz",
+     "ref": {
+      "id": "60201198",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Stephansplatz",
+     "ref": {
+      "id": "60201320",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Taubstummengasse",
+     "ref": {
+      "id": "60201366",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Südtiroler Pl. - Hbf.",
+     "ref": {
+      "id": "60201349",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Keplerplatz",
+     "ref": {
+      "id": "60200666",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Reumannplatz",
+     "ref": {
+      "id": "60201095",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Troststraße",
+     "ref": {
+      "id": "60201573",
+      "arrDateTime": "20261008 12:46",
+      "depDateTime": "20261008 12:46"
+     }
+    },
+    {
+     "name": "Wien Altes Landgut",
+     "ref": {
+      "id": "60200033",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Alaudagasse",
+     "ref": {
+      "id": "60200014",
+      "arrDateTime": "20261008 12:49",
+      "depDateTime": "20261008 12:49"
+     }
+    },
+    {
+     "name": "Wien Neulaa",
+     "ref": {
+      "id": "60201481",
+      "arrDateTime": "20261008 12:51",
+      "depDateTime": "20261008 12:51"
+     }
+    },
+    {
+     "name": "Wien Oberlaa",
+     "ref": {
+      "id": "60200949",
+      "arrDateTime": "20261008 12:52"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "33"
+   },
+   "servingLine": {
+    "number": "O",
+    "motType": "4",
+    "direction": "Wien Raxstraße",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Franzensbrücke",
+     "ref": {
+      "id": "60200348",
+      "arrDateTime": "20261008 12:35",
+      "depDateTime": "20261008 12:35"
+     }
+    },
+    {
+     "name": "Wien Radetzkyplatz (Radetzkystraße)",
+     "ref": {
+      "id": "60201063",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Hintere Zollamtsstraße",
+     "ref": {
+      "id": "60200527",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Marxergasse",
+     "ref": {
+      "id": "60200845",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Mitte-Landstraße (Invalidenstraße)",
+     "ref": {
+      "id": "60200743",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Sechskrügelgasse",
+     "ref": {
+      "id": "60201218",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Ungargasse/Neulinggasse",
+     "ref": {
+      "id": "60200929",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Rennweg (Ungargasse)",
+     "ref": {
+      "id": "60201091",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Kölblgasse",
+     "ref": {
+      "id": "60200736",
+      "arrDateTime": "20261008 12:48",
+      "depDateTime": "20261008 12:48"
+     }
+    },
+    {
+     "name": "Wien Fasangasse",
+     "ref": {
+      "id": "60200300",
+      "arrDateTime": "20261008 12:50",
+      "depDateTime": "20261008 12:50"
+     }
+    },
+    {
+     "name": "Wien Quartier Belvedere (Wiedner Gürtel)",
+     "ref": {
+      "id": "60201346",
+      "arrDateTime": "20261008 12:52",
+      "depDateTime": "20261008 12:52"
+     }
+    },
+    {
+     "name": "Wien Hauptbahnhof (Wiedner Gürtel)",
+     "ref": {
+      "id": "60201349",
+      "arrDateTime": "20261008 12:55",
+      "depDateTime": "20261008 12:55"
+     }
+    },
+    {
+     "name": "Wien Columbusplatz",
+     "ref": {
+      "id": "60200211",
+      "arrDateTime": "20261008 12:57",
+      "depDateTime": "20261008 12:57"
+     }
+    },
+    {
+     "name": "Wien Laxenburger Straße/Gudrunstraße",
+     "ref": {
+      "id": "60200136",
+      "arrDateTime": "20261008 12:59",
+      "depDateTime": "20261008 12:59"
+     }
+    },
+    {
+     "name": "Wien Quellenplatz",
+     "ref": {
+      "id": "60201058",
+      "arrDateTime": "20261008 13:01",
+      "depDateTime": "20261008 13:01"
+     }
+    },
+    {
+     "name": "Wien Arthaberplatz",
+     "ref": {
+      "id": "60200086",
+      "arrDateTime": "20261008 13:02",
+      "depDateTime": "20261008 13:02"
+     }
+    },
+    {
+     "name": "Wien Laxenburger Straße/Troststraße",
+     "ref": {
+      "id": "60200760",
+      "arrDateTime": "20261008 13:04",
+      "depDateTime": "20261008 13:04"
+     }
+    },
+    {
+     "name": "Wien Troststraße/Neilreichgasse",
+     "ref": {
+      "id": "60201393",
+      "arrDateTime": "20261008 13:05",
+      "depDateTime": "20261008 13:05"
+     }
+    },
+    {
+     "name": "Wien Raxstraße (Rudolfshügelgasse)",
+     "ref": {
+      "id": "60201078",
+      "arrDateTime": "20261008 13:08",
+      "depDateTime": "20261008 13:08"
+     }
+    },
+    {
+     "name": "Wien Raxstraße (Migerkastraße)",
+     "ref": {
+      "id": "60201078",
+      "arrDateTime": "20261008 13:09"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "34"
+   },
+   "servingLine": {
+    "number": "O",
+    "motType": "4",
+    "direction": "Wien Bruno-Marek-Allee",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nordbahnstraße",
+     "ref": {
+      "id": "60200941",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Krakauer Straße",
+     "ref": {
+      "id": "60201918",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Bruno-Marek-Allee (Taborstraße)",
+     "ref": {
+      "id": "60201919",
+      "arrDateTime": "20261008 12:40"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "35"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Karlsplatz",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Taborstraße",
+     "ref": {
+      "id": "60201891",
+      "arrDateTime": "20261008 12:36",
+      "depDateTime": "20261008 12:36"
+     }
+    },
+    {
+     "name": "Wien Schottenring",
+     "ref": {
+      "id": "60201182",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Schottentor",
+     "ref": {
+      "id": "60201184",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Rathaus",
+     "ref": {
+      "id": "60201072",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Volkstheater",
+     "ref": {
+      "id": "60201430",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Museumsquartier",
+     "ref": {
+      "id": "60200835",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Karlsplatz",
+     "ref": {
+      "id": "60200657",
+      "arrDateTime": "20261008 12:46"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "36"
+   },
+   "servingLine": {
+    "number": "U1",
+    "motType": "2",
+    "direction": "Wien Leopoldau",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Vorgartenstraße",
+     "ref": {
+      "id": "60201433",
+      "arrDateTime": "20261008 12:37",
+      "depDateTime": "20261008 12:37"
+     }
+    },
+    {
+     "name": "Wien Donauinsel",
+     "ref": {
+      "id": "60200234",
+      "arrDateTime": "20261008 12:39",
+      "depDateTime": "20261008 12:39"
+     }
+    },
+    {
+     "name": "Wien Kaisermühlen-VIC",
+     "ref": {
+      "id": "60200641",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Alte Donau",
+     "ref": {
+      "id": "60200031",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Kagran",
+     "ref": {
+      "id": "60200627",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Kagraner Platz",
+     "ref": {
+      "id": "60200633",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Rennbahnweg",
+     "ref": {
+      "id": "60201860",
+      "arrDateTime": "20261008 12:46",
+      "depDateTime": "20261008 12:46"
+     }
+    },
+    {
+     "name": "Wien Aderklaaer Straße",
+     "ref": {
+      "id": "60201858",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Großfeldsiedlung",
+     "ref": {
+      "id": "60201859",
+      "arrDateTime": "20261008 12:49",
+      "depDateTime": "20261008 12:49"
+     }
+    },
+    {
+     "name": "Wien Leopoldau",
+     "ref": {
+      "id": "60200769",
+      "arrDateTime": "20261008 12:50"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "37"
+   },
+   "servingLine": {
+    "number": "5",
+    "motType": "4",
+    "direction": "Wien Westbahnhof",
+    "liErgRiProj": {
+     "direction": "H"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Nordbahnstraße",
+     "ref": {
+      "id": "60200941",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Am Tabor",
+     "ref": {
+      "id": "60200051",
+      "arrDateTime": "20261008 12:42",
+      "depDateTime": "20261008 12:42"
+     }
+    },
+    {
+     "name": "Wien Nordwestbahnstraße",
+     "ref": {
+      "id": "60200944",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Rauscherstraße",
+     "ref": {
+      "id": "60201077",
+      "arrDateTime": "20261008 12:45",
+      "depDateTime": "20261008 12:45"
+     }
+    },
+    {
+     "name": "Wien Wallensteinplatz",
+     "ref": {
+      "id": "60201443",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Klosterneuburger Straße/Wallensteinstraße",
+     "ref": {
+      "id": "60201444",
+      "arrDateTime": "20261008 12:49",
+      "depDateTime": "20261008 12:49"
+     }
+    },
+    {
+     "name": "Wien Friedensbrücke",
+     "ref": {
+      "id": "60200357",
+      "arrDateTime": "20261008 12:50",
+      "depDateTime": "20261008 12:50"
+     }
+    },
+    {
+     "name": "Wien Franz-Josefs-Bahnhof (Julius-Tandler-Platz)",
+     "ref": {
+      "id": "60200345",
+      "arrDateTime": "20261008 12:52",
+      "depDateTime": "20261008 12:52"
+     }
+    },
+    {
+     "name": "Wien Alserbachstraße",
+     "ref": {
+      "id": "60200029",
+      "arrDateTime": "20261008 12:55",
+      "depDateTime": "20261008 12:55"
+     }
+    },
+    {
+     "name": "Wien Spitalgasse",
+     "ref": {
+      "id": "60201288",
+      "arrDateTime": "20261008 12:57",
+      "depDateTime": "20261008 12:57"
+     }
+    },
+    {
+     "name": "Wien Lazarettgasse",
+     "ref": {
+      "id": "60200762",
+      "arrDateTime": "20261008 12:58",
+      "depDateTime": "20261008 12:58"
+     }
+    },
+    {
+     "name": "Wien Lange Gasse",
+     "ref": {
+      "id": "60200747",
+      "arrDateTime": "20261008 13:00",
+      "depDateTime": "20261008 13:00"
+     }
+    },
+    {
+     "name": "Wien Laudongasse",
+     "ref": {
+      "id": "60200753",
+      "arrDateTime": "20261008 13:02",
+      "depDateTime": "20261008 13:02"
+     }
+    },
+    {
+     "name": "Wien Florianigasse",
+     "ref": {
+      "id": "60200333",
+      "arrDateTime": "20261008 13:03",
+      "depDateTime": "20261008 13:03"
+     }
+    },
+    {
+     "name": "Wien Albertgasse",
+     "ref": {
+      "id": "60200019",
+      "arrDateTime": "20261008 13:04",
+      "depDateTime": "20261008 13:04"
+     }
+    },
+    {
+     "name": "Wien Blindengasse",
+     "ref": {
+      "id": "60200148",
+      "arrDateTime": "20261008 13:06",
+      "depDateTime": "20261008 13:06"
+     }
+    },
+    {
+     "name": "Wien Lerchenfelder Straße (Blindengasse)",
+     "ref": {
+      "id": "60201558",
+      "arrDateTime": "20261008 13:07",
+      "depDateTime": "20261008 13:07"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße/Neustiftgasse",
+     "ref": {
+      "id": "60200645",
+      "arrDateTime": "20261008 13:09",
+      "depDateTime": "20261008 13:09"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße/Burggasse",
+     "ref": {
+      "id": "60200644",
+      "arrDateTime": "20261008 13:10",
+      "depDateTime": "20261008 13:10"
+     }
+    },
+    {
+     "name": "Wien Kaiserstraße",
+     "ref": {
+      "id": "60200646",
+      "arrDateTime": "20261008 13:11",
+      "depDateTime": "20261008 13:11"
+     }
+    },
+    {
+     "name": "Wien Stollgasse",
+     "ref": {
+      "id": "60201328",
+      "arrDateTime": "20261008 13:13",
+      "depDateTime": "20261008 13:13"
+     }
+    },
+    {
+     "name": "Wien Westbahnhof (Neubaugürtel)",
+     "ref": {
+      "id": "60201468",
+      "arrDateTime": "20261008 13:15"
+     }
+    }
+   ]
+  },
+  {
+   "stopID": "60201040",
+   "dateTime": {
+    "year": "2026",
+    "month": "10",
+    "day": "8",
+    "hour": "12",
+    "minute": "37"
+   },
+   "servingLine": {
+    "number": "U2",
+    "motType": "2",
+    "direction": "Wien Seestadt",
+    "liErgRiProj": {
+     "direction": "R"
+    }
+   },
+   "onwardStopSeq": [
+    {
+     "name": "Wien Messe-Prater",
+     "ref": {
+      "id": "60201892",
+      "arrDateTime": "20261008 12:38",
+      "depDateTime": "20261008 12:38"
+     }
+    },
+    {
+     "name": "Wien Krieau",
+     "ref": {
+      "id": "60201893",
+      "arrDateTime": "20261008 12:40",
+      "depDateTime": "20261008 12:40"
+     }
+    },
+    {
+     "name": "Wien Stadion",
+     "ref": {
+      "id": "60201894",
+      "arrDateTime": "20261008 12:41",
+      "depDateTime": "20261008 12:41"
+     }
+    },
+    {
+     "name": "Wien Donaumarina",
+     "ref": {
+      "id": "60200282",
+      "arrDateTime": "20261008 12:43",
+      "depDateTime": "20261008 12:43"
+     }
+    },
+    {
+     "name": "Wien Donaustadtbrücke",
+     "ref": {
+      "id": "60200290",
+      "arrDateTime": "20261008 12:44",
+      "depDateTime": "20261008 12:44"
+     }
+    },
+    {
+     "name": "Wien Stadlau",
+     "ref": {
+      "id": "60201299",
+      "arrDateTime": "20261008 12:46",
+      "depDateTime": "20261008 12:46"
+     }
+    },
+    {
+     "name": "Wien Hardeggasse",
+     "ref": {
+      "id": "60200473",
+      "arrDateTime": "20261008 12:47",
+      "depDateTime": "20261008 12:47"
+     }
+    },
+    {
+     "name": "Wien Donauspital",
+     "ref": {
+      "id": "60201278",
+      "arrDateTime": "20261008 12:48",
+      "depDateTime": "20261008 12:48"
+     }
+    },
+    {
+     "name": "Wien Aspernstraße",
+     "ref": {
+      "id": "60200299",
+      "arrDateTime": "20261008 12:50",
+      "depDateTime": "20261008 12:50"
+     }
+    },
+    {
+     "name": "Wien Lina-Loos-Platz",
+     "ref": {
+      "id": "60201973",
+      "arrDateTime": "20261008 12:51",
+      "depDateTime": "20261008 12:51"
+     }
+    },
+    {
+     "name": "Wien Hausfeldstraße",
+     "ref": {
+      "id": "60200487",
+      "arrDateTime": "20261008 12:52",
+      "depDateTime": "20261008 12:52"
+     }
+    },
+    {
+     "name": "Wien Aspern Nord",
+     "ref": {
+      "id": "60200910",
+      "arrDateTime": "20261008 12:54",
+      "depDateTime": "20261008 12:54"
+     }
+    },
+    {
+     "name": "Wien Seestadt",
+     "ref": {
+      "id": "60200942",
+      "arrDateTime": "20261008 12:56"
+     }
+    }
+   ]
+  }
+ ]
+}
