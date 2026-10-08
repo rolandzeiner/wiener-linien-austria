@@ -386,6 +386,16 @@ RUN_TIME_MAX_AGE: Final = timedelta(days=7)
 # the table above). So a stop costs one request a week, and a second only
 # when its trail is opened in the other part too.
 RUN_TIME_DAY_HOURS: Final = (6, 19)
+# How far past a switch between the two an answer may stay valid, picked at
+# random for every answer. The switch is the one moment here set by the
+# clock rather than by when somebody opened a trail: without the spread,
+# every card with a trail open across 06:00 or 19:00 asks again in the same
+# second, on every install at once, and the ones whose sample for the new
+# part of the day is missing or a week old all fetch it then. A sample
+# fetched that way would also expire to the second a week later, so the
+# pile-up would repeat. Fifteen minutes of the other timetable's run times
+# is a difference nobody can see; the timetables change over gradually.
+RUN_TIME_SWITCH_SPREAD: Final = timedelta(minutes=15)
 # A line the card asks about that no sample holds earns one more request,
 # once per line and sample, and no sooner than this after the last one for
 # the stop: a sample minutes old would only return the same rows.

@@ -530,7 +530,10 @@ buses are timetabled a few minutes slower by day than in the evening, so the
 daytime answer (06:00–19:00) and the evening one are kept apart, and a second
 request happens only if you open a trail in the other part of the day. A line
 neither answer holds costs one more request, once. A stop whose trail nobody
-opens is never asked for. The request skips the cooldown slot, because someone
+opens is never asked for. Nothing here runs on the clock except the switch
+between the two parts of the day, and an answer stays valid for up to 15
+minutes past it, picked at random, so installs with a trail open at 06:00 or
+19:00 don't all ask at once. The request skips the cooldown slot, because someone
 is waiting for the times, and a failed one is retried no sooner than 5 minutes
 later, doubling up to 30.
 

@@ -30,6 +30,11 @@ answer isn't already held, which bounds the requests four ways:
 Callers asking at once share one request. A failure keeps whatever samples
 exist and spaces the retries like the S-Bahn timetable does. The 15 s routing
 cooldown is not taken: someone has just opened a trail and is waiting.
+
+Nothing is tied to the clock except the switch between the two parts of the
+day, and an answer outlives that by a random `RUN_TIME_SWITCH_SPREAD`, so
+installs with a trail open at 06:00 or 19:00 don't all fetch in one second.
+A sample's week runs from whenever its trail was opened.
 """
 
 from __future__ import annotations
@@ -37,6 +42,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, tzinfo
@@ -54,6 +60,7 @@ from .const import (
     RUN_TIME_DAY_HOURS,
     RUN_TIME_DEPARTURES_REQUESTED,
     RUN_TIME_MAX_AGE,
+    RUN_TIME_SWITCH_SPREAD,
     RUN_TIME_TOP_UP_AFTER,
     TIMETABLE_RETRY_AFTER,
     USER_AGENT,
@@ -299,8 +306,12 @@ class RunTimes:
         if current is not None:
             merged.update(current.pairs)
         if current is not None and now - current.fetched_at < RUN_TIME_MAX_AGE:
+            # Until the other part of the day begins, plus a random spread so
+            # the cards that are open then don't all ask in the same second
+            # (see RUN_TIME_SWITCH_SPREAD), or until the sample expires.
             valid_until = min(
-                regime_ends(now.astimezone(zone)),
+                regime_ends(now.astimezone(zone))
+                + RUN_TIME_SWITCH_SPREAD * random.random(),
                 current.fetched_at + RUN_TIME_MAX_AGE,
             )
         else:

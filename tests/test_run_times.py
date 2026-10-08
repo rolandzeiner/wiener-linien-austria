@@ -27,6 +27,7 @@ from custom_components.wiener_linien_austria.const import (
     ROUTING_DEPARTURE_ENDPOINT,
     RUN_TIME_DEPARTURES_REQUESTED,
     RUN_TIME_MAX_AGE,
+    RUN_TIME_SWITCH_SPREAD,
     RUN_TIME_TOP_UP_AFTER,
     TIMETABLE_RETRY_AFTER,
     USER_AGENT,
@@ -109,6 +110,17 @@ def _body(*runs: dict[str, Any]) -> dict[str, Any]:
 def storage(hass_storage: dict[str, Any]) -> dict[str, Any]:
     """Keep every Store write in memory."""
     return hass_storage
+
+
+@pytest.fixture(autouse=True)
+def no_spread() -> Generator[None]:
+    """Pin the random spread past a day/night switch to zero.
+
+    So `valid_until` can be asserted to the second; the spread itself has
+    its own test.
+    """
+    with patch(f"{_MODULE}.random.random", return_value=0.0):
+        yield
 
 
 @pytest.fixture
@@ -320,6 +332,33 @@ async def test_first_ask_fetches_one_sample_for_the_whole_stop(
     assert len(answer.pairs) == 10
     assert answer.fetched_at == DAY
     assert answer.valid_until == datetime(2026, 10, 8, 19, 0, tzinfo=VIENNA)
+
+
+async def test_answers_outlive_the_switch_by_a_random_spread(
+    hass: HomeAssistant,
+    board: MockConfigEntry,
+    dm_fetch: AsyncMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """Or every install with a trail open at 19:00 would ask in one second."""
+    registry = async_get_run_times(hass)
+    freezer.move_to(DAY)
+    switch = datetime(2026, 10, 8, 19, 0, tzinfo=VIENNA)
+    until = []
+    for share in (0.0, 0.5, 0.999):
+        with patch(f"{_MODULE}.random.random", return_value=share):
+            until.append((await registry.async_get(PRATERSTERN)).valid_until)
+
+    assert until[0] == switch
+    assert until[1] == switch + RUN_TIME_SWITCH_SPREAD / 2
+    assert switch < until[2] < switch + RUN_TIME_SWITCH_SPREAD
+    assert dm_fetch.await_count == 1
+
+    # The sample's own expiry is not spread: it runs from when it was fetched.
+    freezer.move_to(DAY + RUN_TIME_MAX_AGE - timedelta(hours=1))
+    with patch(f"{_MODULE}.random.random", return_value=0.999):
+        answer = await registry.async_get(PRATERSTERN)
+    assert answer.valid_until == DAY + RUN_TIME_MAX_AGE
 
 
 async def test_a_sample_answers_every_line_for_a_week(
