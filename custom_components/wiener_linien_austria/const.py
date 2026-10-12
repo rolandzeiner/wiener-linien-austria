@@ -292,6 +292,18 @@ MIN_ROUTE_POLL_SECONDS: Final = 120
 MAX_ROUTE_POLL_SECONDS: Final = 1800
 # Never schedule the "departure just passed" refresh sooner than this.
 MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
+# That refresh waits 30 s after the departure plus a random number of
+# seconds from this range. Timetable times are whole minutes, so on a fixed
+# 30 s every install whose connection left in a given minute asked the trip
+# planner in the same second: measured 2026-10-12, 24 coordinators started
+# at random moments all asked 29.3 to 30.2 s after each departure.
+# The lower end is not there for the spread. Home Assistant runs a
+# coordinator on a whole second of its loop clock, up to a second before the
+# interval is over, so the refresh could come back before the 30 s were up.
+# The connection that had just left then still counted as ahead and timed a
+# second refresh 60 s later: 10 of 26 such refreshes in that measurement.
+# Two seconds puts every one of them past the 30 s.
+ROUTE_ROLLOVER_SPREAD_SECONDS: Final = (2.0, 30.0)
 
 # Planned S-Bahn departures on a departure board (timetable.py), from the
 # same routing server's departure monitor.
