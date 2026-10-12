@@ -33,6 +33,7 @@ from custom_components.wiener_linien_austria import (
     async_unload_entry,
 )
 from custom_components.wiener_linien_austria.const import (
+    ALERTS_REFRESH_SECONDS,
     BATCH_REGISTRY_KEY,
     CARD_VERSION,
     DOMAIN,
@@ -43,6 +44,7 @@ from custom_components.wiener_linien_austria.const import (
     STATIC_CACHE_FIRST_CHECK_SECONDS,
     STATIC_CACHE_REFRESH_HOURS,
 )
+from custom_components.wiener_linien_austria.rate_limit import backoff_delay
 from custom_components.wiener_linien_austria.static import (
     CATALOGUE_KEY,
     StaticCatalogue,
@@ -462,6 +464,87 @@ async def test_alerts_refresh_timer_swallows_a_failure(
         await hass.async_block_till_done()
 
     assert "Alerts periodic refresh failed" in caplog.text
+
+
+_ALERTS = "custom_components.wiener_linien_austria.async_refresh_alerts"
+_ALERTS_TICK = timedelta(seconds=ALERTS_REFRESH_SECONDS)
+
+
+def _backoff_without_jitter() -> Any:
+    """The tick's `backoff_delay`, with the +/-10% taken out."""
+    return patch(
+        "custom_components.wiener_linien_austria.backoff_delay",
+        side_effect=lambda base, failures, **_kwargs: backoff_delay(base, failures),
+    )
+
+
+async def test_alerts_tick_is_skipped_while_backing_off(
+    hass: HomeAssistant, mock_fetch, freezer, caplog
+) -> None:
+    """Failing alerts are asked for 5, 10, 20, then every 30 minutes apart."""
+    caplog.set_level(logging.INFO)
+    await _static_setup(hass, age=timedelta(days=1))
+
+    with (
+        patch(_ALERTS, new=AsyncMock(return_value=False)) as refresh,
+        _backoff_without_jitter() as backoff,
+    ):
+        asked_at: list[int] = []
+        for minute in range(5, 75, 5):
+            await _advance(hass, freezer, _ALERTS_TICK)
+            if refresh.await_count > len(asked_at):
+                asked_at.append(minute)
+        assert asked_at == [5, 10, 20, 40, 70]
+        # The first failure waits out one tick and needs no delay computed.
+        assert [call.args[1] for call in backoff.call_args_list] == [2, 3, 4, 5]
+        assert all(call.kwargs == {"jitter": True} for call in backoff.call_args_list)
+        assert "Alerts failing 2 times in a row; next try in about 10 min" in (
+            caplog.text
+        )
+
+        # The first answer ends it: the tick after it asks again.
+        refresh.return_value = True
+        for _ in range(6):
+            await _advance(hass, freezer, _ALERTS_TICK)
+        assert refresh.await_count == 6
+        assert "Alerts are answering again" in caplog.text
+        await _advance(hass, freezer, _ALERTS_TICK)
+        assert refresh.await_count == 7
+
+
+async def test_skipped_alerts_tick_takes_no_cooldown_slot(
+    hass: HomeAssistant, mock_fetch, freezer
+) -> None:
+    """A tick that is backing off returns before the shared 15 s slot."""
+    await _static_setup(hass, age=timedelta(days=1))
+    session = MagicMock()
+    session.get = MagicMock(side_effect=TimeoutError())
+
+    with (
+        patch(
+            "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+            return_value=session,
+        ),
+        patch(
+            "custom_components.wiener_linien_austria.alerts.async_enforce_domain_cooldown",
+            new=AsyncMock(),
+        ) as cooldown,
+        _backoff_without_jitter(),
+    ):
+        await _advance(hass, freezer, _ALERTS_TICK)
+        await _advance(hass, freezer, _ALERTS_TICK)
+        assert cooldown.await_count == 2
+        assert session.get.call_count == 2
+
+        # Two failures in a row: the next tick asks nothing and waits for
+        # nothing.
+        await _advance(hass, freezer, _ALERTS_TICK)
+        assert cooldown.await_count == 2
+        assert session.get.call_count == 2
+
+        await _advance(hass, freezer, _ALERTS_TICK)
+        assert cooldown.await_count == 3
+        assert session.get.call_count == 3
 
 
 # ---------------------------------------------------------------------------

@@ -147,8 +147,9 @@ def backoff_delay(base: timedelta, failures: int, *, jitter: bool = False) -> ti
     One failure waits `base`, two wait twice that, three four times, capped
     at `BACKOFF_CAP_SECONDS`. `jitter` spreads the result by +/-10% so
     installs that failed on the same tick don't all retry on the same one.
-    The monitor batch, the route coordinators and the S-Bahn timetable share
-    this curve; each decides for itself what a first failure does.
+    The monitor batch, the route coordinators, the S-Bahn timetable and the
+    alerts tick share this curve; each decides for itself what a first
+    failure does.
     """
     doubled = base * (1 << max(failures - 1, 0))
     delay = min(doubled, timedelta(seconds=BACKOFF_CAP_SECONDS))

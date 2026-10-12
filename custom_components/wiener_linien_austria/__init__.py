@@ -6,7 +6,7 @@ import asyncio
 import functools
 import logging
 import random
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import voluptuous as vol
@@ -58,6 +58,7 @@ from .rate_limit import (
     ROUTING_LAST_CALL_KEY,
     ROUTING_LOCK_KEY,
     ROUTING_LOCK_LOOP_KEY,
+    backoff_delay,
 )
 from .route_coordinator import WienerLinienRouteCoordinator, route_device_info
 from .run_times import RUN_TIMES_KEY
@@ -250,16 +251,46 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
         domain_data[STATIC_REFRESH_UNSUB_KEY] = _unsub_static
 
     if ALERTS_REFRESH_UNSUB_KEY not in domain_data:
+        failures = 0
+        not_before: datetime | None = None
 
-        async def _periodic_alerts(_now: Any) -> None:
+        async def _periodic_alerts(now: datetime) -> None:
+            nonlocal failures, not_before
+            # Backing off (see ALERTS_REFRESH_SECONDS). Skipped here, before
+            # the request takes the shared cooldown slot, so a tick that
+            # asks nothing never holds a departure poll up either.
+            if not_before is not None and now < not_before:
+                return
             # Same safety-net rationale as _periodic_refresh above —
             # exceptions inside an async_track_time_interval callback
             # log to HA core's generic listener log, not under this
             # integration's namespace.
             try:
-                await async_refresh_alerts(hass)
+                refreshed = await async_refresh_alerts(hass)
             except Exception as err:  # noqa: BLE001 — periodic callback safety net
                 _LOGGER.warning("Alerts periodic refresh failed: %s", err)
+                refreshed = False
+            if refreshed:
+                if not_before is not None:
+                    _LOGGER.info("Alerts are answering again")
+                failures = 0
+                not_before = None
+                return
+            failures += 1
+            # One failure waits a tick, and the next tick is that already.
+            if failures < 2:
+                return
+            delay = backoff_delay(
+                timedelta(seconds=ALERTS_REFRESH_SECONDS), failures, jitter=True
+            )
+            # Counted from the tick, not from the failure: the request can
+            # take half a minute to fail, and that must not cost a tick more.
+            not_before = now + delay
+            _LOGGER.info(
+                "Alerts failing %d times in a row; next try in about %d min",
+                failures,
+                round(delay.total_seconds() / 60),
+            )
 
         # No eager first fetch — the periodic timer populates the cache after
         # ALERTS_REFRESH_SECONDS. During the warm-up window (up to 5 min after

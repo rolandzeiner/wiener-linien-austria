@@ -98,6 +98,12 @@ TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
 # shared across all entries. 5 min is plenty — these don't change any faster
 # than a few times an hour and fetching more often just eats the request
 # budget that belongs to live departure polling.
+# From the second failed request in a row the tick is skipped until a
+# not-before time: 10, 20, then BACKOFF_CAP_SECONDS after the tick that
+# failed, +/-10% (`rate_limit.backoff_delay`), and back to every tick on the
+# first answer. Ticks stay 5 min apart, so the retry is the first tick at or
+# after that time. Without it an outage cost 12 requests an hour for as long
+# as it lasted, beside a departure poll that had backed off to two.
 ALERTS_REFRESH_SECONDS: Final = 300
 
 # hass.data keys for the shared alert caches + scheduler unsub.

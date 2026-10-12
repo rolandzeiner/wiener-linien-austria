@@ -480,7 +480,7 @@ Four live endpoints and five static files, on separate cadences:
 | What | Endpoint | Cadence |
 |---|---|---|
 | Live departures | `/monitor?stopId=…` | One request per interval group, default 60 s (30–600 s) |
-| Service, stop and elevator alerts | `/trafficInfoList` — `stoerunglang` + `stoerungkurz` + `aufzugsinfo`, all three in one request | Domain-wide, 5 min — shared across all entries |
+| Service, stop and elevator alerts | `/trafficInfoList` — `stoerunglang` + `stoerungkurz` + `aufzugsinfo`, all three in one request | Domain-wide, 5 min — shared across all entries. From the second failed request in a row the wait doubles, up to about 30 min, until it answers again |
 | Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, counted from the last download; cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
