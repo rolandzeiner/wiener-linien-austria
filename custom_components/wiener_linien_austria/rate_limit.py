@@ -151,6 +151,9 @@ def backoff_delay(base: timedelta, failures: int, *, jitter: bool = False) -> ti
     alerts tick share this curve; each decides for itself what a first
     failure does.
     """
-    doubled = base * (1 << max(failures - 1, 0))
+    # The shift is clamped because the count is not: 65536 times any interval
+    # in use is far past the cap, and an unclamped timedelta overflows at the
+    # 37th to 43rd failure in a row, most of a day into an outage.
+    doubled = base * (1 << min(max(failures - 1, 0), 16))
     delay = min(doubled, timedelta(seconds=BACKOFF_CAP_SECONDS))
     return delay * random.uniform(0.9, 1.1) if jitter else delay
