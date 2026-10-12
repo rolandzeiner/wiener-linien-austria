@@ -147,6 +147,63 @@ async def test_route_entry_sets_up_sensor_and_risk(
     assert params["itdTime"] == "0750"
 
 
+async def test_sensors_name_the_next_connection_not_one_that_left(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """The list keeps a connection for a minute after it leaves.
+
+    The refresh just after a departure gets that connection back from the
+    planner, so `trips[0]` was one that had gone, and the sensor named it
+    until the next one left: seen on a live route at 16:02:36 with a state
+    of 16:00:53.
+    """
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+    route = _entity_id(hass, entry, "route")
+    risk = _entity_id(hass, entry, "route_at_risk")
+
+    # 45 s after the 07:57 left, as the refresh after a departure does.
+    frozen.move_to("2026-09-14 05:57:45+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert str(coordinator.data.trips[0].departure).startswith("2026-09-14 07:57")
+    state = hass.states.get(route)
+    assert state is not None
+    assert dt_util.parse_datetime(state.state) == dt_util.parse_datetime(
+        "2026-09-14T08:00:00+02:00"
+    )
+    ahead = coordinator.data.trips[1]
+    assert state.attributes["arrival"] == ahead.arrival.isoformat()
+    assert state.attributes["risk"] == ahead.risk
+    assert hass.states.get(risk).attributes["risk"] == ahead.risk
+    # The card filters the list itself and still gets all of it.
+    assert len(state.attributes["trips"]) == 4
+
+    # A live-time update writes the state too, with no refresh in between.
+    # Ahead reaches 30 s past the departure, as on the card.
+    frozen.move_to("2026-09-14 06:00:30+00:00")
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    assert dt_util.parse_datetime(
+        hass.states.get(route).state
+    ) == dt_util.parse_datetime("2026-09-14T08:00:00+02:00")
+    frozen.move_to("2026-09-14 06:00:31+00:00")
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    state = hass.states.get(route)
+    assert dt_util.parse_datetime(state.state) == dt_util.parse_datetime(
+        "2026-09-14T08:03:00+02:00"
+    )
+
+    # Nothing left ahead is no connection, not the last one that went.
+    frozen.move_to("2026-09-14 06:06:00+00:00")
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get(route).state == "unknown"
+    assert hass.states.get(risk).state == "unknown"
+
+
 async def test_realtime_delay_turns_risk_sensor_on(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory
 ) -> None:

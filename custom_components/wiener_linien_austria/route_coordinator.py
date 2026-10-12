@@ -98,6 +98,28 @@ class RouteData:
     # outside the evening or when there is none.
     last_connection: Trip | None = None
 
+    def next_trip(self, now: datetime) -> Trip | None:
+        """The first connection still ahead of `now`, in ranked order.
+
+        What the sensors mean by the next connection, by the rule the route
+        card applies to the same list (`upcomingTrips`): ahead reaches 30 s
+        past the departure. `trips[0]` is not it. The list keeps a
+        connection for a minute after it leaves, and the refresh just after
+        a departure gets it back from the planner, so the first entry is
+        often one that has gone.
+        """
+        cutoff = now - timedelta(seconds=30)
+        return next(
+            (
+                trip
+                for trip in self.trips
+                if not trip.cancelled
+                and trip.departure is not None
+                and trip.departure >= cutoff
+            ),
+            None,
+        )
+
 
 class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
     """Plan connections for one origin → destination pair."""
