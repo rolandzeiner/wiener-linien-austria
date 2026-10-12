@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { HomeAssistant, RouteTripAttr } from "../types.js";
 import {
   accessIcon,
   ADHOC_REFRESH_MS,
   ADHOC_ROLLOVER_FLOOR_MS,
+  ADHOC_ROLLOVER_SPREAD_MS,
   adhocPlanRefreshDelay,
   adhocRefreshDelay,
+  adhocRolloverJitter,
   ADHOC_NO_TIMETABLE_RETRY_MS,
   ADHOC_NOT_LOADED_RETRY_MS,
   adhocErrorSpec,
@@ -203,17 +205,38 @@ describe("ad-hoc timing", () => {
     ({ departure: iso, cancelled: false }) as unknown as RouteTripAttr;
 
   it("refreshes after the next departure, within floor and cadence", () => {
+    // The random wait, pinned to 10 s.
+    const delay = (iso: string) => adhocRefreshDelay([departing(iso)], NOW, 10_000);
     // Leaves in 7 min: the cadence comes first.
-    expect(adhocRefreshDelay([departing("2026-09-14T07:57:00+02:00")], NOW)).toBe(ADHOC_REFRESH_MS);
-    // Leaves in 60 s: refresh 30 s after it has gone.
-    expect(adhocRefreshDelay([departing("2026-09-14T07:51:00+02:00")], NOW)).toBe(90_000);
+    expect(delay("2026-09-14T07:57:00+02:00")).toBe(ADHOC_REFRESH_MS);
+    // Leaves in 40 s: refresh 30 s plus the wait after it has gone.
+    expect(delay("2026-09-14T07:50:40+02:00")).toBe(80_000);
     // Leaves in 10 s: never sooner than the floor.
-    expect(adhocRefreshDelay([departing("2026-09-14T07:50:10+02:00")], NOW)).toBe(
-      ADHOC_ROLLOVER_FLOOR_MS,
-    );
+    expect(delay("2026-09-14T07:50:10+02:00")).toBe(ADHOC_ROLLOVER_FLOOR_MS);
     // Only trips that already left: nothing to roll over to.
-    expect(adhocRefreshDelay([departing("2026-09-14T07:40:00+02:00")], NOW)).toBe(ADHOC_REFRESH_MS);
-    expect(adhocRefreshDelay([], NOW)).toBe(ADHOC_REFRESH_MS);
+    expect(delay("2026-09-14T07:40:00+02:00")).toBe(ADHOC_REFRESH_MS);
+    expect(adhocRefreshDelay([], NOW, 10_000)).toBe(ADHOC_REFRESH_MS);
+  });
+
+  it("spreads the refresh after a departure instead of landing on the 30 s mark", () => {
+    const trips = [departing("2026-09-14T07:50:40+02:00")];
+    const [min, max] = ADHOC_ROLLOVER_SPREAD_MS;
+    const random = vi.spyOn(Math, "random");
+    try {
+      // The ends of the range: 32 s and 60 s after the 07:50:40 departure.
+      random.mockReturnValue(0);
+      expect(adhocRolloverJitter()).toBe(min);
+      expect(adhocRefreshDelay(trips, NOW)).toBe(40_000 + 30_000 + min);
+      random.mockReturnValue(1);
+      expect(adhocRolloverJitter()).toBe(max);
+      expect(adhocRefreshDelay(trips, NOW)).toBe(40_000 + 30_000 + max);
+    } finally {
+      random.mockRestore();
+    }
+    // Unpinned, no draw lands on the mark itself.
+    for (let i = 0; i < 50; i++) {
+      expect(adhocRefreshDelay(trips, NOW)).toBeGreaterThanOrEqual(40_000 + 30_000 + min);
+    }
   });
 
   it("waits out the budget after a stale plan", () => {

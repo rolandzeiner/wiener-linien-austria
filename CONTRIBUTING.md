@@ -225,9 +225,9 @@ they can't disagree about the same query. In tests, patch the fetch at
 the top of `adhoc.py`: a 60 s cache, a 5 min stale limit, 120 requests an hour
 (burst 10) for the instance and 60 (burst 5) per user. The card's sit in
 `src/utils/route.ts`: a 120 s refresh while on screen, a 60 s rollover floor,
-a 30 min idle pause and a 400 ms debounce. They were sized against the routing
-backend's measured capabilities (the block in `const.py`) and the load a
-configured route already makes.
+a 2 to 30 s rollover spread, a 30 min idle pause and a 400 ms debounce. They
+were sized against the routing backend's measured capabilities (the block in
+`const.py`) and the load a configured route already makes.
 Changing any of them means re-measuring with the `api-polling` skill's probe
 first, and updating the README's Data Updates section in the same commit.
 

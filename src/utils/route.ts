@@ -497,9 +497,27 @@ export const ADHOC_DEBOUNCE_MS = 400;
 /** Wait after an upstream failure that didn't say how long to wait. */
 export const ADHOC_RETRY_MS = 60_000;
 
-/** When to refresh next: shortly after the best connection departs, but
- *  within [floor, cadence]. */
-export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number {
+/** A random wait from this range goes on top of the 30 s after the best
+ *  connection leaves, the same range as the route entries'
+ *  `ROUTE_ROLLOVER_SPREAD_SECONDS`. Timetable times are whole minutes, so a
+ *  fixed 30 s has every card whose connection leaves in a given minute ask
+ *  in the same second, on every install at once. */
+export const ADHOC_ROLLOVER_SPREAD_MS: readonly [number, number] = [2_000, 30_000];
+
+/** One wait picked from `ADHOC_ROLLOVER_SPREAD_MS`. */
+export function adhocRolloverJitter(): number {
+  const [min, max] = ADHOC_ROLLOVER_SPREAD_MS;
+  return min + Math.random() * (max - min);
+}
+
+/** When to refresh next: after the best connection departs, but within
+ *  [floor, cadence]. `jitterMs` is the wait added to the rollover; only
+ *  tests pass it. */
+export function adhocRefreshDelay(
+  trips: RouteTripAttr[],
+  nowMs: number,
+  jitterMs: number = adhocRolloverJitter(),
+): number {
   // Only a departure still ahead can roll the list over. Trips that already
   // left would pin every refresh to the floor for no new information.
   const next = trips
@@ -507,7 +525,7 @@ export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number
     .map((trip) => Date.parse(trip.departure!))
     .find((ts) => Number.isFinite(ts) && ts + 30_000 > nowMs);
   if (next === undefined) return ADHOC_REFRESH_MS;
-  const untilRollover = next + 30_000 - nowMs;
+  const untilRollover = next + 30_000 + jitterMs - nowMs;
   return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
 }
 
