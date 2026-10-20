@@ -125,14 +125,14 @@ export class WienerLinienStopCombobox extends LitElement {
     }
   }
 
-  private _onInput(ev: Event): void {
+  private _onInput = (ev: Event): void => {
     this._text = (ev.target as HTMLInputElement).value;
     this._filtering = true;
     this._invalid = false;
     this._open = true;
     this._active = -1;
     this._scheduleStatus();
-  }
+  };
 
   private _scheduleStatus(): void {
     if (this._statusTimer !== null) clearTimeout(this._statusTimer);
@@ -150,7 +150,7 @@ export class WienerLinienStopCombobox extends LitElement {
     this._status = "";
   }
 
-  private _onKeyDown(ev: KeyboardEvent): void {
+  private _onKeyDown = (ev: KeyboardEvent): void => {
     const { matches } = this._results;
     switch (ev.key) {
       case "ArrowDown":
@@ -195,11 +195,11 @@ export class WienerLinienStopCombobox extends LitElement {
       default:
         return;
     }
-  }
+  };
 
   /** Leaving the field commits an exact match, clears on empty text, and
    *  otherwise keeps the text but flags it, instead of silently guessing. */
-  private _onBlur(): void {
+  private _onBlur = (): void => {
     this._open = false;
     this._active = -1;
     this._clearStatus();
@@ -215,7 +215,7 @@ export class WienerLinienStopCombobox extends LitElement {
       return;
     }
     this._invalid = true;
-  }
+  };
 
   private _revert(): void {
     this._text = this._labelByValue.get(this.value) ?? "";
@@ -223,13 +223,13 @@ export class WienerLinienStopCombobox extends LitElement {
     this._invalid = false;
   }
 
-  private _toggle(): void {
+  private _toggle = (): void => {
     this._open = !this._open;
     this._active = -1;
     this._clearStatus();
     if (this._open) this._filtering = false;
     this._input?.focus();
-  }
+  };
 
   protected override render(): TemplateResult {
     const id = this.idBase;

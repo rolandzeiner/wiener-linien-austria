@@ -106,7 +106,7 @@ function hass(state: string, attributes: Record<string, unknown>, language = "de
     themes: { darkMode: false },
     localize: (key: string) => key,
     states: { [ENTITY]: { entity_id: ENTITY, state, attributes } },
-  } as unknown as HomeAssistant;
+  };
 }
 
 const ACTIVE = {
@@ -187,7 +187,7 @@ describe("registration + config", () => {
       getStubConfig(h: HomeAssistant): Record<string, unknown>;
     };
     expect(Card.getStubConfig(hass("x", ACTIVE))).toEqual({ entity: ENTITY });
-    expect(Card.getStubConfig({ states: {} } as unknown as HomeAssistant)).toEqual({});
+    expect(Card.getStubConfig({ states: {} })).toEqual({});
   });
 
   it("sizes to content in sections view", () => {
@@ -336,10 +336,10 @@ describe("stops along a ride", () => {
 describe("step-free", () => {
   function stepFreeTrip(): RouteTripAttr {
     const base = trip("07:57", "08:11");
-    const lift = (level: string, stop: string): RouteAccessStepAttr => ({
+    const lift = (level: string, stopId: string): RouteAccessStepAttr => ({
       kind: "elevator",
       level,
-      stop_id: stop,
+      stop_id: stopId,
     });
     const walk = (at: string, access: RouteAccessStepAttr[]) => ({
       ...base.legs[0]!,
@@ -830,7 +830,7 @@ describe("rendering", () => {
     ],
     [{ entity: ENTITY }, hass("unknown", { ...ACTIVE, trips: [] }), "Gerade keine Verbindung"],
   ])("empty state %#", async (config, h, expected) => {
-    const el = await mount((h ?? { states: {}, language: "de" }) as HomeAssistant, config);
+    const el = await mount(h ?? { states: {}, language: "de" }, config);
     expect(text(el)).toContain(expected);
     expect(root(el).querySelector('[role="status"]')).not.toBeNull();
   });
@@ -1382,7 +1382,7 @@ describe("ad-hoc mode", () => {
     await settle(el);
     const from = combos(el)[0]!;
     const status = () =>
-      root(el).querySelector<HTMLElement>('.picker--from [role="status"]')!.textContent!.trim();
+      root(el).querySelector<HTMLElement>('.picker--from [role="status"]')!.textContent.trim();
     await typeInto(el, from, "w");
     await typeInto(el, from, "wa");
     expect(status()).toBe("");
@@ -1475,10 +1475,12 @@ describe("editor", () => {
     );
     expect(config).toMatchObject({ show_map_pins: false });
 
-    const labels = (form as unknown as { computeLabel(f: { name: string }): string }).computeLabel;
+    const labels = (form as unknown as { computeLabel: (f: { name: string }) => string })
+      .computeLabel;
     expect(labels({ name: "alternatives" })).toBe("Weitere Verbindungen");
-    const helper = (form as unknown as { computeHelper(f: { name: string }): string | undefined })
-      .computeHelper;
+    const helper = (
+      form as unknown as { computeHelper: (f: { name: string }) => string | undefined }
+    ).computeHelper;
     expect(helper({ name: "title" })).toContain("Start → Ziel");
   });
 

@@ -32,6 +32,7 @@ import "./wiener-linien-austria-retro-card.js";
 import "./wiener-linien-austria-flap-card.js";
 
 import type { HomeAssistant } from "./types.js";
+import { sorted } from "./utils.js";
 
 interface CardElement extends HTMLElement {
   hass: HomeAssistant | undefined;
@@ -93,7 +94,7 @@ function busyHass(): HomeAssistant {
         },
       },
     },
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** The state a dashboard holds for the first seconds after an HA restart. */
@@ -103,7 +104,7 @@ function emptyHass(): HomeAssistant {
     themes: { darkMode: false },
     localize: (key: string) => key,
     states: {},
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** Each card with a config its own normaliser accepts, and a fragment its
@@ -268,7 +269,7 @@ describe("rendering", () => {
 /** A stop with a live U3 on either side of a planned S-Bahn train. */
 function timetableHass(): HomeAssistant {
   const hass = busyHass();
-  const attrs = hass.states[ENTITY]!.attributes as Record<string, unknown>;
+  const attrs = hass.states[ENTITY]!.attributes;
   const [u3] = attrs.departures as Array<Record<string, unknown>>;
   attrs.departures = [
     u3,
@@ -405,7 +406,7 @@ describe("tab-scoped alert banner", () => {
           { name: "T1", title: "U1: Gleisschaden", description: "", related_lines: ["U1"] },
         ],
       },
-    } as (typeof base.states)[string];
+    };
     return base;
   }
 
@@ -529,7 +530,7 @@ function trailHass(): HomeAssistant {
         },
       },
     },
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** Inline chip labels plus the count behind the `+N` toggle.
@@ -601,7 +602,7 @@ describe("stops_ahead_modes", () => {
   it("keeps only metro and S-Bahn when every other category is off", async () => {
     const { inline, total } = trailChips(await mountTrail(["metro", "sbahn"]));
     expect(total).toBe(2);
-    expect(inline.sort()).toEqual(["S45", "U3"]);
+    expect(sorted(inline)).toEqual(["S45", "U3"]);
   });
 
   it("renders no chip and no +N toggle when every category is off", async () => {

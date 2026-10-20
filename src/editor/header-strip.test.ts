@@ -122,7 +122,7 @@ describe("the bar preview", () => {
           show_clock: true,
           extra_icons: ["mdi:coffee"],
           chips: ["Gleis 1", "Gleis 2"],
-        } as RetroHeaderSide,
+        },
       },
       callbacks(),
     );
@@ -145,7 +145,7 @@ describe("the bar preview", () => {
   });
 
   it("omits the exit pictogram when the side is set to none", () => {
-    const el = strip({ left: { exit: "none", text: "Nur Text" } as RetroHeaderSide }, callbacks());
+    const el = strip({ left: { exit: "none", text: "Nur Text" } }, callbacks());
     expect(icons(at(zones(el), 0, "zone"))).toEqual([]);
   });
 
@@ -159,7 +159,7 @@ describe("the bar preview", () => {
           exit: "regular",
           show_wc: true,
           chips: ["Gleis 1"],
-        } as RetroHeaderSide,
+        },
       },
       callbacks(),
     );
@@ -171,7 +171,7 @@ describe("the bar preview", () => {
   });
 
   it("falls back to the raw MDI key as the name of a user-picked icon", () => {
-    const el = strip({ left: { extra_icons: ["mdi:coffee"] } as RetroHeaderSide }, callbacks());
+    const el = strip({ left: { extra_icons: ["mdi:coffee"] } }, callbacks());
     expect(at(zones(el), 0, "zone").getAttribute("aria-label")).toContain("mdi:coffee");
   });
 });
@@ -219,20 +219,20 @@ describe("the field panel", () => {
   });
 
   it("marks the active exit choice pressed", () => {
-    const el = strip({ left: { exit: "accessible" } as RetroHeaderSide }, callbacks());
+    const el = strip({ left: { exit: "accessible" } }, callbacks());
     const active = el.querySelector('.wl-pict[aria-label="header_exit_accessible"]');
     expect(active?.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("treats an unset exit as none", () => {
-    const el = strip({ left: {} as RetroHeaderSide }, callbacks());
+    const el = strip({ left: {} }, callbacks());
     const none = el.querySelector('.wl-pict[aria-label="header_exit_none"]');
     expect(none?.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("toggles an amenity off when it is already on", () => {
     const cb = callbacks();
-    const el = strip({ left: { show_wc: true } as RetroHeaderSide }, cb);
+    const el = strip({ left: { show_wc: true } }, cb);
     one<HTMLButtonElement>(el, '.wl-tray-btn[aria-label="show_wc_short"]').click();
     expect(cb.patch).toHaveBeenCalledWith("header_left", "show_wc", false);
   });
@@ -269,7 +269,7 @@ describe("chips and icons", () => {
         left: {
           chips: ["Gleis 1", "Gleis 2"],
           extra_icons: ["mdi:coffee"],
-        } as RetroHeaderSide,
+        },
       },
       callbacks(),
     );
@@ -279,7 +279,7 @@ describe("chips and icons", () => {
 
   it("removes the chip at the tapped index, not the first one", () => {
     const cb = callbacks();
-    const el = strip({ left: { chips: ["Gleis 1", "Gleis 2", "Gleis 3"] } as RetroHeaderSide }, cb);
+    const el = strip({ left: { chips: ["Gleis 1", "Gleis 2", "Gleis 3"] } }, cb);
     at(removers(el, "chip"), 1, "chip remover").click();
     expect(cb.patch).toHaveBeenCalledWith("header_left", "chips", ["Gleis 1", "Gleis 3"]);
   });
@@ -290,7 +290,7 @@ describe("chips and icons", () => {
       {
         left: {
           extra_icons: ["mdi:coffee", "mdi:bike", "mdi:train"],
-        } as RetroHeaderSide,
+        },
       },
       cb,
     );
@@ -311,7 +311,7 @@ describe("chips and icons", () => {
         left: {
           extra_icons: ["mdi:coffee"],
           chips: ["Gleis 1", "Gleis 2"],
-        } as RetroHeaderSide,
+        },
       },
       cb,
     );

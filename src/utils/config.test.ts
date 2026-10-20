@@ -115,7 +115,7 @@ describe("normaliseRetroConfig — defaults", () => {
     // The concrete cross-card inconsistency finding 6 was about.
     const retroVal = normaliseRetroConfig(retro({ show_platform: 0 as never })).show_platform;
     const modernVal = normaliseModernConfig({
-      show_platform: 0 as never,
+      show_platform: 0,
     }).show_platform;
     expect(retroVal).toBe(modernVal);
   });
@@ -248,8 +248,8 @@ describe("normaliseModernConfig — defaults", () => {
 
   it("coerces non-boolean YAML values rather than passing them through", () => {
     // asBool is the guard: untyped YAML can hand us 0, "false" or null.
-    expect(normaliseModernConfig({ show_platform: 0 as never }).show_platform).toBe(true);
-    expect(normaliseModernConfig({ show_platform: "false" as never }).show_platform).toBe(true);
+    expect(normaliseModernConfig({ show_platform: 0 }).show_platform).toBe(true);
+    expect(normaliseModernConfig({ show_platform: "false" }).show_platform).toBe(true);
     expect(normaliseModernConfig({ show_platform: false }).show_platform).toBe(false);
   });
 });

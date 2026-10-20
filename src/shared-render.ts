@@ -49,9 +49,14 @@ export async function checkCardVersionWS(
  */
 export function reloadAfterCacheWipe(forVersion?: string | null): void {
   try {
-    window.caches?.keys?.().then((keys) => {
-      keys.forEach((k) => window.caches?.delete?.(k));
-    });
+    window.caches
+      ?.keys?.()
+      .then((keys) => {
+        keys.forEach((k) => window.caches?.delete?.(k));
+      })
+      // The surrounding try never sees an async rejection; the reload
+      // below goes ahead either way.
+      .catch(() => {});
   } catch {
     // best-effort cache wipe
   }

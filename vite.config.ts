@@ -84,7 +84,7 @@ export default defineConfig(({ command, mode }) => {
       // Build only the card environments. The default `client` environment
       // would look for an index.html and fail.
       async buildApp(builder) {
-        for (const c of CARDS) await builder.build(builder.environments[envName(c)]!);
+        for (const c of CARDS) await builder.build(builder.environments[envName(c)]);
       },
     },
     fmt: {

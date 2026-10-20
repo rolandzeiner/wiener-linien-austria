@@ -366,7 +366,8 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
   const facts: TrafficFact[] = [];
   const seenFacts = new Set<string>();
 
-  for (const line of toLines(String(raw ?? ""))) {
+  const text = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+  for (const line of toLines(text)) {
     for (const piece of splitRunOns(line)) {
       const fact = FACT_RE.exec(piece);
       if (fact?.[1] && fact[2]) {

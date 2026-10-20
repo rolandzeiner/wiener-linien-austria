@@ -405,7 +405,7 @@ describe("rideFrequency", () => {
   it("gives the headway for a frequent line and the next times otherwise", () => {
     const next = ["2026-09-14T08:07:00+02:00", "2026-09-14T08:14:00+02:00"];
     expect(rideFrequency(leg(5, next))).toEqual({ every: 5 });
-    expect(rideFrequency(leg(7, next))).toEqual({ then: ["08:07", "08:14"] });
+    expect(rideFrequency(leg(7, next))).toEqual({ upcoming: ["08:07", "08:14"] });
     expect(rideFrequency(leg(12))).toEqual({ every: 12 });
     expect(rideFrequency(leg(null))).toBeNull();
   });

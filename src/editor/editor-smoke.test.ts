@@ -47,7 +47,7 @@ function hassWith(attributes: Record<string, unknown>): HomeAssistant {
     themes: { darkMode: false },
     localize: (key: string) => key,
     states: { [ENTITY]: { entity_id: ENTITY, state: "3", attributes } },
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** Two lines, both served in both directions — the ordinary case. */

@@ -23,7 +23,7 @@ function dep(over: Partial<DepartureAttr> = {}): DepartureAttr {
 }
 
 function attrs(over: Partial<WienerLinienAttrs> = {}): WienerLinienAttrs {
-  return { departures: [dep()], ...over } as WienerLinienAttrs;
+  return { departures: [dep()], ...over };
 }
 
 describe("deriveRetroView — row selection", () => {
@@ -70,7 +70,7 @@ describe("deriveRetroView — row selection", () => {
   });
 
   it("survives a sensor with no departures attribute at all", () => {
-    const v = deriveRetroView(cfg(), {} as WienerLinienAttrs);
+    const v = deriveRetroView(cfg(), {});
     expect(v.rows).toEqual([]);
     expect(v.platform).toBeNull();
     expect(v.stopName).toBe("");

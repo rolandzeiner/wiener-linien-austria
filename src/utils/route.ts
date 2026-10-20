@@ -112,7 +112,7 @@ export function normaliseRouteConfig(config: WienerLinienRouteCardConfig): Norma
 
 function stopIdOf(value: unknown, field: string): string {
   if (value === undefined || value === null || value === "") return "";
-  const text = String(value).trim();
+  const text = (typeof value === "string" || typeof value === "number" ? String(value) : "").trim();
   if (!/^\d+$/.test(text)) {
     throw new Error(`${ROUTE_CARD_TYPE}: '${field}' must be a stop number (DIVA)`);
   }
@@ -217,7 +217,7 @@ export function delayedClock(
  *  anyone needs, and the next exact times would only add reading. */
 const FREQUENT_HEADWAY_MINUTES = 5;
 
-export type RideFrequency = { every: number } | { then: string[] } | null;
+export type RideFrequency = { every: number } | { upcoming: string[] } | null;
 
 /** What the card says about how often a ride's line runs: the headway for a
  *  frequent line, otherwise the next departures, otherwise the headway if
@@ -226,7 +226,7 @@ export function rideFrequency(leg: RouteLegAttr): RideFrequency {
   const headway = leg.headway_minutes ?? null;
   const next = (leg.next_departures ?? []).map(clockOf).filter(Boolean);
   if (headway !== null && headway <= FREQUENT_HEADWAY_MINUTES) return { every: headway };
-  if (next.length) return { then: next };
+  if (next.length) return { upcoming: next };
   if (headway !== null) return { every: headway };
   return null;
 }

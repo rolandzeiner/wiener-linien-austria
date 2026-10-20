@@ -751,7 +751,7 @@ export function lineChipColors(
   line: string,
   overrides: Record<string, string>,
   gtfsColors: LineColorsMap = {},
-  scheme?: "dark" | "light" | undefined,
+  scheme?: "dark" | "light",
   fallback = "var(--primary-color)",
 ): { fill: string; ink: string | undefined; text: string | undefined } {
   const palette = chipPalette(line, overrides, gtfsColors, fallback);

@@ -230,8 +230,6 @@ interface HaFormElement extends HTMLElement {
 // Keep in sync with sensor.extra_state_attributes in custom_components/.
 // ---------------------------------------------------------------------------
 
-export type DepartureDirection = "H" | "R";
-
 // One entry on the per-departure "stops ahead" trail. `is_terminus`
 // only appears on the final stop. `lines` is the list of OTHER lines
 // (excluding the one this departure runs on) that pass through this
@@ -246,7 +244,8 @@ export interface StopAheadAttr {
 export interface DepartureAttr {
   line: string;
   towards: string;
-  direction: DepartureDirection | string;
+  /** `"H"` or `"R"` in practice; typed loosely because it is upstream data. */
+  direction: string;
   type: string;
   countdown: number;
   time_planned?: string | null;

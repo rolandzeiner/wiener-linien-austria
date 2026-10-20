@@ -517,7 +517,7 @@ export class WienerLinienAustriaCard extends LitElement {
   }
 
   private _attrs(entityId: string): WienerLinienAttrs {
-    return (this.hass?.states?.[entityId]?.attributes ?? {}) as WienerLinienAttrs;
+    return this.hass?.states?.[entityId]?.attributes ?? {};
   }
 
   // ------------------------------------------------------------------
@@ -1424,9 +1424,9 @@ export class WienerLinienAustriaCard extends LitElement {
     // The command takes the two direction codes /monitor uses and nothing else.
     if (direction !== "H" && direction !== "R") return null;
     if (open) this._runTimeWants.push({ diva, line, direction });
-    const state = this._runTimes.get(diva);
-    const minutes = state?.runTimes[runTimeKey(line, direction)];
-    if (state && !minutes) return null;
+    const held = this._runTimes.get(diva);
+    const minutes = held?.runTimes[runTimeKey(line, direction)];
+    if (held && !minutes) return null;
     const now = Date.now();
     return (stopName) => stopEta(dep, minutes?.[stopName], now);
   }
@@ -2518,7 +2518,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const shapes = WienerLinienAustriaCard.DEV_TRAFFIC_SHAPES;
     const shape = shapes[this._devTrafficVariant % shapes.length]!;
     this._devTrafficVariant += 1;
-    const html = shape.html(line, towards);
+    const markup = shape.html(line, towards);
     this._debugTraffic = [
       ...this._debugTraffic,
       {
@@ -2526,11 +2526,11 @@ export class WienerLinienAustriaCard extends LitElement {
         title: `${line}: ${shape.label}`,
         // Plain-text twin of the HTML, mirroring the feed: `description`
         // is the same prose with the tags removed.
-        description: html
+        description: markup
           .replace(/<[^>]+>/g, " ")
           .replace(/\s+/g, " ")
           .trim(),
-        description_html: html,
+        description_html: markup,
         location: "Debug-Stelle",
         related_lines: [line],
         time_start: new Date(now.getTime() - 30 * 60_000).toISOString(),

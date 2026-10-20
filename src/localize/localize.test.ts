@@ -22,6 +22,7 @@ import retroView from "../utils/retro-view.ts?raw";
 import stationIcons from "../utils/retro-station-icons.ts?raw";
 import sharedRender from "../shared-render.ts?raw";
 import routeUtils from "../utils/route.ts?raw";
+import { sorted } from "../utils.js";
 
 // Catalogue health, guarded mechanically.
 //
@@ -45,8 +46,8 @@ function flatten(dict: Dict, prefix = ""): Record<string, string> {
   return out;
 }
 
-const DE = flatten(de as unknown as Dict);
-const EN = flatten(en as unknown as Dict);
+const DE = flatten(de);
+const EN = flatten(en);
 
 const SOURCES: Record<string, string> = {
   modernCard,
@@ -82,7 +83,7 @@ const FORM_FIELD = /\bname:\s*"([a-z0-9_]+)"/g;
 
 describe("catalogue parity", () => {
   it("de and en carry exactly the same keys", () => {
-    expect(Object.keys(DE).sort()).toEqual(Object.keys(EN).sort());
+    expect(sorted(Object.keys(DE))).toEqual(sorted(Object.keys(EN)));
   });
 
   it("has no empty strings", () => {
@@ -94,10 +95,7 @@ describe("catalogue parity", () => {
   // literal `{line}` in it, or drops the substitution entirely.
   it("uses the same placeholders in both languages", () => {
     const tokens = (s: string): string =>
-      [...s.matchAll(/\{(\w+)\}/g)]
-        .map((m) => m[1]!)
-        .sort()
-        .join();
+      sorted(Array.from(s.matchAll(/\{(\w+)\}/g), (m) => m[1]!)).join();
     expect(Object.keys(DE).filter((k) => tokens(DE[k]!) !== tokens(EN[k]!))).toEqual([]);
   });
 });
@@ -178,11 +176,11 @@ describe("every key the code asks for resolves", () => {
     ["header-strip", headerStrip, ["retro", "flap"]],
   ])("%s keys resolve for every namespace that renders it", (_name, src, namespaces) => {
     const missing: string[] = [];
-    for (const ns of namespaces as string[]) {
-      for (const k of literals(src as string, ET_CALL)) {
+    for (const ns of namespaces) {
+      for (const k of literals(src, ET_CALL)) {
         if (!editorKeyResolves(ns, k)) missing.push(`${ns}.editor.${k}`);
       }
-      for (const k of literals(src as string, DOT_T_CALL)) {
+      for (const k of literals(src, DOT_T_CALL)) {
         if (DE[`${ns}.${k}`] === undefined) missing.push(`${ns}.${k}`);
       }
     }

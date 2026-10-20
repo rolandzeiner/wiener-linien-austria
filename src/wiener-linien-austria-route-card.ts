@@ -248,7 +248,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   public static getConfigElement(): LovelaceCardEditor {
-    return document.createElement(`${ROUTE_CARD_TYPE}-editor`) as LovelaceCardEditor;
+    return document.createElement(`${ROUTE_CARD_TYPE}-editor`);
   }
 
   public static getStubConfig(hass: HomeAssistant): Partial<WienerLinienRouteCardConfig> {
@@ -708,8 +708,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const cfg = this._config;
     if (!cfg) return nothing;
     const adhoc = !cfg.entity;
-    const state = cfg.entity ? this.hass?.states[cfg.entity] : undefined;
-    const attrs = ((adhoc ? this._plan : state?.attributes) ?? {}) as RouteAttrs;
+    const entity = cfg.entity ? this.hass?.states[cfg.entity] : undefined;
+    const attrs = ((adhoc ? this._plan : entity?.attributes) ?? {}) as RouteAttrs;
     const heading =
       cfg.title ||
       (adhoc
@@ -741,7 +741,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                   ${this._renderAdhocBody(cfg)}
                 </div>
               `
-              : this._renderBody(cfg, state?.state, attrs)
+              : this._renderBody(cfg, entity?.state, attrs)
           }
           ${attribution ? html`<div class="attribution">${attribution}</div>` : nothing}
         </div>
@@ -1407,7 +1407,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       ${
         "every" in frequency
           ? this._t("every_minutes", { n: frequency.every })
-          : this._t("then_at", { times: frequency.then.join(", ") })
+          : this._t("then_at", { times: frequency.upcoming.join(", ") })
       }
     </span>`;
   }

@@ -33,6 +33,7 @@ import {
 import { departureBoardOptions } from "../utils/entities.js";
 import { lineTypeIcon } from "../utils/mot.js";
 import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
+import { sorted } from "../utils.js";
 
 /** The saved shape every card's per-stop config structurally satisfies.
  *  Retro adapts its flat `{entity, lines, direction ("both" → absent),
@@ -77,9 +78,9 @@ export interface StopBlockOptions {
   /** Per-line colour overrides from the card config. */
   lineColorOverrides: Record<string, string>;
   /** Card-namespaced translator (`dir_h`, `dir_both`, `entity_missing`, …). */
-  t(key: string): string;
+  t: (key: string) => string;
   /** Editor-namespaced translator (`lines_label`, `walk_time_hint`, …). */
-  et(key: string): string;
+  et: (key: string) => string;
 }
 
 /** What `colorOf` hands each renderer. Mirrors `lineChipColors`'s return. */
@@ -105,7 +106,7 @@ const WALK_MIN = 1;
 const WALK_MAX = 120;
 
 function attrsOf(hass: HomeAssistant | undefined, entity: string): WienerLinienAttrs | undefined {
-  return hass?.states?.[entity]?.attributes as WienerLinienAttrs | undefined;
+  return hass?.states?.[entity]?.attributes;
 }
 
 /** Termini reachable in `dir`, optionally narrowed to one line. Feeds the
@@ -118,7 +119,7 @@ function terminiFor(triplets: ReadonlyArray<Triplet>, dir: "H" | "R", line?: str
     if (line && t.line !== line) continue;
     if (t.towards) out.add(t.towards);
   }
-  return [...out].sort();
+  return sorted(out);
 }
 
 /** Per-line rows replace the stop-wide control once two or more lines are in
@@ -151,7 +152,7 @@ export function renderStopBlock(
   // it in the list so it gets a chip, a direction row and a walk-time row, and
   // can actually be deselected. Dropping it stranded the config invisibly.
   const known = linesAtStop(attrs);
-  const lines = picked.size ? [...new Set([...known, ...picked])].sort() : known;
+  const lines = picked.size ? sorted(new Set([...known, ...picked])) : known;
   const triplets = tripletsAtStop(attrs);
 
   // Per-line vehicle type so each chip carries its mode icon. First-seen wins:
@@ -643,9 +644,9 @@ function renderWalkTimes(
 export interface StopsTabOptions extends Omit<StopBlockOptions, "index" | "total"> {
   hass: HomeAssistant | undefined;
   stops: readonly StopView[];
-  computeLabel(field: { name: string }): string;
-  computeHelper(field: { name: string }): string | undefined;
-  onEntitiesChanged(ev: CustomEvent<{ value: Record<string, unknown> }>): void;
+  computeLabel: (field: { name: string }) => string;
+  computeHelper: (field: { name: string }) => string | undefined;
+  onEntitiesChanged: (ev: CustomEvent<{ value: Record<string, unknown> }>) => void;
   callbacks: StopBlockCallbacks;
 }
 

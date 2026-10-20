@@ -24,8 +24,10 @@ const PALETTE: ReadonlyArray<[string, string]> = [
 ];
 
 describe("colorSchemeOf", () => {
-  const hass = (darkMode?: boolean): HomeAssistant =>
-    ({ states: {}, themes: darkMode === undefined ? {} : { darkMode } }) as HomeAssistant;
+  const hass = (darkMode?: boolean): HomeAssistant => ({
+    states: {},
+    themes: darkMode === undefined ? {} : { darkMode },
+  });
 
   it("reads the polarity from HA's themes state", () => {
     expect(colorSchemeOf(hass(true))).toBe("dark");

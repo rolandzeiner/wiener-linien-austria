@@ -104,7 +104,7 @@ export class WienerLinienAustriaRetroCardEditor extends BoardEditor<NormalisedRe
       },
       setWalkTime: (_eid, key, minutes) => {
         if (!this._config) return;
-        const cur = { ...(this._config.walk_times ?? {}) };
+        const cur = { ...this._config.walk_times };
         if (minutes === null) delete cur[key];
         else cur[key] = minutes;
         const next: NormalisedRetroConfig = { ...this._config };

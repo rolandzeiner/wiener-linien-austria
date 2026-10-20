@@ -10,6 +10,7 @@ import {
   walkTimePairs,
 } from "./departures.js";
 import type { DepartureAttr, WienerLinienAttrs } from "../types.js";
+import { sorted } from "../utils.js";
 
 function dep(over: Partial<DepartureAttr> = {}): DepartureAttr {
   return {
@@ -262,8 +263,10 @@ describe("walkTimePairs — rows the walk-time control offers", () => {
 });
 
 describe("directionSurface — unknown is not 'not served'", () => {
-  const attrs = (over: Partial<WienerLinienAttrs> = {}): WienerLinienAttrs =>
-    ({ departures: [], ...over }) as WienerLinienAttrs;
+  const attrs = (over: Partial<WienerLinienAttrs> = {}): WienerLinienAttrs => ({
+    departures: [],
+    ...over,
+  });
 
   it("reports unknown when there is no data at all", () => {
     const s = directionSurface(attrs());
@@ -286,7 +289,7 @@ describe("directionSurface — unknown is not 'not served'", () => {
       "N25",
     );
     expect(s.unknown).toBe(false);
-    expect([...s.available].sort()).toEqual(["H", "R"]);
+    expect(sorted(s.available)).toEqual(["H", "R"]);
     expect(s.oneWay).toBeNull();
   });
 
@@ -299,7 +302,7 @@ describe("directionSurface — unknown is not 'not served'", () => {
   it("narrows tracked keys to the requested line", () => {
     const a = attrs({ tracked_line_keys: ["U1|H", "U1|R", "13A|H"] });
     expect(directionSurface(a, "13A").oneWay).toBe("H");
-    expect([...directionSurface(a, "U1").available].sort()).toEqual(["H", "R"]);
+    expect(sorted(directionSurface(a, "U1").available)).toEqual(["H", "R"]);
   });
 
   it("falls back to live departures when no tracked keys exist", () => {
@@ -317,7 +320,7 @@ describe("directionSurface — unknown is not 'not served'", () => {
       }),
       "U1",
     );
-    expect([...s.available].sort()).toEqual(["H", "R"]);
+    expect(sorted(s.available)).toEqual(["H", "R"]);
   });
 
   it("ignores malformed direction components", () => {

@@ -97,7 +97,7 @@ export class WienerLinienAustriaRouteCardEditor extends LitElement implements Lo
   private _computeHelper = (field: { name: string }): string | undefined =>
     editorHelper(this._i18n, field.name);
 
-  private _onValueChanged(ev: CustomEvent<{ value: Record<string, unknown> }>): void {
+  private _onValueChanged = (ev: CustomEvent<{ value: Record<string, unknown> }>): void => {
     if (!this._config) return;
     const value = ev.detail.value;
     const next: Record<string, unknown> = { ...this._config, ...value };
@@ -113,7 +113,7 @@ export class WienerLinienAustriaRouteCardEditor extends LitElement implements Lo
     if (next.hide_attribution !== true) delete next.hide_attribution;
     this._config = normaliseRouteConfig(next as WienerLinienRouteCardConfig);
     fireEvent(this, "config-changed", { config: next });
-  }
+  };
 
   protected override updated(): void {
     if (this._stopsRequested || !this._config || this._config.entity || !this.hass?.callWS) {
@@ -147,7 +147,7 @@ export class WienerLinienAustriaRouteCardEditor extends LitElement implements Lo
       }
       <ha-form
         .hass=${this.hass}
-        .data=${this._config as unknown as Record<string, unknown>}
+        .data=${this._config}
         .schema=${schema(routes, !this._config.entity, this._stopSelector)}
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}

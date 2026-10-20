@@ -181,7 +181,7 @@ describe("reloadAfterCacheWipe", () => {
     const reload = vi.fn();
     Object.defineProperty(window, "location", {
       configurable: true,
-      value: { ...window.location, reload },
+      value: { reload },
     });
 
     reloadAfterCacheWipe("2.1.0");
@@ -194,7 +194,7 @@ describe("reloadAfterCacheWipe", () => {
     const reload = vi.fn();
     Object.defineProperty(window, "location", {
       configurable: true,
-      value: { ...window.location, reload },
+      value: { reload },
     });
 
     reloadAfterCacheWipe();

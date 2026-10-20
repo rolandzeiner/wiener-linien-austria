@@ -70,16 +70,16 @@ const EXIT_CHOICES: ReadonlyArray<{ value: RetroHeaderExit; icon: string; labelK
 
 export interface HeaderStripCallbacks {
   /** Patch one field on one side. The editor merges and normalises. */
-  patch(side: HeaderSideKey, field: keyof RetroHeaderSide, value: unknown): void;
+  patch: (side: HeaderSideKey, field: keyof RetroHeaderSide, value: unknown) => void;
   /** Which side the panel is editing. Editor-local UI state, never config. */
-  selectSide(side: HeaderSideKey): void;
+  selectSide: (side: HeaderSideKey) => void;
 }
 
 export interface HeaderStripOptions {
   left: RetroHeaderSide | undefined;
   right: RetroHeaderSide | undefined;
   selected: HeaderSideKey;
-  et(key: string): string;
+  et: (key: string) => string;
 }
 
 interface Token {
@@ -382,16 +382,16 @@ export interface HeaderSectionOptions {
   left: RetroHeaderSide | undefined;
   right: RetroHeaderSide | undefined;
   selected: HeaderSideKey;
-  et(key: string): string;
+  et: (key: string) => string;
   computeLabel: (field: { name: string }) => string;
   computeHelper: (field: { name: string }) => string | undefined;
   /** The side as the editor holds it right now. Read at patch time, not
    *  captured at render, so two edits landing before Lit re-renders both
    *  merge onto the latest config instead of the second dropping the first. */
-  currentSide(side: HeaderSideKey): RetroHeaderSide | undefined;
+  currentSide: (side: HeaderSideKey) => RetroHeaderSide | undefined;
   /** Merge a partial config value: `{ show_header }` or one whole side. */
-  onChange(value: Record<string, unknown>): void;
-  selectSide(side: HeaderSideKey): void;
+  onChange: (value: Record<string, unknown>) => void;
+  selectSide: (side: HeaderSideKey) => void;
 }
 
 /** The "Header" section of the retro and flap editors: the `show_header`

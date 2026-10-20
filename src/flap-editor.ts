@@ -24,6 +24,7 @@ import { headerStripStyles } from "./editor/header-strip-styles.js";
 import { renderFormSection } from "./editor/editor-shell.js";
 import { MultiStopEditor } from "./editor/board-editor.js";
 import type { WienerLinienAttrs, WienerLinienFlapCardConfig } from "./types.js";
+import { sorted } from "./utils.js";
 import { normaliseFlapConfig, type NormalisedFlapConfig } from "./utils/flap-config.js";
 
 @customElement("wiener-linien-austria-flap-card-editor")
@@ -154,7 +155,7 @@ export class WienerLinienAustriaFlapCardEditor extends MultiStopEditor<Normalise
         : undefined;
       for (const ln of Object.keys(lineColors ?? {})) tracked.add(ln);
     }
-    for (const line of [...tracked].sort()) {
+    for (const line of sorted(tracked)) {
       options.push({ value: `line:${line}`, label: line });
     }
     options.push({ value: "white", label: et("station_bg_white") });
