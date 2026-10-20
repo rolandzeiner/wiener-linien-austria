@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { accentTextColor, colorSchemeOf, contrastRatio } from "./color.js";
 import { lineChipColors } from "./config.js";

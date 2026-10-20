@@ -25,7 +25,7 @@
 // defined. An unknown element is inert in the DOM and Lit renders straight
 // through it, which is why this costs a docblock rather than a test harness.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import "./wiener-linien-austria-card.js";
 import "./wiener-linien-austria-retro-card.js";

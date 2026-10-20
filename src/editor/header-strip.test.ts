@@ -15,7 +15,7 @@
 // straight through it, so the icon's `icon` attribute is still assertable.
 
 import { render } from "lit";
-import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vite-plus/test";
 
 import {
   renderHeaderSection,

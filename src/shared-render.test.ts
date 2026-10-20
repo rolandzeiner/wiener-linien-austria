@@ -12,7 +12,7 @@
 // it.
 
 import { render } from "lit";
-import { beforeEach, describe, expect, it, vi, afterEach } from "vitest";
+import { beforeEach, describe, expect, it, vi, afterEach } from "vite-plus/test";
 
 import {
   checkCardVersionWS,

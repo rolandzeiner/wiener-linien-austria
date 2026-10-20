@@ -1,5 +1,5 @@
-import * as de from "./languages/de.json";
-import * as en from "./languages/en.json";
+import de from "./languages/de.json";
+import en from "./languages/en.json";
 
 type Dict = Record<string, unknown>;
 

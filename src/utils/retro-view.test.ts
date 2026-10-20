@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { deriveRetroView, retroEmptyStateKey } from "./retro-view.js";
 import { normaliseRetroConfig } from "./config.js";

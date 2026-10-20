@@ -24,7 +24,7 @@
 // this layer costs a docblock rather than a test harness — no vitest config,
 // no HA stubs, no shims.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import "../editor.js";
 import "../retro-editor.js";

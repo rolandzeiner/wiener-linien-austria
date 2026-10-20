@@ -3,7 +3,7 @@
 // `parseTrafficNotice` extracts through `DOMParser`, which the default node
 // environment doesn't provide. Opted in per-file rather than globally so the
 // other suites keep the faster node environment.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   iconForElevatorReason,

@@ -10,7 +10,7 @@
  * — inert in the DOM, which is all the render path needs.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import cardStylesSource from "./card-styles.ts?raw";
 import routeCardSource from "./wiener-linien-austria-route-card.ts?raw";
