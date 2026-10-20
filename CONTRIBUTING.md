@@ -155,13 +155,14 @@ picks between them per file:
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
 - **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
-  file's leading comment, for anything that needs a DOM. Seven of the 25 test
+  file's leading comment, for anything that needs a DOM. Eight of the 27 test
   files today: `card-smoke.test.ts` mounts the three departure-board cards,
   `editor-smoke.test.ts` mounts their three editors and asserts the
   `config-changed` payload, `editor/board-editor.test.ts` checks which `hass`
   updates re-render an editor, `route-card.test.ts` covers the route card, its
   ad-hoc mode and its editor,
   `editor/header-strip.test.ts` drives the signage-strip editor,
+  `utils/station-header.test.ts` checks the order of the strip the cards render,
   `shared-render.test.ts` covers the stale-cache reload machinery, and
   `utils/traffic-notice.test.ts` needs `DOMParser` to extract notice prose.
 
