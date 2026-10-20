@@ -567,3 +567,59 @@ describe("helper text names the setting a field depends on", () => {
     expect(form(on).computeHelper({ name: "message_text" })).not.toBe("Braucht „Lauftext anzeigen“.");
   });
 });
+
+describe("section headers and line colours (modern)", () => {
+  const MODERN_CFG = { type: "custom:wiener-linien-austria-card", entities: [{ entity: ENTITY }] };
+
+  async function onTab(index: number, config: Record<string, unknown> = {}): Promise<EditorElement> {
+    const el = await mount(MODERN, BUSY_STOP, { ...MODERN_CFG, ...config });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.click();
+    await el.updateComplete;
+    return el;
+  }
+
+  const hints = (el: EditorElement): string[] =>
+    [...shadow(el).querySelectorAll(".wl-section-hint")].map((h) => h.textContent ?? "");
+
+  it("names what each Anzeige section is set to", async () => {
+    // Defaults: hero on, six rows, stops trail on, every mode, platform shown,
+    // alerts, elevators and colour-coded delays on.
+    expect(hints(await onTab(1))).toEqual([
+      "Große Abfahrt · 6 Abfahrten · Zwischenstationen",
+      "Alle Verkehrsmittel",
+      "Steig",
+      "Störungen · Aufzüge · Verspätungen farbig",
+    ]);
+  });
+
+  it("follows the config, including the switched-off cases", async () => {
+    const el = await onTab(1, {
+      hide_header: true,
+      show_hero_metric: false,
+      max_departures: 1,
+      show_stops_ahead: false,
+      show_platform: false,
+      show_traffic_info: false,
+      show_elevator_info: false,
+      show_delay: false,
+    });
+    expect(hints(el)).toEqual([
+      "Ohne Kopfzeile · 1 Abfahrt",
+      "Aus",
+      "Nur Linie, Ziel und Zeit",
+      "Aus",
+    ]);
+  });
+
+  it("offers Reset only for a line whose colour was changed", async () => {
+    const plain = await onTab(2);
+    expect(shadow(plain).querySelectorAll(".wl-color-row .wl-icon-btn")).toHaveLength(0);
+    expect(hints(plain)[0]).toBe("Offizielle Farben");
+
+    const changed = await onTab(2, { line_colors: { U3: "#123456" } });
+    const resets = shadow(changed).querySelectorAll(".wl-color-row .wl-icon-btn");
+    expect(resets).toHaveLength(1);
+    expect(resets[0]?.getAttribute("aria-label")).toContain("U3");
+    expect(hints(changed)[0]).toBe("1 angepasst");
+  });
+});

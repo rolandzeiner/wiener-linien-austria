@@ -153,10 +153,17 @@ export type HASelector =
     }
   | {
       select: {
-        mode?: "dropdown" | "list";
+        /** `box` (frontend 2025.3+) draws a tile per option and is the only
+         *  mode that shows `description` and `image`. */
+        mode?: "dropdown" | "list" | "box";
         multiple?: boolean;
         custom_value?: boolean;
-        options: ReadonlyArray<{ value: string; label: string }>;
+        options: ReadonlyArray<{
+          value: string;
+          label: string;
+          description?: string;
+          image?: string | { src: string; src_dark?: string; flip_rtl?: boolean };
+        }>;
       };
     };
 
