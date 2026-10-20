@@ -200,7 +200,7 @@ describe("edge states are reachable", () => {
     // The empty state can only ever render inside a stop block, so a stop is
     // always already chosen and named in the header directly above it. That is
     // why its hint must describe what the sensor is doing rather than tell the
-    // user to pick a stop — which is what it used to say.
+    // user to pick a stop.
     expect(shadow(el).querySelector(".wl-section-title")?.textContent).toContain("Kalt");
   });
 
@@ -700,9 +700,10 @@ describe("flap station-band background options", () => {
   }
 
   it("offers one entry per line in the stop's filter, sorted", async () => {
-    expect(await bgOptions(BUSY_STOP, [{ entity: ENTITY, lines: ["U3", "52"] }])).toEqual([
+    // A set the live palette doesn't match, so only the filter can produce it.
+    expect(await bgOptions(BUSY_STOP, [{ entity: ENTITY, lines: ["U3", "13A"] }])).toEqual([
       "line",
-      "line:52",
+      "line:13A",
       "line:U3",
       "white",
       "black",

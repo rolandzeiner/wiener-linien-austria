@@ -1202,6 +1202,7 @@ describe("retro station-name tile", () => {
     const station = await tile({});
     expect(station?.textContent?.trim()).toBe("Westbahnhof");
     expect(station?.style.background).toBe("#EF7C00");
+    expect(station?.style.color).toBe("#FFFFFF");
   });
 
   it("falls back to white for a line with no published colour", async () => {
@@ -1211,8 +1212,10 @@ describe("retro station-name tile", () => {
   });
 
   it("uses the fixed colours the user picked", async () => {
-    expect((await tile({ station_bg: "black" }))?.style.background).toBe("#000");
-    expect((await tile({ station_bg: "white" }))?.style.background).toBe("#fff");
+    const black = await tile({ station_bg: "black" });
+    expect([black?.style.background, black?.style.color]).toEqual(["#000", "#fff"]);
+    const white = await tile({ station_bg: "white" });
+    expect([white?.style.background, white?.style.color]).toEqual(["#fff", "#000"]);
   });
 
   it("stays hidden unless asked for", async () => {

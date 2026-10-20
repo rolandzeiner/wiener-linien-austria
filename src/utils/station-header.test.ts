@@ -18,8 +18,8 @@ function mount(left?: RetroHeaderSide, right?: RetroHeaderSide): HTMLElement {
   return host;
 }
 
-/** One token per child of a side: the aria-label of an icon tile, otherwise
- *  the chip kind or its text. */
+/** One token per child of a side: "clock" / "date" for those chips, otherwise
+ *  an icon tile's aria-label, otherwise the text. */
 function order(host: HTMLElement, pos: "left" | "right"): string[] {
   const side = host.querySelector(`.retro-station-header__side--${pos}`)!;
   return [...side.children].map((el) => {

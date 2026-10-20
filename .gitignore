@@ -171,7 +171,3 @@ private_*.py
 # Dev-only fixture hook (gitignored by design — per-repo file is local)
 # ───────────────────────────────────────────────────────────────────
 custom_components/*/_dev_fixture.py
-
-# MDI icon names extracted from @mdi/js so the retro editor's "Extra
-# icons" chip input can offer autocomplete. Regenerated on every
-# `npm run build` / `npm run dev`.
