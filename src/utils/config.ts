@@ -315,6 +315,7 @@ export interface NormalisedModernConfigValidated {
   show_platform: boolean;
   show_hero_metric: boolean;
   show_departures: boolean;
+  show_departure_time: boolean;
   show_stops_ahead: boolean;
   show_stop_times: boolean;
   /** Which vehicle categories get a transfer chip in the stops-ahead trail.
@@ -365,6 +366,7 @@ const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_platform",
   "show_hero_metric",
   "show_departures",
+  "show_departure_time",
   "show_stops_ahead",
   "show_stop_times",
   "stops_ahead_modes",
@@ -390,6 +392,7 @@ const MODERN_DEFAULTS: Omit<
   show_platform: true,
   show_hero_metric: true,
   show_departures: true,
+  show_departure_time: false,
   show_stops_ahead: true,
   show_stop_times: false,
   show_qr_button: true,
@@ -511,6 +514,10 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     show_platform: asBool(raw.show_platform, MODERN_DEFAULTS.show_platform),
     show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
     show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
+    show_departure_time: asBool(
+      raw.show_departure_time,
+      MODERN_DEFAULTS.show_departure_time,
+    ),
     show_stops_ahead: showStopsAhead,
     show_stop_times:
       showStopsAhead && asBool(raw.show_stop_times, MODERN_DEFAULTS.show_stop_times),

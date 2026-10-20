@@ -633,6 +633,118 @@ describe("stops_ahead_modes", () => {
 });
 
 // ---------------------------------------------------------------------------
+// show_departure_time — estimated departure beside the countdown.
+// ---------------------------------------------------------------------------
+
+describe("show_departure_time", () => {
+  // Planned 16:38:00, leaving 16:38:30 live: half a minute is not late.
+  async function mountDeparture(
+    config: Record<string, unknown> = {},
+    timeReal?: string,
+  ): Promise<CardElement> {
+    const hass = trailHass();
+    if (timeReal) {
+      (
+        hass.states[ENTITY]!.attributes as { departures: Array<{ time_real: string }> }
+      ).departures[0]!.time_real = timeReal;
+    }
+    return mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_departure_time: true,
+      ...config,
+    });
+  }
+
+  const texts = (el: CardElement, selector: string): string[] =>
+    [...shadow(el).querySelectorAll(selector)].map((n) => n.textContent?.trim() ?? "");
+
+  it("shows no time while the option is off", async () => {
+    const el = await mountDeparture({ show_departure_time: false });
+    expect(shadow(el).querySelector(".dep-time")).toBeNull();
+    expect(shadow(el).querySelector(".row-time")).toBeNull();
+  });
+
+  it("puts the live departure in the hero, as the minute it falls in", async () => {
+    const el = await mountDeparture();
+    expect(texts(el, ".dep-time--hero time")).toEqual(["16:38"]);
+    const time = shadow(el).querySelector(".dep-time--hero time");
+    expect(time?.getAttribute("datetime")).toBe("2026-09-09T14:38:00.000Z");
+    expect(texts(el, ".dep-time--hero .sr-only")).toEqual(["Voraussichtliche Abfahrt 16:38"]);
+    expect(shadow(el).querySelector(".dep-time-planned")).toBeNull();
+  });
+
+  it("stacks the time under the countdown of a row", async () => {
+    const el = await mountDeparture({ show_hero_metric: false });
+    const cell = shadow(el).querySelector(".dep-row .row-time");
+    expect(cell?.firstElementChild?.classList.contains("countdown")).toBe(true);
+    expect(cell?.lastElementChild?.classList.contains("dep-time--row")).toBe(true);
+    expect(cell?.querySelector(".dep-time--row time")?.textContent?.trim()).toBe("16:38");
+  });
+
+  it("leaves the struck time out of a late row, but says it", async () => {
+    const el = await mountDeparture(
+      { show_hero_metric: false },
+      "2026-09-09T16:40:30.000+0200",
+    );
+    expect(shadow(el).querySelector(".dep-time--row s")).toBeNull();
+    expect(texts(el, ".dep-time--row time.late")).toEqual(["16:40"]);
+    expect(texts(el, ".dep-time--row .sr-only")).toEqual([
+      "Voraussichtliche Abfahrt 16:40, geplant 16:38, 2 min später",
+    ]);
+  });
+
+  // An expandable row or hero entry is a button whose label replaces its
+  // content for assistive tech, so what it shows has to be in the label.
+  it("reads the countdown and the time out on an expandable row", async () => {
+    const el = await mountDeparture({ show_hero_metric: false });
+    expect(shadow(el).querySelector(".dep-row")?.getAttribute("aria-label")).toBe(
+      "Streckenverlauf für U3 Richtung Simmering anzeigen · 3 Min · 1 Min. verspätet · Voraussichtliche Abfahrt 16:38",
+    );
+  });
+
+  it("reads the time out on an expandable hero entry", async () => {
+    const el = await mountDeparture({}, "2026-09-09T16:40:30.000+0200");
+    expect(shadow(el).querySelector(".hero-entry")?.getAttribute("aria-label")).toBe(
+      "Streckenverlauf für U3 Richtung Simmering anzeigen · Voraussichtliche Abfahrt 16:40, geplant 16:38, 2 min später",
+    );
+  });
+
+  it("reads the countdown out on an expandable row with the time switched off", async () => {
+    const el = await mountDeparture({ show_hero_metric: false, show_departure_time: false });
+    expect(shadow(el).querySelector(".dep-row")?.getAttribute("aria-label")).toBe(
+      "Streckenverlauf für U3 Richtung Simmering anzeigen · 3 Min · 1 Min. verspätet",
+    );
+  });
+
+  it("strikes the timetable's time through on a late departure", async () => {
+    const el = await mountDeparture({}, "2026-09-09T16:40:30.000+0200");
+    expect(texts(el, ".dep-time--hero s.dep-time-planned")).toEqual(["16:38"]);
+    expect(texts(el, ".dep-time--hero time")).toEqual(["16:40"]);
+    expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(1);
+    expect(texts(el, ".dep-time--hero .sr-only")).toEqual([
+      "Voraussichtliche Abfahrt 16:40, geplant 16:38, 2 min später",
+    ]);
+  });
+
+  it("prints only the expected time with delays switched off", async () => {
+    const el = await mountDeparture({ show_delay: false }, "2026-09-09T16:40:30.000+0200");
+    expect(shadow(el).querySelector(".dep-time-planned")).toBeNull();
+    expect(texts(el, ".dep-time--hero time")).toEqual(["16:40"]);
+    expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(0);
+  });
+
+  it("strikes through without the red when only the colours are off", async () => {
+    const el = await mountDeparture(
+      { show_delay_colors: false },
+      "2026-09-09T16:40:30.000+0200",
+    );
+    expect(texts(el, ".dep-time--hero s.dep-time-planned")).toEqual(["16:38"]);
+    expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // show_stop_times — estimated arrival beside each stop of the trail.
 // ---------------------------------------------------------------------------
 

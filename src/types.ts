@@ -406,6 +406,11 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_platform?: boolean | undefined;
   show_hero_metric?: boolean | undefined;
   show_departures?: boolean | undefined;
+  /** Put the estimated departure time beside the countdown, in the hero and
+   *  on every row: the live departure, or the planned one without live data.
+   *  A late departure shows the timetable's time struck through, as the
+   *  trail's arrival times do. Off by default. */
+  show_departure_time?: boolean | undefined;
   show_stops_ahead?: boolean | undefined;
   /** Put an estimated arrival time beside each stop of the trail: the
    *  departure's own time plus the timetable's minutes to that stop. The

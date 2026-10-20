@@ -431,6 +431,36 @@ describe("a switch that needs another one goes off with it (modern, Anzeige tab)
   });
 });
 
+describe("estimated departure time switch (modern, Anzeige tab)", () => {
+  type Form = { schema?: Array<{ name: string }>; data?: Record<string, unknown> };
+
+  async function forms(config: Record<string, unknown> = {}): Promise<Form[]> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    return [...shadow(el).querySelectorAll("ha-form")] as unknown as Form[];
+  }
+
+  const value = (all: Form[]): unknown =>
+    all.find((f) => f.schema?.some((x) => x.name === "show_departure_time"))?.data?.[
+      "show_departure_time"
+    ];
+
+  it("is off until switched on", async () => {
+    expect(value(await forms())).toBe(false);
+    expect(value(await forms({ show_departure_time: true }))).toBe(true);
+  });
+
+  it("sits right under the departure list switch", async () => {
+    const names = (await forms()).flatMap((f) => f.schema?.map((x) => x.name) ?? []);
+    expect(names[names.indexOf("show_departures") + 1]).toBe("show_departure_time");
+  });
+});
+
 describe("estimated arrival times switch (modern, Anzeige tab)", () => {
   type Field = { name: string; disabled?: boolean };
   type Form = { schema?: Field[]; data?: Record<string, unknown> };

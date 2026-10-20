@@ -1519,6 +1519,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
       this._expandState(d, entityId, "hero");
+    const depTime = this._departureTime(d);
 
     const entryClasses = {
       "hero-entry": true,
@@ -1538,7 +1539,11 @@ export class WienerLinienAustriaCard extends LitElement {
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
         aria-controls=${hasStopsAhead ? panelId : nothing}
-        aria-label=${hasStopsAhead ? ariaLabel : nothing}
+        aria-label=${hasStopsAhead
+          ? // The countdown sits outside the entry, in .hero-time, and is
+            // read there; the time inside it would be lost.
+            this._expanderLabel(ariaLabel, [depTime?.label])
+          : nothing}
         @click=${() => hasStopsAhead && this._toggleRow(rowKey)}
         @keydown=${(ev: KeyboardEvent) =>
           this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
@@ -1556,6 +1561,7 @@ export class WienerLinienAustriaCard extends LitElement {
           : nothing}
         <span class="hero-direction">${deText(d.towards)}</span>
         ${this._renderHeroBadges(d)}
+        ${this._renderDepartureTime(depTime, "hero")}
         ${hasStopsAhead
           ? html`<ha-icon
               class="hero-chevron"
@@ -1565,6 +1571,64 @@ export class WienerLinienAustriaCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /** The estimated departure time beside a countdown (show_departure_time):
+   *  the live departure, or the planned one without live data, as the
+   *  minute it falls in. A departure running a minute or more late prints
+   *  the timetable's time struck through first, the way the trail prints
+   *  its arrival times; the strike needs show_delay, the red on top needs
+   *  show_delay_colors. */
+  private _departureTime(
+    d: DepartureAttr,
+  ): { eta: StopEta; struck: boolean; label: string } | null {
+    const cfg = this._config!;
+    if (!cfg.show_departure_time) return null;
+    // A run of zero minutes: the departure itself.
+    const eta = stopEta(d, 0, Date.now());
+    if (!eta) return null;
+    const struck = cfg.show_delay && eta.planned !== undefined;
+    const lateLabel = struck
+      ? this._t("stop_time_late", { time: eta.planned!.clock, n: eta.planned!.late })
+      : "";
+    const label = [`${this._t("departure_time_title")} ${eta.clock}`, lateLabel]
+      .filter(Boolean)
+      .join(", ");
+    return { eta, struck, label };
+  }
+
+  /** The expander's label, which replaces the hero entry's or row's content
+   *  for assistive tech: the trail action first, then what the row shows
+   *  that the label would otherwise hide. The trail rows do the same. */
+  private _expanderLabel(action: string, shown: Array<string | null | undefined>): string {
+    return [action, ...shown].filter(Boolean).join(" · ");
+  }
+
+  private _renderDepartureTime(
+    time: ReturnType<WienerLinienAustriaCard["_departureTime"]>,
+    variant: "hero" | "row",
+  ): TemplateResult | typeof nothing {
+    if (!time) return nothing;
+    const { eta, struck, label } = time;
+    return html`<span class=${`dep-time dep-time--${variant}`}>
+      ${struck && variant === "hero"
+        ? // A row leaves the struck time out: its red time and the delay
+          // beside the direction already say it, and a pair would widen the
+          // cell and push that row's platform out of line with the others.
+          html`<s class="dep-time-planned" aria-hidden="true">${eta.planned!.clock}</s>`
+        : nothing}
+      <time
+        class=${classMap({
+          "dep-time-clock": true,
+          late: struck && this._config!.show_delay_colors,
+        })}
+        datetime=${eta.iso}
+        title=${label}
+        aria-hidden="true"
+        >${eta.clock}</time
+      >
+      <span class="sr-only">${label}</span>
+    </span>`;
   }
 
   /** The pills after a hero entry's direction: platform, timetable-only,
@@ -1756,6 +1820,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // short list.
     const { hasStopsAhead, rowKey, expanded, panelId, ariaLabel } =
       this._expandState(d, entityId, "row");
+    const depTime = this._departureTime(d);
 
     const rowClasses = {
       "dep-row": true,
@@ -1776,7 +1841,9 @@ export class WienerLinienAustriaCard extends LitElement {
         tabindex=${hasStopsAhead ? "0" : nothing}
         aria-expanded=${hasStopsAhead ? (expanded ? "true" : "false") : nothing}
         aria-controls=${hasStopsAhead ? panelId : nothing}
-        aria-label=${hasStopsAhead ? ariaLabel : nothing}
+        aria-label=${hasStopsAhead
+          ? this._expanderLabel(ariaLabel, [cdLabel, delayText, depTime?.label])
+          : nothing}
         @click=${() => hasStopsAhead && this._toggleRow(rowKey)}
         @keydown=${(ev: KeyboardEvent) =>
           this._onExpanderKeydown(ev, hasStopsAhead, () => this._toggleRow(rowKey))}
@@ -1838,7 +1905,14 @@ export class WienerLinienAustriaCard extends LitElement {
             </span>`
           : html`<span></span>`}
         <!-- Conditional spread avoids classMap({ "": true }) when cdState is "". -->
-        <div class=${classMap({ countdown: true, ...(cdState ? { [cdState]: true } : {}) })}>${cdLabel}</div>
+        ${depTime
+          ? // One grid cell either way: the clock stacks under the countdown,
+            // so the platform and the delay beside it stay where they were.
+            html`<div class="row-time">
+              <div class=${classMap({ countdown: true, ...(cdState ? { [cdState]: true } : {}) })}>${cdLabel}</div>
+              ${this._renderDepartureTime(depTime, "row")}
+            </div>`
+          : html`<div class=${classMap({ countdown: true, ...(cdState ? { [cdState]: true } : {}) })}>${cdLabel}</div>`}
         ${hasStopsAhead
           ? html`<ha-icon
               class="row-chevron"

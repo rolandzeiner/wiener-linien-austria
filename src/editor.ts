@@ -191,6 +191,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
           hide_header: cfg.hide_header,
           show_hero_metric: cfg.show_hero_metric,
           show_departures: cfg.show_departures,
+          show_departure_time: cfg.show_departure_time,
           show_stops_ahead: cfg.show_stops_ahead,
           show_stop_times: cfg.show_stop_times,
           show_qr_button: cfg.show_qr_button,
@@ -228,6 +229,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
           { name: "hide_header", selector: { boolean: {} } },
           { name: "show_hero_metric", selector: { boolean: {} } },
           { name: "show_departures", selector: { boolean: {} } },
+          { name: "show_departure_time", selector: { boolean: {} } },
           { name: "show_stops_ahead", selector: { boolean: {} } },
           {
             name: "show_stop_times",

@@ -1527,6 +1527,59 @@ export const cardStyles = css`
   .countdown.late  { color: var(--wl-error); }
   .countdown.early { color: var(--wl-rt); }
 
+  /* Estimated departure time (show_departure_time). In a row it stacks
+     under the countdown in the same grid cell, right-aligned with it, so
+     nothing to its left moves. The row grows by the clock's line; that is
+     the price of switching the option on, and set any tighter the two
+     lines read as one cramped block. Quieter than the
+     countdown (secondary colour, regular weight), since the minutes stay
+     what a glance is for. In the hero it closes the entry, before the
+     chevron. A late departure
+     prints the timetable's time struck through first, styled like the
+     trail's arrival times: the strike and the second time carry the
+     delay, the red comes on top only with show_delay_colors, in the same
+     mix as .stops-ahead-time.late for contrast. */
+  .row-time {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .row-time .countdown {
+    line-height: 1.2;
+  }
+  .dep-time {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--ha-space-1, 4px);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .dep-time--row {
+    font-size: var(--ha-font-size-s, 12px);
+    line-height: 1.2;
+    color: var(--secondary-text-color);
+  }
+  .dep-time--hero {
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+  .dep-time-planned {
+    text-decoration-thickness: 1.5px;
+  }
+  .dep-time-clock.late {
+    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    font-weight: 600;
+  }
+  /* On a narrow card the hero's struck time gives its room back; the
+     expected time stays, and so does the spoken delay. */
+  @container wlcard (inline-size < 360px) {
+    .dep-time-planned {
+      display: none;
+    }
+  }
+
   /* Empty / fallback states */
   .empty {
     padding: 18px 0;
