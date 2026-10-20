@@ -21,13 +21,13 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { AdhocStopOption } from "./types.js";
 import { filterStops, foldStopLabels, foldStopText } from "./utils/route.js";
 
-export const STOP_COMBOBOX_TAG = "wiener-linien-austria-stop-combobox";
+const STOP_COMBOBOX_TAG = "wiener-linien-austria-stop-combobox";
 
 /** How long typing has to pause before the match count is announced, so a
  *  screen reader doesn't read out a count for every keystroke. */
-export const STOP_STATUS_DELAY_MS = 500;
+const STOP_STATUS_DELAY_MS = 500;
 
-export interface StopPickedDetail {
+interface StopPickedDetail {
   value: string;
 }
 

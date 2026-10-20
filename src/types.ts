@@ -59,17 +59,13 @@ export interface LovelaceCardEditor extends HTMLElement {
   setConfig(config: LovelaceCardConfig): void;
 }
 
-/** `LovelaceCard` is only referenced as the `hui-error-card` tag-map
- *  entry below, so an HTMLElement alias suffices. */
-export type LovelaceCard = HTMLElement;
-
 // Register editor element tags with the global customElements registry so
 // TypeScript autocompletes them inside html`…` templates.
 declare global {
   interface HTMLElementTagNameMap {
     "wiener-linien-austria-card-editor": LovelaceCardEditor;
     "wiener-linien-austria-retro-card-editor": LovelaceCardEditor;
-    "hui-error-card": LovelaceCard;
+    "hui-error-card": HTMLElement;
     "ha-form": HaFormElement;
     "ha-icon-picker": HaIconPickerElement;
   }
