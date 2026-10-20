@@ -163,7 +163,7 @@ describe("edge states are reachable", () => {
     const alert = shadow(el).querySelector("ha-alert");
     expect(alert).toBeTruthy();
     expect(alert?.textContent).toContain("sensor.renamed_away");
-    expect(shadow(el).querySelector("[slot=\"action\"]")).toBeTruthy();
+    expect(shadow(el).querySelector('[slot="action"]')).toBeTruthy();
   });
 
   it("a sensor that has not reported yet shows the empty state", async () => {
@@ -262,9 +262,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
    *  does — by clicking. The Anzeige tab's other sections are `ha-form`,
    *  which is undefined here and renders nothing, so every `.wl-chip` found
    *  afterwards is a transfer-mode chip. */
-  async function onDisplayTab(
-    config: Record<string, unknown> = {},
-  ): Promise<EditorElement> {
+  async function onDisplayTab(config: Record<string, unknown> = {}): Promise<EditorElement> {
     const el = await mount(MODERN, BUSY_STOP, {
       type: "custom:wiener-linien-austria-card",
       entities: [{ entity: ENTITY }],
@@ -283,9 +281,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
   it("renders one chip per mode, all pressed by default", async () => {
     const chips = modeChips(await onDisplayTab());
     expect(chips).toHaveLength(6);
-    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(
-      Array(6).fill("true"),
-    );
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(Array(6).fill("true"));
   });
 
   it("reflects a saved subset rather than always showing every chip as on", async () => {
@@ -315,13 +311,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
     modeChips(el)[0]?.click();
     await el.updateComplete;
 
-    expect(config?.["stops_ahead_modes"]).toEqual([
-      "sbahn",
-      "tram",
-      "badner",
-      "bus",
-      "night",
-    ]);
+    expect(config?.["stops_ahead_modes"]).toEqual(["sbahn", "tram", "badner", "bus", "night"]);
   });
 
   // Empty must survive the round-trip: the normaliser reads a missing key as
@@ -343,9 +333,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
   it("goes inert — but stays focusable — with the stops trail switched off", async () => {
     const el = await onDisplayTab({ show_stops_ahead: false });
     const chips = modeChips(el);
-    expect(chips.map((c) => c.getAttribute("aria-disabled"))).toEqual(
-      Array(6).fill("true"),
-    );
+    expect(chips.map((c) => c.getAttribute("aria-disabled"))).toEqual(Array(6).fill("true"));
     // aria-disabled rather than the `disabled` attribute, so a keyboard user
     // sweeping the group still meets the option and the note explaining it.
     expect(chips.some((c) => c.hasAttribute("disabled"))).toBe(false);
@@ -550,7 +538,11 @@ describe("retro editor writes back through config-changed", () => {
   });
 
   it("a per-line direction writes that line only and keeps the stop-wide 'both'", async () => {
-    const el = await mount(RETRO, BUSY_STOP, { ...RETRO_CFG, lines: ["U3", "52"], direction: "both" });
+    const el = await mount(RETRO, BUSY_STOP, {
+      ...RETRO_CFG,
+      lines: ["U3", "52"],
+      direction: "both",
+    });
     const config = lastConfig(el);
     const u3 = [...shadow(el).querySelectorAll<HTMLElement>(".wl-override-row")].find(
       (row) => row.querySelector(".wl-badge")?.textContent?.trim() === "U3",
@@ -563,8 +555,7 @@ describe("retro editor writes back through config-changed", () => {
 
 describe("helper text names the setting a field depends on", () => {
   type Form = { computeHelper(field: { name: string }): string | undefined };
-  const form = (el: EditorElement): Form =>
-    shadow(el).querySelector("ha-form") as unknown as Form;
+  const form = (el: EditorElement): Form => shadow(el).querySelector("ha-form") as unknown as Form;
 
   it("modern: the stop layout only matters from two stops", async () => {
     const one = await mount(MODERN, BUSY_STOP, EDITORS[0]![1]);
@@ -573,7 +564,9 @@ describe("helper text names the setting a field depends on", () => {
       type: "custom:wiener-linien-austria-card",
       entities: [{ entity: ENTITY }, { entity: "sensor.other_abfahrten" }],
     });
-    expect(form(two).computeHelper({ name: "layout" })).not.toBe("Wirkt erst ab zwei Haltestellen.");
+    expect(form(two).computeHelper({ name: "layout" })).not.toBe(
+      "Wirkt erst ab zwei Haltestellen.",
+    );
   });
 
   it("modern: arrival times need the stops trail", async () => {
@@ -594,14 +587,19 @@ describe("helper text names the setting a field depends on", () => {
     const off = await mount(RETRO, BUSY_STOP, EDITORS[1]![1]);
     expect(form(off).computeHelper({ name: "message_text" })).toBe("Braucht „Lauftext anzeigen“.");
     const on = await mount(RETRO, BUSY_STOP, { ...EDITORS[1]![1], message_ticker: true });
-    expect(form(on).computeHelper({ name: "message_text" })).not.toBe("Braucht „Lauftext anzeigen“.");
+    expect(form(on).computeHelper({ name: "message_text" })).not.toBe(
+      "Braucht „Lauftext anzeigen“.",
+    );
   });
 });
 
 describe("section headers and line colours (modern)", () => {
   const MODERN_CFG = { type: "custom:wiener-linien-austria-card", entities: [{ entity: ENTITY }] };
 
-  async function onTab(index: number, config: Record<string, unknown> = {}): Promise<EditorElement> {
+  async function onTab(
+    index: number,
+    config: Record<string, unknown> = {},
+  ): Promise<EditorElement> {
     const el = await mount(MODERN, BUSY_STOP, { ...MODERN_CFG, ...config });
     shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.click();
     await el.updateComplete;

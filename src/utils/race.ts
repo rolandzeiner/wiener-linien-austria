@@ -47,9 +47,12 @@ export type Racer = "A" | "B";
 // screen: about half in simulation, and every one when both racers start
 // close to the strip.
 const RACE_PATTERNS: ReadonlyArray<readonly [Racer, Racer, Racer]> = [
-  ["A", "A", "B"], ["B", "B", "A"],   // single late swap
-  ["A", "B", "B"], ["B", "A", "A"],   // single mid swap
-  ["A", "B", "A"], ["B", "A", "B"],   // double swap (ping-pong)
+  ["A", "A", "B"],
+  ["B", "B", "A"], // single late swap
+  ["A", "B", "B"],
+  ["B", "A", "A"], // single mid swap
+  ["A", "B", "A"],
+  ["B", "A", "B"], // double swap (ping-pong)
 ];
 
 // When the winner reaches the line, in ms from the gate opening.
@@ -164,17 +167,14 @@ const smoothstep = (t: number): number => {
   const c = clamp01(t);
   return c * c * (3 - 2 * c);
 };
-const ramp = (u: number, from: number, to: number): number =>
-  smoothstep((u - from) / (to - from));
+const ramp = (u: number, from: number, to: number): number => smoothstep((u - from) / (to - from));
 
 /** Shared normalised progress s(u), sampled on the keyframe grid.
  *  Trapezoidal integral of the launch-into-cruise velocity profile,
  *  scaled so s(0) = 0 and s(1) = 1. */
 function buildProgress(): number[] {
   const velocity = (u: number): number =>
-    u >= LAUNCH_SPAN
-      ? 1
-      : LAUNCH_FLOOR + (1 - LAUNCH_FLOOR) * smoothstep(u / LAUNCH_SPAN);
+    u >= LAUNCH_SPAN ? 1 : LAUNCH_FLOOR + (1 - LAUNCH_FLOOR) * smoothstep(u / LAUNCH_SPAN);
   const s: number[] = [0];
   for (let i = 1; i <= SAMPLE_COUNT; i += 1) {
     const u0 = (i - 1) / SAMPLE_COUNT;
@@ -210,8 +210,7 @@ function buildDuel(pattern: readonly [Racer, Racer, Racer]): number[] {
       sigma += t.delta * smoothstep((u - t.centre + half) / DUEL_TRANSITION_WIDTH);
     }
     const envelope =
-      ramp(u, DUEL_FADE_IN[0], DUEL_FADE_IN[1]) *
-      (1 - ramp(u, DUEL_FADE_OUT[0], DUEL_FADE_OUT[1]));
+      ramp(u, DUEL_FADE_IN[0], DUEL_FADE_IN[1]) * (1 - ramp(u, DUEL_FADE_OUT[0], DUEL_FADE_OUT[1]));
     out.push(sigma * envelope);
   }
   return out;
@@ -242,10 +241,7 @@ function duelAmplitude(
 /** Progress (0–1) at which this trajectory reaches the finish line,
  *  interpolated inside the sample it happens in. 0 when the racer is
  *  already at or past the line at the gate. */
-function crossingProgress(
-  samples: readonly RaceSample[],
-  finishX: number,
-): number {
+function crossingProgress(samples: readonly RaceSample[], finishX: number): number {
   if (samples[0]!.xCqw >= finishX) return 0;
   for (let i = 1; i < samples.length; i += 1) {
     const prev = samples[i - 1]!;
@@ -263,14 +259,11 @@ function crossingProgress(
  *  sampled paths the card hands to `Element.animate()`. Pure: no DOM
  *  access, no internal state. */
 export function computeRaceParams(measurements: RaceMeasurements): RaceParams {
-  const rand = (min: number, max: number): number =>
-    min + Math.random() * (max - min);
+  const rand = (min: number, max: number): number => min + Math.random() * (max - min);
 
   const intendedWinner: Racer = Math.random() < 0.5 ? "A" : "B";
   const isComeback = Math.random() < RACE_PROB_COMEBACK;
-  const patternLeader: Racer = isComeback
-    ? intendedWinner === "A" ? "B" : "A"
-    : intendedWinner;
+  const patternLeader: Racer = isComeback ? (intendedWinner === "A" ? "B" : "A") : intendedWinner;
   const patternPool = RACE_PATTERNS.filter((p) => p[2] === patternLeader);
   const pattern = patternPool[Math.floor(Math.random() * patternPool.length)]!;
 
@@ -327,10 +320,7 @@ export function computeRaceParams(measurements: RaceMeasurements): RaceParams {
     const crossU = crossingProgress(samples, finishX);
     const durationMs = Math.min(
       DURATION_MAX_MS,
-      Math.max(
-        DURATION_MIN_MS,
-        crossTarget[racer] / Math.max(crossU, CROSS_PROGRESS_FLOOR),
-      ),
+      Math.max(DURATION_MIN_MS, crossTarget[racer] / Math.max(crossU, CROSS_PROGRESS_FLOOR)),
     );
     return { startCqw: start, durationMs, crossMs: durationMs * crossU, samples };
   };

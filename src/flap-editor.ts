@@ -35,14 +35,10 @@ export class WienerLinienAustriaFlapCardEditor extends MultiStopEditor<Normalise
     // becomes an empty config in the editor — the user opens it, sees defaults,
     // and may overwrite a broken-but-recoverable file.
     if (!config || typeof config !== "object") {
-      throw new Error(
-        "wiener-linien-austria-flap-card-editor: config must be an object",
-      );
+      throw new Error("wiener-linien-austria-flap-card-editor: config must be an object");
     }
     if (config.entity !== undefined && typeof config.entity !== "string") {
-      throw new Error(
-        "wiener-linien-austria-flap-card-editor: 'entity' must be a string",
-      );
+      throw new Error("wiener-linien-austria-flap-card-editor: 'entity' must be a string");
     }
     super.setConfig(config);
   }
@@ -55,9 +51,7 @@ export class WienerLinienAustriaFlapCardEditor extends MultiStopEditor<Normalise
     cfg: NormalisedFlapConfig,
   ): Record<string, string | undefined> {
     const { et } = this._i18n;
-    return cfg.show_accessibility
-      ? {}
-      : { accessibility_only: et("accessibility_only_requires") };
+    return cfg.show_accessibility ? {} : { accessibility_only: et("accessibility_only_requires") };
   }
 
   // ------------------------------------------------------------------
@@ -144,11 +138,8 @@ export class WienerLinienAustriaFlapCardEditor extends MultiStopEditor<Normalise
     const options = [{ value: "line", label: et("station_bg_line") }];
     const tracked = new Set<string>();
     for (const stop of this._config?.entities ?? []) {
-      const attrs = this.hass?.states?.[stop.entity]?.attributes as
-        | WienerLinienAttrs
-        | undefined;
-      const stopLines =
-        stop.lines && stop.lines.length > 0 ? stop.lines : attrs?.tracked_lines;
+      const attrs = this.hass?.states?.[stop.entity]?.attributes as WienerLinienAttrs | undefined;
+      const stopLines = stop.lines && stop.lines.length > 0 ? stop.lines : attrs?.tracked_lines;
       for (const ln of stopLines ?? []) {
         if (typeof ln === "string" && ln) tracked.add(ln);
       }
@@ -159,8 +150,7 @@ export class WienerLinienAustriaFlapCardEditor extends MultiStopEditor<Normalise
     if (tracked.size === 0) {
       const firstEid = this._config?.entities?.[0]?.entity;
       const lineColors = firstEid
-        ? (this.hass?.states?.[firstEid]?.attributes as WienerLinienAttrs | undefined)
-            ?.line_colors
+        ? (this.hass?.states?.[firstEid]?.attributes as WienerLinienAttrs | undefined)?.line_colors
         : undefined;
       for (const ln of Object.keys(lineColors ?? {})) tracked.add(ln);
     }

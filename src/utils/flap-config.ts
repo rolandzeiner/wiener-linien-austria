@@ -26,17 +26,9 @@ import type {
   WienerLinienFlapCardConfig,
 } from "../types.js";
 import { CARD_DEFAULTS } from "./card-vocabulary.js";
-import {
-  filterPassthrough,
-  normaliseRetroHeaderSide,
-  normaliseStopFields,
-} from "./config.js";
+import { filterPassthrough, normaliseRetroHeaderSide, normaliseStopFields } from "./config.js";
 
-const FLAP_SIZES: ReadonlySet<FlapSize> = new Set([
-  "small",
-  "medium",
-  "regular",
-] as const);
+const FLAP_SIZES: ReadonlySet<FlapSize> = new Set(["small", "medium", "regular"] as const);
 
 /** Whitelist for station_bg. `"line"` (sentinel) and the two literal
  *  colour values are exact-match; `"line:<X>"` is matched by prefix in
@@ -156,9 +148,7 @@ const FLAP_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "housing",
 ]);
 
-export function normaliseFlapConfig(
-  raw: WienerLinienFlapCardConfig,
-): NormalisedFlapConfig {
+export function normaliseFlapConfig(raw: WienerLinienFlapCardConfig): NormalisedFlapConfig {
   // Default = "small" (which the editor surfaces as "Normal"). The
   // smaller pitch keeps the board readable in mixed-height dashboard
   // grids; users who want the bigger pitch can opt into "regular"
@@ -175,9 +165,7 @@ export function normaliseFlapConfig(
       `[wiener-linien-austria-flap-card] max_rows ${JSON.stringify(raw.max_rows)} is not a number — falling back to 2`,
     );
   }
-  const max_rows = max_rowsValid
-    ? Math.max(1, Math.min(8, Math.round(maxRowsRaw)))
-    : 2;
+  const max_rows = max_rowsValid ? Math.max(1, Math.min(8, Math.round(maxRowsRaw))) : 2;
 
   // Back-compat: flat single-entity shape gets promoted to entities[0].
   // Conditional spread, not undefined-pass-through: `{ lines: undefined }`
@@ -188,9 +176,7 @@ export function normaliseFlapConfig(
   } else if (typeof raw.entity === "string") {
     let legacyLines: string[] | undefined;
     if (Array.isArray(raw.lines)) {
-      legacyLines = raw.lines.filter(
-        (l): l is string => typeof l === "string" && l.length > 0,
-      );
+      legacyLines = raw.lines.filter((l): l is string => typeof l === "string" && l.length > 0);
     } else if (typeof raw.line === "string" && raw.line) {
       legacyLines = [raw.line];
     }
@@ -199,9 +185,7 @@ export function normaliseFlapConfig(
         entity: raw.entity,
         ...(legacyLines && legacyLines.length ? { lines: legacyLines } : {}),
         ...(raw.direction !== undefined ? { direction: raw.direction } : {}),
-        ...(raw.walk_times !== undefined
-          ? { walk_times: raw.walk_times }
-          : {}),
+        ...(raw.walk_times !== undefined ? { walk_times: raw.walk_times } : {}),
       } satisfies Partial<FlapStopConfig> & { entity: string },
     ];
   }
@@ -211,10 +195,7 @@ export function normaliseFlapConfig(
   for (const r of rawEntities) {
     const stop = normaliseStopEntry(r);
     if (!stop) {
-      console.warn(
-        "[wiener-linien-austria-flap-card] dropping malformed stop entry",
-        r,
-      );
+      console.warn("[wiener-linien-austria-flap-card] dropping malformed stop entry", r);
       continue;
     }
     if (seen.has(stop.entity)) continue;
@@ -251,8 +232,7 @@ export function normaliseFlapConfig(
     show_accessibility: asBool(raw.show_accessibility, true),
     // Needs the icon switched on, so off without it: see the same rule in
     // normaliseModernConfig for what a greyed-out switch left on used to do.
-    accessibility_only:
-      asBool(raw.show_accessibility, true) && raw.accessibility_only === true,
+    accessibility_only: asBool(raw.show_accessibility, true) && raw.accessibility_only === true,
     // Master gate for the signage header strip — defaults `false` so
     // pre-feature flap cards render byte-identical. Per-side configs
     // are preserved either way (so toggling back on restores them).
@@ -271,9 +251,7 @@ export function normaliseFlapConfig(
     // (true = show). Old-key-only configs read through the inversion and
     // render identically; the new key wins when both are present.
     show_line_column:
-      raw.show_line_column !== undefined
-        ? raw.show_line_column === true
-        : raw.line_pill !== true,
+      raw.show_line_column !== undefined ? raw.show_line_column === true : raw.line_pill !== true,
     housing: asBool(raw.housing, CARD_DEFAULTS.housing.flap),
   };
 }

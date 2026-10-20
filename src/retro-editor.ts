@@ -23,11 +23,7 @@ import { editorTokens } from "./editor/editor-tokens.js";
 import { headerStripStyles } from "./editor/header-strip-styles.js";
 import { renderFormSection } from "./editor/editor-shell.js";
 import { BoardEditor } from "./editor/board-editor.js";
-import {
-  renderStopBlock,
-  type StopBlockCallbacks,
-  type StopView,
-} from "./editor/stop-block.js";
+import { renderStopBlock, type StopBlockCallbacks, type StopView } from "./editor/stop-block.js";
 import type { HaFormSchema, WienerLinienRetroCardConfig } from "./types.js";
 import { normaliseRetroConfig, type NormalisedRetroConfig } from "./utils/config.js";
 import { departureBoardOptions } from "./utils/entities.js";
@@ -129,44 +125,46 @@ export class WienerLinienAustriaRetroCardEditor extends BoardEditor<NormalisedRe
       <ha-form
         .hass=${this.hass}
         .data=${{ entity: cfg.entity }}
-        .schema=${[
-          {
-            name: "entity",
-            required: true,
-            selector: {
-              entity: {
-                include_entities: departureBoardOptions(
-                  this.hass,
-                  cfg.entity ? [cfg.entity] : [],
-                ),
+        .schema=${
+          [
+            {
+              name: "entity",
+              required: true,
+              selector: {
+                entity: {
+                  include_entities: departureBoardOptions(
+                    this.hass,
+                    cfg.entity ? [cfg.entity] : [],
+                  ),
+                },
               },
             },
-          },
-        ] satisfies ReadonlyArray<HaFormSchema>}
+          ] satisfies ReadonlyArray<HaFormSchema>
+        }
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}
         @value-changed=${this._onEntityChanged}
       ></ha-form>
-      ${cfg.entity
-        ? renderStopBlock(
-            this.hass,
-            this._stopView(cfg),
-            {
-              index: 1,
-              total: 1,
-              lineColorOverrides: {},
-              t,
-              et,
-            },
-            this._stopCallbacks,
-          )
-        : nothing}
+      ${
+        cfg.entity
+          ? renderStopBlock(
+              this.hass,
+              this._stopView(cfg),
+              {
+                index: 1,
+                total: 1,
+                lineColorOverrides: {},
+                t,
+                et,
+              },
+              this._stopCallbacks,
+            )
+          : nothing
+      }
     `;
   }
 
-  private _onEntityChanged = (
-    ev: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
+  private _onEntityChanged = (ev: CustomEvent<{ value: Record<string, unknown> }>): void => {
     ev.stopPropagation();
     if (!this._config) return;
     const raw = ev.detail.value["entity"];

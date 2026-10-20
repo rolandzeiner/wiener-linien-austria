@@ -120,9 +120,7 @@ function emptyHass(): HomeAssistant {
  *      face of each split-flap tile — so its board text for line U3 is
  *      "U U 3 3", not "U3".
  */
-const CARDS: ReadonlyArray<
-  readonly [string, Record<string, unknown>, string]
-> = [
+const CARDS: ReadonlyArray<readonly [string, Record<string, unknown>, string]> = [
   [MODERN, { type: `custom:${MODERN}`, entities: [{ entity: ENTITY }] }, "U3"],
   [RETRO, { type: `custom:${RETRO}`, entity: ENTITY }, "U3"],
   [FLAP, { type: `custom:${FLAP}`, entities: [{ entity: ENTITY }] }, "UU33"],
@@ -161,9 +159,7 @@ describe("custom element registration", () => {
     // It happens at import time, so a bundling change that tree-shakes the
     // side effect away is silent — the card still works if you hand-write
     // the YAML, and is undiscoverable if you don't.
-    const registered = (
-      window as unknown as { customCards?: Array<{ type: string }> }
-    ).customCards;
+    const registered = (window as unknown as { customCards?: Array<{ type: string }> }).customCards;
     expect(registered).toBeDefined();
     const types = new Set((registered ?? []).map((c) => c.type));
     for (const [tag] of CARDS) {
@@ -267,7 +263,6 @@ describe("rendering", () => {
     const empty = shadow(el).querySelector(".retro-empty");
     expect(empty?.textContent?.trim()).toBe("Keine Abfahrten in dieser Richtung");
   });
-
 });
 
 /** A stop with a live U3 on either side of a planned S-Bahn train. */
@@ -415,9 +410,7 @@ describe("tab-scoped alert banner", () => {
   }
 
   const alertBadges = (el: CardElement): string[] =>
-    [...shadow(el).querySelectorAll(".alert-line-badge")].map(
-      (n) => n.textContent?.trim() ?? "",
-    );
+    [...shadow(el).querySelectorAll(".alert-line-badge")].map((n) => n.textContent?.trim() ?? "");
 
   const tabsConfig = {
     type: `custom:${MODERN}`,
@@ -596,16 +589,12 @@ describe("stops_ahead_modes", () => {
   // The Badner Bahn used to fall into `tram`, so this is the case that pins
   // the split: hiding trams must leave the WLB chip alone, and vice versa.
   it("hides the Badner Bahn without touching the trams", async () => {
-    const { total } = trailChips(
-      await mountTrail(["metro", "sbahn", "tram", "bus", "night"]),
-    );
+    const { total } = trailChips(await mountTrail(["metro", "sbahn", "tram", "bus", "night"]));
     expect(total).toBe(5);
   });
 
   it("hides the trams without touching the Badner Bahn", async () => {
-    const { total } = trailChips(
-      await mountTrail(["metro", "sbahn", "badner", "bus", "night"]),
-    );
+    const { total } = trailChips(await mountTrail(["metro", "sbahn", "badner", "bus", "night"]));
     expect(total).toBe(5);
   });
 
@@ -625,8 +614,8 @@ describe("stops_ahead_modes", () => {
   // the trail, only strip it of chips.
   it("still renders the stop name when every category is off", async () => {
     const el = await mountTrail([]);
-    const names = [...shadow(el).querySelectorAll(".stops-ahead-name")].map(
-      (n) => n.textContent?.trim(),
+    const names = [...shadow(el).querySelectorAll(".stops-ahead-name")].map((n) =>
+      n.textContent?.trim(),
     );
     expect(names).toContain("Zieglergasse");
   });
@@ -683,10 +672,7 @@ describe("show_departure_time", () => {
   });
 
   it("leaves the struck time out of a late row, but says it", async () => {
-    const el = await mountDeparture(
-      { show_hero_metric: false },
-      "2026-09-09T16:40:30.000+0200",
-    );
+    const el = await mountDeparture({ show_hero_metric: false }, "2026-09-09T16:40:30.000+0200");
     expect(shadow(el).querySelector(".dep-time--row s")).toBeNull();
     expect(texts(el, ".dep-time--row time.late")).toEqual(["16:40"]);
     expect(texts(el, ".dep-time--row .sr-only")).toEqual([
@@ -735,10 +721,7 @@ describe("show_departure_time", () => {
   });
 
   it("strikes through without the red when only the colours are off", async () => {
-    const el = await mountDeparture(
-      { show_delay_colors: false },
-      "2026-09-09T16:40:30.000+0200",
-    );
+    const el = await mountDeparture({ show_delay_colors: false }, "2026-09-09T16:40:30.000+0200");
     expect(texts(el, ".dep-time--hero s.dep-time-planned")).toEqual(["16:38"]);
     expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(0);
   });
@@ -802,9 +785,7 @@ async function openTrail(el: CardElement): Promise<void> {
 }
 
 const stopTimes = (el: CardElement): string[] =>
-  [...shadow(el).querySelectorAll(".stops-ahead-time")].map(
-    (n) => n.textContent?.trim() ?? "",
-  );
+  [...shadow(el).querySelectorAll(".stops-ahead-time")].map((n) => n.textContent?.trim() ?? "");
 
 describe("show_stop_times", () => {
   const U3 = { Zieglergasse: 2, Neubaugasse: 3 };
@@ -921,8 +902,7 @@ describe("show_stop_times", () => {
 describe("show_stop_times on a late departure", () => {
   // Planned 16:38:00, leaving 16:40:30: two and a half minutes behind.
   const LATE = "2026-09-09T16:40:30.000+0200";
-  const answer = (): unknown =>
-    runTimesAnswer({ "U3|H": { Zieglergasse: 2, Neubaugasse: 3 } });
+  const answer = (): unknown => runTimesAnswer({ "U3|H": { Zieglergasse: 2, Neubaugasse: 3 } });
 
   async function mountLate(config: Record<string, unknown> = {}): Promise<CardElement> {
     const callWS = vi.fn().mockResolvedValue(answer());
@@ -1079,7 +1059,17 @@ describe("retro wheelchair race", () => {
     proto.getBoundingClientRect = function (this: HTMLElement): DOMRect {
       const width = this.classList.contains("retro") ? 580 : 20;
       const left = this.classList.contains("retro-wheelchair") ? 200 : 0;
-      return { width, height: 20, left, top: 0, right: left + width, bottom: 20, x: left, y: 0, toJSON: () => ({}) };
+      return {
+        width,
+        height: 20,
+        left,
+        top: 0,
+        right: left + width,
+        bottom: 20,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      };
     };
   });
 
@@ -1097,7 +1087,12 @@ describe("retro wheelchair race", () => {
     return hass;
   }
 
-  const RACE_CONFIG = { type: `custom:${RETRO}`, entity: ENTITY, direction: "both", wheelchair_race: true };
+  const RACE_CONFIG = {
+    type: `custom:${RETRO}`,
+    entity: ENTITY,
+    direction: "both",
+    wheelchair_race: true,
+  };
 
   it("starts on a tap and plays both racers through the Web Animations API", async () => {
     const el = await mount(RETRO, raceHass(), RACE_CONFIG);
@@ -1143,7 +1138,8 @@ describe("modern card dev mode", () => {
   it("injects a test disruption and lift outage, and opens the colour palette", async () => {
     const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
     const root = shadow(el);
-    const [traffic, elevator, colours] = root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
+    const [traffic, elevator, colours] =
+      root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
     const alerts = (): number => root.querySelectorAll(".alert-title").length;
     const before = alerts();
 

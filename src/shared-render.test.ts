@@ -59,9 +59,7 @@ describe("checkCardVersionWS", () => {
     const hass = {
       callWS: vi.fn().mockResolvedValue({ version: "2.1.0" }),
     } as unknown as HomeAssistant;
-    expect(await checkCardVersionWS(hass, "x/card_version", "2.0.0")).toBe(
-      "2.1.0",
-    );
+    expect(await checkCardVersionWS(hass, "x/card_version", "2.0.0")).toBe("2.1.0");
   });
 
   it("stays silent when the backend has no handler", async () => {
@@ -86,9 +84,7 @@ describe("checkCardVersionWS", () => {
 
   it("stays silent without hass or without callWS", async () => {
     expect(await checkCardVersionWS(undefined, "x", "2.0.0")).toBeNull();
-    expect(
-      await checkCardVersionWS({} as HomeAssistant, "x", "2.0.0"),
-    ).toBeNull();
+    expect(await checkCardVersionWS({} as HomeAssistant, "x", "2.0.0")).toBeNull();
   });
 });
 

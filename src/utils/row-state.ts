@@ -32,10 +32,7 @@ export interface RowStateOptions {
   showPlatform: boolean;
 }
 
-export function deriveRowState(
-  d: DepartureAttr,
-  opts: RowStateOptions,
-): RowState {
+export function deriveRowState(d: DepartureAttr, opts: RowStateOptions): RowState {
   const countdown = Number.isFinite(d.countdown) ? d.countdown : null;
 
   // Not gated on `show_delay` here: that switch decides the "1 Minute
@@ -54,9 +51,7 @@ export function deriveRowState(
   else if (signedDelay <= -1) cdState = "early";
 
   const hasFlags = Boolean(
-    d.traffic_jam ||
-      (opts.showAccessibility && d.barrier_free) ||
-      (opts.showCooling && d.cooling),
+    d.traffic_jam || (opts.showAccessibility && d.barrier_free) || (opts.showCooling && d.cooling),
   );
 
   return {

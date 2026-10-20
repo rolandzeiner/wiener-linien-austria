@@ -84,8 +84,7 @@ export function runTimesAnswered(
   const runTimes = answer.run_times;
   return {
     runTimes: runTimes && typeof runTimes === "object" ? runTimes : {},
-    validUntil:
-      Number.isFinite(until) && until > nowMs ? until : nowMs + RUN_TIMES_RETRY_MS,
+    validUntil: Number.isFinite(until) && until > nowMs ? until : nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };
 }

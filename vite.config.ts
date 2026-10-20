@@ -62,9 +62,7 @@ export default defineConfig(({ command, mode }) => {
           // client-side failure signal, and the console.info banner shows
           // which bundle the browser actually loaded. Rolldown's dropConsole
           // is all-or-nothing, so keeping warn/error means keeping everything.
-          minify: dev
-            ? false
-            : { compress: { dropConsole: false }, mangle: true, codegen: true },
+          minify: dev ? false : { compress: { dropConsole: false }, mangle: true, codegen: true },
         },
       },
     },

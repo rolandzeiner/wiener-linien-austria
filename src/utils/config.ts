@@ -37,7 +37,11 @@ const RETRO_STATION_BG: ReadonlySet<RetroStationBg> = new Set([
   "black",
 ] as const);
 const RETRO_STYLES: ReadonlySet<RetroStyle> = new Set(["classic", "warm", "pixel"] as const);
-const RETRO_PLATFORM_SIDES: ReadonlySet<RetroPlatformSide> = new Set(["auto", "left", "right"] as const);
+const RETRO_PLATFORM_SIDES: ReadonlySet<RetroPlatformSide> = new Set([
+  "auto",
+  "left",
+  "right",
+] as const);
 // Curated valid values for the header strip's exit corner. Combines
 // the three fixed variants ("none" / "regular" / "accessible") with
 // the curated MDI set from `retro-station-icons` so the normaliser
@@ -214,9 +218,7 @@ export interface NormalisedModernStop {
   walk_times?: WalkTimes;
 }
 
-function normaliseLineDirections(
-  raw: unknown,
-): Record<string, "H" | "R"> | undefined {
+function normaliseLineDirections(raw: unknown): Record<string, "H" | "R"> | undefined {
   if (!raw || typeof raw !== "object") return undefined;
   const out: Record<string, "H" | "R"> = {};
   for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
@@ -455,7 +457,9 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
   // dashboards where the next bus/tram is the only thing the user
   // cares about. Upper bound 20 stays — pragmatic limit before the
   // row list becomes a wall of text.
-  const maxClamped = Number.isFinite(maxRaw) ? Math.max(0, Math.min(20, Math.round(maxRaw))) : MODERN_DEFAULTS.max_departures;
+  const maxClamped = Number.isFinite(maxRaw)
+    ? Math.max(0, Math.min(20, Math.round(maxRaw)))
+    : MODERN_DEFAULTS.max_departures;
 
   const lineColors: Record<string, string> = {};
   if (raw.line_colors && typeof raw.line_colors === "object") {
@@ -484,26 +488,19 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
   // kept hiding departures with the step-free icon switched off, and the
   // delay colours kept painting with delays switched off. Switching the
   // needed option back on does not bring the dependent one back.
-  const showAccessibility = asBool(
-    raw.show_accessibility,
-    MODERN_DEFAULTS.show_accessibility,
-  );
+  const showAccessibility = asBool(raw.show_accessibility, MODERN_DEFAULTS.show_accessibility);
   const showDelay = asBool(raw.show_delay, MODERN_DEFAULTS.show_delay);
   const showStopsAhead = asBool(raw.show_stops_ahead, MODERN_DEFAULTS.show_stops_ahead);
 
   return {
     ...passthrough,
-    type:
-      typeof raw.type === "string" && raw.type
-        ? raw.type
-        : "custom:wiener-linien-austria-card",
+    type: typeof raw.type === "string" && raw.type ? raw.type : "custom:wiener-linien-austria-card",
     entities,
     max_departures: maxClamped,
     line_colors: lineColors,
     show_accessibility: showAccessibility,
     accessibility_only:
-      showAccessibility &&
-      asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
+      showAccessibility && asBool(raw.accessibility_only, MODERN_DEFAULTS.accessibility_only),
     show_cooling: asBool(raw.show_cooling, MODERN_DEFAULTS.show_cooling),
     show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
     show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
@@ -514,13 +511,9 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     show_platform: asBool(raw.show_platform, MODERN_DEFAULTS.show_platform),
     show_hero_metric: asBool(raw.show_hero_metric, MODERN_DEFAULTS.show_hero_metric),
     show_departures: asBool(raw.show_departures, MODERN_DEFAULTS.show_departures),
-    show_departure_time: asBool(
-      raw.show_departure_time,
-      MODERN_DEFAULTS.show_departure_time,
-    ),
+    show_departure_time: asBool(raw.show_departure_time, MODERN_DEFAULTS.show_departure_time),
     show_stops_ahead: showStopsAhead,
-    show_stop_times:
-      showStopsAhead && asBool(raw.show_stop_times, MODERN_DEFAULTS.show_stop_times),
+    show_stop_times: showStopsAhead && asBool(raw.show_stop_times, MODERN_DEFAULTS.show_stop_times),
     stops_ahead_modes: normaliseTransferModes(raw.stops_ahead_modes),
     show_qr_button: asBool(raw.show_qr_button, MODERN_DEFAULTS.show_qr_button),
     hide_header: asBool(raw.hide_header, MODERN_DEFAULTS.hide_header),
@@ -615,9 +608,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
  *  expresses "every direction" as absence; the config spells it "both", so
  *  that a saved card can tell a deliberate choice apart from an omission.
  *  One helper so the card and the view can't answer this differently. */
-export function retroDirectionFilter(
-  direction: RetroDirection,
-): "H" | "R" | undefined {
+export function retroDirectionFilter(direction: RetroDirection): "H" | "R" | undefined {
   return direction === "both" ? undefined : direction;
 }
 
@@ -643,7 +634,8 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
   return {
     ...passthrough,
     type: raw.type || "custom:wiener-linien-austria-retro-card",
-    entity: typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
+    entity:
+      typeof raw.entity === "string" && raw.entity.startsWith("sensor.") ? raw.entity : undefined,
     direction,
     line: lines?.[0],
     lines: lines?.length ? lines : undefined,
@@ -653,10 +645,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     // hiding the column, where modern and flap both yield `true`).
     show_platform: asBool(raw.show_platform, CARD_DEFAULTS.show_platform.retro),
     platform_side: oneOf(RETRO_PLATFORM_SIDES, raw.platform_side, "auto"),
-    show_station_name: asBool(
-      raw.show_station_name,
-      CARD_DEFAULTS.show_station_name.retro,
-    ),
+    show_station_name: asBool(raw.show_station_name, CARD_DEFAULTS.show_station_name.retro),
     station_bg: oneOf(RETRO_STATION_BG, raw.station_bg, CARD_DEFAULTS.station_bg.retro),
     size: oneOf(RETRO_SIZES, raw.size, CARD_DEFAULTS.size.retro),
     style: oneOf(RETRO_STYLES, raw.style, "classic"),
@@ -687,9 +676,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     // see utils/card-vocabulary.ts. Polarity unchanged, so old YAML renders
     // identically; the new key wins when both are present.
     show_line_pill:
-      raw.show_line_pill !== undefined
-        ? raw.show_line_pill === true
-        : raw.line_pill === true,
+      raw.show_line_pill !== undefined ? raw.show_line_pill === true : raw.line_pill === true,
     line_stripe: raw.line_stripe === true,
     housing: asBool(raw.housing, CARD_DEFAULTS.housing.retro),
     show_unit: asBool(raw.show_unit, CARD_DEFAULTS.unit_caption.retro),

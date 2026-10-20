@@ -56,8 +56,7 @@ function renderHeaderSide(
   //   anything else            → no icon.
   let exitNode: TemplateResult | typeof nothing = nothing;
   if (side.exit === "regular" || side.exit === "accessible") {
-    const key: "exit" | "exit-access" =
-      side.exit === "regular" ? "exit" : "exit-access";
+    const key: "exit" | "exit-access" = side.exit === "regular" ? "exit" : "exit-access";
     exitNode = renderRetroHeaderIcon(key, {
       ariaLabel: t(`header.${RETRO_HEADER_ICONS[key].labelKey}`),
       // Glyph's native direction is `glyphPointsTo`. Flip when the side it
@@ -88,9 +87,7 @@ function renderHeaderSide(
   // variants (white square, --mdi padding modifier). Sit between the WC
   // tile and the text chips. Aria-label is the MDI key itself, the
   // closest semantic label we have without an explicit per-row label.
-  const mdiTileNodes = (side.extra_icons ?? []).map((icon) =>
-    renderRetroHeaderMdiTile(icon, icon),
-  );
+  const mdiTileNodes = (side.extra_icons ?? []).map((icon) => renderRetroHeaderMdiTile(icon, icon));
   const mdiTilesRightOrder = [...mdiTileNodes].reverse();
   // Text chips — same-height white boxes with dynamic width. Sit beyond
   // the MDI tiles (further from the sign text than any amenity icon or
@@ -98,8 +95,7 @@ function renderHeaderSide(
   // Mirrored across sides so chip[0] is always the closest-to-extra-icons
   // entry regardless of which side it lives on.
   const chipNodes = (side.chips ?? []).map(
-    (chipText) =>
-      html`<span class="retro-station-header__chip">${chipText}</span>`,
+    (chipText) => html`<span class="retro-station-header__chip">${chipText}</span>`,
   );
   const chipsRightOrder = [...chipNodes].reverse();
   // Optional clock + date chips. Suppressed if server_time hasn't arrived
@@ -168,9 +164,7 @@ export function renderStationHeader(opts: {
         ${left ? renderHeaderSide(left, "left", serverTime, t, lang) : nothing}
       </div>
       <div class="retro-station-header__side retro-station-header__side--right">
-        ${right
-          ? renderHeaderSide(right, "right", serverTime, t, lang)
-          : nothing}
+        ${right ? renderHeaderSide(right, "right", serverTime, t, lang) : nothing}
       </div>
     </div>
   `;

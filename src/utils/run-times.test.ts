@@ -214,8 +214,11 @@ describe("stopEta", () => {
       });
       expect(stopEta(at(null), 7, NOW)?.planned).toBeUndefined();
       expect(
-        stopEta({ time_planned: null, time_real: "2026-09-09T16:40:20.000+0200", countdown: 5 }, 7, NOW)
-          ?.planned,
+        stopEta(
+          { time_planned: null, time_real: "2026-09-09T16:40:20.000+0200", countdown: 5 },
+          7,
+          NOW,
+        )?.planned,
       ).toBeUndefined();
     });
   });

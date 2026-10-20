@@ -205,10 +205,7 @@ export interface HaFormExpandableSchema {
   schema: ReadonlyArray<HaFormSchema>;
 }
 
-export type HaFormSchema =
-  | HaFormSelectorSchema
-  | HaFormGridSchema
-  | HaFormExpandableSchema;
+export type HaFormSchema = HaFormSelectorSchema | HaFormGridSchema | HaFormExpandableSchema;
 
 /** `<ha-icon-picker>` element shape. Only usable outside `ha-form` — see
  *  editor/header-strip.ts for why nesting it in an expandable breaks it. */
@@ -455,11 +452,7 @@ export type RetroDirection = "H" | "R" | "both";
  *  here (`mdi:${string}`) to avoid a circular `types.ts ↔ utils`
  *  type import; the runtime normaliser validates against the
  *  curated set. */
-export type RetroHeaderExit =
-  | "none"
-  | "regular"
-  | "accessible"
-  | `mdi:${string}`;
+export type RetroHeaderExit = "none" | "regular" | "accessible" | `mdi:${string}`;
 
 /** Per-side config for the retro card's optional U-Bahn-signage
  *  header strip (the black band above the orange station name).

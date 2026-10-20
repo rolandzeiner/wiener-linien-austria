@@ -105,10 +105,7 @@ export function multiStopCallbacks<S extends MutableStop>(
  * user-visible order tracks what they dragged; a newly added entity gets a bare
  * placeholder for the normaliser to fill in.
  */
-export function rebuildStops<S extends MutableStop>(
-  current: ReadonlyArray<S>,
-  raw: unknown,
-): S[] {
+export function rebuildStops<S extends MutableStop>(current: ReadonlyArray<S>, raw: unknown): S[] {
   const ids = Array.isArray(raw)
     ? raw.filter((s): s is string => typeof s === "string" && s.length > 0)
     : [];

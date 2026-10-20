@@ -2,11 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import { deriveRetroView, retroEmptyStateKey } from "./retro-view.js";
 import { normaliseRetroConfig } from "./config.js";
-import type {
-  DepartureAttr,
-  WienerLinienAttrs,
-  WienerLinienRetroCardConfig,
-} from "../types.js";
+import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "../types.js";
 
 function cfg(over: Partial<WienerLinienRetroCardConfig> = {}) {
   return normaliseRetroConfig({
@@ -35,11 +31,7 @@ describe("deriveRetroView — row selection", () => {
     const v = deriveRetroView(
       cfg(),
       attrs({
-        departures: [
-          dep({ countdown: 1 }),
-          dep({ countdown: 3 }),
-          dep({ countdown: 7 }),
-        ],
+        departures: [dep({ countdown: 1 }), dep({ countdown: 3 }), dep({ countdown: 7 })],
       }),
     );
     expect(v.rows).toHaveLength(2);
@@ -57,12 +49,9 @@ describe("deriveRetroView — row selection", () => {
         dep({ line: "U1", direction: "R" }),
       ],
     });
-    expect(deriveRetroView(cfg({ line: "U3" }), feed).rows.map((d) => d.line))
-      .toEqual(["U3"]);
+    expect(deriveRetroView(cfg({ line: "U3" }), feed).rows.map((d) => d.line)).toEqual(["U3"]);
     // Retro always filters to one direction — default H.
-    expect(
-      deriveRetroView(cfg(), feed).rows.every((d) => d.direction === "H"),
-    ).toBe(true);
+    expect(deriveRetroView(cfg(), feed).rows.every((d) => d.direction === "H")).toBe(true);
   });
 
   it("shows both directions for every selected line", () => {
@@ -76,10 +65,7 @@ describe("deriveRetroView — row selection", () => {
         dep({ line: "U3", direction: "R" }),
       ],
     });
-    const view = deriveRetroView(
-      cfg({ lines: ["U1", "U2", "U3"], direction: "both" }),
-      feed,
-    );
+    const view = deriveRetroView(cfg({ lines: ["U1", "U2", "U3"], direction: "both" }), feed);
     expect(view.matching).toHaveLength(6);
   });
 
@@ -112,8 +98,7 @@ describe("deriveRetroView — platform column", () => {
 
   it("puts platform 2 on the left and everything else right, on auto", () => {
     const at = (p: string): boolean =>
-      deriveRetroView(cfg(), attrs({ departures: [dep({ platform: p })] }))
-        .gleisLeft;
+      deriveRetroView(cfg(), attrs({ departures: [dep({ platform: p })] })).gleisLeft;
     expect(at("2")).toBe(true);
     expect(at("1")).toBe(false);
     expect(at("3")).toBe(false);
@@ -121,13 +106,9 @@ describe("deriveRetroView — platform column", () => {
 
   it("lets an explicit side override the auto rule in both directions", () => {
     const feed = attrs({ departures: [dep({ platform: "1" })] });
-    expect(deriveRetroView(cfg({ platform_side: "left" }), feed).gleisLeft).toBe(
-      true,
-    );
+    expect(deriveRetroView(cfg({ platform_side: "left" }), feed).gleisLeft).toBe(true);
     const feed2 = attrs({ departures: [dep({ platform: "2" })] });
-    expect(
-      deriveRetroView(cfg({ platform_side: "right" }), feed2).gleisLeft,
-    ).toBe(false);
+    expect(deriveRetroView(cfg({ platform_side: "right" }), feed2).gleisLeft).toBe(false);
   });
 
   it("hiding the platform also flips the auto side, since there is no 2", () => {
@@ -143,12 +124,10 @@ describe("deriveRetroView — platform column", () => {
 describe("deriveRetroView — caption and station name", () => {
   it("says GLEIS for metro and STEIG for everything else", () => {
     expect(
-      deriveRetroView(cfg(), attrs({ departures: [dep({ type: "ptMetro" })] }))
-        .platformLabelKey,
+      deriveRetroView(cfg(), attrs({ departures: [dep({ type: "ptMetro" })] })).platformLabelKey,
     ).toBe("gleis");
     expect(
-      deriveRetroView(cfg(), attrs({ departures: [dep({ type: "ptTram" })] }))
-        .platformLabelKey,
+      deriveRetroView(cfg(), attrs({ departures: [dep({ type: "ptTram" })] })).platformLabelKey,
     ).toBe("steig");
   });
 
@@ -163,13 +142,10 @@ describe("deriveRetroView — caption and station name", () => {
   });
 
   it("falls back from stop_name to friendly_name, then to empty", () => {
-    expect(
-      deriveRetroView(cfg(), attrs({ stop_name: "Karlsplatz" })).stopName,
-    ).toBe("Karlsplatz");
-    expect(
-      deriveRetroView(cfg(), attrs({ friendly_name: "WL Karlsplatz" }))
-        .stopName,
-    ).toBe("WL Karlsplatz");
+    expect(deriveRetroView(cfg(), attrs({ stop_name: "Karlsplatz" })).stopName).toBe("Karlsplatz");
+    expect(deriveRetroView(cfg(), attrs({ friendly_name: "WL Karlsplatz" })).stopName).toBe(
+      "WL Karlsplatz",
+    );
     expect(deriveRetroView(cfg(), attrs()).stopName).toBe("");
   });
 });
@@ -182,10 +158,31 @@ describe("retroEmptyStateKey", () => {
     ["a frozen feed", cfg(), [], "2026-09-29T12:00:00+02:00", 2, "stale_feed"],
     ["a stop with nothing left", cfg(), [], "2026-09-29T12:00:00+02:00", 0, "betriebsschluss"],
     ["no answer at all", cfg(), [], null, 0, "no_data"],
-    ["a picked line that isn't running", cfg({ lines: ["U6"], direction: "both" }), [U3H, TRAM52R], null, 0, "no_data_wrong_line"],
-    ["a picked line running only the other way", cfg({ lines: ["U3"], direction: "both", line_directions: { U3: "R" } }), [U3H, TRAM52R], null, 0, "no_data_wrong_direction"],
+    [
+      "a picked line that isn't running",
+      cfg({ lines: ["U6"], direction: "both" }),
+      [U3H, TRAM52R],
+      null,
+      0,
+      "no_data_wrong_line",
+    ],
+    [
+      "a picked line running only the other way",
+      cfg({ lines: ["U3"], direction: "both", line_directions: { U3: "R" } }),
+      [U3H, TRAM52R],
+      null,
+      0,
+      "no_data_wrong_direction",
+    ],
     ["the stop-wide direction", cfg({ direction: "R" }), [U3H], null, 0, "no_data_wrong_direction"],
-    ["a legacy LB pick against a live WLB", cfg({ lines: ["LB"], direction: "R" }), [dep({ line: "WLB", direction: "H" })], null, 0, "no_data_wrong_direction"],
+    [
+      "a legacy LB pick against a live WLB",
+      cfg({ lines: ["LB"], direction: "R" }),
+      [dep({ line: "WLB", direction: "H" })],
+      null,
+      0,
+      "no_data_wrong_direction",
+    ],
   ] as const)("names %s", (_label, config, departures, serverTime, staleDropped, key) => {
     expect(retroEmptyStateKey(config, departures, serverTime, staleDropped)).toBe(key);
   });

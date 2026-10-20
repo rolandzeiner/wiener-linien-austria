@@ -6,14 +6,7 @@
 // the @state declarations below; reduced-motion fallback swaps the
 // rotation for a 60 ms cross-fade per WCAG 2.3.3.
 
-import {
-  LitElement,
-  css,
-  html,
-  nothing,
-  type PropertyValues,
-  type TemplateResult,
-} from "lit";
+import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
@@ -22,10 +15,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import { ATTRIBUTION_FALLBACK, FLAP_CARD_VERSION } from "./const.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
-import {
-  checkCardVersionWS,
-  renderVersionBanner,
-} from "./shared-render.js";
+import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
 import "./flap-editor.js";
 import type {
   DepartureAttr,
@@ -40,10 +30,7 @@ import type {
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
-import {
-  findWienerLinienEntities,
-  mergeLineColorsMaps,
-} from "./utils/entities.js";
+import { findWienerLinienEntities, mergeLineColorsMaps } from "./utils/entities.js";
 import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
@@ -138,9 +125,7 @@ const DEST_PICTOGRAM_GAP_PX = 6;
 // blank so the visual width is constant on the 10→9 / 0→N boundaries.
 // Negative or at-platform countdowns collapse to 0 (rendered as " 0").
 function padCountdown(countdown: number | undefined | null): string {
-  const cd = typeof countdown === "number" && Number.isFinite(countdown)
-    ? countdown
-    : null;
+  const cd = typeof countdown === "number" && Number.isFinite(countdown) ? countdown : null;
   if (cd === null) return "--";
   return String(cd <= 0 ? 0 : cd).padStart(2, " ");
 }
@@ -150,9 +135,7 @@ function padCountdown(countdown: number | undefined | null): string {
 {
   const win = window as unknown as WindowWithCustomCards;
   win.customCards = win.customCards ?? [];
-  if (
-    !win.customCards.some((c) => c.type === "wiener-linien-austria-flap-card")
-  ) {
+  if (!win.customCards.some((c) => c.type === "wiener-linien-austria-flap-card")) {
     win.customCards.push({
       type: "wiener-linien-austria-flap-card",
       name: "Wiener Linien Austria — Flap Board",
@@ -208,9 +191,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       throw new Error("wiener-linien-austria-flap-card: config must be an object");
     }
     if (config.entity !== undefined && typeof config.entity !== "string") {
-      throw new Error(
-        "wiener-linien-austria-flap-card: 'entity' must be a string",
-      );
+      throw new Error("wiener-linien-austria-flap-card: 'entity' must be a string");
     }
     const normalised = normaliseFlapConfig(config);
     // If the user configured stops but every single one was rejected
@@ -262,14 +243,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   public static getConfigElement(): LovelaceCardEditor {
-    return document.createElement(
-      "wiener-linien-austria-flap-card-editor",
-    ) as LovelaceCardEditor;
+    return document.createElement("wiener-linien-austria-flap-card-editor") as LovelaceCardEditor;
   }
 
-  public static getStubConfig(
-    hass: HomeAssistant,
-  ): Partial<WienerLinienFlapCardConfig> {
+  public static getStubConfig(hass: HomeAssistant): Partial<WienerLinienFlapCardConfig> {
     const entities = findWienerLinienEntities(hass);
     const first = entities[0];
     if (!first) return {};
@@ -299,9 +276,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   /** Any field whose displayed text hasn't reached its target yet — i.e.
    *  the march is unfinished and needs a timer to carry it. */
   private _hasPendingFlips(): boolean {
-    return Object.entries(this._target).some(
-      ([key, target]) => this._displayed[key] !== target,
-    );
+    return Object.entries(this._target).some(([key, target]) => this._displayed[key] !== target);
   }
 
   public override disconnectedCallback(): void {
@@ -440,10 +415,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
   private _ensureMarchTimer(): void {
     if (this._marchTimer !== null) return;
-    this._marchTimer = setInterval(
-      () => this._marchTick(),
-      FLAP_MARCH_INTERVAL_MS,
-    );
+    this._marchTimer = setInterval(() => this._marchTick(), FLAP_MARCH_INTERVAL_MS);
   }
 
   private _marchTick(): void {
@@ -564,11 +536,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   private _t(key: string, replacements?: Record<string, string | number>): string {
-    return translate(
-      `flap.${key}`,
-      { hassLanguage: this.hass?.language },
-      replacements,
-    );
+    return translate(`flap.${key}`, { hassLanguage: this.hass?.language }, replacements);
   }
 
   // ------------------------------------------------------------------
@@ -583,11 +551,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // Card-wide metadata sourced from the FIRST stop: WL-orange band
     // station name and server_time for the header chips.
     const firstEid = eids[0] ?? "";
-    const firstAttrs = (firstEid
-      ? this.hass?.states?.[firstEid]?.attributes ?? {}
-      : {}) as WienerLinienAttrs;
-    const stationName =
-      firstAttrs.stop_name || firstAttrs.friendly_name || "";
+    const firstAttrs = (
+      firstEid ? (this.hass?.states?.[firstEid]?.attributes ?? {}) : {}
+    ) as WienerLinienAttrs;
+    const stationName = firstAttrs.stop_name || firstAttrs.friendly_name || "";
     const serverTime = firstAttrs.server_time;
     // The palette is the one card-wide value that must NOT come from the
     // first stop alone. This board renders rows from every configured
@@ -603,8 +570,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // a platform value — otherwise (tram / bus stops with no
     // platform metadata) the column would just be empty cream
     // pockets next to the cd, wasted horizontal space.
-    const hasAnyPlatform =
-      cfg.show_platform && rows.some((d) => d.platform);
+    const hasAnyPlatform = cfg.show_platform && rows.some((d) => d.platform);
     const isMetro = (rows[0]?.type ?? "") === LINE_TYPE_METRO;
     const platformLabel = this._t(isMetro ? "gleis" : "steig");
 
@@ -668,15 +634,17 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         <div class=${classMap(classes)}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${stationHeaderStrip}
-          ${cfg.show_station_name
-            ? html`<div
+          ${
+            cfg.show_station_name
+              ? html`<div
                 class="flap-header"
                 role="group"
                 style=${styleMap(headerStyle)}
               >
                 <div class="flap-header__station">${stationName}</div>
               </div>`
-            : nothing}
+              : nothing
+          }
           <div class="flap-panel">
             ${this._renderBoard(
               eids,
@@ -687,9 +655,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               !cfg.show_line_column,
               lineColors,
             )}
-            ${attribution
-              ? html`<div class="flap-foot">${attribution}</div>`
-              : nothing}
+            ${attribution ? html`<div class="flap-foot">${attribution}</div>` : nothing}
           </div>
         </div>
       </ha-card>
@@ -739,9 +705,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // coherent Wiener Linien voice when the named line isn't yet in
     // the live palette (e.g. integration just started, sensor warm-up).
     const background =
-      palette.background === "var(--primary-color)"
-        ? "var(--wl-orange)"
-        : palette.background;
+      palette.background === "var(--primary-color)" ? "var(--wl-orange)" : palette.background;
     // Foreground is deliberately cream-hi, NOT palette.color. GTFS
     // publishes white (FFFFFF) for most line fg values, but a white
     // station name breaks the flap card's cohesive cream voice — the
@@ -781,11 +745,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
         return typeof attrs.stale_departures === "number" && attrs.stale_departures > 0;
       });
-      const key = anyDepartures
-        ? "no_data"
-        : anyStale
-          ? "stale_feed"
-          : "betriebsschluss";
+      const key = anyDepartures ? "no_data" : anyStale ? "stale_feed" : "betriebsschluss";
       return html`<div class="flap-empty">${this._t(key)}</div>`;
     }
     // Thin column-header caption above the rows — gives every column
@@ -809,8 +769,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // role="list" + role="listitem" preserve the list semantics that
     // the dropped <ul>/<li> pair was carrying.
     const tileW = TILE_W_BY_SIZE[this._config?.size ?? "regular"];
-    const destStripPx =
-      maxDestLen * tileW + Math.max(0, maxDestLen - 1) * TILE_GAP_PX;
+    const destStripPx = maxDestLen * tileW + Math.max(0, maxDestLen - 1) * TILE_GAP_PX;
     const destContentPx = showAccessibility
       ? destStripPx + DEST_PICTOGRAM_GAP_PX + tileW
       : destStripPx;
@@ -825,39 +784,37 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         aria-label=${this._t("departures_list")}
       >
         <div class="flap-colheader" aria-hidden="true">
-          ${hideLineColumn
-            ? nothing
-            : html`<span class="flap-colheader__line"
+          ${
+            hideLineColumn
+              ? nothing
+              : html`<span class="flap-colheader__line"
                 >${this._t("col_line")}</span
-              >`}
+              >`
+          }
           <span
             class="flap-colheader__dest"
             style=${styleMap({ maxWidth: `${destContentPx}px` })}
           >
             <span>${this._t("col_dest")}</span>
-            ${showAccessibility
-              ? html`<span class="flap-colheader__step-free"
+            ${
+              showAccessibility
+                ? html`<span class="flap-colheader__step-free"
                   >${this._t("col_step_free")}</span
                 >`
-              : nothing}
+                : nothing
+            }
           </span>
-          ${hasAnyPlatform
-            ? html`<span class="flap-colheader__platform"
+          ${
+            hasAnyPlatform
+              ? html`<span class="flap-colheader__platform"
                 >${platformLabel}</span
               >`
-            : nothing}
+              : nothing
+          }
           <span class="flap-colheader__cd">${this._t("col_cd")}</span>
         </div>
         ${rows.map((d, i) =>
-          this._renderRow(
-            d,
-            i,
-            lineColors,
-            hasAnyPlatform,
-            hideLineColumn,
-            maxDestLen,
-            maxLineLen,
-          ),
+          this._renderRow(d, i, lineColors, hasAnyPlatform, hideLineColumn, maxDestLen, maxLineLen),
         )}
       </div>
     `;
@@ -889,9 +846,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
           ? this._t("at_platform")
           : this._t("countdown_minutes", { n: String(cd) });
     const timetableLabel = d.timetable ? this._t("timetable_title") : "";
-    const rowLabel = [rawLine, towards, cdLabel, timetableLabel]
-      .filter(Boolean)
-      .join(" — ");
+    const rowLabel = [rawLine, towards, cdLabel, timetableLabel].filter(Boolean).join(" — ");
 
     // Resolve the line palette through chipPalette so each character
     // tile in the line column is painted with the official WL line
@@ -915,11 +870,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         ? { tileBg: palette.background, blankSpace: true }
         : { blankSpace: true };
 
-    const cdContent = this._renderFlipString(
-      padCountdown(d.countdown),
-      flipKey(rowIndex, "cd"),
-      { blankSpace: true },
-    );
+    const cdContent = this._renderFlipString(padCountdown(d.countdown), flipKey(rowIndex, "cd"), {
+      blankSpace: true,
+    });
 
     // Per-row platform tile — wide tile in its own column between
     // dest and cd. When the row has no platform value, render a
@@ -927,54 +880,56 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // rows in the same board.
     const platformCell = hasAnyPlatform
       ? html`<div class="flap-cell flap-cell--platform" aria-hidden="true">
-          ${d.platform
-            ? this._renderTile(d.platform, undefined, 0, { wide: true })
-            : this._renderTile(" ", undefined, 0, {
-                wide: true,
-                blankSpace: true,
-              })}
+          ${
+            d.platform
+              ? this._renderTile(d.platform, undefined, 0, { wide: true })
+              : this._renderTile(" ", undefined, 0, {
+                  wide: true,
+                  blankSpace: true,
+                })
+          }
         </div>`
       : nothing;
 
     return html`
       <div class="flap-row" role="listitem" aria-label=${rowLabel}>
-        ${hideLineColumn
-          ? nothing
-          : html`<div class="flap-cell flap-cell--line" aria-hidden="true">
+        ${
+          hideLineColumn
+            ? nothing
+            : html`<div class="flap-cell flap-cell--line" aria-hidden="true">
               ${this._renderFlipString(line, flipKey(rowIndex, "line"), lineTileOpts)}
-            </div>`}
+            </div>`
+        }
         <div class="flap-cell flap-cell--dest" aria-hidden="true">
-          ${this._renderFlipString(
-            towards.padEnd(maxDestLen, " "),
-            flipKey(rowIndex, "dest"),
-            { blankSpace: true },
-          )}
-          ${cfg.show_accessibility
-            ? d.barrier_free
-              ? this._renderPictogramTile(
-                  "mdi:wheelchair-accessibility",
-                  this._t("barrier_free_title"),
-                )
-              : this._renderAccessibilityBlankTile(
-                  this._t("not_barrier_free_title"),
-                )
-            : nothing}
+          ${this._renderFlipString(towards.padEnd(maxDestLen, " "), flipKey(rowIndex, "dest"), {
+            blankSpace: true,
+          })}
+          ${
+            cfg.show_accessibility
+              ? d.barrier_free
+                ? this._renderPictogramTile(
+                    "mdi:wheelchair-accessibility",
+                    this._t("barrier_free_title"),
+                  )
+                : this._renderAccessibilityBlankTile(this._t("not_barrier_free_title"))
+              : nothing
+          }
         </div>
         ${platformCell}
         <div class="flap-cell flap-cell--cd" aria-hidden="true">
-          ${d.timetable
-            ? // Before the digits: the cell packs to the end, so the
-              // countdown stays aligned with the live rows above and below.
-              this._renderPictogramTile(
-                "mdi:calendar-clock",
-                this._t("timetable_title"),
-                "plain",
-              )
-            : nothing}
+          ${
+            d.timetable
+              ? // Before the digits: the cell packs to the end, so the
+                // countdown stays aligned with the live rows above and below.
+                this._renderPictogramTile("mdi:calendar-clock", this._t("timetable_title"), "plain")
+              : nothing
+          }
           <span class="flap-cd-tiles">${cdContent}</span>
-          ${cfg.show_min_unit && cd !== null
-            ? html`<span class="flap-cd-unit">${this._t("unit_min")}</span>`
-            : nothing}
+          ${
+            cfg.show_min_unit && cd !== null
+              ? html`<span class="flap-cd-unit">${this._t("unit_min")}</span>`
+              : nothing
+          }
         </div>
       </div>
     `;
@@ -1065,11 +1020,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       <span class="flap-tile__seam" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--l" aria-hidden="true"></span>
       <span class="flap-tile__pin flap-tile__pin--r" aria-hidden="true"></span>
-      ${isFlipping
-        ? html`<span class="flap-tile__leaf"
+      ${
+        isFlipping
+          ? html`<span class="flap-tile__leaf"
             ><span class="flap-tile__glyph">${flippingFrom === " " ? "" : flippingFrom}</span></span
           >`
-        : nothing}
+          : nothing
+      }
     </span>`;
   }
 
@@ -1084,9 +1041,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // The blue face is reserved for the accessibility sign; any other
     // pictogram takes the cream face so it can't be read as one.
     return html`<span
-      class="flap-tile flap-tile--pictogram${face === "plain"
-        ? " flap-tile--pictogram-plain"
-        : ""}"
+      class="flap-tile flap-tile--pictogram${face === "plain" ? " flap-tile--pictogram-plain" : ""}"
       aria-label=${ariaLabel}
     >
       <span class="flap-tile__half flap-tile__half--top"></span>

@@ -40,9 +40,7 @@ export const NEUTRAL_ACCENT_TEXT = "var(--primary-text-color)";
  * invisible. Shared by the cards and the editors so the two cannot end up
  * clamping against different polarities on the same screen.
  */
-export function colorSchemeOf(
-  hass: HomeAssistant | undefined,
-): "dark" | "light" | undefined {
+export function colorSchemeOf(hass: HomeAssistant | undefined): "dark" | "light" | undefined {
   if (hass?.themes?.darkMode === true) return "dark";
   if (hass?.themes?.darkMode === false) return "light";
   return undefined;
@@ -90,7 +88,10 @@ function parseColor(value: string): Rgb | null {
     }
     const match = /^rgba?\(([^)]+)\)$/.exec(serialised);
     if (!match?.[1]) return null;
-    const parts = match[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    const parts = match[1]
+      .split(/[,\s/]+/)
+      .filter(Boolean)
+      .map(Number);
     const [r, g, b] = parts;
     if (r === undefined || g === undefined || b === undefined) return null;
     if (![r, g, b].every(Number.isFinite)) return null;
@@ -145,8 +146,7 @@ const toHex = ([r, g, b]: Rgb): string =>
     .join("");
 
 /** WCAG 2.x relative luminance, from linear-light sRGB. */
-const relativeLuminance = ([r, g, b]: Rgb): number =>
-  0.2126 * r + 0.7152 * g + 0.0722 * b;
+const relativeLuminance = ([r, g, b]: Rgb): number => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 /**
  * WCAG contrast ratio between two colours, or null if either won't parse.
@@ -167,11 +167,7 @@ export function contrastRatio(a: string, b: string): number | null {
  * paints its accented blocks with, composited onto the card background.
  * Returns null if either colour won't parse.
  */
-export function mixOver(
-  accent: string,
-  ground: string,
-  ratio: number,
-): string | null {
+export function mixOver(accent: string, ground: string, ratio: number): string | null {
   const top = parseColor(accent);
   const base = parseColor(ground);
   if (!top || !base) return null;
@@ -221,17 +217,11 @@ export function accentTextColor(
 
   const [lightness, a, b] = linearToOklab(linear);
   const clamped =
-    scheme === "dark"
-      ? Math.max(DARK_FLOOR, lightness)
-      : Math.min(LIGHT_CEILING, lightness);
+    scheme === "dark" ? Math.max(DARK_FLOOR, lightness) : Math.min(LIGHT_CEILING, lightness);
   if (clamped === lightness) return toHex(linear);
 
   const chroma = Math.hypot(a, b);
   const hue = Math.atan2(b, a);
-  const lifted = oklabToLinear([
-    clamped,
-    chroma * Math.cos(hue),
-    chroma * Math.sin(hue),
-  ]);
+  const lifted = oklabToLinear([clamped, chroma * Math.cos(hue), chroma * Math.sin(hue)]);
   return toHex([clamp01(lifted[0]), clamp01(lifted[1]), clamp01(lifted[2])]);
 }

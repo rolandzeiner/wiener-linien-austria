@@ -28,11 +28,7 @@ import {
   type NormalisedModernConfig,
 } from "./utils/config.js";
 import { colorSchemeOf } from "./utils/color.js";
-import {
-  TRANSFER_MODES,
-  TRANSFER_MODE_ICONS,
-  type TransferMode,
-} from "./utils/mot.js";
+import { TRANSFER_MODES, TRANSFER_MODE_ICONS, type TransferMode } from "./utils/mot.js";
 import { collectLinesInSelection } from "./utils/departures.js";
 import { mergeLineColorsMaps } from "./utils/entities.js";
 
@@ -95,13 +91,9 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
   ): Record<string, string | undefined> {
     const { et } = this._i18n;
     return {
-      ...(cfg.show_accessibility
-        ? {}
-        : { accessibility_only: et("accessibility_only_requires") }),
+      ...(cfg.show_accessibility ? {} : { accessibility_only: et("accessibility_only_requires") }),
       ...(cfg.show_delay ? {} : { show_delay_colors: et("show_delay_colors_requires") }),
-      ...(cfg.show_stops_ahead
-        ? {}
-        : { show_stop_times: et("show_stop_times_requires") }),
+      ...(cfg.show_stops_ahead ? {} : { show_stop_times: et("show_stop_times_requires") }),
       ...(cfg.entities.length >= 2 ? {} : { layout: et("layout_requires") }),
     };
   }
@@ -322,10 +314,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
               class="wl-chip"
               aria-pressed=${on ? "true" : "false"}
               aria-disabled=${inert ? "true" : "false"}
-              aria-label=${et(on ? "mode_shown_aria" : "mode_hidden_aria").replace(
-                "{mode}",
-                label,
-              )}
+              aria-label=${et(on ? "mode_shown_aria" : "mode_hidden_aria").replace("{mode}", label)}
               @click=${(ev: Event) => {
                 // aria-disabled, not `disabled` — see dirButton in
                 // editor/stop-block.ts for why the button stays focusable.
@@ -435,8 +424,9 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
                         this._setLineColor(line, (ev.target as HTMLInputElement).value)}
                     />
                   </label>
-                  ${overridden
-                    ? html`<button
+                  ${
+                    overridden
+                      ? html`<button
                         type="button"
                         class="wl-icon-btn"
                         aria-label=${et("reset_color_aria").replace("{line}", line)}
@@ -445,7 +435,8 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
                       >
                         <ha-icon icon="mdi:restore" aria-hidden="true"></ha-icon>
                       </button>`
-                    : nothing}
+                      : nothing
+                  }
                 </div>
               `;
             })}

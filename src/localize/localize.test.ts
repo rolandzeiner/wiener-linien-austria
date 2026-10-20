@@ -94,7 +94,10 @@ describe("catalogue parity", () => {
   // literal `{line}` in it, or drops the substitution entirely.
   it("uses the same placeholders in both languages", () => {
     const tokens = (s: string): string =>
-      [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!).sort().join();
+      [...s.matchAll(/\{(\w+)\}/g)]
+        .map((m) => m[1]!)
+        .sort()
+        .join();
     expect(Object.keys(DE).filter((k) => tokens(DE[k]!) !== tokens(EN[k]!))).toEqual([]);
   });
 });
@@ -131,9 +134,13 @@ describe("every key the code asks for resolves", () => {
   // The ad-hoc error table names its copy as `title: "key"` / `detail: "key"`
   // rather than through `_t()`, so it needs its own check.
   it("route error table keys exist in both languages", () => {
-    const keys = [...routeUtils.matchAll(/\b(?:title|detail): "(adhoc_[a-z_]+)"/g)].map((m) => m[1]!);
+    const keys = [...routeUtils.matchAll(/\b(?:title|detail): "(adhoc_[a-z_]+)"/g)].map(
+      (m) => m[1]!,
+    );
     expect(keys.length).toBeGreaterThan(10);
-    expect(keys.filter((k) => DE[`route.${k}`] === undefined || EN[`route.${k}`] === undefined)).toEqual([]);
+    expect(
+      keys.filter((k) => DE[`route.${k}`] === undefined || EN[`route.${k}`] === undefined),
+    ).toEqual([]);
   });
 
   it.each([

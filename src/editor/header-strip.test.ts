@@ -90,9 +90,7 @@ const zones = (el: HTMLElement): HTMLElement[] =>
   Array.from(el.querySelectorAll<HTMLElement>(".wl-strip-bar > button"));
 
 const icons = (el: Element): string[] =>
-  Array.from(el.querySelectorAll("ha-icon")).map(
-    (i) => i.getAttribute("icon") ?? "",
-  );
+  Array.from(el.querySelectorAll("ha-icon")).map((i) => i.getAttribute("icon") ?? "");
 
 beforeEach(() => {
   host = document.createElement("div");
@@ -147,10 +145,7 @@ describe("the bar preview", () => {
   });
 
   it("omits the exit pictogram when the side is set to none", () => {
-    const el = strip(
-      { left: { exit: "none", text: "Nur Text" } as RetroHeaderSide },
-      callbacks(),
-    );
+    const el = strip({ left: { exit: "none", text: "Nur Text" } as RetroHeaderSide }, callbacks());
     expect(icons(at(zones(el), 0, "zone"))).toEqual([]);
   });
 
@@ -176,13 +171,8 @@ describe("the bar preview", () => {
   });
 
   it("falls back to the raw MDI key as the name of a user-picked icon", () => {
-    const el = strip(
-      { left: { extra_icons: ["mdi:coffee"] } as RetroHeaderSide },
-      callbacks(),
-    );
-    expect(at(zones(el), 0, "zone").getAttribute("aria-label")).toContain(
-      "mdi:coffee",
-    );
+    const el = strip({ left: { extra_icons: ["mdi:coffee"] } as RetroHeaderSide }, callbacks());
+    expect(at(zones(el), 0, "zone").getAttribute("aria-label")).toContain("mdi:coffee");
   });
 });
 
@@ -206,9 +196,7 @@ describe("side selection", () => {
   it("selects a side from the segmented switch too", () => {
     const cb = callbacks();
     const el = strip({ selected: "header_left" }, cb);
-    const seg = Array.from(
-      el.querySelectorAll<HTMLButtonElement>(".wl-seg .wl-seg-btn"),
-    );
+    const seg = Array.from(el.querySelectorAll<HTMLButtonElement>(".wl-seg .wl-seg-btn"));
     expect(seg).toHaveLength(2);
     at(seg, 1, "segment button").click();
     expect(cb.selectSide).toHaveBeenCalledWith("header_right");
@@ -226,25 +214,13 @@ describe("the field panel", () => {
   it("patches the exit pictogram when one is picked", () => {
     const cb = callbacks();
     const el = strip({ selected: "header_left" }, cb);
-    one<HTMLButtonElement>(
-      el,
-      '.wl-pict[aria-label="header_exit_accessible"]',
-    ).click();
-    expect(cb.patch).toHaveBeenCalledWith(
-      "header_left",
-      "exit",
-      "accessible",
-    );
+    one<HTMLButtonElement>(el, '.wl-pict[aria-label="header_exit_accessible"]').click();
+    expect(cb.patch).toHaveBeenCalledWith("header_left", "exit", "accessible");
   });
 
   it("marks the active exit choice pressed", () => {
-    const el = strip(
-      { left: { exit: "accessible" } as RetroHeaderSide },
-      callbacks(),
-    );
-    const active = el.querySelector(
-      '.wl-pict[aria-label="header_exit_accessible"]',
-    );
+    const el = strip({ left: { exit: "accessible" } as RetroHeaderSide }, callbacks());
+    const active = el.querySelector('.wl-pict[aria-label="header_exit_accessible"]');
     expect(active?.getAttribute("aria-pressed")).toBe("true");
   });
 
@@ -270,9 +246,7 @@ describe("the field panel", () => {
       "show_clock_short",
       "show_date_short",
     ]) {
-      expect(
-        el.querySelector(`.wl-tray-btn[aria-label="${label}"]`),
-      ).not.toBeNull();
+      expect(el.querySelector(`.wl-tray-btn[aria-label="${label}"]`)).not.toBeNull();
     }
   });
 });
@@ -286,9 +260,7 @@ describe("chips and icons", () => {
   // the wrong index, and a name-based selector would hide exactly that.
   const removers = (el: HTMLElement, kind: "chip" | "icon"): HTMLButtonElement[] =>
     Array.from(
-      el.querySelectorAll<HTMLButtonElement>(
-        `.wl-pill-x[aria-label="remove_${kind}_aria"]`,
-      ),
+      el.querySelectorAll<HTMLButtonElement>(`.wl-pill-x[aria-label="remove_${kind}_aria"]`),
     );
 
   it("renders one remove control per configured chip and icon", () => {
@@ -307,15 +279,9 @@ describe("chips and icons", () => {
 
   it("removes the chip at the tapped index, not the first one", () => {
     const cb = callbacks();
-    const el = strip(
-      { left: { chips: ["Gleis 1", "Gleis 2", "Gleis 3"] } as RetroHeaderSide },
-      cb,
-    );
+    const el = strip({ left: { chips: ["Gleis 1", "Gleis 2", "Gleis 3"] } as RetroHeaderSide }, cb);
     at(removers(el, "chip"), 1, "chip remover").click();
-    expect(cb.patch).toHaveBeenCalledWith("header_left", "chips", [
-      "Gleis 1",
-      "Gleis 3",
-    ]);
+    expect(cb.patch).toHaveBeenCalledWith("header_left", "chips", ["Gleis 1", "Gleis 3"]);
   });
 
   it("removes the extra icon at the tapped index", () => {
@@ -359,11 +325,7 @@ describe("chips and icons", () => {
     const input = one<HTMLInputElement>(el, '.wl-text[aria-label="text"]');
     input.value = "Ausgang Mariahilfer Straße";
     input.dispatchEvent(new Event("change"));
-    expect(cb.patch).toHaveBeenCalledWith(
-      "header_left",
-      "text",
-      "Ausgang Mariahilfer Straße",
-    );
+    expect(cb.patch).toHaveBeenCalledWith("header_left", "text", "Ausgang Mariahilfer Straße");
   });
 
   it("caps the free-text field at the configured length", () => {
@@ -420,10 +382,7 @@ describe("renderHeaderSection — the retro and flap editors' header block", () 
     // The patch must build on the latest side, not the rendered one.
     const latest = { show_wc: true } as RetroHeaderSide;
     const { el, onChange } = section({ currentSide: () => latest });
-    one<HTMLButtonElement>(
-      el,
-      '.wl-pict[aria-label="header_exit_accessible"]',
-    ).click();
+    one<HTMLButtonElement>(el, '.wl-pict[aria-label="header_exit_accessible"]').click();
     expect(onChange).toHaveBeenCalledWith({
       header_left: { show_wc: true, exit: "accessible" },
     });

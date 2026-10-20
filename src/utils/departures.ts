@@ -52,7 +52,9 @@ export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] 
     seen.add(key);
     out.push({ line: d.line, direction: dir, towards: d.towards, type: d.type });
   }
-  out.sort((a, b) => (a.line === b.line ? a.towards.localeCompare(b.towards) : a.line.localeCompare(b.line)));
+  out.sort((a, b) =>
+    a.line === b.line ? a.towards.localeCompare(b.towards) : a.line.localeCompare(b.line),
+  );
   return out;
 }
 
@@ -273,11 +275,7 @@ export function shouldShowStopsAhead(
   showStopsAhead: boolean | undefined,
   d: DepartureAttr,
 ): boolean {
-  return (
-    showStopsAhead !== false &&
-    Array.isArray(d.stops_ahead) &&
-    d.stops_ahead.length > 0
-  );
+  return showStopsAhead !== false && Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
 }
 
 /**
@@ -305,8 +303,7 @@ export function walkTimePairs(
   },
 ): Pair[] {
   const { lines, picked, lineDirections, stopDirection } = opts;
-  const resolved = (line: string): "H" | "R" | null =>
-    lineDirections[line] ?? stopDirection;
+  const resolved = (line: string): "H" | "R" | null => lineDirections[line] ?? stopDirection;
 
   const live = pairsAtStop(attrs).filter((p) => {
     if (picked.size > 0 && !picked.has(p.line)) return false;
@@ -326,8 +323,6 @@ export function walkTimePairs(
   }
 
   return [...live, ...synthetic].sort((a, b) =>
-    a.line === b.line
-      ? a.direction.localeCompare(b.direction)
-      : a.line.localeCompare(b.line),
+    a.line === b.line ? a.direction.localeCompare(b.direction) : a.line.localeCompare(b.line),
   );
 }

@@ -121,9 +121,7 @@ export class WienerLinienStopCombobox extends LitElement {
     this._active = -1;
     this._clearStatus();
     if (value !== this.value) {
-      this.dispatchEvent(
-        new CustomEvent<StopPickedDetail>("stop-picked", { detail: { value } }),
-      );
+      this.dispatchEvent(new CustomEvent<StopPickedDetail>("stop-picked", { detail: { value } }));
     }
   }
 
@@ -287,9 +285,10 @@ export class WienerLinienStopCombobox extends LitElement {
         aria-label=${this.strings.label}
         ?hidden=${!this._open}
       >
-        ${this._open
-          ? matches.map(
-              (stop, index) => html`<li
+        ${
+          this._open
+            ? matches.map(
+                (stop, index) => html`<li
                 id=${`${id}-option-${index}`}
                 role="option"
                 class="combo-option"
@@ -301,19 +300,26 @@ export class WienerLinienStopCombobox extends LitElement {
               >
                 ${stop.label}
               </li>`,
-            )
-          : nothing}
+              )
+            : nothing
+        }
       </ul>
-      ${this._open && total === 0
-        ? html`<p class="combo-note">${this.strings.noResults}</p>`
-        : nothing}
-      ${this._open && total > matches.length
-        ? html`<p class="combo-note" aria-hidden="true">${this.strings.count(matches.length, total)}</p>`
-        : nothing}
+      ${
+        this._open && total === 0
+          ? html`<p class="combo-note">${this.strings.noResults}</p>`
+          : nothing
+      }
+      ${
+        this._open && total > matches.length
+          ? html`<p class="combo-note" aria-hidden="true">${this.strings.count(matches.length, total)}</p>`
+          : nothing
+      }
       <span class="sr-only" role="status">${this._open ? this._status : ""}</span>
-      ${this._invalid
-        ? html`<p class="field-error" id=${`${id}-error`}>${this.strings.noMatch}</p>`
-        : nothing}
+      ${
+        this._invalid
+          ? html`<p class="field-error" id=${`${id}-error`}>${this.strings.noMatch}</p>`
+          : nothing
+      }
     `;
   }
 }

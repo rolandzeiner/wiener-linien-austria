@@ -20,12 +20,7 @@ import "./route-editor.js";
 
 import { ROUTE_CARD_VERSION } from "./const.js";
 import { pickerText } from "./localize/localize.js";
-import type {
-  HomeAssistant,
-  RouteAccessStepAttr,
-  RouteLegAttr,
-  RouteTripAttr,
-} from "./types.js";
+import type { HomeAssistant, RouteAccessStepAttr, RouteLegAttr, RouteTripAttr } from "./types.js";
 import { ADHOC_DEBOUNCE_MS, ADHOC_REFRESH_MS } from "./utils/route.js";
 
 const TAG = "wiener-linien-austria-route-card";
@@ -59,7 +54,11 @@ function trip(dep: string, arr: string, risk: RouteTripAttr["risk"] = "tight"): 
     cancelled: false,
     legs: [
       {
-        walk: false, line: "U3", type: "ptMetro", product: "U-Bahn", towards: "Simmering",
+        walk: false,
+        line: "U3",
+        type: "ptMetro",
+        product: "U-Bahn",
+        towards: "Simmering",
         origin: {
           ...stop("Westbahnhof", dep),
           stop_id: "60201468",
@@ -72,17 +71,32 @@ function trip(dep: string, arr: string, risk: RouteTripAttr["risk"] = "tight"): 
           { name: "Zieglergasse", stop_id: "60201530", time: `2026-09-14T${dep}:00+02:00` },
           { name: "Neubaugasse", stop_id: "60200056", time: "2026-09-14T07:59:00+02:00" },
         ],
-        realtime: true, stop_count: 5, duration_minutes: 7, walk_after_minutes: 4, cancelled: false,
+        realtime: true,
+        stop_count: 5,
+        duration_minutes: 7,
+        walk_after_minutes: 4,
+        cancelled: false,
       },
       {
-        walk: false, line: "N31", type: "ptBusNight", product: "Nachtbus", towards: "Leopoldau",
+        walk: false,
+        line: "N31",
+        type: "ptBusNight",
+        product: "Nachtbus",
+        towards: "Leopoldau",
         origin: stop("Stephansplatz", "08:08", null),
         destination: stop("Praterstern", arr),
-        realtime: false, stop_count: 1, duration_minutes: 3, walk_after_minutes: 0, cancelled: false,
-        headway_minutes: 10, next_departures: ["2026-09-14T08:18:00+02:00", "2026-09-14T08:28:40+02:00"],
+        realtime: false,
+        stop_count: 1,
+        duration_minutes: 3,
+        walk_after_minutes: 0,
+        cancelled: false,
+        headway_minutes: 10,
+        next_departures: ["2026-09-14T08:18:00+02:00", "2026-09-14T08:28:40+02:00"],
       },
     ],
-    transfers: [{ at: "Stephansplatz", walk_minutes: 4, slack_minutes: risk === "at_risk" ? -2 : 0, risk }],
+    transfers: [
+      { at: "Stephansplatz", walk_minutes: 4, slack_minutes: risk === "at_risk" ? -2 : 0, risk },
+    ],
   };
 }
 
@@ -105,7 +119,10 @@ const ACTIVE = {
   traffic_info: [{ title: "U3: Verspätungen", related_lines: ["U3"] }],
 };
 
-async function mount(h: HomeAssistant | undefined, config: Record<string, unknown>): Promise<CardElement> {
+async function mount(
+  h: HomeAssistant | undefined,
+  config: Record<string, unknown>,
+): Promise<CardElement> {
   const el = document.createElement(TAG) as CardElement;
   document.body.appendChild(el);
   el.hass = h;
@@ -149,8 +166,9 @@ beforeEach(() => {
 describe("registration + config", () => {
   it("defines the element and registers in the picker", () => {
     expect(customElements.get(TAG)).toBeTypeOf("function");
-    const entry = (window as unknown as { customCards?: Array<Record<string, unknown>> })
-      .customCards?.find((c) => c["type"] === TAG);
+    const entry = (
+      window as unknown as { customCards?: Array<Record<string, unknown>> }
+    ).customCards?.find((c) => c["type"] === TAG);
     expect(entry).toBeDefined();
     const suggest = entry?.["getEntitySuggestion"] as (h: HomeAssistant, e: string) => unknown;
     const withRegistry = {
@@ -192,9 +210,13 @@ describe("registration + config", () => {
 describe("card picker text", () => {
   it("follows the page language HA sets, then the stored pick", () => {
     document.documentElement.lang = "de-AT";
-    expect(pickerText("picker_route")).toBe("Nächste Verbindung von A nach B, mit Puffer beim Umsteigen");
+    expect(pickerText("picker_route")).toBe(
+      "Nächste Verbindung von A nach B, mit Puffer beim Umsteigen",
+    );
     document.documentElement.lang = "en";
-    expect(pickerText("picker_route")).toBe("Next connection from A to B, with time to spare at each change");
+    expect(pickerText("picker_route")).toBe(
+      "Next connection from A to B, with time to spare at each change",
+    );
     document.documentElement.lang = "";
     window.localStorage.setItem("selectedLanguage", JSON.stringify("de"));
     expect(pickerText("picker_modern")).toBe("Abfahrten mit Störungen und Aufzugsinfos");
@@ -210,8 +232,16 @@ describe("live state and frequency", () => {
     const onTime = {
       ...base,
       legs: [
-        { ...base.legs[0]!, origin: { ...base.legs[0]!.origin, estimated: base.legs[0]!.origin.planned, delay_minutes: 0 }, headway_minutes: 3,
-          next_departures: ["2026-09-14T08:00:00+02:00"] },
+        {
+          ...base.legs[0]!,
+          origin: {
+            ...base.legs[0]!.origin,
+            estimated: base.legs[0]!.origin.planned,
+            delay_minutes: 0,
+          },
+          headway_minutes: 3,
+          next_departures: ["2026-09-14T08:00:00+02:00"],
+        },
         base.legs[1]!,
       ],
     };
@@ -282,13 +312,20 @@ describe("stops along a ride", () => {
     expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(list.hidden).toBe(false);
     expect(
-      [...list.querySelectorAll(".leg-stop")].map((li) => li.textContent?.replace(/\s+/g, " ").trim()),
+      [...list.querySelectorAll(".leg-stop")].map((li) =>
+        li.textContent?.replace(/\s+/g, " ").trim(),
+      ),
     ).toEqual(["07:57 Zieglergasse", "07:59 Neubaugasse"]);
 
     // A new plan for the same ride keeps the list open.
-    el.hass = hass("2026-09-14T05:51:00+00:00", { ...ACTIVE, fetched_at: "2026-09-14T05:51:00+00:00" });
+    el.hass = hass("2026-09-14T05:51:00+00:00", {
+      ...ACTIVE,
+      fetched_at: "2026-09-14T05:51:00+00:00",
+    });
     await el.updateComplete;
-    expect(root(el).querySelector(".strand .stops-toggle")?.getAttribute("aria-expanded")).toBe("true");
+    expect(root(el).querySelector(".strand .stops-toggle")?.getAttribute("aria-expanded")).toBe(
+      "true",
+    );
 
     // A ride without a stop list keeps its plain count.
     expect(root(el).querySelectorAll(".strand .stops-toggle")).toHaveLength(1);
@@ -305,10 +342,19 @@ describe("step-free", () => {
       stop_id: stop,
     });
     const walk = (at: string, access: RouteAccessStepAttr[]) => ({
-      ...base.legs[0]!, walk: true, line: null, type: "walk", towards: null,
-      origin: stop("Westbahnhof", at), destination: stop("Westbahnhof", at),
-      realtime: false, stop_count: 0, headway_minutes: null, next_departures: [],
-      low_floor: false, access,
+      ...base.legs[0]!,
+      walk: true,
+      line: null,
+      type: "walk",
+      towards: null,
+      origin: stop("Westbahnhof", at),
+      destination: stop("Westbahnhof", at),
+      realtime: false,
+      stop_count: 0,
+      headway_minutes: null,
+      next_departures: [],
+      low_floor: false,
+      access,
     });
     return {
       ...base,
@@ -375,7 +421,9 @@ describe("step-free", () => {
       step_free: true,
       trips: [stepFreeTrip()],
       traffic_info: [],
-      elevator_info: [{ station: "Stephansplatz", description: "", reason: "", stop_ids: ["60201320"] }],
+      elevator_info: [
+        { station: "Stephansplatz", description: "", reason: "", stop_ids: ["60201320"] },
+      ],
     };
     const el = await mount(hass("2026-09-14T05:50:00+00:00", attrs), { entity: ENTITY });
     expect(text(el)).toContain("Aufzug außer Betrieb: Stephansplatz");
@@ -437,11 +485,17 @@ describe("map links", () => {
         { ...second, origin: { ...second.origin, stop_id: sameDiva ? "60201320" : "60201198" } },
       ],
     });
-    for (const [sameDiva, pins] of [[true, 3], [false, 4]] as const) {
+    for (const [sameDiva, pins] of [
+      [true, 3],
+      [false, 4],
+    ] as const) {
       document.body.innerHTML = "";
-      const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [change(sameDiva)] }), {
-        entity: ENTITY,
-      });
+      const el = await mount(
+        hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [change(sameDiva)] }),
+        {
+          entity: ENTITY,
+        },
+      );
       expect(links(el)).toHaveLength(pins);
       expect(root(el).querySelector(".stop--arrive .map-link") !== null).toBe(!sameDiva);
     }
@@ -450,11 +504,20 @@ describe("map links", () => {
   it("gives walks no pin of their own", async () => {
     const base = trip("07:57", "08:11");
     const walk = {
-      ...base.legs[0]!, walk: true, line: null, type: "walk", towards: null,
-      origin: stop("Wohnung", "07:50"), destination: stop("Westbahnhof", "07:55"),
-      stops: [], stop_count: 0,
+      ...base.legs[0]!,
+      walk: true,
+      line: null,
+      type: "walk",
+      towards: null,
+      origin: stop("Wohnung", "07:50"),
+      destination: stop("Westbahnhof", "07:55"),
+      stops: [],
+      stop_count: 0,
     };
-    const walking = { ...base, legs: [walk, ...base.legs, { ...walk, origin: stop("Praterstern", "08:11") }] };
+    const walking = {
+      ...base,
+      legs: [walk, ...base.legs, { ...walk, origin: stop("Praterstern", "08:11") }],
+    };
     const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [walking] }), {
       entity: ENTITY,
     });
@@ -583,7 +646,10 @@ describe("rendering", () => {
     // The ride before a change hands over to the dotted walk; the last ride
     // runs on into the destination node.
     const legs = [...root(el).querySelectorAll(".strand > .leg")];
-    expect(legs.map((leg) => leg.classList.contains("leg--before-transfer"))).toEqual([true, false]);
+    expect(legs.map((leg) => leg.classList.contains("leg--before-transfer"))).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("says when the connections were last updated, in Vienna time", async () => {
@@ -658,12 +724,16 @@ describe("rendering", () => {
     const callWS = vi.fn();
     const h = { ...hass("x", ACTIVE), callWS } as unknown as HomeAssistant;
     const el = await mount(h, { entity: ENTITY });
-    const before = callWS.mock.calls.filter(([msg]) => msg?.type !== "wiener_linien_austria/card_version").length;
+    const before = callWS.mock.calls.filter(
+      ([msg]) => msg?.type !== "wiener_linien_austria/card_version",
+    ).length;
     root(el).querySelector<HTMLButtonElement>(".alt-toggle")?.click();
     await el.updateComplete;
     root(el).querySelector<HTMLButtonElement>(".alt-summary")?.click();
     await el.updateComplete;
-    const after = callWS.mock.calls.filter(([msg]) => msg?.type !== "wiener_linien_austria/card_version").length;
+    const after = callWS.mock.calls.filter(
+      ([msg]) => msg?.type !== "wiener_linien_austria/card_version",
+    ).length;
     expect(after).toBe(before);
   });
 
@@ -681,7 +751,10 @@ describe("rendering", () => {
       if (i !== 1) return t;
       const origin = t.legs[0]!.origin;
       const estimated = new Date(Date.parse(origin.planned!) + 4 * 60_000).toISOString();
-      return { ...t, legs: [{ ...t.legs[0]!, origin: { ...origin, estimated, delay_minutes: 4 } }, t.legs[1]!] };
+      return {
+        ...t,
+        legs: [{ ...t.legs[0]!, origin: { ...origin, estimated, delay_minutes: 4 } }, t.legs[1]!],
+      };
     });
     el.hass = hass("y", { ...ACTIVE, trips: refreshed });
     await el.updateComplete;
@@ -706,7 +779,9 @@ describe("rendering", () => {
     const ids = [...root(el).querySelectorAll("[id]")].map((n) => n.id);
     expect(new Set(ids).size).toBe(ids.length);
 
-    const [heroToggle, altToggle] = [...root(el).querySelectorAll<HTMLButtonElement>(".stops-toggle")];
+    const [heroToggle, altToggle] = [
+      ...root(el).querySelectorAll<HTMLButtonElement>(".stops-toggle"),
+    ];
     altToggle!.click();
     await el.updateComplete;
     expect(altToggle!.getAttribute("aria-expanded")).toBe("true");
@@ -741,15 +816,21 @@ describe("rendering", () => {
     [{ entity: ENTITY }, hass("unavailable", {}), "Routenplaner nicht erreichbar"],
     [
       { entity: ENTITY },
-      hass("unknown", { ...ACTIVE, active: false, trips: [], active_window: { from: "06:30:00", to: "09:00:00", days: ["mon", "tue", "wed", "thu", "fri"] } }),
+      hass("unknown", {
+        ...ACTIVE,
+        active: false,
+        trips: [],
+        active_window: {
+          from: "06:30:00",
+          to: "09:00:00",
+          days: ["mon", "tue", "wed", "thu", "fri"],
+        },
+      }),
       "Aktualisiert Mo",
     ],
     [{ entity: ENTITY }, hass("unknown", { ...ACTIVE, trips: [] }), "Gerade keine Verbindung"],
   ])("empty state %#", async (config, h, expected) => {
-    const el = await mount(
-      (h ?? { states: {}, language: "de" }) as HomeAssistant,
-      config,
-    );
+    const el = await mount((h ?? { states: {}, language: "de" }) as HomeAssistant, config);
     expect(text(el)).toContain(expected);
     expect(root(el).querySelector('[role="status"]')).not.toBeNull();
   });
@@ -757,7 +838,9 @@ describe("rendering", () => {
   it("names a departure board picked as the entity", async () => {
     const board = {
       language: "de",
-      states: { [ENTITY]: { state: "3", attributes: { diva: 1, departures: [], next_by_line: {} } } },
+      states: {
+        [ENTITY]: { state: "3", attributes: { diva: 1, departures: [], next_by_line: {} } },
+      },
     } as unknown as HomeAssistant;
     const el = await mount(board, { entity: ENTITY });
     expect(text(el)).toContain("Das ist ein Abfahrtsmonitor, keine Verbindung");
@@ -799,12 +882,19 @@ function adhocHass(plan: (msg: WsMessage) => Promise<unknown> = async () => PLAN
     if (msg.type === "wiener_linien_austria/plan") return plan(msg);
     return { version: ROUTE_CARD_VERSION };
   });
-  const h = { language: "de", states: {}, localize: (k: string) => k, callWS } as unknown as HomeAssistant;
+  const h = {
+    language: "de",
+    states: {},
+    localize: (k: string) => k,
+    callWS,
+  } as unknown as HomeAssistant;
   return { h, callWS };
 }
 
 const planCalls = (callWS: ReturnType<typeof vi.fn>): WsMessage[] =>
-  callWS.mock.calls.map((c) => c[0] as WsMessage).filter((m) => m.type === "wiener_linien_austria/plan");
+  callWS.mock.calls
+    .map((c) => c[0] as WsMessage)
+    .filter((m) => m.type === "wiener_linien_austria/plan");
 
 async function settle(el: CardElement, ms = 0): Promise<void> {
   await vi.advanceTimersByTimeAsync(ms);
@@ -848,9 +938,9 @@ describe("ad-hoc mode", () => {
     const [from] = inputs;
     expect(from!.getAttribute("aria-expanded")).toBe("false");
     expect(from!.getAttribute("aria-autocomplete")).toBe("list");
-    expect(root(el).getElementById(from!.getAttribute("aria-controls")!)?.getAttribute("role")).toBe(
-      "listbox",
-    );
+    expect(
+      root(el).getElementById(from!.getAttribute("aria-controls")!)?.getAttribute("role"),
+    ).toBe("listbox");
     expect(root(el).querySelector(`label[for="${from!.id}"]`)?.textContent).toBe("Von");
     expect(root(el).querySelector("legend")?.textContent).toContain("Start und Ziel");
     expect(root(el).querySelector('.swap[aria-label="Start und Ziel tauschen"]')).not.toBeNull();
@@ -1121,9 +1211,7 @@ describe("ad-hoc mode", () => {
   it("keeps the answer to the latest pick when an older one arrives last", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
     const answers: Array<(plan: unknown) => void> = [];
-    const { h, callWS } = adhocHass(
-      () => new Promise((resolve) => answers.push(resolve)),
-    );
+    const { h, callWS } = adhocHass(() => new Promise((resolve) => answers.push(resolve)));
     const el = await mount(h, {});
     await settle(el);
     root(el).querySelector<HTMLButtonElement>(".swap")!.click();
@@ -1323,7 +1411,9 @@ describe("ad-hoc mode", () => {
     }));
     const { h, callWS } = adhocHass();
     callWS.mockImplementation(async (msg: WsMessage) =>
-      msg.type === "wiener_linien_austria/stops" ? { stops: many } : { version: ROUTE_CARD_VERSION },
+      msg.type === "wiener_linien_austria/stops"
+        ? { stops: many }
+        : { version: ROUTE_CARD_VERSION },
     );
     const el = await mount(h, {});
     await settle(el);
@@ -1368,7 +1458,13 @@ describe("editor", () => {
     form?.dispatchEvent(
       new CustomEvent("value-changed", {
         detail: {
-          value: { entity: ENTITY, title: "", alternatives: 1, show_map_pins: true, hide_attribution: false },
+          value: {
+            entity: ENTITY,
+            title: "",
+            alternatives: 1,
+            show_map_pins: true,
+            hide_attribution: false,
+          },
         },
       }),
     );
@@ -1424,8 +1520,15 @@ describe("editor", () => {
       schema: Array<{ name: string; required?: boolean }>;
     };
     expect(form.schema.map((f) => f.name)).toEqual([
-      "entity", "title", "from", "to", "alternatives", "step_free", "replan_from_change",
-      "show_map_pins", "hide_attribution",
+      "entity",
+      "title",
+      "from",
+      "to",
+      "alternatives",
+      "step_free",
+      "replan_from_change",
+      "show_map_pins",
+      "hide_attribution",
     ]);
     expect(form.schema[0]?.required).toBeUndefined();
 
@@ -1445,7 +1548,9 @@ describe("editor", () => {
     expect(config).toMatchObject({ from: WESTBAHNHOF, step_free: true });
     // A route brings its own options; step-free only applies without one.
     formEl.dispatchEvent(
-      new CustomEvent("value-changed", { detail: { value: { entity: ENTITY, from: WESTBAHNHOF } } }),
+      new CustomEvent("value-changed", {
+        detail: { value: { entity: ENTITY, from: WESTBAHNHOF } },
+      }),
     );
     expect(config).toEqual({ type: `custom:${TAG}`, entity: ENTITY, alternatives: 2 });
   });
@@ -1465,9 +1570,13 @@ describe("editor", () => {
       config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
     });
     const form = root(el).querySelector("ha-form")!;
-    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { title: "Arbeit" } } }));
+    form.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { title: "Arbeit" } } }),
+    );
     expect(config).toMatchObject({ title: "Arbeit", ...layout });
-    form.dispatchEvent(new CustomEvent("value-changed", { detail: { value: { alternatives: 1 } } }));
+    form.dispatchEvent(
+      new CustomEvent("value-changed", { detail: { value: { alternatives: 1 } } }),
+    );
     expect(config).toMatchObject({ title: "Arbeit", alternatives: 1, ...layout });
   });
 
@@ -1512,9 +1621,7 @@ describe("searching again from a change", () => {
   it("plans from the change to the same destination, for the minute you get in", async () => {
     const { el, callWS } = await jumped();
     const button = chip(el)!;
-    expect(button.getAttribute("aria-label")).toBe(
-      "Andere Verbindung ab Stephansplatz suchen",
-    );
+    expect(button.getAttribute("aria-label")).toBe("Andere Verbindung ab Stephansplatz suchen");
 
     button.click();
     await settle(el, ADHOC_DEBOUNCE_MS);
@@ -1601,10 +1708,13 @@ describe("searching again from a change", () => {
   });
 
   it("leaves the chip off a card bound to a route entity", async () => {
-    const el = await mount(hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [trackableChange()] }), {
-      entity: ENTITY,
-      replan_from_change: true,
-    });
+    const el = await mount(
+      hass("2026-09-14T05:50:00+00:00", { ...ACTIVE, trips: [trackableChange()] }),
+      {
+        entity: ENTITY,
+        replan_from_change: true,
+      },
+    );
     expect(chip(el)).toBeNull();
   });
 });

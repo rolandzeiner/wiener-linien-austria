@@ -72,10 +72,7 @@ function schema(
 }
 
 @customElement(`${ROUTE_CARD_TYPE}-editor`)
-export class WienerLinienAustriaRouteCardEditor
-  extends LitElement
-  implements LovelaceCardEditor
-{
+export class WienerLinienAustriaRouteCardEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
   @state() private _config?: NormalisedRouteConfig;
@@ -140,12 +137,14 @@ export class WienerLinienAustriaRouteCardEditor
     const routes = findRouteEntities(this.hass);
     const { et } = this._i18n;
     return html`
-      ${routes.length === 0
-        ? html`<ha-alert alert-type="info">
+      ${
+        routes.length === 0
+          ? html`<ha-alert alert-type="info">
             ${et("no_routes")}
             <a slot="action" href=${ADD_ROUTE_HREF}>${et("add_route")}</a>
           </ha-alert>`
-        : nothing}
+          : nothing
+      }
       <ha-form
         .hass=${this.hass}
         .data=${this._config as unknown as Record<string, unknown>}

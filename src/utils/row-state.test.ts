@@ -44,12 +44,8 @@ describe("deriveRowState — countdown", () => {
   });
 
   it("reports null for a countdown the feed did not give us", () => {
-    expect(
-      deriveRowState(dep({ countdown: NaN }), ALL_OFF).countdown,
-    ).toBeNull();
-    expect(
-      deriveRowState(dep({ countdown: Infinity }), ALL_OFF).countdown,
-    ).toBeNull();
+    expect(deriveRowState(dep({ countdown: NaN }), ALL_OFF).countdown).toBeNull();
+    expect(deriveRowState(dep({ countdown: Infinity }), ALL_OFF).countdown).toBeNull();
   });
 });
 
@@ -65,27 +61,17 @@ describe("deriveRowState — the countdown state ladder", () => {
   });
 
   it("lets 'now' outrank a late or early reading", () => {
-    expect(
-      deriveRowState(dep({ countdown: 0, ...delayed(9) }), ALL_ON).cdState,
-    ).toBe("now");
-    expect(
-      deriveRowState(dep({ countdown: 0, ...delayed(-9) }), ALL_ON).cdState,
-    ).toBe("now");
+    expect(deriveRowState(dep({ countdown: 0, ...delayed(9) }), ALL_ON).cdState).toBe("now");
+    expect(deriveRowState(dep({ countdown: 0, ...delayed(-9) }), ALL_ON).cdState).toBe("now");
   });
 
   it("marks late and early once the threshold is reached", () => {
-    expect(
-      deriveRowState(dep({ countdown: 5, ...delayed(1) }), ALL_ON).cdState,
-    ).toBe("late");
-    expect(
-      deriveRowState(dep({ countdown: 5, ...delayed(-1) }), ALL_ON).cdState,
-    ).toBe("early");
+    expect(deriveRowState(dep({ countdown: 5, ...delayed(1) }), ALL_ON).cdState).toBe("late");
+    expect(deriveRowState(dep({ countdown: 5, ...delayed(-1) }), ALL_ON).cdState).toBe("early");
   });
 
   it("treats a sub-minute deviation as no state at all", () => {
-    expect(
-      deriveRowState(dep({ countdown: 5, ...delayed(0) }), ALL_ON).cdState,
-    ).toBe("");
+    expect(deriveRowState(dep({ countdown: 5, ...delayed(0) }), ALL_ON).cdState).toBe("");
   });
 
   it("suppresses late and early — but only those — with colours off", () => {
@@ -102,18 +88,12 @@ describe("deriveRowState — the countdown state ladder", () => {
 
 describe("deriveRowState — flag strip", () => {
   it("shows for a traffic jam regardless of the other toggles", () => {
-    expect(deriveRowState(dep({ traffic_jam: true }), ALL_OFF).hasFlags).toBe(
-      true,
-    );
+    expect(deriveRowState(dep({ traffic_jam: true }), ALL_OFF).hasFlags).toBe(true);
   });
 
   it("shows step-free and cooling only when their toggle is on", () => {
-    expect(deriveRowState(dep({ barrier_free: true }), ALL_OFF).hasFlags).toBe(
-      false,
-    );
-    expect(deriveRowState(dep({ barrier_free: true }), ALL_ON).hasFlags).toBe(
-      true,
-    );
+    expect(deriveRowState(dep({ barrier_free: true }), ALL_OFF).hasFlags).toBe(false);
+    expect(deriveRowState(dep({ barrier_free: true }), ALL_ON).hasFlags).toBe(true);
     expect(deriveRowState(dep({ cooling: true }), ALL_OFF).hasFlags).toBe(false);
     expect(deriveRowState(dep({ cooling: true }), ALL_ON).hasFlags).toBe(true);
   });

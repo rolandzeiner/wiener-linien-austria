@@ -91,9 +91,9 @@ describe("normaliseRouteConfig", () => {
       replan_from_change: false,
     });
     expect(normaliseRouteConfig({ type: "x", show_map_pins: false }).show_map_pins).toBe(false);
-    expect(
-      normaliseRouteConfig({ type: "x", replan_from_change: true }).replan_from_change,
-    ).toBe(true);
+    expect(normaliseRouteConfig({ type: "x", replan_from_change: true }).replan_from_change).toBe(
+      true,
+    );
     expect(normaliseRouteConfig({ type: "x", alternatives: -1 }).alternatives).toBe(0);
     expect(normaliseRouteConfig({ type: "x", alternatives: "no" as never }).alternatives).toBe(2);
   });
@@ -157,11 +157,27 @@ describe("upcomingTrips", () => {
   });
 
   it("keeps only rides in transitLegs", () => {
-    const stop = { name: "A", stop_id: null, platform: null, planned: null, estimated: null, delay_minutes: null };
+    const stop = {
+      name: "A",
+      stop_id: null,
+      platform: null,
+      planned: null,
+      estimated: null,
+      delay_minutes: null,
+    };
     const leg = {
-      walk: false, line: "U1", type: "ptMetro", product: null, towards: null,
-      origin: stop, destination: stop, realtime: false, stop_count: 1,
-      duration_minutes: 1, walk_after_minutes: 0, cancelled: false,
+      walk: false,
+      line: "U1",
+      type: "ptMetro",
+      product: null,
+      towards: null,
+      origin: stop,
+      destination: stop,
+      realtime: false,
+      stop_count: 1,
+      duration_minutes: 1,
+      walk_after_minutes: 0,
+      cancelled: false,
     };
     const t = trip("x", { legs: [leg, { ...leg, walk: true, line: null }] });
     expect(transitLegs(t)).toHaveLength(1);
@@ -245,7 +261,9 @@ describe("ad-hoc timing", () => {
     // Stale with a long wait: don't ask again before a token is back.
     expect(adhocPlanRefreshDelay({ trips, stale: true, retry_after: 900 }, NOW)).toBe(900_000);
     // Stale with a short wait: the usual cadence is already later.
-    expect(adhocPlanRefreshDelay({ trips, stale: true, retry_after: 5 }, NOW)).toBe(ADHOC_REFRESH_MS);
+    expect(adhocPlanRefreshDelay({ trips, stale: true, retry_after: 5 }, NOW)).toBe(
+      ADHOC_REFRESH_MS,
+    );
     // retry_after without stale is ignored.
     expect(adhocPlanRefreshDelay({ trips, retry_after: 900 }, NOW)).toBe(ADHOC_REFRESH_MS);
   });
@@ -366,7 +384,10 @@ describe("chosen-time planning", () => {
   });
 
   it("keeps a planned answer's connections and refreshes it slowly", () => {
-    const plan = { trips: [trip("2026-09-14T06:00:00+02:00")], planned_for: "2026-09-14T06:00:00+02:00" };
+    const plan = {
+      trips: [trip("2026-09-14T06:00:00+02:00")],
+      planned_for: "2026-09-14T06:00:00+02:00",
+    };
     expect(upcomingTrips(plan, NOW)).toHaveLength(1);
     expect(upcomingTrips({ trips: plan.trips }, NOW)).toHaveLength(0);
     expect(adhocPlanRefreshDelay(plan, NOW)).toBe(ADHOC_PLANNED_REFRESH_MS);
@@ -377,7 +398,9 @@ describe("chosen-time planning", () => {
 describe("rideFrequency", () => {
   // Only the two fields rideFrequency reads.
   const leg = (headway: number | null, next: string[] = []) =>
-    ({ headway_minutes: headway, next_departures: next }) as unknown as Parameters<typeof rideFrequency>[0];
+    ({ headway_minutes: headway, next_departures: next }) as unknown as Parameters<
+      typeof rideFrequency
+    >[0];
 
   it("gives the headway for a frequent line and the next times otherwise", () => {
     const next = ["2026-09-14T08:07:00+02:00", "2026-09-14T08:14:00+02:00"];
@@ -420,8 +443,11 @@ describe("roundedClock", () => {
 });
 
 describe("catchableDeparture", () => {
-  const leg = (fields: Record<string, unknown>) => fields as unknown as Parameters<typeof catchableDeparture>[0];
-  const arriving = leg({ destination: { planned: "2026-09-14T09:44:00+02:00", estimated: "2026-09-14T09:46:00+02:00" } });
+  const leg = (fields: Record<string, unknown>) =>
+    fields as unknown as Parameters<typeof catchableDeparture>[0];
+  const arriving = leg({
+    destination: { planned: "2026-09-14T09:44:00+02:00", estimated: "2026-09-14T09:46:00+02:00" },
+  });
   const departing = leg({
     next_departures: ["2026-09-14T09:52:11+02:00", "2026-09-14T09:59:56+02:00"],
   });
@@ -429,8 +455,12 @@ describe("catchableDeparture", () => {
     ({ at: "Ottakring", walk_minutes: walk, slack_minutes: -2, risk }) as never;
 
   it("picks the first later departure reachable after the walk", () => {
-    expect(catchableDeparture(arriving, transfer("at_risk"), departing)).toBe("2026-09-14T09:52:11+02:00");
-    expect(catchableDeparture(arriving, transfer("at_risk", 7), departing)).toBe("2026-09-14T09:59:56+02:00");
+    expect(catchableDeparture(arriving, transfer("at_risk"), departing)).toBe(
+      "2026-09-14T09:52:11+02:00",
+    );
+    expect(catchableDeparture(arriving, transfer("at_risk", 7), departing)).toBe(
+      "2026-09-14T09:59:56+02:00",
+    );
     expect(catchableDeparture(arriving, transfer("at_risk", 20), departing)).toBeNull();
   });
 
@@ -452,7 +482,9 @@ describe("sameStop", () => {
   });
 
   it("tells different stops apart, and never guesses without data", () => {
-    expect(sameStop(stop("60201206", 48.2066, 16.3851), stop("60200657", 48.2053, 16.3854))).toBe(false);
+    expect(sameStop(stop("60201206", 48.2066, 16.3851), stop("60200657", 48.2053, 16.3854))).toBe(
+      false,
+    );
     expect(sameStop(stop(null), stop(null))).toBe(false);
   });
 });

@@ -3,24 +3,13 @@ import { customElement, property, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
-import type {
-  HomeAssistant,
-  LovelaceCardEditor,
-  WindowWithCustomCards,
-} from "./types.js";
+import type { HomeAssistant, LovelaceCardEditor, WindowWithCustomCards } from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
 import { deText } from "./utils.js";
 import { pickerText, translate } from "./localize/localize.js";
-import {
-  checkCardVersionWS,
-  renderVersionBanner,
-} from "./shared-render.js";
-import type {
-  DepartureAttr,
-  WienerLinienAttrs,
-  WienerLinienRetroCardConfig,
-} from "./types.js";
+import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
+import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
 import {
   chipPalette,
   normaliseRetroConfig,
@@ -183,13 +172,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // retro display has nothing to render; surface that as a Lovelace
     // error card instead of a silently-empty LED panel. Allow an empty
     // string (the picker's stub state) so the editor still loads.
-    if (
-      config.entity !== undefined &&
-      typeof config.entity !== "string"
-    ) {
-      throw new Error(
-        "wiener-linien-austria-retro-card: 'entity' must be a string",
-      );
+    if (config.entity !== undefined && typeof config.entity !== "string") {
+      throw new Error("wiener-linien-austria-retro-card: 'entity' must be a string");
     }
     // Reject a wrong-domain entity loudly. The normaliser would silently
     // drop it to `undefined` and the panel would render blank, which a
@@ -292,10 +276,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           }
         })
         .catch((err) => {
-          console.warn(
-            "[wiener-linien-austria-retro-card] document.fonts.ready rejected",
-            err,
-          );
+          console.warn("[wiener-linien-austria-retro-card] document.fonts.ready rejected", err);
         });
     }
     if (!this._versionCheckDone && this.hass?.callWS) {
@@ -408,8 +389,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // near-instant preview; the falling edge stops the schedule and
     // clears any in-flight scroll.
     const tickerWasOn = prev?.message_ticker === true && !!prev?.message_text;
-    const tickerIsOn =
-      this._config?.message_ticker === true && !!this._config?.message_text;
+    const tickerIsOn = this._config?.message_ticker === true && !!this._config?.message_text;
     const textChanged = prev?.message_text !== this._config?.message_text;
     if (tickerIsOn && (!tickerWasOn || textChanged)) {
       // Toggle just enabled, OR the message text changed (the user is
@@ -647,11 +627,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Schedule the photo-finish freeze at winner cross + small delta,
     // then victory after the freeze. This gives the viewer a still
     // frame of the wheelchairs at the line before the trophy appears.
-    this._raceEndAt =
-      now +
-      COUNTDOWN_TOTAL_MS +
-      winnerCrossT +
-      FREEZE_DELAY_AFTER_WINNER_MS;
+    this._raceEndAt = now + COUNTDOWN_TOTAL_MS + winnerCrossT + FREEZE_DELAY_AFTER_WINNER_MS;
     this._freezeEndAt = this._raceEndAt + FREEZE_DURATION_MS;
     this._victoryEndAt = this._freezeEndAt + VICTORY_DURATION_MS;
     this._scheduleCountdownTick();
@@ -668,14 +644,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._beginRacing();
       return;
     }
-    const digit = Math.max(
-      1,
-      Math.min(3, 3 - Math.floor(elapsed / COUNTDOWN_DIGIT_MS)),
-    ) as 1 | 2 | 3;
+    const digit = Math.max(1, Math.min(3, 3 - Math.floor(elapsed / COUNTDOWN_DIGIT_MS))) as
+      | 1
+      | 2
+      | 3;
     if (this._countdownDigit !== digit) this._countdownDigit = digit;
     const nextDigitAt =
-      this._countdownStartAt +
-      (Math.floor(elapsed / COUNTDOWN_DIGIT_MS) + 1) * COUNTDOWN_DIGIT_MS;
+      this._countdownStartAt + (Math.floor(elapsed / COUNTDOWN_DIGIT_MS) + 1) * COUNTDOWN_DIGIT_MS;
     const wait = Math.max(50, nextDigitAt - now);
     this._scheduleRaceTimer(() => this._scheduleCountdownTick(), wait);
   }
@@ -714,13 +689,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (!card) return null;
     const cardRect = card.getBoundingClientRect();
     if (cardRect.width <= 0) return null;
-    const wheels = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".retro-row .retro-wheelchair",
-    );
+    const wheels = this.shadowRoot?.querySelectorAll<HTMLElement>(".retro-row .retro-wheelchair");
     if (!wheels || wheels.length < 2) return null;
     const wheelA = wheels[0];
     const wheelB = wheels[1];
-    if (!wheelA || !wheelB) return null;  // length-guard above; satisfies noUncheckedIndexedAccess
+    if (!wheelA || !wheelB) return null; // length-guard above; satisfies noUncheckedIndexedAccess
     const aRect = wheelA.getBoundingClientRect();
     const bRect = wheelB.getBoundingClientRect();
     const aLeft = aRect.left - cardRect.left;
@@ -773,8 +746,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._raceTracks = params.tracks;
     // Fall back to the live card width when the measurement failed, so
     // the cqw -> px conversion still lands somewhere sane.
-    this._raceCardWidthPx =
-      measured?.cardWidthPx ?? this.getBoundingClientRect().width;
+    this._raceCardWidthPx = measured?.cardWidthPx ?? this.getBoundingClientRect().width;
     return { winnerCrossT: params.winnerCrossT };
   }
 
@@ -817,9 +789,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._cancelRaceAnimations();
     const tracks = this._raceTracks;
     if (!tracks || this._raceCardWidthPx <= 0) return;
-    const wheels = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".retro-row .retro-wheelchair",
-    );
+    const wheels = this.shadowRoot?.querySelectorAll<HTMLElement>(".retro-row .retro-wheelchair");
     if (!wheels || wheels.length < 2) return;
     const elapsed =
       this._raceState === "freeze" && this._freezeAtElapsedMs !== null
@@ -873,38 +843,45 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         return;
       case "racing":
         if (this._raceEndAt !== null) {
-          this._scheduleRaceTimer(() => {
-            this._freezeAtElapsedMs =
-              this._racingStartedAt === null
-                ? null
-                : Date.now() - this._racingStartedAt;
-            this._raceState = "freeze";
-            this._raceEndAt = null;
-            this._armStateTransitions();
-          }, Math.max(0, this._raceEndAt - now));
+          this._scheduleRaceTimer(
+            () => {
+              this._freezeAtElapsedMs =
+                this._racingStartedAt === null ? null : Date.now() - this._racingStartedAt;
+              this._raceState = "freeze";
+              this._raceEndAt = null;
+              this._armStateTransitions();
+            },
+            Math.max(0, this._raceEndAt - now),
+          );
         }
         return;
       case "freeze":
         if (this._freezeEndAt !== null) {
-          this._scheduleRaceTimer(() => {
-            this._raceState = "victory";
-            this._freezeEndAt = null;
-            this._armStateTransitions();
-          }, Math.max(0, this._freezeEndAt - now));
+          this._scheduleRaceTimer(
+            () => {
+              this._raceState = "victory";
+              this._freezeEndAt = null;
+              this._armStateTransitions();
+            },
+            Math.max(0, this._freezeEndAt - now),
+          );
         }
         return;
       case "victory":
         if (this._victoryEndAt !== null) {
-          this._scheduleRaceTimer(() => {
-            this._raceState = "idle";
-            this._victoryEndAt = null;
-            this._racingStartedAt = null;
-            this._freezeAtElapsedMs = null;
-            this._raceTracks = null;
-            if (this._config?.wheelchair_race) {
-              this._scheduleRace(this._nextRaceDelay());
-            }
-          }, Math.max(0, this._victoryEndAt - now));
+          this._scheduleRaceTimer(
+            () => {
+              this._raceState = "idle";
+              this._victoryEndAt = null;
+              this._racingStartedAt = null;
+              this._freezeAtElapsedMs = null;
+              this._raceTracks = null;
+              if (this._config?.wheelchair_race) {
+                this._scheduleRace(this._nextRaceDelay());
+              }
+            },
+            Math.max(0, this._victoryEndAt - now),
+          );
         }
         return;
       default: {
@@ -945,15 +922,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     const attrs = (eid ? (this.hass?.states?.[eid]?.attributes ?? {}) : {}) as WienerLinienAttrs;
     // What to show is derived in utils/retro-view.ts (pure, unit-tested);
     // this method only decides how to draw it.
-    const {
-      rows,
-      matching,
-      departures,
-      platform,
-      gleisLeft,
-      platformLabelKey,
-      stopName,
-    } = deriveRetroView(cfg, attrs);
+    const { rows, matching, departures, platform, gleisLeft, platformLabelKey, stopName } =
+      deriveRetroView(cfg, attrs);
     const platformLabel = this._t(platformLabelKey);
 
     const showStationName = cfg.show_station_name && !!stopName;
@@ -991,8 +961,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Card is interactive when it can accept a tap to start a race OR
     // to dismiss the scrolling message — both paths are handled by
     // _handleCardClick / _handleCardKeydown.
-    const clickable =
-      (cfg.wheelchair_race && this._raceState === "idle") || this._tickerActive;
+    const clickable = (cfg.wheelchair_race && this._raceState === "idle") || this._tickerActive;
     const winnerLane: 1 | 2 | null =
       this._raceWinner === "A" ? 1 : this._raceWinner === "B" ? 2 : null;
     this._anyViaInRows = rows.some((d) => !!d.via);
@@ -1042,21 +1011,22 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           ${stationPanel}
           <div class="retro-led">
             ${this._renderMain(eid, rows, departures, platform, platformLabel, attrs.server_time, attrs.line_colors ?? {}, typeof attrs.stale_departures === "number" ? attrs.stale_departures : 0)}
-            ${this._tickerActive && cfg.message_text
-              ? html`<div class="retro-ticker" role="status" aria-live="polite">
+            ${
+              this._tickerActive && cfg.message_text
+                ? html`<div class="retro-ticker" role="status" aria-live="polite">
                   <div
                     class="retro-ticker-text"
-                    style=${`animation-duration:${this._tickerDurationSeconds(
-                      cfg.message_text,
-                    )}s`}
+                    style=${`animation-duration:${this._tickerDurationSeconds(cfg.message_text)}s`}
                     @animationend=${this._onTickerDone}
                   >
                     ${cfg.message_text}
                   </div>
                 </div>`
-              : nothing}
-            ${raceCountdown && this._countdownDigit !== null
-              ? html`<div class="retro-countdown" role="status" aria-live="polite">
+                : nothing
+            }
+            ${
+              raceCountdown && this._countdownDigit !== null
+                ? html`<div class="retro-countdown" role="status" aria-live="polite">
                   ${keyed(
                     this._countdownDigit,
                     html`<span class="retro-countdown-digit" aria-hidden="true">${this._countdownDigit}</span>`,
@@ -1065,26 +1035,35 @@ export class WienerLinienAustriaRetroCard extends LitElement {
                     ${this._t("race_starting_in", { n: this._countdownDigit })}
                   </span>
                 </div>`
-              : nothing}
-            ${raceCountdown || raceActive || raceFreeze
-              ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
-              : nothing}
-            ${raceVictory
-              ? html`<div class="retro-victory" role="status" aria-live="polite">
+                : nothing
+            }
+            ${
+              raceCountdown || raceActive || raceFreeze
+                ? html`<div class="retro-finish-line" aria-hidden="true"></div>`
+                : nothing
+            }
+            ${
+              raceVictory
+                ? html`<div class="retro-victory" role="status" aria-live="polite">
                   <div class="retro-victory-flag" aria-hidden="true"></div>
-                  ${winnerLane !== null
-                    ? html`<div class="retro-victory-winner" aria-hidden="true">
+                  ${
+                    winnerLane !== null
+                      ? html`<div class="retro-victory-winner" aria-hidden="true">
                         <ha-icon class="retro-winner-trophy" icon="mdi:trophy"></ha-icon>
                         <span class="retro-winner-num">${winnerLane}</span>
                       </div>`
-                    : nothing}
+                      : nothing
+                  }
                   <span class="retro-victory-sr">
-                    ${winnerLane !== null
-                      ? this._t("race_winner_announce", { n: winnerLane })
-                      : this._t("race_finished")}
+                    ${
+                      winnerLane !== null
+                        ? this._t("race_winner_announce", { n: winnerLane })
+                        : this._t("race_finished")
+                    }
                   </span>
                 </div>`
-              : nothing}
+                : nothing
+            }
           </div>
         </div>
       </ha-card>
@@ -1101,7 +1080,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     lineColors: LineColorsMap,
     staleDropped: number,
   ): TemplateResult {
-    if (!eid) return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
+    if (!eid)
+      return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
       const key = retroEmptyStateKey(this._config!, allDepartures, serverTime, staleDropped);
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
@@ -1114,7 +1094,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     `;
   }
 
-  private _renderRow(d: DepartureAttr, rowIndex: number, lineColors: LineColorsMap): TemplateResult {
+  private _renderRow(
+    d: DepartureAttr,
+    rowIndex: number,
+    lineColors: LineColorsMap,
+  ): TemplateResult {
     const cd = Number.isFinite(d.countdown) ? d.countdown : null;
     const isAtPlatform = cd !== null && cd <= 0;
     const line = d.line || "?";
@@ -1156,8 +1140,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         <div class="retro-dest" aria-hidden="true">
           <span class="retro-dest-stack">
             <span class="retro-dest-text retro-dest-text--layout">${deText(towards)}</span>
-            ${showVia
-              ? html`
+            ${
+              showVia
+                ? html`
                   <span
                     class=${classMap({
                       "retro-dest-text": true,
@@ -1174,31 +1159,38 @@ export class WienerLinienAustriaRetroCard extends LitElement {
                     })}
                   >${this._t("via_prefix")} ${deText(via)}</span>
                 `
-              : nothing}
+                : nothing
+            }
           </span>
-          ${d.timetable
-            ? html`<ha-icon
+          ${
+            d.timetable
+              ? html`<ha-icon
                 class="retro-timetable"
                 icon="mdi:calendar-clock"
                 title=${this._t("timetable_title")}
               ></ha-icon>`
-            : nothing}
-          ${d.barrier_free
-            ? html`<ha-icon
+              : nothing
+          }
+          ${
+            d.barrier_free
+              ? html`<ha-icon
                 class="retro-wheelchair"
                 icon="mdi:wheelchair-accessibility"
                 title=${this._t("barrier_free_title")}
               ></ha-icon>`
-            : nothing}
+              : nothing
+          }
         </div>
         <div class="retro-cd" aria-hidden="true">
-          ${cd === null
-            ? "--"
-            : isAtPlatform
-              ? html`<span class="retro-stars"><span>*</span><span>*</span></span>`
-              : this._config?.show_unit
-                ? html`<span class="retro-cd-num">${cd}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`
-                : String(cd)}
+          ${
+            cd === null
+              ? "--"
+              : isAtPlatform
+                ? html`<span class="retro-stars"><span>*</span><span>*</span></span>`
+                : this._config?.show_unit
+                  ? html`<span class="retro-cd-num">${cd}</span><span class="retro-cd-unit">${this._t("unit_min")}</span>`
+                  : String(cd)
+          }
         </div>
       </li>
     `;

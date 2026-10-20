@@ -25,12 +25,7 @@
 
 import { html, svg, type SVGTemplateResult, type TemplateResult } from "lit";
 
-export type RetroHeaderIconKey =
-  | "exit"
-  | "exit-access"
-  | "wc"
-  | "escalator"
-  | "elevator";
+export type RetroHeaderIconKey = "exit" | "exit-access" | "wc" | "escalator" | "elevator";
 
 /** Discriminated by `kind`. The SVG variant is the default —
  *  bespoke station-signage glyphs traced as path data. The TEXT
@@ -169,10 +164,10 @@ interface MdiExitDef {
 }
 
 export const RETRO_HEADER_MDI_EXITS: Record<RetroHeaderMdiExit, MdiExitDef> = {
-  "mdi:exit-run":    { labelKey: "icon_mdi_exit_run",    glyphPointsTo: "right" },
+  "mdi:exit-run": { labelKey: "icon_mdi_exit_run", glyphPointsTo: "right" },
   "mdi:exit-to-app": { labelKey: "icon_mdi_exit_to_app", glyphPointsTo: "right" },
-  "mdi:door-open":   { labelKey: "icon_mdi_door_open"    },
-  "mdi:stairs":      { labelKey: "icon_mdi_stairs"       },
+  "mdi:door-open": { labelKey: "icon_mdi_door_open" },
+  "mdi:stairs": { labelKey: "icon_mdi_stairs" },
 };
 
 /** Runtime guard — narrows a `string` to a `RetroHeaderMdiExit`. The
@@ -193,10 +188,7 @@ export function isRetroHeaderMdiExit(v: unknown): v is RetroHeaderMdiExit {
  *   - `"text"`: a centred `<span>` containing literal characters
  *     (WC). The tile's flex centering positions them — no manual
  *     transform needed. */
-export function renderRetroHeaderIcon(
-  key: RetroHeaderIconKey,
-  opts: RenderOpts,
-): TemplateResult {
+export function renderRetroHeaderIcon(key: RetroHeaderIconKey, opts: RenderOpts): TemplateResult {
   const def = RETRO_HEADER_ICONS[key];
   if (def.kind === "text") {
     return html`<span class="retro-station-header__tile" role="img" aria-label=${opts.ariaLabel}>
@@ -241,10 +233,7 @@ export function renderRetroHeaderMdiIcon(
  *  string (the config normaliser already enforces the `mdi:` prefix
  *  + sanity caps) and never flips — auto-flip is a directional
  *  concept that only applies to the curated exit-arrow variants. */
-export function renderRetroHeaderMdiTile(
-  mdiIcon: string,
-  ariaLabel: string,
-): TemplateResult {
+export function renderRetroHeaderMdiTile(mdiIcon: string, ariaLabel: string): TemplateResult {
   return html`<span class="retro-station-header__tile retro-station-header__tile--mdi" role="img" aria-label=${ariaLabel}>
     <ha-icon class="retro-station-header__mdi" icon=${mdiIcon}></ha-icon>
   </span>`;

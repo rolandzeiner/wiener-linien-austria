@@ -32,10 +32,7 @@ export function safeHttpsUri(raw: unknown): string {
  * fallbacks (entity ids, etc.) are returned unwrapped — the lang hint
  * would be inaccurate and AT handles ASCII fine.
  */
-export function deText(
-  raw: string | undefined | null,
-  fallback?: string,
-): TemplateResult | string {
+export function deText(raw: string | undefined | null, fallback?: string): TemplateResult | string {
   if (raw) return html`<span lang="de">${raw}</span>`;
   return fallback ?? "";
 }
@@ -46,7 +43,5 @@ export function deText(
  * outside the card's shadow root receive it.
  */
 export function fireEvent<T>(node: HTMLElement, type: string, detail: T): void {
-  node.dispatchEvent(
-    new CustomEvent(type, { detail, bubbles: true, composed: true }),
-  );
+  node.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
 }

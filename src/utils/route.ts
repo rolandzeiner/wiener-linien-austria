@@ -77,9 +77,7 @@ export interface NormalisedRouteConfig {
 
 /** Validate + default a route card config. Throws the messages Lovelace shows
  *  in its error card, exactly like the other three cards' setConfig guards. */
-export function normaliseRouteConfig(
-  config: WienerLinienRouteCardConfig,
-): NormalisedRouteConfig {
+export function normaliseRouteConfig(config: WienerLinienRouteCardConfig): NormalisedRouteConfig {
   if (!config || typeof config !== "object") {
     throw new Error(`${ROUTE_CARD_TYPE}: config must be an object`);
   }
@@ -143,10 +141,7 @@ export function clockOf(iso: string | null | undefined): string {
  *  them; this only drops the ones that have left since its last refresh.
  *  A plan for a chosen time (`planned_for`) keeps them all: that is what
  *  was asked for, whatever the clock says now. */
-export function upcomingTrips(
-  attrs: RouteAttrs | undefined,
-  nowMs: number,
-): RouteTripAttr[] {
+export function upcomingTrips(attrs: RouteAttrs | undefined, nowMs: number): RouteTripAttr[] {
   const trips = Array.isArray(attrs?.trips) ? attrs.trips : [];
   const planned = !!attrs?.planned_for;
   return trips.filter((trip) => {
@@ -323,10 +318,7 @@ const WEEKDAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 /** Localised short weekday names for a window's days, in week order, with
  *  runs of three or more collapsed ("Mo.–Fr."). Empty when every day (or
  *  none) is selected — "every day" needs no label. */
-export function windowDays(
-  window: RouteActiveWindow | undefined,
-  lang: string,
-): string {
+export function windowDays(window: RouteActiveWindow | undefined, lang: string): string {
   const days = (window?.days ?? []).filter((d) => WEEKDAY_ORDER.includes(d));
   if (days.length === 0 || days.length === 7) return "";
   // 2024-01-01 was a Monday, so index i is WEEKDAY_ORDER[i].
@@ -335,9 +327,7 @@ export function windowDays(
     timeZone: "UTC",
   });
   const name = (index: number): string => formatter.format(Date.UTC(2024, 0, 1 + index));
-  const indices = WEEKDAY_ORDER.map((d, i) => (days.includes(d) ? i : -1)).filter(
-    (i) => i >= 0,
-  );
+  const indices = WEEKDAY_ORDER.map((d, i) => (days.includes(d) ? i : -1)).filter((i) => i >= 0);
   const parts: string[] = [];
   let start = 0;
   while (start < indices.length) {
@@ -358,7 +348,10 @@ export function windowDays(
  *  (S-Bahn, regional trains and buses), so this extends `lineTypeIcon` rather
  *  than widening it for all four cards. An "S" + number label is always the
  *  S-Bahn, whatever type the trip planner reported. */
-export function legTypeIcon(type: string | null | undefined, line: string | null | undefined): string | null {
+export function legTypeIcon(
+  type: string | null | undefined,
+  line: string | null | undefined,
+): string | null {
   if (line && /^S\d/i.test(line)) return "mdi:train";
   switch (type) {
     case "ptTrain":
@@ -639,7 +632,10 @@ export function adhocErrorSpec(code: string, translationKey?: string | null): Ad
 }
 
 /** After how long to retry an error on its own, or null to wait for the user. */
-export function adhocRetryDelay(spec: AdhocErrorSpec, retryAfterSeconds: number | null): number | null {
+export function adhocRetryDelay(
+  spec: AdhocErrorSpec,
+  retryAfterSeconds: number | null,
+): number | null {
   if (spec.retry === "countdown") {
     return Math.max(1, retryAfterSeconds ?? ADHOC_RETRY_MS / 1000) * 1000;
   }

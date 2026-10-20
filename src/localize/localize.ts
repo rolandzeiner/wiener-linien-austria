@@ -78,7 +78,6 @@ export function pickerText(key: string): string {
   } catch {
     stored = undefined;
   }
-  const hassLanguage =
-    document.documentElement.lang || stored || navigator.language || undefined;
+  const hassLanguage = document.documentElement.lang || stored || navigator.language || undefined;
   return translate(`common.picker.${key}`, { hassLanguage });
 }
