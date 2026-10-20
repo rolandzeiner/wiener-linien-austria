@@ -433,6 +433,35 @@ describe("tab-scoped alert banner", () => {
     expect(text).not.toContain("Gleisschaden");
   });
 
+  it("moves selection and focus with the arrow, Home and End keys", async () => {
+    const el = await mount(MODERN, twoStopHass(), tabsConfig);
+    const press = async (index: number, key: string): Promise<void> => {
+      const tab = shadow(el).querySelectorAll<HTMLElement>('[role="tab"]')[index]!;
+      tab.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      await el.updateComplete;
+      await el.updateComplete;
+    };
+    const selected = (): string[] =>
+      [...shadow(el).querySelectorAll('[role="tab"]')].map((t) => t.getAttribute("aria-selected")!);
+    const focused = (): string | null | undefined =>
+      shadow(el).activeElement?.getAttribute("title");
+
+    await press(0, "ArrowRight");
+    expect(selected()).toEqual(["false", "true"]);
+    expect(focused()).toBe("Taubstummengasse");
+
+    // Wraps past either end rather than dead-ending.
+    await press(1, "ArrowRight");
+    expect(selected()).toEqual(["true", "false"]);
+    await press(0, "ArrowLeft");
+    expect(selected()).toEqual(["false", "true"]);
+
+    await press(1, "Home");
+    expect(selected()).toEqual(["true", "false"]);
+    await press(0, "End");
+    expect(selected()).toEqual(["false", "true"]);
+  });
+
   it("follows the tab the reader switches to", async () => {
     const el = await mount(MODERN, twoStopHass(), tabsConfig);
     const tabs = shadow(el).querySelectorAll<HTMLElement>('[role="tab"]');
@@ -1155,5 +1184,38 @@ describe("modern card dev mode", () => {
     colours!.click();
     await el.updateComplete;
     expect(root.querySelectorAll(".dev-pal-chip").length).toBeGreaterThan(0);
+  });
+});
+
+describe("retro station-name tile", () => {
+  async function tile(config: Record<string, unknown>): Promise<HTMLElement | null> {
+    const el = await mount(RETRO, busyHass(), {
+      type: `custom:${RETRO}`,
+      entity: ENTITY,
+      show_station_name: true,
+      ...config,
+    });
+    return shadow(el).querySelector<HTMLElement>(".retro-station");
+  }
+
+  it("is tinted with the live line's published colours by default", async () => {
+    const station = await tile({});
+    expect(station?.textContent?.trim()).toBe("Westbahnhof");
+    expect(station?.style.background).toBe("#EF7C00");
+  });
+
+  it("falls back to white for a line with no published colour", async () => {
+    const station = await tile({ lines: ["52"] });
+    expect(station?.style.background).toBe("#fff");
+    expect(station?.style.color).toBe("#000");
+  });
+
+  it("uses the fixed colours the user picked", async () => {
+    expect((await tile({ station_bg: "black" }))?.style.background).toBe("#000");
+    expect((await tile({ station_bg: "white" }))?.style.background).toBe("#fff");
+  });
+
+  it("stays hidden unless asked for", async () => {
+    expect(await tile({ show_station_name: false })).toBeNull();
   });
 });

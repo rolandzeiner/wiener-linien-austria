@@ -104,6 +104,30 @@ describe("every editor renders", () => {
     expect(text(el)).toContain("Westbahnhof");
   });
 
+  it.each(EDITORS)("%s moves between tabs with the arrow keys, wrapping", async (tag, config) => {
+    const el = await mount(tag, BUSY_STOP, config);
+    const tabs = () => [...shadow(el).querySelectorAll<HTMLElement>('[role="tab"]')];
+    const press = async (index: number, key: string): Promise<void> => {
+      tabs()[index]!.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      );
+      await el.updateComplete;
+    };
+    const selected = (): number =>
+      tabs().findIndex((t) => t.getAttribute("aria-selected") === "true");
+
+    await press(0, "ArrowRight");
+    expect(selected()).toBe(1);
+    // Focus follows the selection, so the next Tab leaves from the new tab.
+    expect(shadow(el).activeElement).toBe(tabs()[1]);
+    await press(1, "ArrowLeft");
+    await press(0, "ArrowLeft");
+    expect(selected()).toBe(2);
+    // Any other key leaves the selection alone.
+    await press(2, "Enter");
+    expect(selected()).toBe(2);
+  });
+
   it.each(EDITORS)("%s survives being given no hass", async (tag, config) => {
     // Lovelace constructs the editor before it assigns hass. Rendering has to
     // survive that gap; v1 shipped a card editor that threw in it.
@@ -649,5 +673,59 @@ describe("section headers and line colours (modern)", () => {
     expect(resets).toHaveLength(1);
     expect(resets[0]?.getAttribute("aria-label")).toContain("U3");
     expect(hints(changed)[0]).toBe("1 angepasst");
+  });
+});
+
+describe("flap station-band background options", () => {
+  type Option = { value: string; label: string };
+  type Field = { name: string; selector?: { select?: { options: Option[] } } };
+
+  async function bgOptions(
+    hass: HomeAssistant,
+    entities: Array<Record<string, unknown>>,
+  ): Promise<string[]> {
+    const el = await mount(FLAP, hass, {
+      type: "custom:wiener-linien-austria-flap-card",
+      entities,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    for (const form of shadow(el).querySelectorAll("ha-form")) {
+      const field = (form as unknown as { schema: Field[] }).schema.find(
+        (f) => f.name === "station_bg",
+      );
+      if (field) return field.selector!.select!.options.map((o) => o.value);
+    }
+    throw new Error("no station_bg field on the display tab");
+  }
+
+  it("offers one entry per line in the stop's filter, sorted", async () => {
+    expect(await bgOptions(BUSY_STOP, [{ entity: ENTITY, lines: ["U3", "52"] }])).toEqual([
+      "line",
+      "line:52",
+      "line:U3",
+      "white",
+      "black",
+    ]);
+  });
+
+  it("falls back to the sensor's tracked lines when no filter is set", async () => {
+    const hass = hassWith({ tracked_lines: ["U6"], line_colors: { U6: "#9D6830" } });
+    expect(await bgOptions(hass, [{ entity: ENTITY }])).toEqual([
+      "line",
+      "line:U6",
+      "white",
+      "black",
+    ]);
+  });
+
+  it("offers the live palette while nothing is tracked yet", async () => {
+    expect(await bgOptions(BUSY_STOP, [{ entity: ENTITY }])).toEqual([
+      "line",
+      "line:52",
+      "line:U3",
+      "white",
+      "black",
+    ]);
   });
 });

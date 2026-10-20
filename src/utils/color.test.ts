@@ -106,3 +106,24 @@ describe("lineChipColors — one ladder, three surfaces", () => {
     expect(c.text).toBeUndefined();
   });
 });
+
+describe("hex parsing", () => {
+  it("expands shorthand hex to the same colour as the long form", () => {
+    expect(contrastRatio("#fff", "#000")).toBe(contrastRatio("#ffffff", "#000000"));
+    expect(contrastRatio("#e30", "#fff")).toBe(contrastRatio("#ee3300", "#ffffff"));
+  });
+
+  it("ignores the alpha digits of #rgba and #rrggbbaa", () => {
+    expect(contrastRatio("#fff8", "#000")).toBe(contrastRatio("#fff", "#000"));
+    expect(contrastRatio("#ffffff80", "#000")).toBe(contrastRatio("#fff", "#000"));
+  });
+
+  it("rejects hex of any other length", () => {
+    expect(contrastRatio("#fffff", "#000")).toBeNull();
+    expect(contrastRatio("#fffffff", "#000")).toBeNull();
+  });
+
+  it("leaves a var() fallback unresolved", () => {
+    expect(contrastRatio("var(--primary-color)", "#000")).toBeNull();
+  });
+});
