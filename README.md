@@ -100,12 +100,13 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 ### HACS (recommended)
 
-1. HACS → **Integrations** → ⋯ → **Custom repositories**
-2. Add `https://github.com/rolandzeiner/wiener-linien-austria`, category **Integration**
-3. Search for "Wiener Linien Austria" and install
-4. Restart Home Assistant
+1. Open HACS and search for **Wiener Linien Austria**.
+2. Select it and choose **Download**.
+3. Restart Home Assistant.
 
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=wiener-linien-austria&category=integration)
+
+Not in the search yet? In HACS, open ⋮ → **Custom repositories**, add `https://github.com/rolandzeiner/wiener-linien-austria` with type **Integration**, then search again.
 
 ### Manual
 
