@@ -10,6 +10,8 @@ describe("coerceWalkTime", () => {
   it("rounds and clamps a number to 1..120 minutes", () => {
     expect(coerceWalkTime(" 4.6 ", "sensor.x/U1|H")).toBe(5);
     expect(coerceWalkTime("500", "sensor.x/U1|H")).toBe(120);
+    // A positive value that rounds to 0 still means "some walk".
+    expect(coerceWalkTime("0.3", "sensor.x/U1|H")).toBe(1);
   });
 
   it("clears on empty, zero or negative input without a warning", () => {
