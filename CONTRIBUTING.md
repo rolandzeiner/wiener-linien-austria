@@ -152,7 +152,7 @@ picks between them per file:
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
 - **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
-  file's leading comment, for anything that needs a DOM. Eight of the 27 test
+  file's leading comment, for anything that needs a DOM. Nine of the 28 test
   files today: `card-smoke.test.ts` mounts the three departure-board cards,
   `editor-smoke.test.ts` mounts their three editors and asserts the
   `config-changed` payload, `editor/board-editor.test.ts` checks which `hass`
@@ -160,7 +160,8 @@ picks between them per file:
   ad-hoc mode and its editor,
   `editor/header-strip.test.ts` drives the signage-strip editor,
   `utils/station-header.test.ts` checks the order of the strip the cards render,
-  `shared-render.test.ts` covers the stale-cache reload machinery, and
+  `shared-render.test.ts` covers the stale-cache reload machinery,
+  `utils/color-cssom.test.ts` covers the colours that go through CSSOM, and
   `utils/traffic-notice.test.ts` needs `DOMParser` to extract notice prose.
 
 Opt in per file rather than globally: only the suites that need a DOM should pay
@@ -176,10 +177,12 @@ The HA components the editors host (`ha-form`, `ha-icon`, `ha-alert`,
 is inert, Lit renders straight through it, and not stubbing them is what keeps
 this layer free of a test harness.
 
-Two things happy-dom gets wrong, so don't chase them: its `outline` shorthand
-parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`.
-Both are fine in every browser HA supports — assert on the source, not on parsed
-`cssText`.
+Three things happy-dom gets wrong, so don't chase them: its `outline` shorthand
+parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`,
+and `style.color` keeps named and `hsl()` colours as written where a browser
+serialises them to `rgb()`. All are fine in every browser HA supports — assert
+on the source, not on parsed `cssText`, and test colour parsing with `rgb()` or
+hex.
 
 ## Card editors
 
