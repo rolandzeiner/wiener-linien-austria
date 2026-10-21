@@ -1124,6 +1124,10 @@ describe("retro wheelchair race", () => {
     wheelchair_race: true,
   };
 
+  /** The longest gap before the next race, plus the 3-2-1 countdown that
+   *  runs before the racers start moving. */
+  const NEXT_RACE_WITHIN = 180_000 + 3_000;
+
   it("starts on a tap and plays both racers through the Web Animations API", async () => {
     const el = await mount(RETRO, raceHass(), RACE_CONFIG);
     shadow(el).querySelector<HTMLElement>(".retro")!.click();
@@ -1188,7 +1192,7 @@ describe("retro wheelchair race", () => {
     // The next race starts one to three minutes after the victory screen clears.
     await vi.advanceTimersByTimeAsync(59_000);
     expect(animate).toHaveBeenCalledTimes(2);
-    await vi.advanceTimersByTimeAsync(121_000);
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN - 59_000);
     expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
@@ -1205,6 +1209,29 @@ describe("retro wheelchair race", () => {
     expect(animate).toHaveBeenCalledTimes(4);
 
     expect((await phasesUntilIdle(el)).at(-1)).toBe("idle");
+  });
+
+  it("keeps racing after the dashboard detaches the card between races", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await phasesUntilIdle(el);
+
+    el.remove();
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN);
+    expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("keeps racing after another option changes between races", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await phasesUntilIdle(el);
+
+    el.setConfig({ ...RACE_CONFIG, show_station_name: true });
+    await el.updateComplete;
+
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN);
+    expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
   it("holds a scrolling message back until the race is over", async () => {
@@ -1299,6 +1326,16 @@ describe("retro message ticker", () => {
     } finally {
       window.matchMedia = matchMedia;
     }
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+  });
+
+  it("keeps its schedule when another option changes", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
+
+    el.setConfig({ ...TICKER_CONFIG, show_station_name: true });
     await advance(el, FIVE_MINUTES);
     expect(ticker(el)).not.toBeNull();
   });

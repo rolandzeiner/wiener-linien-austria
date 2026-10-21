@@ -300,6 +300,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         this._clearRaceTimers();
         this._cancelRaceAnimations();
       }
+    } else if (this._config?.wheelchair_race && this._raceTimers.size === 0) {
+      // Idle between races: disconnectedCallback dropped the pending
+      // next race along with the rest, so roll a fresh one.
+      this._scheduleRace(this._nextRaceDelay());
     }
     // Re-arm the message ticker after a detach/reattach (HA rebuilds
     // the dashboard on load). `updated()` won't fire when `_config` is
@@ -381,6 +385,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       this._freezeEndAt = null;
       this._victoryEndAt = null;
       this._raceWinner = null;
+    } else if (isOn && this._raceTimers.size === 0) {
+      // Still on, but setConfig reset the race along with every other
+      // timer. Editing another option mustn't end the loop.
+      this._scheduleRace(this._nextRaceDelay());
     }
 
     // Message ticker — "on" means the toggle is set AND there's text to
@@ -402,6 +410,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     } else if (!tickerIsOn && tickerWasOn) {
       this._clearTickerTimer();
       this._tickerActive = false;
+    } else if (tickerIsOn && this._tickerTimer === null) {
+      // Unchanged, but setConfig cleared the schedule; resume it at the
+      // normal interval rather than re-running the preview.
+      this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
     }
   }
 
