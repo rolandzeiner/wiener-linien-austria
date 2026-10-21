@@ -1159,6 +1159,178 @@ describe("retro wheelchair race", () => {
       window.matchMedia = matchMedia;
     }
   });
+
+  /** The race phase the LED panel shows, read from its modifier class. */
+  const phase = (el: CardElement): string =>
+    [...shadow(el).querySelector(".retro")!.classList]
+      .find((c) => c.startsWith("retro--race-"))
+      ?.slice("retro--race-".length) ?? "idle";
+
+  /** Step the clock and note each phase the panel passes through. */
+  async function phasesOver(el: CardElement, ms: number): Promise<string[]> {
+    const seen: string[] = [];
+    for (let t = 0; t < ms; t += 250) {
+      await vi.advanceTimersByTimeAsync(250);
+      await el.updateComplete;
+      if (seen.at(-1) !== phase(el)) seen.push(phase(el));
+    }
+    return seen;
+  }
+
+  it("runs countdown, race, freeze and victory, then rolls the next race itself", async () => {
+    // Switching the option on starts a race straight away.
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    expect(phase(el)).toBe("countdown");
+
+    expect(await phasesOver(el, 60_000)).toEqual([
+      "countdown",
+      "active",
+      "freeze",
+      "victory",
+      "idle",
+    ]);
+    expect(animate).toHaveBeenCalledTimes(2);
+
+    // The next one follows somewhere in the next one to three minutes.
+    await vi.advanceTimersByTimeAsync(180_000);
+    expect(animate).toHaveBeenCalledTimes(4);
+  });
+
+  it("picks a race up again after the dashboard detaches the card mid-race", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await vi.advanceTimersByTimeAsync(3_000);
+    await el.updateComplete;
+    expect(phase(el)).toBe("active");
+
+    el.remove();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    // The racers are rebuilt at the point the wall clock says they've reached.
+    expect(animate).toHaveBeenCalledTimes(4);
+
+    expect((await phasesOver(el, 60_000)).at(-1)).toBe("idle");
+  });
+
+  it("holds a scrolling message back until the race is over", async () => {
+    const el = await mount(RETRO, raceHass(), {
+      ...RACE_CONFIG,
+      message_ticker: true,
+      message_text: "Gute Fahrt",
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+    await el.updateComplete;
+    expect(phase(el)).not.toBe("idle");
+    expect(shadow(el).querySelector(".retro-ticker")).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await el.updateComplete;
+    expect(phase(el)).toBe("idle");
+    expect(shadow(el).querySelector(".retro-ticker")?.textContent?.trim()).toBe("Gute Fahrt");
+  });
+});
+
+describe("retro message ticker", () => {
+  const TICKER_CONFIG = {
+    type: `custom:${RETRO}`,
+    entity: ENTITY,
+    message_ticker: true,
+    message_text: "Gute Fahrt",
+  };
+  const FIVE_MINUTES = 5 * 60_000;
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const ticker = (el: CardElement): HTMLElement | null =>
+    shadow(el).querySelector<HTMLElement>(".retro-ticker");
+
+  async function advance(el: CardElement, ms: number): Promise<void> {
+    await vi.advanceTimersByTimeAsync(ms);
+    await el.updateComplete;
+  }
+
+  it("scrolls the message just after it is switched on, then every five minutes", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    expect(ticker(el)).toBeNull();
+
+    await advance(el, 1_500);
+    expect(ticker(el)?.textContent?.trim()).toBe("Gute Fahrt");
+    expect(ticker(el)?.getAttribute("role")).toBe("status");
+
+    // The interval counts from the end of a run, not its start.
+    ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
+    await el.updateComplete;
+    expect(ticker(el)).toBeNull();
+
+    await advance(el, FIVE_MINUTES - 1_000);
+    expect(ticker(el)).toBeNull();
+    await advance(el, 1_000);
+    expect(ticker(el)).not.toBeNull();
+  });
+
+  it("goes away on a tap or Enter and comes back on schedule", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    shadow(el).querySelector<HTMLElement>(".retro")!.click();
+    await el.updateComplete;
+    expect(ticker(el)).toBeNull();
+
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+    shadow(el)
+      .querySelector<HTMLElement>(".retro")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await el.updateComplete;
+    expect(ticker(el)).toBeNull();
+  });
+
+  it("keeps still under prefers-reduced-motion without dropping the schedule", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    let el: CardElement;
+    try {
+      el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+      await advance(el, 1_500);
+      expect(ticker(el)).toBeNull();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+  });
+
+  it("re-runs the preview while the text is being edited and stops when it is cleared", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    el.setConfig({ ...TICKER_CONFIG, message_text: "Gute Reise" });
+    await advance(el, 1_500);
+    expect(ticker(el)?.textContent?.trim()).toBe("Gute Reise");
+
+    el.setConfig({ ...TICKER_CONFIG, message_text: "" });
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).toBeNull();
+  });
+});
+
+describe("retro card updates", () => {
+  it("re-renders for its own entity and ignores the rest of hass", async () => {
+    const el = await mount(RETRO, busyHass(), { type: `custom:${RETRO}`, entity: ENTITY });
+    const render = vi.spyOn(el as unknown as { render(): unknown }, "render");
+
+    const hass = el.hass!;
+    el.hass = { ...hass, states: { ...hass.states, "sensor.other": hass.states[ENTITY]! } };
+    await el.updateComplete;
+    expect(render).not.toHaveBeenCalled();
+
+    el.hass = busyHass();
+    await el.updateComplete;
+    expect(render).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("modern card dev mode", () => {
