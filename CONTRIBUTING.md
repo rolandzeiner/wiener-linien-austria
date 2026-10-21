@@ -40,7 +40,7 @@ Because the TS literals are asserted equal to the manifest, none of the four can
   - **`target-version` tracks the oldest Python we support, never the one CI runs.** `hacs.json` promises HA ≥ 2025.6.0, which runs on Python 3.13, so `target-version = "py313"` — even though the venv and CI are on 3.14. Pointing it at the CI interpreter lets ruff rewrite code into syntax our users cannot parse and then stay silent about it; that is how v1.7.1 shipped a SyntaxError (issue #91). The `compile-floor-python` CI job byte-compiles the shipped package on 3.13 as an independent backstop. Raise all three together or not at all.
 - `vite.config.ts` — the whole card toolchain, run through [Vite+](https://viteplus.dev/) (`vp`): `vp build` (Vite library mode on Rolldown), `vp test` (Vitest) and `vp check` (Oxfmt + Oxlint + type-check). Vitest, Rolldown and the type-checker all ship inside `vite-plus`; `typescript` is not installed. Each card is its own Vite environment with its own bundle and its own copy of Lit, and `builder.buildApp` builds exactly those four. Things there that fail silently if you change them:
   - **`minify` lives on `rolldownOptions.output`**, not `build.minify`: Vite's library mode skips whitespace minification for ES output.
-  - **Dev vs prod comes from `--mode development`** (`npm run dev`). A plain `vp build` is production: minified, no sourcemap, CSS comments stripped. A dev build writes `.map` files into `www/`; they are gitignored, but a dev-push right after a dev build ships them.
+  - **Dev vs prod comes from `--mode development`** (`npm run dev`). A plain `vp build` is production: minified, no sourcemap, CSS comments stripped. A dev build writes `.map` files into `www/`; they are gitignored, so they never get committed.
   - **`emptyOutDir: false`.** `www/` also holds the vendored fonts, and Vite empties the output directory by default.
   - **`json: { namedExports: false, stringify: false }`, with default imports** (`import de from "./languages/de.json"`). Both language packs are over 10 kB, and Vite's defaults would ship them as `JSON.parse('…')` strings that gzip worse. With named exports off, `import * as de` yields only `{ default }`: every lookup misses and the card shows raw keys. The card suites catch that.
   - **`fmt.embeddedLanguageFormatting: "off"`.** Oxfmt would otherwise reformat the Lit `html` / `css` templates, which changes the whitespace inside rendered elements.
@@ -139,10 +139,7 @@ coverage instead of its estimate cut the findings above threshold from 128 to
 100 and the criticals from 53 to 36 — the difference was all false alarms on
 covered code. The three card files used to report as `estimated` there because
 no test imported them, leaving V8 to emit a stub entry with an empty `fnMap`;
-the smoke tests fixed that at the source. `coverage/` is gitignored and sits
-outside `custom_components/`, so `scripts/dev-push.sh` never ships it (a file
-inside `custom_components/` would ship regardless: `.gitignore` does not filter
-rsync).
+the smoke tests fixed that at the source. `coverage/` is gitignored.
 
 ## Card tests
 
