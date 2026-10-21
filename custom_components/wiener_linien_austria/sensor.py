@@ -260,6 +260,15 @@ class WienerLinienStopSensor(
             # empty board instead of mislabelling it "Betriebsschluss".
             "stale_departures": data.stale_dropped if data is not None else 0,
             "stale_since": data.stale_since if data is not None else None,
+            # Our own polling has been failing, so the board below is the
+            # last one that arrived. Set from the second failed poll in a
+            # row; the cards say the times aren't current instead of
+            # counting down a frozen board.
+            "connection_lost_since": (
+                lost.isoformat()
+                if (lost := self.coordinator.connection_lost_since)
+                else None
+            ),
             "departures": capped,
             "next_by_line": next_by_line,
             "lines_at_stop": lines_at_stop,

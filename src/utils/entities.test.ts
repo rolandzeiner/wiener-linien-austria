@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { departureBoardOptions, mergeLineColorsMaps } from "./entities.js";
+import { allDisconnected, departureBoardOptions, mergeLineColorsMaps } from "./entities.js";
 import type { HomeAssistant } from "../types.js";
 import { sorted } from "../utils.js";
 
@@ -124,5 +124,37 @@ describe("departureBoardOptions — what a board editor's picker offers", () => 
 
   it("is empty without hass", () => {
     expect(departureBoardOptions(undefined)).toEqual([]);
+  });
+});
+
+describe("allDisconnected", () => {
+  const hass = {
+    states: {
+      "sensor.a": { entity_id: "sensor.a", state: "unavailable", attributes: {} },
+      "sensor.b": {
+        entity_id: "sensor.b",
+        state: "3",
+        attributes: { connection_lost_since: "2026-10-21T14:30:00+00:00" },
+      },
+      "sensor.c": {
+        entity_id: "sensor.c",
+        state: "3",
+        attributes: { connection_lost_since: null },
+      },
+    },
+  } as unknown as HomeAssistant;
+
+  it("counts an unavailable sensor and a failing one alike", () => {
+    expect(allDisconnected(hass, ["sensor.a", "sensor.b"])).toBe(true);
+  });
+
+  it("is false while one of them still polls fine", () => {
+    expect(allDisconnected(hass, ["sensor.a", "sensor.c"])).toBe(false);
+  });
+
+  it("leaves a deleted sensor and an empty list to the other empty states", () => {
+    expect(allDisconnected(hass, ["sensor.gone"])).toBe(false);
+    expect(allDisconnected(hass, [])).toBe(false);
+    expect(allDisconnected(undefined, ["sensor.a"])).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.wiener_linien_austria.batch import BatchResult
@@ -139,6 +140,46 @@ async def test_available_tolerates_transient_failures(hass: HomeAssistant) -> No
     # that legitimately renders the sensor unavailable.
     coordinator.data = None
     assert sensor.available is False
+
+
+async def test_connection_lost_since_waits_for_the_second_failed_poll(
+    hass: HomeAssistant, freezer
+) -> None:
+    """The cards stop trusting a cached board only from the second miss.
+
+    One failed poll is routine and the board it leaves is a minute old; from
+    the second, the attribute names when the failures began, and the first
+    good poll clears it.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(
+        departures=_make_departures(), server_time="2026-04-20T14:40:00+0200"
+    )
+    coordinator = _make_coordinator(hass, entry, data)
+    sensor = WienerLinienStopSensor(coordinator, entry)
+    err = UpdateFailed(
+        translation_domain=DOMAIN,
+        translation_key="api_http_error",
+        translation_placeholders={"status": "502", "reason": "Bad Gateway"},
+    )
+    assert sensor.extra_state_attributes["connection_lost_since"] is None
+
+    freezer.move_to("2026-10-21T14:30:00+00:00")
+    coordinator.batch_set_error(err)
+    assert sensor.extra_state_attributes["connection_lost_since"] is None
+
+    freezer.move_to("2026-10-21T14:31:00+00:00")
+    coordinator.batch_set_error(err)
+    assert (
+        sensor.extra_state_attributes["connection_lost_since"]
+        == "2026-10-21T14:30:00+00:00"
+    )
+    # Still serving the cached board while it says so.
+    assert sensor.available is True
+
+    coordinator.batch_apply(BatchResult(body={}, server_time=None))
+    assert sensor.extra_state_attributes["connection_lost_since"] is None
 
 
 async def test_unit_and_device_class(hass: HomeAssistant) -> None:

@@ -332,6 +332,9 @@ export interface WienerLinienAttrs {
   // older than 1.7.8, which is why every read treats them as optional.
   stale_departures?: number;
   stale_since?: string | null;
+  // Our own polling has failed twice or more in a row since this time, so
+  // the board is the last one that arrived. Null while polls succeed.
+  connection_lost_since?: string | null;
   departures?: DepartureAttr[];
   next_by_line?: Record<string, number>;
   // Static-catalogue line list for this stop — every line serving the

@@ -30,7 +30,11 @@ import type {
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
-import { findWienerLinienEntities, mergeLineColorsMaps } from "./utils/entities.js";
+import {
+  allDisconnected,
+  findWienerLinienEntities,
+  mergeLineColorsMaps,
+} from "./utils/entities.js";
 import {
   normaliseFlapConfig,
   type NormalisedFlapConfig,
@@ -733,6 +737,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
     if (rows.length === 0) {
+      // Polling is failing for every stop on the board: nothing current to
+      // read, so neither "no departures" nor end-of-service is true.
+      if (allDisconnected(this.hass, eids)) {
+        return html`<div class="flap-empty">${this._t("unavailable")}</div>`;
+      }
       const anyDepartures = eids.some((eid) => {
         const attrs = (this.hass?.states?.[eid]?.attributes ?? {}) as WienerLinienAttrs;
         return Array.isArray(attrs.departures) && attrs.departures.length > 0;
