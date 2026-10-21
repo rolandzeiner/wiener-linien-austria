@@ -38,6 +38,7 @@ from custom_components.wiener_linien_austria.const import (
     CARD_VERSION,
     DOMAIN,
     FLAP_CARD_VERSION,
+    OUTAGE_ISSUE_ID,
     RETRO_CARD_VERSION,
     ROUTE_CARD_VERSION,
     STATIC_CACHE_CHECK_INTERVAL,
@@ -662,8 +663,9 @@ async def test_remove_last_entry_unregisters_resources(
 ) -> None:
     """The last entry going away takes the Lovelace resources with it.
 
-    Also clears the entry's Repairs issue: leaving it behind would keep
-    warning about a config entry the user has just deleted.
+    Also clears the entry's Repairs issue and the domain-wide outage issue:
+    leaving either behind would keep warning about an integration the user
+    has just deleted.
     """
     from custom_components.wiener_linien_austria import async_remove_entry
 
@@ -685,4 +687,5 @@ async def test_remove_last_entry_unregisters_resources(
         await async_remove_entry(hass, entry)
 
     registration.return_value.async_unregister.assert_awaited_once()
-    delete_issue.assert_called_once()
+    deleted = {call.args[2] for call in delete_issue.call_args_list}
+    assert deleted == {f"rate_limited_{entry.entry_id}", OUTAGE_ISSUE_ID}

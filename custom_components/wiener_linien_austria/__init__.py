@@ -52,6 +52,7 @@ from .const import (
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
 from .live import LIVE_BOARD_KEY
+from .outage import async_clear_outage
 from .rate_limit import (
     LOCK_KEY,
     LOCK_LOOP_KEY,
@@ -640,6 +641,8 @@ async def async_remove_entry(
     ]
     if remaining:
         return
+    # Nothing is left to report an outage for.
+    async_clear_outage(hass)
     registration = JSModuleRegistration(hass)
     await registration.async_unregister()
 

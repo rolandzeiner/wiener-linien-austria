@@ -46,6 +46,26 @@ export function departureBoardOptions(
   return sorted(options);
 }
 
+/** Whether a stop sensor has lost its connection to Wiener Linien. Two
+ *  shapes: `unavailable`, when no poll has succeeded since Home Assistant
+ *  started (the sensor serves a cached board otherwise, so this is the only
+ *  way it goes unavailable), and `connection_lost_since`, when polling has
+ *  failed twice in a row and the board on screen is the last that arrived.
+ *  Either way an empty board means "no connection", not "no departures".
+ *  False for an id with no state at all: a deleted sensor is a different
+ *  problem. */
+export function isDisconnected(hass: HomeAssistant | undefined, eid: string): boolean {
+  const state = hass?.states?.[eid];
+  if (!state) return false;
+  if (state.state === "unavailable") return true;
+  return Boolean((state.attributes as WienerLinienAttrs | undefined)?.connection_lost_since);
+}
+
+/** `isDisconnected` for every listed stop; false for an empty list. */
+export function allDisconnected(hass: HomeAssistant | undefined, eids: readonly string[]): boolean {
+  return eids.length > 0 && eids.every((eid) => isDisconnected(hass, eid));
+}
+
 /** Sensor entity ids whose attributes pass `matches`, sorted. The walk the
  *  stop and route cards share; each supplies its own fingerprint, which is
  *  the part that must keep the two from picking up each other's sensors. */

@@ -136,6 +136,18 @@ ENTRY_COUNT_KEY: Final = "entry_count"
 # then fans the response out to each member coordinator's own slice. See
 # batch.py. Popped by `_teardown_domain_state` on last-entry removal.
 BATCH_REGISTRY_KEY: Final = "monitor_batch_registry"
+# Domain-wide tracker of a sustained upstream outage on /monitor (outage.py).
+# Deliberately NOT popped by `_teardown_domain_state`: during an outage every
+# board entry sits in setup retry and the entry count can reach zero while
+# HA keeps retrying, and the clock must keep running through that.
+OUTAGE_KEY: Final = "upstream_outage"
+# The single Repairs issue (and its translation key) for that outage.
+OUTAGE_ISSUE_ID: Final = "upstream_unavailable"
+# How long /monitor must keep failing on Wiener Linien's side before the
+# Repairs issue appears. Long enough that a short blip or a deploy restart
+# never reaches it; short enough that someone staring at an empty board
+# gets an answer while they're still wondering.
+OUTAGE_REPAIR_AFTER_SECONDS: Final = 600
 # Sentinel that the Lovelace resources have been registered for the
 # current "run" (first entry → last entry → … → first entry again).
 # Popped by `_teardown_domain_state` so the next first-entry boot
@@ -633,6 +645,12 @@ STALE_DEPARTURE_MAX_AGE: Final = timedelta(hours=3)
 # multiplier rather than a constant because the cadence is per entry
 # (MIN_POLL_SECONDS 30 .. MAX_POLL_SECONDS 600).
 STALE_INTERVAL_MULTIPLIER: Final = 3
+
+# Consecutive failed polls before the stop sensor reports
+# `connection_lost_since` and the cards say the board isn't current. Two,
+# for the reason above: one missed poll is routine and would only flash a
+# notice for a single interval.
+CONNECTION_LOST_AFTER_POLLS: Final = 2
 
 # Hard safety cap on `stops_ahead` length per departure. The longest Wiener
 # Linien lines are ~25 stops end-to-end; 30 gives generous headroom while

@@ -18,7 +18,7 @@ import {
 } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
 import { deriveRetroView, retroEmptyStateKey } from "./utils/retro-view.js";
-import { findWienerLinienEntities } from "./utils/entities.js";
+import { allDisconnected, findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
 import { renderStationHeader } from "./utils/station-header.js";
@@ -1095,7 +1095,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (!eid)
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
     if (rows.length === 0) {
-      const key = retroEmptyStateKey(this._config!, allDepartures, serverTime, staleDropped);
+      const key = allDisconnected(this.hass, [eid])
+        ? "unavailable"
+        : retroEmptyStateKey(this._config!, allDepartures, serverTime, staleDropped);
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t(key)}</div>`;
     }
     return html`

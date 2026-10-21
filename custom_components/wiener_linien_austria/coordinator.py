@@ -23,6 +23,7 @@ from .const import (
     CONF_DIVA,
     CONF_LINES,
     CONF_RBLS,
+    CONNECTION_LOST_AFTER_POLLS,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     LINE_TYPE_S_BAHN,
@@ -161,6 +162,10 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         self._rate_limited: bool = False
         self._last_error_code: int | None = None
         self._server_time: str | None = None
+        # Consecutive failed polls and when the first of them happened;
+        # behind `connection_lost_since`.
+        self._failed_polls = 0
+        self._first_failed_at: datetime | None = None
         # Memoised `extra_state_attributes` payload — HA calls that
         # property on every state read AND every attribute read, so a
         # busy dashboard can hammer it 10+ Hz. The build path queries
@@ -283,6 +288,26 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         return _parse_iso(self._server_time)
 
     @property
+    def connection_lost_since(self) -> datetime | None:
+        """When polling started failing, once it has failed enough in a row.
+
+        None while polls succeed, and through the first failed one: a single
+        missed poll is routine, and the board it leaves is still recent.
+        """
+        if self._failed_polls < CONNECTION_LOST_AFTER_POLLS:
+            return None
+        return self._first_failed_at
+
+    def _note_poll(self, *, ok: bool) -> None:
+        if ok:
+            self._failed_polls = 0
+            self._first_failed_at = None
+            return
+        self._failed_polls += 1
+        if self._first_failed_at is None:
+            self._first_failed_at = dt_util.utcnow()
+
+    @property
     def rbls(self) -> list[int]:
         return list(self._rbls)
 
@@ -373,7 +398,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
                     "error": "batch group not attached",
                 },
             )
-        result = await self._batch.async_fetch()
+        try:
+            result = await self._batch.async_fetch()
+        except UpdateFailed:
+            self._note_poll(ok=False)
+            raise
+        self._note_poll(ok=True)
         return self._parse_slice(result)
 
     def attach_batch(self, group: MonitorBatchGroup) -> None:
@@ -387,11 +417,13 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         the entity update directly through `async_set_updated_data`.
         """
         self._invalidate_attrs_cache()
+        self._note_poll(ok=True)
         self.async_set_updated_data(self._parse_slice(result))
 
     def batch_set_error(self, err: UpdateFailed) -> None:
         """Propagate a batch fetch failure to this entry's coordinator state."""
         self._invalidate_attrs_cache()
+        self._note_poll(ok=False)
         self.async_set_update_error(err)
 
     def apply_upstream_meta(self, server_time: str | None, code: int | None) -> None:

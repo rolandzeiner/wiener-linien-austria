@@ -266,6 +266,65 @@ describe("rendering", () => {
   });
 });
 
+/** The stop sensor after a failed update: HA publishes no attributes beyond
+ *  the friendly name, exactly what every board shows during an API outage. */
+function unavailableHass(): HomeAssistant {
+  const hass = emptyHass();
+  hass.states[ENTITY] = {
+    entity_id: ENTITY,
+    state: "unavailable",
+    attributes: { friendly_name: "Westbahnhof Abfahrten" },
+  };
+  return hass;
+}
+
+describe("lost connection", () => {
+  // An outage used to read as "Keine Abfahrten verfügbar", which is what an
+  // empty stop says too, so a dead API looked like a broken install.
+  it("the modern card says the connection is down, and that nothing needs doing", async () => {
+    const el = await mount(MODERN, unavailableHass(), CARDS[0]![1]);
+    const empty = shadow(el).querySelector(".empty");
+    expect(empty?.querySelector(".empty-title")?.textContent?.trim()).toBe(
+      "Keine Verbindung zu den Wiener Linien",
+    );
+    expect(empty?.querySelector(".empty-detail")?.textContent).toContain("Du musst nichts tun");
+    expect(empty?.getAttribute("role")).toBe("status");
+  });
+
+  it("the retro card says the connection is down", async () => {
+    const el = await mount(RETRO, unavailableHass(), CARDS[1]![1]);
+    const empty = shadow(el).querySelector(".retro-empty");
+    expect(empty?.textContent?.trim()).toBe("Keine Verbindung");
+  });
+
+  it("an empty board with failing polls says so instead of Betriebsschluss", async () => {
+    // A board that emptied while the API was down still carries the
+    // server_time of its last answer, which would otherwise read as
+    // end of service.
+    const hass = busyHass();
+    const attrs = hass.states[ENTITY]!.attributes;
+    attrs.departures = [];
+    attrs.connection_lost_since = "2026-10-21T14:30:00+00:00";
+    const el = await mount(RETRO, hass, CARDS[1]![1]);
+    expect(shadow(el).querySelector(".retro-empty")?.textContent?.trim()).toBe("Keine Verbindung");
+  });
+
+  it("the modern card flags a frozen board above its departures", async () => {
+    const hass = busyHass();
+    hass.states[ENTITY]!.attributes.connection_lost_since = "2026-10-21T14:30:00+00:00";
+    const el = await mount(MODERN, hass, CARDS[0]![1]);
+    const note = shadow(el).querySelector(".stale-note");
+    expect(note?.textContent).toContain("Keine Verbindung zu den Wiener Linien seit");
+    expect(shadow(el).querySelector(".dep-list")).not.toBeNull();
+  });
+
+  it("the flap card says the connection is down", async () => {
+    const el = await mount(FLAP, unavailableHass(), CARDS[2]![1]);
+    const empty = shadow(el).querySelector(".flap-empty");
+    expect(empty?.textContent?.trim()).toBe("Keine Verbindung");
+  });
+});
+
 /** A stop with a live U3 on either side of a planned S-Bahn train. */
 function timetableHass(): HomeAssistant {
   const hass = busyHass();

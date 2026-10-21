@@ -222,6 +222,10 @@
     "catalogue_unavailable": {
       "title": "Wiener Linien stop catalogue unavailable",
       "description": "The static stop catalogue (Open Government Data) could not be downloaded during configuration. The line picker fell back to a live-only probe, which omits any currently out-of-service lines (e.g. nightlines polled during the day, or seasonal services). Re-run the configuration once the OGD endpoint is reachable to get the full picker."
+    },
+    "upstream_unavailable": {
+      "title": "Wiener Linien isn't delivering departures",
+      "description": "The Wiener Linien real-time service has been answering with errors for more than 10 minutes. The fault is on Wiener Linien's side: your Home Assistant setup and your stops are fine, and there's nothing you need to change. Departures come back on their own as soon as the service works again, and this message goes away with them."
     }
   },
   "selector": {

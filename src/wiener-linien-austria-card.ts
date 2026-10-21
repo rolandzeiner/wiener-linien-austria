@@ -33,7 +33,12 @@ import {
   type NormalisedModernConfig,
   type NormalisedModernStop,
 } from "./utils/config.js";
-import { findWienerLinienEntities, mergeLineColorsMaps, lineColorsFor } from "./utils/entities.js";
+import {
+  isDisconnected,
+  findWienerLinienEntities,
+  mergeLineColorsMaps,
+  lineColorsFor,
+} from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeDomId, toggleInSet } from "./utils/html.js";
 import { stopMapUrl } from "./utils/map-url.js";
@@ -1025,6 +1030,14 @@ export class WienerLinienAustriaCard extends LitElement {
           this._config!.show_departures && this._config!.max_departures > 0
             ? rows.length
               ? html`${
+                  attrs.connection_lost_since
+                    ? html`<div class="stale-note" role="status" aria-live="polite">
+                      ${this._t("connection_lost_partial", {
+                        time: formatTime(attrs.connection_lost_since, this._lang()),
+                      })}
+                    </div>`
+                    : nothing
+                }${
                   staleDropped > 0
                     ? html`<div class="stale-note" role="status" aria-live="polite">
                       ${this._t("stale_feed_partial")}
@@ -1034,17 +1047,20 @@ export class WienerLinienAustriaCard extends LitElement {
                 <ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
                   ${rows.map((d, i) => this._renderRow(d, stopCfg.entity, i))}
                 </ul>`
-              : this._renderEmptyState(attrs, staleDropped)
+              : this._renderEmptyState(stopCfg.entity, attrs, staleDropped)
             : nothing
         }
       </section>
     `;
   }
 
-  /** Empty departure board, with the reason. Three distinct causes, and
+  /** Empty departure board, with the reason. Four distinct causes, and
    *  conflating them is what made a frozen upstream feed read as a normal
    *  end-of-service board for two and a half days (issue #103):
    *
+   *  - no connection — polling is failing, so there is no current answer
+   *    to read. Said outright, so an API outage doesn't look like a broken
+   *    install; the integration's Repairs issue says whose fault it is.
    *  - stale feed — the coordinator dropped every record because upstream
    *    stopped advancing their planned times. Named explicitly, because
    *    the user's first instinct is otherwise that the card is broken.
@@ -1052,7 +1068,17 @@ export class WienerLinienAustriaCard extends LitElement {
    *    stop genuinely has nothing left tonight.
    *  - no data — no successful poll yet.
    */
-  private _renderEmptyState(attrs: WienerLinienAttrs, staleDropped: number): TemplateResult {
+  private _renderEmptyState(
+    entity: string,
+    attrs: WienerLinienAttrs,
+    staleDropped: number,
+  ): TemplateResult {
+    if (isDisconnected(this.hass, entity)) {
+      return html`<div class="empty stale" role="status" aria-live="polite">
+        <div class="empty-title">${this._t("unavailable")}</div>
+        <div class="empty-detail">${this._t("unavailable_detail")}</div>
+      </div>`;
+    }
     if (staleDropped > 0) {
       const frozenAt = attrs.stale_since ? formatTime(attrs.stale_since, this._lang()) : "";
       return html`<div class="empty stale" role="status" aria-live="polite">

@@ -54,6 +54,7 @@ from .const import (
 )
 from .http import base_request_headers
 from .live import async_get_live_board
+from .outage import async_note_monitor_failure, async_note_monitor_success
 from .parsing import as_int
 from .rate_limit import async_enforce_domain_cooldown, backoff_delay
 
@@ -248,11 +249,18 @@ class MonitorBatchGroup:
 
         Raises ``UpdateFailed`` on any transport/upstream error. Applies
         per-member side effects (server-time / error-code meta, rate-limit
-        Repairs issue) so both the timer path and a member's
-        ``async_config_entry_first_refresh`` observe identical behaviour.
+        Repairs issue) and feeds the domain-wide outage tracker, so both the
+        timer path and a member's ``async_config_entry_first_refresh`` observe
+        identical behaviour.
         """
         async with self._fetch_lock:
-            return await self._async_fetch_locked()
+            try:
+                result = await self._async_fetch_locked()
+            except UpdateFailed as err:
+                async_note_monitor_failure(self.hass, err)
+                raise
+        async_note_monitor_success(self.hass)
+        return result
 
     async def _async_fetch_locked(self) -> BatchResult:
         await async_enforce_domain_cooldown(self.hass)

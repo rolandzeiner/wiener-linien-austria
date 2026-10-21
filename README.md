@@ -47,6 +47,7 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Resilient polling** — stops sharing an interval fetch in one request instead of one each, and a board the upstream feed has frozen is reported as stale rather than as end of service *(1.7.8)*.
 - **Routes from A to B** *(experimental)* — pick two stops and get the next connections, with live departure times for Wiener Linien rides and a buffer grade on every change. A second sensor turns on when a change no longer fits, and the `plan_trip` action answers "when do I have to leave?" for scripts and voice assistants, for a route or between any two stops by name. The route card can also plan between any two stops on the spot, without setting up a route. See [Routes](#routes) *(2.0.0)*.
 - **A stale-data sensor per stop** — the departure sensor keeps showing the last known board through a brief outage, so a second entity tells you when that board stopped being refreshed. Gate outage automations on it *(2.0.0)*.
+- **Outage notice** *(2.3.0)* — when the Wiener Linien real-time service fails, you can tell it's their fault, not your setup. After 10 minutes of errors from their side, a Repairs issue says so, and it clears itself once departures return. The boards show *Can't reach Wiener Linien* instead of an empty board, and the modern card flags a board that has stopped updating.
 
 ## Screenshots
 
@@ -463,6 +464,7 @@ Use it instead of the departure sensor's availability. The departure sensor stay
 | `tracked_line_keys` | list[str] | Raw `{line}\|{direction}` keys. The modern, retro and flap card editors use them to offer only directions this stop actually serves. |
 | `stale_departures` | int | Records dropped this poll because the feed stopped advancing them. |
 | `stale_since` | ISO string \| None | Newest planned time among those dropped — roughly when the feed froze. |
+| `connection_lost_since` | ISO string \| None | When polling started failing, once two polls in a row have failed. The other attributes then hold the last board that arrived. `None` while polls succeed. |
 | `traffic_info` | list[dict] | Service disruptions. `category` says which feed a notice came from: `stoerunglang` matches your tracked lines. `stoerungkurz` is the stop's own display text. It needs one of this stop's RBLs plus one of your tracked lines — named in the notice or, if it names none, calling at that platform per the timetable. A notice with no lines of its own lists those tracked lines in `inferred_lines`, which the card shows as badges. Every `stoerungkurz` notice has the platform's station name in `location`. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `inferred_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
 | `elevator_info` | list[dict] | Elevator outages matching the stop's RBLs. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
 
@@ -820,6 +822,10 @@ To try it, open Assist from the top of the Overview page and type *wie komme ich
 **The route card says "Updates paused".** Nobody has touched the card for 30 minutes. Tap it, or select **Resume updates**, and it plans again.
 
 **"No stop matches that."** Try a shorter or partial name — `Karls` matches Karlsplatz, Karlskirche, and more. Search is case-insensitive, but umlauts matter.
+
+**Repairs issue "Wiener Linien isn't delivering departures".** The Wiener Linien real-time service has answered with errors (HTTP 5xx or unreadable data) for more than 10 minutes. Nothing on your side needs fixing: departures come back on their own, and the issue clears itself with the first good answer. Timeouts and connection errors don't count toward it, because those can come from your own network.
+
+**A board says *Can't reach Wiener Linien* or *No connection*.** Home Assistant has missed the last two answers from Wiener Linien, or hasn't had one since it started. Check **Settings → Repairs**. If the outage issue is there, the fault is on Wiener Linien's side. If it isn't, check that your Home Assistant host can reach the internet.
 
 **Repairs issue "Wiener Linien rate limit hit".** Usually several HA instances behind one outbound IP sharing the OGD allowance. Raise the scan interval, or put your stops on the *same* interval so they share one request — adding stops at a cadence you already use costs nothing, while each distinct interval starts its own request stream. Or ignore it; the integration recovers on its own.
 

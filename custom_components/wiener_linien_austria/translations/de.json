@@ -222,6 +222,10 @@
     "catalogue_unavailable": {
       "title": "Wiener-Linien-Haltestellenkatalog nicht verfügbar",
       "description": "Der statische Haltestellenkatalog (Open Government Data) konnte während der Einrichtung nicht geladen werden. Die Linienauswahl ist auf eine reine Live-Abfrage zurückgefallen, in der aktuell außer Betrieb stehende Linien fehlen (z. B. Nightlines tagsüber oder saisonaler Verkehr). Konfiguration erneut durchführen, sobald die OGD-Schnittstelle wieder erreichbar ist, um die vollständige Auswahl zu erhalten."
+    },
+    "upstream_unavailable": {
+      "title": "Die Wiener Linien liefern keine Abfahrten",
+      "description": "Der Echtzeitdienst der Wiener Linien antwortet seit mehr als 10 Minuten mit Fehlern. Der Fehler liegt bei den Wiener Linien: Deine Home-Assistant-Einrichtung und deine Haltestellen sind in Ordnung, du musst nichts ändern. Sobald der Dienst wieder funktioniert, erscheinen die Abfahrten von selbst, und diese Meldung verschwindet mit ihnen."
     }
   },
   "selector": {
