@@ -32,5 +32,5 @@ export function coerceWalkTime(raw: string, context: string): number | null {
       `[wiener-linien-austria] walk-time "${raw}" for ${context} is not a number — clearing`,
     );
   }
-  return Number.isFinite(n) && n > 0 ? Math.min(120, Math.round(n)) : null;
+  return Number.isFinite(n) && n > 0 ? Math.min(120, Math.max(1, Math.round(n))) : null;
 }

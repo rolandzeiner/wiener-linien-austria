@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { departureBoardOptions, mergeLineColorsMaps } from "./entities.js";
 import type { HomeAssistant } from "../types.js";
+import { sorted } from "../utils.js";
 
 function hassWith(
   maps: Record<string, Record<string, { bg: string; fg?: string }>>,
@@ -42,7 +43,7 @@ describe("mergeLineColorsMaps", () => {
 
     const merged = mergeLineColorsMaps(hass, ["sensor.a", "sensor.b"]);
 
-    expect(Object.keys(merged).sort()).toEqual(["U1", "U2"]);
+    expect(sorted(Object.keys(merged))).toEqual(["U1", "U2"]);
   });
 
   it("skips entities with no palette without losing later ones", () => {

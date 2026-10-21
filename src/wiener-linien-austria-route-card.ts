@@ -18,14 +18,7 @@
 // text colour — so the label keeps body-text contrast in both themes and the
 // grade is carried by icon + words, not hue (WCAG 1.4.1).
 
-import {
-  LitElement,
-  css,
-  html,
-  nothing,
-  type PropertyValues,
-  type TemplateResult,
-} from "lit";
+import { LitElement, css, html, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
@@ -135,7 +128,6 @@ function adhocErrorOf(err: unknown): AdhocError {
 type Which = "from" | "to";
 
 const TIME_MODES: readonly AdhocTimeMode[] = ["now", "depart", "arrive"];
-
 
 {
   const win = window as unknown as WindowWithCustomCards;
@@ -256,7 +248,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   public static getConfigElement(): LovelaceCardEditor {
-    return document.createElement(`${ROUTE_CARD_TYPE}-editor`) as LovelaceCardEditor;
+    return document.createElement(`${ROUTE_CARD_TYPE}-editor`);
   }
 
   public static getStubConfig(hass: HomeAssistant): Partial<WienerLinienRouteCardConfig> {
@@ -334,8 +326,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (this._from && this._to) {
       // Reconnecting with a plan already on screen: refresh only once due.
       if (this._plan && this._planKey === this._queryKey()) {
-        const remaining =
-          this._nextRefreshAt === null ? 0 : this._nextRefreshAt - Date.now();
+        const remaining = this._nextRefreshAt === null ? 0 : this._nextRefreshAt - Date.now();
         if (remaining > 0) {
           this._schedule(remaining);
         } else {
@@ -570,7 +561,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._requestPlan(true);
   };
 
-
   // ------------------------------------------------------------------
   // Ad-hoc mode: searching again from a change
   // ------------------------------------------------------------------
@@ -718,8 +708,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const cfg = this._config;
     if (!cfg) return nothing;
     const adhoc = !cfg.entity;
-    const state = cfg.entity ? this.hass?.states[cfg.entity] : undefined;
-    const attrs = ((adhoc ? this._plan : state?.attributes) ?? {}) as RouteAttrs;
+    const entity = cfg.entity ? this.hass?.states[cfg.entity] : undefined;
+    const attrs = ((adhoc ? this._plan : entity?.attributes) ?? {}) as RouteAttrs;
     const heading =
       cfg.title ||
       (adhoc
@@ -742,15 +732,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             </h2>
             ${this._renderUpdated(attrs.fetched_at)}
           </div>
-          ${adhoc
-            ? html`
+          ${
+            adhoc
+              ? html`
                 ${this._renderPickers()} ${this._renderTimeControl()}
                 <p class="sr-only" role="status" aria-live="polite">${this._announcement}</p>
                 <div class="results" aria-busy=${this._phase === "loading" ? "true" : "false"}>
                   ${this._renderAdhocBody(cfg)}
                 </div>
               `
-            : this._renderBody(cfg, state?.state, attrs)}
+              : this._renderBody(cfg, entity?.state, attrs)
+          }
           ${attribution ? html`<div class="attribution">${attribution}</div>` : nothing}
         </div>
       </ha-card>
@@ -821,12 +813,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             </label>`,
           )}
         </div>
-        ${this._timeMode === "now"
-          ? nothing
-          : html`<label class="when-field">
+        ${
+          this._timeMode === "now"
+            ? nothing
+            : html`<label class="when-field">
               <span class="sr-only">${this._t("when_input")}</span>
               <input type="datetime-local" .value=${this._when} @change=${this._onWhen} />
-            </label>`}
+            </label>`
+        }
       </fieldset>
     `;
   }
@@ -959,11 +953,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     const trips = upcomingTrips(attrs, this._now);
     if (!trips[0]) {
-      return this._empty(
-        "mdi:timetable",
-        this._t("no_trips"),
-        this._t("no_trips_detail"),
-      );
+      return this._empty("mdi:timetable", this._t("no_trips"), this._t("no_trips_detail"));
     }
     return this._renderTrips(trips, attrs, cfg);
   }
@@ -1042,18 +1032,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (attrs.planned_for) return this._renderPlannedHero(trip);
     const minutes = minutesUntil(trip.departure, this._now);
     const isNow = minutes === 0;
-    const spoken = isNow
-      ? this._t("now")
-      : this._t("minutes_long", { n: minutes ?? 0 });
+    const spoken = isNow ? this._t("now") : this._t("minutes_long", { n: minutes ?? 0 });
     const sub = this._heroSub(trip);
     return html`
       <div class="hero">
         <p class="hero-count">
           <span class="hero-label">${this._t("leave_in")}</span>
           <span class="hero-metric" aria-hidden="true">
-            ${isNow
-              ? this._t("now")
-              : html`${minutes ?? "–"}<span class="hero-unit">min</span>`}
+            ${isNow ? this._t("now") : html`${minutes ?? "–"}<span class="hero-unit">min</span>`}
           </span>
           <span class="sr-only">${spoken}</span>
         </p>
@@ -1127,7 +1113,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   /** Lift outages at a station this trip takes a lift at. */
-  private _liftOutages(trip: RouteTripAttr, attrs: RouteAttrs): NonNullable<RouteAttrs["elevator_info"]> {
+  private _liftOutages(
+    trip: RouteTripAttr,
+    attrs: RouteAttrs,
+  ): NonNullable<RouteAttrs["elevator_info"]> {
     const stations = new Set(
       tripAccessSteps(trip)
         .filter((step) => step.kind === "elevator" && step.stop_id)
@@ -1204,19 +1193,22 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               i === 0 ? walkAccess(trip, "start") : undefined,
               scope,
             )}
-            ${transfer && i < legs.length - 1
-              ? this._renderTransfer(
-                  transfer,
-                  attrs,
-                  catchableDeparture(leg, transfer, legs[i + 1]!),
-                  leg.destination,
-                  legs[i + 1]!.origin,
-                )
-              : nothing}
+            ${
+              transfer && i < legs.length - 1
+                ? this._renderTransfer(
+                    transfer,
+                    attrs,
+                    catchableDeparture(leg, transfer, legs[i + 1]!),
+                    leg.destination,
+                    legs[i + 1]!.origin,
+                  )
+                : nothing
+            }
           `;
         })}
-        ${last
-          ? html`
+        ${
+          last
+            ? html`
               <li class="stop stop--end">
                 <span class="node node--end" aria-hidden="true"></span>
                 ${this._renderStopTime(last.destination)}
@@ -1225,7 +1217,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 ${this._renderAccess(walkAccess(trip, "end"), attrs)}
               </li>
             `
-          : nothing}
+            : nothing
+        }
       </ol>
     `;
   }
@@ -1242,9 +1235,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   ): TemplateResult {
     const icon = legTypeIcon(leg.type, leg.line);
     const stops =
-      leg.stop_count === 1
-        ? this._t("stops_one")
-        : this._t("stops_many", { n: leg.stop_count });
+      leg.stop_count === 1 ? this._t("stops_one") : this._t("stops_many", { n: leg.stop_count });
     const between = leg.stops ?? [];
     // The stops in between already carry the ride's delay; show them late too.
     const late = !!delayedClock(leg.origin);
@@ -1269,26 +1260,31 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         </div>
         <div class="ride">
           ${this._renderBadge(leg, attrs)}
-          ${icon
-            ? html`<ha-icon class="type-icon" icon=${icon} aria-hidden="true"></ha-icon>`
-            : nothing}
-          ${leg.low_floor && attrs.step_free
-            ? html`<ha-icon
+          ${
+            icon
+              ? html`<ha-icon class="type-icon" icon=${icon} aria-hidden="true"></ha-icon>`
+              : nothing
+          }
+          ${
+            leg.low_floor && attrs.step_free
+              ? html`<ha-icon
                   class="type-icon"
                   icon="mdi:wheelchair-accessibility"
                   aria-hidden="true"
                 ></ha-icon
                 ><span class="sr-only">${this._t("low_floor")}</span>`
-            : nothing}
+              : nothing
+          }
           <span class="towards"
-            >${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}${platform
-              ? html` <span class="platform">${platform}</span>`
-              : nothing}</span
+            >${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}${
+              platform ? html` <span class="platform">${platform}</span>` : nothing
+            }</span
           >
         </div>
         <div class="ride-detail">
-          ${between.length
-            ? html`<button
+          ${
+            between.length
+              ? html`<button
                 type="button"
                 class="stops-toggle"
                 aria-expanded=${open ? "true" : "false"}
@@ -1301,11 +1297,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                   aria-hidden="true"
                 ></ha-icon>
               </button>`
-            : html`<span class="ride-meta">${stops}</span>`}
+              : html`<span class="ride-meta">${stops}</span>`
+          }
           ${this._renderFrequency(leg)}
         </div>
-        ${between.length
-          ? html`<ol
+        ${
+          between.length
+            ? html`<ol
               class="leg-stops"
               id=${listId}
               aria-label=${this._t("stops_between", { line: leg.line ?? "" })}
@@ -1321,18 +1319,23 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 </li>`,
               )}
             </ol>`
-          : nothing}
-        ${nextLeg
-          ? html`<div class="stop stop--arrive">
+            : nothing
+        }
+        ${
+          nextLeg
+            ? html`<div class="stop stop--arrive">
               <span class="node" aria-hidden="true"></span>
               <span class="sr-only">${this._t("arrival")}</span>
               ${this._renderStopTime(leg.destination)}
               <span class="stop-name">${leg.destination.name}</span>
-              ${sameStop(leg.destination, nextLeg.origin)
-                ? nothing
-                : this._renderMapLink(leg.destination)}
+              ${
+                sameStop(leg.destination, nextLeg.origin)
+                  ? nothing
+                  : this._renderMapLink(leg.destination)
+              }
             </div>`
-          : nothing}
+            : nothing
+        }
       </li>
     `;
   }
@@ -1401,9 +1404,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const frequency = rideFrequency(leg);
     if (!frequency) return nothing;
     return html`<span class="ride-frequency">
-      ${"every" in frequency
-        ? this._t("every_minutes", { n: frequency.every })
-        : this._t("then_at", { times: frequency.then.join(", ") })}
+      ${
+        "every" in frequency
+          ? this._t("every_minutes", { n: frequency.every })
+          : this._t("then_at", { times: frequency.upcoming.join(", ") })
+      }
     </span>`;
   }
 
@@ -1438,19 +1443,23 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       <li class="transfer" data-risk=${transfer.risk}>
         <span class="node node--transfer" aria-hidden="true"></span>
         <span class="transfer-at">${this._t("transfer")}</span>
-        ${transfer.walk_minutes > 0
-          ? html`<span class="walk">
+        ${
+          transfer.walk_minutes > 0
+            ? html`<span class="walk">
               <ha-icon icon="mdi:walk" aria-hidden="true"></ha-icon>
               ${this._t("walk", { n: transfer.walk_minutes })}
             </span>`
-          : nothing}
+            : nothing
+        }
         ${this._renderAccess(transfer.access, attrs)}
         ${this._renderRisk(transfer)}
-        ${catchable
-          ? html`<span class="catchable">
+        ${
+          catchable
+            ? html`<span class="catchable">
               ${this._t("next_catchable", { time: roundedClock(catchable) })}
             </span>`
-          : nothing}
+            : nothing
+        }
         ${this._renderReplan(transfer, arrival, boarding)}
       </li>
     `;
@@ -1553,28 +1562,32 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         >
           <span class="alt-times">
             <span aria-hidden="true"
-              >${delayed
-                ? html`<s class="time-planned">${delayed.planned}</s>
+              >${
+                delayed
+                  ? html`<s class="time-planned">${delayed.planned}</s>
                     <span class="time-late">${delayed.expected}</span>`
-                : clockOf(trip.departure)}
+                  : clockOf(trip.departure)
+              }
               – ${clockOf(trip.arrival)}</span
             >
             <span class="sr-only"
-              >${this._tripSummary(trip)}${delayed
-                ? `, ${this._t("planned_late", {
-                    time: delayed.planned,
-                    n: first?.origin.delay_minutes ?? 0,
-                  })}`
-                : ""}</span
+              >${this._tripSummary(trip)}${
+                delayed
+                  ? `, ${this._t("planned_late", {
+                      time: delayed.planned,
+                      n: first?.origin.delay_minutes ?? 0,
+                    })}`
+                  : ""
+              }</span
             >
           </span>
           <span class="alt-lines">
             ${transitLegs(trip).map((leg) => this._renderBadge(leg, attrs))}
           </span>
           <span class="alt-meta">
-            ${trip.duration_minutes !== null
-              ? this._t("minutes", { n: trip.duration_minutes })
-              : ""}
+            ${
+              trip.duration_minutes !== null ? this._t("minutes", { n: trip.duration_minutes }) : ""
+            }
           </span>
           ${worst ? this._renderRisk(worst) : nothing}
           <ha-icon
@@ -1587,10 +1600,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
              since every alternative drawing its strand up front would be most
              of the card's DOM for rows nobody opened. -->
         <div class="alt-detail" id=${detailId} ?hidden=${!open}>
-          ${open
-            ? html`${this._renderNotices(trip, attrs)}
+          ${
+            open
+              ? html`${this._renderNotices(trip, attrs)}
               ${this._renderStrand(trip, attrs, `alt-${key}`)}`
-            : nothing}
+              : nothing
+          }
         </div>
       </li>
     `;

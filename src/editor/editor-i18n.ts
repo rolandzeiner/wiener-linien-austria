@@ -16,11 +16,11 @@ import { translate, type TranslateContext } from "../localize/localize.js";
 export interface EditorTranslators {
   /** Card-namespaced lookup (`retro.dir_h`). For strings the card itself
    *  renders too, so the editor cannot drift from the card's own wording. */
-  t(key: string): string;
+  t: (key: string) => string;
   /** Editor lookup: `<card>.editor.<key>`, falling back to
    *  `common.editor.<key>`, then to the raw key so a missing string is visible
    *  in the UI rather than silently blank. */
-  et(key: string): string;
+  et: (key: string) => string;
 }
 
 export function editorTranslators(

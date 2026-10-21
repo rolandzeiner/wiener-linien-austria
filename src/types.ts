@@ -59,17 +59,13 @@ export interface LovelaceCardEditor extends HTMLElement {
   setConfig(config: LovelaceCardConfig): void;
 }
 
-/** `LovelaceCard` is only referenced as the `hui-error-card` tag-map
- *  entry below, so an HTMLElement alias suffices. */
-export type LovelaceCard = HTMLElement;
-
 // Register editor element tags with the global customElements registry so
 // TypeScript autocompletes them inside html`…` templates.
 declare global {
   interface HTMLElementTagNameMap {
     "wiener-linien-austria-card-editor": LovelaceCardEditor;
     "wiener-linien-austria-retro-card-editor": LovelaceCardEditor;
-    "hui-error-card": LovelaceCard;
+    "hui-error-card": HTMLElement;
     "ha-form": HaFormElement;
     "ha-icon-picker": HaIconPickerElement;
   }
@@ -153,10 +149,17 @@ export type HASelector =
     }
   | {
       select: {
-        mode?: "dropdown" | "list";
+        /** `box` (frontend 2025.3+) draws a tile per option and is the only
+         *  mode that shows `description` and `image`. */
+        mode?: "dropdown" | "list" | "box";
         multiple?: boolean;
         custom_value?: boolean;
-        options: ReadonlyArray<{ value: string; label: string }>;
+        options: ReadonlyArray<{
+          value: string;
+          label: string;
+          description?: string;
+          image?: string | { src: string; src_dark?: string; flip_rtl?: boolean };
+        }>;
       };
     };
 
@@ -198,10 +201,7 @@ export interface HaFormExpandableSchema {
   schema: ReadonlyArray<HaFormSchema>;
 }
 
-export type HaFormSchema =
-  | HaFormSelectorSchema
-  | HaFormGridSchema
-  | HaFormExpandableSchema;
+export type HaFormSchema = HaFormSelectorSchema | HaFormGridSchema | HaFormExpandableSchema;
 
 /** `<ha-icon-picker>` element shape. Only usable outside `ha-form` — see
  *  editor/header-strip.ts for why nesting it in an expandable breaks it. */
@@ -226,8 +226,6 @@ interface HaFormElement extends HTMLElement {
 // Keep in sync with sensor.extra_state_attributes in custom_components/.
 // ---------------------------------------------------------------------------
 
-export type DepartureDirection = "H" | "R";
-
 // One entry on the per-departure "stops ahead" trail. `is_terminus`
 // only appears on the final stop. `lines` is the list of OTHER lines
 // (excluding the one this departure runs on) that pass through this
@@ -242,7 +240,8 @@ export interface StopAheadAttr {
 export interface DepartureAttr {
   line: string;
   towards: string;
-  direction: DepartureDirection | string;
+  /** `"H"` or `"R"` in practice; typed loosely because it is upstream data. */
+  direction: string;
   type: string;
   countdown: number;
   time_planned?: string | null;
@@ -399,7 +398,17 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_platform?: boolean | undefined;
   show_hero_metric?: boolean | undefined;
   show_departures?: boolean | undefined;
+  /** Put the estimated departure time beside the countdown, in the hero and
+   *  on every row: the live departure, or the planned one without live data.
+   *  A late departure shows the timetable's time struck through, as the
+   *  trail's arrival times do. Off by default. */
+  show_departure_time?: boolean | undefined;
   show_stops_ahead?: boolean | undefined;
+  /** Put an estimated arrival time beside each stop of the trail: the
+   *  departure's own time plus the timetable's minutes to that stop. The
+   *  minutes come over the `run_times` WebSocket command the first time a
+   *  trail is opened. Off by default; needs `show_stops_ahead`. */
+  show_stop_times?: boolean | undefined;
   /** Vehicle categories that get a transfer chip in the stops-ahead trail.
    *  Omit the key for every category; an empty array hides every chip. */
   stops_ahead_modes?: TransferMode[] | undefined;
@@ -438,11 +447,7 @@ export type RetroDirection = "H" | "R" | "both";
  *  here (`mdi:${string}`) to avoid a circular `types.ts ↔ utils`
  *  type import; the runtime normaliser validates against the
  *  curated set. */
-export type RetroHeaderExit =
-  | "none"
-  | "regular"
-  | "accessible"
-  | `mdi:${string}`;
+export type RetroHeaderExit = "none" | "regular" | "accessible" | `mdi:${string}`;
 
 /** Per-side config for the retro card's optional U-Bahn-signage
  *  header strip (the black band above the orange station name).

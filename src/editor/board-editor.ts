@@ -51,10 +51,7 @@ import type {
 import { fireEvent } from "../utils.js";
 
 /** The fields every section form is handed. */
-type FormContext = Pick<
-  FormSectionOptions,
-  "hass" | "computeLabel" | "computeHelper" | "onChange"
->;
+type FormContext = Pick<FormSectionOptions, "hass" | "computeLabel" | "computeHelper" | "onChange">;
 
 /** The slice of config behind the header strip and station band, which the
  *  flap and retro cards share. */
@@ -239,9 +236,7 @@ interface MultiStopConfig extends LovelaceCardConfig {
 
 /** The modern and flap editors: an `entities` array, one stop block per
  *  entry, and the entity picker in front of them. */
-export abstract class MultiStopEditor<
-  C extends MultiStopConfig,
-> extends BoardEditor<C> {
+export abstract class MultiStopEditor<C extends MultiStopConfig> extends BoardEditor<C> {
   protected override _watchedEntities(cfg: C): readonly string[] {
     return cfg.entities.map((s) => s.entity);
   }
@@ -271,9 +266,7 @@ export abstract class MultiStopEditor<
     });
   }
 
-  private _onEntitiesChanged = (
-    ev: CustomEvent<{ value: Record<string, unknown> }>,
-  ): void => {
+  private _onEntitiesChanged = (ev: CustomEvent<{ value: Record<string, unknown> }>): void => {
     ev.stopPropagation();
     if (!this._config) return;
     // Re-normalised, unlike the stop-block edits: a bare `{ entity }`

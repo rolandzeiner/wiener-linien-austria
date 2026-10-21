@@ -33,6 +33,7 @@ import {
 import { departureBoardOptions } from "../utils/entities.js";
 import { lineTypeIcon } from "../utils/mot.js";
 import { coerceWalkTime, swallowEditorKeys } from "../editor-shared.js";
+import { sorted } from "../utils.js";
 
 /** The saved shape every card's per-stop config structurally satisfies.
  *  Retro adapts its flat `{entity, lines, direction ("both" → absent),
@@ -77,9 +78,9 @@ export interface StopBlockOptions {
   /** Per-line colour overrides from the card config. */
   lineColorOverrides: Record<string, string>;
   /** Card-namespaced translator (`dir_h`, `dir_both`, `entity_missing`, …). */
-  t(key: string): string;
+  t: (key: string) => string;
   /** Editor-namespaced translator (`lines_label`, `walk_time_hint`, …). */
-  et(key: string): string;
+  et: (key: string) => string;
 }
 
 /** What `colorOf` hands each renderer. Mirrors `lineChipColors`'s return. */
@@ -104,36 +105,27 @@ function badgeStyle(c: LineColors): Record<string, string> {
 const WALK_MIN = 1;
 const WALK_MAX = 120;
 
-function attrsOf(
-  hass: HomeAssistant | undefined,
-  entity: string,
-): WienerLinienAttrs | undefined {
-  return hass?.states?.[entity]?.attributes as WienerLinienAttrs | undefined;
+function attrsOf(hass: HomeAssistant | undefined, entity: string): WienerLinienAttrs | undefined {
+  return hass?.states?.[entity]?.attributes;
 }
 
 /** Termini reachable in `dir`, optionally narrowed to one line. Feeds the
  *  direction-button labels, which name real destinations rather than the
  *  abstract H/R the API uses — the one v1 affordance worth keeping verbatim. */
-function terminiFor(
-  triplets: ReadonlyArray<Triplet>,
-  dir: "H" | "R",
-  line?: string,
-): string[] {
+function terminiFor(triplets: ReadonlyArray<Triplet>, dir: "H" | "R", line?: string): string[] {
   const out = new Set<string>();
   for (const t of triplets) {
     if (t.direction !== dir) continue;
     if (line && t.line !== line) continue;
     if (t.towards) out.add(t.towards);
   }
-  return [...out].sort();
+  return sorted(out);
 }
 
 /** Per-line rows replace the stop-wide control once two or more lines are in
  *  play. Below that the stop-wide control is the only direction picker there
  *  is, so it can never be dropped outright. */
-function showPerLineDirections(
-  ctx: { lines: string[]; picked: Set<string> },
-): boolean {
+function showPerLineDirections(ctx: { lines: string[]; picked: Set<string> }): boolean {
   return effectiveLines(ctx.lines, ctx.picked).length >= 2;
 }
 
@@ -160,9 +152,7 @@ export function renderStopBlock(
   // it in the list so it gets a chip, a direction row and a walk-time row, and
   // can actually be deselected. Dropping it stranded the config invisibly.
   const known = linesAtStop(attrs);
-  const lines = picked.size
-    ? [...new Set([...known, ...picked])].sort()
-    : known;
+  const lines = picked.size ? sorted(new Set([...known, ...picked])) : known;
   const triplets = tripletsAtStop(attrs);
 
   // Per-line vehicle type so each chip carries its mode icon. First-seen wins:
@@ -180,23 +170,34 @@ export function renderStopBlock(
   return html`
     <section class="wl-section">
       <header class="wl-section-header">
-        ${opts.total > 1
-          ? html`<span class="wl-index" aria-hidden="true">${opts.index}</span>`
-          : nothing}
+        ${
+          opts.total > 1
+            ? html`<span class="wl-index" aria-hidden="true">${opts.index}</span>`
+            : nothing
+        }
         <span class="wl-section-title">${stopName}</span>
       </header>
       <div class="wl-stop-body">
         ${missing ? renderMissing(stop, opts, cb) : nothing}
         ${renderLines(stop, opts, cb, { lines, picked, colorOf, typeByLine })}
-        ${!missing && lines.length
-          ? // Exactly one direction control is shown at a time. Two levels at
-            // once read as contradicting each other (the stop-wide row says R
-            // while a line row says H), and the stop-wide label degrades into
-            // soup at a hub because it pools termini across every line.
-            showPerLineDirections({ lines, picked })
-            ? renderOverrides(stop, opts, cb, { attrs, triplets, picked, lines, colorOf, dirStrings })
-            : renderDirection(stop, opts, cb, { attrs, triplets, picked, lines, dirStrings })
-          : nothing}
+        ${
+          !missing && lines.length
+            ? // Exactly one direction control is shown at a time. Two levels at
+              // once read as contradicting each other (the stop-wide row says R
+              // while a line row says H), and the stop-wide label degrades into
+              // soup at a hub because it pools termini across every line.
+              showPerLineDirections({ lines, picked })
+              ? renderOverrides(stop, opts, cb, {
+                  attrs,
+                  triplets,
+                  picked,
+                  lines,
+                  colorOf,
+                  dirStrings,
+                })
+              : renderDirection(stop, opts, cb, { attrs, triplets, picked, lines, dirStrings })
+            : nothing
+        }
         ${!missing ? renderWalkTimes(stop, opts, cb, { attrs, picked, colorOf, lines, dirStrings }) : nothing}
       </div>
     </section>
@@ -215,8 +216,9 @@ function renderMissing(
   return html`
     <ha-alert alert-type="error">
       ${opts.t("entity_missing").replace("{entity}", stop.entity)}
-      ${cb.remove
-        ? html`<button
+      ${
+        cb.remove
+          ? html`<button
             type="button"
             slot="action"
             class="wl-add"
@@ -224,7 +226,8 @@ function renderMissing(
           >
             ${opts.et("remove_stop")}
           </button>`
-        : nothing}
+          : nothing
+      }
     </ha-alert>
   `;
 }
@@ -242,7 +245,10 @@ function renderLines(
 ): TemplateResult {
   const { lines, picked, colorOf, typeByLine } = ctx;
   const hint = picked.size
-    ? opts.et("lines_selected").replace("{n}", String(picked.size)).replace("{total}", String(lines.length))
+    ? opts
+        .et("lines_selected")
+        .replace("{n}", String(picked.size))
+        .replace("{total}", String(lines.length))
     : opts.et("lines_empty_means_all");
 
   return html`
@@ -251,8 +257,9 @@ function renderLines(
         <span class="wl-label wl-label--grow">${opts.et("lines_label")}</span>
         ${lines.length ? html`<span class="wl-note">${hint}</span>` : nothing}
       </div>
-      ${lines.length
-        ? html`<div class="wl-chips">
+      ${
+        lines.length
+          ? html`<div class="wl-chips">
             ${lines.map((line) => {
               // Empty selection means "all lines", so every chip reads as
               // active — that is what no filter actually shows.
@@ -268,19 +275,22 @@ function renderLines(
                   .replace("{line}", line)}
                 @click=${() => cb.toggleLine(stop.entity, line)}
               >
-                ${icon
-                  ? html`<span class="wl-chip-mode"
+                ${
+                  icon
+                    ? html`<span class="wl-chip-mode"
                       ><ha-icon icon=${icon} aria-hidden="true"></ha-icon
                     ></span>`
-                  : nothing}
+                    : nothing
+                }
                 ${line}
               </button>`;
             })}
           </div>`
-        : html`<div class="wl-empty">
+          : html`<div class="wl-empty">
             <span class="wl-empty-title">${opts.et("no_lines_title")}</span>
             <span class="wl-note">${opts.et("no_lines_hint")}</span>
-          </div>`}
+          </div>`
+      }
     </div>
   `;
 }
@@ -350,18 +360,14 @@ function renderDirection(
           // `unknown` enables both — see DirectionSurface. Only a set that
           // genuinely says one-way disables the other button.
           disabled: !surface.unknown && !hasH,
-          title: hasH || surface.unknown
-            ? opts.t("dir_h")
-            : opts.et("direction_unavailable"),
+          title: hasH || surface.unknown ? opts.t("dir_h") : opts.et("direction_unavailable"),
           onClick: () => commit("H"),
         })}
         ${dirButton({
           label: label("R"),
           active: activeR,
           disabled: !surface.unknown && !hasR,
-          title: hasR || surface.unknown
-            ? opts.t("dir_r")
-            : opts.et("direction_unavailable"),
+          title: hasR || surface.unknown ? opts.t("dir_r") : opts.et("direction_unavailable"),
           onClick: () => commit("R"),
         })}
         ${dirButton({
@@ -408,9 +414,7 @@ function dirButton(spec: DirButtonSpec): TemplateResult {
       spec.onClick();
     }}
   >
-    ${spec.icon
-      ? html`<ha-icon icon=${spec.icon} aria-hidden="true"></ha-icon>`
-      : spec.label}
+    ${spec.icon ? html`<ha-icon icon=${spec.icon} aria-hidden="true"></ha-icon>` : spec.label}
   </button>`;
 }
 
@@ -574,11 +578,7 @@ function renderWalkTimes(
           // the keyboard sweep instead of hiding an option.
           const bump = (delta: number): void => {
             const next = (val ?? 0) + delta;
-            cb.setWalkTime(
-              stop.entity,
-              key,
-              next < WALK_MIN ? null : Math.min(WALK_MAX, next),
-            );
+            cb.setWalkTime(stop.entity, key, next < WALK_MIN ? null : Math.min(WALK_MAX, next));
           };
           return html`
             <div class="wl-walk-row">
@@ -587,9 +587,7 @@ function renderWalkTimes(
               >
               <span
                 class="wl-walk-dest"
-                title=${p.termini.length > 1
-                  ? opts.et("walk_time_branching_hint")
-                  : terminus}
+                title=${p.termini.length > 1 ? opts.et("walk_time_branching_hint") : terminus}
                 >→ ${terminus}</span
               >
               <span class="wl-stepper">
@@ -619,7 +617,10 @@ function renderWalkTimes(
                     cb.setWalkTime(
                       stop.entity,
                       key,
-                      coerceWalkTime((ev.target as HTMLInputElement).value, `${stop.entity}/${key}`),
+                      coerceWalkTime(
+                        (ev.target as HTMLInputElement).value,
+                        `${stop.entity}/${key}`,
+                      ),
                     )}
                 />
                 <button
@@ -643,9 +644,9 @@ function renderWalkTimes(
 export interface StopsTabOptions extends Omit<StopBlockOptions, "index" | "total"> {
   hass: HomeAssistant | undefined;
   stops: readonly StopView[];
-  computeLabel(field: { name: string }): string;
-  computeHelper(field: { name: string }): string | undefined;
-  onEntitiesChanged(ev: CustomEvent<{ value: Record<string, unknown> }>): void;
+  computeLabel: (field: { name: string }) => string;
+  computeHelper: (field: { name: string }) => string | undefined;
+  onEntitiesChanged: (ev: CustomEvent<{ value: Record<string, unknown> }>) => void;
   callbacks: StopBlockCallbacks;
 }
 
@@ -664,18 +665,20 @@ export function renderStopsTab(opts: StopsTabOptions): TemplateResult {
     <ha-form
       .hass=${opts.hass}
       .data=${{ entities }}
-      .schema=${[
-        {
-          name: "entities",
-          required: true,
-          selector: {
-            entity: {
-              multiple: true,
-              include_entities: departureBoardOptions(opts.hass, entities),
+      .schema=${
+        [
+          {
+            name: "entities",
+            required: true,
+            selector: {
+              entity: {
+                multiple: true,
+                include_entities: departureBoardOptions(opts.hass, entities),
+              },
             },
           },
-        },
-      ] satisfies ReadonlyArray<HaFormSchema>}
+        ] satisfies ReadonlyArray<HaFormSchema>
+      }
       .computeLabel=${opts.computeLabel}
       .computeHelper=${opts.computeHelper}
       @value-changed=${opts.onEntitiesChanged}

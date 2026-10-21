@@ -300,7 +300,7 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        await async_refresh_alerts(hass)
+        assert await async_refresh_alerts(hass) is True
 
     assert fake_session.get.call_count == 1, "both feeds must ride in one request"
     params = fake_session.get.call_args.kwargs["params"]
@@ -364,8 +364,8 @@ async def test_async_refresh_alerts_swallows_errors(hass: HomeAssistant) -> None
         "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
         return_value=fake_session,
     ):
-        # Should not raise.
-        await async_refresh_alerts(hass)
+        # Should not raise, and says so the periodic tick can back off.
+        assert await async_refresh_alerts(hass) is False
 
     # Caches are empty lists, not missing keys.
     assert hass.data[DOMAIN][TRAFFIC_INFO_KEY] == []

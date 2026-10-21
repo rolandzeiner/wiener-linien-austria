@@ -32,14 +32,12 @@ export interface RowStateOptions {
   showPlatform: boolean;
 }
 
-export function deriveRowState(
-  d: DepartureAttr,
-  opts: RowStateOptions,
-): RowState {
+export function deriveRowState(d: DepartureAttr, opts: RowStateOptions): RowState {
   const countdown = Number.isFinite(d.countdown) ? d.countdown : null;
 
-  // Computed independently of `show_delay` so the state colours still
-  // light up when the verbose "1 Minute verspätet" text is switched off.
+  // Not gated on `show_delay` here: that switch decides the "1 Minute
+  // verspätet" text in the card. The colours follow `showDelayColors`, which
+  // the config normaliser already turns off whenever delays are off.
   const signedDelay = delayMinutes(d.time_planned, d.time_real);
 
   // `now` outranks late/early: a departure at the platform is announced
@@ -53,9 +51,7 @@ export function deriveRowState(
   else if (signedDelay <= -1) cdState = "early";
 
   const hasFlags = Boolean(
-    d.traffic_jam ||
-      (opts.showAccessibility && d.barrier_free) ||
-      (opts.showCooling && d.cooling),
+    d.traffic_jam || (opts.showAccessibility && d.barrier_free) || (opts.showCooling && d.cooling),
   );
 
   return {

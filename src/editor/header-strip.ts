@@ -21,12 +21,7 @@ import { html, nothing, type TemplateResult } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { live } from "lit/directives/live.js";
 
-import type {
-  HaFormSchema,
-  HomeAssistant,
-  RetroHeaderExit,
-  RetroHeaderSide,
-} from "../types.js";
+import type { HaFormSchema, HomeAssistant, RetroHeaderExit, RetroHeaderSide } from "../types.js";
 import {
   RETRO_HEADER_MDI_EXIT_KEYS,
   RETRO_HEADER_MDI_EXITS,
@@ -75,16 +70,16 @@ const EXIT_CHOICES: ReadonlyArray<{ value: RetroHeaderExit; icon: string; labelK
 
 export interface HeaderStripCallbacks {
   /** Patch one field on one side. The editor merges and normalises. */
-  patch(side: HeaderSideKey, field: keyof RetroHeaderSide, value: unknown): void;
+  patch: (side: HeaderSideKey, field: keyof RetroHeaderSide, value: unknown) => void;
   /** Which side the panel is editing. Editor-local UI state, never config. */
-  selectSide(side: HeaderSideKey): void;
+  selectSide: (side: HeaderSideKey) => void;
 }
 
 export interface HeaderStripOptions {
   left: RetroHeaderSide | undefined;
   right: RetroHeaderSide | undefined;
   selected: HeaderSideKey;
-  et(key: string): string;
+  et: (key: string) => string;
 }
 
 interface Token {
@@ -225,8 +220,9 @@ export function renderHeaderStrip(
               </button>`;
             })}
           </div>
-          ${side.show_date
-            ? html`<input
+          ${
+            side.show_date
+              ? html`<input
                 type="text"
                 class="wl-text"
                 maxlength=${HEADER_MAX_DATE_FORMAT_LEN}
@@ -237,12 +233,10 @@ export function renderHeaderStrip(
                 @keyup=${swallowEditorKeys}
                 @keypress=${swallowEditorKeys}
                 @change=${(ev: Event) =>
-                  patch(
-                    "date_format",
-                    (ev.target as HTMLInputElement).value.trim() || undefined,
-                  )}
+                  patch("date_format", (ev.target as HTMLInputElement).value.trim() || undefined)}
               />`
-            : nothing}
+              : nothing
+          }
         </div>
 
         ${renderChipsAndIcons(side, opts, patch)}
@@ -276,9 +270,7 @@ function renderZone(
       ${tokens.map(
         (t) => html`<span
           class=${classMap({ "wl-token": true, "wl-token--chip": t.kind === "chip" })}
-          >${t.icon
-            ? html`<ha-icon icon=${t.icon} aria-hidden="true"></ha-icon>`
-            : t.label}</span
+          >${t.icon ? html`<ha-icon icon=${t.icon} aria-hidden="true"></ha-icon>` : t.label}</span
         >`,
       )}
     </span>
@@ -330,14 +322,15 @@ function renderChipsAndIcons(
         )}
       </div>
 
-      ${icons.length < HEADER_MAX_ICONS
-        ? // live() is load-bearing here. A plain .value="" binding makes Lit
-          // compare the previous bound value ("") against the new one ("") and
-          // skip the update — so after the first pick the element keeps showing
-          // the icon it chose and no further pick registers. live() compares
-          // against the element's actual DOM value instead, so it is cleared on
-          // every render and ready for the next pick.
-          html`<ha-icon-picker
+      ${
+        icons.length < HEADER_MAX_ICONS
+          ? // live() is load-bearing here. A plain .value="" binding makes Lit
+            // compare the previous bound value ("") against the new one ("") and
+            // skip the update — so after the first pick the element keeps showing
+            // the icon it chose and no further pick registers. live() compares
+            // against the element's actual DOM value instead, so it is cleared on
+            // every render and ready for the next pick.
+            html`<ha-icon-picker
             .value=${live("")}
             .label=${opts.et("add_icon")}
             @value-changed=${(ev: CustomEvent<{ value?: string }>) => {
@@ -348,9 +341,11 @@ function renderChipsAndIcons(
               patch("extra_icons", [...icons, v].slice(0, HEADER_MAX_ICONS));
             }}
           ></ha-icon-picker>`
-        : nothing}
-      ${chips.length < HEADER_MAX_CHIPS
-        ? html`<input
+          : nothing
+      }
+      ${
+        chips.length < HEADER_MAX_CHIPS
+          ? html`<input
             type="text"
             class="wl-text"
             maxlength=${HEADER_MAX_CHIP_LEN}
@@ -368,7 +363,8 @@ function renderChipsAndIcons(
             @keyup=${swallowEditorKeys}
             @keypress=${swallowEditorKeys}
           />`
-        : nothing}
+          : nothing
+      }
     </div>
   `;
 }
@@ -386,16 +382,16 @@ export interface HeaderSectionOptions {
   left: RetroHeaderSide | undefined;
   right: RetroHeaderSide | undefined;
   selected: HeaderSideKey;
-  et(key: string): string;
+  et: (key: string) => string;
   computeLabel: (field: { name: string }) => string;
   computeHelper: (field: { name: string }) => string | undefined;
   /** The side as the editor holds it right now. Read at patch time, not
    *  captured at render, so two edits landing before Lit re-renders both
    *  merge onto the latest config instead of the second dropping the first. */
-  currentSide(side: HeaderSideKey): RetroHeaderSide | undefined;
+  currentSide: (side: HeaderSideKey) => RetroHeaderSide | undefined;
   /** Merge a partial config value: `{ show_header }` or one whole side. */
-  onChange(value: Record<string, unknown>): void;
-  selectSide(side: HeaderSideKey): void;
+  onChange: (value: Record<string, unknown>) => void;
+  selectSide: (side: HeaderSideKey) => void;
 }
 
 /** The "Header" section of the retro and flap editors: the `show_header`
@@ -408,9 +404,9 @@ export function renderHeaderSection(opts: HeaderSectionOptions): TemplateResult 
       <ha-form
         .hass=${opts.hass}
         .data=${{ show_header: opts.showHeader }}
-        .schema=${[
-          { name: "show_header", selector: { boolean: {} } },
-        ] satisfies ReadonlyArray<HaFormSchema>}
+        .schema=${
+          [{ name: "show_header", selector: { boolean: {} } }] satisfies ReadonlyArray<HaFormSchema>
+        }
         .computeLabel=${opts.computeLabel}
         .computeHelper=${opts.computeHelper}
         @value-changed=${(ev: CustomEvent<{ value: Record<string, unknown> }>) => {
@@ -418,23 +414,25 @@ export function renderHeaderSection(opts: HeaderSectionOptions): TemplateResult 
           opts.onChange(ev.detail.value);
         }}
       ></ha-form>
-      ${opts.showHeader
-        ? renderHeaderStrip(
-            {
-              left: opts.left,
-              right: opts.right,
-              selected: opts.selected,
-              et: opts.et,
-            },
-            {
-              selectSide: opts.selectSide,
-              patch: (side, field, value) =>
-                opts.onChange({
-                  [side]: patchHeaderSide(opts.currentSide(side), field, value),
-                }),
-            },
-          )
-        : nothing}
+      ${
+        opts.showHeader
+          ? renderHeaderStrip(
+              {
+                left: opts.left,
+                right: opts.right,
+                selected: opts.selected,
+                et: opts.et,
+              },
+              {
+                selectSide: opts.selectSide,
+                patch: (side, field, value) =>
+                  opts.onChange({
+                    [side]: patchHeaderSide(opts.currentSide(side), field, value),
+                  }),
+              },
+            )
+          : nothing
+      }
     `,
   );
 }

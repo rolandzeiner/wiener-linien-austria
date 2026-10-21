@@ -13,6 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .alerts import get_alerts_for, line_names_from_keys
 from .const import (
@@ -343,7 +344,7 @@ class WienerLinienStopSensor(
 class WienerLinienRouteSensor(
     CoordinatorEntity[WienerLinienRouteCoordinator], SensorEntity
 ):
-    """One sensor per route. State = departure of the best connection.
+    """One sensor per route. State = departure of the best connection ahead.
 
     A timestamp rather than a countdown: Home Assistant renders it as
     "in 4 minutes" on its own, automations can compare it directly, and
@@ -373,11 +374,10 @@ class WienerLinienRouteSensor(
 
     @property
     def native_value(self) -> datetime | None:
-        """Departure of the best connection, or None when there is none."""
+        """Departure of the best connection still ahead, or None without one."""
         data = self.coordinator.data
-        if data is None or not data.trips:
-            return None
-        return data.trips[0].departure
+        best = data.next_trip(dt_util.utcnow()) if data is not None else None
+        return best.departure if best is not None else None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -385,7 +385,7 @@ class WienerLinienRouteSensor(
         coordinator = self.coordinator
         data = coordinator.data
         trips = data.trips if data is not None else []
-        best = trips[0] if trips else None
+        best = data.next_trip(dt_util.utcnow()) if data is not None else None
         return {
             "origin": coordinator.origin_name,
             "destination": coordinator.destination_name,

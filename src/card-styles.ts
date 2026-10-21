@@ -1257,6 +1257,58 @@ export const cardStyles = css`
     z-index: 1;
     forced-color-adjust: none;
   }
+  /* Estimated arrival at the stop (show_stop_times): the departure's own
+     time plus the timetable's minutes to here. Tabular figures and a fixed
+     inline size keep the names in one column, also for a stop the timetable
+     gave no time for, which renders the element empty. */
+  .stops-ahead-time {
+    flex: 0 0 auto;
+    inline-size: 5ch;
+    font-variant-numeric: tabular-nums;
+  }
+  /* A late departure: the timetable's arrival struck through, then the
+     expected one, the way the route card prints a late boarding time. The
+     strike and the second time carry the delay; the red comes on top only
+     with show_delay_colors. Same mix as the route card's late time: the
+     theme's error red alone measures 4.0:1 on a dark card at this size,
+     and 15% of the body text lifts it past 4.5:1. */
+  .stops-ahead-times {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--ha-space-1, 4px);
+  }
+  .stops-ahead-time--planned {
+    text-decoration-thickness: 1.5px;
+  }
+  .stops-ahead-time.late {
+    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    font-weight: 600;
+  }
+  /* The slot of a stop without a time on a struck-through trail: as wide
+     as the two times its neighbours carry. */
+  .stops-ahead-time--pair {
+    inline-size: calc(10ch + var(--ha-space-1, 4px));
+  }
+  /* On a narrow card the struck time gives its room back to the stop
+     names; the expected time stays, and so does the spoken delay. */
+  @container wlcard (inline-size < 360px) {
+    .stops-ahead-time--planned {
+      display: none;
+    }
+    .stops-ahead-time--pair {
+      inline-size: 5ch;
+    }
+  }
+  /* Read out, not shown. */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .stops-ahead-name {
     color: var(--primary-text-color);
     flex: 0 1 auto;
@@ -1474,6 +1526,59 @@ export const cardStyles = css`
   .countdown.now   { color: var(--wl-accent-text); }
   .countdown.late  { color: var(--wl-error); }
   .countdown.early { color: var(--wl-rt); }
+
+  /* Estimated departure time (show_departure_time). In a row it stacks
+     under the countdown in the same grid cell, right-aligned with it, so
+     nothing to its left moves. The row grows by the clock's line; that is
+     the price of switching the option on, and set any tighter the two
+     lines read as one cramped block. Quieter than the
+     countdown (secondary colour, regular weight), since the minutes stay
+     what a glance is for. In the hero it closes the entry, before the
+     chevron. A late departure
+     prints the timetable's time struck through first, styled like the
+     trail's arrival times: the strike and the second time carry the
+     delay, the red comes on top only with show_delay_colors, in the same
+     mix as .stops-ahead-time.late for contrast. */
+  .row-time {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+  .row-time .countdown {
+    line-height: 1.2;
+  }
+  .dep-time {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--ha-space-1, 4px);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .dep-time--row {
+    font-size: var(--ha-font-size-s, 12px);
+    line-height: 1.2;
+    color: var(--secondary-text-color);
+  }
+  .dep-time--hero {
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+  .dep-time-planned {
+    text-decoration-thickness: 1.5px;
+  }
+  .dep-time-clock.late {
+    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    font-weight: 600;
+  }
+  /* On a narrow card the hero's struck time gives its room back; the
+     expected time stays, and so does the spoken delay. */
+  @container wlcard (inline-size < 360px) {
+    .dep-time-planned {
+      display: none;
+    }
+  }
 
   /* Empty / fallback states */
   .empty {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   chipPalette,
@@ -14,9 +14,7 @@ import type { WienerLinienRetroCardConfig } from "../types.js";
 /** Minimal valid retro config — every test starts from this and overrides
  *  only the key under test, so a default assertion can't be satisfied by
  *  an unrelated field the fixture happened to set. */
-function retro(
-  over: Partial<WienerLinienRetroCardConfig> = {},
-): WienerLinienRetroCardConfig {
+function retro(over: Partial<WienerLinienRetroCardConfig> = {}): WienerLinienRetroCardConfig {
   return { type: "custom:wiener-linien-austria-retro-card", ...over };
 }
 
@@ -43,12 +41,8 @@ describe("normaliseRetroConfig — defaults", () => {
   });
 
   it("keeps the card type the user configured", () => {
-    expect(normaliseRetroConfig(retro()).type).toBe(
-      "custom:wiener-linien-austria-retro-card",
-    );
-    expect(normaliseRetroConfig(retro({ type: "custom:renamed" })).type).toBe(
-      "custom:renamed",
-    );
+    expect(normaliseRetroConfig(retro()).type).toBe("custom:wiener-linien-austria-retro-card");
+    expect(normaliseRetroConfig(retro({ type: "custom:renamed" })).type).toBe("custom:renamed");
   });
 
   it("collapses direction to H unless R is explicitly asked for", () => {
@@ -57,18 +51,12 @@ describe("normaliseRetroConfig — defaults", () => {
     expect(normaliseRetroConfig(retro({ direction: "R" })).direction).toBe("R");
     expect(normaliseRetroConfig(retro({ direction: "H" })).direction).toBe("H");
     // `""` is not in the retro type, but untyped YAML can still supply it.
-    expect(
-      normaliseRetroConfig(retro({ direction: "" as never })).direction,
-    ).toBe("H");
-    expect(normaliseRetroConfig(retro({ direction: undefined })).direction).toBe(
-      "H",
-    );
+    expect(normaliseRetroConfig(retro({ direction: "" as never })).direction).toBe("H");
+    expect(normaliseRetroConfig(retro({ direction: undefined })).direction).toBe("H");
   });
 
   it("preserves a multi-line filter and an explicit both-directions choice", () => {
-    const c = normaliseRetroConfig(
-      retro({ lines: ["U1", "U2", "U3"], direction: "both" }),
-    );
+    const c = normaliseRetroConfig(retro({ lines: ["U1", "U2", "U3"], direction: "both" }));
     expect(c.direction).toBe("both");
     expect(c.lines).toEqual(["U1", "U2", "U3"]);
     // `line` is re-emitted as lines[0] so a config written here still loads
@@ -105,69 +93,46 @@ describe("normaliseRetroConfig — defaults", () => {
   });
 
   it("accepts only sensor-domain entities", () => {
-    expect(normaliseRetroConfig(retro({ entity: "sensor.wl" })).entity).toBe(
-      "sensor.wl",
-    );
-    expect(
-      normaliseRetroConfig(retro({ entity: "light.kitchen" })).entity,
-    ).toBeUndefined();
+    expect(normaliseRetroConfig(retro({ entity: "sensor.wl" })).entity).toBe("sensor.wl");
+    expect(normaliseRetroConfig(retro({ entity: "light.kitchen" })).entity).toBeUndefined();
     expect(normaliseRetroConfig(retro({ entity: "" })).entity).toBeUndefined();
   });
 
   it("coerces non-boolean YAML values rather than passing them through", () => {
     // `?? true` used to hand `0` straight back, hiding the platform column
     // where modern and flap both showed it. asBool is the shared guard.
-    expect(
-      normaliseRetroConfig(retro({ show_platform: 0 as never })).show_platform,
-    ).toBe(true);
-    expect(
-      normaliseRetroConfig(retro({ show_platform: "false" as never }))
-        .show_platform,
-    ).toBe(true);
-    expect(
-      normaliseRetroConfig(retro({ show_platform: false })).show_platform,
-    ).toBe(false);
-    expect(
-      normaliseRetroConfig(retro({ show_station_name: 1 as never }))
-        .show_station_name,
-    ).toBe(false);
+    expect(normaliseRetroConfig(retro({ show_platform: 0 as never })).show_platform).toBe(true);
+    expect(normaliseRetroConfig(retro({ show_platform: "false" as never })).show_platform).toBe(
+      true,
+    );
+    expect(normaliseRetroConfig(retro({ show_platform: false })).show_platform).toBe(false);
+    expect(normaliseRetroConfig(retro({ show_station_name: 1 as never })).show_station_name).toBe(
+      false,
+    );
   });
 
   it("agrees with the other two cards on how a non-boolean is read", () => {
     // The concrete cross-card inconsistency finding 6 was about.
-    const retroVal = normaliseRetroConfig(
-      retro({ show_platform: 0 as never }),
-    ).show_platform;
+    const retroVal = normaliseRetroConfig(retro({ show_platform: 0 as never })).show_platform;
     const modernVal = normaliseModernConfig({
-      show_platform: 0 as never,
+      show_platform: 0,
     }).show_platform;
     expect(retroVal).toBe(modernVal);
   });
 
   it("rejects out-of-whitelist enum values instead of passing them through", () => {
-    expect(normaliseRetroConfig(retro({ size: "huge" as never })).size).toBe(
-      "regular",
+    expect(normaliseRetroConfig(retro({ size: "huge" as never })).size).toBe("regular");
+    expect(normaliseRetroConfig(retro({ style: "neon" as never })).style).toBe("classic");
+    expect(normaliseRetroConfig(retro({ station_bg: "puce" as never })).station_bg).toBe("default");
+    expect(normaliseRetroConfig(retro({ platform_side: "up" as never })).platform_side).toBe(
+      "auto",
     );
-    expect(normaliseRetroConfig(retro({ style: "neon" as never })).style).toBe(
-      "classic",
-    );
-    expect(
-      normaliseRetroConfig(retro({ station_bg: "puce" as never })).station_bg,
-    ).toBe("default");
-    expect(
-      normaliseRetroConfig(retro({ platform_side: "up" as never }))
-        .platform_side,
-    ).toBe("auto");
   });
 
   it("treats a blank marquee message as no message, and bounds a long one", () => {
-    expect(
-      normaliseRetroConfig(retro({ message_text: "   " })).message_text,
-    ).toBeUndefined();
+    expect(normaliseRetroConfig(retro({ message_text: "   " })).message_text).toBeUndefined();
     const long = "x".repeat(400);
-    expect(
-      normaliseRetroConfig(retro({ message_text: long })).message_text?.length,
-    ).toBe(160);
+    expect(normaliseRetroConfig(retro({ message_text: long })).message_text?.length).toBe(160);
   });
 });
 
@@ -175,23 +140,17 @@ describe("normaliseRetroConfig — the v2.0.0 line_pill migration", () => {
   it("carries the old key's meaning across unchanged (same polarity)", () => {
     // v1 retro: `line_pill === true` showed the pill. v2 renamed it to
     // `show_line_pill` without inverting, so old YAML must render the same.
-    expect(normaliseRetroConfig(retro({ line_pill: true })).show_line_pill).toBe(
-      true,
-    );
-    expect(
-      normaliseRetroConfig(retro({ line_pill: false })).show_line_pill,
-    ).toBe(false);
+    expect(normaliseRetroConfig(retro({ line_pill: true })).show_line_pill).toBe(true);
+    expect(normaliseRetroConfig(retro({ line_pill: false })).show_line_pill).toBe(false);
     expect(normaliseRetroConfig(retro()).show_line_pill).toBe(false);
   });
 
   it("lets the new key win when both are present", () => {
     expect(
-      normaliseRetroConfig(retro({ line_pill: true, show_line_pill: false }))
-        .show_line_pill,
+      normaliseRetroConfig(retro({ line_pill: true, show_line_pill: false })).show_line_pill,
     ).toBe(false);
     expect(
-      normaliseRetroConfig(retro({ line_pill: false, show_line_pill: true }))
-        .show_line_pill,
+      normaliseRetroConfig(retro({ line_pill: false, show_line_pill: true })).show_line_pill,
     ).toBe(true);
   });
 
@@ -219,14 +178,13 @@ describe("normaliseModernConfig — defaults", () => {
     expect(c.show_hero_metric).toBe(true);
     expect(c.show_departures).toBe(true);
     expect(c.show_stops_ahead).toBe(true);
-    expect(c.stops_ahead_modes).toEqual([
-      "metro",
-      "sbahn",
-      "tram",
-      "badner",
-      "bus",
-      "night",
-    ]);
+    expect(c.show_departure_time).toBe(false);
+    expect(normaliseModernConfig({ show_departure_time: true }).show_departure_time).toBe(true);
+    // Off unless asked for: it is the one option that makes the card send a
+    // request of its own.
+    expect(c.show_stop_times).toBe(false);
+    expect(normaliseModernConfig({ show_stop_times: true }).show_stop_times).toBe(true);
+    expect(c.stops_ahead_modes).toEqual(["metro", "sbahn", "tram", "badner", "bus", "night"]);
     expect(c.show_qr_button).toBe(true);
     expect(c.hide_header).toBe(false);
     expect(c.hide_attribution).toBe(false);
@@ -238,15 +196,9 @@ describe("normaliseModernConfig — defaults", () => {
   it("clamps max_departures to 0..20 and falls back on non-numbers", () => {
     expect(normaliseModernConfig({ max_departures: -5 }).max_departures).toBe(0);
     expect(normaliseModernConfig({ max_departures: 0 }).max_departures).toBe(0);
-    expect(normaliseModernConfig({ max_departures: 99 }).max_departures).toBe(
-      20,
-    );
-    expect(normaliseModernConfig({ max_departures: 4.6 }).max_departures).toBe(
-      5,
-    );
-    expect(
-      normaliseModernConfig({ max_departures: "seven" }).max_departures,
-    ).toBe(6);
+    expect(normaliseModernConfig({ max_departures: 99 }).max_departures).toBe(20);
+    expect(normaliseModernConfig({ max_departures: 4.6 }).max_departures).toBe(5);
+    expect(normaliseModernConfig({ max_departures: "seven" }).max_departures).toBe(6);
   });
 
   it("promotes the legacy flat entity shape into entities[0]", () => {
@@ -296,15 +248,38 @@ describe("normaliseModernConfig — defaults", () => {
 
   it("coerces non-boolean YAML values rather than passing them through", () => {
     // asBool is the guard: untyped YAML can hand us 0, "false" or null.
-    expect(
-      normaliseModernConfig({ show_platform: 0 as never }).show_platform,
-    ).toBe(true);
-    expect(
-      normaliseModernConfig({ show_platform: "false" as never }).show_platform,
-    ).toBe(true);
-    expect(
-      normaliseModernConfig({ show_platform: false }).show_platform,
-    ).toBe(false);
+    expect(normaliseModernConfig({ show_platform: 0 }).show_platform).toBe(true);
+    expect(normaliseModernConfig({ show_platform: "false" }).show_platform).toBe(true);
+    expect(normaliseModernConfig({ show_platform: false }).show_platform).toBe(false);
+  });
+});
+
+describe("normaliseModernConfig — options that need another one", () => {
+  const PAIRS = [
+    ["accessibility_only", "show_accessibility"],
+    ["show_delay_colors", "show_delay"],
+    ["show_stop_times", "show_stops_ahead"],
+  ] as const;
+
+  // The editor greys such a switch out. Left on underneath, it read as on,
+  // and the card went on acting on it.
+  it.each(PAIRS)("%s is off whenever %s is off", (dependent, needed) => {
+    const withIt = normaliseModernConfig({ [needed]: true, [dependent]: true });
+    expect(withIt[dependent]).toBe(true);
+    const without = normaliseModernConfig({ [needed]: false, [dependent]: true });
+    expect(without[dependent]).toBe(false);
+  });
+
+  it("turns the delay colours off with delays, though they default to on", () => {
+    expect(normaliseModernConfig({ show_delay: false }).show_delay_colors).toBe(false);
+  });
+
+  it("doesn't bring the dependent option back with the one it needs", () => {
+    // What the editor does on the two clicks: it saves the normalised
+    // config, so the first click has already written the dependent one off.
+    const off = normaliseModernConfig({ show_delay: false, show_delay_colors: true });
+    const onAgain = normaliseModernConfig({ ...off, show_delay: true });
+    expect(onAgain.show_delay_colors).toBe(false);
   });
 });
 
@@ -316,38 +291,29 @@ describe("normaliseRetroHeaderSide", () => {
     expect(normaliseRetroHeaderSide({ exit: "none" })).toBeUndefined();
     // Every field unset/falsy collapses the whole side, so the card's
     // "is this side configured at all?" check is a single truthy test.
-    expect(
-      normaliseRetroHeaderSide({ show_wc: false, text: "   ", chips: [] }),
-    ).toBeUndefined();
+    expect(normaliseRetroHeaderSide({ show_wc: false, text: "   ", chips: [] })).toBeUndefined();
   });
 
   it("keeps the fixed exit variants and drops an unknown one", () => {
     expect(normaliseRetroHeaderSide({ exit: "regular" })?.exit).toBe("regular");
-    expect(normaliseRetroHeaderSide({ exit: "accessible" })?.exit).toBe(
-      "accessible",
-    );
+    expect(normaliseRetroHeaderSide({ exit: "accessible" })?.exit).toBe("accessible");
     // Unknown value falls back to "none", which is then omitted entirely.
     expect(normaliseRetroHeaderSide({ exit: "sideways" })).toBeUndefined();
   });
 
   it("trims and bounds the sign text to 64 characters", () => {
-    expect(normaliseRetroHeaderSide({ text: "  Karlsplatz  " })?.text).toBe(
-      "Karlsplatz",
-    );
-    expect(
-      normaliseRetroHeaderSide({ text: "x".repeat(200) })?.text?.length,
-    ).toBe(64);
+    expect(normaliseRetroHeaderSide({ text: "  Karlsplatz  " })?.text).toBe("Karlsplatz");
+    expect(normaliseRetroHeaderSide({ text: "x".repeat(200) })?.text?.length).toBe(64);
   });
 
   it("bounds date_format but does not trim it", () => {
     // Leading/trailing spaces are legitimate padding in a signage chip.
+    expect(normaliseRetroHeaderSide({ show_date: true, date_format: " d.m " })?.date_format).toBe(
+      " d.m ",
+    );
     expect(
-      normaliseRetroHeaderSide({ show_date: true, date_format: " d.m " })
-        ?.date_format,
-    ).toBe(" d.m ");
-    expect(
-      normaliseRetroHeaderSide({ show_date: true, date_format: "d".repeat(80) })
-        ?.date_format?.length,
+      normaliseRetroHeaderSide({ show_date: true, date_format: "d".repeat(80) })?.date_format
+        ?.length,
     ).toBe(32);
   });
 
@@ -356,10 +322,9 @@ describe("normaliseRetroHeaderSide", () => {
     // not make an otherwise-empty side "configured", or the header strip
     // would appear with nothing in it.
     expect(normaliseRetroHeaderSide({ date_format: "d.m.Y" })).toBeUndefined();
-    expect(
-      normaliseRetroHeaderSide({ text: "Oper", date_format: "d.m.Y" })
-        ?.date_format,
-    ).toBe("d.m.Y");
+    expect(normaliseRetroHeaderSide({ text: "Oper", date_format: "d.m.Y" })?.date_format).toBe(
+      "d.m.Y",
+    );
   });
 
   it("only sets the amenity flags when they are literally true", () => {
@@ -377,9 +342,7 @@ describe("normaliseRetroHeaderSide", () => {
       show_clock: true,
       show_date: true,
     });
-    expect(
-      normaliseRetroHeaderSide({ show_wc: 1, show_escalator: "yes" }),
-    ).toBeUndefined();
+    expect(normaliseRetroHeaderSide({ show_wc: 1, show_escalator: "yes" })).toBeUndefined();
   });
 
   it("cleans the chip list: trim, drop empties, cap length and count", () => {
@@ -389,8 +352,7 @@ describe("normaliseRetroHeaderSide", () => {
       })?.chips,
     ).toEqual(["A", "B", "x".repeat(16)]);
     expect(
-      normaliseRetroHeaderSide({ chips: ["1", "2", "3", "4", "5", "6", "7"] })
-        ?.chips,
+      normaliseRetroHeaderSide({ chips: ["1", "2", "3", "4", "5", "6", "7"] })?.chips,
     ).toHaveLength(6);
   });
 
@@ -436,9 +398,10 @@ describe("filterPassthrough", () => {
 
 describe("normaliseWalkTimes", () => {
   it("keeps finite minutes in 0..120 and drops everything else", () => {
-    expect(
-      normaliseWalkTimes({ "U1|H": 5, "U2|R": "7", "U3|H": -1, "U4|H": 999 }),
-    ).toEqual({ "U1|H": 5, "U2|R": 7 });
+    expect(normaliseWalkTimes({ "U1|H": 5, "U2|R": "7", "U3|H": -1, "U4|H": 999 })).toEqual({
+      "U1|H": 5,
+      "U2|R": 7,
+    });
   });
 
   it("returns undefined for a non-object", () => {
@@ -457,9 +420,7 @@ describe("chipPalette — the four-step precedence ladder", () => {
   });
 
   it("matches an override case-insensitively", () => {
-    expect(chipPalette("u1", { U1: "#123456" }, gtfs).background).toBe(
-      "#123456",
-    );
+    expect(chipPalette("u1", { U1: "#123456" }, gtfs).background).toBe("#123456");
   });
 
   it("lets the nightline rule beat GTFS — deliberate, not a bug", () => {
@@ -486,9 +447,7 @@ describe("chipPalette — the four-step precedence ladder", () => {
 
   it("colorForLine returns exactly chipPalette's background", () => {
     for (const line of ["U1", "N60", "X99"]) {
-      expect(colorForLine(line, {}, gtfs)).toBe(
-        chipPalette(line, {}, gtfs).background,
-      );
+      expect(colorForLine(line, {}, gtfs)).toBe(chipPalette(line, {}, gtfs).background);
     }
   });
 });
@@ -509,15 +468,12 @@ describe("normaliseModernConfig — stops_ahead_modes", () => {
   // emptiness are different states, and collapsing them would make "hide
   // every chip" impossible to save.
   it("keeps an empty array empty rather than restoring the default", () => {
-    expect(normaliseModernConfig({ stops_ahead_modes: [] }).stops_ahead_modes).toEqual(
-      [],
-    );
+    expect(normaliseModernConfig({ stops_ahead_modes: [] }).stops_ahead_modes).toEqual([]);
   });
 
   it("re-sorts into signage order regardless of click order", () => {
     expect(
-      normaliseModernConfig({ stops_ahead_modes: ["night", "tram", "metro"] })
-        .stops_ahead_modes,
+      normaliseModernConfig({ stops_ahead_modes: ["night", "tram", "metro"] }).stops_ahead_modes,
     ).toEqual(["metro", "tram", "night"]);
   });
 
@@ -531,9 +487,14 @@ describe("normaliseModernConfig — stops_ahead_modes", () => {
 
   it("falls back to every mode when the value is not an array", () => {
     for (const bad of ["metro", null, 3, {}, undefined]) {
-      expect(normaliseModernConfig({ stops_ahead_modes: bad }).stops_ahead_modes).toEqual(
-        ["metro", "sbahn", "tram", "badner", "bus", "night"],
-      );
+      expect(normaliseModernConfig({ stops_ahead_modes: bad }).stops_ahead_modes).toEqual([
+        "metro",
+        "sbahn",
+        "tram",
+        "badner",
+        "bus",
+        "night",
+      ]);
     }
   });
 

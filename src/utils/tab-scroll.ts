@@ -21,11 +21,7 @@ export interface TabEdges {
   end: boolean;
 }
 
-export function tabEdges(
-  scrollStart: number,
-  clientWidth: number,
-  scrollWidth: number,
-): TabEdges {
+export function tabEdges(scrollStart: number, clientWidth: number, scrollWidth: number): TabEdges {
   const offset = Math.abs(scrollStart);
   return {
     start: offset > EDGE_SLACK_PX,

@@ -49,18 +49,20 @@ export async function checkCardVersionWS(
  */
 export function reloadAfterCacheWipe(forVersion?: string | null): void {
   try {
-    window.caches?.keys?.().then((keys) => {
-      keys.forEach((k) => window.caches?.delete?.(k));
-    });
+    window.caches
+      ?.keys?.()
+      .then((keys) => {
+        keys.forEach((k) => window.caches?.delete?.(k));
+      })
+      // The surrounding try never sees an async rejection; the reload
+      // below goes ahead either way.
+      .catch(() => {});
   } catch {
     // best-effort cache wipe
   }
   if (forVersion) {
     try {
-      window.sessionStorage?.setItem(
-        `wl-reload-attempted-${forVersion}`,
-        "1",
-      );
+      window.sessionStorage?.setItem(`wl-reload-attempted-${forVersion}`, "1");
     } catch {
       // sessionStorage may be disabled (Safari private mode etc.) —
       // fall through; worst case the user gets the regular reload
@@ -82,10 +84,7 @@ export function reloadAfterCacheWipe(forVersion?: string | null): void {
 export function wasReloadAttemptedFor(version: string | null): boolean {
   if (!version) return false;
   try {
-    return (
-      window.sessionStorage?.getItem(`wl-reload-attempted-${version}`) ===
-      "1"
-    );
+    return window.sessionStorage?.getItem(`wl-reload-attempted-${version}`) === "1";
   } catch {
     return false;
   }

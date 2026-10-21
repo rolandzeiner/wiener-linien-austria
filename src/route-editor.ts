@@ -72,10 +72,7 @@ function schema(
 }
 
 @customElement(`${ROUTE_CARD_TYPE}-editor`)
-export class WienerLinienAustriaRouteCardEditor
-  extends LitElement
-  implements LovelaceCardEditor
-{
+export class WienerLinienAustriaRouteCardEditor extends LitElement implements LovelaceCardEditor {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
   @state() private _config?: NormalisedRouteConfig;
@@ -100,7 +97,7 @@ export class WienerLinienAustriaRouteCardEditor
   private _computeHelper = (field: { name: string }): string | undefined =>
     editorHelper(this._i18n, field.name);
 
-  private _onValueChanged(ev: CustomEvent<{ value: Record<string, unknown> }>): void {
+  private _onValueChanged = (ev: CustomEvent<{ value: Record<string, unknown> }>): void => {
     if (!this._config) return;
     const value = ev.detail.value;
     const next: Record<string, unknown> = { ...this._config, ...value };
@@ -116,7 +113,7 @@ export class WienerLinienAustriaRouteCardEditor
     if (next.hide_attribution !== true) delete next.hide_attribution;
     this._config = normaliseRouteConfig(next as WienerLinienRouteCardConfig);
     fireEvent(this, "config-changed", { config: next });
-  }
+  };
 
   protected override updated(): void {
     if (this._stopsRequested || !this._config || this._config.entity || !this.hass?.callWS) {
@@ -140,15 +137,17 @@ export class WienerLinienAustriaRouteCardEditor
     const routes = findRouteEntities(this.hass);
     const { et } = this._i18n;
     return html`
-      ${routes.length === 0
-        ? html`<ha-alert alert-type="info">
+      ${
+        routes.length === 0
+          ? html`<ha-alert alert-type="info">
             ${et("no_routes")}
             <a slot="action" href=${ADD_ROUTE_HREF}>${et("add_route")}</a>
           </ha-alert>`
-        : nothing}
+          : nothing
+      }
       <ha-form
         .hass=${this.hass}
-        .data=${this._config as unknown as Record<string, unknown>}
+        .data=${this._config}
         .schema=${schema(routes, !this._config.entity, this._stopSelector)}
         .computeLabel=${this._computeLabel}
         .computeHelper=${this._computeHelper}

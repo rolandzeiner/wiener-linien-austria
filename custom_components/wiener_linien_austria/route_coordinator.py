@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, tzinfo
@@ -34,6 +35,7 @@ from .const import (
     MAX_ROUTE_POLL_SECONDS,
     MIN_ROUTE_POLL_SECONDS,
     MIN_ROUTE_ROLLOVER_SECONDS,
+    ROUTE_ROLLOVER_SPREAD_SECONDS,
     USER_AGENT,
 )
 from .live import (
@@ -95,6 +97,28 @@ class RouteData:
     # The night's last connection without a bus, once looked up; None
     # outside the evening or when there is none.
     last_connection: Trip | None = None
+
+    def next_trip(self, now: datetime) -> Trip | None:
+        """The first connection still ahead of `now`, in ranked order.
+
+        What the sensors mean by the next connection, by the rule the route
+        card applies to the same list (`upcomingTrips`): ahead reaches 30 s
+        past the departure. `trips[0]` is not it. The list keeps a
+        connection for a minute after it leaves, and the refresh just after
+        a departure gets it back from the planner, so the first entry is
+        often one that has gone.
+        """
+        cutoff = now - timedelta(seconds=30)
+        return next(
+            (
+                trip
+                for trip in self.trips
+                if not trip.cancelled
+                and trip.departure is not None
+                and trip.departure >= cutoff
+            ),
+            None,
+        )
 
 
 class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
@@ -339,12 +363,18 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         out of date, so refresh shortly after it rather than waiting out
         the full interval — but never sooner than the rollover floor, so a
         connection leaving in ten seconds can't turn into a tight loop.
+        Shortly after is 30 s plus a random wait
+        (`ROUTE_ROLLOVER_SPREAD_SECONDS`), so installs showing the same
+        connection don't all ask in the same second.
 
         Only a connection still ahead counts, the same rule the route card
         uses. `rank_trips` keeps one for a minute after it leaves, and the
         refresh just after a departure gets it back from the planner, so
         timing from it scheduled a second refresh 60 s later on every
         rollover: 24 requests an hour instead of 12 on a line every 5 minutes.
+        Ahead here reaches 30 s past the departure, and the random wait is
+        what keeps the rollover refresh clear of those 30 s; see the constant
+        for why exactly 30 s wasn't enough.
         """
         self._failures = 0
         interval = self.scan_interval
@@ -359,7 +389,11 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
             None,
         )
         if departure is not None:
-            until = (departure - now).total_seconds() + 30
+            until = (
+                (departure - now).total_seconds()
+                + 30
+                + random.uniform(*ROUTE_ROLLOVER_SPREAD_SECONDS)
+            )
             rollover = timedelta(seconds=max(MIN_ROUTE_ROLLOVER_SECONDS, until))
             interval = min(interval, rollover)
         self.update_interval = interval

@@ -1,5 +1,6 @@
 import type { HomeAssistant } from "../types.js";
 import { canonicalLineLabel } from "./line-labels.js";
+import { sorted } from "../utils.js";
 
 import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 
@@ -52,7 +53,9 @@ export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] 
     seen.add(key);
     out.push({ line: d.line, direction: dir, towards: d.towards, type: d.type });
   }
-  out.sort((a, b) => (a.line === b.line ? a.towards.localeCompare(b.towards) : a.line.localeCompare(b.line)));
+  out.sort((a, b) =>
+    a.line === b.line ? a.towards.localeCompare(b.towards) : a.line.localeCompare(b.line),
+  );
   return out;
 }
 
@@ -145,7 +148,7 @@ export interface DirectionSurface {
 
 export function directionSurface(
   attrs: WienerLinienAttrs | undefined,
-  line?: string | undefined,
+  line?: string,
 ): DirectionSurface {
   const available = new Set<"H" | "R">();
   for (const key of attrs?.tracked_line_keys ?? []) {
@@ -198,7 +201,7 @@ export function effectiveLines(
 // in the past on stops with both `lines_at_stop` AND new live lines.
 export function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
   if (attrs?.tracked_lines?.length) {
-    return [...attrs.tracked_lines].sort();
+    return sorted(attrs.tracked_lines);
   }
   const s = new Set<string>();
   if (attrs?.lines_at_stop?.length) {
@@ -207,7 +210,7 @@ export function linesAtStop(attrs: WienerLinienAttrs | undefined): string[] {
   for (const d of attrs?.departures ?? []) {
     if (d.line) s.add(d.line);
   }
-  return Array.from(s).sort();
+  return sorted(s);
 }
 
 export function collectLinesInSelection(
@@ -219,7 +222,7 @@ export function collectLinesInSelection(
     const attrs = hass?.states?.[eid]?.attributes as WienerLinienAttrs | undefined;
     for (const l of linesAtStop(attrs)) s.add(l);
   }
-  return Array.from(s).sort();
+  return sorted(s);
 }
 
 export interface ModernStopFilter {
@@ -273,11 +276,7 @@ export function shouldShowStopsAhead(
   showStopsAhead: boolean | undefined,
   d: DepartureAttr,
 ): boolean {
-  return (
-    showStopsAhead !== false &&
-    Array.isArray(d.stops_ahead) &&
-    d.stops_ahead.length > 0
-  );
+  return showStopsAhead !== false && Array.isArray(d.stops_ahead) && d.stops_ahead.length > 0;
 }
 
 /**
@@ -305,8 +304,7 @@ export function walkTimePairs(
   },
 ): Pair[] {
   const { lines, picked, lineDirections, stopDirection } = opts;
-  const resolved = (line: string): "H" | "R" | null =>
-    lineDirections[line] ?? stopDirection;
+  const resolved = (line: string): "H" | "R" | null => lineDirections[line] ?? stopDirection;
 
   const live = pairsAtStop(attrs).filter((p) => {
     if (picked.size > 0 && !picked.has(p.line)) return false;
@@ -325,9 +323,7 @@ export function walkTimePairs(
     }
   }
 
-  return [...live, ...synthetic].sort((a, b) =>
-    a.line === b.line
-      ? a.direction.localeCompare(b.direction)
-      : a.line.localeCompare(b.line),
+  return sorted([...live, ...synthetic], (a, b) =>
+    a.line === b.line ? a.direction.localeCompare(b.direction) : a.line.localeCompare(b.line),
   );
 }

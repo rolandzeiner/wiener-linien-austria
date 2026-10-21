@@ -77,9 +77,7 @@ export interface NormalisedRouteConfig {
 
 /** Validate + default a route card config. Throws the messages Lovelace shows
  *  in its error card, exactly like the other three cards' setConfig guards. */
-export function normaliseRouteConfig(
-  config: WienerLinienRouteCardConfig,
-): NormalisedRouteConfig {
+export function normaliseRouteConfig(config: WienerLinienRouteCardConfig): NormalisedRouteConfig {
   if (!config || typeof config !== "object") {
     throw new Error(`${ROUTE_CARD_TYPE}: config must be an object`);
   }
@@ -114,7 +112,7 @@ export function normaliseRouteConfig(
 
 function stopIdOf(value: unknown, field: string): string {
   if (value === undefined || value === null || value === "") return "";
-  const text = String(value).trim();
+  const text = (typeof value === "string" || typeof value === "number" ? String(value) : "").trim();
   if (!/^\d+$/.test(text)) {
     throw new Error(`${ROUTE_CARD_TYPE}: '${field}' must be a stop number (DIVA)`);
   }
@@ -143,10 +141,7 @@ export function clockOf(iso: string | null | undefined): string {
  *  them; this only drops the ones that have left since its last refresh.
  *  A plan for a chosen time (`planned_for`) keeps them all: that is what
  *  was asked for, whatever the clock says now. */
-export function upcomingTrips(
-  attrs: RouteAttrs | undefined,
-  nowMs: number,
-): RouteTripAttr[] {
+export function upcomingTrips(attrs: RouteAttrs | undefined, nowMs: number): RouteTripAttr[] {
   const trips = Array.isArray(attrs?.trips) ? attrs.trips : [];
   const planned = !!attrs?.planned_for;
   return trips.filter((trip) => {
@@ -222,7 +217,7 @@ export function delayedClock(
  *  anyone needs, and the next exact times would only add reading. */
 const FREQUENT_HEADWAY_MINUTES = 5;
 
-export type RideFrequency = { every: number } | { then: string[] } | null;
+export type RideFrequency = { every: number } | { upcoming: string[] } | null;
 
 /** What the card says about how often a ride's line runs: the headway for a
  *  frequent line, otherwise the next departures, otherwise the headway if
@@ -231,7 +226,7 @@ export function rideFrequency(leg: RouteLegAttr): RideFrequency {
   const headway = leg.headway_minutes ?? null;
   const next = (leg.next_departures ?? []).map(clockOf).filter(Boolean);
   if (headway !== null && headway <= FREQUENT_HEADWAY_MINUTES) return { every: headway };
-  if (next.length) return { then: next };
+  if (next.length) return { upcoming: next };
   if (headway !== null) return { every: headway };
   return null;
 }
@@ -323,10 +318,7 @@ const WEEKDAY_ORDER = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 /** Localised short weekday names for a window's days, in week order, with
  *  runs of three or more collapsed ("Mo.–Fr."). Empty when every day (or
  *  none) is selected — "every day" needs no label. */
-export function windowDays(
-  window: RouteActiveWindow | undefined,
-  lang: string,
-): string {
+export function windowDays(window: RouteActiveWindow | undefined, lang: string): string {
   const days = (window?.days ?? []).filter((d) => WEEKDAY_ORDER.includes(d));
   if (days.length === 0 || days.length === 7) return "";
   // 2024-01-01 was a Monday, so index i is WEEKDAY_ORDER[i].
@@ -335,9 +327,7 @@ export function windowDays(
     timeZone: "UTC",
   });
   const name = (index: number): string => formatter.format(Date.UTC(2024, 0, 1 + index));
-  const indices = WEEKDAY_ORDER.map((d, i) => (days.includes(d) ? i : -1)).filter(
-    (i) => i >= 0,
-  );
+  const indices = WEEKDAY_ORDER.map((d, i) => (days.includes(d) ? i : -1)).filter((i) => i >= 0);
   const parts: string[] = [];
   let start = 0;
   while (start < indices.length) {
@@ -358,7 +348,10 @@ export function windowDays(
  *  (S-Bahn, regional trains and buses), so this extends `lineTypeIcon` rather
  *  than widening it for all four cards. An "S" + number label is always the
  *  S-Bahn, whatever type the trip planner reported. */
-export function legTypeIcon(type: string | null | undefined, line: string | null | undefined): string | null {
+export function legTypeIcon(
+  type: string | null | undefined,
+  line: string | null | undefined,
+): string | null {
   if (line && /^S\d/i.test(line)) return "mdi:train";
   switch (type) {
     case "ptTrain":
@@ -497,9 +490,27 @@ export const ADHOC_DEBOUNCE_MS = 400;
 /** Wait after an upstream failure that didn't say how long to wait. */
 export const ADHOC_RETRY_MS = 60_000;
 
-/** When to refresh next: shortly after the best connection departs, but
- *  within [floor, cadence]. */
-export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number {
+/** A random wait from this range goes on top of the 30 s after the best
+ *  connection leaves, the same range as the route entries'
+ *  `ROUTE_ROLLOVER_SPREAD_SECONDS`. Timetable times are whole minutes, so a
+ *  fixed 30 s has every card whose connection leaves in a given minute ask
+ *  in the same second, on every install at once. */
+export const ADHOC_ROLLOVER_SPREAD_MS: readonly [number, number] = [2_000, 30_000];
+
+/** One wait picked from `ADHOC_ROLLOVER_SPREAD_MS`. */
+export function adhocRolloverJitter(): number {
+  const [min, max] = ADHOC_ROLLOVER_SPREAD_MS;
+  return min + Math.random() * (max - min);
+}
+
+/** When to refresh next: after the best connection departs, but within
+ *  [floor, cadence]. `jitterMs` is the wait added to the rollover; only
+ *  tests pass it. */
+export function adhocRefreshDelay(
+  trips: RouteTripAttr[],
+  nowMs: number,
+  jitterMs: number = adhocRolloverJitter(),
+): number {
   // Only a departure still ahead can roll the list over. Trips that already
   // left would pin every refresh to the floor for no new information.
   const next = trips
@@ -507,7 +518,7 @@ export function adhocRefreshDelay(trips: RouteTripAttr[], nowMs: number): number
     .map((trip) => Date.parse(trip.departure!))
     .find((ts) => Number.isFinite(ts) && ts + 30_000 > nowMs);
   if (next === undefined) return ADHOC_REFRESH_MS;
-  const untilRollover = next + 30_000 - nowMs;
+  const untilRollover = next + 30_000 + jitterMs - nowMs;
   return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
 }
 
@@ -621,7 +632,10 @@ export function adhocErrorSpec(code: string, translationKey?: string | null): Ad
 }
 
 /** After how long to retry an error on its own, or null to wait for the user. */
-export function adhocRetryDelay(spec: AdhocErrorSpec, retryAfterSeconds: number | null): number | null {
+export function adhocRetryDelay(
+  spec: AdhocErrorSpec,
+  retryAfterSeconds: number | null,
+): number | null {
   if (spec.retry === "countdown") {
     return Math.max(1, retryAfterSeconds ?? ADHOC_RETRY_MS / 1000) * 1000;
   }

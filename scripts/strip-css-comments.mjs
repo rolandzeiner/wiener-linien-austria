@@ -1,4 +1,4 @@
-// Bundler transform (Rollup plugin API, run by rolldown): drop authoring
+// Bundler transform (Rollup plugin API, run as a Vite plugin): drop authoring
 // whitespace and comments from Lit `css`
 // templates before they reach the bundle.
 //
@@ -20,9 +20,9 @@
 // * A template body containing `${` is skipped outright. There are none today;
 //   if one is added later the plugin backs off rather than corrupting it.
 // * A stray backtick inside a css template terminates the literal early and
-//   silently breaks the card at load. That is already a CI gate
-//   (validate.yml → "Guard against backticks inside Lit css/html templates"),
-//   so scanning to the first unescaped backtick is sound.
+//   silently breaks the card at load. `vp check`'s type-check already fails
+//   on that, locally and in CI, so scanning to the first unescaped backtick
+//   is sound.
 // * Whitespace is only ever collapsed at line boundaries — each line is
 //   trimmed, empty lines are dropped, and the rest are rejoined with a
 //   newline. Nothing inside a line moves, so multi-line values keep the token
@@ -31,15 +31,17 @@
 // This plugin must run AFTER the transpiler. The rule outlived the plugin that
 // motivated it: @rollup/plugin-typescript emitted from a TS program that read
 // the file off disk rather than from the bundler's transform chain, so anything
-// done upstream of it was silently discarded. swc, and now rolldown's built-in
+// done upstream of it was silently discarded. swc, and now Vite's built-in
 // transpile, are well-behaved — but ordering still matters, because they reprint
 // the source, so running before them means re-expanded templates downstream.
-// Note the pattern below tolerates whitespace before the backtick, because an
-// emitter may reprint the tag as `css \`` with a space; rolldown emits it
-// without one. Both forms match.
+// A plugin without `enforce` runs after Vite's transpile. Note the pattern
+// below tolerates whitespace before the backtick, because an emitter may
+// reprint the tag as `css \`` with a space; the current one emits it without
+// one. Both forms match.
 //
-// Disabled during `npm run dev` (rolldown -c -w), where readable output and
-// working sourcemaps are worth more than bytes.
+// Production builds only (see vite.config.ts): off during `npm run dev`, where
+// readable output and working sourcemaps are worth more than bytes, and under
+// `vp test`.
 
 const CSS_TEMPLATE = /\bcss\s*`/g;
 

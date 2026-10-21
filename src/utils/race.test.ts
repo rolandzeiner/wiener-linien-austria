@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vite-plus/test";
 
 import {
   computeRaceParams,
@@ -100,10 +100,7 @@ describe("computeRaceParams", () => {
         const p = computeRaceParams(m);
         for (const racer of ["A", "B"] as const) {
           const slowest = Math.min(...stepSpeeds(p.tracks[racer]));
-          expect(
-            slowest,
-            `${label} / racer ${racer} went backwards or stalled`,
-          ).toBeGreaterThan(0);
+          expect(slowest, `${label} / racer ${racer} went backwards or stalled`).toBeGreaterThan(0);
         }
       }
     }
@@ -204,10 +201,7 @@ describe("computeRaceParams", () => {
         const p = computeRaceParams(m);
         const expected = p.tracks.A.crossMs <= p.tracks.B.crossMs ? "A" : "B";
         expect(p.winner, label).toBe(expected);
-        expect(p.winnerCrossT).toBeCloseTo(
-          Math.min(p.tracks.A.crossMs, p.tracks.B.crossMs),
-          10,
-        );
+        expect(p.winnerCrossT).toBeCloseTo(Math.min(p.tracks.A.crossMs, p.tracks.B.crossMs), 10);
       }
     }
   });

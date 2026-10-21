@@ -39,6 +39,8 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 - **Four Lovelace cards** — modern board, retro LED panel, Solari split-flap and a route card — each painted in the official line colours from the Wiener Linien GTFS feed. See [Lovelace Cards](#lovelace-cards).
 - **Visual card editors** — pick lines as coloured chips, set each stop's direction inline, and build the station header strip by tapping the side you want to fill. Shared by the modern, retro and flap cards *(2.0.0)*.
 - **Stops-ahead trail** — expand any departure on the modern card into a metro-style trail of every upcoming stop, with transfer-line chips. Air-conditioned vehicles get a snowflake, off by default *(1.8.0)*. Pick which vehicle types get a chip — metro, S-Bahn, tram, Badner Bahn, bus, NightLine — and hide the ones you never change to *(2.1.0)*.
+- **Arrival times on the stops-ahead trail** *(2.2.0)* — switch on `show_stop_times` and every stop of the trail shows when the vehicle should get there: its live departure plus the timetable's travel time. When the departure runs a minute or more late, each stop shows the scheduled arrival struck through and the expected one after it. The travel times are looked up about once a week per stop, and only when you open a trail. Off by default.
+- **Departure times** *(2.2.0)* — switch on `show_departure_time` and the modern card shows when each vehicle should leave, next to its countdown: in the large next departure and in the list. A departure a minute or more late shows the scheduled time struck through and the expected one after it. Off by default.
 - **S-Bahn transfers on the stops-ahead trail** *(2.0.0)* — a U-Bahn, tram or bus trail shows S-Bahn chips next to the U-Bahn ones wherever you can change to the S-Bahn. They come from the timetable, so a chip means the S-Bahn stops there, not that a train is due. This works whether or not you track any S-Bahn lines.
 - **S-Bahn on departure boards** *(2.0.0)* — track a stop's S-Bahn lines next to its Wiener Linien lines. They show timetable times only, since no live data exists for them, and every card marks those rows *Timetable only*. On the modern card, an S-Bahn departure expands into its stops ahead like any other, with the lines you can change to.
 - **Service + elevator alerts** for your tracked lines and stop, surfaced as `traffic_info` / `elevator_info` and rendered inline. Each notice breaks out per line with the reason and expected duration *(1.7.3)*. Stop-display notices — moved boarding points, works detours, closed stops — appear in the same banner, and only for the platforms and lines your card shows *(2.0.0)*.
@@ -98,12 +100,13 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 ### HACS (recommended)
 
-1. HACS → **Integrations** → ⋯ → **Custom repositories**
-2. Add `https://github.com/rolandzeiner/wiener-linien-austria`, category **Integration**
-3. Search for "Wiener Linien Austria" and install
-4. Restart Home Assistant
+1. Open HACS and search for **Wiener Linien Austria**.
+2. Select it and choose **Download**.
+3. Restart Home Assistant.
 
 [![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=wiener-linien-austria&category=integration)
+
+Not in the search yet? In HACS, open ⋮ → **Custom repositories**, add `https://github.com/rolandzeiner/wiener-linien-austria` with type **Integration**, then search again.
 
 ### Manual
 
@@ -156,7 +159,7 @@ The everyday departure board. Themed to your HA palette; each stop auto-tints to
 
 - **Multi-stop layout** — stacked or tabbed; up to 20 departures per stop.
 - **Hero countdown** — next departure rendered large, full board beneath.
-- **Stops-ahead trail** — click any row to expand a metro-map trail down to the terminus, with transfer chips at each station.
+- **Stops-ahead trail** — click any row to expand a metro-map trail down to the terminus, with transfer chips at each station and, if you switch them on, an estimated arrival time.
 - **Per-line walking time** — hides departures you can't reach in time.
 - **QR map button** — encodes the stop as a `geo:` URI for phone scanners.
 - **Disruption + elevator banners** — collapsible rows above the board.
@@ -189,7 +192,9 @@ entities:
 | `line_colors` | none | Your own colour per line, such as `{U1: "#e20d17"}`. Without one, the official line colour applies. |
 | `show_hero_metric` | `true` | Shows the next departure large. |
 | `show_departures` | `true` | Shows the departure list. |
+| `show_departure_time` | `false` | Shows the estimated departure time next to the countdown, in the large next departure and in the list: the live time, or the scheduled one when there is no live data. A departure a minute or more late shows the scheduled time struck through, unless `show_delay` is off, and the expected one in red, unless `show_delay_colors` is off. |
 | `show_stops_ahead` | `true` | Lets you expand a departure into its stops ahead. |
+| `show_stop_times` | `false` | Shows an estimated arrival time beside each stop ahead: the live departure plus the scheduled travel time. A departure a minute or more late shows the scheduled arrival struck through, unless `show_delay` is off, and the expected one in red, unless `show_delay_colors` is off. Needs `show_stops_ahead`. [Data Updates](#data-updates) says what it requests. |
 | `stops_ahead_modes` | all | Which vehicle types get a transfer chip on the trail: `metro`, `sbahn`, `tram`, `badner`, `bus`, `night`. List only the ones you want. Needs `show_stops_ahead`. |
 | `show_platform` | `true` | Shows the platform or track. |
 | `show_type_icon` | `false` | Shows the vehicle-type icon. |
@@ -478,14 +483,15 @@ Four live endpoints and five static files, on separate cadences:
 | What | Endpoint | Cadence |
 |---|---|---|
 | Live departures | `/monitor?stopId=…` | One request per interval group, default 60 s (30–600 s) |
-| Service, stop and elevator alerts | `/trafficInfoList` — `stoerunglang` + `stoerungkurz` + `aufzugsinfo`, all three in one request | Domain-wide, 5 min — shared across all entries |
-| Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, cached to HA storage |
+| Service, stop and elevator alerts | `/trafficInfoList` — `stoerunglang` + `stoerungkurz` + `aufzugsinfo`, all three in one request | Domain-wide, 5 min — shared across all entries. From the second failed request in a row the wait doubles, up to about 30 min, until it answers again |
+| Stop catalogue | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, counted from the last download; cached to HA storage |
 | Line catalogue + trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached — powers the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached — powers `line_colors` |
 | Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 60 trains with their stops, fetched again after 2 h or once your picked lines have fewer than 6 trains left, never more often than every 5 min. After a failed request the wait doubles, up to 30 min, until it answers again. Counted down locally in between, and shares the routes' 15 s cooldown slot |
 | S-Bahn lines per stop | `ogd_routing/XML_DM_REQUEST` | Weekly, cached — 40 trains with their stops at each of 7 hub stations, for the S-Bahn transfer chips. Checked daily, so a failed station is retried the next day. Only with a departure board set up; shares the routes' 15 s cooldown slot |
-| Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window. Pulled forward to 30 s after the best connection leaves, but never sooner than 60 s after the last refresh |
-| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`. The card refreshes every 120 s while visible, sooner right after the best connection leaves (never within 60 s), every 10 min for a plan at a chosen time, and pauses after 30 min idle. Answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
+| Travel times to the stops ahead | `ogd_routing/XML_DM_REQUEST` | Only with `show_stop_times` on, and only when you open a stops-ahead trail: the next 60 departures at that stop with their stops, which covers every line there in one request. Kept for a week per stop, cached to HA storage |
+| Route connections *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | Per route, default 300 s (120–1800 s), only inside its refresh window. Pulled forward to 32–60 s after the best connection leaves, at a random moment so installs don't all ask at once, but never sooner than 60 s after the last refresh |
+| Connections between any two stops *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | On demand from the route card and `plan_trip`. The card refreshes every 120 s while visible, or 32–60 s after the best connection leaves when that comes first (never within 60 s of its last refresh), every 10 min for a plan at a chosen time, and pauses after 30 min idle. Answers reused for 1 min; at most 60 requests/h per user and 120/h per Home Assistant |
 | Last connection of the night *(experimental)* | `ogd_routing/XML_TRIP_REQUEST2` | One request per route per night, at its first refresh between 22:00 and 03:00. Not retried if it fails |
 | Live times on connections *(experimental)* | `/monitor?stopId=…` | Rides in the departure boards' request. A request of its own only for a stop that has no answer yet, or when no departure board is set up (then once per route refresh, shared by all routes for 1 min) |
 
@@ -493,7 +499,11 @@ Four live endpoints and five static files, on separate cadences:
 with the same interval joins one group that issues a single `/monitor` request
 carrying all their stops, then fans the response out. Adding stops at the same
 cadence costs no extra requests. The five static files likewise refresh as one
-weekly burst, not five schedules.
+weekly burst, not five schedules. The week counts from the last download, not
+from the last restart: their age is checked once a day, and once more 5 to 60
+minutes after Home Assistant starts, at a random moment so installs that
+restart together don't download together. A failed refresh is tried again at
+the next check.
 
 Recurring calls share a **15 s domain-wide cooldown** plus a 30 s per-entry
 floor — that is the departure poll, the alerts refresh, the live-times request
@@ -519,6 +529,20 @@ again. A new plan makes one request of its own only when its stops have no
 answer yet. Without any departure board, a route refresh makes that request
 itself, taking the 15 s cooldown slot, and one answer serves every route for a
 minute. If it fails, the plan simply stays on the timetable.
+
+**Arrival times on the trail cost about one request a week per stop.** With
+`show_stop_times` on, opening a trail asks the timetable once for the whole
+stop, every line and direction, and keeps the answer for a week. Trams and
+buses are timetabled a few minutes slower by day than in the evening, so the
+daytime answer (06:00–19:00) and the evening one are kept apart, and a second
+request happens only if you open a trail in the other part of the day. A line
+neither answer holds costs one more request, once. A stop whose trail nobody
+opens is never asked for. Nothing here runs on the clock except the switch
+between the two parts of the day, and an answer stays valid for up to 15
+minutes past it, picked at random, so installs with a trail open at 06:00 or
+19:00 don't all ask at once. The request skips the cooldown slot, because someone
+is waiting for the times, and a failed one is retried no sooner than 5 minutes
+later, doubling up to 30.
 
 Planning between any two stops on the card, and the `plan_trip` action, skip
 that cooldown slot, because someone is waiting for the answer. Three other
@@ -611,7 +635,7 @@ Errors come back with one of these codes:
 
 | Code | Meaning |
 |---|---|
-| `not_loaded` | The integration has no loaded entry. Both commands answer this until one loads. |
+| `not_loaded` | The integration has no loaded entry. Every command here answers this until one loads. |
 | `catalogue_unavailable` | The stop list couldn't be loaded. |
 | `invalid_stop` | A DIVA isn't in the `stops` list. |
 | `same_stop` | Origin and destination are the same stop. |
@@ -620,6 +644,24 @@ Errors come back with one of these codes:
 | `upstream` | The trip planner couldn't be reached or sent an error. |
 
 A request that doesn't match the schema gets Home Assistant's own `invalid_format` error.
+
+**`wiener_linien_austria/run_times`** returns the scheduled minutes from a stop to every stop ahead, for each line and direction. The modern card calls it for `show_stop_times`.
+
+| Field | Required | Values |
+|---|---|---|
+| `diva` | yes | The stop's DIVA, from the departure sensor's `diva` attribute. Only a stop with a departure board set up gets an answer. |
+| `line`, `direction` | no | The line you're about to show, such as `U1` and `H`. If the answer doesn't hold it yet, the integration may request it. |
+
+```json
+{
+  "diva": 60201040,
+  "fetched_at": "2026-10-08T10:30:00+00:00",
+  "valid_until": "2026-10-08T19:00:00+02:00",
+  "run_times": {"U1|H": {"Vorgartenstraße": 1.0, "Donauinsel": 2.6}}
+}
+```
+
+`run_times` is keyed by line and direction, then by stop name as the stops-ahead trail spells it. The minutes can carry a decimal. Add a stop's minutes to a departure's `time_real`, or `time_planned` without one, to get its estimated arrival there. Ask again after `valid_until`. [Data Updates](#data-updates) says when a call costs a request. It answers `not_loaded`, `catalogue_unavailable` and `upstream` like the commands above, and `invalid_stop` for a DIVA without a departure board.
 
 ## Use Cases
 
@@ -802,6 +844,7 @@ logger:
 - **Routes are experimental and stop to stop.** Start and destination are stops, not addresses, and the trip planner decides the walking between platforms.
 - **Live times on routes come from the departure boards.** The trip planner sends none, so a ride gets its live time from `/monitor`, which lists about the next hour. Rides more than about an hour away stay on the timetable. `/monitor` has no arrival times, so a ride's arrival moves by its departure delay.
 - **Static catalogue refreshes weekly.** Brand-new stops may take up to a week to appear in search.
+- **Arrival times on the trail are estimates.** They add the timetable's travel time to the departure's live time, so a delay the vehicle picks up further down the line isn't in them. They're usually within a minute or two; the far end of a long tram or bus line can be off by a few minutes, because its timetable changes through the day. A line the timetable doesn't list at your stop shows no times.
 - **Stops-ahead is best-effort.** Short-turn services may show the full scheduled path. Replacement buses (SEV) and unscheduled detours produce no panel — the row stays as it is, with no chevron.
 
 ## Removal

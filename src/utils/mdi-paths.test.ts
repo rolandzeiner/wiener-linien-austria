@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { mdiPathForIcon } from "./mdi-paths.js";
 import { LINE_TYPE_METRO, LINE_TYPE_S_BAHN, headerIconForType, lineTypeIcon } from "./mot.js";

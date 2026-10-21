@@ -3,7 +3,7 @@
 // `parseTrafficNotice` extracts through `DOMParser`, which the default node
 // environment doesn't provide. Opted in per-file rather than globally so the
 // other suites keep the faster node environment.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   iconForElevatorReason,
@@ -121,16 +121,14 @@ describe("parseTrafficNotice — prose matching stays conservative", () => {
   it("does not split a prose fact out of the middle of a paragraph", () => {
     // Only whole-line sentences are classified; mid-paragraph prose reads
     // correctly as prose, so it is left alone.
-    const raw =
-      "<p>Weichen Sie auf die Linie 43A aus. Grund daf&uuml;r ist ein Unfall.</p>";
+    const raw = "<p>Weichen Sie auf die Linie 43A aus. Grund daf&uuml;r ist ein Unfall.</p>";
     const { blocks, facts } = parseTrafficNotice(raw);
     expect(facts).toEqual([]);
     expect(blocks).toHaveLength(1);
   });
 
   it("lets the templated form win and keeps the prose sentence as prose", () => {
-    const raw =
-      "<p>Grund: Gleisschaden.</p><p>Grund daf&uuml;r ist ein Rettungseinsatz.</p>";
+    const raw = "<p>Grund: Gleisschaden.</p><p>Grund daf&uuml;r ist ein Rettungseinsatz.</p>";
     const { blocks, facts } = parseTrafficNotice(raw);
     expect(facts).toHaveLength(1);
     expect(facts[0]?.value).toBe("Gleisschaden");
@@ -140,9 +138,7 @@ describe("parseTrafficNotice — prose matching stays conservative", () => {
 
 describe("parseTrafficNotice — structure recovery", () => {
   it("detaches a heading glued to its first statement", () => {
-    const { blocks } = parseTrafficNotice(
-      "<p>Linie 43:Betrieb nur zwischen A und B.</p>",
-    );
+    const { blocks } = parseTrafficNotice("<p>Linie 43:Betrieb nur zwischen A und B.</p>");
     expect(blocks).toEqual([
       { kind: "heading", text: "Linie 43" },
       { kind: "para", text: "Betrieb nur zwischen A und B." },
@@ -154,10 +150,7 @@ describe("parseTrafficNotice — structure recovery", () => {
       "Weichen Sie auf die Linie 43A aus.Voraussichtliche Dauer: 31.07.2026.Grund: Gleisbauarbeiten.",
     );
     expect(blocks).toHaveLength(1);
-    expect(facts.map((f) => f.label)).toEqual([
-      "Voraussichtliche Dauer",
-      "Grund",
-    ]);
+    expect(facts.map((f) => f.label)).toEqual(["Voraussichtliche Dauer", "Grund"]);
     expect(facts[0]?.value).toBe("31.07.2026");
   });
 
@@ -205,18 +198,15 @@ describe("lift helpers", () => {
   it("maps a lift reason onto the shared reason table", () => {
     expect(iconForElevatorReason("wegen Bauarbeiten")).toBe("mdi:excavator");
     expect(iconForElevatorReason("AUFZUGSERNEUERUNG")).toBe("mdi:wrench");
-    expect(iconForElevatorReason("völlig unbekannt")).toBe(
-      "mdi:information-outline",
-    );
+    expect(iconForElevatorReason("völlig unbekannt")).toBe("mdi:information-outline");
   });
 
   it("segments a location path without breaking hyphenated names", () => {
-    expect(
-      splitLocationPath("U3 Mittelbahnsteig - Ausgang Schlachthausgasse"),
-    ).toEqual(["U3 Mittelbahnsteig", "Ausgang Schlachthausgasse"]);
-    expect(splitLocationPath("Franz-Josefs-Bahnhof")).toEqual([
-      "Franz-Josefs-Bahnhof",
+    expect(splitLocationPath("U3 Mittelbahnsteig - Ausgang Schlachthausgasse")).toEqual([
+      "U3 Mittelbahnsteig",
+      "Ausgang Schlachthausgasse",
     ]);
+    expect(splitLocationPath("Franz-Josefs-Bahnhof")).toEqual(["Franz-Josefs-Bahnhof"]);
   });
 });
 
@@ -239,9 +229,7 @@ describe("trimTitleLinePrefix", () => {
   });
 
   it("leaves a colon that is not a line list alone", () => {
-    expect(trimTitleLinePrefix("Achtung: Ersatzverkehr", ["13A"])).toBe(
-      "Achtung: Ersatzverkehr",
-    );
+    expect(trimTitleLinePrefix("Achtung: Ersatzverkehr", ["13A"])).toBe("Achtung: Ersatzverkehr");
     expect(trimTitleLinePrefix("Aufzug außer Betrieb", ["U1"])).toBe("Aufzug außer Betrieb");
   });
 

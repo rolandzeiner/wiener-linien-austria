@@ -1,21 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { normaliseFlapConfig } from "./flap-config.js";
 import { normaliseRetroConfig } from "./config.js";
-import type {
-  WienerLinienFlapCardConfig,
-  WienerLinienRetroCardConfig,
-} from "../types.js";
+import type { WienerLinienFlapCardConfig, WienerLinienRetroCardConfig } from "../types.js";
 
-function flap(
-  over: Partial<WienerLinienFlapCardConfig> = {},
-): WienerLinienFlapCardConfig {
+function flap(over: Partial<WienerLinienFlapCardConfig> = {}): WienerLinienFlapCardConfig {
   return { type: "custom:wiener-linien-austria-flap-card", ...over };
 }
 
-function retro(
-  over: Partial<WienerLinienRetroCardConfig> = {},
-): WienerLinienRetroCardConfig {
+function retro(over: Partial<WienerLinienRetroCardConfig> = {}): WienerLinienRetroCardConfig {
   return { type: "custom:wiener-linien-austria-retro-card", ...over };
 }
 
@@ -37,34 +30,30 @@ describe("normaliseFlapConfig — defaults", () => {
     expect(c.entities).toEqual([]);
   });
 
+  it("shows only step-free departures only while the step-free icon is on", () => {
+    expect(normaliseFlapConfig(flap({ accessibility_only: true })).accessibility_only).toBe(true);
+    expect(
+      normaliseFlapConfig(flap({ show_accessibility: false, accessibility_only: true }))
+        .accessibility_only,
+    ).toBe(false);
+  });
+
   it("clamps max_rows to 1..8 and falls back to 2 on non-numbers", () => {
     expect(normaliseFlapConfig(flap({ max_rows: 0 })).max_rows).toBe(1);
     expect(normaliseFlapConfig(flap({ max_rows: 99 })).max_rows).toBe(8);
     expect(normaliseFlapConfig(flap({ max_rows: 3.4 })).max_rows).toBe(3);
-    expect(
-      normaliseFlapConfig(flap({ max_rows: "many" as never })).max_rows,
-    ).toBe(2);
+    expect(normaliseFlapConfig(flap({ max_rows: "many" as never })).max_rows).toBe(2);
   });
 
   it("accepts the line: prefix for station_bg but rejects a bare prefix", () => {
-    expect(normaliseFlapConfig(flap({ station_bg: "line:U3" })).station_bg).toBe(
-      "line:U3",
-    );
-    expect(normaliseFlapConfig(flap({ station_bg: "white" })).station_bg).toBe(
-      "white",
-    );
-    expect(
-      normaliseFlapConfig(flap({ station_bg: "line:" as never })).station_bg,
-    ).toBe("line");
-    expect(
-      normaliseFlapConfig(flap({ station_bg: "puce" as never })).station_bg,
-    ).toBe("line");
+    expect(normaliseFlapConfig(flap({ station_bg: "line:U3" })).station_bg).toBe("line:U3");
+    expect(normaliseFlapConfig(flap({ station_bg: "white" })).station_bg).toBe("white");
+    expect(normaliseFlapConfig(flap({ station_bg: "line:" as never })).station_bg).toBe("line");
+    expect(normaliseFlapConfig(flap({ station_bg: "puce" as never })).station_bg).toBe("line");
   });
 
   it("promotes the legacy flat shape into entities[0]", () => {
-    const c = normaliseFlapConfig(
-      flap({ entity: "sensor.wl", line: "U1", direction: "H" }),
-    );
+    const c = normaliseFlapConfig(flap({ entity: "sensor.wl", line: "U1", direction: "H" }));
     expect(c.entities).toHaveLength(1);
     expect(c.entities[0]?.entity).toBe("sensor.wl");
     expect(c.entities[0]?.lines).toEqual(["U1"]);
@@ -72,35 +61,24 @@ describe("normaliseFlapConfig — defaults", () => {
   });
 
   it("canonicalises a legacy line label in the stop filter", () => {
-    const c = normaliseFlapConfig(
-      flap({ entities: [{ entity: "sensor.wl", lines: ["LB"] }] }),
-    );
+    const c = normaliseFlapConfig(flap({ entities: [{ entity: "sensor.wl", lines: ["LB"] }] }));
     expect(c.entities[0]?.lines).toEqual(["WLB"]);
   });
 
   it("drops malformed stops and de-duplicates the rest", () => {
     const c = normaliseFlapConfig(
       flap({
-        entities: [
-          "sensor.a",
-          "light.nope",
-          { entity: "sensor.b" },
-          "sensor.a",
-        ] as never,
+        entities: ["sensor.a", "light.nope", { entity: "sensor.b" }, "sensor.a"] as never,
       }),
     );
     expect(c.entities.map((s) => s.entity)).toEqual(["sensor.a", "sensor.b"]);
   });
 
   it("accepts the legacy show_station_header alias, new key winning", () => {
+    expect(normaliseFlapConfig(flap({ show_station_header: false })).show_station_name).toBe(false);
     expect(
-      normaliseFlapConfig(flap({ show_station_header: false }))
+      normaliseFlapConfig(flap({ show_station_header: false, show_station_name: true }))
         .show_station_name,
-    ).toBe(false);
-    expect(
-      normaliseFlapConfig(
-        flap({ show_station_header: false, show_station_name: true }),
-      ).show_station_name,
     ).toBe(true);
   });
 
@@ -116,23 +94,17 @@ describe("normaliseFlapConfig — the v2.0.0 line_pill migration", () => {
     // `show_line_column` with the polarity flipped, so the inversion is
     // what preserves the look. Getting this backwards silently rewrites
     // how every upgraded board renders.
-    expect(
-      normaliseFlapConfig(flap({ line_pill: true })).show_line_column,
-    ).toBe(false);
-    expect(
-      normaliseFlapConfig(flap({ line_pill: false })).show_line_column,
-    ).toBe(true);
+    expect(normaliseFlapConfig(flap({ line_pill: true })).show_line_column).toBe(false);
+    expect(normaliseFlapConfig(flap({ line_pill: false })).show_line_column).toBe(true);
     expect(normaliseFlapConfig(flap()).show_line_column).toBe(true);
   });
 
   it("lets the new key win when both are present", () => {
     expect(
-      normaliseFlapConfig(flap({ line_pill: true, show_line_column: true }))
-        .show_line_column,
+      normaliseFlapConfig(flap({ line_pill: true, show_line_column: true })).show_line_column,
     ).toBe(true);
     expect(
-      normaliseFlapConfig(flap({ line_pill: false, show_line_column: false }))
-        .show_line_column,
+      normaliseFlapConfig(flap({ line_pill: false, show_line_column: false })).show_line_column,
     ).toBe(false);
   });
 

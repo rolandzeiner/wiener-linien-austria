@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+from collections.abc import Generator
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,7 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     ENTRY_TYPE_ROUTE,
     MAX_CHANGES_CHOICES,
+    ROUTE_ROLLOVER_SPREAD_SECONDS,
     ROUTE_TYPES,
     ROUTING_TIME_ZONE,
     S_BAHN_COLORS,
@@ -84,6 +86,10 @@ from .conftest import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 PROBE = "custom_components.wiener_linien_austria.config_flow._probe_route"
+ROLLOVER_SPREAD = (
+    "custom_components.wiener_linien_austria.route_coordinator"
+    ".ROUTE_ROLLOVER_SPREAD_SECONDS"
+)
 
 
 def _entity_id(hass: HomeAssistant, entry: MockConfigEntry, suffix: str) -> str:
@@ -139,6 +145,63 @@ async def test_route_entry_sets_up_sensor_and_risk(
     params = dict(fetch.call_args.args[1])
     assert params["name_origin"] == "60201468"
     assert params["itdTime"] == "0750"
+
+
+async def test_sensors_name_the_next_connection_not_one_that_left(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """The list keeps a connection for a minute after it leaves.
+
+    The refresh just after a departure gets that connection back from the
+    planner, so `trips[0]` was one that had gone, and the sensor named it
+    until the next one left: seen on a live route at 16:02:36 with a state
+    of 16:00:53.
+    """
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+    route = _entity_id(hass, entry, "route")
+    risk = _entity_id(hass, entry, "route_at_risk")
+
+    # 45 s after the 07:57 left, as the refresh after a departure does.
+    frozen.move_to("2026-09-14 05:57:45+00:00")
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert str(coordinator.data.trips[0].departure).startswith("2026-09-14 07:57")
+    state = hass.states.get(route)
+    assert state is not None
+    assert dt_util.parse_datetime(state.state) == dt_util.parse_datetime(
+        "2026-09-14T08:00:00+02:00"
+    )
+    ahead = coordinator.data.trips[1]
+    assert state.attributes["arrival"] == ahead.arrival.isoformat()
+    assert state.attributes["risk"] == ahead.risk
+    assert hass.states.get(risk).attributes["risk"] == ahead.risk
+    # The card filters the list itself and still gets all of it.
+    assert len(state.attributes["trips"]) == 4
+
+    # A live-time update writes the state too, with no refresh in between.
+    # Ahead reaches 30 s past the departure, as on the card.
+    frozen.move_to("2026-09-14 06:00:30+00:00")
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    assert dt_util.parse_datetime(
+        hass.states.get(route).state
+    ) == dt_util.parse_datetime("2026-09-14T08:00:00+02:00")
+    frozen.move_to("2026-09-14 06:00:31+00:00")
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    state = hass.states.get(route)
+    assert dt_util.parse_datetime(state.state) == dt_util.parse_datetime(
+        "2026-09-14T08:03:00+02:00"
+    )
+
+    # Nothing left ahead is no connection, not the last one that went.
+    frozen.move_to("2026-09-14 06:06:00+00:00")
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+    assert hass.states.get(route).state == "unknown"
+    assert hass.states.get(risk).state == "unknown"
 
 
 async def test_realtime_delay_turns_risk_sensor_on(
@@ -298,15 +361,62 @@ async def test_platform_failure_rolls_back_route_setup(
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture
+def pinned_spread() -> Generator[None]:
+    """The random wait added to a rollover, pinned to 10 s."""
+    with patch(ROLLOVER_SPREAD, (10.0, 10.0)):
+        yield
+
+
 async def test_refresh_is_pulled_up_to_the_next_departure(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
 ) -> None:
     # 07:55 in Vienna; the best connection leaves at 07:57. Refresh 30 s
-    # after it goes rather than waiting out the 300 s interval.
+    # plus the wait after it goes rather than waiting out the 300 s interval.
     freezer.move_to("2026-09-14 05:55:00+00:00")
     entry = route_entry()
     await async_setup_entry_and_wait(hass, entry)
-    assert entry.runtime_data.update_interval == timedelta(seconds=150)
+    assert entry.runtime_data.update_interval == timedelta(seconds=160)
+
+
+async def test_rollover_lands_after_the_30_s_mark(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    # The wait is random here, as installed. Home Assistant runs a
+    # coordinator on a whole second of its loop clock, up to a second before
+    # the interval is over, so the wait has to cover that second too.
+    freezer.move_to("2026-09-14 05:55:00+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    low, high = ROUTE_ROLLOVER_SPREAD_SECONDS
+    mark = timedelta(seconds=120 + 30)
+    interval = entry.runtime_data.update_interval
+    assert mark + timedelta(seconds=low) <= interval <= mark + timedelta(seconds=high)
+    assert interval - timedelta(seconds=1) > mark
+
+
+async def test_no_second_refresh_after_a_rollover(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    # The worst case: the shortest wait in the range, and the refresh a full
+    # second early on top of it.
+    low = ROUTE_ROLLOVER_SPREAD_SECONDS[0]
+    with patch(ROLLOVER_SPREAD, (low, low)):
+        freezer.move_to("2026-09-14 05:55:00+00:00")
+        entry = route_entry()
+        await async_setup_entry_and_wait(hass, entry)
+        coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+        assert coordinator.update_interval == timedelta(seconds=150 + low)
+        freezer.move_to("2026-09-14 05:57:31+00:00")
+        await coordinator.async_refresh()
+    # The 07:57 connection is still listed, but it left more than 30 s ago:
+    # the next refresh is for the 08:00 one, not 60 s from now.
+    assert str(coordinator.data.trips[0].departure).startswith("2026-09-14 07:57")
+    assert coordinator.update_interval == timedelta(seconds=149 + 30 + low)
+    assert fetch.await_count == 2
 
 
 async def test_distant_departure_keeps_the_scan_interval(
@@ -319,7 +429,10 @@ async def test_distant_departure_keeps_the_scan_interval(
 
 
 async def test_rollover_never_drops_below_the_floor(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
 ) -> None:
     freezer.move_to("2026-09-14 05:56:50+00:00")
     entry = route_entry()
@@ -328,7 +441,10 @@ async def test_rollover_never_drops_below_the_floor(
 
 
 async def test_a_connection_that_left_does_not_time_the_rollover(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
 ) -> None:
     # 07:57:30: the 07:57 connection left 30 s ago but is still in the list
     # (rank_trips keeps it for a minute). The refresh waits for the 08:00 one
@@ -339,17 +455,20 @@ async def test_a_connection_that_left_does_not_time_the_rollover(
     await async_setup_entry_and_wait(hass, entry)
     coordinator: WienerLinienRouteCoordinator = entry.runtime_data
     assert str(coordinator.data.trips[0].departure).startswith("2026-09-14 07:57")
-    assert coordinator.update_interval == timedelta(seconds=180)
+    assert coordinator.update_interval == timedelta(seconds=190)
 
 
 async def test_first_failure_does_not_keep_a_pulled_up_refresh(
-    hass: HomeAssistant, freezer: FrozenDateTimeFactory, fetch: AsyncMock
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
 ) -> None:
     freezer.move_to("2026-09-14 05:55:00+00:00")
     entry = route_entry()
     await async_setup_entry_and_wait(hass, entry)
     coordinator: WienerLinienRouteCoordinator = entry.runtime_data
-    assert coordinator.update_interval == timedelta(seconds=150)
+    assert coordinator.update_interval == timedelta(seconds=160)
     fetch.side_effect = RoutingError("api_timeout", {"seconds": "20"})
     await coordinator.async_refresh()
     assert coordinator.update_interval == timedelta(seconds=300)

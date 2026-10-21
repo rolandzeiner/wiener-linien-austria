@@ -35,10 +35,7 @@ export interface RetroView {
   stopName: string;
 }
 
-export function deriveRetroView(
-  cfg: NormalisedRetroConfig,
-  attrs: WienerLinienAttrs,
-): RetroView {
+export function deriveRetroView(cfg: NormalisedRetroConfig, attrs: WienerLinienAttrs): RetroView {
   const departures = Array.isArray(attrs.departures) ? attrs.departures : [];
 
   const matching = filterDepartures(departures, {

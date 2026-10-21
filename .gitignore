@@ -1,5 +1,5 @@
 # Unified .gitignore for the *-austria HACS portfolio (6 integrations,
-# all Lit 3 + TypeScript + Rolldown card + HA Python integration).
+# all Lit 3 + TypeScript card + HA Python integration).
 # Reviewed 2026-05-08 — composed from the union of all 6 existing files,
 # de-duplicated, with per-repo paths replaced by globbed equivalents.
 
@@ -24,7 +24,7 @@ coverage.xml
 coverage.json
 htmlcov/
 .tox/
-# vitest --coverage output (npm run test:coverage). Also excluded from
+# Vitest coverage output (npm run test:coverage). Also excluded from
 # scripts/dev-push.sh — .gitignore does not filter rsync, so anything
 # dropped in the tree can otherwise ship to the live HA box.
 coverage/
@@ -56,7 +56,8 @@ node_modules/
 .npm/
 *.js.map
 
-# Bundler caches
+# Bundler / test caches
+.vitest/
 .rolldown.cache/
 .vite-cache/
 .parcel-cache/
@@ -78,7 +79,9 @@ Desktop.ini
 # ───────────────────────────────────────────────────────────────────
 # IDE / editor state
 # ───────────────────────────────────────────────────────────────────
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .idea/
 *.iml
 .cursor/
@@ -168,7 +171,3 @@ private_*.py
 # Dev-only fixture hook (gitignored by design — per-repo file is local)
 # ───────────────────────────────────────────────────────────────────
 custom_components/*/_dev_fixture.py
-
-# MDI icon names extracted from @mdi/js so the retro editor's "Extra
-# icons" chip input can offer autocomplete. Regenerated on every
-# `npm run build` / `npm run dev`.

@@ -10,7 +10,7 @@
 // the states: the tab labels follow `hass.language`, which makes a re-render
 // visible as German labels turning English.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import "../editor.js";
 import "../retro-editor.js";

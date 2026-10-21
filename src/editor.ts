@@ -16,7 +16,7 @@
 // MultiStopEditor) every add/remove cycle would silently wipe every stop's
 // lines, direction and walk times.
 
-import { html, type TemplateResult } from "lit";
+import { html, nothing, type TemplateResult } from "lit";
 import { customElement } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
@@ -28,11 +28,7 @@ import {
   type NormalisedModernConfig,
 } from "./utils/config.js";
 import { colorSchemeOf } from "./utils/color.js";
-import {
-  TRANSFER_MODES,
-  TRANSFER_MODE_ICONS,
-  type TransferMode,
-} from "./utils/mot.js";
+import { TRANSFER_MODES, TRANSFER_MODE_ICONS, type TransferMode } from "./utils/mot.js";
 import { collectLinesInSelection } from "./utils/departures.js";
 import { mergeLineColorsMaps } from "./utils/entities.js";
 
@@ -48,6 +44,35 @@ const TRANSFER_MODE_LABEL_KEYS: Readonly<Record<TransferMode, string>> = {
   bus: "mode_bus",
   night: "mode_night",
 };
+
+/** Pictures for the multi-stop layout's box select: two stop panels stacked,
+ *  or one panel under a tab strip. Inline SVG data URIs so the bundle needs no
+ *  asset files; a dark variant because ha-form shows `src_dark` on dark themes
+ *  and a light-grey drawing would vanish there. */
+const layoutImage = (body: string, ink: string, fill: string, fill2: string): string =>
+  `data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 72 44" fill="none" stroke="${ink}" stroke-width="1.5">${body
+      .replaceAll("FILL2", fill2)
+      .replaceAll("FILL", fill)}</svg>`,
+  )}`;
+const STACKED_SVG =
+  '<rect x="14" y="4" width="44" height="16" rx="3" fill="FILL"/><rect x="14" y="24" width="44" height="16" rx="3" fill="FILL2"/><path d="M19 12h14M19 32h14"/>';
+const TABS_SVG =
+  '<rect x="14" y="10" width="44" height="30" rx="3" fill="FILL"/><path d="M14 10h14V4h14v6" fill="FILL2"/><path d="M19 22h20M19 30h14"/>';
+const LAYOUT_IMAGES = {
+  stacked: {
+    src: layoutImage(STACKED_SVG, "#5b6470", "#d4e9f2", "#b7d9e8"),
+    src_dark: layoutImage(STACKED_SVG, "#a9b1b8", "#1f3f4c", "#2a5869"),
+  },
+  tabs: {
+    src: layoutImage(TABS_SVG, "#5b6470", "#d4e9f2", "#b7d9e8"),
+    src_dark: layoutImage(TABS_SVG, "#a9b1b8", "#1f3f4c", "#2a5869"),
+  },
+} as const;
+
+/** Joins the values a section header names, ` · ` between them. */
+const joinSummary = (parts: ReadonlyArray<string | null>): string =>
+  parts.filter((p): p is string => Boolean(p)).join(" · ");
 
 @customElement("wiener-linien-austria-card-editor")
 export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedModernConfig> {
@@ -66,12 +91,79 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
   ): Record<string, string | undefined> {
     const { et } = this._i18n;
     return {
-      ...(cfg.show_accessibility
-        ? {}
-        : { accessibility_only: et("accessibility_only_requires") }),
+      ...(cfg.show_accessibility ? {} : { accessibility_only: et("accessibility_only_requires") }),
       ...(cfg.show_delay ? {} : { show_delay_colors: et("show_delay_colors_requires") }),
+      ...(cfg.show_stops_ahead ? {} : { show_stop_times: et("show_stop_times_requires") }),
       ...(cfg.entities.length >= 2 ? {} : { layout: et("layout_requires") }),
     };
+  }
+
+  // ------------------------------------------------------------------
+  // Section summaries
+  //
+  // Each section header names what the section is set to, so the user can
+  // read the card's state down the right edge without parsing every switch.
+  // ------------------------------------------------------------------
+
+  private _layoutSummary(cfg: NormalisedModernConfig): string {
+    const { et } = this._i18n;
+    const list = cfg.show_departures && cfg.max_departures > 0;
+    return joinSummary([
+      cfg.hide_header ? et("summary_header_off") : null,
+      cfg.show_hero_metric ? et("summary_hero") : null,
+      list
+        ? cfg.max_departures === 1
+          ? et("summary_departure_one")
+          : et("summary_departures").replace("{n}", String(cfg.max_departures))
+        : et("summary_no_list"),
+      cfg.show_stops_ahead ? et("summary_stops_ahead") : null,
+    ]);
+  }
+
+  private _transfersSummary(cfg: NormalisedModernConfig): string {
+    const { et } = this._i18n;
+    const n = cfg.stops_ahead_modes.length;
+    if (!cfg.show_stops_ahead) return et("summary_off");
+    if (n === TRANSFER_MODES.length) return et("summary_all_modes");
+    if (n === 0) return et("summary_no_modes");
+    return et("summary_some_modes")
+      .replace("{n}", String(n))
+      .replace("{total}", String(TRANSFER_MODES.length));
+  }
+
+  private _rowSummary(cfg: NormalisedModernConfig): string {
+    const { et } = this._i18n;
+    return (
+      joinSummary([
+        cfg.show_platform ? et("summary_platform") : null,
+        cfg.show_accessibility
+          ? et(cfg.accessibility_only ? "summary_step_free_only" : "summary_step_free")
+          : null,
+        cfg.show_cooling ? et("summary_cooling") : null,
+        cfg.show_type_icon ? et("summary_type_icon") : null,
+      ]) || et("summary_row_bare")
+    );
+  }
+
+  private _disruptionsSummary(cfg: NormalisedModernConfig): string {
+    const { et } = this._i18n;
+    return (
+      joinSummary([
+        cfg.show_traffic_info ? et("summary_alerts") : null,
+        cfg.show_elevator_info ? et("summary_elevators") : null,
+        cfg.show_delay
+          ? et(cfg.show_delay_colors ? "summary_delays_colored" : "summary_delays")
+          : null,
+      ]) || et("summary_off")
+    );
+  }
+
+  private _colorsSummary(cfg: NormalisedModernConfig): string {
+    const { et } = this._i18n;
+    const n = Object.keys(cfg.line_colors).length;
+    return n
+      ? et("summary_colors_changed").replace("{n}", String(n))
+      : et("summary_colors_official");
   }
 
   // ------------------------------------------------------------------
@@ -84,14 +176,16 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
       ${renderFormSection({
         ...this._form,
         title: et("section_layout"),
-        hint: et("section_layout_hint"),
+        hint: this._layoutSummary(cfg),
         data: {
           layout: cfg.layout,
           max_departures: cfg.max_departures,
           hide_header: cfg.hide_header,
           show_hero_metric: cfg.show_hero_metric,
           show_departures: cfg.show_departures,
+          show_departure_time: cfg.show_departure_time,
           show_stops_ahead: cfg.show_stops_ahead,
+          show_stop_times: cfg.show_stop_times,
           show_qr_button: cfg.show_qr_button,
         },
         schema: [
@@ -102,10 +196,20 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
             disabled: cfg.entities.length < 2,
             selector: {
               select: {
-                mode: "dropdown",
+                mode: "box",
                 options: [
-                  { value: "stacked", label: et("layout_stacked") },
-                  { value: "tabs", label: et("layout_tabs") },
+                  {
+                    value: "stacked",
+                    label: et("layout_stacked"),
+                    description: et("layout_stacked_description"),
+                    image: LAYOUT_IMAGES.stacked,
+                  },
+                  {
+                    value: "tabs",
+                    label: et("layout_tabs"),
+                    description: et("layout_tabs_description"),
+                    image: LAYOUT_IMAGES.tabs,
+                  },
                 ],
               },
             },
@@ -117,7 +221,13 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
           { name: "hide_header", selector: { boolean: {} } },
           { name: "show_hero_metric", selector: { boolean: {} } },
           { name: "show_departures", selector: { boolean: {} } },
+          { name: "show_departure_time", selector: { boolean: {} } },
           { name: "show_stops_ahead", selector: { boolean: {} } },
+          {
+            name: "show_stop_times",
+            disabled: !cfg.show_stops_ahead,
+            selector: { boolean: {} },
+          },
           { name: "show_qr_button", selector: { boolean: {} } },
         ],
       })}
@@ -125,7 +235,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
       ${renderFormSection({
         ...this._form,
         title: et("section_departure_row"),
-        hint: et("section_departure_row_hint"),
+        hint: this._rowSummary(cfg),
         data: {
           show_platform: cfg.show_platform,
           show_accessibility: cfg.show_accessibility,
@@ -148,6 +258,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
       ${renderFormSection({
         ...this._form,
         title: et("section_disruptions"),
+        hint: this._disruptionsSummary(cfg),
         data: {
           show_traffic_info: cfg.show_traffic_info,
           show_elevator_info: cfg.show_elevator_info,
@@ -189,7 +300,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
     const picked = new Set(cfg.stops_ahead_modes);
 
     return renderSection(
-      { title: et("section_transfers"), hint: et("section_transfers_hint") },
+      { title: et("section_transfers"), hint: this._transfersSummary(cfg) },
       html`<div class="wl-group">
         <span class="wl-note">
           ${inert ? et("transfer_modes_requires") : et("transfer_modes_hint")}
@@ -203,10 +314,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
               class="wl-chip"
               aria-pressed=${on ? "true" : "false"}
               aria-disabled=${inert ? "true" : "false"}
-              aria-label=${et(on ? "mode_shown_aria" : "mode_hidden_aria").replace(
-                "{mode}",
-                label,
-              )}
+              aria-label=${et(on ? "mode_shown_aria" : "mode_hidden_aria").replace("{mode}", label)}
               @click=${(ev: Event) => {
                 // aria-disabled, not `disabled` — see dirButton in
                 // editor/stop-block.ts for why the button stays focusable.
@@ -246,6 +354,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
       ${renderFormSection({
         ...this._form,
         title: et("section_footer"),
+        hint: et(cfg.hide_attribution ? "summary_credit_hidden" : "summary_credit_shown"),
         data: { hide_attribution: cfg.hide_attribution },
         schema: [{ name: "hide_attribution", selector: { boolean: {} } }],
       })}
@@ -264,7 +373,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
     const gtfs = mergeLineColorsMaps(this.hass, eids);
 
     return renderSection(
-      { title: et("section_colors"), hint: et("section_colors_hint") },
+      { title: et("section_colors"), hint: this._colorsSummary(cfg) },
       lines.length
         ? html`<div class="wl-group">
             <span class="wl-note">${et("colors_hint")}</span>
@@ -280,11 +389,10 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
               );
               const current = palette.fill;
               const hex = current.startsWith("#") ? current : "#888888";
-              // Real `disabled` on the reset button below, not the stop
-              // block's aria-disabled idiom: with no override in place there is
-              // genuinely nothing to reset, and the swatch already shows that.
-              // aria-disabled is reserved for options whose unavailability is
-              // itself information the user needs (see dirButton).
+              // The reset button only exists while an override does: with
+              // nothing to reset there is nothing to offer, and a permanently
+              // greyed-out button beside every line is noise (house rule:
+              // reset appears only when there is something to reset).
               const overridden = Boolean(cfg.line_colors[line.toUpperCase()]);
               const pick = et("pick_color_for_line").replace("{line}", line);
               return html`
@@ -316,16 +424,19 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
                         this._setLineColor(line, (ev.target as HTMLInputElement).value)}
                     />
                   </label>
-                  <button
-                    type="button"
-                    class="wl-icon-btn"
-                    ?disabled=${!overridden}
-                    aria-label=${et("reset_color_aria").replace("{line}", line)}
-                    title=${et("reset_color")}
-                    @click=${() => this._resetLineColor(line)}
-                  >
-                    <ha-icon icon="mdi:restore" aria-hidden="true"></ha-icon>
-                  </button>
+                  ${
+                    overridden
+                      ? html`<button
+                        type="button"
+                        class="wl-icon-btn"
+                        aria-label=${et("reset_color_aria").replace("{line}", line)}
+                        title=${et("reset_color")}
+                        @click=${() => this._resetLineColor(line)}
+                      >
+                        <ha-icon icon="mdi:restore" aria-hidden="true"></ha-icon>
+                      </button>`
+                      : nothing
+                  }
                 </div>
               `;
             })}

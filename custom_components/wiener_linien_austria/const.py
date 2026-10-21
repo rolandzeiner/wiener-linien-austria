@@ -69,9 +69,25 @@ DOMAIN_COOLDOWN_SECONDS: Final = 15
 # the integration is broken" and well above any realistic transient hiccup.
 BACKOFF_CAP_SECONDS: Final = 1800
 
-# Static cache refresh interval (weekly is plenty for Wiener Linien's
-# stop catalogue; it changes only when routes do).
+# How old the static catalogue may get before it is refetched (weekly is
+# plenty for Wiener Linien's stop catalogue; it changes only when routes do).
 STATIC_CACHE_REFRESH_HOURS: Final = 24 * 7
+# How often that age is checked. The check costs nothing while the catalogue
+# is fresh; it is what makes "weekly" a week since the last download rather
+# than a week of unbroken uptime. The refresh used to be a 168 h timer
+# started with Home Assistant, which an install restarted more often than
+# weekly never reaches: on a box restarted most days the catalogue was 26
+# days old (measured 2026-10-08), held up only by the cache-format
+# migrations that happened to force a refetch. A failed refresh is retried
+# at the next check, a day later.
+STATIC_CACHE_CHECK_INTERVAL: Final = timedelta(hours=24)
+# The first check after a start comes this many seconds in, picked at random
+# from the range. Needed because the daily timer also restarts with Home
+# Assistant, so an install restarted every day would again never get there.
+# Not at the start itself: it would land on the first departure polls, and a
+# Home Assistant release has a whole user base restarting within the same
+# evening; an hour's spread keeps their five-file downloads from bunching.
+STATIC_CACHE_FIRST_CHECK_SECONDS: Final = (300, 3600)
 
 # Upstream API
 API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"
@@ -82,6 +98,12 @@ TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
 # shared across all entries. 5 min is plenty — these don't change any faster
 # than a few times an hour and fetching more often just eats the request
 # budget that belongs to live departure polling.
+# From the second failed request in a row the tick is skipped until a
+# not-before time: 10, 20, then BACKOFF_CAP_SECONDS after the tick that
+# failed, +/-10% (`rate_limit.backoff_delay`), and back to every tick on the
+# first answer. Ticks stay 5 min apart, so the retry is the first tick at or
+# after that time. Without it an outage cost 12 requests an hour for as long
+# as it lasted, beside a departure poll that had backed off to two.
 ALERTS_REFRESH_SECONDS: Final = 300
 
 # hass.data keys for the shared alert caches + scheduler unsub.
@@ -276,6 +298,18 @@ MIN_ROUTE_POLL_SECONDS: Final = 120
 MAX_ROUTE_POLL_SECONDS: Final = 1800
 # Never schedule the "departure just passed" refresh sooner than this.
 MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
+# That refresh waits 30 s after the departure plus a random number of
+# seconds from this range. Timetable times are whole minutes, so on a fixed
+# 30 s every install whose connection left in a given minute asked the trip
+# planner in the same second: measured 2026-10-12, 24 coordinators started
+# at random moments all asked 29.3 to 30.2 s after each departure.
+# The lower end is not there for the spread. Home Assistant runs a
+# coordinator on a whole second of its loop clock, up to a second before the
+# interval is over, so the refresh could come back before the 30 s were up.
+# The connection that had just left then still counted as ahead and timed a
+# second refresh 60 s later: 10 of 26 such refreshes in that measurement.
+# Two seconds puts every one of them past the 30 s.
+ROUTE_ROLLOVER_SPREAD_SECONDS: Final = (2.0, 30.0)
 
 # Planned S-Bahn departures on a departure board (timetable.py), from the
 # same routing server's departure monitor.
@@ -341,6 +375,65 @@ TIMETABLE_MIN_UPCOMING: Final = 6
 # S-Bahn stop for as long as it lasted. The board keeps counting down the
 # rows it has meanwhile, so a slower retry costs nothing visible.
 TIMETABLE_RETRY_AFTER: Final = timedelta(minutes=5)
+
+# Scheduled run times from a stop to the stops ahead (run_times.py), from the
+# same departure monitor. `/monitor` says when a vehicle leaves this stop and
+# nothing about the stops after it; the timetable's stop sequences do, so a
+# card adds the two up into an estimated arrival at each stop.
+# --- Upstream capabilities, measured 2026-10-08 -------------------
+#   XML_DM_REQUEST (outputFormat=JSON), U-Bahn, tram and bus only, 60 rows
+#   with stop sequences: Praterstern 93 KB wire / 769 KB identity, Karlsplatz
+#   104 / 831, ~0.4 s. One answer holds every line and direction at the
+#   stop: 10 pairs at Praterstern across 35 min, 9 at Karlsplatz across 36.
+#   Nearly all of a row is the stops already passed (`prevStopSeq`, 23 KB of
+#   a 24 KB row), which the request can't leave out.
+#   Each onward point carries `ref.arrDateTime` to the minute (the `...Sec`
+#   variants always end in `:00`) and `ref.id`, the catalogue's DIVA.
+#   `liErgRiProj.direction` is `/monitor`'s `H` / `R`. No realtime
+#   (`realtime: "0"`, `arrDelay: "0"`), same as the S-Bahn rows.
+#   The Badner Bahn is `number: "BB"` here, as in GTFS, where `/monitor`
+#   says "WLB"; `GTFS_LINE_LABEL_ALIASES` covers both.
+#   Minutes from Praterstern to the terminus, by time of day (a Friday):
+#
+#     line                 05:30  08:00  12:20  19:00  20:30  23:30
+#     U1  Leopoldau           15     15     14     15     15     15
+#     U2  Seestadt            19     19     19     19     20     19
+#     5   Westbahnhof         35     38     38     36     35     33
+#     O   Raxstraße           32     35     35     33     31     32
+#     80A Schlachthausgasse   15     18     16     16     15     15
+#     5B  Heiligenstadt       25     26     23     23     22     22
+#
+#   The U-Bahn keeps one timetable all day. Trams and buses get two to five
+#   minutes more across a whole line in daytime traffic, and are back on
+#   the faster one by 19:00.
+# ----------------------------------------------------------------
+# Rows per request. The answer can't be narrowed to a line, so the rows have
+# to span enough time for every line at the stop to turn up once; 60 reached
+# 35 minutes at both hubs above. A line that runs less often than that is
+# picked up by the top-up below.
+RUN_TIME_DEPARTURES_REQUESTED: Final = 60
+# A sample is refetched once it is this old, and only when a card asks.
+# Run times change with the timetable, which a week covers.
+RUN_TIME_MAX_AGE: Final = timedelta(days=7)
+# A sample stands for the part of the day it was taken in: these Vienna
+# hours are the daytime timetable, the rest the evening and night one (see
+# the table above). So a stop costs one request a week, and a second only
+# when its trail is opened in the other part too.
+RUN_TIME_DAY_HOURS: Final = (6, 19)
+# How far past a switch between the two an answer may stay valid, picked at
+# random for every answer. The switch is the one moment here set by the
+# clock rather than by when somebody opened a trail: without the spread,
+# every card with a trail open across 06:00 or 19:00 asks again in the same
+# second, on every install at once, and the ones whose sample for the new
+# part of the day is missing or a week old all fetch it then. A sample
+# fetched that way would also expire to the second a week later, so the
+# pile-up would repeat. Fifteen minutes of the other timetable's run times
+# is a difference nobody can see; the timetables change over gradually.
+RUN_TIME_SWITCH_SPREAD: Final = timedelta(minutes=15)
+# A line the card asks about that no sample holds earns one more request,
+# once per line and sample, and no sooner than this after the last one for
+# the stop: a sample minutes old would only return the same rows.
+RUN_TIME_TOP_UP_AFTER: Final = timedelta(hours=1)
 
 # The timetable server speaks Vienna wall-clock time with no offset, no
 # matter which zone Home Assistant itself is configured in.

@@ -80,7 +80,7 @@ export function multiStopCallbacks<S extends MutableStop>(
       }),
     setWalkTime: (eid, key, minutes) =>
       update(eid, (s) => {
-        const cur = { ...(s.walk_times ?? {}) };
+        const cur = { ...s.walk_times };
         if (minutes === null) delete cur[key];
         else cur[key] = minutes;
         if (Object.keys(cur).length) s.walk_times = cur;
@@ -105,10 +105,7 @@ export function multiStopCallbacks<S extends MutableStop>(
  * user-visible order tracks what they dragged; a newly added entity gets a bare
  * placeholder for the normaliser to fill in.
  */
-export function rebuildStops<S extends MutableStop>(
-  current: ReadonlyArray<S>,
-  raw: unknown,
-): S[] {
+export function rebuildStops<S extends MutableStop>(current: ReadonlyArray<S>, raw: unknown): S[] {
   const ids = Array.isArray(raw)
     ? raw.filter((s): s is string => typeof s === "string" && s.length > 0)
     : [];
@@ -127,7 +124,7 @@ export function patchHeaderSide(
   field: keyof RetroHeaderSide,
   value: unknown,
 ): RetroHeaderSide {
-  const next: RetroHeaderSide = { ...(current ?? {}), [field]: value };
+  const next: RetroHeaderSide = { ...current, [field]: value };
   if (value === undefined) delete next[field];
   return next;
 }

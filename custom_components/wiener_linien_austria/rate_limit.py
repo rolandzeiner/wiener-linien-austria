@@ -24,9 +24,10 @@ The routing backend has a separate 15 s slot
 timetable refresh (timetable.py) and the daily S-Bahn network sample
 (s_bahn_network.py, one slot per hub). Requests someone is waiting for take
 no slot at all: `plan_trip` and the route card's From / To mode go through
-the cache, coalescing and token-bucket budget in adhoc.py instead, and the
-config flow's probes skip both slots. A cooldown bounds what runs
-unattended; the budget bounds what people ask for.
+the cache, coalescing and token-bucket budget in adhoc.py instead, the run
+times a card asks for when a trail is opened are bounded by run_times.py's
+weekly samples, and the config flow's probes skip both slots. A cooldown
+bounds what runs unattended; the budget bounds what people ask for.
 """
 
 from __future__ import annotations
@@ -146,9 +147,13 @@ def backoff_delay(base: timedelta, failures: int, *, jitter: bool = False) -> ti
     One failure waits `base`, two wait twice that, three four times, capped
     at `BACKOFF_CAP_SECONDS`. `jitter` spreads the result by +/-10% so
     installs that failed on the same tick don't all retry on the same one.
-    The monitor batch, the route coordinators and the S-Bahn timetable share
-    this curve; each decides for itself what a first failure does.
+    The monitor batch, the route coordinators, the S-Bahn timetable and the
+    alerts tick share this curve; each decides for itself what a first
+    failure does.
     """
-    doubled = base * (1 << max(failures - 1, 0))
+    # The shift is clamped because the count is not: 65536 times any interval
+    # in use is far past the cap, and an unclamped timedelta overflows at the
+    # 37th to 43rd failure in a row, most of a day into an outage.
+    doubled = base * (1 << min(max(failures - 1, 0), 16))
     delay = min(doubled, timedelta(seconds=BACKOFF_CAP_SECONDS))
     return delay * random.uniform(0.9, 1.1) if jitter else delay

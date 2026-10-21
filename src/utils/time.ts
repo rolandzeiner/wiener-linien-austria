@@ -34,9 +34,7 @@ export function formatTime(iso: string | null | undefined, lang = "de"): string 
 // Station-signage clock chip: HH:MM in the viewer's local time. Returns
 // null on missing/unparseable input so the caller can omit the chip
 // instead of painting "NaN:NaN". Shared by the retro + flap header clocks.
-export function formatClock(
-  serverTime: string | null | undefined,
-): string | null {
+export function formatClock(serverTime: string | null | undefined): string | null {
   if (!serverTime) return null;
   const ts = Date.parse(serverTime);
   if (!Number.isFinite(ts)) return null;
@@ -84,23 +82,56 @@ export function formatDate(date: Date, format: string, lang = "de"): string {
       continue;
     }
     switch (c) {
-      case "d": result += pad2(date.getDate()); break;
-      case "j": result += String(date.getDate()); break;
-      case "D": result += weekdayShort(); break;
-      case "l": result += weekdayLong(); break;
-      case "m": result += pad2(date.getMonth() + 1); break;
-      case "n": result += String(date.getMonth() + 1); break;
-      case "M": result += monthShort(); break;
-      case "F": result += monthLong(); break;
-      case "Y": result += String(date.getFullYear()); break;
-      case "y": result += pad2(date.getFullYear() % 100); break;
-      case "H": result += pad2(date.getHours()); break;
-      case "G": result += String(date.getHours()); break;
-      case "h": result += pad2(((date.getHours() + 11) % 12) + 1); break;
-      case "g": result += String(((date.getHours() + 11) % 12) + 1); break;
-      case "i": result += pad2(date.getMinutes()); break;
-      case "s": result += pad2(date.getSeconds()); break;
-      default: result += c ?? "";
+      case "d":
+        result += pad2(date.getDate());
+        break;
+      case "j":
+        result += String(date.getDate());
+        break;
+      case "D":
+        result += weekdayShort();
+        break;
+      case "l":
+        result += weekdayLong();
+        break;
+      case "m":
+        result += pad2(date.getMonth() + 1);
+        break;
+      case "n":
+        result += String(date.getMonth() + 1);
+        break;
+      case "M":
+        result += monthShort();
+        break;
+      case "F":
+        result += monthLong();
+        break;
+      case "Y":
+        result += String(date.getFullYear());
+        break;
+      case "y":
+        result += pad2(date.getFullYear() % 100);
+        break;
+      case "H":
+        result += pad2(date.getHours());
+        break;
+      case "G":
+        result += String(date.getHours());
+        break;
+      case "h":
+        result += pad2(((date.getHours() + 11) % 12) + 1);
+        break;
+      case "g":
+        result += String(((date.getHours() + 11) % 12) + 1);
+        break;
+      case "i":
+        result += pad2(date.getMinutes());
+        break;
+      case "s":
+        result += pad2(date.getSeconds());
+        break;
+      default:
+        result += c ?? "";
     }
     i++;
   }

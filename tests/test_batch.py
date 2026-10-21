@@ -33,6 +33,7 @@ from custom_components.wiener_linien_austria.const import (
 from custom_components.wiener_linien_austria.coordinator import (
     WienerLinienAustriaCoordinator,
 )
+from custom_components.wiener_linien_austria.rate_limit import backoff_delay
 
 from .conftest import make_entry, make_response_cm
 
@@ -574,6 +575,21 @@ async def test_backoff_widens_then_resets(hass: HomeAssistant) -> None:
     # A success restores the normal cadence.
     group._note_success()
     assert group._current_interval == timedelta(seconds=base)
+
+
+@pytest.mark.parametrize("base", [30, 60, 300, 1800])
+def test_backoff_delay_holds_the_cap_through_any_outage(base: int) -> None:
+    """An unclamped shift overflowed a timedelta at the 37th to 43rd failure.
+
+    That is 18 to 20 hours into an outage. The batch, the routes and the
+    timetable went on at the cap with a traceback on every try; the alerts
+    tick lost its not-before and asked every 5 minutes again.
+    """
+    cap = timedelta(seconds=BACKOFF_CAP_SECONDS)
+    for failures in (36, 37, 43, 44, 5000, 10**6):
+        assert backoff_delay(timedelta(seconds=base), failures) == cap
+        jittered = backoff_delay(timedelta(seconds=base), failures, jitter=True)
+        assert cap * 0.9 <= jittered <= cap * 1.1
 
 
 async def test_rate_limit_widens_cadence_on_the_first_failure(

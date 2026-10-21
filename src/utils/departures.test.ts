@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import {
   directionSurface,
@@ -10,6 +10,7 @@ import {
   walkTimePairs,
 } from "./departures.js";
 import type { DepartureAttr, WienerLinienAttrs } from "../types.js";
+import { sorted } from "../utils.js";
 
 function dep(over: Partial<DepartureAttr> = {}): DepartureAttr {
   return {
@@ -47,19 +48,14 @@ describe("filterDepartures — line and direction", () => {
   // has to be folded onto the spelling live departures carry.
   it("matches a legacy line label against the realtime spelling", () => {
     const wlb = [dep({ line: "WLB", direction: "H" })];
-    expect(filterDepartures(wlb, { lines: ["LB"] }).map((d) => d.line)).toEqual([
-      "WLB",
-    ]);
+    expect(filterDepartures(wlb, { lines: ["LB"] }).map((d) => d.line)).toEqual(["WLB"]);
     expect(filterDepartures(wlb, { lines: ["WLB"] })).toHaveLength(1);
     expect(filterDepartures(wlb, { lines: ["U1"] })).toHaveLength(0);
   });
 
   it("applies a stop-wide direction to every line", () => {
     const out = filterDepartures(feed, { direction: "H" });
-    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual([
-      "U1/H",
-      "U3/H",
-    ]);
+    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual(["U1/H", "U3/H"]);
   });
 
   it("lets a per-line direction override the stop-wide one", () => {
@@ -68,19 +64,13 @@ describe("filterDepartures — line and direction", () => {
       direction: "H",
       line_directions: { U1: "R" },
     });
-    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual([
-      "U1/R",
-      "U3/H",
-    ]);
+    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual(["U1/R", "U3/H"]);
   });
 
   it("applies a per-line direction even with no stop-wide direction set", () => {
     const out = filterDepartures(feed, { line_directions: { U1: "H" } });
     // U1 is constrained to H; U3 has no override and no stop-wide rule.
-    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual([
-      "U1/H",
-      "U3/H",
-    ]);
+    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual(["U1/H", "U3/H"]);
   });
 
   it("preserves upstream order rather than re-sorting", () => {
@@ -106,12 +96,8 @@ describe("filterDepartures — walk times", () => {
   });
 
   it("ignores a threshold keyed for a different line or direction", () => {
-    expect(
-      filterDepartures(feed, { walk_times: { "U3|H": 99 } }),
-    ).toHaveLength(2);
-    expect(
-      filterDepartures(feed, { walk_times: { "U1|R": 99 } }),
-    ).toHaveLength(2);
+    expect(filterDepartures(feed, { walk_times: { "U3|H": 99 } })).toHaveLength(2);
+    expect(filterDepartures(feed, { walk_times: { "U1|R": 99 } })).toHaveLength(2);
   });
 
   it("keys thresholds by line and direction only, not by terminus", () => {
@@ -145,9 +131,7 @@ describe("filterDepartures — accessibility", () => {
   });
 
   it("keeps everything when the filter is off", () => {
-    expect(filterDepartures(feed, { accessibility_only: false })).toHaveLength(
-      3,
-    );
+    expect(filterDepartures(feed, { accessibility_only: false })).toHaveLength(3);
   });
 });
 
@@ -202,9 +186,9 @@ describe("walkTimePairs — rows the walk-time control offers", () => {
     });
     expect(rows.find((p) => p.line === "N6")?.termini).toEqual([]);
     // A line with live data keeps its real terminus.
-    expect(
-      rows.find((p) => p.line === "U3" && p.direction === "H")?.termini,
-    ).toEqual(["Simmering"]);
+    expect(rows.find((p) => p.line === "U3" && p.direction === "H")?.termini).toEqual([
+      "Simmering",
+    ]);
   });
 
   it("does not duplicate a line that already has live rows", () => {
@@ -225,9 +209,7 @@ describe("walkTimePairs — rows the walk-time control offers", () => {
       lineDirections: {},
       stopDirection: "H",
     });
-    expect(rows.filter((p) => p.line === "N6").map((p) => p.direction)).toEqual([
-      "H",
-    ]);
+    expect(rows.filter((p) => p.line === "N6").map((p) => p.direction)).toEqual(["H"]);
   });
 
   it("lets a per-line override beat the stop-wide direction", () => {
@@ -237,9 +219,7 @@ describe("walkTimePairs — rows the walk-time control offers", () => {
       lineDirections: { N6: "R" },
       stopDirection: "H",
     });
-    expect(rows.filter((p) => p.line === "N6").map((p) => p.direction)).toEqual([
-      "R",
-    ]);
+    expect(rows.filter((p) => p.line === "N6").map((p) => p.direction)).toEqual(["R"]);
   });
 
   it("honours the user's line selection for synthetic rows too", () => {
@@ -283,8 +263,10 @@ describe("walkTimePairs — rows the walk-time control offers", () => {
 });
 
 describe("directionSurface — unknown is not 'not served'", () => {
-  const attrs = (over: Partial<WienerLinienAttrs> = {}): WienerLinienAttrs =>
-    ({ departures: [], ...over }) as WienerLinienAttrs;
+  const attrs = (over: Partial<WienerLinienAttrs> = {}): WienerLinienAttrs => ({
+    departures: [],
+    ...over,
+  });
 
   it("reports unknown when there is no data at all", () => {
     const s = directionSurface(attrs());
@@ -307,7 +289,7 @@ describe("directionSurface — unknown is not 'not served'", () => {
       "N25",
     );
     expect(s.unknown).toBe(false);
-    expect([...s.available].sort()).toEqual(["H", "R"]);
+    expect(sorted(s.available)).toEqual(["H", "R"]);
     expect(s.oneWay).toBeNull();
   });
 
@@ -320,14 +302,11 @@ describe("directionSurface — unknown is not 'not served'", () => {
   it("narrows tracked keys to the requested line", () => {
     const a = attrs({ tracked_line_keys: ["U1|H", "U1|R", "13A|H"] });
     expect(directionSurface(a, "13A").oneWay).toBe("H");
-    expect([...directionSurface(a, "U1").available].sort()).toEqual(["H", "R"]);
+    expect(sorted(directionSurface(a, "U1").available)).toEqual(["H", "R"]);
   });
 
   it("falls back to live departures when no tracked keys exist", () => {
-    const s = directionSurface(
-      attrs({ departures: [dep({ line: "U1", direction: "R" })] }),
-      "U1",
-    );
+    const s = directionSurface(attrs({ departures: [dep({ line: "U1", direction: "R" })] }), "U1");
     expect(s.oneWay).toBe("R");
   });
 
@@ -341,13 +320,11 @@ describe("directionSurface — unknown is not 'not served'", () => {
       }),
       "U1",
     );
-    expect([...s.available].sort()).toEqual(["H", "R"]);
+    expect(sorted(s.available)).toEqual(["H", "R"]);
   });
 
   it("ignores malformed direction components", () => {
-    expect(directionSurface(attrs({ tracked_line_keys: ["U1|X", "U1|"] })).unknown).toBe(
-      true,
-    );
+    expect(directionSurface(attrs({ tracked_line_keys: ["U1|X", "U1|"] })).unknown).toBe(true);
   });
 });
 

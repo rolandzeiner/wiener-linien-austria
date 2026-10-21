@@ -274,17 +274,18 @@ class WienerLinienRouteRiskBinarySensor(
 
     @property
     def is_on(self) -> bool | None:
-        """True when the best connection has an at-risk transfer."""
+        """True when the best connection ahead has an at-risk transfer."""
         data = self.coordinator.data
-        if data is None or not data.trips:
+        best = data.next_trip(dt_util.utcnow()) if data is not None else None
+        if best is None:
             return None
-        return data.trips[0].risk == "at_risk"
+        return best.risk == "at_risk"
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """The tightest transfer on the best connection."""
+        """The tightest transfer on the best connection ahead."""
         data = self.coordinator.data
-        best = data.trips[0] if data is not None and data.trips else None
+        best = data.next_trip(dt_util.utcnow()) if data is not None else None
         tightest = (
             min(best.transfers, key=lambda t: t.slack_minutes)
             if best is not None and best.transfers

@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
-from datetime import timedelta
+import random
+from datetime import datetime, timedelta
 from typing import Any
 
 import voluptuous as vol
@@ -17,11 +18,12 @@ from homeassistant.components.websocket_api.decorators import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, Platform
-from homeassistant.core import CoreState, Event, HomeAssistant, callback
+from homeassistant.core import CoreState, Event, HassJob, HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.util import dt as dt_util
 
 from .adhoc import ADHOC_PLANNER_KEY, AdhocPlanner
 from .alerts import async_refresh_alerts
@@ -44,7 +46,8 @@ from .const import (
     RETRO_CARD_VERSION,
     ROUTE_CARD_VERSION,
     S_BAHN_NETWORK_CHECK_INTERVAL,
-    STATIC_CACHE_REFRESH_HOURS,
+    STATIC_CACHE_CHECK_INTERVAL,
+    STATIC_CACHE_FIRST_CHECK_SECONDS,
     TRAFFIC_INFO_KEY,
 )
 from .coordinator import WienerLinienAustriaCoordinator, WienerLinienConfigEntry
@@ -55,8 +58,10 @@ from .rate_limit import (
     ROUTING_LAST_CALL_KEY,
     ROUTING_LOCK_KEY,
     ROUTING_LOCK_LOOP_KEY,
+    backoff_delay,
 )
 from .route_coordinator import WienerLinienRouteCoordinator, route_device_info
+from .run_times import RUN_TIMES_KEY
 from .s_bahn_network import (
     S_BAHN_NETWORK_KEY,
     S_BAHN_NETWORK_TASK_KEY,
@@ -68,6 +73,8 @@ from .static import (
     CATALOGUE_KEY,
     async_refresh_catalogue,
     async_set_cached_catalogue,
+    catalogue_is_stale,
+    current_catalogue,
 )
 from .websocket import STOPS_CACHE_KEY, async_setup_websocket
 
@@ -195,6 +202,11 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
     if STATIC_REFRESH_UNSUB_KEY not in domain_data:
 
         async def _periodic_refresh(_now: Any) -> None:
+            # Checked daily, fetched weekly: the catalogue's own age decides,
+            # so a restart doesn't put the refresh off (see
+            # STATIC_CACHE_CHECK_INTERVAL for what a bare weekly timer did).
+            if not catalogue_is_stale(current_catalogue(hass), dt_util.utcnow()):
+                return
             # Belt-and-braces: async_refresh_catalogue catches the known
             # network / parse errors, but Store I/O can still raise
             # OSError / JSONDecodeError. Without this guard, a refresh
@@ -213,24 +225,72 @@ def _ensure_domain_timers(hass: HomeAssistant) -> None:
                 # for the next entry reload.
                 async_set_cached_catalogue(hass, refreshed)
 
-        domain_data[STATIC_REFRESH_UNSUB_KEY] = async_track_time_interval(
+        unsub_daily = async_track_time_interval(
             hass,
             _periodic_refresh,
-            timedelta(hours=STATIC_CACHE_REFRESH_HOURS),
+            STATIC_CACHE_CHECK_INTERVAL,
             cancel_on_shutdown=True,
         )
+        # One check soon after the start as well, at a random moment: the
+        # daily timer starts over with Home Assistant too.
+        unsub_first = async_call_later(
+            hass,
+            random.uniform(*STATIC_CACHE_FIRST_CHECK_SECONDS),
+            HassJob(
+                _periodic_refresh,
+                f"{DOMAIN} first static check",
+                cancel_on_shutdown=True,
+            ),
+        )
+
+        @callback
+        def _unsub_static() -> None:
+            unsub_daily()
+            unsub_first()
+
+        domain_data[STATIC_REFRESH_UNSUB_KEY] = _unsub_static
 
     if ALERTS_REFRESH_UNSUB_KEY not in domain_data:
+        failures = 0
+        not_before: datetime | None = None
 
-        async def _periodic_alerts(_now: Any) -> None:
+        async def _periodic_alerts(now: datetime) -> None:
+            nonlocal failures, not_before
+            # Backing off (see ALERTS_REFRESH_SECONDS). Skipped here, before
+            # the request takes the shared cooldown slot, so a tick that
+            # asks nothing never holds a departure poll up either.
+            if not_before is not None and now < not_before:
+                return
             # Same safety-net rationale as _periodic_refresh above —
             # exceptions inside an async_track_time_interval callback
             # log to HA core's generic listener log, not under this
             # integration's namespace.
             try:
-                await async_refresh_alerts(hass)
+                refreshed = await async_refresh_alerts(hass)
             except Exception as err:  # noqa: BLE001 — periodic callback safety net
                 _LOGGER.warning("Alerts periodic refresh failed: %s", err)
+                refreshed = False
+            if refreshed:
+                if not_before is not None:
+                    _LOGGER.info("Alerts are answering again")
+                failures = 0
+                not_before = None
+                return
+            failures += 1
+            # One failure waits a tick, and the next tick is that already.
+            if failures < 2:
+                return
+            delay = backoff_delay(
+                timedelta(seconds=ALERTS_REFRESH_SECONDS), failures, jitter=True
+            )
+            # Counted from the tick, not from the failure: the request can
+            # take half a minute to fail, and that must not cost a tick more.
+            not_before = now + delay
+            _LOGGER.info(
+                "Alerts failing %d times in a row; next try in about %d min",
+                failures,
+                round(delay.total_seconds() / 60),
+            )
 
         # No eager first fetch — the periodic timer populates the cache after
         # ALERTS_REFRESH_SECONDS. During the warm-up window (up to 5 min after
@@ -485,6 +545,9 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         STOPS_CACHE_KEY,
         # Live rows and leases name the stops routes and dashboards use.
         LIVE_BOARD_KEY,
+        # The samples stay in their Store; a request still on the wire
+        # finishes and saves into it.
+        RUN_TIMES_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)

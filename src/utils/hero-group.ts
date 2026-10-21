@@ -52,9 +52,7 @@ export function splitHeroAndRows(
   opts: { showHeroMetric: boolean; maxDepartures: number },
 ): HeroSplit {
   const heroGroup = computeHeroGroup(filtered);
-  const dedupe = opts.showHeroMetric
-    ? new Set<DepartureAttr>(heroGroup)
-    : new Set<DepartureAttr>();
+  const dedupe = opts.showHeroMetric ? new Set<DepartureAttr>(heroGroup) : new Set<DepartureAttr>();
   const remaining = filtered.filter((d) => !dedupe.has(d));
   return {
     heroGroup,

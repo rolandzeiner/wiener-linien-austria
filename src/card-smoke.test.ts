@@ -25,13 +25,14 @@
 // defined. An unknown element is inert in the DOM and Lit renders straight
 // through it, which is why this costs a docblock rather than a test harness.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import "./wiener-linien-austria-card.js";
 import "./wiener-linien-austria-retro-card.js";
 import "./wiener-linien-austria-flap-card.js";
 
 import type { HomeAssistant } from "./types.js";
+import { sorted } from "./utils.js";
 
 interface CardElement extends HTMLElement {
   hass: HomeAssistant | undefined;
@@ -93,7 +94,7 @@ function busyHass(): HomeAssistant {
         },
       },
     },
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** The state a dashboard holds for the first seconds after an HA restart. */
@@ -103,7 +104,7 @@ function emptyHass(): HomeAssistant {
     themes: { darkMode: false },
     localize: (key: string) => key,
     states: {},
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** Each card with a config its own normaliser accepts, and a fragment its
@@ -120,9 +121,7 @@ function emptyHass(): HomeAssistant {
  *      face of each split-flap tile — so its board text for line U3 is
  *      "U U 3 3", not "U3".
  */
-const CARDS: ReadonlyArray<
-  readonly [string, Record<string, unknown>, string]
-> = [
+const CARDS: ReadonlyArray<readonly [string, Record<string, unknown>, string]> = [
   [MODERN, { type: `custom:${MODERN}`, entities: [{ entity: ENTITY }] }, "U3"],
   [RETRO, { type: `custom:${RETRO}`, entity: ENTITY }, "U3"],
   [FLAP, { type: `custom:${FLAP}`, entities: [{ entity: ENTITY }] }, "UU33"],
@@ -161,9 +160,7 @@ describe("custom element registration", () => {
     // It happens at import time, so a bundling change that tree-shakes the
     // side effect away is silent — the card still works if you hand-write
     // the YAML, and is undiscoverable if you don't.
-    const registered = (
-      window as unknown as { customCards?: Array<{ type: string }> }
-    ).customCards;
+    const registered = (window as unknown as { customCards?: Array<{ type: string }> }).customCards;
     expect(registered).toBeDefined();
     const types = new Set((registered ?? []).map((c) => c.type));
     for (const [tag] of CARDS) {
@@ -267,13 +264,12 @@ describe("rendering", () => {
     const empty = shadow(el).querySelector(".retro-empty");
     expect(empty?.textContent?.trim()).toBe("Keine Abfahrten in dieser Richtung");
   });
-
 });
 
 /** A stop with a live U3 on either side of a planned S-Bahn train. */
 function timetableHass(): HomeAssistant {
   const hass = busyHass();
-  const attrs = hass.states[ENTITY]!.attributes as Record<string, unknown>;
+  const attrs = hass.states[ENTITY]!.attributes;
   const [u3] = attrs.departures as Array<Record<string, unknown>>;
   attrs.departures = [
     u3,
@@ -295,6 +291,34 @@ function timetableHass(): HomeAssistant {
   ];
   return hass;
 }
+
+describe("step-free-only filter", () => {
+  // busyHass: the U3 is step-free, the 52 is not.
+  const lines = (el: CardElement): string => (shadow(el).textContent ?? "").replace(/\s+/g, "");
+
+  it("hides the departures that aren't step-free", async () => {
+    const el = await mount(MODERN, busyHass(), {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_accessibility: true,
+      accessibility_only: true,
+    });
+    expect(lines(el)).toContain("Simmering");
+    expect(lines(el)).not.toContain("Baumgarten");
+  });
+
+  it("hides nothing once the step-free icon it needs is switched off", async () => {
+    // The editor greys the filter out then; it used to go on filtering.
+    const el = await mount(MODERN, busyHass(), {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_accessibility: false,
+      accessibility_only: true,
+    });
+    expect(lines(el)).toContain("Simmering");
+    expect(lines(el)).toContain("Baumgarten");
+  });
+});
 
 describe("tab strip", () => {
   it("renders inert scroll arrows while the tabs fit", async () => {
@@ -382,14 +406,12 @@ describe("tab-scoped alert banner", () => {
           { name: "T1", title: "U1: Gleisschaden", description: "", related_lines: ["U1"] },
         ],
       },
-    } as (typeof base.states)[string];
+    };
     return base;
   }
 
   const alertBadges = (el: CardElement): string[] =>
-    [...shadow(el).querySelectorAll(".alert-line-badge")].map(
-      (n) => n.textContent?.trim() ?? "",
-    );
+    [...shadow(el).querySelectorAll(".alert-line-badge")].map((n) => n.textContent?.trim() ?? "");
 
   const tabsConfig = {
     type: `custom:${MODERN}`,
@@ -409,6 +431,35 @@ describe("tab-scoped alert banner", () => {
     // it used to pool traffic_info across every configured stop and
     // announce a Taubstummengasse fault under the Westbahnhof tab.
     expect(text).not.toContain("Gleisschaden");
+  });
+
+  it("moves selection and focus with the arrow, Home and End keys", async () => {
+    const el = await mount(MODERN, twoStopHass(), tabsConfig);
+    const press = async (index: number, key: string): Promise<void> => {
+      const tab = shadow(el).querySelectorAll<HTMLElement>('[role="tab"]')[index]!;
+      tab.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+      await el.updateComplete;
+      await el.updateComplete;
+    };
+    const selected = (): string[] =>
+      [...shadow(el).querySelectorAll('[role="tab"]')].map((t) => t.getAttribute("aria-selected")!);
+    const focused = (): string | null | undefined =>
+      shadow(el).activeElement?.getAttribute("title");
+
+    await press(0, "ArrowRight");
+    expect(selected()).toEqual(["false", "true"]);
+    expect(focused()).toBe("Taubstummengasse");
+
+    // Wraps past either end rather than dead-ending.
+    await press(1, "ArrowRight");
+    expect(selected()).toEqual(["true", "false"]);
+    await press(0, "ArrowLeft");
+    expect(selected()).toEqual(["false", "true"]);
+
+    await press(1, "Home");
+    expect(selected()).toEqual(["true", "false"]);
+    await press(0, "End");
+    expect(selected()).toEqual(["false", "true"]);
   });
 
   it("follows the tab the reader switches to", async () => {
@@ -508,7 +559,7 @@ function trailHass(): HomeAssistant {
         },
       },
     },
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** Inline chip labels plus the count behind the `+N` toggle.
@@ -568,23 +619,19 @@ describe("stops_ahead_modes", () => {
   // The Badner Bahn used to fall into `tram`, so this is the case that pins
   // the split: hiding trams must leave the WLB chip alone, and vice versa.
   it("hides the Badner Bahn without touching the trams", async () => {
-    const { total } = trailChips(
-      await mountTrail(["metro", "sbahn", "tram", "bus", "night"]),
-    );
+    const { total } = trailChips(await mountTrail(["metro", "sbahn", "tram", "bus", "night"]));
     expect(total).toBe(5);
   });
 
   it("hides the trams without touching the Badner Bahn", async () => {
-    const { total } = trailChips(
-      await mountTrail(["metro", "sbahn", "badner", "bus", "night"]),
-    );
+    const { total } = trailChips(await mountTrail(["metro", "sbahn", "badner", "bus", "night"]));
     expect(total).toBe(5);
   });
 
   it("keeps only metro and S-Bahn when every other category is off", async () => {
     const { inline, total } = trailChips(await mountTrail(["metro", "sbahn"]));
     expect(total).toBe(2);
-    expect(inline.sort()).toEqual(["S45", "U3"]);
+    expect(sorted(inline)).toEqual(["S45", "U3"]);
   });
 
   it("renders no chip and no +N toggle when every category is off", async () => {
@@ -597,10 +644,365 @@ describe("stops_ahead_modes", () => {
   // the trail, only strip it of chips.
   it("still renders the stop name when every category is off", async () => {
     const el = await mountTrail([]);
-    const names = [...shadow(el).querySelectorAll(".stops-ahead-name")].map(
-      (n) => n.textContent?.trim(),
+    const names = [...shadow(el).querySelectorAll(".stops-ahead-name")].map((n) =>
+      n.textContent?.trim(),
     );
     expect(names).toContain("Zieglergasse");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// show_departure_time — estimated departure beside the countdown.
+// ---------------------------------------------------------------------------
+
+describe("show_departure_time", () => {
+  // Planned 16:38:00, leaving 16:38:30 live: half a minute is not late.
+  async function mountDeparture(
+    config: Record<string, unknown> = {},
+    timeReal?: string,
+  ): Promise<CardElement> {
+    const hass = trailHass();
+    if (timeReal) {
+      (
+        hass.states[ENTITY]!.attributes as { departures: Array<{ time_real: string }> }
+      ).departures[0]!.time_real = timeReal;
+    }
+    return mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_departure_time: true,
+      ...config,
+    });
+  }
+
+  const texts = (el: CardElement, selector: string): string[] =>
+    [...shadow(el).querySelectorAll(selector)].map((n) => n.textContent?.trim() ?? "");
+
+  it("shows no time while the option is off", async () => {
+    const el = await mountDeparture({ show_departure_time: false });
+    expect(shadow(el).querySelector(".dep-time")).toBeNull();
+    expect(shadow(el).querySelector(".row-time")).toBeNull();
+  });
+
+  it("puts the live departure in the hero, as the minute it falls in", async () => {
+    const el = await mountDeparture();
+    expect(texts(el, ".dep-time--hero time")).toEqual(["16:38"]);
+    const time = shadow(el).querySelector(".dep-time--hero time");
+    expect(time?.getAttribute("datetime")).toBe("2026-09-09T14:38:00.000Z");
+    expect(texts(el, ".dep-time--hero .sr-only")).toEqual(["Voraussichtliche Abfahrt 16:38"]);
+    expect(shadow(el).querySelector(".dep-time-planned")).toBeNull();
+  });
+
+  it("stacks the time under the countdown of a row", async () => {
+    const el = await mountDeparture({ show_hero_metric: false });
+    const cell = shadow(el).querySelector(".dep-row .row-time");
+    expect(cell?.firstElementChild?.classList.contains("countdown")).toBe(true);
+    expect(cell?.lastElementChild?.classList.contains("dep-time--row")).toBe(true);
+    expect(cell?.querySelector(".dep-time--row time")?.textContent?.trim()).toBe("16:38");
+  });
+
+  it("leaves the struck time out of a late row, but says it", async () => {
+    const el = await mountDeparture({ show_hero_metric: false }, "2026-09-09T16:40:30.000+0200");
+    expect(shadow(el).querySelector(".dep-time--row s")).toBeNull();
+    expect(texts(el, ".dep-time--row time.late")).toEqual(["16:40"]);
+    expect(texts(el, ".dep-time--row .sr-only")).toEqual([
+      "Voraussichtliche Abfahrt 16:40, geplant 16:38, 2 min später",
+    ]);
+  });
+
+  // An expandable row or hero entry is a button whose label replaces its
+  // content for assistive tech, so what it shows has to be in the label.
+  it("reads the countdown and the time out on an expandable row", async () => {
+    const el = await mountDeparture({ show_hero_metric: false });
+    expect(shadow(el).querySelector(".dep-row")?.getAttribute("aria-label")).toBe(
+      "Streckenverlauf für U3 Richtung Simmering anzeigen · 3 Min · 1 Min. verspätet · Voraussichtliche Abfahrt 16:38",
+    );
+  });
+
+  it("reads the time out on an expandable hero entry", async () => {
+    const el = await mountDeparture({}, "2026-09-09T16:40:30.000+0200");
+    expect(shadow(el).querySelector(".hero-entry")?.getAttribute("aria-label")).toBe(
+      "Streckenverlauf für U3 Richtung Simmering anzeigen · Voraussichtliche Abfahrt 16:40, geplant 16:38, 2 min später",
+    );
+  });
+
+  it("reads the countdown out on an expandable row with the time switched off", async () => {
+    const el = await mountDeparture({ show_hero_metric: false, show_departure_time: false });
+    expect(shadow(el).querySelector(".dep-row")?.getAttribute("aria-label")).toBe(
+      "Streckenverlauf für U3 Richtung Simmering anzeigen · 3 Min · 1 Min. verspätet",
+    );
+  });
+
+  it("strikes the timetable's time through on a late departure", async () => {
+    const el = await mountDeparture({}, "2026-09-09T16:40:30.000+0200");
+    expect(texts(el, ".dep-time--hero s.dep-time-planned")).toEqual(["16:38"]);
+    expect(texts(el, ".dep-time--hero time")).toEqual(["16:40"]);
+    expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(1);
+    expect(texts(el, ".dep-time--hero .sr-only")).toEqual([
+      "Voraussichtliche Abfahrt 16:40, geplant 16:38, 2 min später",
+    ]);
+  });
+
+  it("prints only the expected time with delays switched off", async () => {
+    const el = await mountDeparture({ show_delay: false }, "2026-09-09T16:40:30.000+0200");
+    expect(shadow(el).querySelector(".dep-time-planned")).toBeNull();
+    expect(texts(el, ".dep-time--hero time")).toEqual(["16:40"]);
+    expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(0);
+  });
+
+  it("strikes through without the red when only the colours are off", async () => {
+    const el = await mountDeparture({ show_delay_colors: false }, "2026-09-09T16:40:30.000+0200");
+    expect(texts(el, ".dep-time--hero s.dep-time-planned")).toEqual(["16:38"]);
+    expect(shadow(el).querySelectorAll(".dep-time-clock.late")).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// show_stop_times — estimated arrival beside each stop of the trail.
+// ---------------------------------------------------------------------------
+
+type CallWS = NonNullable<HomeAssistant["callWS"]>;
+
+/** The trail stop with three stops ahead and a `callWS` to ask for their run
+ *  times. The U3 leaves at 16:38:30 live. */
+function timesHass(callWS: CallWS, timeReal?: string): HomeAssistant {
+  const hass = trailHass();
+  const departure = (
+    hass.states[ENTITY]!.attributes as {
+      departures: Array<{ stops_ahead: unknown; time_real: string }>;
+    }
+  ).departures[0]!;
+  departure.stops_ahead = [
+    { name: "Zieglergasse" },
+    { name: "Neubaugasse", lines: ["13A"] },
+    { name: "Simmering", is_terminus: true },
+  ];
+  if (timeReal) departure.time_real = timeReal;
+  return { ...hass, callWS };
+}
+
+function runTimesAnswer(runTimes: Record<string, Record<string, number>>): unknown {
+  return {
+    diva: 60200959,
+    fetched_at: "2026-09-09T14:30:00+00:00",
+    valid_until: "2099-01-01T00:00:00+00:00",
+    run_times: runTimes,
+  };
+}
+
+async function mountTimes(
+  callWS: CallWS,
+  config: Record<string, unknown> = { show_stop_times: true },
+): Promise<CardElement> {
+  return mount(MODERN, timesHass(callWS), {
+    type: `custom:${MODERN}`,
+    entities: [{ entity: ENTITY }],
+    ...config,
+  });
+}
+
+/** Let the ask resolve and the render it triggers finish. */
+async function settle(el: CardElement): Promise<void> {
+  for (let i = 0; i < 5; i += 1) {
+    await Promise.resolve();
+    await el.updateComplete;
+  }
+}
+
+async function openTrail(el: CardElement): Promise<void> {
+  shadow(el).querySelector<HTMLElement>("[aria-controls]")?.click();
+  await settle(el);
+}
+
+const stopTimes = (el: CardElement): string[] =>
+  [...shadow(el).querySelectorAll(".stops-ahead-time")].map((n) => n.textContent?.trim() ?? "");
+
+describe("show_stop_times", () => {
+  const U3 = { Zieglergasse: 2, Neubaugasse: 3 };
+  const asked = (callWS: CallWS): number =>
+    (callWS as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("asks nothing and shows no times while the option is off", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS, {});
+    await openTrail(el);
+    expect(callWS).not.toHaveBeenCalled();
+    expect(stopTimes(el)).toEqual([]);
+  });
+
+  it("asks nothing until a trail is opened", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await settle(el);
+    expect(callWS).not.toHaveBeenCalled();
+  });
+
+  it("asks once for the stop when a trail opens, and adds the minutes to the live departure", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(callWS).toHaveBeenCalledTimes(1);
+    expect(callWS).toHaveBeenCalledWith({
+      type: "wiener_linien_austria/run_times",
+      diva: 60200959,
+      line: "U3",
+      direction: "H",
+    });
+    // 16:38:30 + 2 min and + 3 min, seconds cut off. The terminus has no run
+    // time in the answer and keeps an empty slot, so the names stay aligned.
+    expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
+    const time = shadow(el).querySelector("time.stops-ahead-time");
+    expect(time?.getAttribute("datetime")).toBe("2026-09-09T14:40:00.000Z");
+    expect(time?.getAttribute("title")).toBe("Voraussichtliche Ankunft 16:40");
+  });
+
+  it("answers later renders and reopened trails from what it holds", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+    await openTrail(el); // close
+    await openTrail(el); // reopen
+    el.hass = timesHass(callWS); // the next poll
+    await settle(el);
+
+    expect(callWS).toHaveBeenCalledTimes(1);
+    expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
+  });
+
+  it("reads the time out on a stop whose row is a button", async () => {
+    // The row's label replaces its content for a screen reader.
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
+    expect(row?.getAttribute("aria-label")).toBe(
+      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:41",
+    );
+  });
+
+  it("drops the time column for a line the answer doesn't know", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "52|R": { Baumgarten: 9 } }));
+    const el = await mountTimes(callWS);
+    // Before the answer the column is held open, empty.
+    expect(stopTimes(el)).toEqual(["", "", ""]);
+    await openTrail(el);
+    expect(stopTimes(el)).toEqual([]);
+    // Asked about once, not on every render that follows.
+    el.hass = timesHass(callWS);
+    await settle(el);
+    expect(callWS).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the trail without times when the ask fails, and doesn't ask again right away", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const callWS = vi.fn().mockRejectedValue({ code: "upstream", message: "api_timeout" });
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(stopTimes(el)).toEqual([]);
+    expect(shadow(el).querySelectorAll(".stops-ahead-name")).toHaveLength(3);
+    expect(warn).toHaveBeenCalledTimes(1);
+    el.hass = timesHass(callWS);
+    await settle(el);
+    expect(asked(callWS)).toBe(1);
+  });
+
+  it("asks nothing for a row whose direction the command doesn't take", async () => {
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({}));
+    const hass = timesHass(callWS);
+    (
+      hass.states[ENTITY]!.attributes as { departures: Array<{ direction: string }> }
+    ).departures[0]!.direction = "";
+    const el = await mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_stop_times: true,
+    });
+    await openTrail(el);
+    expect(callWS).not.toHaveBeenCalled();
+    expect(stopTimes(el)).toEqual([]);
+  });
+});
+
+describe("show_stop_times on a late departure", () => {
+  // Planned 16:38:00, leaving 16:40:30: two and a half minutes behind.
+  const LATE = "2026-09-09T16:40:30.000+0200";
+  const answer = (): unknown => runTimesAnswer({ "U3|H": { Zieglergasse: 2, Neubaugasse: 3 } });
+
+  async function mountLate(config: Record<string, unknown> = {}): Promise<CardElement> {
+    const callWS = vi.fn().mockResolvedValue(answer());
+    const el = await mount(MODERN, timesHass(callWS, LATE), {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_stop_times: true,
+      ...config,
+    });
+    await openTrail(el);
+    return el;
+  }
+
+  const texts = (el: CardElement, selector: string): string[] =>
+    [...shadow(el).querySelectorAll(selector)].map((n) => n.textContent?.trim() ?? "");
+
+  it("strikes the timetable's arrival through and prints the expected one after it", async () => {
+    const el = await mountLate();
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual(["16:40", "16:41"]);
+    expect(texts(el, "time.stops-ahead-time")).toEqual(["16:42", "16:43"]);
+    // The struck time comes first in each pair, as it reads.
+    const pair = shadow(el).querySelector(".stops-ahead-times");
+    expect(pair?.firstElementChild?.tagName).toBe("S");
+    expect(shadow(el).querySelectorAll("time.stops-ahead-time.late")).toHaveLength(2);
+  });
+
+  it("says the delay in words, since a strike-through isn't read out", async () => {
+    const el = await mountLate();
+    expect(
+      shadow(el).querySelector("s.stops-ahead-time--planned")?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(texts(el, ".stops-ahead-times .sr-only")).toEqual([
+      "geplant 16:40, 2 min später",
+      "geplant 16:41, 2 min später",
+    ]);
+    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
+    expect(row?.getAttribute("aria-label")).toBe(
+      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:43, geplant 16:41, 2 min später",
+    );
+  });
+
+  it("keeps a stop without a time as wide as its neighbours' two", async () => {
+    const el = await mountLate();
+    const slot = shadow(el).querySelector("span.stops-ahead-time[aria-hidden]");
+    expect(slot?.classList.contains("stops-ahead-time--pair")).toBe(true);
+  });
+
+  it("prints only the expected time with delays switched off", async () => {
+    const el = await mountLate({ show_delay: false });
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual([]);
+    expect(texts(el, "time.stops-ahead-time")).toEqual(["16:42", "16:43"]);
+    // The delay colours need delays, so they are off too.
+    expect(shadow(el).querySelectorAll(".stops-ahead-time.late")).toHaveLength(0);
+    const slot = shadow(el).querySelector("span.stops-ahead-time[aria-hidden]");
+    expect(slot?.classList.contains("stops-ahead-time--pair")).toBe(false);
+  });
+
+  it("strikes through without the red when delay colours are off", async () => {
+    const el = await mountLate({ show_delay_colors: false });
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual(["16:40", "16:41"]);
+    expect(shadow(el).querySelectorAll(".stops-ahead-time.late")).toHaveLength(0);
+  });
+
+  it("leaves a departure under a minute late alone", async () => {
+    // The trail stop's own live time: 30 s behind.
+    const callWS = vi.fn().mockResolvedValue(answer());
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+    expect(texts(el, "s.stops-ahead-time--planned")).toEqual([]);
+    expect(shadow(el).querySelectorAll(".stops-ahead-time.late")).toHaveLength(0);
   });
 });
 
@@ -687,7 +1089,17 @@ describe("retro wheelchair race", () => {
     proto.getBoundingClientRect = function (this: HTMLElement): DOMRect {
       const width = this.classList.contains("retro") ? 580 : 20;
       const left = this.classList.contains("retro-wheelchair") ? 200 : 0;
-      return { width, height: 20, left, top: 0, right: left + width, bottom: 20, x: left, y: 0, toJSON: () => ({}) };
+      return {
+        width,
+        height: 20,
+        left,
+        top: 0,
+        right: left + width,
+        bottom: 20,
+        x: left,
+        y: 0,
+        toJSON: () => ({}),
+      };
     };
   });
 
@@ -705,7 +1117,16 @@ describe("retro wheelchair race", () => {
     return hass;
   }
 
-  const RACE_CONFIG = { type: `custom:${RETRO}`, entity: ENTITY, direction: "both", wheelchair_race: true };
+  const RACE_CONFIG = {
+    type: `custom:${RETRO}`,
+    entity: ENTITY,
+    direction: "both",
+    wheelchair_race: true,
+  };
+
+  /** The longest gap before the next race, plus the 3-2-1 countdown that
+   *  runs before the racers start moving. */
+  const NEXT_RACE_WITHIN = 180_000 + 3_000;
 
   it("starts on a tap and plays both racers through the Web Animations API", async () => {
     const el = await mount(RETRO, raceHass(), RACE_CONFIG);
@@ -742,6 +1163,210 @@ describe("retro wheelchair race", () => {
       window.matchMedia = matchMedia;
     }
   });
+
+  /** The race phase the LED panel shows, read from its modifier class. */
+  const phase = (el: CardElement): string =>
+    [...shadow(el).querySelector(".retro")!.classList]
+      .find((c) => c.startsWith("retro--race-"))
+      ?.slice("retro--race-".length) ?? "idle";
+
+  /** Step the clock until the panel is back to idle, noting each phase it
+   *  passes through on the way. Stops there, so the clock sits at the moment
+   *  the victory screen cleared. */
+  async function phasesUntilIdle(el: CardElement): Promise<string[]> {
+    const seen = [phase(el)];
+    for (let t = 0; t < 60_000 && seen.at(-1) !== "idle"; t += 250) {
+      await vi.advanceTimersByTimeAsync(250);
+      await el.updateComplete;
+      if (seen.at(-1) !== phase(el)) seen.push(phase(el));
+    }
+    return seen;
+  }
+
+  it("runs countdown, race, freeze and victory, then rolls the next race itself", async () => {
+    // Switching the option on starts a race straight away.
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    expect(await phasesUntilIdle(el)).toEqual(["countdown", "active", "freeze", "victory", "idle"]);
+    expect(animate).toHaveBeenCalledTimes(2);
+
+    // The next race starts one to three minutes after the victory screen clears.
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(animate).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN - 59_000);
+    expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("picks a race up again after the dashboard detaches the card mid-race", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await vi.advanceTimersByTimeAsync(3_000);
+    await el.updateComplete;
+    expect(phase(el)).toBe("active");
+
+    el.remove();
+    document.body.appendChild(el);
+    await el.updateComplete;
+    // The racers are rebuilt at the point the wall clock says they've reached.
+    expect(animate).toHaveBeenCalledTimes(4);
+
+    expect((await phasesUntilIdle(el)).at(-1)).toBe("idle");
+  });
+
+  it("keeps racing after the dashboard detaches the card between races", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await phasesUntilIdle(el);
+
+    el.remove();
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN);
+    expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("keeps racing after another option changes between races", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await phasesUntilIdle(el);
+
+    el.setConfig({ ...RACE_CONFIG, show_station_name: true });
+    await el.updateComplete;
+
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN);
+    expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("holds a scrolling message back until the race is over", async () => {
+    const el = await mount(RETRO, raceHass(), {
+      ...RACE_CONFIG,
+      message_ticker: true,
+      message_text: "Gute Fahrt",
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+    await el.updateComplete;
+    expect(phase(el)).not.toBe("idle");
+    expect(shadow(el).querySelector(".retro-ticker")).toBeNull();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    await el.updateComplete;
+    expect(phase(el)).toBe("idle");
+    expect(shadow(el).querySelector(".retro-ticker")?.textContent?.trim()).toBe("Gute Fahrt");
+  });
+});
+
+describe("retro message ticker", () => {
+  const TICKER_CONFIG = {
+    type: `custom:${RETRO}`,
+    entity: ENTITY,
+    message_ticker: true,
+    message_text: "Gute Fahrt",
+  };
+  const FIVE_MINUTES = 5 * 60_000;
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const ticker = (el: CardElement): HTMLElement | null =>
+    shadow(el).querySelector<HTMLElement>(".retro-ticker");
+
+  async function advance(el: CardElement, ms: number): Promise<void> {
+    await vi.advanceTimersByTimeAsync(ms);
+    await el.updateComplete;
+  }
+
+  it("scrolls the message just after it is switched on, then every five minutes", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    expect(ticker(el)).toBeNull();
+
+    await advance(el, 1_500);
+    expect(ticker(el)?.textContent?.trim()).toBe("Gute Fahrt");
+    expect(ticker(el)?.getAttribute("role")).toBe("status");
+
+    // The interval counts from the end of a run, not its start: let this one
+    // scroll for 3 s before it ends, so a start-based schedule would show the
+    // next run 3 s early.
+    await advance(el, 3_000);
+    ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
+    await el.updateComplete;
+    expect(ticker(el)).toBeNull();
+
+    await advance(el, FIVE_MINUTES - 1_000);
+    expect(ticker(el)).toBeNull();
+    await advance(el, 1_000);
+    expect(ticker(el)).not.toBeNull();
+  });
+
+  it("goes away on a tap or Enter and comes back on schedule", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    shadow(el).querySelector<HTMLElement>(".retro")!.click();
+    await el.updateComplete;
+    expect(ticker(el)).toBeNull();
+
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+    shadow(el)
+      .querySelector<HTMLElement>(".retro")!
+      .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await el.updateComplete;
+    expect(ticker(el)).toBeNull();
+  });
+
+  it("keeps still under prefers-reduced-motion without dropping the schedule", async () => {
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query.includes("reduce"),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+    let el: CardElement;
+    try {
+      el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+      await advance(el, 1_500);
+      expect(ticker(el)).toBeNull();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+  });
+
+  it("keeps its schedule when another option changes", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
+
+    el.setConfig({ ...TICKER_CONFIG, show_station_name: true });
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+  });
+
+  it("re-runs the preview while the text is being edited and stops when it is cleared", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    el.setConfig({ ...TICKER_CONFIG, message_text: "Gute Reise" });
+    await advance(el, 1_500);
+    expect(ticker(el)?.textContent?.trim()).toBe("Gute Reise");
+
+    el.setConfig({ ...TICKER_CONFIG, message_text: "" });
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).toBeNull();
+  });
+});
+
+describe("retro card updates", () => {
+  it("re-renders for its own entity and ignores the rest of hass", async () => {
+    const el = await mount(RETRO, busyHass(), { type: `custom:${RETRO}`, entity: ENTITY });
+    const render = vi.spyOn(el as unknown as { render(): unknown }, "render");
+
+    const hass = el.hass!;
+    el.hass = { ...hass, states: { ...hass.states, "sensor.other": hass.states[ENTITY]! } };
+    await el.updateComplete;
+    expect(render).not.toHaveBeenCalled();
+
+    el.hass = busyHass();
+    await el.updateComplete;
+    expect(render).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("modern card dev mode", () => {
@@ -751,7 +1376,8 @@ describe("modern card dev mode", () => {
   it("injects a test disruption and lift outage, and opens the colour palette", async () => {
     const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
     const root = shadow(el);
-    const [traffic, elevator, colours] = root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
+    const [traffic, elevator, colours] =
+      root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
     const alerts = (): number => root.querySelectorAll(".alert-title").length;
     const before = alerts();
 
@@ -766,5 +1392,41 @@ describe("modern card dev mode", () => {
     colours!.click();
     await el.updateComplete;
     expect(root.querySelectorAll(".dev-pal-chip").length).toBeGreaterThan(0);
+  });
+});
+
+describe("retro station-name tile", () => {
+  async function tile(config: Record<string, unknown>): Promise<HTMLElement | null> {
+    const el = await mount(RETRO, busyHass(), {
+      type: `custom:${RETRO}`,
+      entity: ENTITY,
+      show_station_name: true,
+      ...config,
+    });
+    return shadow(el).querySelector<HTMLElement>(".retro-station");
+  }
+
+  it("is tinted with the live line's published colours by default", async () => {
+    const station = await tile({});
+    expect(station?.textContent?.trim()).toBe("Westbahnhof");
+    expect(station?.style.background).toBe("#EF7C00");
+    expect(station?.style.color).toBe("#FFFFFF");
+  });
+
+  it("falls back to white for a line with no published colour", async () => {
+    const station = await tile({ lines: ["52"] });
+    expect(station?.style.background).toBe("#fff");
+    expect(station?.style.color).toBe("#000");
+  });
+
+  it("uses the fixed colours the user picked", async () => {
+    const black = await tile({ station_bg: "black" });
+    expect([black?.style.background, black?.style.color]).toEqual(["#000", "#fff"]);
+    const white = await tile({ station_bg: "white" });
+    expect([white?.style.background, white?.style.color]).toEqual(["#fff", "#000"]);
+  });
+
+  it("stays hidden unless asked for", async () => {
+    expect(await tile({ show_station_name: false })).toBeNull();
   });
 });

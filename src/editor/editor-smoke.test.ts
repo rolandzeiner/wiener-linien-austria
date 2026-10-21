@@ -24,7 +24,7 @@
 // this layer costs a docblock rather than a test harness — no vitest config,
 // no HA stubs, no shims.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import "../editor.js";
 import "../retro-editor.js";
@@ -47,7 +47,7 @@ function hassWith(attributes: Record<string, unknown>): HomeAssistant {
     themes: { darkMode: false },
     localize: (key: string) => key,
     states: { [ENTITY]: { entity_id: ENTITY, state: "3", attributes } },
-  } as unknown as HomeAssistant;
+  };
 }
 
 /** Two lines, both served in both directions — the ordinary case. */
@@ -102,6 +102,30 @@ describe("every editor renders", () => {
     // The stop's name comes from the live sensor, so this also proves the
     // editor read `hass` rather than rendering a bare entity id.
     expect(text(el)).toContain("Westbahnhof");
+  });
+
+  it.each(EDITORS)("%s moves between tabs with the arrow keys, wrapping", async (tag, config) => {
+    const el = await mount(tag, BUSY_STOP, config);
+    const tabs = () => [...shadow(el).querySelectorAll<HTMLElement>('[role="tab"]')];
+    const press = async (index: number, key: string): Promise<void> => {
+      tabs()[index]!.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      );
+      await el.updateComplete;
+    };
+    const selected = (): number =>
+      tabs().findIndex((t) => t.getAttribute("aria-selected") === "true");
+
+    await press(0, "ArrowRight");
+    expect(selected()).toBe(1);
+    // Focus follows the selection, so the next Tab leaves from the new tab.
+    expect(shadow(el).activeElement).toBe(tabs()[1]);
+    await press(1, "ArrowLeft");
+    await press(0, "ArrowLeft");
+    expect(selected()).toBe(2);
+    // Any other key leaves the selection alone.
+    await press(2, "Enter");
+    expect(selected()).toBe(2);
   });
 
   it.each(EDITORS)("%s survives being given no hass", async (tag, config) => {
@@ -163,7 +187,7 @@ describe("edge states are reachable", () => {
     const alert = shadow(el).querySelector("ha-alert");
     expect(alert).toBeTruthy();
     expect(alert?.textContent).toContain("sensor.renamed_away");
-    expect(shadow(el).querySelector("[slot=\"action\"]")).toBeTruthy();
+    expect(shadow(el).querySelector('[slot="action"]')).toBeTruthy();
   });
 
   it("a sensor that has not reported yet shows the empty state", async () => {
@@ -176,7 +200,7 @@ describe("edge states are reachable", () => {
     // The empty state can only ever render inside a stop block, so a stop is
     // always already chosen and named in the header directly above it. That is
     // why its hint must describe what the sensor is doing rather than tell the
-    // user to pick a stop — which is what it used to say.
+    // user to pick a stop.
     expect(shadow(el).querySelector(".wl-section-title")?.textContent).toContain("Kalt");
   });
 
@@ -262,9 +286,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
    *  does — by clicking. The Anzeige tab's other sections are `ha-form`,
    *  which is undefined here and renders nothing, so every `.wl-chip` found
    *  afterwards is a transfer-mode chip. */
-  async function onDisplayTab(
-    config: Record<string, unknown> = {},
-  ): Promise<EditorElement> {
+  async function onDisplayTab(config: Record<string, unknown> = {}): Promise<EditorElement> {
     const el = await mount(MODERN, BUSY_STOP, {
       type: "custom:wiener-linien-austria-card",
       entities: [{ entity: ENTITY }],
@@ -283,9 +305,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
   it("renders one chip per mode, all pressed by default", async () => {
     const chips = modeChips(await onDisplayTab());
     expect(chips).toHaveLength(6);
-    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(
-      Array(6).fill("true"),
-    );
+    expect(chips.map((c) => c.getAttribute("aria-pressed"))).toEqual(Array(6).fill("true"));
   });
 
   it("reflects a saved subset rather than always showing every chip as on", async () => {
@@ -315,13 +335,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
     modeChips(el)[0]?.click();
     await el.updateComplete;
 
-    expect(config?.["stops_ahead_modes"]).toEqual([
-      "sbahn",
-      "tram",
-      "badner",
-      "bus",
-      "night",
-    ]);
+    expect(config?.["stops_ahead_modes"]).toEqual(["sbahn", "tram", "badner", "bus", "night"]);
   });
 
   // Empty must survive the round-trip: the normaliser reads a missing key as
@@ -343,9 +357,7 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
   it("goes inert — but stays focusable — with the stops trail switched off", async () => {
     const el = await onDisplayTab({ show_stops_ahead: false });
     const chips = modeChips(el);
-    expect(chips.map((c) => c.getAttribute("aria-disabled"))).toEqual(
-      Array(6).fill("true"),
-    );
+    expect(chips.map((c) => c.getAttribute("aria-disabled"))).toEqual(Array(6).fill("true"));
     // aria-disabled rather than the `disabled` attribute, so a keyboard user
     // sweeping the group still meets the option and the note explaining it.
     expect(chips.some((c) => c.hasAttribute("disabled"))).toBe(false);
@@ -357,6 +369,156 @@ describe("transfer-mode chips (modern, Anzeige tab)", () => {
     chips[0]?.click();
     await el.updateComplete;
     expect(fired).toBe(false);
+  });
+});
+
+describe("a switch that needs another one goes off with it (modern, Anzeige tab)", () => {
+  type Field = { name: string; disabled?: boolean };
+  type Form = HTMLElement & { schema?: Field[]; data?: Record<string, unknown> };
+
+  async function onDisplayTab(config: Record<string, unknown> = {}): Promise<EditorElement> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    return el;
+  }
+
+  const formWith = (el: EditorElement, name: string): Form => {
+    const form = [...shadow(el).querySelectorAll<Form>("ha-form")].find((f) =>
+      f.schema?.some((field) => field.name === name),
+    );
+    if (!form) throw new Error(`no section offers ${name}`);
+    return form;
+  };
+
+  /** Flip one switch the way ha-form reports it: the section's whole data
+   *  with that one value changed. */
+  async function flip(el: EditorElement, name: string, value: boolean): Promise<void> {
+    const form = formWith(el, name);
+    form.dispatchEvent(
+      new CustomEvent("value-changed", {
+        detail: { value: { ...form.data, [name]: value } },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await el.updateComplete;
+  }
+
+  it.each([
+    ["show_delay", "show_delay_colors"],
+    ["show_accessibility", "accessibility_only"],
+    ["show_stops_ahead", "show_stop_times"],
+  ])("switching %s off switches %s off, not just grey", async (needed, dependent) => {
+    const el = await onDisplayTab({ [needed]: true, [dependent]: true });
+    expect(formWith(el, dependent).data?.[dependent]).toBe(true);
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+
+    await flip(el, needed, false);
+
+    const form = formWith(el, dependent);
+    expect(form.data?.[dependent]).toBe(false);
+    expect(form.schema?.find((f) => f.name === dependent)?.disabled).toBe(true);
+    // Saved that way too, so the card and the YAML agree with the switch.
+    expect(config).toMatchObject({ [needed]: false, [dependent]: false });
+  });
+
+  it("leaves the dependent switch off, and usable, when the needed one comes back", async () => {
+    const el = await onDisplayTab({ show_delay: true, show_delay_colors: true });
+    await flip(el, "show_delay", false);
+    await flip(el, "show_delay", true);
+
+    const form = formWith(el, "show_delay_colors");
+    expect(form.data?.["show_delay_colors"]).toBe(false);
+    expect(form.schema?.find((f) => f.name === "show_delay_colors")?.disabled).toBe(false);
+    await flip(el, "show_delay_colors", true);
+    expect(formWith(el, "show_delay_colors").data?.["show_delay_colors"]).toBe(true);
+  });
+});
+
+describe("estimated departure time switch (modern, Anzeige tab)", () => {
+  type Form = { schema?: Array<{ name: string }>; data?: Record<string, unknown> };
+
+  async function forms(config: Record<string, unknown> = {}): Promise<Form[]> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    return [...shadow(el).querySelectorAll("ha-form")] as unknown as Form[];
+  }
+
+  const value = (all: Form[]): unknown =>
+    all.find((f) => f.schema?.some((x) => x.name === "show_departure_time"))?.data?.[
+      "show_departure_time"
+    ];
+
+  it("is off until switched on", async () => {
+    expect(value(await forms())).toBe(false);
+    expect(value(await forms({ show_departure_time: true }))).toBe(true);
+  });
+
+  it("sits right under the departure list switch", async () => {
+    const names = (await forms()).flatMap((f) => f.schema?.map((x) => x.name) ?? []);
+    expect(names[names.indexOf("show_departures") + 1]).toBe("show_departure_time");
+  });
+});
+
+describe("estimated arrival times switch (modern, Anzeige tab)", () => {
+  type Field = { name: string; disabled?: boolean };
+  type Form = { schema?: Field[]; data?: Record<string, unknown> };
+
+  /** The `ha-form` section holding the switch, with its field. `ha-form` is
+   *  undefined here, so the schema and data Lit set on it are plain
+   *  properties to read back. */
+  async function stopTimes(
+    config: Record<string, unknown> = {},
+  ): Promise<{ field: Field; value: unknown }> {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+      ...config,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    for (const form of shadow(el).querySelectorAll("ha-form")) {
+      const { schema, data } = form as unknown as Form;
+      const field = schema?.find((f) => f.name === "show_stop_times");
+      if (field) return { field, value: data?.["show_stop_times"] };
+    }
+    throw new Error("no section offers show_stop_times");
+  }
+
+  it("is off until switched on", async () => {
+    expect((await stopTimes()).value).toBe(false);
+    expect((await stopTimes({ show_stop_times: true })).value).toBe(true);
+  });
+
+  it("sits right under the stops trail it depends on", async () => {
+    const el = await mount(MODERN, BUSY_STOP, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY }],
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    const names = [...shadow(el).querySelectorAll("ha-form")].flatMap(
+      (form) => (form as unknown as Form).schema?.map((f) => f.name) ?? [],
+    );
+    expect(names[names.indexOf("show_stops_ahead") + 1]).toBe("show_stop_times");
+  });
+
+  it("is disabled with the stops trail switched off", async () => {
+    expect((await stopTimes()).field.disabled).toBe(false);
+    expect((await stopTimes({ show_stops_ahead: false })).field.disabled).toBe(true);
   });
 });
 
@@ -400,7 +562,11 @@ describe("retro editor writes back through config-changed", () => {
   });
 
   it("a per-line direction writes that line only and keeps the stop-wide 'both'", async () => {
-    const el = await mount(RETRO, BUSY_STOP, { ...RETRO_CFG, lines: ["U3", "52"], direction: "both" });
+    const el = await mount(RETRO, BUSY_STOP, {
+      ...RETRO_CFG,
+      lines: ["U3", "52"],
+      direction: "both",
+    });
     const config = lastConfig(el);
     const u3 = [...shadow(el).querySelectorAll<HTMLElement>(".wl-override-row")].find(
       (row) => row.querySelector(".wl-badge")?.textContent?.trim() === "U3",
@@ -413,8 +579,7 @@ describe("retro editor writes back through config-changed", () => {
 
 describe("helper text names the setting a field depends on", () => {
   type Form = { computeHelper(field: { name: string }): string | undefined };
-  const form = (el: EditorElement): Form =>
-    shadow(el).querySelector("ha-form") as unknown as Form;
+  const form = (el: EditorElement): Form => shadow(el).querySelector("ha-form") as unknown as Form;
 
   it("modern: the stop layout only matters from two stops", async () => {
     const one = await mount(MODERN, BUSY_STOP, EDITORS[0]![1]);
@@ -423,13 +588,145 @@ describe("helper text names the setting a field depends on", () => {
       type: "custom:wiener-linien-austria-card",
       entities: [{ entity: ENTITY }, { entity: "sensor.other_abfahrten" }],
     });
-    expect(form(two).computeHelper({ name: "layout" })).not.toBe("Wirkt erst ab zwei Haltestellen.");
+    expect(form(two).computeHelper({ name: "layout" })).not.toBe(
+      "Wirkt erst ab zwei Haltestellen.",
+    );
+  });
+
+  it("modern: arrival times need the stops trail", async () => {
+    const off = await mount(MODERN, BUSY_STOP, {
+      ...EDITORS[0]![1],
+      show_stops_ahead: false,
+    });
+    expect(form(off).computeHelper({ name: "show_stop_times" })).toBe(
+      "Braucht „Zwischenstationen anzeigen“.",
+    );
+    const on = await mount(MODERN, BUSY_STOP, EDITORS[0]![1]);
+    expect(form(on).computeHelper({ name: "show_stop_times" })).toMatch(
+      /^Zeigt, wann das Fahrzeug/,
+    );
   });
 
   it("retro: the marquee text needs the marquee", async () => {
     const off = await mount(RETRO, BUSY_STOP, EDITORS[1]![1]);
     expect(form(off).computeHelper({ name: "message_text" })).toBe("Braucht „Lauftext anzeigen“.");
     const on = await mount(RETRO, BUSY_STOP, { ...EDITORS[1]![1], message_ticker: true });
-    expect(form(on).computeHelper({ name: "message_text" })).not.toBe("Braucht „Lauftext anzeigen“.");
+    expect(form(on).computeHelper({ name: "message_text" })).not.toBe(
+      "Braucht „Lauftext anzeigen“.",
+    );
+  });
+});
+
+describe("section headers and line colours (modern)", () => {
+  const MODERN_CFG = { type: "custom:wiener-linien-austria-card", entities: [{ entity: ENTITY }] };
+
+  async function onTab(
+    index: number,
+    config: Record<string, unknown> = {},
+  ): Promise<EditorElement> {
+    const el = await mount(MODERN, BUSY_STOP, { ...MODERN_CFG, ...config });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[index]?.click();
+    await el.updateComplete;
+    return el;
+  }
+
+  const hints = (el: EditorElement): string[] =>
+    [...shadow(el).querySelectorAll(".wl-section-hint")].map((h) => h.textContent ?? "");
+
+  it("names what each Anzeige section is set to", async () => {
+    // Defaults: hero on, six rows, stops trail on, every mode, platform shown,
+    // alerts, elevators and colour-coded delays on.
+    expect(hints(await onTab(1))).toEqual([
+      "Große Abfahrt · 6 Abfahrten · Zwischenstationen",
+      "Alle Verkehrsmittel",
+      "Steig",
+      "Störungen · Aufzüge · Verspätungen farbig",
+    ]);
+  });
+
+  it("follows the config, including the switched-off cases", async () => {
+    const el = await onTab(1, {
+      hide_header: true,
+      show_hero_metric: false,
+      max_departures: 1,
+      show_stops_ahead: false,
+      show_platform: false,
+      show_traffic_info: false,
+      show_elevator_info: false,
+      show_delay: false,
+    });
+    expect(hints(el)).toEqual([
+      "Ohne Kopfzeile · 1 Abfahrt",
+      "Aus",
+      "Nur Linie, Ziel und Zeit",
+      "Aus",
+    ]);
+  });
+
+  it("offers Reset only for a line whose colour was changed", async () => {
+    const plain = await onTab(2);
+    expect(shadow(plain).querySelectorAll(".wl-color-row .wl-icon-btn")).toHaveLength(0);
+    expect(hints(plain)[0]).toBe("Offizielle Farben");
+
+    const changed = await onTab(2, { line_colors: { U3: "#123456" } });
+    const resets = shadow(changed).querySelectorAll(".wl-color-row .wl-icon-btn");
+    expect(resets).toHaveLength(1);
+    expect(resets[0]?.getAttribute("aria-label")).toContain("U3");
+    expect(hints(changed)[0]).toBe("1 angepasst");
+  });
+});
+
+describe("flap station-band background options", () => {
+  type Option = { value: string; label: string };
+  type Field = { name: string; selector?: { select?: { options: Option[] } } };
+
+  async function bgOptions(
+    hass: HomeAssistant,
+    entities: Array<Record<string, unknown>>,
+  ): Promise<string[]> {
+    const el = await mount(FLAP, hass, {
+      type: "custom:wiener-linien-austria-flap-card",
+      entities,
+    });
+    shadow(el).querySelectorAll<HTMLButtonElement>('[role="tab"]')[1]?.click();
+    await el.updateComplete;
+    for (const form of shadow(el).querySelectorAll("ha-form")) {
+      const field = (form as unknown as { schema: Field[] }).schema.find(
+        (f) => f.name === "station_bg",
+      );
+      if (field) return field.selector!.select!.options.map((o) => o.value);
+    }
+    throw new Error("no station_bg field on the display tab");
+  }
+
+  it("offers one entry per line in the stop's filter, sorted", async () => {
+    // A set the live palette doesn't match, so only the filter can produce it.
+    expect(await bgOptions(BUSY_STOP, [{ entity: ENTITY, lines: ["U3", "13A"] }])).toEqual([
+      "line",
+      "line:13A",
+      "line:U3",
+      "white",
+      "black",
+    ]);
+  });
+
+  it("falls back to the sensor's tracked lines when no filter is set", async () => {
+    const hass = hassWith({ tracked_lines: ["U6"], line_colors: { U6: "#9D6830" } });
+    expect(await bgOptions(hass, [{ entity: ENTITY }])).toEqual([
+      "line",
+      "line:U6",
+      "white",
+      "black",
+    ]);
+  });
+
+  it("offers the live palette while nothing is tracked yet", async () => {
+    expect(await bgOptions(BUSY_STOP, [{ entity: ENTITY }])).toEqual([
+      "line",
+      "line:52",
+      "line:U3",
+      "white",
+      "black",
+    ]);
   });
 });

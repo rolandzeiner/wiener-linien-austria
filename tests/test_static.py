@@ -47,6 +47,7 @@ from custom_components.wiener_linien_austria.static import (
     async_set_cached_catalogue,
     canonical_line_key,
     canonical_line_label,
+    catalogue_is_stale,
     stops_ahead_for_match,
 )
 from tests.conftest import make_response_cm
@@ -140,6 +141,30 @@ def _build_sample_index() -> TripPatternIndex:
         colors_by_line={"U1": "E3000F", "71": "C00808"},
         text_colors_by_line={"U1": "FFFFFF", "71": "FFFFFF"},
     )
+
+
+def test_catalogue_is_stale_a_week_after_its_last_download() -> None:
+    """By its own age, so a restart doesn't reset the week."""
+    from datetime import UTC, datetime, timedelta
+
+    now = datetime(2026, 10, 8, 10, 0, tzinfo=UTC)
+
+    def fetched(when: str) -> StaticCatalogue:
+        return StaticCatalogue(stations_by_diva={}, last_fetched=when)
+
+    week = timedelta(days=7)
+    assert not catalogue_is_stale(fetched((now - timedelta(days=6)).isoformat()), now)
+    assert not catalogue_is_stale(
+        fetched((now - week + timedelta(seconds=1)).isoformat()), now
+    )
+    assert catalogue_is_stale(fetched((now - week).isoformat()), now)
+    assert catalogue_is_stale(fetched("2026-09-12T10:40:18.275259+00:00"), now)
+    # Nothing loaded, or nothing readable, is due rather than trusted.
+    assert catalogue_is_stale(None, now)
+    assert catalogue_is_stale(fetched("last week"), now)
+    # A stamp without an offset is read as UTC, not as a crash.
+    assert not catalogue_is_stale(fetched("2026-10-07T10:00:00"), now)
+    assert catalogue_is_stale(fetched("2026-10-01T09:59:59"), now)
 
 
 def test_parse_haltestellen() -> None:

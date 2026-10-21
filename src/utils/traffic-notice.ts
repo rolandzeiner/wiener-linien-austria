@@ -116,9 +116,7 @@ const PROSE_FACT_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 /** First prose pattern that consumes `piece` whole, or `null`. */
-function matchProseFact(
-  piece: string,
-): { label: string; value: string } | null {
+function matchProseFact(piece: string): { label: string; value: string } | null {
   for (const [pattern, label] of PROSE_FACT_PATTERNS) {
     const match = pattern.exec(piece);
     if (match?.[1]) return { label, value: match[1] };
@@ -235,9 +233,7 @@ function iconForFact(label: string, value: string): string {
     return FALLBACK_ICON;
   }
   if (label === "Voraussichtliche Dauer") {
-    return TIME_ONLY_RE.test(value.trim())
-      ? "mdi:clock-outline"
-      : "mdi:calendar-clock";
+    return TIME_ONLY_RE.test(value.trim()) ? "mdi:clock-outline" : "mdi:calendar-clock";
   }
   return FALLBACK_ICON;
 }
@@ -370,7 +366,8 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
   const facts: TrafficFact[] = [];
   const seenFacts = new Set<string>();
 
-  for (const line of toLines(String(raw ?? ""))) {
+  const text = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+  for (const line of toLines(text)) {
     for (const piece of splitRunOns(line)) {
       const fact = FACT_RE.exec(piece);
       if (fact?.[1] && fact[2]) {

@@ -6,10 +6,7 @@
           "type": "Feature",
           "geometry": {
             "type": "Point",
-            "coordinates": [
-              16.3570367,
-              48.2055835
-            ]
+            "coordinates": [16.3570367, 48.2055835]
           },
           "properties": {
             "name": "60201430",
@@ -195,10 +192,7 @@
           "type": "Feature",
           "geometry": {
             "type": "Point",
-            "coordinates": [
-              16.3689035,
-              48.2012488
-            ]
+            "coordinates": [16.3689035, 48.2012488]
           },
           "properties": {
             "name": "60200657",
@@ -261,10 +255,7 @@
           "type": "Feature",
           "geometry": {
             "type": "Point",
-            "coordinates": [
-              16.3716613,
-              48.208062
-            ]
+            "coordinates": [16.3716613, 48.208062]
           },
           "properties": {
             "name": "60201320",

@@ -1,6 +1,7 @@
 import type { HomeAssistant } from "../types.js";
 
 import type { WienerLinienAttrs } from "../types.js";
+import { sorted } from "../utils.js";
 
 // Discover WL stop sensors by attribute fingerprint. Entity-id prefix is not
 // stable (the sensor slug is built from the stop name, e.g.
@@ -42,7 +43,7 @@ export function departureBoardOptions(
   for (const id of selected) {
     if (id) options.add(id);
   }
-  return [...options].sort();
+  return sorted(options);
 }
 
 /** Sensor entity ids whose attributes pass `matches`, sorted. The walk the
@@ -58,7 +59,8 @@ export function findSensors<Attrs>(
     if (!eid.startsWith("sensor.")) continue;
     if (matches((state?.attributes ?? {}) as Partial<Attrs>)) found.push(eid);
   }
-  return found.sort();
+  found.sort();
+  return found;
 }
 
 // `line_colors` map for a single entity; empty `{}` when missing or

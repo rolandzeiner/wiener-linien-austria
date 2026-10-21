@@ -306,10 +306,12 @@ def _split_by_category(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     return out
 
 
-async def async_refresh_alerts(hass: HomeAssistant) -> None:
+async def async_refresh_alerts(hass: HomeAssistant) -> bool:
     """Refresh the traffic (long + short) and elevator alerts into hass.data.
 
-    Safe to call whenever; a failed fetch keeps the previous cache.
+    Safe to call whenever; a failed fetch keeps the previous cache. Returns
+    False only for a failed fetch, which is what the periodic tick backs
+    off on.
 
     Bails immediately when the domain has been torn down (no entries
     left). The periodic timer is unsubscribed in `async_unload_entry`,
@@ -318,7 +320,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     dropped.
     """
     if not domain_is_live(hass):
-        return
+        return True
 
     result = await _fetch_info_lists(hass)
 
@@ -326,7 +328,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
     # points, and unload may have run while we were waiting on the
     # network. Same risk as the entry guard above.
     if not domain_is_live(hass):
-        return
+        return True
     domain_data = hass.data[DOMAIN]
 
     # Fetch/parse failure → leave both caches exactly as they were. Only an
@@ -368,6 +370,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> None:
         len(domain_data.get(ELEVATOR_INFO_KEY, [])),
         failed,
     )
+    return not failed
 
 
 # ---------------------------------------------------------------------------

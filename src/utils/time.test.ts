@@ -1,23 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { delayMinutes, formatClock, formatDate } from "./time.js";
 
 describe("delayMinutes", () => {
   it("reports the signed difference in whole minutes", () => {
-    expect(
-      delayMinutes("2026-09-07T10:00:00+02:00", "2026-09-07T10:03:00+02:00"),
-    ).toBe(3);
-    expect(
-      delayMinutes("2026-09-07T10:00:00+02:00", "2026-09-07T09:58:00+02:00"),
-    ).toBe(-2);
+    expect(delayMinutes("2026-09-07T10:00:00+02:00", "2026-09-07T10:03:00+02:00")).toBe(3);
+    expect(delayMinutes("2026-09-07T10:00:00+02:00", "2026-09-07T09:58:00+02:00")).toBe(-2);
   });
 
   it("reports 0 rather than null when the two timestamps are equal", () => {
     // Upstream emits equal planned/real even with no delay; the caller
     // decides whether to label it, so the helper must not collapse to null.
-    expect(
-      delayMinutes("2026-09-07T10:00:00+02:00", "2026-09-07T10:00:00+02:00"),
-    ).toBe(0);
+    expect(delayMinutes("2026-09-07T10:00:00+02:00", "2026-09-07T10:00:00+02:00")).toBe(0);
   });
 
   it("returns null when either side is missing or unparseable", () => {

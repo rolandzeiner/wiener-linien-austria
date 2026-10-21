@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vite-plus/test";
 
 import { computeHeroGroup, splitHeroAndRows } from "./hero-group.js";
 import type { DepartureAttr } from "../types.js";

@@ -1,11 +1,11 @@
-import * as de from "./languages/de.json";
-import * as en from "./languages/en.json";
+import de from "./languages/de.json";
+import en from "./languages/en.json";
 
 type Dict = Record<string, unknown>;
 
 const languages: Record<string, Dict> = {
-  de: de as unknown as Dict,
-  en: en as unknown as Dict,
+  de,
+  en,
 };
 
 // Hoisted fallback dict — `noUncheckedIndexedAccess` makes
@@ -78,7 +78,6 @@ export function pickerText(key: string): string {
   } catch {
     stored = undefined;
   }
-  const hassLanguage =
-    document.documentElement.lang || stored || navigator.language || undefined;
+  const hassLanguage = document.documentElement.lang || stored || navigator.language || undefined;
   return translate(`common.picker.${key}`, { hassLanguage });
 }

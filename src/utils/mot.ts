@@ -60,14 +60,7 @@ export function headerIconForType(type: string | undefined): string {
 // `/^N\d/` for nightlines) keeps one rule rather than two that can disagree.
 
 /** The categories a user can show or hide, in signage order. */
-export const TRANSFER_MODES = [
-  "metro",
-  "sbahn",
-  "tram",
-  "badner",
-  "bus",
-  "night",
-] as const;
+export const TRANSFER_MODES = ["metro", "sbahn", "tram", "badner", "bus", "night"] as const;
 
 export type TransferMode = (typeof TRANSFER_MODES)[number];
 
