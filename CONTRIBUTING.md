@@ -179,10 +179,10 @@ this layer free of a test harness.
 
 Three things happy-dom gets wrong, so don't chase them: its `outline` shorthand
 parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`,
-and `style.color` keeps named and `hsl()` colours as written where a browser
-serialises them to `rgb()`. All are fine in every browser HA supports — assert
-on the source, not on parsed `cssText`, and test colour parsing with `rgb()` or
-hex.
+and `style.color` keeps `rgb()`, named and `hsl()` colours as written where a
+browser serialises them to `rgb()` / `rgba()`. All are fine in every browser HA
+supports — assert on the source, not on parsed `cssText`, and test colour
+parsing with `rgb()` or hex, which `parseColor` reads the same either way.
 
 ## Card editors
 
