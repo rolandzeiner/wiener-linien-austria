@@ -1166,10 +1166,12 @@ describe("retro wheelchair race", () => {
       .find((c) => c.startsWith("retro--race-"))
       ?.slice("retro--race-".length) ?? "idle";
 
-  /** Step the clock and note each phase the panel passes through. */
-  async function phasesOver(el: CardElement, ms: number): Promise<string[]> {
-    const seen: string[] = [];
-    for (let t = 0; t < ms; t += 250) {
+  /** Step the clock until the panel is back to idle, noting each phase it
+   *  passes through on the way. Stops there, so the clock sits at the moment
+   *  the victory screen cleared. */
+  async function phasesUntilIdle(el: CardElement): Promise<string[]> {
+    const seen = [phase(el)];
+    for (let t = 0; t < 60_000 && seen.at(-1) !== "idle"; t += 250) {
       await vi.advanceTimersByTimeAsync(250);
       await el.updateComplete;
       if (seen.at(-1) !== phase(el)) seen.push(phase(el));
@@ -1180,20 +1182,14 @@ describe("retro wheelchair race", () => {
   it("runs countdown, race, freeze and victory, then rolls the next race itself", async () => {
     // Switching the option on starts a race straight away.
     const el = await mount(RETRO, raceHass(), RACE_CONFIG);
-    expect(phase(el)).toBe("countdown");
-
-    expect(await phasesOver(el, 60_000)).toEqual([
-      "countdown",
-      "active",
-      "freeze",
-      "victory",
-      "idle",
-    ]);
+    expect(await phasesUntilIdle(el)).toEqual(["countdown", "active", "freeze", "victory", "idle"]);
     expect(animate).toHaveBeenCalledTimes(2);
 
-    // The next one follows somewhere in the next one to three minutes.
-    await vi.advanceTimersByTimeAsync(180_000);
-    expect(animate).toHaveBeenCalledTimes(4);
+    // The next race starts one to three minutes after the victory screen clears.
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(animate).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(121_000);
+    expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
   it("picks a race up again after the dashboard detaches the card mid-race", async () => {
@@ -1208,7 +1204,7 @@ describe("retro wheelchair race", () => {
     // The racers are rebuilt at the point the wall clock says they've reached.
     expect(animate).toHaveBeenCalledTimes(4);
 
-    expect((await phasesOver(el, 60_000)).at(-1)).toBe("idle");
+    expect((await phasesUntilIdle(el)).at(-1)).toBe("idle");
   });
 
   it("holds a scrolling message back until the race is over", async () => {
@@ -1257,7 +1253,10 @@ describe("retro message ticker", () => {
     expect(ticker(el)?.textContent?.trim()).toBe("Gute Fahrt");
     expect(ticker(el)?.getAttribute("role")).toBe("status");
 
-    // The interval counts from the end of a run, not its start.
+    // The interval counts from the end of a run, not its start: let this one
+    // scroll for 3 s before it ends, so a start-based schedule would show the
+    // next run 3 s early.
+    await advance(el, 3_000);
     ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
     await el.updateComplete;
     expect(ticker(el)).toBeNull();

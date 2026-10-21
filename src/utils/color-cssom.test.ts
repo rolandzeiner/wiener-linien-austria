@@ -3,10 +3,10 @@
 // The non-hex colours a hand-written `line_colors` override can carry go
 // through CSSOM, which needs a document; color.test.ts runs without one.
 //
-// happy-dom keeps `rgb()` as written and rejects junk with "", like a
-// browser, but leaves named and `hsl()` colours unnormalised where a browser
-// would serialise them to `rgb()`. Only the shapes it handles faithfully are
-// pinned here.
+// happy-dom rejects junk with "" like a browser, but keeps `rgb()`, named
+// and `hsl()` colours as written where a browser serialises them to
+// `rgb()` / `rgba()`. Only `rgb()` is pinned here, because parseColor reads
+// it the same in either form.
 
 import { describe, expect, it } from "vite-plus/test";
 
