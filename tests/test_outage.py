@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
 import pytest
 from freezegun.api import FrozenDateTimeFactory
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -225,3 +226,39 @@ async def test_clear_outage_forgets_state_and_issue(
     async_clear_outage(hass)
     assert _issue(hass) is None
     assert OUTAGE_KEY not in hass.data[DOMAIN]
+
+
+async def test_entries_in_setup_retry_raise_and_clear_the_issue(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, monitor_fixture
+) -> None:
+    """The 2026-10-21 incident, end to end through real config-entry setups.
+
+    /monitor answered an empty 502 for hours, so every entry sat in setup
+    retry with no group timer running. The setup attempts themselves have to
+    feed the clock, or the issue never appears in exactly the case it was
+    built for. Pinned here because nobody can stage a real outage to check.
+    """
+    session = MagicMock()
+    session.get = _status(502)
+    entry = make_entry()
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.wiener_linien_austria.batch.async_get_clientsession",
+        return_value=session,
+    ):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.SETUP_RETRY
+        assert _issue(hass) is None
+
+        freezer.tick(_PAST_THRESHOLD)
+        await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.SETUP_RETRY
+        assert _issue(hass) is not None
+
+        session.get = _body(monitor_fixture)
+        await hass.config_entries.async_reload(entry.entry_id)
+        await hass.async_block_till_done()
+        assert entry.state is ConfigEntryState.LOADED
+        assert _issue(hass) is None
