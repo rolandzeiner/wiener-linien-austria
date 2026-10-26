@@ -10,6 +10,11 @@
  * `@vitest/coverage-v8` stays a devDependency because CI enforces the
  * coverage floor. It must match the Vitest that Vite+ bundles exactly, or
  * the provider loads against a different Vitest. `vp migrate` re-pins it.
+ *
+ * The provider has a required `vitest` peer, so `vp migrate` also declares
+ * `vitest` directly and overrides it to the same version, keeping the graph
+ * on a single Vitest instead of relying on npm hoisting vite-plus's copy.
+ * Both pins follow the bundled Vitest as well.
  */
 import { describe, expect, it } from "vite-plus/test";
 
@@ -25,5 +30,10 @@ describe("toolchain pins", () => {
 
   it("pins the coverage provider to the Vitest bundled with vite-plus", () => {
     expect(pkg.devDependencies["@vitest/coverage-v8"]).toBe(vitePlusPkg.dependencies.vitest);
+  });
+
+  it("pins vitest and its override to the Vitest bundled with vite-plus", () => {
+    expect(pkg.devDependencies.vitest).toBe(vitePlusPkg.dependencies.vitest);
+    expect(pkg.overrides.vitest).toBe(vitePlusPkg.dependencies.vitest);
   });
 });
