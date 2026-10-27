@@ -171,3 +171,6 @@ private_*.py
 # Dev-only fixture hook (gitignored by design — per-repo file is local)
 # ───────────────────────────────────────────────────────────────────
 custom_components/*/_dev_fixture.py
+
+# Local notes, not published
+core-checklist.md
