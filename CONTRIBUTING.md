@@ -60,6 +60,7 @@ Because the TS literals are asserted equal to the manifest, none of the four can
     .venv/bin/python -m pytest tests/ -q
     .venv/bin/python scripts/check_module_coverage.py
     ```
+- `custom_components/wiener_linien_austria/api.py` — every request to Wiener Linien: the realtime, routing and OGD file URLs, the request headers, and the `WienerLinienApiError` exceptions every transport failure turns into. It returns decoded bodies and nothing more: `messageCode` handling, cooldowns, parsing and translated errors stay in the module that owns each feature. **It must not import Home Assistant or anything else from the package** (`const.py` pulls in HA for the User-Agent, so callers pass that in), and `tests/test_api.py` fails on any such import. Catch `WienerLinienApiError`, never `aiohttp` errors, outside `api.py`.
 - `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes, and keep the two code copies in sync: `const.ATTRIBUTION` for the sensors and diagnostics, and `ATTRIBUTION_FALLBACK` in `src/const.ts`, which the card footers show until a sensor reports its own.
 
 ## Dependency policy

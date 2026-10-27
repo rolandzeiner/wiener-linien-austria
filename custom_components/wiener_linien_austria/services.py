@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import (
@@ -21,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from . import static
 from .adhoc import AdhocRateLimited, async_get_planner
+from .api import WienerLinienApiError
 from .const import DOMAIN
 from .route_coordinator import (
     MAX_TRIPS_PUBLISHED,
@@ -124,7 +124,7 @@ async def _async_stop_pair_options(
         )
     try:
         catalogue = await static.async_get_catalogue(hass)
-    except (TimeoutError, aiohttp.ClientError) as err:
+    except WienerLinienApiError as err:
         raise HomeAssistantError(
             translation_domain=DOMAIN,
             translation_key="adhoc_catalogue_unavailable",

@@ -12,7 +12,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from zoneinfo import ZoneInfo
 
-import aiohttp
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant import config_entries
@@ -28,6 +27,10 @@ from homeassistant.util import dt as dt_util
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.wiener_linien_austria import adhoc, rate_limit
+from custom_components.wiener_linien_austria.api import (
+    ApiTimeoutError,
+    WienerLinienApiError,
+)
 from custom_components.wiener_linien_austria.config_flow import _probe_route
 from custom_components.wiener_linien_austria.const import (
     CONF_ACTIVE_DAYS,
@@ -313,7 +316,7 @@ async def test_route_setup_survives_a_missing_catalogue(
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_catalogue",
         new_callable=AsyncMock,
-        side_effect=TimeoutError,
+        side_effect=ApiTimeoutError(30),
     ):
         entry = route_entry()
         await async_setup_entry_and_wait(hass, entry)
@@ -837,7 +840,7 @@ async def test_plan_trip_between_stops_needs_the_integration_and_its_catalogue(
     with (
         patch(
             "custom_components.wiener_linien_austria.static.async_get_catalogue",
-            side_effect=aiohttp.ClientError,
+            side_effect=WienerLinienApiError,
         ),
         pytest.raises(HomeAssistantError) as err,
     ):
@@ -975,7 +978,7 @@ async def test_route_flow_catalogue_unavailable(hass: HomeAssistant) -> None:
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
-        side_effect=TimeoutError,
+        side_effect=ApiTimeoutError(30),
     ):
         result = await _start_route_flow(hass)
     assert result["type"] == FlowResultType.ABORT

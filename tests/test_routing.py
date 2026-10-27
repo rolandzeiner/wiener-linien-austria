@@ -371,7 +371,18 @@ async def test_fetch_returns_body_and_sends_user_agent() -> None:
 @pytest.mark.parametrize(
     ("setup", "key"),
     [
-        (lambda r: setattr(r, "status", 503), "api_http_error"),
+        (
+            lambda r: setattr(
+                r,
+                "raise_for_status",
+                MagicMock(
+                    side_effect=aiohttp.ClientResponseError(
+                        MagicMock(), (), status=503, message="Service Unavailable"
+                    )
+                ),
+            ),
+            "api_http_error",
+        ),
         (
             lambda r: setattr(r, "json", AsyncMock(side_effect=ValueError("bad"))),
             "api_invalid_response",

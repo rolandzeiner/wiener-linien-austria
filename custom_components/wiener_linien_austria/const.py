@@ -89,10 +89,7 @@ STATIC_CACHE_CHECK_INTERVAL: Final = timedelta(hours=24)
 # evening; an hour's spread keeps their five-file downloads from bunching.
 STATIC_CACHE_FIRST_CHECK_SECONDS: Final = (300, 3600)
 
-# Upstream API
-API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"
-MONITOR_ENDPOINT: Final = "/monitor"
-TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
+# Upstream URLs live in api.py, which must stay free of Home Assistant.
 
 # Alerts (traffic disruptions + elevator outages) refresh cadence. Domain-wide,
 # shared across all entries. 5 min is plenty — these don't change any faster
@@ -154,19 +151,6 @@ OUTAGE_REPAIR_AFTER_SECONDS: Final = 600
 # re-registers after an async_remove_entry tore the resources down.
 RESOURCES_REGISTERED_KEY: Final = "resources_registered"
 
-STATIC_FILES: Final = {
-    "haltestellen": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltestellen.csv",
-    "haltepunkte": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-haltepunkte.csv",
-    "linien": f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-linien.csv",
-    "fahrwegverlaeufe": (
-        f"{API_BASE_URL}/doku/ogd/wienerlinien-ogd-fahrwegverlaeufe.csv"
-    ),
-    # GTFS routes.txt — authoritative `route_color` + `route_text_color`
-    # per line label. Roughly 8 KB on the wire (gzipped). Keeps the card's
-    # default palette in sync with whatever Wiener Linien publishes
-    # (e.g. the U5 launch will rev every metro colour at once).
-    "routes": f"{API_BASE_URL}/doku/ogd/gtfs/routes.txt",
-}
 
 # Line labels where `wienerlinien-ogd-linien.csv` and the realtime
 # `/monitor` feed disagree about the same line. Keyed by `LineID`, which
@@ -281,8 +265,6 @@ EXCLUDABLE_MEANS: Final[dict[str, str]] = {
     "bus": "5",
 }
 
-ROUTING_BASE_URL: Final = "https://www.wienerlinien.at/ogd_routing"
-ROUTING_TRIP_ENDPOINT: Final = "/XML_TRIP_REQUEST2"
 # --- Upstream capabilities, measured 2026-09-14 -------------------
 #   XML_TRIP_REQUEST2 (outputFormat=JSON), Floridsdorf -> Meidling, 3 trips.
 #   Compression: honoured (gzip). 85144 B identity -> 10698 B wire (8.0x).
@@ -337,7 +319,6 @@ ROUTE_ROLLOVER_SPREAD_SECONDS: Final = (2.0, 30.0)
 #   timetable reflects it. Timetable period in the answer: 2025-12-14 to
 #   2026-12-12.
 # ----------------------------------------------------------------
-ROUTING_DEPARTURE_ENDPOINT: Final = "/XML_DM_REQUEST"
 # Rows per board refresh. Sized for the lines a board actually shows, not
 # for the rows the answer carries: the request can't filter by line, so a
 # stop served by several S-Bahn lines spends most of its batch on trains
@@ -469,7 +450,7 @@ ROUTING_TIME_ZONE: Final = "Europe/Vienna"
 #   `itdDate` / `itdTime` are honoured: the 40 rows start at the asked time.
 #   Together the seven hubs saw S1 S2 S3 S4 S7 S40 S45 S50 S60 S80 at 43
 #   stops in Vienna. The airport hub is not optional: with the Stammstrecke
-#   closed (see ROUTING_DEPARTURE_ENDPOINT) the S7 runs Flughafen - St. Marx
+#   closed (see the XML_DM_REQUEST notes above) the S7 runs Flughafen - St. Marx
 #   on its own, and no other hub's trains call at that section.
 # ----------------------------------------------------------------
 S_BAHN_NETWORK_HUBS: Final[tuple[int, ...]] = (

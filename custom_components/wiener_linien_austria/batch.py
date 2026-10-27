@@ -34,25 +34,30 @@ import asyncio
 import logging
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Final
 
-import aiohttp
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
+from .api import (
+    ApiConnectionError,
+    ApiHttpError,
+    ApiPayloadError,
+    ApiResponseShapeError,
+    ApiTimeoutError,
+    WienerLinienApiError,
+    fetch_monitor,
+)
 from .const import (
-    API_BASE_URL,
     BATCH_REGISTRY_KEY,
     DOMAIN,
     ERR_RATE_LIMIT,
-    MONITOR_ENDPOINT,
     RATE_LIMIT_TRANSLATION_KEY,
     UPSTREAM_ERROR_KEYS,
     USER_AGENT,
 )
-from .http import base_request_headers
 from .live import async_get_live_board
 from .outage import async_note_monitor_failure, async_note_monitor_success
 from .parsing import as_int
@@ -62,6 +67,8 @@ if TYPE_CHECKING:
     from .coordinator import WienerLinienAustriaCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+MONITOR_TIMEOUT_SECONDS: Final = 30
 
 
 @dataclass(slots=True)
@@ -267,99 +274,49 @@ class MonitorBatchGroup:
 
         rbls = self.union_rbls()
 
-        url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
-        params: list[tuple[str, str]] = [("stopId", str(rbl)) for rbl in rbls]
-        headers = base_request_headers(USER_AGENT)
-        timeout = aiohttp.ClientTimeout(total=30)
-
         try:
-            async with self._session.get(
-                url, params=params, headers=headers, timeout=timeout
-            ) as resp:
-                status = resp.status
-                resp.raise_for_status()
+            body = await fetch_monitor(
+                self._session,
+                rbls,
+                user_agent=USER_AGENT,
+                timeout_seconds=MONITOR_TIMEOUT_SECONDS,
+            )
+        except WienerLinienApiError as err:
+            raise _transport_failure(err) from err
 
-                try:
-                    body = await resp.json()
-                except (aiohttp.ContentTypeError, ValueError) as err:
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_invalid_response",
-                        translation_placeholders={
-                            "status": str(status),
-                            "error": str(err),
-                        },
-                    ) from err
+        message = body.get("message") or {}
+        code = as_int(message.get("messageCode"))
+        server_time = message.get("serverTime")
+        # Propagate the latest server-time / error-code to every member
+        # before any raise, so diagnostics reflect the last observed
+        # upstream state even on an error tick.
+        for coordinator in self._members.values():
+            coordinator.apply_upstream_meta(server_time, code)
 
-                if not isinstance(body, dict):
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key="api_invalid_response",
-                        translation_placeholders={
-                            "status": str(status),
-                            "error": f"expected object, got {type(body).__name__}",
-                        },
-                    )
-
-                message = body.get("message") or {}
-                code = as_int(message.get("messageCode"))
-                server_time = message.get("serverTime")
-                # Propagate the latest server-time / error-code to every member
-                # before any raise, so diagnostics reflect the last observed
-                # upstream state even on an error tick.
-                for coordinator in self._members.values():
-                    coordinator.apply_upstream_meta(server_time, code)
-
-                if code == ERR_RATE_LIMIT:
-                    for coordinator in self._members.values():
-                        coordinator.note_rate_limited()
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key=RATE_LIMIT_TRANSLATION_KEY,
-                    )
-
-                if code is not None and code != 1:
-                    # Named message where the code is documented, raw code
-                    # and value otherwise. Both shapes carry `code` and
-                    # `value` so an unrecognised code still says something
-                    # useful rather than swallowing the upstream text.
-                    raise UpdateFailed(
-                        translation_domain=DOMAIN,
-                        translation_key=UPSTREAM_ERROR_KEYS.get(
-                            code, "api_upstream_error"
-                        ),
-                        translation_placeholders={
-                            "code": str(code),
-                            "value": str(message.get("value") or ""),
-                        },
-                    )
-
-                for coordinator in self._members.values():
-                    coordinator.note_not_rate_limited()
-        except TimeoutError as err:
+        if code == ERR_RATE_LIMIT:
+            for coordinator in self._members.values():
+                coordinator.note_rate_limited()
             raise UpdateFailed(
                 translation_domain=DOMAIN,
-                translation_key="api_timeout",
-                translation_placeholders={"seconds": "30"},
-            ) from err
-        except aiohttp.ClientResponseError as err:
+                translation_key=RATE_LIMIT_TRANSLATION_KEY,
+            )
+
+        if code is not None and code != 1:
+            # Named message where the code is documented, raw code
+            # and value otherwise. Both shapes carry `code` and
+            # `value` so an unrecognised code still says something
+            # useful rather than swallowing the upstream text.
             raise UpdateFailed(
                 translation_domain=DOMAIN,
-                translation_key="api_http_error",
+                translation_key=UPSTREAM_ERROR_KEYS.get(code, "api_upstream_error"),
                 translation_placeholders={
-                    "status": str(err.status),
-                    "reason": err.message or "",
+                    "code": str(code),
+                    "value": str(message.get("value") or ""),
                 },
-            ) from err
-        except aiohttp.ClientError as err:
-            raise UpdateFailed(
-                translation_domain=DOMAIN,
-                translation_key="api_connection_error",
-                translation_placeholders={
-                    "error_type": type(err).__name__,
-                    "error": str(err),
-                },
-            ) from err
+            )
+
+        for coordinator in self._members.values():
+            coordinator.note_not_rate_limited()
 
         try:
             async_get_live_board(self.hass).ingest(body, rbls)
@@ -405,6 +362,41 @@ class MonitorBatchGroup:
                 jitter=True,
             )
         )
+
+
+def _transport_failure(err: WienerLinienApiError) -> UpdateFailed:
+    """Translate a failed `/monitor` request into the UpdateFailed members see.
+
+    The keys and placeholders are what `outage.classify` and strings.json
+    read, so they stay as they were when the request was made here.
+    """
+    key: str
+    placeholders: dict[str, str]
+    match err:
+        case ApiTimeoutError():
+            key, placeholders = "api_timeout", {"seconds": f"{err.seconds:g}"}
+        case ApiHttpError():
+            key = "api_http_error"
+            placeholders = {"status": str(err.status), "reason": err.reason}
+        case ApiResponseShapeError():
+            key = "api_invalid_response"
+            placeholders = {
+                "status": str(err.status),
+                "error": f"expected object, got {err.got}",
+            }
+        case ApiPayloadError():
+            key = "api_invalid_response"
+            placeholders = {"status": str(err.status), "error": err.error}
+        case ApiConnectionError():
+            key = "api_connection_error"
+            placeholders = {"error_type": err.error_type, "error": err.error}
+        case _:
+            return _unexpected_failure(err)
+    return UpdateFailed(
+        translation_domain=DOMAIN,
+        translation_key=key,
+        translation_placeholders=placeholders,
+    )
 
 
 def _unexpected_failure(err: Exception) -> UpdateFailed:

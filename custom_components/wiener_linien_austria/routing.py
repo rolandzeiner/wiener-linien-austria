@@ -40,6 +40,14 @@ from typing import Any, Final, Literal
 import aiohttp
 from homeassistant.util import dt as dt_util
 
+from .api import (
+    ROUTING_TRIP_ENDPOINT,
+    ApiConnectionError,
+    ApiHttpError,
+    ApiPayloadError,
+    ApiTimeoutError,
+    fetch_routing,
+)
 from .const import (
     CONF_EXCLUDED_MEANS,
     CONF_MAX_CHANGES,
@@ -53,14 +61,11 @@ from .const import (
     EXCLUDABLE_MEANS,
     MAX_CHANGES_ANY,
     ROUTE_TYPES,
-    ROUTING_BASE_URL,
     ROUTING_REQUEST_TIMEOUT_SECONDS,
     ROUTING_TIME_ZONE,
-    ROUTING_TRIP_ENDPOINT,
     ROUTING_TRIPS_REQUESTED,
     WEEKDAYS,
 )
-from .http import base_request_headers
 from .parsing import as_mapping, as_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -468,48 +473,34 @@ async def async_fetch_trip_body(
     """GET one request from the routing server and return the decoded JSON body.
 
     A trip request by default; timetable.py passes the departure-monitor
-    endpoint, which answers in the same envelope. The server labels its
-    JSON `text/html`, so `content_type=None` is required, not defensive.
-    Raises `RoutingError` for every failure so callers map one exception
+    endpoint, which answers in the same envelope. Raises `RoutingError` for every failure so callers map one exception
     type onto their own surface (UpdateFailed for the coordinator,
     HomeAssistantError for the action).
     """
-    url = f"{ROUTING_BASE_URL}{endpoint}"
     try:
-        async with session.get(
-            url,
-            params=list(params),
-            headers=base_request_headers(user_agent),
-            timeout=aiohttp.ClientTimeout(total=ROUTING_REQUEST_TIMEOUT_SECONDS),
-        ) as resp:
-            if resp.status >= 400:
-                raise RoutingError(
-                    "api_http_error",
-                    {"status": str(resp.status), "reason": str(resp.reason or "")},
-                )
-            body = await resp.json(content_type=None)
-    except TimeoutError as err:
+        return await fetch_routing(
+            session,
+            endpoint,
+            params,
+            user_agent=user_agent,
+            timeout_seconds=ROUTING_REQUEST_TIMEOUT_SECONDS,
+        )
+    except ApiHttpError as err:
         raise RoutingError(
-            "api_timeout", {"seconds": str(ROUTING_REQUEST_TIMEOUT_SECONDS)}
+            "api_http_error", {"status": str(err.status), "reason": err.reason}
         ) from err
-    except aiohttp.ClientError as err:
+    except ApiTimeoutError as err:
+        raise RoutingError("api_timeout", {"seconds": f"{err.seconds:g}"}) from err
+    except ApiConnectionError as err:
         raise RoutingError(
             "api_connection_error",
-            {"error_type": type(err).__name__, "error": str(err)},
+            {"error_type": err.error_type, "error": err.error},
         ) from err
-    except ValueError as err:
+    except ApiPayloadError as err:
+        # Status stays "200" as it always read: any 2xx means the same here.
         raise RoutingError(
-            "api_invalid_response", {"status": "200", "error": str(err)}
+            "api_invalid_response", {"status": "200", "error": err.error}
         ) from err
-    if not isinstance(body, dict):
-        raise RoutingError(
-            "api_invalid_response",
-            {
-                "status": "200",
-                "error": f"expected an object, got {type(body).__name__}",
-            },
-        )
-    return body
 
 
 # ---------------------------------------------------------------------------
