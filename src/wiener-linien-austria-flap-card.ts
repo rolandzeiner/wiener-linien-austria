@@ -301,6 +301,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
+    // A language switch changes no entity state; without this the card keeps
+    // the old language until its sensor next updates.
+    if (prev.language !== this.hass.language) return true;
     // Multi-stop: re-render when ANY configured stop's state changed.
     const eids = this._resolveStopEids();
     if (eids.length === 0) return false;

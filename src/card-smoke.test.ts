@@ -325,6 +325,22 @@ describe("lost connection", () => {
   });
 });
 
+describe("language switch", () => {
+  // A profile language switch hands every card a new hass whose states are
+  // unchanged; the re-render gates used to skip it and keep the old text.
+  it.each([
+    [MODERN, 0, "Can't reach Wiener Linien"],
+    [RETRO, 1, "No connection"],
+    [FLAP, 2, "No connection"],
+  ] as const)("%s repaints in the new language", async (tag, i, english) => {
+    const hass = unavailableHass();
+    const el = await mount(tag, hass, CARDS[i]![1]);
+    el.hass = { ...hass, language: "en" };
+    await el.updateComplete;
+    expect(shadow(el).textContent).toContain(english);
+  });
+});
+
 /** A stop with a live U3 on either side of a planned S-Bahn train. */
 function timetableHass(): HomeAssistant {
   const hass = busyHass();

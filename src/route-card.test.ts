@@ -259,6 +259,19 @@ describe("live state and frequency", () => {
   });
 });
 
+describe("language switch", () => {
+  // A profile language switch leaves the sensor's state object as it was;
+  // the re-render gate used to compare the language only in ad-hoc mode.
+  it("repaints a sensor-backed card in the new language", async () => {
+    const h = hass("x", ACTIVE);
+    const el = await mount(h, { entity: ENTITY });
+    const before = text(el);
+    el.hass = { ...h, language: "en" };
+    await el.updateComplete;
+    expect(text(el)).not.toBe(before);
+  });
+});
+
 describe("a change that no longer fits", () => {
   it("names the next departure that can still be reached", async () => {
     const el = await mount(hass("x", { ...ACTIVE, trips: [trip("07:57", "08:11", "at_risk")] }), {
