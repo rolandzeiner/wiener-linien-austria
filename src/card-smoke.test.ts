@@ -759,17 +759,16 @@ describe("stops_ahead_modes", () => {
     expect(stopRow.getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("keeps Enter and Space on the +N toggle from reaching the departure row", async () => {
+  // A key on the toggle must stay there: the stop's row toggles the same
+  // panel on Enter and Space, and a second toggle would undo the first.
+  it("keeps Enter and Space on the +N toggle from reaching the stop's row", async () => {
     const el = await mountTrail(["tram", "bus"]);
     const toggle = shadow(el).querySelector<HTMLElement>(".stops-ahead-other-toggle")!;
-    const reached: string[] = [];
-    shadow(el)
-      .querySelector(".stops-ahead-stop")!
-      .parentElement!.addEventListener("keydown", (ev) => reached.push(ev.key));
-    for (const key of ["Enter", " ", "Tab"]) {
+    for (const key of ["Enter", " "]) {
       toggle.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, composed: true }));
+      await el.updateComplete;
+      expect(shadow(el).querySelector(".stops-ahead-others")).toBeNull();
     }
-    expect(reached).toEqual(["Tab"]);
   });
 
   // The stop itself is not a transfer — hiding every category must not empty
@@ -1489,7 +1488,7 @@ describe("retro message ticker", () => {
     expect(ticker(el)).not.toBeNull();
   });
 
-  it("keeps its schedule after the dashboard detaches the card", async () => {
+  it("keeps its schedule after the dashboard detaches and re-attaches the card", async () => {
     const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
     await advance(el, 1_500);
     ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));

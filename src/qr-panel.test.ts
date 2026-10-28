@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-// The modern card's QR panel: the code is tinted with the station accent and
-// carries the stop's transport icon on a white plate at its centre. happy-dom
+// The modern card's QR panel: the stop's transport icon is drawn on a white
+// plate at the centre of the code, in the code's own colour. happy-dom
 // has no 2D canvas, so qr-creator is replaced by a stub that appends a canvas,
 // and that canvas hands out a recording context.
 

@@ -149,8 +149,9 @@ config/
 # The same trap caught `check_module_coverage.py`: it was written, wired into
 # `validate.yml`, documented in CONTRIBUTING and cited in quality_scale.yaml —
 # and never committed, so the per-module coverage gate passed locally and the
-# CI step failed with "can't open file". Anything a workflow step invokes has
-# to be named here, not just anything the build needs.
+# CI step failed with "can't open file". Anything a workflow step invokes or the
+# type-check reads (the plugin's .d.mts) has to be named here, not just
+# anything the build needs.
 # ───────────────────────────────────────────────────────────────────
 scripts/*
 !scripts/strip-css-comments.mjs

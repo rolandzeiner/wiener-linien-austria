@@ -262,6 +262,7 @@ describe("edge states are reachable", () => {
   it("a stop-wide direction drops the overrides it governs and keeps the others", async () => {
     const el = await mount(MODERN, ONE_WAY_R, {
       type: "custom:wiener-linien-austria-card",
+      // D: a line this stop doesn't pick, so the stop-wide control doesn't govern it.
       entities: [{ entity: ENTITY, lines: ["49"], line_directions: { "49": "H", D: "H" } }],
     });
     let config: Record<string, unknown> | undefined;

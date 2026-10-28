@@ -420,7 +420,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // module boundaries to recover from rather than mixed accent /
     // icon pixels at the icon edge. Rounded corners (≈20% of icon
     // size) match the rest of the card's visual language; falls
-    // through to a sharp rect on browsers without Path2D.roundRect
+    // through to a sharp rect on browsers without ctx.roundRect
     // (pre-Chrome 99 / Safari 16) so the QR still scans correctly.
     const padding = Math.round(iconSize * 0.18);
     const plateX = iconX - padding;
@@ -2046,7 +2046,7 @@ export class WienerLinienAustriaCard extends LitElement {
             { count: otherLines.length, stop: s.name },
           )}
           @click=${(ev: MouseEvent) => {
-            // Prevent the click from bubbling to the row's collapse handler.
+            // Keep the click off the stop row's own toggle, which would undo it.
             ev.stopPropagation();
             this._toggleTransfers(transferKey);
           }}
