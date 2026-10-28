@@ -4,10 +4,10 @@
 // If they drift, the WebSocket version check sees a mismatch, shows
 // a reload banner, the reload re-serves the same JS, and the banner
 // loops forever.
-export const CARD_VERSION = "2.3.0";
-export const RETRO_CARD_VERSION = "2.3.0";
-export const FLAP_CARD_VERSION = "2.3.0";
-export const ROUTE_CARD_VERSION = "2.3.0";
+export const CARD_VERSION = "2.3.1";
+export const RETRO_CARD_VERSION = "2.3.1";
+export const FLAP_CARD_VERSION = "2.3.1";
+export const ROUTE_CARD_VERSION = "2.3.1";
 
 // CC-BY credit shown in a card footer until the sensor reports its own
 // `attribution` attribute (fresh card, sensor not up yet). Same text as
