@@ -469,6 +469,11 @@ export class WienerLinienAustriaCard extends LitElement {
     // A language switch changes no entity state; without this the card keeps
     // the old language until its sensor next updates.
     if (prev.language !== this.hass.language) return true;
+    // The memo still holds the last render's stops, resolved against the
+    // previous hass. If that render found none (entity briefly missing after
+    // an HA restart), watching them would reject every tick and willUpdate,
+    // the only other place that clears it, would never run again (#125).
+    this._resolvedStopsMemo = null;
     const eids = this._resolveStops().map((s) => s.entity);
     return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
   }

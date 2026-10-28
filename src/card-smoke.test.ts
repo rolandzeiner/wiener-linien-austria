@@ -222,6 +222,20 @@ describe("rendering", () => {
     expect(shadow(el).childElementCount).toBeGreaterThan(0);
   });
 
+  it.each(CARDS)(
+    "%s shows the stop once a missing entity reappears",
+    async (tag, config, expected) => {
+      // #125: the modern card cached the empty result of that first render
+      // and its hass filter kept rejecting every later tick, so it stayed on
+      // "no sensors found" until the page was reloaded.
+      const el = await mount(tag, emptyHass(), config);
+      el.hass = busyHass();
+      await el.updateComplete;
+      const rendered = (shadow(el).textContent ?? "").replace(/\s+/g, "");
+      expect(rendered).toContain(expected);
+    },
+  );
+
   it.each(CARDS)("%s renders before hass is ever set", async (tag, config) => {
     const el = document.createElement(tag) as CardElement;
     document.body.appendChild(el);
