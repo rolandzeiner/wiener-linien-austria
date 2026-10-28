@@ -22,6 +22,7 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria import adhoc, live
+from custom_components.wiener_linien_austria.api import ApiResponseShapeError
 from custom_components.wiener_linien_austria.batch import MonitorBatchGroup
 from custom_components.wiener_linien_austria.const import (
     BATCH_REGISTRY_KEY,
@@ -459,7 +460,7 @@ async def test_monitor_request_shape_and_refusals() -> None:
         await REAL_MONITOR_FETCH(
             _session({"message": {"messageCode": 316}}), [1], "UA/1"
         )
-    with pytest.raises(ValueError, match="expected an object"):
+    with pytest.raises(ApiResponseShapeError, match="expected an object"):
         await REAL_MONITOR_FETCH(_session([]), [1], "UA/1")
 
 

@@ -11,6 +11,7 @@ from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
+from custom_components.wiener_linien_austria.api import WienerLinienApiError
 from custom_components.wiener_linien_austria.config_flow import (
     _probe_monitor_lines,
     _resolve_lines_for_picker,
@@ -220,7 +221,7 @@ async def test_catalogue_unavailable_aborts_user_step(hass: HomeAssistant) -> No
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("upstream down"),
+        side_effect=WienerLinienApiError("upstream down"),
     ):
         result = await _start_stop_flow(hass)
     assert result["type"] == FlowResultType.ABORT
@@ -237,7 +238,7 @@ async def test_reconfigure_aborts_when_catalogue_unavailable(
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_catalogue",
         new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("upstream down"),
+        side_effect=WienerLinienApiError("upstream down"),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -569,7 +570,7 @@ async def test_select_lines_raises_repairs_issue_when_catalogue_fails(
         new_callable=AsyncMock,
         side_effect=[
             mock_static_catalogue,
-            aiohttp.ClientError("OGD endpoint down"),
+            WienerLinienApiError("OGD endpoint down"),
         ],
     ):
         result = await hass.config_entries.flow.async_configure(

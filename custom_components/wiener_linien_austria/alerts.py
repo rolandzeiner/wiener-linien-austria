@@ -37,23 +37,25 @@ import logging
 from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
-import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .api import (
+    ApiPayloadError,
+    ApiResponseShapeError,
+    WienerLinienApiError,
+    fetch_traffic_info,
+)
 from .const import (
     ALERT_FEED_ELEVATOR,
     ALERT_FEED_TRAFFIC,
     ALERT_FEED_TRAFFIC_SHORT,
     ALERTS_SEQ_KEY,
-    API_BASE_URL,
     DOMAIN,
     ELEVATOR_INFO_KEY,
-    TRAFFIC_INFO_ENDPOINT,
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
-from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
 from .static import (
     StaticCatalogue,
@@ -222,44 +224,28 @@ async def _fetch_info_lists(
     disruptions. Returns `_FETCH_FAILED` on any fetch/parse failure
     (advisory, never fatal — the caller keeps the previous cache).
     """
-    session = async_get_clientsession(hass)
-    url = f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}"
-    headers = base_request_headers(USER_AGENT)
     names = ",".join(_REQUESTED_FEEDS)
     try:
         await async_enforce_domain_cooldown(hass)
-        async with session.get(
-            url,
-            params=[("name", name) for name in _REQUESTED_FEEDS],
-            headers=headers,
-            timeout=aiohttp.ClientTimeout(total=15),
-        ) as resp:
-            resp.raise_for_status()
-            body = await resp.json()
-            if not isinstance(body, dict):
-                return _FETCH_FAILED
-            message = body.get("message") or {}
-            if message.get("messageCode") not in (1, None):
-                _LOGGER.debug(
-                    "trafficInfoList?name=%s returned non-OK messageCode %s",
-                    names,
-                    message.get("messageCode"),
-                )
-                return _FETCH_FAILED
-            return _split_by_category(body.get("data") or {})
+        body = await fetch_traffic_info(
+            async_get_clientsession(hass),
+            _REQUESTED_FEEDS,
+            user_agent=USER_AGENT,
+            timeout_seconds=15,
+        )
     except asyncio.CancelledError:
         # HA shutting down with a fetch in flight. Re-raise without logging:
         # the user can do nothing about it, and the noise buries real faults.
         raise
-    except (aiohttp.ContentTypeError, ValueError):
+    except ApiResponseShapeError:
+        return _FETCH_FAILED
+    except ApiPayloadError:
         # The endpoint answered, but not with the JSON object we expect —
         # a contract break upstream, or a proxy error page served with the
         # wrong content type. Rare and actionable, so keep the traceback.
-        # Must be caught before ClientError below: ContentTypeError is a
-        # subclass of ClientResponseError, which is a subclass of ClientError.
         _LOGGER.warning("Failed to refresh %s alerts", names, exc_info=True)
         return _FETCH_FAILED
-    except (TimeoutError, aiohttp.ClientError) as err:
+    except WienerLinienApiError as err:
         # Transient upstream trouble — the OGD endpoint sheds load with
         # 502/503 and times out sporadically. Alerts are advisory and the
         # previous cache survives, so there is nothing for the user to act
@@ -267,6 +253,15 @@ async def _fetch_info_lists(
         # faults (29 of them in one week on an otherwise healthy install).
         _LOGGER.debug("Failed to refresh %s alerts: %s", names, err)
         return _FETCH_FAILED
+    message = body.get("message") or {}
+    if message.get("messageCode") not in (1, None):
+        _LOGGER.debug(
+            "trafficInfoList?name=%s returned non-OK messageCode %s",
+            names,
+            message.get("messageCode"),
+        )
+        return _FETCH_FAILED
+    return _split_by_category(body.get("data") or {})
 
 
 def _split_by_category(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:

@@ -222,6 +222,20 @@ describe("rendering", () => {
     expect(shadow(el).childElementCount).toBeGreaterThan(0);
   });
 
+  it.each(CARDS)(
+    "%s shows the stop once a missing entity reappears",
+    async (tag, config, expected) => {
+      // #125: the modern card cached the empty result of that first render
+      // and its hass filter kept rejecting every later tick, so it stayed on
+      // "no sensors found" until the page was reloaded.
+      const el = await mount(tag, emptyHass(), config);
+      el.hass = busyHass();
+      await el.updateComplete;
+      const rendered = (shadow(el).textContent ?? "").replace(/\s+/g, "");
+      expect(rendered).toContain(expected);
+    },
+  );
+
   it.each(CARDS)("%s renders before hass is ever set", async (tag, config) => {
     const el = document.createElement(tag) as CardElement;
     document.body.appendChild(el);
@@ -322,6 +336,22 @@ describe("lost connection", () => {
     const el = await mount(FLAP, unavailableHass(), CARDS[2]![1]);
     const empty = shadow(el).querySelector(".flap-empty");
     expect(empty?.textContent?.trim()).toBe("Keine Verbindung");
+  });
+});
+
+describe("language switch", () => {
+  // A profile language switch hands every card a new hass whose states are
+  // unchanged; the re-render gates used to skip it and keep the old text.
+  it.each([
+    [MODERN, 0, "Can't reach Wiener Linien"],
+    [RETRO, 1, "No connection"],
+    [FLAP, 2, "No connection"],
+  ] as const)("%s repaints in the new language", async (tag, i, english) => {
+    const hass = unavailableHass();
+    const el = await mount(tag, hass, CARDS[i]![1]);
+    el.hass = { ...hass, language: "en" };
+    await el.updateComplete;
+    expect(shadow(el).textContent).toContain(english);
   });
 });
 
@@ -697,6 +727,48 @@ describe("stops_ahead_modes", () => {
     const el = await mountTrail([]);
     expect(trailChips(el)).toEqual({ inline: [], total: 0 });
     expect(shadow(el).querySelector(".stops-ahead-other-toggle")).toBeNull();
+  });
+
+  it("opens the +N panel without collapsing the trail, and relabels the toggle", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const root = shadow(el);
+    const departureRow = root.querySelector<HTMLElement>("[aria-controls]")!;
+    departureRow.click();
+    await el.updateComplete;
+    expect(departureRow.getAttribute("aria-expanded")).toBe("true");
+    const shown = root.querySelector(".stops-ahead-other-toggle")!.getAttribute("aria-label");
+
+    root.querySelector<HTMLElement>(".stops-ahead-other-toggle")!.click();
+    await el.updateComplete;
+
+    const others = [...root.querySelectorAll(".stops-ahead-others .stops-ahead-line-chip")];
+    expect(others.map((n) => n.textContent?.trim())).toEqual(["43", "13A"]);
+    const toggle = root.querySelector(".stops-ahead-other-toggle")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-label")).not.toBe(shown);
+    expect(departureRow.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("opens the +N panel from anywhere on the stop's row", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const stopRow = shadow(el).querySelector<HTMLElement>(".stops-ahead-row")!;
+    expect(stopRow.getAttribute("role")).toBe("button");
+    stopRow.click();
+    await el.updateComplete;
+    expect(shadow(el).querySelector(".stops-ahead-others")).not.toBeNull();
+    expect(stopRow.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  // A key on the toggle must stay there: the stop's row toggles the same
+  // panel on Enter and Space, and a second toggle would undo the first.
+  it("keeps Enter and Space on the +N toggle from reaching the stop's row", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const toggle = shadow(el).querySelector<HTMLElement>(".stops-ahead-other-toggle")!;
+    for (const key of ["Enter", " "]) {
+      toggle.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, composed: true }));
+      await el.updateComplete;
+      expect(shadow(el).querySelector(".stops-ahead-others")).toBeNull();
+    }
   });
 
   // The stop itself is not a transfer — hiding every category must not empty
@@ -1282,6 +1354,23 @@ describe("retro wheelchair race", () => {
     expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
+  it("ends a race and rolls no next one once the option is switched off", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await vi.advanceTimersByTimeAsync(3_000);
+    await el.updateComplete;
+    expect(phase(el)).toBe("active");
+
+    el.setConfig({ ...RACE_CONFIG, wheelchair_race: false });
+    await el.updateComplete;
+    expect(phase(el)).toBe("idle");
+
+    const started = animate.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN);
+    await el.updateComplete;
+    expect(phase(el)).toBe("idle");
+    expect(animate).toHaveBeenCalledTimes(started);
+  });
+
   it("keeps racing after another option changes between races", async () => {
     const el = await mount(RETRO, raceHass(), RACE_CONFIG);
     await phasesUntilIdle(el);
@@ -1399,6 +1488,18 @@ describe("retro message ticker", () => {
     expect(ticker(el)).not.toBeNull();
   });
 
+  it("keeps its schedule after the dashboard detaches and re-attaches the card", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
+    await el.updateComplete;
+
+    el.remove();
+    document.body.appendChild(el);
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+  });
+
   it("re-runs the preview while the text is being edited and stops when it is cleared", async () => {
     const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
     await advance(el, 1_500);
@@ -1409,6 +1510,47 @@ describe("retro message ticker", () => {
     el.setConfig({ ...TICKER_CONFIG, message_text: "" });
     await advance(el, FIVE_MINUTES);
     expect(ticker(el)).toBeNull();
+  });
+});
+
+describe("retro font check", () => {
+  const original = Object.getOwnPropertyDescriptor(document, "fonts");
+
+  afterEach(() => {
+    if (original) Object.defineProperty(document, "fonts", original);
+    else delete (document as { fonts?: unknown }).fonts;
+    vi.restoreAllMocks();
+  });
+
+  function stubFonts(fonts: { ready: Promise<unknown>; check: () => boolean }): void {
+    Object.defineProperty(document, "fonts", { configurable: true, value: fonts });
+  }
+
+  async function warningsAfterMount(): Promise<unknown[][]> {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await mount(RETRO, busyHass(), { type: `custom:${RETRO}`, entity: ENTITY });
+    await Promise.resolve();
+    await Promise.resolve();
+    return warn.mock.calls.filter((c) => String(c[0]).startsWith(`[${RETRO}]`));
+  }
+
+  it("warns when the board face did not load", async () => {
+    stubFonts({ ready: Promise.resolve(), check: () => false });
+    const warnings = await warningsAfterMount();
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]![0])).toContain('"WL Mono" 700 not loaded');
+  });
+
+  it("stays quiet when the board face loaded", async () => {
+    stubFonts({ ready: Promise.resolve(), check: () => true });
+    expect(await warningsAfterMount()).toEqual([]);
+  });
+
+  it("warns when the browser rejects the font wait", async () => {
+    stubFonts({ ready: Promise.reject(new Error("blocked")), check: () => true });
+    const warnings = await warningsAfterMount();
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]![0])).toContain("document.fonts.ready rejected");
   });
 });
 

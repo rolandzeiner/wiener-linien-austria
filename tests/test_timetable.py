@@ -20,6 +20,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.update_coordinator import UpdateFailed
 from homeassistant.util import dt as dt_util
 
+from custom_components.wiener_linien_austria.api import ROUTING_DEPARTURE_ENDPOINT
 from custom_components.wiener_linien_austria.batch import BatchResult
 from custom_components.wiener_linien_austria.config_flow import _line_label
 from custom_components.wiener_linien_austria.const import (
@@ -28,7 +29,6 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     LINE_TYPE_S_BAHN,
     MAX_STOPS_AHEAD,
-    ROUTING_DEPARTURE_ENDPOINT,
     TIMETABLE_DEPARTURES_REQUESTED,
     TIMETABLE_MAX_AGE,
 )

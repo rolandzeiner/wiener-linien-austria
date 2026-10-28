@@ -35,7 +35,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import aiohttp
 import voluptuous as vol
 from homeassistant.config_entries import (
     ConfigEntry,
@@ -60,8 +59,8 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util import dt as dt_util
 
+from .api import ApiResponseShapeError, WienerLinienApiError, fetch_monitor
 from .const import (
-    API_BASE_URL,
     CONF_ACTIVE_DAYS,
     CONF_ACTIVE_FROM,
     CONF_ACTIVE_TO,
@@ -99,13 +98,11 @@ from .const import (
     MAX_ROUTE_POLL_SECONDS,
     MIN_POLL_SECONDS,
     MIN_ROUTE_POLL_SECONDS,
-    MONITOR_ENDPOINT,
     ROUTE_TYPES,
     USER_AGENT,
     WALK_SPEEDS,
     WEEKDAYS,
 )
-from .http import base_request_headers
 from .route_coordinator import async_plan_trips
 from .routing import (
     ROUTE_STOP_ERRORS,
@@ -173,24 +170,19 @@ async def _probe_monitor_lines(
     If you are here because a linter or an audit flagged the inconsistency:
     it is deliberate, and README's Data Updates section documents it.
     """
-    session = async_get_clientsession(hass)
-    url = f"{API_BASE_URL}{MONITOR_ENDPOINT}"
-    params = [("stopId", str(r)) for r in rbls]
     try:
-        async with session.get(
-            url,
-            params=params,
-            headers=base_request_headers(USER_AGENT),
-            timeout=aiohttp.ClientTimeout(total=10),
-        ) as resp:
-            resp.raise_for_status()
-            body = await resp.json()
-    except (TimeoutError, aiohttp.ClientError, ValueError) as err:
+        body = await fetch_monitor(
+            async_get_clientsession(hass),
+            rbls,
+            user_agent=USER_AGENT,
+            timeout_seconds=10,
+        )
+    except ApiResponseShapeError:
+        return []
+    except WienerLinienApiError as err:
         _LOGGER.warning("Line-probe failed for RBLs %s: %s", rbls, err)
         return []
 
-    if not isinstance(body, dict):
-        return []
     message = body.get("message") or {}
     if message.get("messageCode") not in (1, None):
         return []
@@ -394,7 +386,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick a stop from the full catalogue, nearest to home first."""
         try:
             catalogue = await async_get_catalogue(self.hass)
-        except (TimeoutError, aiohttp.ClientError) as err:
+        except WienerLinienApiError as err:
             # Without the catalogue there is no picker to render and no
             # free-text fallback left to offer, so end the flow cleanly
             # rather than showing an empty dropdown the user can't use.
@@ -544,7 +536,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         if not self._lines:
             try:
                 catalogue = await async_get_catalogue(self.hass)
-            except (TimeoutError, aiohttp.ClientError) as err:
+            except WienerLinienApiError as err:
                 _LOGGER.warning("Static catalogue load failed: %s", err)
                 catalogue = None
             if catalogue is not None:
@@ -691,7 +683,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Pick where a route starts and ends."""
         try:
             catalogue = await async_get_catalogue(self.hass)
-        except (TimeoutError, aiohttp.ClientError) as err:
+        except WienerLinienApiError as err:
             _LOGGER.warning("Static catalogue load failed: %s", err)
             return self.async_abort(reason="catalogue_unavailable")
 
@@ -961,7 +953,7 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
 
         try:
             catalogue = await async_get_catalogue(self.hass)
-        except (TimeoutError, aiohttp.ClientError) as err:
+        except WienerLinienApiError as err:
             _LOGGER.warning("Static catalogue load failed on reconfigure: %s", err)
             return self.async_abort(reason="catalogue_unavailable")
 

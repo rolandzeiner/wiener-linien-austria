@@ -52,7 +52,9 @@ Because the TS literals are asserted equal to the manifest, none of the four can
   and a tagged template's contents are string data, so without this every
   explanatory CSS comment shipped to users; it was 17.8% of the modern bundle.
   Comments stay intact in `npm run dev` and under `vp test`. It has to run
-  *after* the transpile step, which a plugin without `enforce` does.
+  *after* the transpile step, which a plugin without `enforce` does. Its
+  tests are in `src/strip-css-comments.test.ts`, typed through the
+  `.d.mts` beside it, and the coverage run measures it with the card sources.
 - `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.70% on 2026-09-29).
   - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the others carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
 
@@ -60,6 +62,7 @@ Because the TS literals are asserted equal to the manifest, none of the four can
     .venv/bin/python -m pytest tests/ -q
     .venv/bin/python scripts/check_module_coverage.py
     ```
+- `custom_components/wiener_linien_austria/api.py` — every request to Wiener Linien: the realtime, routing and OGD file URLs, the request headers, and the `WienerLinienApiError` exceptions every transport failure turns into. It returns decoded bodies and nothing more: `messageCode` handling, cooldowns, parsing and translated errors stay in the module that owns each feature. **It must not import Home Assistant or anything else from the package** (`const.py` pulls in HA for the User-Agent, so callers pass that in), and `tests/test_api.py` fails on any such import. Catch `WienerLinienApiError`, never `aiohttp` errors, outside `api.py`.
 - `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes, and keep the two code copies in sync: `const.ATTRIBUTION` for the sensors and diagnostics, and `ATTRIBUTION_FALLBACK` in `src/const.ts`, which the card footers show until a sensor reports its own.
 
 ## Dependency policy
@@ -102,7 +105,8 @@ npm run test:coverage                     # cards
 ```
 
 `npm run test:coverage:gate` is the same run with thresholds attached, and is
-what CI enforces. Both carry their whole configuration as CLI flags rather than
+what CI enforces. Both measure `src/**/*.ts` and the build plugins in
+`scripts/**/*.mjs`. Both carry their whole configuration as CLI flags rather than
 a `test` block in `vite.config.ts`, for the reason in **Card tests** below.
 
 **Whether `--coverage.include` reports a file no test imports depends on the
@@ -152,8 +156,9 @@ picks between them per file:
   filtering, time and colour helpers, the catalogue-health checks in
   `src/localize/localize.test.ts`.
 - **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
-  file's leading comment, for anything that needs a DOM. Nine of the 28 test
+  file's leading comment, for anything that needs a DOM. Ten of the 30 test
   files today: `card-smoke.test.ts` mounts the three departure-board cards,
+  `qr-panel.test.ts` draws the modern card's QR code on a stubbed canvas,
   `editor-smoke.test.ts` mounts their three editors and asserts the
   `config-changed` payload, `editor/board-editor.test.ts` checks which `hass`
   updates re-render an editor, `route-card.test.ts` covers the route card, its

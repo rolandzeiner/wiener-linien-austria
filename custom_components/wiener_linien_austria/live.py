@@ -48,14 +48,12 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
+from .api import WienerLinienApiError, fetch_monitor
 from .const import (
-    API_BASE_URL,
     BATCH_REGISTRY_KEY,
     DOMAIN,
-    MONITOR_ENDPOINT,
     USER_AGENT,
 )
-from .http import base_request_headers
 from .parsing import as_int, as_mapping
 from .rate_limit import async_enforce_domain_cooldown
 from .routing import Trip, assess_transfers
@@ -461,7 +459,7 @@ class LiveBoard:
             body = await async_fetch_monitor_body(
                 async_get_clientsession(self._hass), rbls, USER_AGENT
             )
-        except (TimeoutError, aiohttp.ClientError, ValueError) as err:
+        except (WienerLinienApiError, ValueError) as err:
             _LOGGER.debug("Live times unavailable, keeping timetable: %s", err)
             return
         self.ingest(body, rbls)
@@ -470,21 +468,17 @@ class LiveBoard:
 async def async_fetch_monitor_body(
     session: aiohttp.ClientSession, rbls: Sequence[int], user_agent: str
 ) -> dict[str, Any]:
-    """GET `/monitor` for `rbls`; raise `ValueError` unless it answered OK.
+    """GET `/monitor` for `rbls`; raise unless it answered OK.
 
-    Same request shape as the batch group's (repeated `stopId`). Tests patch
-    this at `live.async_fetch_monitor_body`.
+    A failed request raises a `WienerLinienApiError`, a non-OK `messageCode`
+    a `ValueError`. Tests patch this at `live.async_fetch_monitor_body`.
     """
-    async with session.get(
-        f"{API_BASE_URL}{MONITOR_ENDPOINT}",
-        params=[("stopId", str(rbl)) for rbl in rbls],
-        headers=base_request_headers(user_agent),
-        timeout=aiohttp.ClientTimeout(total=LIVE_REQUEST_TIMEOUT_SECONDS),
-    ) as resp:
-        resp.raise_for_status()
-        body = await resp.json()
-    if not isinstance(body, dict):
-        raise ValueError(f"expected an object, got {type(body).__name__}")
+    body = await fetch_monitor(
+        session,
+        rbls,
+        user_agent=user_agent,
+        timeout_seconds=LIVE_REQUEST_TIMEOUT_SECONDS,
+    )
     code = as_int(as_mapping(body.get("message")).get("messageCode"))
     if code is not None and code != 1:
         raise ValueError(f"monitor answered messageCode {code}")

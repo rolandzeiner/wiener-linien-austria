@@ -65,7 +65,6 @@ declare global {
   interface HTMLElementTagNameMap {
     "wiener-linien-austria-card-editor": LovelaceCardEditor;
     "wiener-linien-austria-retro-card-editor": LovelaceCardEditor;
-    "hui-error-card": HTMLElement;
     "ha-form": HaFormElement;
     "ha-icon-picker": HaIconPickerElement;
   }

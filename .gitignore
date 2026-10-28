@@ -149,11 +149,13 @@ config/
 # The same trap caught `check_module_coverage.py`: it was written, wired into
 # `validate.yml`, documented in CONTRIBUTING and cited in quality_scale.yaml —
 # and never committed, so the per-module coverage gate passed locally and the
-# CI step failed with "can't open file". Anything a workflow step invokes has
-# to be named here, not just anything the build needs.
+# CI step failed with "can't open file". Anything a workflow step invokes or the
+# type-check reads (the plugin's .d.mts) has to be named here, not just
+# anything the build needs.
 # ───────────────────────────────────────────────────────────────────
 scripts/*
 !scripts/strip-css-comments.mjs
+!scripts/strip-css-comments.d.mts
 !scripts/check_module_coverage.py
 !scripts/readme_toc.py
 dev-push.sh
@@ -171,3 +173,6 @@ private_*.py
 # Dev-only fixture hook (gitignored by design — per-repo file is local)
 # ───────────────────────────────────────────────────────────────────
 custom_components/*/_dev_fixture.py
+
+# Local notes, not published
+core-checklist.md

@@ -420,7 +420,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // module boundaries to recover from rather than mixed accent /
     // icon pixels at the icon edge. Rounded corners (≈20% of icon
     // size) match the rest of the card's visual language; falls
-    // through to a sharp rect on browsers without Path2D.roundRect
+    // through to a sharp rect on browsers without ctx.roundRect
     // (pre-Chrome 99 / Safari 16) so the QR still scans correctly.
     const padding = Math.round(iconSize * 0.18);
     const plateX = iconX - padding;
@@ -466,6 +466,14 @@ export class WienerLinienAustriaCard extends LitElement {
     // immutable so === is enough.
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
+    // A language switch changes no entity state; without this the card keeps
+    // the old language until its sensor next updates.
+    if (prev.language !== this.hass.language) return true;
+    // The memo still holds the last render's stops, resolved against the
+    // previous hass. If that render found none (entity briefly missing after
+    // an HA restart), watching them would reject every tick and willUpdate,
+    // the only other place that clears it, would never run again (#125).
+    this._resolvedStopsMemo = null;
     const eids = this._resolveStops().map((s) => s.entity);
     return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
   }
@@ -2038,7 +2046,7 @@ export class WienerLinienAustriaCard extends LitElement {
             { count: otherLines.length, stop: s.name },
           )}
           @click=${(ev: MouseEvent) => {
-            // Prevent the click from bubbling to the row's collapse handler.
+            // Keep the click off the stop row's own toggle, which would undo it.
             ev.stopPropagation();
             this._toggleTransfers(transferKey);
           }}

@@ -31,10 +31,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .api import ROUTING_DEPARTURE_ENDPOINT
 from .const import (
     DOMAIN,
     ENTRY_COUNT_KEY,
-    ROUTING_DEPARTURE_ENDPOINT,
     S_BAHN_NETWORK_DEPARTURES,
     S_BAHN_NETWORK_HUBS,
     S_BAHN_NETWORK_MAX_AGE,

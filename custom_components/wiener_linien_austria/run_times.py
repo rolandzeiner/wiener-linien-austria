@@ -53,10 +53,10 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .api import ROUTING_DEPARTURE_ENDPOINT
 from .const import (
     CONF_DIVA,
     DOMAIN,
-    ROUTING_DEPARTURE_ENDPOINT,
     RUN_TIME_DAY_HOURS,
     RUN_TIME_DEPARTURES_REQUESTED,
     RUN_TIME_MAX_AGE,

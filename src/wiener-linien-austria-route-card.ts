@@ -293,10 +293,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (!changed.has("hass") || changed.size > 1) return true;
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev) return true;
+    // A language switch changes no entity state, in either mode.
+    if (prev.language !== this.hass?.language) return true;
     const eid = this._config.entity;
     // Ad-hoc mode reads nothing from the state machine, and re-rendering two
     // 1,800-option pickers on every state change anywhere in HA is not free.
-    if (!eid) return prev.language !== this.hass?.language;
+    if (!eid) return false;
     return prev.states[eid] !== this.hass?.states[eid];
   }
 

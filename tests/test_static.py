@@ -7,12 +7,15 @@ import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import aiohttp
 import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from custom_components.wiener_linien_austria.api import (
+    ApiTimeoutError,
+    WienerLinienApiError,
+)
 from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     DOMAIN_COOLDOWN_SECONDS,
@@ -590,7 +593,7 @@ async def test_async_refresh_catalogue_keeps_cache_on_failure(
     with patch(
         "custom_components.wiener_linien_austria.static._fetch_and_build",
         new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("upstream unreachable"),
+        side_effect=WienerLinienApiError("upstream unreachable"),
     ):
         result = await async_refresh_catalogue(hass)
 
@@ -1113,7 +1116,7 @@ async def test_async_load_catalogue_pre_1_4_cache_swallows_network_failure(
     with patch(
         "custom_components.wiener_linien_austria.static._fetch_and_build",
         new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("upstream unreachable"),
+        side_effect=WienerLinienApiError("upstream unreachable"),
     ):
         result = await async_load_catalogue(hass)
         await hass.async_block_till_done()
@@ -1343,7 +1346,7 @@ async def test_background_refresh_logs_and_returns_on_failure(
     with patch(
         "custom_components.wiener_linien_austria.static._fetch_and_build",
         new_callable=AsyncMock,
-        side_effect=aiohttp.ClientError("upstream down"),
+        side_effect=WienerLinienApiError("upstream down"),
     ):
         await _async_background_refresh(hass, prior, store)
 
@@ -1486,7 +1489,7 @@ async def test_refresh_keeps_the_cache_when_the_fetch_fails(
         patch(
             "custom_components.wiener_linien_austria.static._fetch_and_build",
             new_callable=AsyncMock,
-            side_effect=TimeoutError,
+            side_effect=ApiTimeoutError(30),
         ),
     ):
         assert await async_refresh_catalogue(hass) is None
@@ -1710,7 +1713,7 @@ async def test_download_or_fail_soft_reports_failure_without_raising(
 
     with patch(
         "custom_components.wiener_linien_austria.static._download_text",
-        new=AsyncMock(side_effect=aiohttp.ClientError("connection reset")),
+        new=AsyncMock(side_effect=WienerLinienApiError("connection reset")),
     ):
         body, failed = await _download_or_fail_soft(
             session, "https://example.invalid/x.csv", None

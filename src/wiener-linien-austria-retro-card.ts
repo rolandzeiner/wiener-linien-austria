@@ -343,6 +343,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     }
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
+    // A language switch changes no entity state; without this the card keeps
+    // the old language until its sensor next updates.
+    if (prev.language !== this.hass.language) return true;
     const eid = this._resolveEntity();
     if (!eid) return false;
     return prev.states[eid] !== this.hass.states[eid];

@@ -12,19 +12,21 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 from zoneinfo import ZoneInfo
 
-import aiohttp
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
+from custom_components.wiener_linien_austria.api import (
+    ROUTING_DEPARTURE_ENDPOINT,
+    WienerLinienApiError,
+)
 from custom_components.wiener_linien_austria.const import (
     ATTRIBUTION,
     CONF_DIVA,
     CONF_LINES,
     DOMAIN,
-    ROUTING_DEPARTURE_ENDPOINT,
     RUN_TIME_DEPARTURES_REQUESTED,
     RUN_TIME_MAX_AGE,
     RUN_TIME_SWITCH_SPREAD,
@@ -982,7 +984,7 @@ async def test_command_reports_an_unavailable_catalogue(
     )
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_catalogue",
-        side_effect=aiohttp.ClientError("down"),
+        side_effect=WienerLinienApiError("down"),
     ):
         response = await _ask(client, diva=PRATERSTERN)
     assert response["error"]["code"] == "catalogue_unavailable"

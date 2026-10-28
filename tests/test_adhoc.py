@@ -8,7 +8,6 @@ from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
-import aiohttp
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
@@ -18,6 +17,7 @@ from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.wiener_linien_austria import adhoc
 from custom_components.wiener_linien_austria.alerts import TrafficInfo
+from custom_components.wiener_linien_austria.api import WienerLinienApiError
 from custom_components.wiener_linien_austria.const import DOMAIN, TRAFFIC_INFO_KEY
 from custom_components.wiener_linien_austria.routing import RouteOptions, RoutingError
 from custom_components.wiener_linien_austria.websocket import STOPS_CACHE_KEY
@@ -135,7 +135,7 @@ async def test_commands_report_an_unavailable_catalogue(
     before = fetch.await_count
     with patch(
         "custom_components.wiener_linien_austria.static.async_get_catalogue",
-        side_effect=aiohttp.ClientError,
+        side_effect=WienerLinienApiError,
     ):
         await client.send_json_auto_id(request_payload)
         response = await client.receive_json()

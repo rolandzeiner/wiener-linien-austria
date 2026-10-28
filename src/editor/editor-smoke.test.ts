@@ -238,6 +238,46 @@ describe("edge states are reachable", () => {
     expect(unavailable.length).toBeGreaterThan(0);
     for (const d of unavailable) expect(d.hasAttribute("disabled")).toBe(false);
   });
+
+  /** One line, served only towards R. */
+  const ONE_WAY_R = hassWith({
+    stop_name: "Endstation",
+    line_colors: { "49": "#E20D17" },
+    departures: [
+      { line: "49", direction: "R", towards: "Dr.-Karl-Renner-Ring", type: "ptTram", countdown: 4 },
+    ],
+  });
+
+  it("a stop served only towards R marks H as the unavailable one", async () => {
+    const el = await mount(MODERN, ONE_WAY_R, {
+      type: "custom:wiener-linien-austria-card",
+      entities: [{ entity: ENTITY, lines: ["49"] }],
+    });
+    const [h, r] = [...shadow(el).querySelectorAll<HTMLElement>(".wl-dir")];
+    expect(h?.getAttribute("aria-disabled")).toBe("true");
+    expect(r?.getAttribute("aria-disabled")).not.toBe("true");
+    expect(r?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("a stop-wide direction drops the overrides it governs and keeps the others", async () => {
+    const el = await mount(MODERN, ONE_WAY_R, {
+      type: "custom:wiener-linien-austria-card",
+      // D: a line this stop doesn't pick, so the stop-wide control doesn't govern it.
+      entities: [{ entity: ENTITY, lines: ["49"], line_directions: { "49": "H", D: "H" } }],
+    });
+    let config: Record<string, unknown> | undefined;
+    el.addEventListener("config-changed", (ev) => {
+      config = (ev as CustomEvent<{ config: Record<string, unknown> }>).detail.config;
+    });
+
+    const r = [...shadow(el).querySelectorAll<HTMLElement>(".wl-dir")][1];
+    r?.click();
+    await el.updateComplete;
+
+    expect(config?.["entities"]).toEqual([
+      { entity: ENTITY, lines: ["49"], direction: "R", line_directions: { D: "H" } },
+    ]);
+  });
 });
 
 describe("tablist ARIA matches the DOM it produces", () => {

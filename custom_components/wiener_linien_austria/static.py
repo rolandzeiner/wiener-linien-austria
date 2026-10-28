@@ -37,7 +37,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, NamedTuple
+from typing import Any, Final, NamedTuple
 
 import aiohttp
 from homeassistant.core import HomeAssistant, callback
@@ -45,6 +45,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from .api import STATIC_FILES, WienerLinienApiError, get_text
 from .const import (
     DOMAIN,
     ENTRY_COUNT_KEY,
@@ -56,14 +57,14 @@ from .const import (
     S_BAHN_DEFAULT_COLOR,
     S_BAHN_TEXT_COLOR,
     STATIC_CACHE_REFRESH_HOURS,
-    STATIC_FILES,
     USER_AGENT,
 )
-from .http import base_request_headers
 from .rate_limit import async_enforce_domain_cooldown
 from .s_bahn_network import merge_transfer_lines
 
 _LOGGER = logging.getLogger(__name__)
+
+STATIC_TIMEOUT_SECONDS: Final = 30
 
 # Natural-numeric sort for line labels, applied to lines_at_diva. The
 # user-visible order should be ascending (so "2" < "10" < "13A" < "71"
@@ -385,8 +386,7 @@ class StaticCatalogue:
 # raises when both sources are out. Coordinators that treat the catalogue as
 # optional catch exactly this set, so a new failure mode is added here once.
 CATALOGUE_LOAD_ERRORS: tuple[type[Exception], ...] = (
-    TimeoutError,
-    aiohttp.ClientError,
+    WienerLinienApiError,
     KeyError,
     TypeError,
     ValueError,
@@ -744,7 +744,7 @@ async def async_refresh_catalogue(hass: HomeAssistant) -> StaticCatalogue | None
 
     try:
         catalogue = await _fetch_and_build(hass, prior=prior)
-    except (TimeoutError, aiohttp.ClientError, ValueError) as err:
+    except (WienerLinienApiError, ValueError) as err:
         _LOGGER.warning("Static catalogue refresh failed, keeping cache: %s", err)
         return None
 
@@ -774,7 +774,7 @@ async def _fetch_and_build(
     Every refresh downloads full bodies. There is no conditional-GET path:
     the upstream never answers 304, and its `Last-Modified` is synthetic and
     rounded to the hour, so it could not gate a weekly refresh even if the
-    validators were honoured. `http.py` records the measurements.
+    validators were honoured. `api.py` records the measurements.
 
     Weekly cost, measured 2026-09-07: fahrwegverlaeufe 1,498,715 B +
     haltepunkte 337,502 + haltestellen 127,010 + routes.txt 10,207 on the
@@ -785,7 +785,7 @@ async def _fetch_and_build(
     to the `/monitor` request, so today's share is if anything smaller.)
     """
     session = async_get_clientsession(hass)
-    timeout = aiohttp.ClientTimeout(total=30)
+    timeout = STATIC_TIMEOUT_SECONDS
 
     # One cooldown slot for the whole burst, not one per file. The five
     # downloads then run concurrently inside it: taking the lock per file
@@ -900,22 +900,16 @@ async def _fetch_and_build(
 async def _download_text(
     session: aiohttp.ClientSession,
     url: str,
-    timeout: aiohttp.ClientTimeout,
+    timeout: float,
 ) -> str:
-    """GET a CSV URL and return its body. Raises on any transport error."""
-    async with session.get(
-        url,
-        headers=base_request_headers(USER_AGENT),
-        timeout=timeout,
-    ) as resp:
-        resp.raise_for_status()
-        return await resp.text()
+    """GET a CSV URL and return its body. Raises WienerLinienApiError."""
+    return await get_text(session, url, user_agent=USER_AGENT, timeout_seconds=timeout)
 
 
 async def _download_or_fail_soft(
     session: aiohttp.ClientSession,
     url: str,
-    timeout: aiohttp.ClientTimeout,
+    timeout: float,
 ) -> tuple[str | None, bool]:
     """Like `_download_text` but never raises.
 
@@ -924,7 +918,7 @@ async def _download_or_fail_soft(
     """
     try:
         return (await _download_text(session, url, timeout), False)
-    except (TimeoutError, aiohttp.ClientError) as err:
+    except WienerLinienApiError as err:
         _LOGGER.warning("Optional static CSV fetch failed (%s): %s", url, err)
         return (None, True)
 

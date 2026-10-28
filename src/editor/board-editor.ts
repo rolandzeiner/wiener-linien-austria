@@ -108,6 +108,8 @@ export abstract class BoardEditor<C extends LovelaceCardConfig>
     // takes its options from hass.
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev || !this.hass) return true;
+    // A language switch changes no entity state; the labels follow it.
+    if (prev.language !== this.hass.language) return true;
     const eids = this._watchedEntities(this._config);
     if (eids.length === 0) return true;
     return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);

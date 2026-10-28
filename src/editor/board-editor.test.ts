@@ -5,12 +5,12 @@
 // they show actually changed. Nothing else exercises a second `hass`
 // assignment: the smoke tests mount once and read the first render.
 //
-// A skipped render is invisible in the DOM unless something else on the
-// screen would have changed, so these tests switch the language along with
-// the states: the tab labels follow `hass.language`, which makes a re-render
-// visible as German labels turning English.
+// A skipped render is invisible in the DOM, so these tests count render()
+// calls with the language held still. A language switch is itself a reason
+// to re-render, since the tab labels follow `hass.language`; it used to be
+// the visible signal here, which hid that the filter skipped it.
 
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, vi } from "vite-plus/test";
 
 import "../editor.js";
 import "../retro-editor.js";
@@ -57,6 +57,8 @@ async function assign(el: EditorElement, h: HomeAssistant | undefined): Promise<
   await el.updateComplete;
 }
 
+const renders = (el: EditorElement) => vi.spyOn(el as unknown as { render(): unknown }, "render");
+
 const firstTab = (el: EditorElement): string =>
   el.shadowRoot?.querySelector(".wl-tab-label")?.textContent?.trim() ?? "";
 
@@ -76,16 +78,25 @@ describe("BoardEditor re-renders on hass only when it has to", () => {
   it("skips a hass update that leaves the watched entity alone", async () => {
     const stop = stateOf(STOP, "3");
     const el = await mount(MODERN, MODERN_CFG, hass("de", { [STOP]: stop }));
-    expect(firstTab(el)).toBe("Haltestellen");
+    const spy = renders(el);
 
     // Same state object for the stop, a changed one elsewhere.
-    await assign(el, hass("en", { [STOP]: stop, [OTHER]: stateOf(OTHER, "1") }));
-    expect(firstTab(el)).toBe("Haltestellen");
+    await assign(el, hass("de", { [STOP]: stop, [OTHER]: stateOf(OTHER, "1") }));
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("re-renders when the watched entity changes", async () => {
     const el = await mount(MODERN, MODERN_CFG, hass("de", { [STOP]: stateOf(STOP, "3") }));
-    await assign(el, hass("en", { [STOP]: stateOf(STOP, "4") }));
+    const spy = renders(el);
+    await assign(el, hass("de", { [STOP]: stateOf(STOP, "4") }));
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-renders on a language switch that leaves the watched entity alone", async () => {
+    const stop = stateOf(STOP, "3");
+    const el = await mount(MODERN, MODERN_CFG, hass("de", { [STOP]: stop }));
+    expect(firstTab(el)).toBe("Haltestellen");
+    await assign(el, hass("en", { [STOP]: stop }));
     expect(firstTab(el)).toBe("Stops");
   });
 
@@ -96,8 +107,9 @@ describe("BoardEditor re-renders on hass only when it has to", () => {
     // Nothing to compare against, and the entity picker on screen takes its
     // options from hass.
     const el = await mount(tag, config, hass("de", {}));
-    await assign(el, hass("en", { [OTHER]: stateOf(OTHER, "1") }));
-    expect(firstTab(el)).toBe(tag === RETRO ? "Stop" : "Stops");
+    const spy = renders(el);
+    await assign(el, hass("de", { [OTHER]: stateOf(OTHER, "1") }));
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 
   it("re-renders when hass goes away", async () => {

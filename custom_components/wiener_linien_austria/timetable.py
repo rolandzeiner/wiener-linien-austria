@@ -36,10 +36,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
+from .api import ROUTING_DEPARTURE_ENDPOINT
 from .const import (
     GTFS_LINE_LABEL_ALIASES,
     LINE_TYPE_S_BAHN,
-    ROUTING_DEPARTURE_ENDPOINT,
     TIMETABLE_DEPARTURES_REQUESTED,
     TIMETABLE_MAX_AGE,
     TIMETABLE_MIN_UPCOMING,

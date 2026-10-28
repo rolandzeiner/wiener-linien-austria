@@ -2,7 +2,7 @@
 
 A malformed User-Agent is silent failure (the integration still works, only
 upstream log parsers break). This test guards three independent call sites
-because each one builds its own headers via base_request_headers():
+because each one builds its own request through api.py:
 
 - the shared batch group's `/monitor` fetch (per-tick),
 - `alerts._fetch_info_lists` (5-min refresh of trafficInfoList),

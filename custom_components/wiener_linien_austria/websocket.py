@@ -32,7 +32,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Final
 
-import aiohttp
 import voluptuous as vol
 from homeassistant.components.websocket_api import async_register_command
 from homeassistant.components.websocket_api.connection import ActiveConnection
@@ -46,6 +45,7 @@ from homeassistant.util import dt as dt_util
 
 from . import static
 from .adhoc import AdhocRateLimited, async_get_planner
+from .api import WienerLinienApiError
 from .const import (
     ATTRIBUTION,
     DEFAULT_MIN_TRANSFER_MINUTES,
@@ -113,7 +113,7 @@ async def _async_catalogue(
     """The shared catalogue, or None after answering the error."""
     try:
         return await static.async_get_catalogue(hass)
-    except (TimeoutError, aiohttp.ClientError):
+    except WienerLinienApiError:
         connection.send_error(
             msg_id,
             ERR_CATALOGUE,

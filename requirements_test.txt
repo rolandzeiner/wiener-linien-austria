@@ -20,11 +20,11 @@
 #
 # PHACC 0.13.367 wraps HA core 2026.9.4 and needs Python >=3.14; CI
 # tracks 3.14 in lockstep (validate.yml, tests job).
-pytest-homeassistant-custom-component>=0.13.367,<0.14
+pytest-homeassistant-custom-component>=0.13.375,<0.14
 
 # Not pinned by PHACC, so ours to govern. Exact by design: the `rev:`
 # values in .pre-commit-config.yaml must equal these or the local gate
 # lints with a different ruleset than CI. Dependabot ignores both hook
 # repos; bump pin and rev in the same commit.
-mypy==2.3.1
-ruff==0.16.9
+mypy==2.4.0
+ruff==0.17.2
