@@ -1,6 +1,6 @@
 # Wiener Linien Austria
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://github.com/hacs/integration)
+[![Marketplace](https://img.shields.io/badge/Marketplace-Catalog-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace/)
 [![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.6-blue.svg)](https://www.home-assistant.io/)
 [![Version](https://img.shields.io/github/v/release/rolandzeiner/wiener-linien-austria?label=version&color=blue)](https://github.com/rolandzeiner/wiener-linien-austria/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -99,15 +99,16 @@ Vienna public transport departures for Home Assistant. Start typing your stop, c
 
 ## Installation
 
-### HACS (recommended)
+### Marketplace (recommended)
 
-1. Open HACS and search for **Wiener Linien Austria**.
-2. Select it and choose **Download**.
-3. Restart Home Assistant.
+The Marketplace is HACS, built into Home Assistant since 2026.11.
 
-[![Add to HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=wiener-linien-austria&category=integration)
+1. In Home Assistant, go to **Settings → Marketplace** and search for **Wiener Linien Austria**.
+2. Select it, then select **Install**. The setup starts right away, no restart needed.
 
-Not in the search yet? In HACS, open ⋮ → **Custom repositories**, add `https://github.com/rolandzeiner/wiener-linien-austria` with type **Integration**, then search again.
+[![Open this repository in the Marketplace of your Home Assistant.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=rolandzeiner&repository=wiener-linien-austria&category=integration)
+
+On Home Assistant older than 2026.11, use HACS instead: search for **Wiener Linien Austria**, select **Download**, then restart Home Assistant.
 
 ### Manual
 
@@ -856,7 +857,8 @@ logger:
 ## Removal
 
 1. **Settings → Devices & Services** → Wiener Linien Austria → ⋯ → **Delete**.
-2. Remove `custom_components/wiener_linien_austria/` from HA config (manual installs only; HACS handles it).
+2. To uninstall, open **Wiener Linien Austria** in **Settings → Marketplace**, then ⋮ → **Uninstall**. Restart Home Assistant when a repair asks you to.
+   On Home Assistant older than 2026.11, remove it in HACS instead. After a manual install, delete `custom_components/wiener_linien_austria/` from your HA config.
 
 ## Attribution
 
