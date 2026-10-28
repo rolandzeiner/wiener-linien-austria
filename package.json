@@ -9,8 +9,8 @@
     "dev": "vp build --watch --mode development",
     "build:push": "./scripts/dev-push.sh --quiet",
     "test": "vp test run",
-    "test:coverage": "vp test run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts",
-    "test:coverage:gate": "vp test run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.exclude=src/**/*.test.ts --coverage.thresholds.statements=83 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82 --coverage.thresholds.lines=85",
+    "test:coverage": "vp test run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.include=scripts/**/*.mjs --coverage.exclude=src/**/*.test.ts",
+    "test:coverage:gate": "vp test run --coverage --coverage.provider=v8 --coverage.reporter=text --coverage.reporter=json --coverage.include=src/**/*.ts --coverage.include=scripts/**/*.mjs --coverage.exclude=src/**/*.test.ts --coverage.thresholds.statements=83 --coverage.thresholds.branches=75 --coverage.thresholds.functions=82 --coverage.thresholds.lines=85",
     "check": "vp check"
   },
   "dependencies": {

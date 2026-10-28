@@ -729,6 +729,49 @@ describe("stops_ahead_modes", () => {
     expect(shadow(el).querySelector(".stops-ahead-other-toggle")).toBeNull();
   });
 
+  it("opens the +N panel without collapsing the trail, and relabels the toggle", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const root = shadow(el);
+    const departureRow = root.querySelector<HTMLElement>("[aria-controls]")!;
+    departureRow.click();
+    await el.updateComplete;
+    expect(departureRow.getAttribute("aria-expanded")).toBe("true");
+    const shown = root.querySelector(".stops-ahead-other-toggle")!.getAttribute("aria-label");
+
+    root.querySelector<HTMLElement>(".stops-ahead-other-toggle")!.click();
+    await el.updateComplete;
+
+    const others = [...root.querySelectorAll(".stops-ahead-others .stops-ahead-line-chip")];
+    expect(others.map((n) => n.textContent?.trim())).toEqual(["43", "13A"]);
+    const toggle = root.querySelector(".stops-ahead-other-toggle")!;
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-label")).not.toBe(shown);
+    expect(departureRow.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("opens the +N panel from anywhere on the stop's row", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const stopRow = shadow(el).querySelector<HTMLElement>(".stops-ahead-row")!;
+    expect(stopRow.getAttribute("role")).toBe("button");
+    stopRow.click();
+    await el.updateComplete;
+    expect(shadow(el).querySelector(".stops-ahead-others")).not.toBeNull();
+    expect(stopRow.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps Enter and Space on the +N toggle from reaching the departure row", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const toggle = shadow(el).querySelector<HTMLElement>(".stops-ahead-other-toggle")!;
+    const reached: string[] = [];
+    shadow(el)
+      .querySelector(".stops-ahead-stop")!
+      .parentElement!.addEventListener("keydown", (ev) => reached.push(ev.key));
+    for (const key of ["Enter", " ", "Tab"]) {
+      toggle.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, composed: true }));
+    }
+    expect(reached).toEqual(["Tab"]);
+  });
+
   // The stop itself is not a transfer — hiding every category must not empty
   // the trail, only strip it of chips.
   it("still renders the stop name when every category is off", async () => {
@@ -1312,6 +1355,23 @@ describe("retro wheelchair race", () => {
     expect(animate.mock.calls.length).toBeGreaterThanOrEqual(4);
   });
 
+  it("ends a race and rolls no next one once the option is switched off", async () => {
+    const el = await mount(RETRO, raceHass(), RACE_CONFIG);
+    await vi.advanceTimersByTimeAsync(3_000);
+    await el.updateComplete;
+    expect(phase(el)).toBe("active");
+
+    el.setConfig({ ...RACE_CONFIG, wheelchair_race: false });
+    await el.updateComplete;
+    expect(phase(el)).toBe("idle");
+
+    const started = animate.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(NEXT_RACE_WITHIN);
+    await el.updateComplete;
+    expect(phase(el)).toBe("idle");
+    expect(animate).toHaveBeenCalledTimes(started);
+  });
+
   it("keeps racing after another option changes between races", async () => {
     const el = await mount(RETRO, raceHass(), RACE_CONFIG);
     await phasesUntilIdle(el);
@@ -1429,6 +1489,18 @@ describe("retro message ticker", () => {
     expect(ticker(el)).not.toBeNull();
   });
 
+  it("keeps its schedule after the dashboard detaches the card", async () => {
+    const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
+    await advance(el, 1_500);
+    ticker(el)!.querySelector(".retro-ticker-text")!.dispatchEvent(new Event("animationend"));
+    await el.updateComplete;
+
+    el.remove();
+    document.body.appendChild(el);
+    await advance(el, FIVE_MINUTES);
+    expect(ticker(el)).not.toBeNull();
+  });
+
   it("re-runs the preview while the text is being edited and stops when it is cleared", async () => {
     const el = await mount(RETRO, busyHass(), TICKER_CONFIG);
     await advance(el, 1_500);
@@ -1439,6 +1511,47 @@ describe("retro message ticker", () => {
     el.setConfig({ ...TICKER_CONFIG, message_text: "" });
     await advance(el, FIVE_MINUTES);
     expect(ticker(el)).toBeNull();
+  });
+});
+
+describe("retro font check", () => {
+  const original = Object.getOwnPropertyDescriptor(document, "fonts");
+
+  afterEach(() => {
+    if (original) Object.defineProperty(document, "fonts", original);
+    else delete (document as { fonts?: unknown }).fonts;
+    vi.restoreAllMocks();
+  });
+
+  function stubFonts(fonts: { ready: Promise<unknown>; check: () => boolean }): void {
+    Object.defineProperty(document, "fonts", { configurable: true, value: fonts });
+  }
+
+  async function warningsAfterMount(): Promise<unknown[][]> {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await mount(RETRO, busyHass(), { type: `custom:${RETRO}`, entity: ENTITY });
+    await Promise.resolve();
+    await Promise.resolve();
+    return warn.mock.calls.filter((c) => String(c[0]).startsWith(`[${RETRO}]`));
+  }
+
+  it("warns when the board face did not load", async () => {
+    stubFonts({ ready: Promise.resolve(), check: () => false });
+    const warnings = await warningsAfterMount();
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]![0])).toContain('"WL Mono" 700 not loaded');
+  });
+
+  it("stays quiet when the board face loaded", async () => {
+    stubFonts({ ready: Promise.resolve(), check: () => true });
+    expect(await warningsAfterMount()).toEqual([]);
+  });
+
+  it("warns when the browser rejects the font wait", async () => {
+    stubFonts({ ready: Promise.reject(new Error("blocked")), check: () => true });
+    const warnings = await warningsAfterMount();
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]![0])).toContain("document.fonts.ready rejected");
   });
 });
 
