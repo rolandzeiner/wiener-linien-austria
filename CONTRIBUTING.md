@@ -284,10 +284,7 @@ npx vp check            # format, lint, type-check
 npm test
 npm run test:coverage:gate
 npm run build           # commit the rebuilt www/*.js with any src/ change
-python3 scripts/readme_toc.py --check   # README table of contents matches its ## headings
 ```
-
-**The README's table of contents is generated.** Don't edit the list between `<!-- toc -->` and `<!-- tocstop -->`: `python3 scripts/readme_toc.py` rebuilds it from the `##` headings, and the `readme-toc` pre-commit hook does that on every commit that touches `README.md`.
 
 CI runs the same checks plus hassfest + HACS validation, `npm audit`, a byte-for-byte check that the committed bundles match a fresh build, a syntax check of each bundle, and a guard that `_dev_fixture.py` is never committed. Failing locally wastes a push.
 
