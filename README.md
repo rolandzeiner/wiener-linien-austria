@@ -9,7 +9,47 @@
 
 Live departures for Vienna's public transport in Home Assistant, from the official [Wiener Linien open data](https://www.wienerlinien.at/open-data). Pick a stop and the lines you take, and you get a departure sensor and four dashboard cards. Routes from A to B are optional. No API key and no YAML.
 
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card.webp" height="320" alt="Modern card with the next departures at a stop">
+## Screenshots
+
+### Cards
+
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card.webp" height="320" alt="Modern card" />
+      <br/><em>Modern</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-2.webp" width="264" alt="Retro LED card" />
+      <br/>
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-3.webp" width="264" alt="Split-flap card" />
+      <br/><em>Retro LED · Split-flap</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-4.webp" height="320" alt="Route card" />
+      <br/><em>Route</em>
+    </td>
+  </tr>
+</table>
+
+### Setup
+
+<table>
+  <tr>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="300" alt="Card editor" />
+      <br/><em>Card editor</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="300" alt="Integration setup dialog" />
+      <br/><em>Config flow</em>
+    </td>
+    <td align="center" valign="top">
+      <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/action-editor.webp" height="300" alt="Plan trip action in the action editor" />
+      <br/><em>Action editor</em>
+    </td>
+  </tr>
+</table>
 
 ## Features
 
@@ -50,8 +90,6 @@ On Home Assistant older than 2026.11, use HACS instead: search for **Wiener Lini
 ## Setup
 
 [![Open your Home Assistant instance and start setting up a new integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=wiener_linien_austria)
-
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/config-flow.webp" height="300" alt="Integration setup dialog with the stop picker">
 
 1. Go to **Settings → Devices & services → Add integration**, search for **Wiener Linien Austria** and choose **Departure board for a stop**.
 2. Start typing in **Stop**, such as `Stephans`, and pick a suggestion. The list opens on the stops nearest your Home Assistant location, with their distances. To see every stop that matches, submit a partial name instead.
@@ -214,8 +252,6 @@ Turns on the set number of minutes before the next connection leaves, and off wh
 
 ### `wiener_linien_austria.plan_trip`
 
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/action-editor.webp" height="300" alt="Plan trip action in the action editor">
-
 Plans connections for a route you've set up, or between any two stops, and returns them soonest first, in the same shape as the sensor's `trips` attribute.
 
 | Field | Label | Required | Description |
@@ -314,11 +350,9 @@ The four cards install and register with the integration, and find your Wiener L
 | **Flap** | Decorative boards | Several | Split-flap board |
 | **Route** | "When do I leave?" at a glance | One route, or any two stops | Themed Home Assistant card |
 
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-config.webp" height="300" alt="Card editor with line chips and per-stop directions">
-
 ### Modern card
 
-The everyday departure board, shown at the top of this page. In the card picker it's **Wiener Linien Austria**. It follows your theme, and each stop takes the colour of its next line.
+The everyday departure board. In the card picker it's **Wiener Linien Austria**. It follows your theme, and each stop takes the colour of its next line.
 
 - Several stops, stacked or in tabs, with up to 20 departures each and the next one shown large.
 - Select a departure to see its stops down to the terminus, with transfer chips and, if you turn them on, estimated arrival times.
@@ -368,8 +402,6 @@ entities:
 | `hide_attribution` | `false` | Hides the data-source credit. |
 
 ### Retro card
-
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-2.webp" width="264" alt="Retro LED card">
 
 An LED panel modelled on the amber-on-violet signs above Wiener Linien platforms. In the card picker it's **Wiener Linien Austria — Retro**. Filter it to one line and the station name takes that line's colour, blue and yellow for NightLines.
 
@@ -430,8 +462,6 @@ direction: both
 
 ### Flap card
 
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-3.webp" width="264" alt="Split-flap card">
-
 A split-flap board whose characters flip one tile at a time to the next letter, like the mechanical boards in old European stations. In the card picker it's **Wiener Linien Austria — Flap Board**.
 
 - Any number of stops on one board, 1 to 8 rows, sorted by countdown across all of them.
@@ -467,8 +497,6 @@ max_rows: 4
 | `hide_attribution` | `false` | Hides the data-source credit. |
 
 ### Route card
-
-<img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/screenshots/card-4.webp" height="320" alt="Route card">
 
 The next connection for a route, or between any two stops you pick on the card, drawn the way the network map draws it. In the card picker it's **Wiener Linien Austria — Route**.
 
