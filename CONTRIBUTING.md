@@ -214,8 +214,9 @@ The route card can plan between any two stops without a route entry. That path
 has more moving parts than the rest of the integration, and a few of them are
 easy to break without a test noticing.
 
-**Where it lives.** `websocket.py` holds the two commands the card calls,
-`wiener_linien_austria/stops` and `wiener_linien_austria/plan`. `adhoc.py`
+**Where it lives.** `websocket.py` holds the two commands the route card calls,
+`wiener_linien_austria/stops` and `wiener_linien_austria/plan`, plus the modern
+card's `wiener_linien_austria/run_times` (see *WebSocket API*). `adhoc.py`
 holds the planner behind `plan` and the `plan_trip` action: cache, coalescing,
 per-user and instance budgets, and the stale fallback. `stops.py` builds the
 stop list the setup dialog and the card share. On the card side,
@@ -245,7 +246,7 @@ a 2 to 30 s rollover spread, a 30 min idle pause and a 400 ms debounce. They
 were sized against the routing backend's measured capabilities (the block in
 `const.py`) and the load a configured route already makes.
 Changing any of them means re-measuring with the `api-polling` skill's probe
-first, and updating the README's Data Updates section in the same commit.
+first, and updating the README's Data updates section in the same commit.
 
 **Privacy.** A stop pair picked on a dashboard is a movement pattern. The card
 keeps the last pick in the browser's `localStorage`, and the backend keeps plans
@@ -258,6 +259,93 @@ The auth token is stamped with the real clock, and a clock frozen earlier than
 that rejects it, so a new test that freezes first fails at login rather than at
 the assertion. On the card side, `src/route-card.test.ts` installs an in-memory
 `localStorage` in `beforeEach`, because happy-dom leaves it undefined.
+
+## WebSocket API
+
+The cards reach the backend through three WebSocket commands. They are
+experimental and may change while routes are: the bundled cards are the
+intended callers, and a third-party card can use them on that understanding.
+Any signed-in user can call them, not only admins, so a wall tablet signed in
+as a regular user works.
+
+**`wiener_linien_austria/stops`** takes no fields. It returns every stop you can
+plan from, nearest to the Home Assistant location first: the same list the
+setup dialog offers.
+
+```json
+{"stops": [{"value": "60201349", "label": "Hauptbahnhof (Wien) — 450 m"}]}
+```
+
+**`wiener_linien_austria/plan`** plans connections between two stops, leaving
+now or at a chosen time.
+
+| Field | Required | Values |
+|---|---|---|
+| `origin`, `destination` | yes | Stop DIVAs from the `stops` list. |
+| `route_type` | no | `leasttime` (default), `leastinterchange` or `leastwalking`. Case doesn't matter. |
+| `max_changes` | no | `"0"`–`"3"`, or `"any"` (default). |
+| `walk_speed` | no | `slow`, `normal` (default) or `fast`. |
+| `excluded_means` | no | Any of `train`, `sbahn`, `metro`, `tram`, `bus`. Default: none. |
+| `min_transfer_minutes` | no | `0`–`15`, default `2`. |
+| `datetime` | no | When to leave, as an ISO date and time. Without an offset it's Vienna time. Leave out for now. |
+| `arrive_by` | no | `true` treats `datetime` as the latest arrival instead. Default `false`. |
+| `step_free` | no | `true` plans only step-free connections. Default `false`. |
+
+The answer has the same shape as the next-connection sensor's attributes, so
+one renderer handles both: `origin` and `destination` (stop names),
+`fetched_at`, `min_transfer_minutes`, `step_free`, `trips` (up to four),
+`line_colors`, `traffic_info`, `elevator_info` and `attribution`. `planned_for`
+echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan
+for a chosen time keeps every connection it found, even ones that already left.
+Two more fields cover a used-up allowance: `stale` is `true` when this is an
+older plan served in place of a new one, and `retry_after` then gives the
+seconds until a new one is possible. Otherwise `stale` is `false` and
+`retry_after` is `null`.
+
+`plan` shares the limits in the README's *Data updates* section: answers reused
+for a minute, and at most 60 requests an hour per user and 120 for all users
+together.
+
+Errors come back with one of these codes:
+
+| Code | Meaning |
+|---|---|
+| `not_loaded` | The integration has no loaded entry. Every command here answers this until one loads. |
+| `catalogue_unavailable` | The stop list couldn't be loaded. |
+| `invalid_stop` | A DIVA isn't in the `stops` list. |
+| `same_stop` | Origin and destination are the same stop. |
+| `invalid_query` | The trip planner refused this pair, for example because the stops are too close together. Asking again soon gets the same answer. |
+| `rate_limited` | The allowance is used up and there's no recent plan to fall back on. `translation_placeholders.retry_after` gives the seconds to wait. |
+| `upstream` | The trip planner couldn't be reached or sent an error. |
+
+A request that doesn't match the schema gets Home Assistant's own
+`invalid_format` error.
+
+**`wiener_linien_austria/run_times`** returns the scheduled minutes from a stop
+to every stop ahead, for each line and direction. The modern card calls it for
+`show_stop_times`.
+
+| Field | Required | Values |
+|---|---|---|
+| `diva` | yes | The stop's DIVA, from the departure sensor's `diva` attribute. Only a stop with a departure board set up gets an answer. |
+| `line`, `direction` | no | The line about to be shown, such as `U1` and `H`. If the answer doesn't hold it yet, the integration may request it. |
+
+```json
+{
+  "diva": 60201040,
+  "fetched_at": "2026-10-08T10:30:00+00:00",
+  "valid_until": "2026-10-08T19:00:00+02:00",
+  "run_times": {"U1|H": {"Vorgartenstraße": 1.0, "Donauinsel": 2.6}}
+}
+```
+
+`run_times` is keyed by line and direction, then by stop name as the
+stops-ahead trail spells it. The minutes can carry a decimal. Add a stop's
+minutes to a departure's `time_real`, or `time_planned` without one, to get its
+estimated arrival there. Ask again after `valid_until`. The README's *Data
+updates* section says when a call costs a request. It answers `not_loaded`,
+`catalogue_unavailable` and `upstream` like the commands above, and
+`invalid_stop` for a DIVA without a departure board.
 
 ## Snapshot tests
 
