@@ -1,4 +1,4 @@
-# Wiener Linien Austria
+# <img src="https://raw.githubusercontent.com/rolandzeiner/wiener-linien-austria/main/custom_components/wiener_linien_austria/brand/icon.png" width="40" height="40" alt="" align="absmiddle"> Wiener Linien Austria
 
 [![Marketplace](https://img.shields.io/badge/Marketplace-Catalog-41BDF5.svg)](https://www.home-assistant.io/integrations/marketplace/)
 [![HA min version](https://img.shields.io/badge/Home%20Assistant-%3E%3D2025.6-blue.svg)](https://www.home-assistant.io/)
