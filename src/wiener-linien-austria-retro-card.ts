@@ -348,8 +348,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (this._config?.message_ticker && this._config?.message_text) {
       this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
     }
-    // Via timer is armed on demand from render() when a visible row
-    // carries via routing — no unconditional arm here.
+    // Via timer is armed on demand from updated() when a visible row
+    // carries via routing, and a reconnect alone runs no update.
+    if (this._viaTimer === null) this.requestUpdate();
   }
 
   public override disconnectedCallback(): void {
@@ -376,8 +377,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Arm/clear the via-tick timer as a post-render side effect. This must
     // NOT happen in render(): _clearViaTimer writes the reactive @state
     // `_viaPhase`, and mutating reactive state mid-render is forbidden by
-    // Lit (dev warning + a redundant extra update cycle).
-    if (this._anyViaInRows) this._armViaTimer();
+    // Lit (dev warning + a redundant extra update cycle). Only while
+    // connected: the disconnect's own phase reset updates the detached
+    // card, and arming there starts an interval nothing ever clears.
+    if (this._anyViaInRows && this.isConnected) this._armViaTimer();
     else if (this._viaTimer !== null) this._clearViaTimer();
     // Start / pause / cancel the wheelchair animations after the render
     // that carries the matching race class, so the racers are already

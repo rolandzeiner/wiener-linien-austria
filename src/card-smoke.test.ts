@@ -1633,3 +1633,59 @@ describe("retro station-name tile", () => {
     expect(await tile({ show_station_name: false })).toBeNull();
   });
 });
+
+describe("retro via alternation", () => {
+  // VIA_TICK_MS in the retro card: the destination alternates with its
+  // `via` hint at this pace while any visible row carries one.
+  const VIA_TICK_MS = 4_000;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function viaHass(): HomeAssistant {
+    const hass = busyHass();
+    const departures = hass.states[ENTITY]!.attributes.departures as Array<Record<string, unknown>>;
+    for (const d of departures) d.via = "Volkstheater";
+    return hass;
+  }
+
+  const VIA_CONFIG = { type: `custom:${RETRO}`, entity: ENTITY, direction: "both" };
+  const phase = (el: CardElement): string => (el as unknown as { _viaPhase: string })._viaPhase;
+
+  async function advance(el: CardElement, ms: number): Promise<void> {
+    await vi.advanceTimersByTimeAsync(ms);
+    await el.updateComplete;
+  }
+
+  it("stops for good once the card is removed", async () => {
+    const el = await mount(RETRO, viaHass(), VIA_CONFIG);
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("via");
+    el.remove();
+    // Lets the update that the disconnect's phase reset queued run on the
+    // detached card.
+    await advance(el, 0);
+    expect(phase(el)).toBe("towards");
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("towards");
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("towards");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("starts again when the card comes back", async () => {
+    const el = await mount(RETRO, viaHass(), VIA_CONFIG);
+    el.remove();
+    await advance(el, 0);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(phase(el)).toBe("towards");
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("via");
+  });
+});
