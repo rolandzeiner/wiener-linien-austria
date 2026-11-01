@@ -172,14 +172,14 @@ describe("custom element registration", () => {
 describe("setConfig validation", () => {
   it.each(CARDS)("%s rejects a non-object config", (tag) => {
     const el = document.createElement(tag) as CardElement;
-    expect(() => el.setConfig(undefined as never)).toThrow();
+    expect(() => el.setConfig(undefined as never)).toThrow(/config must be an object/);
   });
 
   it.each(CARDS)("%s rejects a non-string entity", (tag) => {
     // Lovelace surfaces the throw verbatim under hui-error-card, which is
     // the whole reason all three validate shape rather than failing silent.
     const el = document.createElement(tag) as CardElement;
-    expect(() => el.setConfig({ type: `custom:${tag}`, entity: 42 })).toThrow();
+    expect(() => el.setConfig({ type: `custom:${tag}`, entity: 42 })).toThrow(/'entity'/);
   });
 
   it("the modern card requires an entity; retro and flap do not", () => {
@@ -191,7 +191,9 @@ describe("setConfig validation", () => {
     // check in wiener-linien-austria-retro-card.ts). The modern card has
     // no such stub state, so a config naming nothing is a user error.
     const modern = document.createElement(MODERN) as CardElement;
-    expect(() => modern.setConfig({ type: `custom:${MODERN}` })).toThrow();
+    expect(() => modern.setConfig({ type: `custom:${MODERN}` })).toThrow(
+      /'entities' \(array\) or legacy 'entity'/,
+    );
 
     for (const tag of [RETRO, FLAP]) {
       const el = document.createElement(tag) as CardElement;

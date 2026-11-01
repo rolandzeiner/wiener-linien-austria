@@ -200,8 +200,10 @@ describe("registration + config", () => {
 
   it("throws for configs Lovelace should show as an error card", () => {
     const el = document.createElement(TAG) as CardElement;
-    expect(() => el.setConfig(undefined as never)).toThrow();
-    expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow();
+    expect(() => el.setConfig(undefined as never)).toThrow(/config must be an object/);
+    expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow(
+      /'entity' must be a sensor/,
+    );
     expect(() => el.setConfig({ type: TAG, from: "Westbahnhof" })).toThrow(/stop number/);
     expect(() => el.setConfig({ type: TAG, from: 60201468, to: "60201040" })).not.toThrow();
   });

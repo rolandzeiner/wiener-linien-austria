@@ -289,15 +289,15 @@ describe("tablist ARIA matches the DOM it produces", () => {
     // inactive tab would name an id that is not in the document.
     expect(root.querySelectorAll('[role="tabpanel"]')).toHaveLength(1);
 
-    for (const tab of root.querySelectorAll('[role="tab"]')) {
-      const controls = tab.getAttribute("aria-controls");
-      if (tab.getAttribute("aria-selected") === "true") {
-        expect(controls).toBeTruthy();
-        expect(root.querySelector(`#${CSS.escape(controls!)}`)).toBeTruthy();
-      } else {
-        expect(controls).toBeNull();
-      }
-    }
+    const tabs = [...root.querySelectorAll('[role="tab"]')];
+    const selected = tabs.filter((t) => t.getAttribute("aria-selected") === "true");
+    const inactive = tabs.filter((t) => t.getAttribute("aria-selected") !== "true");
+
+    expect(selected).toHaveLength(1);
+    const controls = selected[0]!.getAttribute("aria-controls");
+    expect(controls).toBeTruthy();
+    expect(root.querySelector(`#${CSS.escape(controls!)}`)).toBeTruthy();
+    expect(inactive.map((t) => t.getAttribute("aria-controls"))).toEqual(inactive.map(() => null));
   });
 
   it.each(EDITORS)("%s keeps exactly one tab in the tab order", async (tag, config) => {
