@@ -465,7 +465,7 @@ direction: both
 A split-flap board whose characters flip one tile at a time to the next letter, like the mechanical boards in old European stations. In the card picker it's **Wiener Linien Austria — Flap Board**.
 
 - Any number of stops on one board, 1 to 8 rows, sorted by countdown across all of them.
-- Column headers *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT*. The platform column reads *STEIG* outside the U-Bahn and drops out when the stop reports no platform.
+- Column headers *LINIE / RICHTUNG / STUFENLOS / GLEIS / ANKUNFT*. The platform column reads *STEIG* outside the U-Bahn and drops out when the stop reports no platform. *STUFENLOS* drops out when the board is too narrow for it.
 - A station-name band in the first tracked line's colour, any other tracked line's, or white or black.
 - The same station sign as the retro card, in the board's colours.
 - For a compact board, hide the line column on single-line boards, or drop the cabinet to mount it flush.

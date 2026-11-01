@@ -195,7 +195,7 @@ describe("registration + config", () => {
       getGridOptions(): Record<string, unknown>;
     };
     // No `rows`: the HA docs' way to let the card size itself.
-    expect(el.getGridOptions()).toEqual({ columns: 6, min_columns: 4 });
+    expect(el.getGridOptions()).toEqual({ columns: 6, min_columns: 4, min_rows: 3 });
   });
 
   it("throws for configs Lovelace should show as an error card", () => {

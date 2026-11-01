@@ -23,6 +23,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { ATTRIBUTION_FALLBACK, ROUTE_CARD_VERSION } from "./const.js";
+import { isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import "./route-editor.js";
@@ -237,8 +238,18 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return !!this._config && !this._config.entity;
   }
 
+  /** Masonry height in 50 px units. The card's height follows the trip, not
+   *  the config: a two-leg trip with its strand open measures about 570 px,
+   *  and the alternatives stay collapsed below it. */
   public getCardSize(): number {
-    return 6;
+    return 11;
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). No default rows, so
+   *  only a stored row count fixes the height. */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, undefined);
   }
 
   /** Sections-view sizing, per the HA custom-card docs: half the 12-column
@@ -247,9 +258,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  on purpose — the docs' way to say "size to content", which this card
    *  needs because opening the alternatives or a stop list grows it. A size
    *  set in the dashboard's layout tab lands in `grid_options` and wins over
-   *  these defaults. */
-  public getGridOptions(): { columns: number; min_columns: number } {
-    return { columns: 6, min_columns: 4 };
+   *  these defaults. min_rows 3 is the smallest cell that still shows the
+   *  next departure under the heading (measured at four columns). */
+  public getGridOptions(): { columns: number; min_columns: number; min_rows: number } {
+    return { columns: 6, min_columns: 4, min_rows: 3 };
   }
 
   public static getConfigElement(): LovelaceCardEditor {
@@ -732,7 +744,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       : (typeof attrs.attribution === "string" && attrs.attribution) || ATTRIBUTION_FALLBACK;
 
     return html`
-      <ha-card @pointerdown=${this._onCardActivity} @keydown=${this._onCardActivity}>
+      <ha-card
+        class=${this._fixedHeight ? "fixed-height" : ""}
+        @pointerdown=${this._onCardActivity}
+        @keydown=${this._onCardActivity}
+      >
         <div class="wrap">
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
           <div class="header">
@@ -1696,6 +1712,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     :host([layout="panel"]) ha-card {
       block-size: 100%;
     }
+    /* A cell with a set row count: the content scrolls inside the card
+       instead of being cut off at the cell's edge. */
+    ha-card.fixed-height {
+      display: flex;
+      flex-direction: column;
+    }
+    ha-card.fixed-height > .wrap {
+      flex: 1 1 auto;
+      min-block-size: 0;
+      overflow-y: auto;
+    }
     .wrap {
       display: flex;
       flex-direction: column;
@@ -2385,8 +2412,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       align-items: center;
       gap: 4px;
       margin-inline-start: auto;
+      /* Wraps only when the card is narrower than the line, at four
+         columns, instead of running past the header. */
+      min-width: 0;
       font-size: 0.75rem;
-      white-space: nowrap;
       color: var(--secondary-text-color);
     }
     .updated ha-icon {

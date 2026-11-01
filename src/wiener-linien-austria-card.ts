@@ -10,7 +10,7 @@ import { registerWlFonts } from "./font-face.js";
 import { ATTRIBUTION_FALLBACK, CARD_VERSION, NIGHTLINE_BG } from "./const.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
-import { deText } from "./utils.js";
+import { deText, isFixedHeight } from "./utils.js";
 import {
   LINE_TYPE_METRO,
   LINE_TYPE_S_BAHN,
@@ -247,6 +247,12 @@ export class WienerLinienAustriaCard extends LitElement {
   public getCardSize(): number {
     const n = this._config?.entities.length ?? 1;
     return Math.min(12, 3 + n * 3);
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, this.getGridOptions().rows);
   }
 
   public getGridOptions(): {
@@ -549,6 +555,7 @@ export class WienerLinienAustriaCard extends LitElement {
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     if (!this.hass) return html`<ha-card><div class="wrap"></div></ha-card>`;
+    const fixed = this._fixedHeight;
 
     const cfg = this._config;
     const stops = this._resolveStops();
@@ -561,7 +568,7 @@ export class WienerLinienAustriaCard extends LitElement {
           .find((v): v is string => typeof v === "string" && v.length > 0) || ATTRIBUTION_FALLBACK;
 
     return html`
-      <ha-card>
+      <ha-card class=${fixed ? "fixed-height" : ""}>
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}

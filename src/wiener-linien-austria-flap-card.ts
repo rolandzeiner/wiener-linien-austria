@@ -13,6 +13,7 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { ATTRIBUTION_FALLBACK, FLAP_CARD_VERSION } from "./const.js";
+import { isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
@@ -230,8 +231,18 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     this._justFlipped = {};
   }
 
+  /** Masonry height in 50 px units, measured: 80 px of housing and
+   *  captions, 36 px per board row, 50 px more with the station name. */
   public getCardSize(): number {
-    return 3;
+    const rows = this._config?.max_rows ?? 2;
+    const px = 80 + 36 * rows + (this._config?.show_station_name ? 50 : 0);
+    return Math.max(1, Math.round(px / 50));
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, this.getGridOptions().rows);
   }
 
   public getGridOptions(): {
@@ -246,8 +257,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     return {
       columns: 12,
       rows: "auto",
-      min_columns: 6,
-      min_rows: 3,
+      // Measured: eight columns is the narrowest the board stays legible
+      // at, and the default two rows with the station name need four rows.
+      min_columns: 8,
+      min_rows: 4,
     };
   }
 
@@ -643,7 +656,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         ATTRIBUTION_FALLBACK;
 
     return html`
-      <ha-card style="padding:0;overflow:hidden;">
+      <ha-card
+        class=${this._fixedHeight ? "fixed-height" : ""}
+        style="padding:0;overflow:hidden;"
+      >
         <div class=${classMap(classes)}>
           ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${stationHeaderStrip}
@@ -1165,6 +1181,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     :host([layout="panel"]) ha-card {
       block-size: 100%;
     }
+    /* A cell with a set row count: the board fills the cell, and scrolls
+       when the cell is shorter than the rows it shows. min_rows keeps the
+       default config from ever needing it. */
+    ha-card.fixed-height > div {
+      box-sizing: border-box;
+      block-size: 100%;
+      overflow-y: auto;
+    }
     /* Light mode — driven by HA's theme (hass.themes.darkMode === false),
        not the OS/browser prefers-color-scheme. HA themes are
        deliberately decoupled from system appearance, so a user on
@@ -1353,6 +1377,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       justify-content: space-between;
       gap: 12px;
       min-width: 0;
+      /* When the destination column is too narrow for both captions, the
+         step-free one wraps onto a second line that is clipped away
+         instead of running into the platform caption. Works for every
+         language without measuring the labels. */
+      flex-wrap: wrap;
+      max-block-size: 1lh;
+      overflow: hidden;
     }
     .flap-colheader__step-free {
       /* Sits at the right edge of the dest column via the parent's

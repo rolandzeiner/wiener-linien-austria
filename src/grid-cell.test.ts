@@ -20,6 +20,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { CSSResult, ReactiveElement } from "lit";
 
+import { isFixedHeight } from "./utils.js";
 import "./wiener-linien-austria-card.js";
 import "./wiener-linien-austria-retro-card.js";
 import "./wiener-linien-austria-flap-card.js";
@@ -90,6 +91,57 @@ describe("layout reaches the attribute", () => {
     el.layout = "grid";
     await el.updateComplete;
     expect(el.getAttribute("layout")).toBe("grid");
+    el.remove();
+  });
+});
+
+describe("isFixedHeight", () => {
+  it("is fixed only in a sections cell with a numeric row count", () => {
+    expect(isFixedHeight(undefined, {}, 4)).toBe(false);
+    expect(isFixedHeight("panel", {}, 4)).toBe(false);
+    expect(isFixedHeight("grid", {}, "auto")).toBe(false);
+    expect(isFixedHeight("grid", {}, undefined)).toBe(false);
+  });
+
+  it("takes the default rows when nothing is stored: the fresh-dashboard case", () => {
+    expect(isFixedHeight("grid", {}, 4)).toBe(true);
+    expect(isFixedHeight("grid", undefined, 4)).toBe(true);
+  });
+
+  it("lets a stored row count win over the default, either way", () => {
+    expect(isFixedHeight("grid", { grid_options: { rows: 3 } }, "auto")).toBe(true);
+    expect(isFixedHeight("grid", { grid_options: { rows: "auto" } }, 4)).toBe(false);
+    expect(isFixedHeight("grid", { grid_options: { columns: 6 } }, "auto")).toBe(false);
+  });
+});
+
+describe("fixed-height class", () => {
+  it.each(CARDS)("%s scrolls inside a cell with a set row count only", async (tag) => {
+    const base = tag.endsWith("route-card")
+      ? { type: `custom:${tag}`, from: 60201468, to: 60201040 }
+      : { type: `custom:${tag}`, entity: "sensor.wl_stop" };
+    const el = document.createElement(tag) as ReactiveElement & {
+      layout?: string;
+      hass?: unknown;
+      setConfig(c: Record<string, unknown>): void;
+    };
+    el.hass = {
+      language: "de",
+      themes: { darkMode: false },
+      localize: (k: string) => k,
+      states: {},
+    };
+    el.setConfig({ ...base, grid_options: { rows: 3 } });
+    document.body.append(el);
+    const card = () => el.shadowRoot?.querySelector("ha-card");
+
+    el.layout = "grid";
+    await el.updateComplete;
+    expect(card()?.classList.contains("fixed-height")).toBe(true);
+
+    el.layout = "masonry";
+    await el.updateComplete;
+    expect(card()?.classList.contains("fixed-height")).toBe(false);
     el.remove();
   });
 });

@@ -47,6 +47,23 @@ export function fireEvent(node: HTMLElement, type: string, detail: unknown): voi
 }
 
 /**
+ * Whether a sections-view cell gives the card a fixed height: the user set a
+ * row count (a stored `grid_options.rows`), or nothing is stored and the
+ * card's own default is a number. Outside a sections cell (masonry, a stack,
+ * the add-card picker) the card takes its natural height.
+ */
+export function isFixedHeight(
+  layout: string | undefined,
+  config: object | undefined,
+  defaultRows: unknown,
+): boolean {
+  if (layout !== "grid") return false;
+  const grid = config && "grid_options" in config ? config.grid_options : undefined;
+  const stored = grid && typeof grid === "object" && "rows" in grid ? grid.rows : undefined;
+  return typeof (stored ?? defaultRows) === "number";
+}
+
+/**
  * A sorted copy of `items`; the input is never touched. Stands in for
  * `Array#toSorted()`, which is ES2023 and missing on the older tablets HA
  * still serves its legacy frontend build to.

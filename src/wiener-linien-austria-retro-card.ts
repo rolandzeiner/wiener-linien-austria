@@ -6,7 +6,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor, WindowWithCustomCards } from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
-import { deText } from "./utils.js";
+import { deText, isFixedHeight } from "./utils.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
@@ -218,8 +218,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._cachedEid = null;
   }
 
+  /** Masonry height in 50 px units, measured: the two-row panel is 110 px,
+   *  140 px with the station name above it. */
   public getCardSize(): number {
-    return 2;
+    return this._config?.show_station_name ? 3 : 2;
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, this.getGridOptions().rows);
   }
 
   public getGridOptions(): {
@@ -234,7 +242,8 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return {
       columns: 12,
       rows: "auto",
-      min_columns: 4,
+      // Measured: below eight columns the platform column is cut off.
+      min_columns: 8,
       min_rows: 2,
     };
   }
@@ -1021,7 +1030,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         }
       : {};
     return html`
-      <ha-card style="padding:0;overflow:hidden;">
+      <ha-card
+        class=${this._fixedHeight ? "fixed-height" : ""}
+        style="padding:0;overflow:hidden;"
+      >
         <div
           class=${classMap(retroClasses)}
           role=${interactiveAttrs.role ?? nothing}
@@ -1345,6 +1357,14 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     :host([layout="grid"]) ha-card,
     :host([layout="panel"]) ha-card {
       block-size: 100%;
+    }
+    /* A cell with a set row count: the board fills the cell, and scrolls
+       when the cell is shorter than the rows it shows. min_rows keeps the
+       default config from ever needing it. */
+    ha-card.fixed-height > div {
+      box-sizing: border-box;
+      block-size: 100%;
+      overflow-y: auto;
     }
     .retro {
       /* Classic defaults — swapped wholesale by .retro--style-warm below. */

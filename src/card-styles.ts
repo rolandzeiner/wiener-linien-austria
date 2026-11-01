@@ -168,6 +168,18 @@ export const cardStyles = css`
   :host([layout="panel"]) ha-card {
     block-size: 100%;
   }
+  /* A cell with a set row count: the content scrolls inside the card
+     instead of being cut off at the cell's edge. The tabs
+     stay put above it. */
+  ha-card.fixed-height {
+    display: flex;
+    flex-direction: column;
+  }
+  ha-card.fixed-height > .wrap {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-y: auto;
+  }
 
   .wrap {
     display: flex;
@@ -1867,6 +1879,38 @@ export const cardStyles = css`
     .tab {
       padding: 0 8px;
       font-size: 0.8125rem;
+    }
+    /* At the narrowest a row's direction cell is narrower than "1 Min.
+       verspätet": the delay and the timetable note may wrap onto a second
+       line instead of running past the row. */
+    .delay,
+    .timetable-note {
+      white-space: normal;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+    /* The platform pill and the flags move under the direction, so the
+       direction name gets the row's width instead of a single letter. The
+       badge, the countdown and the chevron span both lines. */
+    .dep-row {
+      grid-template-columns: max-content 1fr auto auto;
+      row-gap: 2px;
+    }
+    .dep-row > .line-badge,
+    .dep-row > .countdown,
+    .dep-row > .row-time,
+    .dep-row > .row-chevron {
+      grid-row: 1 / span 2;
+    }
+    .dep-row > .towards {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .dep-row > .row-end,
+    .dep-row > .towards + span {
+      grid-column: 2;
+      grid-row: 2;
+      justify-self: start;
     }
   }
 
