@@ -262,9 +262,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     return {
       columns: 12,
       rows: "auto",
-      // Measured: eight columns is the narrowest the board stays legible
-      // at, and the default two rows with the station name need four rows.
-      min_columns: 8,
+      // Measured: nine columns keeps four destination tiles even when a
+      // timetable-only departure adds its calendar tile (eight left two,
+      // "AS"), and the default two rows with the station name need four rows.
+      min_columns: 9,
       min_rows: 4,
     };
   }

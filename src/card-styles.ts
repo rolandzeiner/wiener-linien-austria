@@ -651,7 +651,10 @@ export const cardStyles = css`
        line and inflate the hero's vertical footprint. min-width: 0 is
        required for text-overflow: ellipsis to work inside flex. */
     flex: 1 1 0;
-    min-width: 0;
+    /* A floor, not 0: on a half-width card a platform and a "nur
+       Fahrplan" pill squeezed the name down to two letters. With the
+       floor the pills wrap onto a second line first. */
+    min-width: min(8em, 100%);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

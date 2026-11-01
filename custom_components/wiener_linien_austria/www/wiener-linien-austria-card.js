@@ -455,7 +455,7 @@ margin-top: var(--wl-hero-row-gap);
 font-weight: 500;
 color: var(--primary-text-color);
 flex: 1 1 0;
-min-width: 0;
+min-width: min(8em, 100%);
 white-space: nowrap;
 overflow: hidden;
 text-overflow: ellipsis;
