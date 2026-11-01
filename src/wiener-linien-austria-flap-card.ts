@@ -173,6 +173,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   // cell only when there is one (the gated grid-cell rules).
   @property({ reflect: true }) public layout?: string;
 
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedFlapConfig;
   @state() private _versionMismatch: string | null = null;
   // Marching-flap state. Each text field on the board is keyed by an
@@ -310,7 +315,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (!this._config) return false;
     // Lit reflects attributes inside update(), so a false in the cycle that
     // changes layout would leave the attribute stale.
-    if (changed.has("layout")) return true;
+    if (changed.has("layout") || changed.has("preview")) return true;
     if (
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
@@ -661,7 +666,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         style="padding:0;overflow:hidden;"
       >
         <div class=${classMap(classes)}>
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${stationHeaderStrip}
           ${
             cfg.show_station_name

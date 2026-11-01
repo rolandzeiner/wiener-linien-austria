@@ -145,3 +145,36 @@ describe("fixed-height class", () => {
     el.remove();
   });
 });
+
+describe("edit-dialog preview", () => {
+  it.each(CARDS)("%s shows the version banner on the dashboard, not in the editor", async (tag) => {
+    const el = document.createElement(tag) as ReactiveElement & {
+      preview: boolean;
+      hass?: unknown;
+      setConfig(c: Record<string, unknown>): void;
+    };
+    el.hass = {
+      language: "de",
+      themes: { darkMode: false },
+      localize: (k: string) => k,
+      states: {},
+    };
+    el.setConfig(
+      tag.endsWith("route-card")
+        ? { type: `custom:${tag}`, from: 60201468, to: 60201040 }
+        : { type: `custom:${tag}`, entity: "sensor.wl_stop" },
+    );
+    document.body.append(el);
+    // The mismatch the version check sets when the browser holds old JS.
+    (el as unknown as { _versionMismatch: string })._versionMismatch = "9.9.9";
+    el.requestUpdate();
+    await el.updateComplete;
+    const banner = () => el.shadowRoot?.querySelector('[role="alert"]');
+    expect(banner()?.textContent).toContain("9.9.9");
+
+    el.preview = true;
+    await el.updateComplete;
+    expect(banner()).toBeNull();
+    el.remove();
+  });
+});

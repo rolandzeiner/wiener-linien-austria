@@ -152,6 +152,11 @@ export class WienerLinienAustriaCard extends LitElement {
   // config's own `layout` key.
   @property({ reflect: true }) public layout?: string;
 
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedModernConfig;
   @state() private _activeTab = 0;
   // Which ends of the tab strip hide more tabs; drives the edge fades and
@@ -461,7 +466,7 @@ export class WienerLinienAustriaCard extends LitElement {
     if (!this._config) return false;
     // Lit reflects attributes inside update(), so a false in the cycle that
     // changes layout would leave the attribute stale.
-    if (changed.has("layout")) return true;
+    if (changed.has("layout") || changed.has("preview")) return true;
     if (
       changed.has("_config") ||
       changed.has("_activeTab") ||
@@ -571,7 +576,7 @@ export class WienerLinienAustriaCard extends LitElement {
       <ha-card class=${fixed ? "fixed-height" : ""}>
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
           ${
             cfg.show_traffic_info
               ? this._renderTrafficBanner(this._bannerStops(stops, useTabs))

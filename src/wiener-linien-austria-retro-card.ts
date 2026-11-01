@@ -103,6 +103,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // cell only when there is one (the gated grid-cell rules).
   @property({ reflect: true }) public layout?: string;
 
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedRetroConfig;
   @state() private _versionMismatch: string | null = null;
   @state() private _raceState: RaceState = "idle";
@@ -346,7 +351,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (!this._config) return false;
     // Lit reflects attributes inside update(), so a false in the cycle that
     // changes layout would leave the attribute stale.
-    if (changed.has("layout")) return true;
+    if (changed.has("layout") || changed.has("preview")) return true;
     if (
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
@@ -1041,7 +1046,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           aria-label=${interactiveAttrs["aria-label"] ?? nothing}
           @click=${this._handleCardClick}
           @keydown=${clickable ? this._handleCardKeydown : nothing}>
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k), "retro-banner")}
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">

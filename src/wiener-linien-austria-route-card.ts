@@ -160,6 +160,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   // cell only when there is one (the gated grid-cell rules).
   @property({ reflect: true }) public layout?: string;
 
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedRouteConfig;
   @state() private _versionMismatch: string | null = null;
   @state() private _now = Date.now();
@@ -309,7 +314,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (!this._config) return false;
     // Lit reflects attributes inside update(), so a false in the cycle that
     // changes layout would leave the attribute stale.
-    if (changed.has("layout")) return true;
+    if (changed.has("layout") || changed.has("preview")) return true;
     if (!changed.has("hass") || changed.size > 1) return true;
     const prev = changed.get("hass") as HomeAssistant | undefined;
     if (!prev) return true;
@@ -750,7 +755,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         @keydown=${this._onCardActivity}
       >
         <div class="wrap">
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
           <div class="header">
             <h2 class="heading">
               <ha-icon icon="mdi:map-marker-path" aria-hidden="true"></ha-icon>
