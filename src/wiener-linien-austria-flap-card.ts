@@ -13,7 +13,7 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { ATTRIBUTION_FALLBACK, FLAP_CARD_VERSION } from "./const.js";
-import { isFixedHeight } from "./utils.js";
+import { cardShouldUpdate, isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
@@ -314,27 +314,8 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    // Lit reflects attributes inside update(), so a false in the cycle that
-    // changes layout would leave the attribute stale.
-    if (changed.has("layout") || changed.has("preview")) return true;
-    if (
-      changed.has("_config") ||
-      changed.has("_versionMismatch") ||
-      changed.has("_displayed") ||
-      changed.has("_target") ||
-      changed.has("_justFlipped")
-    ) {
-      return true;
-    }
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    // A language switch changes no entity state; without this the card keeps
-    // the old language until its sensor next updates.
-    if (prev.language !== this.hass.language) return true;
-    // Multi-stop: re-render when ANY configured stop's state changed.
-    const eids = this._resolveStopEids();
-    if (eids.length === 0) return false;
-    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
+    // Multi-stop: re-render when any configured stop's state changed.
+    return cardShouldUpdate(changed, this.hass, () => this._resolveStopEids());
   }
 
   protected override willUpdate(changed: PropertyValues): void {

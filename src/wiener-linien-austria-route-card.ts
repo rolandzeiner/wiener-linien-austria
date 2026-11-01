@@ -23,7 +23,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { ATTRIBUTION_FALLBACK, ROUTE_CARD_VERSION } from "./const.js";
-import { isFixedHeight } from "./utils.js";
+import { cardShouldUpdate, isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import "./route-editor.js";
@@ -312,19 +312,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    // Lit reflects attributes inside update(), so a false in the cycle that
-    // changes layout would leave the attribute stale.
-    if (changed.has("layout") || changed.has("preview")) return true;
-    if (!changed.has("hass") || changed.size > 1) return true;
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev) return true;
-    // A language switch changes no entity state, in either mode.
-    if (prev.language !== this.hass?.language) return true;
     const eid = this._config.entity;
     // Ad-hoc mode reads nothing from the state machine, and re-rendering two
     // 1,800-option pickers on every state change anywhere in HA is not free.
-    if (!eid) return false;
-    return prev.states[eid] !== this.hass?.states[eid];
+    return cardShouldUpdate(changed, this.hass, () => (eid ? [eid] : []));
   }
 
   // ------------------------------------------------------------------

@@ -6,7 +6,7 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor, WindowWithCustomCards } from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
-import { deText, isFixedHeight } from "./utils.js";
+import { cardShouldUpdate, deText, isFixedHeight } from "./utils.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
 import type {
@@ -365,28 +365,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    // Lit reflects attributes inside update(), so a false in the cycle that
-    // changes layout would leave the attribute stale.
-    if (changed.has("layout") || changed.has("preview")) return true;
-    if (
-      changed.has("_config") ||
-      changed.has("_versionMismatch") ||
-      changed.has("_raceState") ||
-      changed.has("_countdownDigit") ||
-      changed.has("_raceWinner") ||
-      changed.has("_tickerActive") ||
-      changed.has("_viaPhase")
-    ) {
-      return true;
-    }
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    // A language switch changes no entity state; without this the card keeps
-    // the old language until its sensor next updates.
-    if (prev.language !== this.hass.language) return true;
-    const eid = this._resolveEntity();
-    if (!eid) return false;
-    return prev.states[eid] !== this.hass.states[eid];
+    return cardShouldUpdate(changed, this.hass, () => {
+      const eid = this._resolveEntity();
+      return eid ? [eid] : [];
+    });
   }
 
   protected override updated(changed: PropertyValues): void {

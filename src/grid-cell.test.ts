@@ -20,7 +20,8 @@ import { describe, expect, it } from "vite-plus/test";
 
 import type { CSSResult, ReactiveElement } from "lit";
 
-import { isFixedHeight } from "./utils.js";
+import { cardShouldUpdate, isFixedHeight } from "./utils.js";
+import type { HomeAssistant } from "./types.js";
 import "./wiener-linien-austria-card.js";
 import "./wiener-linien-austria-retro-card.js";
 import "./wiener-linien-austria-flap-card.js";
@@ -92,6 +93,51 @@ describe("layout reaches the attribute", () => {
     await el.updateComplete;
     expect(el.getAttribute("layout")).toBe("grid");
     el.remove();
+  });
+});
+
+describe("cardShouldUpdate", () => {
+  const state = (s: string) => ({ entity_id: "sensor.a", state: s, attributes: {} });
+  const hass = (states: Record<string, unknown>, language = "de") =>
+    ({ language, states }) as unknown as HomeAssistant;
+  const a = state("1");
+  const prev = hass({ "sensor.a": a, "sensor.b": state("x") });
+  const changes = (entries: Record<string, unknown>) => new Map(Object.entries(entries));
+  const ids = () => ["sensor.a"];
+
+  it("skips a hass change that touches no watched entity", () => {
+    const next = hass({ "sensor.a": a, "sensor.b": state("y") });
+    expect(cardShouldUpdate(changes({ hass: prev }), next, ids)).toBe(false);
+  });
+
+  it("renders when a watched entity or the language changed", () => {
+    expect(cardShouldUpdate(changes({ hass: prev }), hass({ "sensor.a": state("2") }), ids)).toBe(
+      true,
+    );
+    expect(cardShouldUpdate(changes({ hass: prev }), hass(prev.states, "en"), ids)).toBe(true);
+  });
+
+  it("renders on the first hass and when hass goes away", () => {
+    expect(cardShouldUpdate(changes({ hass: undefined }), prev, ids)).toBe(true);
+    expect(cardShouldUpdate(changes({ hass: prev }), undefined, ids)).toBe(true);
+  });
+
+  it("lets layout through even when it arrives with an unrelated hass change", () => {
+    expect(cardShouldUpdate(changes({ hass: prev, layout: undefined }), prev, ids)).toBe(true);
+    expect(cardShouldUpdate(changes({ layout: undefined }), prev, ids)).toBe(true);
+  });
+
+  it("asks for the entity ids only for a lone hass change", () => {
+    let asked = 0;
+    const counting = () => {
+      asked++;
+      return ["sensor.a"];
+    };
+    cardShouldUpdate(changes({ _config: undefined }), prev, counting);
+    cardShouldUpdate(changes({ hass: prev }), hass(prev.states, "en"), counting);
+    expect(asked).toBe(0);
+    cardShouldUpdate(changes({ hass: prev }), prev, counting);
+    expect(asked).toBe(1);
   });
 });
 

@@ -4,7 +4,9 @@
 //
 // Kept narrow on purpose: card-specific helpers stay in src/utils/*.
 
-import { html, type TemplateResult } from "lit";
+import { html, type PropertyValues, type TemplateResult } from "lit";
+
+import type { HomeAssistant } from "./types.js";
 
 /**
  * Trust-boundary guard for upstream-supplied URIs that get rendered into
@@ -61,6 +63,29 @@ export function isFixedHeight(
   const grid = config && "grid_options" in config ? config.grid_options : undefined;
   const stored = grid && typeof grid === "object" && "rows" in grid ? grid.rows : undefined;
   return typeof (stored ?? defaultRows) === "number";
+}
+
+/**
+ * The cards' shouldUpdate past the config guard. `hass` is reassigned on
+ * every state change anywhere in HA, so a change to it alone renders only
+ * when the language switched or one of `entityIds()` changed; HA state
+ * objects are immutable, so identity is enough. Any other change renders:
+ * the card's own state, its config, and `layout`, which Lit reflects inside
+ * update(), so a false in that cycle would leave the attribute stale.
+ * `entityIds` runs only for a lone hass change.
+ */
+export function cardShouldUpdate(
+  changed: PropertyValues,
+  hass: HomeAssistant | undefined,
+  entityIds: () => readonly string[],
+): boolean {
+  if (!changed.has("hass") || changed.size > 1) return true;
+  const prev = changed.get("hass") as HomeAssistant | undefined;
+  if (!prev || !hass) return true;
+  // A language switch changes no entity state; without this the card keeps
+  // the old language until its sensor next updates.
+  if (prev.language !== hass.language) return true;
+  return entityIds().some((eid) => prev.states[eid] !== hass.states[eid]);
 }
 
 /**

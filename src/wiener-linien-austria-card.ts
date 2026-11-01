@@ -10,7 +10,7 @@ import { registerWlFonts } from "./font-face.js";
 import { ATTRIBUTION_FALLBACK, CARD_VERSION, NIGHTLINE_BG } from "./const.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
-import { deText, isFixedHeight } from "./utils.js";
+import { cardShouldUpdate, deText, isFixedHeight } from "./utils.js";
 import {
   LINE_TYPE_METRO,
   LINE_TYPE_S_BAHN,
@@ -464,38 +464,15 @@ export class WienerLinienAustriaCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    // Lit reflects attributes inside update(), so a false in the cycle that
-    // changes layout would leave the attribute stale.
-    if (changed.has("layout") || changed.has("preview")) return true;
-    if (
-      changed.has("_config") ||
-      changed.has("_activeTab") ||
-      changed.has("_versionMismatch") ||
-      changed.has("_expandedTraffic") ||
-      changed.has("_expandedElevator") ||
-      changed.has("_expandedRows") ||
-      changed.has("_expandedTransfers") ||
-      changed.has("_qrOpenFor") ||
-      changed.has("_debugTraffic") ||
-      changed.has("_debugElevator")
-    ) {
-      return true;
-    }
-    // hass fires on every state change anywhere in HA — compare identity on
-    // only the entities this card actually reads. HA state objects are
-    // immutable so === is enough.
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    // A language switch changes no entity state; without this the card keeps
-    // the old language until its sensor next updates.
-    if (prev.language !== this.hass.language) return true;
-    // The memo still holds the last render's stops, resolved against the
-    // previous hass. If that render found none (entity briefly missing after
-    // an HA restart), watching them would reject every tick and willUpdate,
-    // the only other place that clears it, would never run again (#125).
-    this._resolvedStopsMemo = null;
-    const eids = this._resolveStops().map((s) => s.entity);
-    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
+    return cardShouldUpdate(changed, this.hass, () => {
+      // The memo still holds the last render's stops, resolved against the
+      // previous hass. If that render found none (entity briefly missing
+      // after an HA restart), watching them would reject every tick and
+      // willUpdate, the only other place that clears it, would never run
+      // again (#125).
+      this._resolvedStopsMemo = null;
+      return this._resolveStops().map((s) => s.entity);
+    });
   }
 
   private _lang(): string {
