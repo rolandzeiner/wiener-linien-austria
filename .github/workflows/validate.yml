@@ -63,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Login to ghcr.io
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -90,7 +90,7 @@ jobs:
         # resolver surfaces hard PHACC transitive pins (e.g.
         # pytest-asyncio==1.4.0) just as clearly as pip 26.1 did, which is
         # what lets requirements_test.txt declare so little.
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@v10.3.2
         with:
           enable-cache: true
       - name: Install dependencies
@@ -122,7 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@v1.22.0
         # Installs the global vp CLI, Node and npm (from devEngines), and
         # caches npm's store. Install runs as its own step below so the
         # lockfile is enforced explicitly.
