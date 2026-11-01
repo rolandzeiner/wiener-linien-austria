@@ -4,6 +4,12 @@ import { sorted } from "../utils.js";
 
 import type { DepartureAttr, WalkTimes, WienerLinienAttrs } from "../types.js";
 
+/** A departure's countdown, or `+Infinity` when it is missing or non-finite,
+ *  so it sorts after every real countdown and never wins a `Math.min`. */
+export function countdownOf(d: DepartureAttr): number {
+  return Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
+}
+
 // (line, direction) identifier used for walk-times lookup. The towards
 // component is intentionally omitted: the /monitor API reports both
 // `line.towards` and per-departure `vehicle.towards` based on whichever

@@ -1,15 +1,11 @@
 // Which departures go in the modern card's hero block, and which fall
 // through to the row list beneath it.
 //
-// Extracted from the card's render path so it can be unit tested — it
-// decides the most prominent thing on the card, so it is worth pinning.
+// Kept pure and DOM-free so it can be unit tested: it decides the most
+// prominent thing on the card, so it is worth pinning.
 
 import type { DepartureAttr } from "../types.js";
-
-/** A departure's countdown, with an unusable one sorted last. */
-export function countdownOf(d: DepartureAttr): number {
-  return Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
-}
+import { countdownOf } from "./departures.js";
 
 /**
  * The departures sharing the soonest countdown — the hero group.

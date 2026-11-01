@@ -29,8 +29,7 @@ import type {
 } from "./types.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
-import { filterDepartures, stubDirection } from "./utils/departures.js";
-import { countdownOf } from "./utils/hero-group.js";
+import { countdownOf, filterDepartures, stubDirection } from "./utils/departures.js";
 import {
   allDisconnected,
   findWienerLinienEntities,
@@ -534,9 +533,9 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       });
       merged.push(...filtered);
     }
-    // Stable sort by countdown ascending. Departures with non-finite
-    // countdown sink to the bottom so the visible rows start with
-    // imminent trains.
+    // Soonest first; `countdownOf` sinks rows without a usable countdown
+    // to the bottom. `sort` is stable, so equal countdowns keep the
+    // configured stop order.
     merged.sort((a, b) => countdownOf(a) - countdownOf(b));
     return merged.slice(0, this._config.max_rows);
   }
