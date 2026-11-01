@@ -27,4 +27,4 @@ pytest-homeassistant-custom-component>=0.13.375,<0.14
 # lints with a different ruleset than CI. Dependabot ignores both hook
 # repos; bump pin and rev in the same commit.
 mypy==2.4.0
-ruff==0.17.2
+ruff==0.17.3
