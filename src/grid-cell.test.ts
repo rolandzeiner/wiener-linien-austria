@@ -178,3 +178,29 @@ describe("edit-dialog preview", () => {
     el.remove();
   });
 });
+
+describe("retro board minimum width", () => {
+  // Measured per LED size: the narrowest cell that still shows about five
+  // letters of the destination beside a timetable and a step-free icon.
+  it.each([
+    ["small", 7],
+    ["medium", 9],
+    ["regular", 11],
+  ] as const)("%s needs %i columns", (size, columns) => {
+    const el = document.createElement("wiener-linien-austria-retro-card") as ReactiveElement & {
+      setConfig(c: Record<string, unknown>): void;
+      getGridOptions(): { min_columns: number };
+    };
+    el.setConfig({ type: "custom:wiener-linien-austria-retro-card", entity: "sensor.x", size });
+    expect(el.getGridOptions().min_columns).toBe(columns);
+  });
+
+  it("defaults to the regular size's minimum", () => {
+    const el = document.createElement("wiener-linien-austria-retro-card") as ReactiveElement & {
+      setConfig(c: Record<string, unknown>): void;
+      getGridOptions(): { min_columns: number };
+    };
+    el.setConfig({ type: "custom:wiener-linien-austria-retro-card", entity: "sensor.x" });
+    expect(el.getGridOptions().min_columns).toBe(11);
+  });
+});

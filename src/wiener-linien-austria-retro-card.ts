@@ -9,7 +9,12 @@ import { RETRO_CARD_VERSION } from "./const.js";
 import { deText, isFixedHeight } from "./utils.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
-import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
+import type {
+  DepartureAttr,
+  RetroSize,
+  WienerLinienAttrs,
+  WienerLinienRetroCardConfig,
+} from "./types.js";
 import {
   chipPalette,
   normaliseRetroConfig,
@@ -93,6 +98,18 @@ const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
     });
   }
 }
+
+/** The narrowest cell, in section columns, at which each LED size still
+ *  shows about five letters of the destination in the worst case: a
+ *  timetable-only, step-free departure with both icons beside the name
+ *  (measured on Bhf. Meidling's S-Bahn). Narrower, small shows "A…",
+ *  medium "AS…" and regular "ASP…". Stops without those icons have room
+ *  to spare. */
+const RETRO_MIN_COLUMNS: Readonly<Record<RetroSize, number>> = {
+  small: 7,
+  medium: 9,
+  regular: 11,
+};
 
 @customElement("wiener-linien-austria-retro-card")
 export class WienerLinienAustriaRetroCard extends LitElement {
@@ -247,8 +264,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return {
       columns: 12,
       rows: "auto",
-      // Measured: below eight columns the platform column is cut off.
-      min_columns: 8,
+      min_columns: RETRO_MIN_COLUMNS[this._config?.size ?? "regular"],
       min_rows: 2,
     };
   }

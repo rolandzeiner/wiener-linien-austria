@@ -427,7 +427,7 @@ direction: both
 | `direction` | `H` | `H`, `R`, or `both` for every direction. |
 | `line_directions` | none | One direction per line, for example `{U1: R}`. Beats `direction` for that line. |
 | `walk_times` | none | Minutes it takes you to reach the line, keyed `"line\|direction"`, `0`–`120`. Departures you can't catch are hidden. |
-| `size` | `regular` | `small`, `medium` or `regular`. |
+| `size` | `regular` | `small`, `medium` or `regular`. A larger size needs a wider card: at least 7, 9 or 11 of a section's 12 columns. |
 | `style` | `classic` | `classic`, `warm` or `pixel` (dot matrix). |
 | `show_platform` | `true` | Shows the GLEIS / STEIG tile. |
 | `platform_side` | `auto` | `auto` (platform 2 on the left, otherwise right), `left` or `right`. |
