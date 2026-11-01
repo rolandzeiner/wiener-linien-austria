@@ -146,6 +146,12 @@ function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
 export class WienerLinienAustriaCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
+  // Set by HA: "grid" in a sections view, "panel" in a panel view, unset in
+  // the add-card picker and masonry. Reflected so the styles can fill the
+  // cell only when there is one (the gated grid-cell rules). Not the card
+  // config's own `layout` key.
+  @property({ reflect: true }) public layout?: string;
+
   @state() private _config?: NormalisedModernConfig;
   @state() private _activeTab = 0;
   // Which ends of the tab strip hide more tabs; drives the edge fades and
@@ -447,6 +453,9 @@ export class WienerLinienAustriaCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
+    // Lit reflects attributes inside update(), so a false in the cycle that
+    // changes layout would leave the attribute stale.
+    if (changed.has("layout")) return true;
     if (
       changed.has("_config") ||
       changed.has("_activeTab") ||

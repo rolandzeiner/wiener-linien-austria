@@ -149,6 +149,25 @@ export const cardStyles = css`
   ha-card {
     overflow: hidden;
   }
+  /* Fill the grid cell the dashboard hands us. A sections view puts a fixed
+     pixel height on the cell wrapper when rows is numeric (the user causes
+     that by dragging the row handle) and styles nothing inside it. :host is
+     display: block, so it is ha-card's containing block and the two
+     declarations only work as a pair: without the host's, ha-card's 100%
+     computes to auto and the card paints over the card beneath it.
+     Gated on the layout HA sets on the card ("grid" in a sections view and
+     its edit dialog, "panel" in a panel view), as Mushroom and HA's tile
+     card do. The add-card picker sets none and centres each preview in a
+     tile as tall as the tallest preview in its row; an ungated 100% would
+     stretch the card down to it. */
+  :host([layout="grid"]),
+  :host([layout="panel"]) {
+    block-size: 100%;
+  }
+  :host([layout="grid"]) ha-card,
+  :host([layout="panel"]) ha-card {
+    block-size: 100%;
+  }
 
   .wrap {
     display: flex;

@@ -98,6 +98,11 @@ const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
 export class WienerLinienAustriaRetroCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
+  // Set by HA: "grid" in a sections view, "panel" in a panel view, unset in
+  // the add-card picker and masonry. Reflected so the styles can fill the
+  // cell only when there is one (the gated grid-cell rules).
+  @property({ reflect: true }) public layout?: string;
+
   @state() private _config?: NormalisedRetroConfig;
   @state() private _versionMismatch: string | null = null;
   @state() private _raceState: RaceState = "idle";
@@ -330,6 +335,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
+    // Lit reflects attributes inside update(), so a false in the cycle that
+    // changes layout would leave the attribute stale.
+    if (changed.has("layout")) return true;
     if (
       changed.has("_config") ||
       changed.has("_versionMismatch") ||
@@ -1318,6 +1326,25 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          inside this card. Without this, race overlays and the LED
          dot pattern can render above HA's dashboard chrome. */
       isolation: isolate;
+    }
+    /* Fill the grid cell the dashboard hands us. A sections view puts a fixed
+       pixel height on the cell wrapper when rows is numeric (the user causes
+       that by dragging the row handle) and styles nothing inside it. :host is
+       display: block, so it is ha-card's containing block and the two
+       declarations only work as a pair: without the host's, ha-card's 100%
+       computes to auto and the card paints over the card beneath it.
+       Gated on the layout HA sets on the card ("grid" in a sections view and
+       its edit dialog, "panel" in a panel view), as Mushroom and HA's tile
+       card do. The add-card picker sets none and centres each preview in a
+       tile as tall as the tallest preview in its row; an ungated 100% would
+       stretch the card down to it. */
+    :host([layout="grid"]),
+    :host([layout="panel"]) {
+      block-size: 100%;
+    }
+    :host([layout="grid"]) ha-card,
+    :host([layout="panel"]) ha-card {
+      block-size: 100%;
     }
     .retro {
       /* Classic defaults — swapped wholesale by .retro--style-warm below. */
