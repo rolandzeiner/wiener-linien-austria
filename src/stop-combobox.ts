@@ -191,9 +191,6 @@ export class WienerLinienStopCombobox extends LitElement {
           ev.preventDefault();
           this._revert();
         }
-        return;
-      default:
-        return;
     }
   };
 

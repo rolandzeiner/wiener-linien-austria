@@ -1291,7 +1291,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const created = formatTime(t.time_created, this._lang());
     const updated = updatedRaw && updatedRaw !== created ? updatedRaw : "";
     const hasMeta = Boolean(t.location || until || updated);
-    const hasDetail = Boolean(hasNotice || hasMeta);
+    const hasDetail = hasNotice || hasMeta;
     const expanded = this._expandedTraffic.has(t.name);
     const classes = {
       alert: true,

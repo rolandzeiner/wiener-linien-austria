@@ -6,7 +6,8 @@
 
 import type { DepartureAttr } from "../types.js";
 
-function countdownOf(d: DepartureAttr): number {
+/** A departure's countdown, with an unusable one sorted last. */
+export function countdownOf(d: DepartureAttr): number {
   return Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
 }
 

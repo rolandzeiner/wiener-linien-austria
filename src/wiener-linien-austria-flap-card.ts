@@ -30,6 +30,7 @@ import type {
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
+import { countdownOf } from "./utils/hero-group.js";
 import {
   allDisconnected,
   findWienerLinienEntities,
@@ -536,9 +537,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     // Stable sort by countdown ascending. Departures with non-finite
     // countdown sink to the bottom so the visible rows start with
     // imminent trains.
-    const cd = (d: DepartureAttr): number =>
-      Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
-    merged.sort((a, b) => cd(a) - cd(b));
+    merged.sort((a, b) => countdownOf(a) - countdownOf(b));
     return merged.slice(0, this._config.max_rows);
   }
 

@@ -2627,7 +2627,7 @@ if(super(e),e.type!==R.PROPERTY&&e.type!==R.ATTRIBUTE&&e.type!==R.BOOLEAN_ATTRIB
                 </div>`)}
             </dl>`:N}
       </div>
-    `}_renderTrafficItem(e,t){let n=this._config.line_colors,r=Array.isArray(e.related_lines)?e.related_lines:[],i=Array.isArray(e.inferred_lines)?e.inferred_lines:[],a=r.length?r:i,o=kn(e.description_html||e.description||``),s=o.blocks.length>0||o.facts.length>0,c=J(e.time_end,this._lang()),l=J(e.time_last_update,this._lang()),u=J(e.time_created,this._lang()),d=l&&l!==u?l:``,f=!!(e.location||c||d),p=!!(s||f),m=this._expandedTraffic.has(e.name),h={alert:!0,expanded:m,"no-detail":!p},g=e.title||this._t(`traffic_label`);return j`
+    `}_renderTrafficItem(e,t){let n=this._config.line_colors,r=Array.isArray(e.related_lines)?e.related_lines:[],i=Array.isArray(e.inferred_lines)?e.inferred_lines:[],a=r.length?r:i,o=kn(e.description_html||e.description||``),s=o.blocks.length>0||o.facts.length>0,c=J(e.time_end,this._lang()),l=J(e.time_last_update,this._lang()),u=J(e.time_created,this._lang()),d=l&&l!==u?l:``,f=!!(e.location||c||d),p=s||f,m=this._expandedTraffic.has(e.name),h={alert:!0,expanded:m,"no-detail":!p},g=e.title||this._t(`traffic_label`);return j`
       <div
         class=${z(h)}
         role=${p?`button`:`group`}

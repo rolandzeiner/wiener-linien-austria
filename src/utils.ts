@@ -42,7 +42,7 @@ export function deText(raw: string | undefined | null, fallback?: string): Templ
  * `composed: true` are required so dashboard / card-editor listeners
  * outside the card's shadow root receive it.
  */
-export function fireEvent<T>(node: HTMLElement, type: string, detail: T): void {
+export function fireEvent(node: HTMLElement, type: string, detail: unknown): void {
   node.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
 }
 
