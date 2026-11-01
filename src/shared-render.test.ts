@@ -177,20 +177,27 @@ describe("renderVersionBanner", () => {
 });
 
 describe("reloadAfterCacheWipe", () => {
-  it("stamps the flag before reloading, so the next mount sees it", () => {
-    const reload = vi.fn();
+  /** Let the reload's promise chain run its course (one macrotask). */
+  const settle = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+  it("stamps the flag before reloading, so the next mount sees it", async () => {
+    let flagAtReload: boolean | undefined;
+    const reload = vi.fn(() => {
+      flagAtReload = wasReloadAttemptedFor("2.1.0");
+    });
     Object.defineProperty(window, "location", {
       configurable: true,
       value: { reload },
     });
 
     reloadAfterCacheWipe("2.1.0");
+    await settle();
 
-    expect(wasReloadAttemptedFor("2.1.0")).toBe(true);
     expect(reload).toHaveBeenCalledOnce();
+    expect(flagAtReload).toBe(true);
   });
 
-  it("still reloads when no version is supplied", () => {
+  it("still reloads when no version is supplied", async () => {
     const reload = vi.fn();
     Object.defineProperty(window, "location", {
       configurable: true,
@@ -198,7 +205,40 @@ describe("reloadAfterCacheWipe", () => {
     });
 
     reloadAfterCacheWipe();
+    await settle();
 
     expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it("reloads only once the cache wipe has finished", async () => {
+    // Started and left running, the deletes raced the unload and usually
+    // lost, so the reload was served the same cached bundle.
+    const order: string[] = [];
+    let finishDelete!: () => void;
+    vi.stubGlobal("caches", {
+      keys: async () => ["bundle"],
+      delete: () =>
+        new Promise<boolean>((resolve) => {
+          finishDelete = () => {
+            order.push("deleted");
+            resolve(true);
+          };
+        }),
+    });
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { reload: () => order.push("reload") },
+    });
+    try {
+      reloadAfterCacheWipe("2.1.0");
+      await settle();
+      expect(order).toEqual([]);
+
+      finishDelete();
+      await settle();
+      expect(order).toEqual(["deleted", "reload"]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
