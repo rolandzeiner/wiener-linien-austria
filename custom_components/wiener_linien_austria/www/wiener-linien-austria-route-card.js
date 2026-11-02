@@ -603,6 +603,10 @@ color: var(--primary-text-color);
 color: var(--secondary-text-color);
 flex: none;
 }
+.heading span {
+min-width: 0;
+overflow-wrap: anywhere;
+}
 .hero {
 display: flex;
 flex-wrap: wrap;
@@ -1048,6 +1052,9 @@ color: var(--primary-text-color);
 font: inherit;
 font-weight: 600;
 cursor: pointer;
+max-width: 100%;
+text-align: start;
+overflow-wrap: anywhere;
 }
 .alt-list {
 list-style: none;

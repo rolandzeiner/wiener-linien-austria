@@ -1765,6 +1765,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--secondary-text-color);
       flex: none;
     }
+    /* A stop name wider than the narrowest cell breaks inside the word
+       rather than running under the card's edge. */
+    .heading span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
 
     /* Hero: the countdown is the answer to "when do I go?" */
     .hero {
@@ -2297,6 +2303,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font: inherit;
       font-weight: 600;
       cursor: pointer;
+      max-width: 100%;
+      text-align: start;
+      overflow-wrap: anywhere;
     }
     .alt-list {
       list-style: none;
