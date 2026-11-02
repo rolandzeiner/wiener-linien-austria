@@ -175,7 +175,7 @@ def _sort_line_labels(
                 key=lambda label: _line_sort_key(label, mot_by_label.get(label)),
             )
         )
-    return tuple(sorted(labels, key=lambda label: _line_sort_key(label)))
+    return tuple(sorted(labels, key=_line_sort_key))
 
 
 STORE_VERSION = 1
