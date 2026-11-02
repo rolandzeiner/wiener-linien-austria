@@ -699,7 +699,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const title = attrs.stop_name || attrs.friendly_name || active.entity;
     const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     const geoUri = this._stopGeoUri(title, attrs.latitude, attrs.longitude);
-    const qrConfigured = this._config!.show_qr_button !== false;
+    const qrConfigured = this._config!.show_qr_button;
     const showQrButton = qrConfigured && geoUri !== null;
     if (!mapUrl && !showQrButton) return nothing;
 
@@ -961,7 +961,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // full open-in-maps-app handoff: the QR encodes the geo: URI
     // separately, and OS camera apps decode + open it at the OS level
     // regardless of which app rendered the QR.
-    const showQrButton = this._config!.show_qr_button !== false && geoUri !== null;
+    const showQrButton = this._config!.show_qr_button && geoUri !== null;
     // Where the toggle lives: the header normally, the tab strip when
     // the header is hidden. `tabIndex` is only passed in tabs mode, so
     // it doubles as "a tab strip exists". With neither, nothing can
@@ -1646,7 +1646,7 @@ export class WienerLinienAustriaCard extends LitElement {
    *  last two) the user turned it on. */
   private _renderHeroBadges(d: DepartureAttr): TemplateResult {
     const cfg = this._config!;
-    const platform = cfg.show_platform && d.platform ? String(d.platform) : null;
+    const platform = cfg.show_platform && d.platform ? d.platform : null;
     const flag = (cls: string, title: string, icon: string): TemplateResult => html`<span
       class=${cls}
       role="img"

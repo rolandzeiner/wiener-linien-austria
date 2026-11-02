@@ -51,7 +51,7 @@ export function tripletsAtStop(attrs: WienerLinienAttrs | undefined): Triplet[] 
   const out: Triplet[] = [];
   const seen = new Set<string>();
   for (const d of attrs?.departures ?? []) {
-    const dir = String(d.direction ?? "");
+    const dir = d.direction ?? "";
     // Triple-keyed dedupe — the triple is the smallest unit the picker
     // shows. Walk-times key by pair instead; see lineDirKey.
     const key = `${d.line}|${dir}|${d.towards}`;
@@ -82,7 +82,7 @@ export interface Pair {
 function pairsAtStop(attrs: WienerLinienAttrs | undefined): Pair[] {
   const byKey = new Map<string, Pair>();
   for (const d of attrs?.departures ?? []) {
-    const dir = String(d.direction ?? "");
+    const dir = d.direction ?? "";
     const k = lineDirKey(d.line, dir);
     let pair = byKey.get(k);
     if (!pair) {
@@ -264,7 +264,7 @@ export function filterDepartures(
     const effectiveDir = line_directions?.[d.line] ?? direction;
     if (effectiveDir && d.direction !== effectiveDir) return false;
     if (walk_times) {
-      const min = walk_times[lineDirKey(d.line, String(d.direction ?? ""))];
+      const min = walk_times[lineDirKey(d.line, d.direction ?? "")];
       if (typeof min === "number" && d.countdown < min) return false;
     }
     if (accessibility_only && !d.barrier_free) return false;

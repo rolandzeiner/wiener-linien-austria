@@ -152,7 +152,7 @@ function memoryStorage(): Storage {
     getItem: (key: string) => data.get(key) ?? null,
     key: (index: number) => [...data.keys()][index] ?? null,
     removeItem: (key: string) => void data.delete(key),
-    setItem: (key: string, value: string) => void data.set(key, String(value)),
+    setItem: (key: string, value: string) => void data.set(key, value),
   };
 }
 
