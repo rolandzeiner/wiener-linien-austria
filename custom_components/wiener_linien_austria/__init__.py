@@ -61,7 +61,7 @@ from .rate_limit import (
     ROUTING_LOCK_LOOP_KEY,
     backoff_delay,
 )
-from .route_coordinator import WienerLinienRouteCoordinator, route_device_info
+from .route_coordinator import WienerLinienRouteCoordinator
 from .run_times import RUN_TIMES_KEY
 from .s_bahn_network import (
     S_BAHN_NETWORK_KEY,
@@ -474,8 +474,16 @@ async def _async_setup_route_entry(
     _ensure_domain_timers(hass)
 
     entry.runtime_data = coordinator
+    # Explicit keywords, not `**route_device_info(entry)`: DeviceInfo is a
+    # dataclass from HA 2026.11 and the splat only works through a
+    # compatibility layer that is slated for deprecation.
     dr.async_get(hass).async_get_or_create(
-        config_entry_id=entry.entry_id, **route_device_info(entry)
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        manufacturer="Wiener Linien",
+        model="Verbindung",
+        configuration_url="https://www.wienerlinien.at/",
     )
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

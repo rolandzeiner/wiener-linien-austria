@@ -2,6 +2,7 @@
   "domain": "wiener_linien_austria",
   "name": "Wiener Linien Austria",
   "after_dependencies": ["frontend", "http", "lovelace"],
+  "categories": ["vehicles_transport.public_transport"],
   "codeowners": ["@rolandzeiner"],
   "config_flow": true,
   "dependencies": [],
