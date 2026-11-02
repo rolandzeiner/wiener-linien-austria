@@ -59,6 +59,6 @@ export function deriveRowState(d: DepartureAttr, opts: RowStateOptions): RowStat
     signedDelay,
     cdState,
     hasFlags,
-    platform: opts.showPlatform && d.platform ? String(d.platform) : null,
+    platform: opts.showPlatform && d.platform ? d.platform : null,
   };
 }

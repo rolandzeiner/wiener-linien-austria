@@ -55,7 +55,7 @@ describe("filterDepartures — line and direction", () => {
 
   it("applies a stop-wide direction to every line", () => {
     const out = filterDepartures(feed, { direction: "H" });
-    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual(["U1/H", "U3/H"]);
+    expect(out.map((d) => `${d.line}/${d.direction}`)).toEqual(["U1/H", "U3/H"]);
   });
 
   it("lets a per-line direction override the stop-wide one", () => {
@@ -64,13 +64,13 @@ describe("filterDepartures — line and direction", () => {
       direction: "H",
       line_directions: { U1: "R" },
     });
-    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual(["U1/R", "U3/H"]);
+    expect(out.map((d) => `${d.line}/${d.direction}`)).toEqual(["U1/R", "U3/H"]);
   });
 
   it("applies a per-line direction even with no stop-wide direction set", () => {
     const out = filterDepartures(feed, { line_directions: { U1: "H" } });
     // U1 is constrained to H; U3 has no override and no stop-wide rule.
-    expect(out.map((d) => `${d.line}/${String(d.direction)}`)).toEqual(["U1/H", "U3/H"]);
+    expect(out.map((d) => `${d.line}/${d.direction}`)).toEqual(["U1/H", "U3/H"]);
   });
 
   it("preserves upstream order rather than re-sorting", () => {

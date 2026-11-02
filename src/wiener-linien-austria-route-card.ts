@@ -23,6 +23,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { ATTRIBUTION_FALLBACK, ROUTE_CARD_VERSION } from "./const.js";
+import { cardShouldUpdate, isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import "./route-editor.js";
@@ -154,6 +155,16 @@ const TIME_MODES: readonly AdhocTimeMode[] = ["now", "depart", "arrive"];
 export class WienerLinienAustriaRouteCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
+  // Set by HA: "grid" in a sections view, "panel" in a panel view, unset in
+  // the add-card picker and masonry. Reflected so the styles can fill the
+  // cell only when there is one (the gated grid-cell rules).
+  @property({ reflect: true }) public layout?: string;
+
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedRouteConfig;
   @state() private _versionMismatch: string | null = null;
   @state() private _now = Date.now();
@@ -232,8 +243,18 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return !!this._config && !this._config.entity;
   }
 
+  /** Masonry height in 50 px units. The card's height follows the trip, not
+   *  the config: a two-leg trip with its strand open measures about 570 px,
+   *  and the alternatives stay collapsed below it. */
   public getCardSize(): number {
-    return 6;
+    return 11;
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). No default rows, so
+   *  only a stored row count fixes the height. */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, undefined);
   }
 
   /** Sections-view sizing, per the HA custom-card docs: half the 12-column
@@ -242,9 +263,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  on purpose — the docs' way to say "size to content", which this card
    *  needs because opening the alternatives or a stop list grows it. A size
    *  set in the dashboard's layout tab lands in `grid_options` and wins over
-   *  these defaults. */
-  public getGridOptions(): { columns: number; min_columns: number } {
-    return { columns: 6, min_columns: 4 };
+   *  these defaults. min_rows 3 is the smallest cell that still shows the
+   *  next departure under the heading (measured at four columns). */
+  public getGridOptions(): { columns: number; min_columns: number; min_rows: number } {
+    return { columns: 6, min_columns: 4, min_rows: 3 };
   }
 
   public static getConfigElement(): LovelaceCardEditor {
@@ -290,16 +312,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    if (!changed.has("hass") || changed.size > 1) return true;
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev) return true;
-    // A language switch changes no entity state, in either mode.
-    if (prev.language !== this.hass?.language) return true;
     const eid = this._config.entity;
     // Ad-hoc mode reads nothing from the state machine, and re-rendering two
     // 1,800-option pickers on every state change anywhere in HA is not free.
-    if (!eid) return false;
-    return prev.states[eid] !== this.hass?.states[eid];
+    return cardShouldUpdate(changed, this.hass, () => (eid ? [eid] : []));
   }
 
   // ------------------------------------------------------------------
@@ -724,9 +740,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       : (typeof attrs.attribution === "string" && attrs.attribution) || ATTRIBUTION_FALLBACK;
 
     return html`
-      <ha-card @pointerdown=${this._onCardActivity} @keydown=${this._onCardActivity}>
+      <ha-card
+        class=${this._fixedHeight ? "fixed-height" : ""}
+        @pointerdown=${this._onCardActivity}
+        @keydown=${this._onCardActivity}
+      >
         <div class="wrap">
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
           <div class="header">
             <h2 class="heading">
               <ha-icon icon="mdi:map-marker-path" aria-hidden="true"></ha-icon>
@@ -1669,6 +1689,36 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       overflow: hidden;
       font-family: "WL Sans", var(--ha-font-family-body, system-ui), sans-serif;
     }
+    /* Fill the grid cell the dashboard hands us. A sections view puts a fixed
+       pixel height on the cell wrapper when rows is numeric (the user causes
+       that by dragging the row handle) and styles nothing inside it. :host is
+       display: block, so it is ha-card's containing block and the two
+       declarations only work as a pair: without the host's, ha-card's 100%
+       computes to auto and the card paints over the card beneath it.
+       Gated on the layout HA sets on the card ("grid" in a sections view and
+       its edit dialog, "panel" in a panel view), as Mushroom and HA's tile
+       card do. The add-card picker sets none and centres each preview in a
+       tile as tall as the tallest preview in its row; an ungated 100% would
+       stretch the card down to it. */
+    :host([layout="grid"]),
+    :host([layout="panel"]) {
+      block-size: 100%;
+    }
+    :host([layout="grid"]) ha-card,
+    :host([layout="panel"]) ha-card {
+      block-size: 100%;
+    }
+    /* A cell with a set row count: the content scrolls inside the card
+       instead of being cut off at the cell's edge. */
+    ha-card.fixed-height {
+      display: flex;
+      flex-direction: column;
+    }
+    ha-card.fixed-height > .wrap {
+      flex: 1 1 auto;
+      min-block-size: 0;
+      overflow-y: auto;
+    }
     .wrap {
       display: flex;
       flex-direction: column;
@@ -1714,6 +1764,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 20px;
       color: var(--secondary-text-color);
       flex: none;
+    }
+    /* A long heading (a user title, or a stop name in "A → B") breaks
+       inside the word in the narrowest cell rather than running under the
+       card's edge. The flex item needs min-width: 0 first, or its content
+       width keeps it from shrinking and overflow-wrap never kicks in. */
+    .heading span {
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
 
     /* Hero: the countdown is the answer to "when do I go?" */
@@ -2247,6 +2305,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font: inherit;
       font-weight: 600;
       cursor: pointer;
+      /* The label may wrap in a narrow cell. Buttons centre their text by
+         default, so without text-align: start a second line would drift
+         away from the chevron. */
+      max-width: 100%;
+      text-align: start;
+      overflow-wrap: anywhere;
     }
     .alt-list {
       list-style: none;
@@ -2358,8 +2422,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       align-items: center;
       gap: 4px;
       margin-inline-start: auto;
+      /* Wraps only when the card is narrower than the line, at four
+         columns, instead of running past the header. */
+      min-width: 0;
       font-size: 0.75rem;
-      white-space: nowrap;
       color: var(--secondary-text-color);
     }
     .updated ha-icon {

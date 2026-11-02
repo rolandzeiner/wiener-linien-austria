@@ -12,13 +12,13 @@
 exclude: ^custom_components/wiener_linien_austria/www/fonts/
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.2 # keep in sync with ruff== in requirements_test.txt
+    rev: v0.17.3 # keep in sync with ruff== in requirements_test.txt
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.4.0 # keep in sync with mypy== in requirements_test.txt
+    rev: v2.4.1 # keep in sync with mypy== in requirements_test.txt
     hooks:
       - id: mypy
         additional_dependencies: [homeassistant, voluptuous]
@@ -41,15 +41,6 @@ repos:
       - id: check-merge-conflict
   - repo: local
     hooks:
-      # Regenerates README.md's table of contents from its `##` headings.
-      # A rewrite fails the commit once, like any fixer; `git add` and commit
-      # again. CI runs the same script with `--check`.
-      - id: readme-toc
-        name: README table of contents
-        entry: python3 scripts/readme_toc.py
-        language: system
-        files: ^README\.md$
-        pass_filenames: false
       # Card side: Oxfmt + Oxlint + type-check, the same `vp check` CI runs.
       # A local hook rather than Vite+'s own `vp staged` / `.vite-hooks`: those
       # take over core.hooksPath, which would switch off the hooks above.

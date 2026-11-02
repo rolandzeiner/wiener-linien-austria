@@ -168,7 +168,7 @@ async def _probe_monitor_lines(
     probe and `_probe_route` skip the routing slot for the same reason.
 
     If you are here because a linter or an audit flagged the inconsistency:
-    it is deliberate, and README's Data Updates section documents it.
+    it is deliberate, and README's Data updates section documents it.
     """
     try:
         body = await fetch_monitor(

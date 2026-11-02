@@ -10,7 +10,7 @@ import { registerWlFonts } from "./font-face.js";
 import { ATTRIBUTION_FALLBACK, CARD_VERSION, NIGHTLINE_BG } from "./const.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
-import { deText } from "./utils.js";
+import { cardShouldUpdate, deText, isFixedHeight } from "./utils.js";
 import {
   LINE_TYPE_METRO,
   LINE_TYPE_S_BAHN,
@@ -146,6 +146,17 @@ function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
 export class WienerLinienAustriaCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
+  // Set by HA: "grid" in a sections view, "panel" in a panel view, unset in
+  // the add-card picker and masonry. Reflected so the styles can fill the
+  // cell only when there is one (the gated grid-cell rules). Not the card
+  // config's own `layout` key.
+  @property({ reflect: true }) public layout?: string;
+
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedModernConfig;
   @state() private _activeTab = 0;
   // Which ends of the tab strip hide more tabs; drives the edge fades and
@@ -241,6 +252,12 @@ export class WienerLinienAustriaCard extends LitElement {
   public getCardSize(): number {
     const n = this._config?.entities.length ?? 1;
     return Math.min(12, 3 + n * 3);
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, this.getGridOptions().rows);
   }
 
   public getGridOptions(): {
@@ -447,35 +464,15 @@ export class WienerLinienAustriaCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    if (
-      changed.has("_config") ||
-      changed.has("_activeTab") ||
-      changed.has("_versionMismatch") ||
-      changed.has("_expandedTraffic") ||
-      changed.has("_expandedElevator") ||
-      changed.has("_expandedRows") ||
-      changed.has("_expandedTransfers") ||
-      changed.has("_qrOpenFor") ||
-      changed.has("_debugTraffic") ||
-      changed.has("_debugElevator")
-    ) {
-      return true;
-    }
-    // hass fires on every state change anywhere in HA — compare identity on
-    // only the entities this card actually reads. HA state objects are
-    // immutable so === is enough.
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    // A language switch changes no entity state; without this the card keeps
-    // the old language until its sensor next updates.
-    if (prev.language !== this.hass.language) return true;
-    // The memo still holds the last render's stops, resolved against the
-    // previous hass. If that render found none (entity briefly missing after
-    // an HA restart), watching them would reject every tick and willUpdate,
-    // the only other place that clears it, would never run again (#125).
-    this._resolvedStopsMemo = null;
-    const eids = this._resolveStops().map((s) => s.entity);
-    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
+    return cardShouldUpdate(changed, this.hass, () => {
+      // The memo still holds the last render's stops, resolved against the
+      // previous hass. If that render found none (entity briefly missing
+      // after an HA restart), watching them would reject every tick and
+      // willUpdate, the only other place that clears it, would never run
+      // again (#125).
+      this._resolvedStopsMemo = null;
+      return this._resolveStops().map((s) => s.entity);
+    });
   }
 
   private _lang(): string {
@@ -540,6 +537,7 @@ export class WienerLinienAustriaCard extends LitElement {
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     if (!this.hass) return html`<ha-card><div class="wrap"></div></ha-card>`;
+    const fixed = this._fixedHeight;
 
     const cfg = this._config;
     const stops = this._resolveStops();
@@ -552,10 +550,10 @@ export class WienerLinienAustriaCard extends LitElement {
           .find((v): v is string => typeof v === "string" && v.length > 0) || ATTRIBUTION_FALLBACK;
 
     return html`
-      <ha-card>
+      <ha-card class=${fixed ? "fixed-height" : ""}>
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k))}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
           ${
             cfg.show_traffic_info
               ? this._renderTrafficBanner(this._bannerStops(stops, useTabs))
@@ -701,7 +699,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const title = attrs.stop_name || attrs.friendly_name || active.entity;
     const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     const geoUri = this._stopGeoUri(title, attrs.latitude, attrs.longitude);
-    const qrConfigured = this._config!.show_qr_button !== false;
+    const qrConfigured = this._config!.show_qr_button;
     const showQrButton = qrConfigured && geoUri !== null;
     if (!mapUrl && !showQrButton) return nothing;
 
@@ -963,7 +961,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // full open-in-maps-app handoff: the QR encodes the geo: URI
     // separately, and OS camera apps decode + open it at the OS level
     // regardless of which app rendered the QR.
-    const showQrButton = this._config!.show_qr_button !== false && geoUri !== null;
+    const showQrButton = this._config!.show_qr_button && geoUri !== null;
     // Where the toggle lives: the header normally, the tab strip when
     // the header is hidden. `tabIndex` is only passed in tabs mode, so
     // it doubles as "a tab strip exists". With neither, nothing can
@@ -1291,7 +1289,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const created = formatTime(t.time_created, this._lang());
     const updated = updatedRaw && updatedRaw !== created ? updatedRaw : "";
     const hasMeta = Boolean(t.location || until || updated);
-    const hasDetail = Boolean(hasNotice || hasMeta);
+    const hasDetail = hasNotice || hasMeta;
     const expanded = this._expandedTraffic.has(t.name);
     const classes = {
       alert: true,
@@ -1648,7 +1646,7 @@ export class WienerLinienAustriaCard extends LitElement {
    *  last two) the user turned it on. */
   private _renderHeroBadges(d: DepartureAttr): TemplateResult {
     const cfg = this._config!;
-    const platform = cfg.show_platform && d.platform ? String(d.platform) : null;
+    const platform = cfg.show_platform && d.platform ? d.platform : null;
     const flag = (cls: string, title: string, icon: string): TemplateResult => html`<span
       class=${cls}
       role="img"

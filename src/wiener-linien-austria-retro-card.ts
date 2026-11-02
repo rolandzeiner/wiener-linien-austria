@@ -6,10 +6,15 @@ import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor, WindowWithCustomCards } from "./types.js";
 
 import { RETRO_CARD_VERSION } from "./const.js";
-import { deText } from "./utils.js";
+import { cardShouldUpdate, deText, isFixedHeight } from "./utils.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
-import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "./types.js";
+import type {
+  DepartureAttr,
+  RetroSize,
+  WienerLinienAttrs,
+  WienerLinienRetroCardConfig,
+} from "./types.js";
 import {
   chipPalette,
   normaliseRetroConfig,
@@ -94,9 +99,31 @@ const MESSAGE_TICKER_RACE_DEFER_MS = 20_000;
   }
 }
 
+/** The narrowest cell, in section columns, at which each LED size still
+ *  shows about five letters of the destination in the worst case: a
+ *  timetable-only, step-free departure with both icons beside the name
+ *  (measured on Bhf. Meidling's S-Bahn). Narrower, small shows "A…",
+ *  medium "AS…" and regular "ASP…". Stops without those icons have room
+ *  to spare. */
+const RETRO_MIN_COLUMNS: Readonly<Record<RetroSize, number>> = {
+  small: 7,
+  medium: 9,
+  regular: 11,
+};
+
 @customElement("wiener-linien-austria-retro-card")
 export class WienerLinienAustriaRetroCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
+
+  // Set by HA: "grid" in a sections view, "panel" in a panel view, unset in
+  // the add-card picker and masonry. Reflected so the styles can fill the
+  // cell only when there is one (the gated grid-cell rules).
+  @property({ reflect: true }) public layout?: string;
+
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
 
   @state() private _config?: NormalisedRetroConfig;
   @state() private _versionMismatch: string | null = null;
@@ -213,8 +240,16 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._cachedEid = null;
   }
 
+  /** Masonry height in 50 px units, measured: the two-row panel is 110 px,
+   *  140 px with the station name above it. */
   public getCardSize(): number {
-    return 2;
+    return this._config?.show_station_name ? 3 : 2;
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, this.getGridOptions().rows);
   }
 
   public getGridOptions(): {
@@ -229,7 +264,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     return {
       columns: 12,
       rows: "auto",
-      min_columns: 4,
+      min_columns: RETRO_MIN_COLUMNS[this._config?.size ?? "regular"],
       min_rows: 2,
     };
   }
@@ -313,8 +348,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (this._config?.message_ticker && this._config?.message_text) {
       this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
     }
-    // Via timer is armed on demand from render() when a visible row
-    // carries via routing — no unconditional arm here.
+    // Via timer is armed on demand from updated() when a visible row
+    // carries via routing, and a reconnect alone runs no update.
+    if (this._viaTimer === null) this.requestUpdate();
   }
 
   public override disconnectedCallback(): void {
@@ -330,25 +366,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    if (
-      changed.has("_config") ||
-      changed.has("_versionMismatch") ||
-      changed.has("_raceState") ||
-      changed.has("_countdownDigit") ||
-      changed.has("_raceWinner") ||
-      changed.has("_tickerActive") ||
-      changed.has("_viaPhase")
-    ) {
-      return true;
-    }
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    // A language switch changes no entity state; without this the card keeps
-    // the old language until its sensor next updates.
-    if (prev.language !== this.hass.language) return true;
-    const eid = this._resolveEntity();
-    if (!eid) return false;
-    return prev.states[eid] !== this.hass.states[eid];
+    return cardShouldUpdate(changed, this.hass, () => {
+      const eid = this._resolveEntity();
+      return eid ? [eid] : [];
+    });
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -356,8 +377,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // Arm/clear the via-tick timer as a post-render side effect. This must
     // NOT happen in render(): _clearViaTimer writes the reactive @state
     // `_viaPhase`, and mutating reactive state mid-render is forbidden by
-    // Lit (dev warning + a redundant extra update cycle).
-    if (this._anyViaInRows) this._armViaTimer();
+    // Lit (dev warning + a redundant extra update cycle). Only while
+    // connected: the disconnect's own phase reset updates the detached
+    // card, and arming there starts an interval nothing ever clears.
+    if (this._anyViaInRows && this.isConnected) this._armViaTimer();
     else if (this._viaTimer !== null) this._clearViaTimer();
     // Start / pause / cancel the wheelchair animations after the render
     // that carries the matching race class, so the racers are already
@@ -1013,7 +1036,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         }
       : {};
     return html`
-      <ha-card style="padding:0;overflow:hidden;">
+      <ha-card
+        class=${this._fixedHeight ? "fixed-height" : ""}
+        style="padding:0;overflow:hidden;"
+      >
         <div
           class=${classMap(retroClasses)}
           role=${interactiveAttrs.role ?? nothing}
@@ -1021,7 +1047,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           aria-label=${interactiveAttrs["aria-label"] ?? nothing}
           @click=${this._handleCardClick}
           @keydown=${clickable ? this._handleCardKeydown : nothing}>
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "retro-banner")}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k), "retro-banner")}
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
@@ -1318,6 +1344,33 @@ export class WienerLinienAustriaRetroCard extends LitElement {
          inside this card. Without this, race overlays and the LED
          dot pattern can render above HA's dashboard chrome. */
       isolation: isolate;
+    }
+    /* Fill the grid cell the dashboard hands us. A sections view puts a fixed
+       pixel height on the cell wrapper when rows is numeric (the user causes
+       that by dragging the row handle) and styles nothing inside it. :host is
+       display: block, so it is ha-card's containing block and the two
+       declarations only work as a pair: without the host's, ha-card's 100%
+       computes to auto and the card paints over the card beneath it.
+       Gated on the layout HA sets on the card ("grid" in a sections view and
+       its edit dialog, "panel" in a panel view), as Mushroom and HA's tile
+       card do. The add-card picker sets none and centres each preview in a
+       tile as tall as the tallest preview in its row; an ungated 100% would
+       stretch the card down to it. */
+    :host([layout="grid"]),
+    :host([layout="panel"]) {
+      block-size: 100%;
+    }
+    :host([layout="grid"]) ha-card,
+    :host([layout="panel"]) ha-card {
+      block-size: 100%;
+    }
+    /* A cell with a set row count: the board fills the cell, and scrolls
+       when the cell is shorter than the rows it shows. min_rows keeps the
+       default config from ever needing it. */
+    ha-card.fixed-height > div {
+      box-sizing: border-box;
+      block-size: 100%;
+      overflow-y: auto;
     }
     .retro {
       /* Classic defaults — swapped wholesale by .retro--style-warm below. */

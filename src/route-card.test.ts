@@ -152,7 +152,7 @@ function memoryStorage(): Storage {
     getItem: (key: string) => data.get(key) ?? null,
     key: (index: number) => [...data.keys()][index] ?? null,
     removeItem: (key: string) => void data.delete(key),
-    setItem: (key: string, value: string) => void data.set(key, String(value)),
+    setItem: (key: string, value: string) => void data.set(key, value),
   };
 }
 
@@ -195,13 +195,15 @@ describe("registration + config", () => {
       getGridOptions(): Record<string, unknown>;
     };
     // No `rows`: the HA docs' way to let the card size itself.
-    expect(el.getGridOptions()).toEqual({ columns: 6, min_columns: 4 });
+    expect(el.getGridOptions()).toEqual({ columns: 6, min_columns: 4, min_rows: 3 });
   });
 
   it("throws for configs Lovelace should show as an error card", () => {
     const el = document.createElement(TAG) as CardElement;
-    expect(() => el.setConfig(undefined as never)).toThrow();
-    expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow();
+    expect(() => el.setConfig(undefined as never)).toThrow(/config must be an object/);
+    expect(() => el.setConfig({ type: TAG, entity: "light.kitchen" })).toThrow(
+      /'entity' must be a sensor/,
+    );
     expect(() => el.setConfig({ type: TAG, from: "Westbahnhof" })).toThrow(/stop number/);
     expect(() => el.setConfig({ type: TAG, from: 60201468, to: "60201040" })).not.toThrow();
   });

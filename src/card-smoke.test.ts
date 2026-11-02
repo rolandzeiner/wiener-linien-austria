@@ -172,14 +172,14 @@ describe("custom element registration", () => {
 describe("setConfig validation", () => {
   it.each(CARDS)("%s rejects a non-object config", (tag) => {
     const el = document.createElement(tag) as CardElement;
-    expect(() => el.setConfig(undefined as never)).toThrow();
+    expect(() => el.setConfig(undefined as never)).toThrow(/config must be an object/);
   });
 
   it.each(CARDS)("%s rejects a non-string entity", (tag) => {
     // Lovelace surfaces the throw verbatim under hui-error-card, which is
     // the whole reason all three validate shape rather than failing silent.
     const el = document.createElement(tag) as CardElement;
-    expect(() => el.setConfig({ type: `custom:${tag}`, entity: 42 })).toThrow();
+    expect(() => el.setConfig({ type: `custom:${tag}`, entity: 42 })).toThrow(/'entity'/);
   });
 
   it("the modern card requires an entity; retro and flap do not", () => {
@@ -191,7 +191,9 @@ describe("setConfig validation", () => {
     // check in wiener-linien-austria-retro-card.ts). The modern card has
     // no such stub state, so a config naming nothing is a user error.
     const modern = document.createElement(MODERN) as CardElement;
-    expect(() => modern.setConfig({ type: `custom:${MODERN}` })).toThrow();
+    expect(() => modern.setConfig({ type: `custom:${MODERN}` })).toThrow(
+      /'entities' \(array\) or legacy 'entity'/,
+    );
 
     for (const tag of [RETRO, FLAP]) {
       const el = document.createElement(tag) as CardElement;
@@ -1629,5 +1631,61 @@ describe("retro station-name tile", () => {
 
   it("stays hidden unless asked for", async () => {
     expect(await tile({ show_station_name: false })).toBeNull();
+  });
+});
+
+describe("retro via alternation", () => {
+  // VIA_TICK_MS in the retro card: the destination alternates with its
+  // `via` hint at this pace while any visible row carries one.
+  const VIA_TICK_MS = 4_000;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function viaHass(): HomeAssistant {
+    const hass = busyHass();
+    const departures = hass.states[ENTITY]!.attributes.departures as Array<Record<string, unknown>>;
+    for (const d of departures) d.via = "Volkstheater";
+    return hass;
+  }
+
+  const VIA_CONFIG = { type: `custom:${RETRO}`, entity: ENTITY, direction: "both" };
+  const phase = (el: CardElement): string => (el as unknown as { _viaPhase: string })._viaPhase;
+
+  async function advance(el: CardElement, ms: number): Promise<void> {
+    await vi.advanceTimersByTimeAsync(ms);
+    await el.updateComplete;
+  }
+
+  it("stops for good once the card is removed", async () => {
+    const el = await mount(RETRO, viaHass(), VIA_CONFIG);
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("via");
+    el.remove();
+    // Lets the update that the disconnect's phase reset queued run on the
+    // detached card.
+    await advance(el, 0);
+    expect(phase(el)).toBe("towards");
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("towards");
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("towards");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("starts again when the card comes back", async () => {
+    const el = await mount(RETRO, viaHass(), VIA_CONFIG);
+    el.remove();
+    await advance(el, 0);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    expect(phase(el)).toBe("towards");
+    await advance(el, VIA_TICK_MS);
+    expect(phase(el)).toBe("via");
   });
 });

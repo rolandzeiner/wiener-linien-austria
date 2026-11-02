@@ -48,18 +48,6 @@ export async function checkCardVersionWS(
  * see `wasReloadAttemptedFor` below for what reads it.
  */
 export function reloadAfterCacheWipe(forVersion?: string | null): void {
-  try {
-    window.caches
-      ?.keys?.()
-      .then((keys) => {
-        keys.forEach((k) => window.caches?.delete?.(k));
-      })
-      // The surrounding try never sees an async rejection; the reload
-      // below goes ahead either way.
-      .catch(() => {});
-  } catch {
-    // best-effort cache wipe
-  }
   if (forVersion) {
     try {
       window.sessionStorage?.setItem(`wl-reload-attempted-${forVersion}`, "1");
@@ -69,7 +57,18 @@ export function reloadAfterCacheWipe(forVersion?: string | null): void {
       // banner twice instead of the stuck-state branch.
     }
   }
-  window.location.reload();
+  // Reload only once the deletes have finished: left running, they race
+  // the unload and usually lose, and the reload is served the bundle that
+  // was supposed to go. Still best-effort: a Cache API that throws or is
+  // missing skips the wipe, and one that hangs is given a second at most.
+  const wipe = (async () => {
+    const keys = (await window.caches?.keys?.()) ?? [];
+    await Promise.all(keys.map((k) => window.caches?.delete?.(k)));
+  })().catch(() => {});
+  const cap = new Promise<void>((resolve) => {
+    setTimeout(resolve, 1000);
+  });
+  void Promise.race([wipe, cap]).then(() => window.location.reload());
 }
 
 /**

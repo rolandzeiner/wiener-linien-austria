@@ -28,16 +28,6 @@ jobs:
             exit 1
           fi
 
-  readme-toc:
-    # The table of contents is generated from the `##` headings. The
-    # pre-commit hook keeps it current; this catches a commit made without
-    # the hook. Standard library only, so no Python setup step.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: README table of contents is up to date
-        run: python3 scripts/readme_toc.py --check
-
   compile-floor-python:
     # Every other job runs the CI interpreter (3.14). `hacs.json` promises
     # Home Assistant >= 2025.6.0, which runs on Python 3.13 — so the whole
@@ -73,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Login to ghcr.io
-        uses: docker/login-action@v4.6.0
+        uses: docker/login-action@v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -100,7 +90,7 @@ jobs:
         # resolver surfaces hard PHACC transitive pins (e.g.
         # pytest-asyncio==1.4.0) just as clearly as pip 26.1 did, which is
         # what lets requirements_test.txt declare so little.
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
       - name: Install dependencies
@@ -132,7 +122,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: voidzero-dev/setup-vp@v1.21.2
+      - uses: voidzero-dev/setup-vp@v1.22.0
         # Installs the global vp CLI, Node and npm (from devEngines), and
         # caches npm's store. Install runs as its own step below so the
         # lockfile is enforced explicitly.

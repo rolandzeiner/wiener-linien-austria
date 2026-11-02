@@ -13,6 +13,7 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 
 import { ATTRIBUTION_FALLBACK, FLAP_CARD_VERSION } from "./const.js";
+import { cardShouldUpdate, isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
@@ -29,7 +30,7 @@ import type {
 } from "./types.js";
 import { LINE_TYPE_METRO } from "./utils/mot.js";
 import { chipPalette } from "./utils/config.js";
-import { filterDepartures, stubDirection } from "./utils/departures.js";
+import { countdownOf, filterDepartures, stubDirection } from "./utils/departures.js";
 import {
   allDisconnected,
   findWienerLinienEntities,
@@ -167,6 +168,16 @@ function padCountdown(countdown: number | undefined | null): string {
 export class WienerLinienAustriaFlapCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
 
+  // Set by HA: "grid" in a sections view, "panel" in a panel view, unset in
+  // the add-card picker and masonry. Reflected so the styles can fill the
+  // cell only when there is one (the gated grid-cell rules).
+  @property({ reflect: true }) public layout?: string;
+
+  // Set by HA while the card is the live preview in the edit-card dialog.
+  // The version banner stays out of it: reloading from inside the editor
+  // throws away the edit.
+  @property({ type: Boolean }) public preview = false;
+
   @state() private _config?: NormalisedFlapConfig;
   @state() private _versionMismatch: string | null = null;
   // Marching-flap state. Each text field on the board is keyed by an
@@ -225,8 +236,18 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     this._justFlipped = {};
   }
 
+  /** Masonry height in 50 px units, measured: 80 px of housing and
+   *  captions, 36 px per board row, 50 px more with the station name. */
   public getCardSize(): number {
-    return 3;
+    const rows = this._config?.max_rows ?? 2;
+    const px = 80 + 36 * rows + (this._config?.show_station_name ? 50 : 0);
+    return Math.max(1, Math.round(px / 50));
+  }
+
+  /** In a cell with a set row count the content scrolls instead of being
+   *  cut off (the fixed-height rules in the styles). */
+  private get _fixedHeight(): boolean {
+    return isFixedHeight(this.layout, this._config, this.getGridOptions().rows);
   }
 
   public getGridOptions(): {
@@ -241,8 +262,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     return {
       columns: 12,
       rows: "auto",
-      min_columns: 6,
-      min_rows: 3,
+      // Measured: nine columns keeps four destination tiles even when a
+      // timetable-only departure adds its calendar tile (eight left two,
+      // "AS"), and the default two rows with the station name need four rows.
+      min_columns: 9,
+      min_rows: 4,
     };
   }
 
@@ -290,24 +314,8 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    if (
-      changed.has("_config") ||
-      changed.has("_versionMismatch") ||
-      changed.has("_displayed") ||
-      changed.has("_target") ||
-      changed.has("_justFlipped")
-    ) {
-      return true;
-    }
-    const prev = changed.get("hass") as HomeAssistant | undefined;
-    if (!prev || !this.hass) return true;
-    // A language switch changes no entity state; without this the card keeps
-    // the old language until its sensor next updates.
-    if (prev.language !== this.hass.language) return true;
-    // Multi-stop: re-render when ANY configured stop's state changed.
-    const eids = this._resolveStopEids();
-    if (eids.length === 0) return false;
-    return eids.some((eid) => prev.states[eid] !== this.hass!.states[eid]);
+    // Multi-stop: re-render when any configured stop's state changed.
+    return cardShouldUpdate(changed, this.hass, () => this._resolveStopEids());
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -533,12 +541,10 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       });
       merged.push(...filtered);
     }
-    // Stable sort by countdown ascending. Departures with non-finite
-    // countdown sink to the bottom so the visible rows start with
-    // imminent trains.
-    const cd = (d: DepartureAttr): number =>
-      Number.isFinite(d.countdown) ? d.countdown : Number.POSITIVE_INFINITY;
-    merged.sort((a, b) => cd(a) - cd(b));
+    // Soonest first; `countdownOf` sinks rows without a usable countdown
+    // to the bottom. `sort` is stable, so equal countdowns keep the
+    // configured stop order.
+    merged.sort((a, b) => countdownOf(a) - countdownOf(b));
     return merged.slice(0, this._config.max_rows);
   }
 
@@ -637,9 +643,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         ATTRIBUTION_FALLBACK;
 
     return html`
-      <ha-card style="padding:0;overflow:hidden;">
+      <ha-card
+        class=${this._fixedHeight ? "fixed-height" : ""}
+        style="padding:0;overflow:hidden;"
+      >
         <div class=${classMap(classes)}>
-          ${renderVersionBanner(this._versionMismatch, (k) => this._t(k), "flap-banner")}
+          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${stationHeaderStrip}
           ${
             cfg.show_station_name
@@ -1140,6 +1149,33 @@ export class WienerLinienAustriaFlapCard extends LitElement {
          board surface is current. */
       --flap-quiet-fg: rgba(255, 255, 255, 0.85);
     }
+    /* Fill the grid cell the dashboard hands us. A sections view puts a fixed
+       pixel height on the cell wrapper when rows is numeric (the user causes
+       that by dragging the row handle) and styles nothing inside it. :host is
+       display: block, so it is ha-card's containing block and the two
+       declarations only work as a pair: without the host's, ha-card's 100%
+       computes to auto and the card paints over the card beneath it.
+       Gated on the layout HA sets on the card ("grid" in a sections view and
+       its edit dialog, "panel" in a panel view), as Mushroom and HA's tile
+       card do. The add-card picker sets none and centres each preview in a
+       tile as tall as the tallest preview in its row; an ungated 100% would
+       stretch the card down to it. */
+    :host([layout="grid"]),
+    :host([layout="panel"]) {
+      block-size: 100%;
+    }
+    :host([layout="grid"]) ha-card,
+    :host([layout="panel"]) ha-card {
+      block-size: 100%;
+    }
+    /* A cell with a set row count: the board fills the cell, and scrolls
+       when the cell is shorter than the rows it shows. min_rows keeps the
+       default config from ever needing it. */
+    ha-card.fixed-height > div {
+      box-sizing: border-box;
+      block-size: 100%;
+      overflow-y: auto;
+    }
     /* Light mode — driven by HA's theme (hass.themes.darkMode === false),
        not the OS/browser prefers-color-scheme. HA themes are
        deliberately decoupled from system appearance, so a user on
@@ -1328,6 +1364,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       justify-content: space-between;
       gap: 12px;
       min-width: 0;
+      /* When the destination column is too narrow for both captions, the
+         step-free one wraps onto a second line that is clipped away
+         instead of running into the platform caption. Works for every
+         language without measuring the labels. */
+      flex-wrap: wrap;
+      max-block-size: 1lh;
+      overflow: hidden;
     }
     .flap-colheader__step-free {
       /* Sits at the right edge of the dest column via the parent's
