@@ -1765,8 +1765,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--secondary-text-color);
       flex: none;
     }
-    /* A stop name wider than the narrowest cell breaks inside the word
-       rather than running under the card's edge. */
+    /* A long heading (a user title, or a stop name in "A → B") breaks
+       inside the word in the narrowest cell rather than running under the
+       card's edge. The flex item needs min-width: 0 first, or its content
+       width keeps it from shrinking and overflow-wrap never kicks in. */
     .heading span {
       min-width: 0;
       overflow-wrap: anywhere;
@@ -2303,6 +2305,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font: inherit;
       font-weight: 600;
       cursor: pointer;
+      /* The label may wrap in a narrow cell. Buttons centre their text by
+         default, so without text-align: start a second line would drift
+         away from the chevron. */
       max-width: 100%;
       text-align: start;
       overflow-wrap: anywhere;
