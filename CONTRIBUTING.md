@@ -1,284 +1,260 @@
 # Contributing to Wiener Linien Austria
 
-Thanks for taking the time to look. This file is the single answer to "how do I work on this repo?" — read it once and you'll have everything you need.
+Thanks for taking a look. This repo is a Home Assistant integration with four Lovelace cards. Everything you need to work on it is on this page, and the gate in *Verification gate* has to pass before a change lands.
 
-## Dev setup
+## Quick start
 
 ```bash
+git clone https://github.com/rolandzeiner/wiener-linien-austria.git
+cd wiener-linien-austria
 uv venv --python 3.14 && source .venv/bin/activate
 uv pip install -r requirements_test.txt pre-commit
-pre-commit install      # runs ruff + mypy + checks on every commit
-
-npm ci                  # Lovelace card deps
-npm run build           # vp builds four bundles into
-                        # custom_components/wiener_linien_austria/www/:
-                        #   wiener-linien-austria-card.js
-                        #   wiener-linien-austria-retro-card.js
-                        #   wiener-linien-austria-flap-card.js
-                        #   wiener-linien-austria-route-card.js
+pre-commit install
+npm ci && npm run build
 ```
 
-`npm run dev` watches `src/` and rebuilds all four bundles on save.
+Before a PR, run the gate in *Verification gate*. It is what CI runs, so failing locally only costs you a push.
 
-## Branching & releases
+## Branching and releases
 
-- Work on `dev`. PRs target `dev`.
-- A release is a `dev → main` PR, squash-merged. The tag is cut from `main` after the merge. `dev` is then rebuilt on top of `main`, keeping any commits that landed on `dev` after the PR, such as a Dependabot bump. A plain reset to `main` would drop them.
-- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`.
+- Work on `dev`; PRs target `dev`. Nothing is committed or force-pushed to `main`.
+- For anything bigger than a fix, open an issue first so the shape is agreed before the code is written.
+- Conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`. A subject line, then bullets that say what changed and why.
+- The built bundles are committed and travel with the `src/` change that produced them: users install through the Marketplace and never run `npm`, and CI fails when a committed bundle differs from a fresh build by a byte.
+- Releases are the maintainer's: a `dev → main` PR, squash-merged, then a tag from `main`. Publishing the release runs `release.yml`, which attaches `wiener_linien_austria.zip`, a flat archive of `custom_components/wiener_linien_austria/`. `hacs.json` sets `zip_release`, so the Marketplace downloads that file, and a release without it can't be installed. If the job fails, `gh workflow run release.yml -f tag=vX.Y.Z` re-runs it against the existing tag.
+- Contributions are accepted under the repo's MIT licence.
 
-## Card-version sync
+## Python environment
 
-Four cards, four version constants. `manifest.json` is the single source of truth: `const.py` reads it at import and aliases `CARD_VERSION`, `RETRO_CARD_VERSION`, `FLAP_CARD_VERSION` and `ROUTE_CARD_VERSION` to it, so the Python side needs no manual edit. The four literals in `src/const.ts` do — each must equal `manifest.json::version` byte-for-byte. `tests/test_card_version.py` checks every constant against the manifest independently, so a failure names exactly which one drifted.
+- The project uses [`uv`](https://docs.astral.sh/uv/) for Python environments, the same tool CI installs with (`astral-sh/setup-uv` and `uv pip install --system`), so a gate that passes locally resolves what CI resolves. Plain `python -m venv` and `pip` work too.
+- `3.14` is the CI interpreter and what `pytest-homeassistant-custom-component` requires. It is deliberately not the support floor; see *Two Python versions*.
+- `pre-commit install` runs ruff, ruff-format, mypy and `vp check` on every commit, plus the whitespace hooks, from which the built bundles are excluded (see *Card toolchain*).
+- A venv built months ago drifts from `requirements_test.txt`. Re-run `uv pip install -U -r requirements_test.txt` after a pin bump and whenever you come back to the repo; the `-U` is what moves a floating range such as PHACC's.
+- `requirements_test.txt` carries its own rules in its header comment: PHACC governs the test stack, and nothing it pins is declared again.
+- `custom_components/wiener_linien_austria/_dev_fixture.py` is gitignored and the `no-dev-fixture` CI job fails if it ever lands. It injects synthetic data for local card work.
 
-A version bump is therefore two files: `manifest.json` and `src/const.ts`. The TS constants drive the served `?v=…` query string; the Python constants drive the WebSocket version check. If they drift, users get an infinite reload-banner loop — the card sees a mismatch, shows the reload banner, the reload re-serves the same JS, and the banner comes straight back.
+## Two Python versions
 
-Because the TS literals are asserted equal to the manifest, none of the four can carry a `-beta-N` suffix on its own; the manifest version is whatever the cards say. Bump both files in the same commit as a rebuilt bundle — `validate.yml` asserts the committed `www/` matches a fresh `npm run build`. The README badge auto-fetches the latest release tag, so it needs no manual edit.
+Every change has to respect both, and conflating them has shipped a broken release in this portfolio.
 
-## Tooling & config
+| Axis | Version | Where it is declared |
+|---|---|---|
+| **Runtime**: what we develop and test on | 3.14 | `validate.yml` `tests` job, your local venv |
+| **Floor**: the oldest Python we must still run on | 3.13 | `pyproject.toml` `[tool.ruff] target-version`, the `compile-floor-python` CI job |
 
-- `pyproject.toml` — source of truth for ruff (target-version, line-length), mypy (strict, ignore_missing_imports, files), and coverage config. Change rules here, not in CI flags.
-  - **`target-version` tracks the oldest Python we support, never the one CI runs.** `hacs.json` promises HA ≥ 2025.6.0, which runs on Python 3.13, so `target-version = "py313"` — even though the venv and CI are on 3.14. Pointing it at the CI interpreter lets ruff rewrite code into syntax our users cannot parse and then stay silent about it; that is how v1.7.1 shipped a SyntaxError (issue #91). The `compile-floor-python` CI job byte-compiles the shipped package on 3.13 as an independent backstop. Raise all three together or not at all.
-- `vite.config.ts` — the whole card toolchain, run through [Vite+](https://viteplus.dev/) (`vp`): `vp build` (Vite library mode on Rolldown), `vp test` (Vitest) and `vp check` (Oxfmt + Oxlint + type-check). Vitest, Rolldown and the type-checker all ship inside `vite-plus`; `typescript` is not installed. Each card is its own Vite environment with its own bundle and its own copy of Lit, and `builder.buildApp` builds exactly those four. Things there that fail silently if you change them:
-  - **`minify` lives on `rolldownOptions.output`**, not `build.minify`: Vite's library mode skips whitespace minification for ES output.
-  - **Dev vs prod comes from `--mode development`** (`npm run dev`). A plain `vp build` is production: minified, no sourcemap, CSS comments stripped. A dev build writes `.map` files into `www/`; they are gitignored, so they never get committed.
-  - **`emptyOutDir: false`.** `www/` also holds the vendored fonts, and Vite empties the output directory by default.
-  - **`json: { namedExports: false, stringify: false }`, with default imports** (`import de from "./languages/de.json"`). Both language packs are over 10 kB, and Vite's defaults would ship them as `JSON.parse('…')` strings that gzip worse. With named exports off, `import * as de` yields only `{ default }`: every lookup misses and the card shows raw keys. The card suites catch that.
-  - **`fmt.embeddedLanguageFormatting: "off"`.** Oxfmt would otherwise reformat the Lit `html` / `css` templates, which changes the whitespace inside rendered elements.
-  - **`lint.options.denyWarnings: true`.** Without it `vp check` exits 0 on warnings, and CI and pre-commit let them through.
-  - **`lint.plugins` names all four: `typescript`, `unicorn`, `oxc`, `vitest`.** Listing plugins replaces Oxlint's defaults, so dropping one of the first three switches its rules off without a word. The `vitest/*` rules fail a focused or skipped test, an `expect` inside an `if`, and a bare `toThrow()`; give `toThrow` the message it expects.
-- **The `vite` override in `package.json` must name the same version as `vite-plus`**, and `@vitest/coverage-v8`, `vitest` and the `vitest` override must equal the Vitest that `vite-plus` bundles (`npx vp toolchain`). The `vite` override keeps npm from installing upstream Vite next to Vite+'s core. `vitest` is declared because the coverage provider has a required `vitest` peer; `vp migrate` adds it and the override so the graph resolves a single Vitest. Dependabot bumps `vite-plus` alone, and `src/toolchain.test.ts` fails until every pin follows. Bump with `npx --package=vite-plus@<new> vp migrate --no-interactive` and keep what it writes.
-- `scripts/strip-css-comments.mjs` — a `transform` plugin (Rollup plugin API,
-  which Vite runs unchanged) that removes comments and indentation from Lit
-  ``css`` templates in production builds. A minifier only minifies JavaScript,
-  and a tagged template's contents are string data, so without this every
-  explanatory CSS comment shipped to users; it was 17.8% of the modern bundle.
-  Comments stay intact in `npm run dev` and under `vp test`. It has to run
-  *after* the transpile step, which a plugin without `enforce` does. Its
-  tests are in `src/strip-css-comments.test.ts`, typed through the
-  `.d.mts` beside it, and the coverage run measures it with the card sources.
-- `pytest.ini` — pytest config and the **`--cov-fail-under=95` coverage gate**. `pytest tests/` automatically runs with coverage; CI fails fast if a new commit drops coverage below the gate. Current measurement sits ~98% (98.70% on 2026-09-29).
-  - **The package total is only half the gate.** The Silver `test-coverage` rule is per module, and a single number cannot express it: one module can slide to 80% while the others carry the average past the floor. That was this repo's actual state — 91.81% total with `diagnostics.py` at 84% and `quality_scale.yaml` claiming `done`. `--cov-report=json` writes `coverage.json`, and `scripts/check_module_coverage.py` fails on any module below 95%. CI runs it right after pytest; run it locally too, because pytest alone will not tell you a module regressed:
-
-    ```bash
-    .venv/bin/python -m pytest tests/ -q
-    .venv/bin/python scripts/check_module_coverage.py
-    ```
-- `custom_components/wiener_linien_austria/api.py` — every request to Wiener Linien: the realtime, routing and OGD file URLs, the request headers, and the `WienerLinienApiError` exceptions every transport failure turns into. It returns decoded bodies and nothing more: `messageCode` handling, cooldowns, parsing and translated errors stay in the module that owns each feature. **It must not import Home Assistant or anything else from the package** (`const.py` pulls in HA for the User-Agent, so callers pass that in), and `tests/test_api.py` fails on any such import. Catch `WienerLinienApiError`, never `aiohttp` errors, outside `api.py`.
-- `ATTRIBUTION` — canonical data-source statement (Wiener Linien OGD, CC BY 4.0) and licence terms; matches the `attribution` attribute every sensor emits. Update when the upstream API or licence wording changes, and keep the two code copies in sync: `const.ATTRIBUTION` for the sensors and diagnostics, and `ATTRIBUTION_FALLBACK` in `src/const.ts`, which the card footers show until a sensor reports its own.
-
-## Dependency policy
-
-`requirements_test.txt` carries its own rules in its header comment. This section covers `package.json`, which is JSON and cannot.
-
-**Runtime vs dev is a real distinction here, not bookkeeping.** The package is `private` and nothing ever installs it, so the split looks cosmetic — but CI runs `npm audit --omit=dev --audit-level=high`, and that gate only means something because the packages that actually reach a user's browser inside the bundle are the ones in `dependencies`. A build-time tool belongs in `devDependencies` even though the build needs it; anything the build inlines into `www/*.js` belongs in `dependencies`.
-
-**When to pin exactly vs. allow a caret:**
-
-- **Caret (`^x.y.z`)** is for actively maintained runtime packages that keep semver honestly. `lit` is the only one left — everything else here meets one of the cases below.
-- **Exact (`x.y.z`)** for four specific cases:
-  1. **The package is unmaintained**, so a range floats over code nobody is watching. `qr-creator` is at its only release, built with a 2019 toolchain.
-  2. **The "version" is really content, not an API.** A patch release can change what you get without changing any signature.
-  3. **The version is mirrored somewhere else** and the two must move together. `@vitest/coverage-v8` must equal the Vitest bundled in `vite-plus` — the provider reaches into Vitest internals and refuses to load on a mismatch — `vitest` and its override follow the same version, and the `vite` override must equal `vite-plus` itself. `src/toolchain.test.ts` asserts all of them.
-  4. **The package decides what the committed bundle looks like.** `validate.yml` asserts `www/*.js` matches a fresh build, so a floating `vite-plus` can turn a clean tree red with no source change — and a transpiler bump that alters decorator output breaks Lit reactivity while the build stays green. It is exact, and a bump commits the rebuilt bundles with it. `happy-dom` is exact on the same logic one layer down: it decides what the DOM suites see.
-
-Bumping an exact pin is a deliberate act — say why in the commit message. Dependabot raises these as their own PRs rather than folding them into the monthly batch; the npm groups only cover minor and patch.
-
-**Before adding a dependency, check it earns its place.** The bundle is served to every user on every dashboard load. Prefer inlining a constant over depending on a package that exports thousands of them: `utils/mdi-paths.ts` and `utils/retro-station-icons.ts` both vendor icon path geometry with provenance comments rather than pulling an icon library, because path data is content and the bundler was tree-shaking all but a handful of exports anyway.
-
-**Build plugins are load-bearing or they are removed.** `validate.yml` asserts the committed bundles match a fresh build, so any plugin that changes output is part of that contract. Vite and Rolldown do resolution, JSON, CommonJS interop, transpilation and minification natively — `strip-css-comments` is the only plugin, and it is there because nothing built in does its job.
-
-**Two output options are load-bearing and fail silently.** The banner must be a **legal** comment — `/*! ... */` — with `comments: { legal: true }`; a `//` banner is stripped by the minifier and only the built file's first bytes reveal it. And **`dropConsole` stays `false`**: Rolldown's option is a boolean rather than terser's per-method array, so it is all-or-nothing, and most `console.*` calls in these cards sit in `catch` blocks where dropping them turns a caught error into a silent one.
-
-**The card bundles are excluded from the `end-of-file-fixer` / `trailing-whitespace` pre-commit hooks.** The exclude pattern, `^custom_components/.*/www/.*\.js$`, covers all four. The bundler emits no trailing newline, so a hook that "fixes" the file *after* the build leaves the committed bundle out of sync with a fresh one — exactly what `validate.yml` asserts byte-for-byte. `output.footer: "\n"` does not work around it; the minifier strips trailing whitespace.
-
-**The bundler does not type-check; `vp check` does.** The build strips types without checking them. `vp check` runs the type-check (tsgolint on TypeScript 7, against the strict `tsconfig.json`) along with lint and format. Two consequences worth knowing:
-
-- **The bundler checks nothing.** A type error will not fail `npm run build`. `vp check` is the single gate between a type error and a shipped bundle, which is why `validate.yml` runs it as its own step. It also catches a stray backtick inside a Lit template, which ends the template early.
-- **Decorator settings live only in `tsconfig.json`.** Lit 3's `@customElement` / `@property` are legacy decorators that need `useDefineForClassFields: false`. Rolldown reads `tsconfig.json` itself, so don't restate them in `vite.config.ts`. If it ever regresses, class fields overwrite Lit's accessors and reactivity dies silently while the build stays green — diff the Lit reactive-property list of a built bundle to catch it.
-
-There is no `tslib`: `tsconfig.json` sets no `importHelpers`, so `__decorate` is inlined into the bundles.
-
-View per-file coverage locally:
+The floor is whatever `hacs.json`'s `homeassistant` value requires. HA 2025.6.0 declares `REQUIRED_PYTHON_VER = (3, 13, …)`, which you can check rather than remember:
 
 ```bash
-pytest tests/ --cov-report=term-missing   # Python
-npm run test:coverage                     # cards
+gh api "repos/home-assistant/core/contents/homeassistant/const.py?ref=2025.6.0" \
+  --jq .content | base64 -d | grep REQUIRED_PYTHON_VER
 ```
 
-`npm run test:coverage:gate` is the same run with thresholds attached, and is
-what CI enforces. Both measure `src/**/*.ts` and the build plugins in
-`scripts/**/*.mjs`. Both carry their whole configuration as CLI flags rather than
-a `test` block in `vite.config.ts`, for the reason in **Card tests** below.
+Setting `target-version` to the CI interpreter lets `ruff format` emit syntax the floor cannot parse and then stay silent about it; that is how this repo once shipped a `SyntaxError` with green CI, because every check ran on the newer interpreter. Raise the floor only by changing all three declarations in one commit, plus the README's requirement line and badge.
 
-**Whether `--coverage.include` reports a file no test imports depends on the
-vitest major, and it has flipped twice.** Vitest 3 did, through `coverage.all`.
-Vitest 4 removed that, and the v8 provider instrumented only modules a run
-actually loaded. Vitest 5 (current) reports them again, as 0% rows. Verify it in
-one command rather than believing this paragraph:
+## Card toolchain
+
+The cards live in `src/` and build to `custom_components/wiener_linien_austria/www/`, one bundle per card: `wiener-linien-austria-card.js`, `wiener-linien-austria-retro-card.js`, `wiener-linien-austria-flap-card.js` and `wiener-linien-austria-route-card.js`. Their whole toolchain runs through [Vite+](https://viteplus.dev/) (`vp`), configured in `vite.config.ts`: `vp build` (Vite library mode on Rolldown), `vp test` (Vitest) and `vp check` (Oxfmt, Oxlint and the type-check). The card `devDependencies` are `vite-plus`, `happy-dom` and the coverage provider; Vitest, Rolldown and the type-checker ship inside `vite-plus`, and `typescript` is not installed. `npx vp` runs the copy in `node_modules`; a global `vp` works too. Each card is its own Vite environment with its own bundle and its own copy of Lit, and `builder.buildApp` builds exactly those four.
+
+| Command | What it does |
+|---|---|
+| `npm run dev` | Watches `src/` and rebuilds all four bundles on save, with sourcemaps (`--mode development`). |
+| `npm run build` | Production build of the four bundles into `www/`. |
+| `npm test` | `vp test run`: the card suites. |
+| `npm run check` | `vp check`: Oxfmt, Oxlint and the type-check. `npx vp check --fix` rewrites what it can. |
+| `npm run test:coverage` | The card suites with coverage: a text report and `coverage/coverage-final.json`. |
+| `npm run test:coverage:gate` | The same run with the thresholds CI enforces. |
+
+Node 24.11 or newer (26 works too) and npm 11.
+
+Commit the built bundles. End users install through the Marketplace and never run `npm`, so `custom_components/wiener_linien_austria/www/*.js` is tracked. CI asserts each committed bundle matches a fresh build byte for byte; a stale bundle is the infinite reload-banner bug. A dev build writes `.map` files next to them; they are gitignored.
+
+Things in `vite.config.ts` that fail silently if you change them:
+
+- The banner must be a **legal** comment, `/*! ... */`, with `comments: { legal: true }`. The minifier strips a `//` banner without a word; only the built file's first bytes show it.
+- **`minify` lives on `rolldownOptions.output`, with `dropConsole: false`.** Vite's library mode skips whitespace minification for ES output, so `build.minify` alone ships the bundle with its whitespace left in. `dropConsole` is all-or-nothing, and the `console.*` calls here sit in `catch` blocks, where dropping them turns a caught error into a silent one.
+- **Dev vs prod comes from `--mode development`** (`npm run dev`). A plain `vp build` is production: minified, no sourcemap, CSS comments stripped.
+- **`fmt.embeddedLanguageFormatting` stays `"off"`.** Otherwise Oxfmt reformats Lit `html` and `css` templates and changes the whitespace inside rendered elements, which is a DOM change, not a style change.
+- **Decorators are not configured.** Rolldown reads `tsconfig.json` itself and enables Lit's legacy decorators from it. If that ever regresses, class fields overwrite Lit's accessors and reactivity dies while the build stays green; diff the reactive-property list of a built bundle to catch it.
+- **`lint.plugins` replaces Oxlint's defaults.** It names `typescript`, `unicorn` and `oxc` next to `vitest`; drop one and its rules stop running without a word. The `vitest/*` rules fail a committed `.only` or `.skip`, a test without an assertion, a duplicate title, an `expect` inside an `if` and a bare `toThrow()`, and `reportUnusedDisableDirectives` fails a disable comment that no longer suppresses anything.
+- **`lint.options.denyWarnings: true`.** Without it `vp check` exits 0 on warnings, and CI and pre-commit let them through.
+- **`codeSplitting: false`.** Each card is one file; a dashboard resource can't load a second chunk the bundler decided on.
+- **`emptyOutDir: false`.** Vite empties the output directory before each build by default, and `www/` also holds the vendored fonts.
+- **`json: { namedExports: false, stringify: false }`**, with default imports (`import de from "./languages/de.json"`). With named exports off, `import * as de` yields only `{ default }`: every lookup misses and the card shows raw keys. The card suites catch that.
+- **`scripts/strip-css-comments.mjs` is the only plugin**, and it is there because nothing built in does its job: a minifier only minifies JavaScript, and a tagged template's contents are string data, so without it every explanatory CSS comment shipped to users. It runs after the transpile step, which a plugin without `enforce` does, and leaves comments intact under `npm run dev` and `vp test`. Its tests are in `src/strip-css-comments.test.ts`, typed through the `.d.mts` beside it. Any plugin that changes output is part of the byte-for-byte contract CI asserts, so a plugin is load-bearing or it is removed.
+
+The `vite` override in `package.json` must name the same version as `vite-plus`, and `@vitest/coverage-v8`, `vitest` and the `vitest` override must equal the Vitest that `vite-plus` bundles (`npx vp toolchain`). The `vite` override keeps npm from installing upstream Vite next to Vite+'s core; `vitest` is declared because the coverage provider has a required `vitest` peer. Dependabot bumps `vite-plus` but not the override, and `src/toolchain.test.ts` fails until every pin follows. Bump with `npx --package=vite-plus@<new> vp migrate --no-interactive`, which moves them together; `npm install vite-plus@<new>` fails with ERESOLVE.
+
+The build does not type-check. `vp check` is the only thing between a type error and a green build, which is why the gate runs it as its own step. It also catches a backtick inside a Lit `css` or `html` template, comments included, which ends the template early and fails the card at load while the build stays green.
+
+The bundles are excluded from the `end-of-file-fixer` and `trailing-whitespace` hooks: the bundler emits no trailing newline, and a hook that fixes the file after the build leaves it out of sync with a fresh one, which CI asserts byte for byte. `vp check` runs as a local hook on card source; don't switch to Vite+'s own `vp staged` hooks, which take over `core.hooksPath` and silently disable ruff and mypy.
+
+`tsconfig.json`'s `lib` is the cards' browser floor: ES2022. That is why `sorted()` from `src/utils.ts` stands in for `toSorted()`, and why the ES2023 array methods stay out: the bundle doesn't polyfill them. Raising it raises the browser requirement in the README's Requirements section; change both together.
+
+### Trying it in Home Assistant
+
+Copy `custom_components/wiener_linien_austria/` into your Home Assistant config's `custom_components/` and restart Home Assistant. After a card change, copy the rebuilt `www/` files the same way and hard-refresh the browser: the resource URL only changes with the version.
+
+## Verification gate
+
+```bash
+# Python
+pytest tests/ -v
+python scripts/check_module_coverage.py   # the per-module floor, reads coverage.json
+mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
+ruff check .
+ruff format --check .                     # separate: `ruff check` never inspects formatting
+
+# The oldest Python we support, derived from pyproject.toml, never hardcoded
+FLOOR=$(sed -n 's/^target-version = "py3\([0-9]*\)"/3.\1/p' pyproject.toml)
+uv run --python "$FLOOR" --no-project python -m compileall -q custom_components/wiener_linien_austria
+
+# Card
+npx vp check                              # format, lint and the only type-check
+npm test                                  # vp test run
+npm run test:coverage:gate                # the card coverage thresholds
+npm run build                             # commit the rebuilt bundles with the src/ change
+git diff --exit-code -- custom_components/wiener_linien_austria/www/*.js
+node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-card.js
+node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-retro-card.js
+node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-flap-card.js
+node -c custom_components/wiener_linien_austria/www/wiener-linien-austria-route-card.js
+```
+
+CI runs the same checks plus hassfest, HACS validation, `npm audit --omit=dev --audit-level=high`, a check that the committed bundles match a fresh build, the dev-fixture guard and CodeQL. Failing locally only costs you a push.
+
+Two of these are easy to skip and expensive to skip:
+
+- **`ruff format --check`** is separate from `ruff check`, which never inspects formatting. Without it the formatter drifts silently until someone runs it.
+- **`npx vp check`** is the only type-check anywhere. The build strips types without checking them, so a type error builds cleanly all the way to a shipped bundle.
+
+**Keep `--no-project`** on the `compileall` line. Without it `uv` treats the repo root as a project, finds no `requires-python`, and rebuilds `.venv` on the floor interpreter, taking every tool in it along. Recover with `uv venv --clear --python 3.14 && uv pip install -r requirements_test.txt pre-commit`.
+
+## Tests
+
+**Python.** `pytest tests/` runs on `pytest-homeassistant-custom-component`. `tests/conftest.py` holds the fixtures a new test starts from: `make_entry` and `route_entry` for the two entry types, `mock_fetch` and `mock_aiohttp_session` for the upstream, `mock_static_catalogue` for the OGD stop catalogue, `frozen` for the clock, `snapshot` for diagnostics. Two tests are AST guards: `test_api.py` fails on any Home Assistant or package import in `api.py`, and `test_user_agent.py` parametrises every outbound call site. The harness traps that cost an afternoon:
+
+- `conftest.py` zeroes the domain cooldown for every test; a test that needs the real value takes `@pytest.mark.real_domain_cooldown`. Unknown markers fail the run (`strict_markers`), and a hung fixture fails after 15 s.
+- The autouse `no_deprecated_ha_api` fixture fails any test that trips Home Assistant's deprecation channel, in both of HA's message shapes. A test that exercises a deprecated API on purpose takes `@pytest.mark.allow_deprecated_ha_api`; don't weaken the fixture.
+- `tests/test_adhoc.py`'s `_connect` authenticates the WebSocket client **before** freezing time. The auth token is stamped with the real clock, and a clock frozen earlier than that rejects it, so a new test that freezes first fails at login rather than at the assertion.
+- Patch the trip fetch at `custom_components.wiener_linien_austria.route_coordinator.async_fetch_trip_body`, the name `route_coordinator` imported, not in `routing.py`. The fixtures already do.
+
+**Card.** The suites sit beside the sources as `src/**/*.test.ts` and import from `vite-plus/test`, not `vitest`. `vite.config.ts` has no `test` block, and adding one is usually the wrong move: the suite runs in two environments and picks between them per file. Pure functions run in plain Node (the config normalisers, departure filtering, the time and colour helpers, the catalogue checks in `src/localize/localize.test.ts`). Anything that needs a DOM opts in with a `@vitest-environment happy-dom` line in the file's leading comment: `card-smoke.test.ts` mounts the three departure-board cards, `qr-panel.test.ts` draws the modern card's QR code on a stubbed canvas, `editor/editor-smoke.test.ts` mounts their three editors and asserts the `config-changed` payload, `editor/board-editor.test.ts` checks which `hass` updates re-render an editor, `route-card.test.ts` covers the route card, its ad-hoc mode and its editor, `editor/header-strip.test.ts` drives the signage-strip editor, `utils/station-header.test.ts` checks the order of the strip the cards render, `shared-render.test.ts` covers the stale-cache reload machinery, `grid-cell.test.ts` guards the gated grid fill, `utils/color-cssom.test.ts` covers the colours that go through CSSOM, and `utils/traffic-notice.test.ts` needs `DOMParser` to extract notice prose. `toolchain.test.ts` pins the Vite+ pins named in *Card toolchain*.
+
+- The HA components the cards and editors host (`ha-card`, `ha-form`, `ha-icon`, `ha-alert`, `ha-icon-picker`) are deliberately never defined in tests. An undefined element is inert, Lit renders straight through it, and not stubbing them is what keeps this layer free of a test harness.
+- What happy-dom gets wrong where it matters, so don't chase it: no layout, no canvas, its `outline` shorthand parser drops CSS system colours and mangles `var()`, and `style.color` keeps `rgb()`, named and `hsl()` colours as written where a browser serialises them. Assert on the source, not on parsed `cssText`, and test colour parsing with `rgb()` or hex.
+- A new source file that names translation keys must join the `SOURCES` list at the top of `src/localize/localize.test.ts`. The catalogue checks find keys by scanning that fixed set of files; keys used only in an unlisted file read as orphaned and the test fails, even though they render fine.
+- `src/route-card.test.ts` installs an in-memory `localStorage` in `beforeEach`, because happy-dom leaves it undefined.
+
+A change to what the card does comes with a test that fails without it.
+
+### Snapshots
+
+Diagnostics output is pinned through `syrupy` under `tests/snapshots/`. After an intended change to the diagnostics shape, regenerate with `pytest tests/test_diagnostics.py --snapshot-update`, review the diff, and commit the `.ambr` file with the code change.
+
+### Coverage
+
+`pytest.ini` enforces `--cov-fail-under=95` on the package total and writes `coverage.json`. The package total is only half the gate: coverage holds per module, and a single number cannot express that, since one module can slide while the others carry the average past the floor. `scripts/check_module_coverage.py` reads `coverage.json` and fails on any module below 95 %; CI runs it right after pytest, and pytest alone will not tell you a module regressed. `pytest tests/ --cov-report=term-missing` gives the per-file view.
+
+The card side is gated too: `npm run test:coverage:gate` enforces the thresholds in `package.json` over `src/**/*.ts` and the build plugins in `scripts/**/*.mjs`, and `npm run test:coverage` is the same run without them. Both carry their configuration as CLI flags rather than a `test` block in `vite.config.ts`, for the reason under *Card*. The thresholds are a ratchet, not a target: they sit a few points under the measured number so a legitimate refactor doesn't trip them while a chunk of newly untested code does. Raise them when coverage rises; don't lower them without saying why.
+
+Whether `--coverage.include` reports a file no test imports depends on the Vitest major, and it has flipped twice: Vitest 3 did, Vitest 4 instrumented only modules a run loaded, Vitest 5 reports them again as 0 % rows. Verify it in one command rather than believing this paragraph:
 
 ```bash
 npx vp test run src/utils/time.test.ts --coverage --coverage.provider=v8 \
   --coverage.reporter=text --coverage.include='src/stop-combobox.ts'
-# vitest 5 -> a 0% row for stop-combobox.ts; vitest 4 printed an empty table
 ```
 
-Under vitest 4 that is why the three departure-board card entrypoints, then the
-largest files in the tree, were absent from the coverage report until
-`src/card-smoke.test.ts` existed, rather than listed at 0%. The headline
-percentage was computed over a denominator that excluded them. Adding the smoke
-tests moved covered statements from 833 to 1480 and the reported percentage
-*down* from 56.35% to 52.59%. **A falling number here can mean the denominator
-got honest**; read the covered/total counts, not the percentage, before
-concluding anything about a coverage change. Every card source is imported by
-some test today, so the move to vitest 5 left the totals where they were
-(68.14% to 68.15% statements).
+The consequence: a falling percentage can mean the denominator got honest. When a suite starts importing a large file for the first time, covered statements go up and the percentage can go down. Read the covered and total counts, not the percentage, before concluding anything about a coverage change.
 
-The thresholds are a ratchet, not a target: they sit a few points under the
-measured number so a legitimate refactor doesn't trip them while a chunk of
-newly-untested code does. Raise them when coverage rises; don't lower them
-without saying why.
+`--coverage.reporter=json` writes `coverage/coverage-final.json` in Istanbul format, which is what `fallow health --coverage` reads; measured coverage keeps its CRAP scores honest where the estimate would flag covered code. `coverage/` is gitignored.
 
-`--coverage.reporter=json` writes `coverage/coverage-final.json` in Istanbul
-format, which is what `fallow health --coverage` reads. Feeding fallow real
-coverage instead of its estimate cut the findings above threshold from 128 to
-100 and the criticals from 53 to 36 — the difference was all false alarms on
-covered code. The three card files used to report as `estimated` there because
-no test imported them, leaving V8 to emit a stub entry with an empty `fnMap`;
-the smoke tests fixed that at the source. `coverage/` is gitignored.
+## Version sync
 
-## Card tests
+Four cards, four version constants, one source of truth. `manifest.json` `version` is it: `const.py` reads it at import and aliases `CARD_VERSION`, `RETRO_CARD_VERSION`, `FLAP_CARD_VERSION` and `ROUTE_CARD_VERSION` to it, so the Python side needs no edit. The four literals in `src/const.ts` must each equal it byte for byte, and `tests/test_card_version.py` checks every constant independently, so a failure names which one drifted. The failure mode: the card's version check sees a mismatch, shows the reload banner, the reload re-serves the same bundle, and the banner comes back, for every user. A bump edits `manifest.json` and `src/const.ts`, rebuilds the bundles and commits all of it together. No constant carries a `-beta` suffix: a pre-release has the final release's number and GitHub's pre-release flag. The README badge reads the latest release tag and needs no edit.
 
-`npm test` runs Vitest (`vp test run`) over `src/**/*.test.ts`. Test files import
-from `vite-plus/test`, not `vitest`. `vite.config.ts` has no `test` block, and
-adding one is usually the wrong move — the suite runs in two environments and
-picks between them per file:
+## Dependencies
 
-- **node (the default)** for the pure functions: config normalisers, departure
-  filtering, time and colour helpers, the catalogue-health checks in
-  `src/localize/localize.test.ts`.
-- **happy-dom**, opted into with a `@vitest-environment happy-dom` line in the
-  file's leading comment, for anything that needs a DOM. Ten of the 30 test
-  files today: `card-smoke.test.ts` mounts the three departure-board cards,
-  `qr-panel.test.ts` draws the modern card's QR code on a stubbed canvas,
-  `editor-smoke.test.ts` mounts their three editors and asserts the
-  `config-changed` payload, `editor/board-editor.test.ts` checks which `hass`
-  updates re-render an editor, `route-card.test.ts` covers the route card, its
-  ad-hoc mode and its editor,
-  `editor/header-strip.test.ts` drives the signage-strip editor,
-  `utils/station-header.test.ts` checks the order of the strip the cards render,
-  `shared-render.test.ts` covers the stale-cache reload machinery,
-  `utils/color-cssom.test.ts` covers the colours that go through CSSOM, and
-  `utils/traffic-notice.test.ts` needs `DOMParser` to extract notice prose.
+| Package | Pin | Why |
+|---|---|---|
+| `ruff`, `mypy` | exact, `requirements_test.txt` | CI runs nightly; a floating linter turns the build red with no code change. The `rev:` in `.pre-commit-config.yaml` must match; check both tools when bumping either. |
+| `pytest-homeassistant-custom-component` | `>=` floor with a `<` cap | it tracks HA core; pinning it would freeze the HA version tested against |
+| `vite-plus` | exact, `package.json` | it decides what the committed bundles look like; the `vite` override names the same version |
+| `@vitest/coverage-v8`, `vitest` | exact, equal to the Vitest inside `vite-plus` | the provider reaches into Vitest internals and refuses to load on a mismatch; `src/toolchain.test.ts` asserts it |
+| `happy-dom` | exact | it decides what the DOM suites see; the siblings keep one version |
+| `qr-creator` | exact | unmaintained, at its only release, built with a 2019 toolchain; a range would float over code nobody is watching |
+| `lit` | caret | maintained, keeps semver |
 
-Opt in per file rather than globally: only the suites that need a DOM should pay
-for booting one.
+- Bumping an exact pin is a deliberate act; say why in the commit message. Dependabot raises these as their own PRs rather than folding them into the monthly batch; the npm groups only cover minor and patch.
+- **Dependabot's blind spots.** It bumps the `requirements_test.txt` pin and leaves the hook `rev` alone (it is told to); it bumps `vite-plus` and leaves the override alone. The toolchain test catches the second; nothing catches the first except reading both files.
+- **Runtime vs dev.** What the build inlines into the bundles is a `dependency`; a build-time tool is a `devDependency` even though the build needs it. CI's `npm audit --omit=dev` only means something because of that split.
+- **Adding a dependency.** The bundles load on every dashboard, so a new runtime dependency is discussed in an issue first; today the cards have `lit` and `qr-creator`. Its licence must be compatible with MIT and its notice must survive the build (`comments: { legal: true }` keeps the `@license` comments). Prefer vendoring a few constants with a provenance comment over depending on a package that exports thousands: `utils/mdi-paths.ts` and `utils/retro-station-icons.ts` carry icon path geometry that way rather than pulling an icon library.
 
-**A new source file that names translation keys must join the list at the top of
-`src/localize/localize.test.ts`.** The catalogue checks find keys by scanning
-that fixed set of files. Keys used only in an unlisted file read as orphaned and
-the test fails, even though they render fine.
+## Translations
 
-The HA components the editors host (`ha-form`, `ha-icon`, `ha-alert`,
-`ha-icon-picker`) are deliberately never defined in tests. An undefined element
-is inert, Lit renders straight through it, and not stubbing them is what keeps
-this layer free of a test harness.
+Adding or changing a user-visible string means touching four files together: `strings.json`, `translations/en.json`, `translations/de.json`, and `icons.json` for a new entity. hassfest checks the keys in CI, and the German copy uses **du**, never **Sie**.
 
-Three things happy-dom gets wrong, so don't chase them: its `outline` shorthand
-parser drops CSS system colours (`CanvasText`, `Highlight`) and mangles `var()`,
-and `style.color` keeps `rgb()`, named and `hsl()` colours as written where a
-browser serialises them to `rgb()` / `rgba()`. All are fine in every browser HA
-supports — assert on the source, not on parsed `cssText`, and test colour
-parsing with `rgb()` or hex, which `parseColor` reads the same either way.
+The cards' strings live in `src/localize/languages/{de,en}.json`, one namespace per card (`modern`, `retro`, `flap`, `route`) plus `common` for the picker and the shared editor copy. `src/localize/localize.test.ts` guards them: both languages carry the same keys and placeholders, no string is empty, and no key is orphaned. It finds keys by scanning the files in its `SOURCES` list, so a new source file that names keys joins that list.
 
-## Card editors
+## Home Assistant conventions
 
-The modern, retro and flap editors share their element plumbing through
-`BoardEditor` in `src/editor/board-editor.ts`: the config and tab state, the
-`hass` filter in `shouldUpdate`, the tab bar, and `_commit` / `_patch`. Modern
-and flap extend `MultiStopEditor`, which adds the entity picker and one stop
-block per stop. Retro shows a single stop and extends `BoardEditor` directly.
-The route editor is one plain form and uses only the label and helper resolvers
-in `src/editor/editor-common.ts`.
+- Every `UpdateFailed`, `ConfigEntryNotReady` and `ConfigEntryAuthFailed` carries `translation_domain`, `translation_key` and placeholders; never a bare string. `outage.py` turns a sustained upstream failure into the translated states the sensors show.
+- Icons live in `icons.json`; `_attr_icon = "mdi:…"` appears nowhere.
+- Every platform module sets `PARALLEL_UPDATES = 0`.
+- `api.py` imports nothing from Home Assistant or the package: it owns the URLs, headers, requests and the `WienerLinienApiError` hierarchy every transport failure turns into, and returns decoded bodies and nothing more. `messageCode` handling, cooldowns, parsing and translated errors stay in the module that owns each feature. Callers pass in the session and the User-Agent, because `const.py` imports HA. `tests/test_api.py` fails on any such import. Outside `api.py`, catch `WienerLinienApiError`, never `aiohttp`'s errors.
+- The `User-Agent` constant goes on every outbound call and no `Accept-Encoding` is pinned (aiohttp's own offer already gets gzip). The poll floors, the domain-wide cooldown in `rate_limit.py` and the ad-hoc budgets are fair use towards Wiener Linien: don't lower them without thinking about the multi-entry install. `tests/test_user_agent.py` parametrises every call site; a new HTTP call joins the table.
+- `unique_id` formulas are frozen: changing one wipes every existing install.
+- `ATTRIBUTION` in `const.py` is the data-source statement every entity emits (Wiener Linien OGD, CC BY 4.0). `ATTRIBUTION_FALLBACK` in `src/const.ts` is what the card footers show until a sensor reports its own; keep the two in step when the upstream wording changes.
+- Diagnostics redact the fields in `TO_REDACT` in `diagnostics.py`, coordinates among them; the set only grows. Test payloads are synthetic: never a real id, contract number or credential, not even in a fixture.
 
-**Add a setting in its card's editor**, as a field in one of that card's section
-schemas. The base class holds only what two or more editors render the same
-way. A control that only one card has stays with that card.
+## Where things are
 
-**Every config write goes through `_commit`**, which sets `_config` before it
-fires `config-changed`. Home Assistant never calls `setConfig` again after that
-event, so a write that only fires the event leaves the form showing the old
-value.
+| Module | Owns |
+|---|---|
+| `api.py` | Transport for every upstream: realtime, routing and OGD files. HA-free. |
+| `coordinator.py`, `batch.py` | The departure-board poll; `batch.py` makes one `/monitor` request per interval group across entries. |
+| `route_coordinator.py`, `routing.py` | The A→B route entries and the connection planning against the OGD routing service. `route_coordinator.async_plan_trips` is the only function that fetches, parses and ranks a trip request. |
+| `adhoc.py`, `websocket.py`, `stops.py` | On-demand planning for the route card and the `plan_trip` action; the WebSocket commands; the stop picker options. See *On-demand route planning*. |
+| `live.py`, `run_times.py`, `timetable.py`, `s_bahn_network.py` | Live times for planned connections, run times to the stops ahead, planned S-Bahn departures, and which S-Bahn lines call where. |
+| `alerts.py`, `outage.py`, `rate_limit.py`, `parsing.py` | Disruptions and lift status; sustained-outage detection; the domain-wide rate limit and backoff; the coercions the parsers share. |
+| `static.py` | The OGD stop catalogue, DIVA → RBL mapping and line trip patterns, cached in `.storage`. |
+| `config_flow.py`, `services.py`, `diagnostics.py`, `card_registration.py` | The setup and options flows, the `plan_trip` action, diagnostics, and the Lovelace resource registration for the four bundles. |
+| `src/wiener-linien-austria-*.ts`, `src/card-styles.ts` | The four cards; the modern card's styles. |
+| `src/editor.ts`, `src/retro-editor.ts`, `src/flap-editor.ts`, `src/route-editor.ts`, `src/editor/` | The editors and what they share. |
+| `src/utils/` | Pure helpers: config normalisers, departure filtering, colours, time, the route helpers. |
+| `src/localize/` | The card strings and their guard test. |
+| `src/shared-render.ts`, `src/stop-combobox.ts`, `src/font-face.ts` | The version banner and cache-wipe reload; the stop picker; the vendored WL fonts served from `www/fonts/`. |
+
+The modern, retro and flap editors share their element plumbing through `BoardEditor` in `src/editor/board-editor.ts`: the config and tab state, the `hass` filter in `shouldUpdate`, the tab bar, and `_commit` / `_patch`. Modern and flap extend `MultiStopEditor`, which adds the entity picker and one stop block per stop. Retro shows a single stop and extends `BoardEditor` directly. The route editor is one plain form and uses only the label and helper resolvers in `src/editor/editor-common.ts`.
+
+### Adding a card setting
+
+Add it as a field in one of that card's section schemas, in that card's editor. The base class holds only what two or more editors render the same way; a control that only one card has stays with that card. Every config write goes through `_commit`, which sets `_config` before it fires `config-changed`: Home Assistant never calls `setConfig` again after that event, so a write that only fires the event leaves the form showing the old value.
 
 ## On-demand route planning
 
-The route card can plan between any two stops without a route entry. That path
-has more moving parts than the rest of the integration, and a few of them are
-easy to break without a test noticing.
+The route card can plan between any two stops without a route entry. That path has more moving parts than the rest of the integration, and a few of them are easy to break without a test noticing.
 
-**Where it lives.** `websocket.py` holds the two commands the route card calls,
-`wiener_linien_austria/stops` and `wiener_linien_austria/plan`, plus the modern
-card's `wiener_linien_austria/run_times` (see *WebSocket API*). `adhoc.py`
-holds the planner behind `plan` and the `plan_trip` action: cache, coalescing,
-per-user and instance budgets, and the stale fallback. `stops.py` builds the
-stop list the setup dialog and the card share. On the card side,
-`src/stop-combobox.ts` is the picker and `src/utils/route.ts` holds the refresh
-cadence, error table and stop filter.
+**Where it lives.** `websocket.py` holds the two commands the route card calls, `wiener_linien_austria/stops` and `wiener_linien_austria/plan`, plus the modern card's `wiener_linien_austria/run_times` (see *WebSocket API*). `adhoc.py` holds the planner behind `plan` and the `plan_trip` action: cache, coalescing, per-user and instance budgets, and the stale fallback. `stops.py` builds the stop list the setup dialog and the card share. On the card side, `src/stop-combobox.ts` is the picker and `src/utils/route.ts` holds the refresh cadence, error table and stop filter.
 
-**Why the commands are registered in `async_setup`.** `websocket_api` has no
-deregister hook, so a command can't be tied to an entry's lifetime: whatever
-registers it, it stays until HA restarts. `async_setup` runs once per HA
-process, which makes it the one place a single registration is guaranteed. The trade-off is that the
-handlers outlive a removed integration, so every command answers `not_loaded`
-unless an entry of the domain is loaded. Keep that check in any command you add.
+**Why the commands are registered in `async_setup`.** `websocket_api` has no deregister hook, so a command can't be tied to an entry's lifetime: whatever registers it, it stays until HA restarts. `async_setup` runs once per HA process, which makes it the one place a single registration is guaranteed. The trade-off is that the handlers outlive a removed integration, so every command answers `not_loaded` unless an entry of the domain is loaded. Keep that check in any command you add.
 
-**One planning path.** `route_coordinator.async_plan_trips` is the only function
-that fetches, parses and ranks a trip request. Route entries, `plan_trip`, the
-card's `plan` command and the config flow's setup probe all go through it, so
-they can't disagree about the same query. In tests, patch the fetch at
-`custom_components.wiener_linien_austria.route_coordinator.async_fetch_trip_body`
-(the name `route_coordinator` imported), not in `routing.py`. The fixtures in
-`tests/conftest.py` already do.
+**One planning path.** `route_coordinator.async_plan_trips` is the only function that fetches, parses and ranks a trip request. Route entries, `plan_trip`, the card's `plan` command and the config flow's setup probe all go through it, so they can't disagree about the same query.
 
-**The fair-use numbers are measured, not picked.** The backend constants sit at
-the top of `adhoc.py`: a 60 s cache, a 5 min stale limit, 120 requests an hour
-(burst 10) for the instance and 60 (burst 5) per user. The card's sit in
-`src/utils/route.ts`: a 120 s refresh while on screen, a 60 s rollover floor,
-a 2 to 30 s rollover spread, a 30 min idle pause and a 400 ms debounce. They
-were sized against the routing backend's measured capabilities (the block in
-`const.py`) and the load a configured route already makes.
-Changing any of them means re-measuring with the `api-polling` skill's probe
-first, and updating the README's Data updates section in the same commit.
+**The fair-use numbers are measured, not picked.** The backend constants sit at the top of `adhoc.py`: a 60 s cache, a 5 min stale limit, 120 requests an hour (burst 10) for the instance and 60 (burst 5) per user. The card's sit in `src/utils/route.ts`: a 120 s refresh while on screen, a 60 s rollover floor, a 2 to 30 s rollover spread, a 30 min idle pause and a 400 ms debounce. They were sized against the routing backend's measured capabilities (the block in `const.py`) and the load a configured route already makes. Changing any of them means re-measuring first, and updating the README's *Data updates* section in the same commit.
 
-**Privacy.** A stop pair picked on a dashboard is a movement pattern. The card
-keeps the last pick in the browser's `localStorage`, and the backend keeps plans
-in memory for at most 5 minutes and clears them when the last entry unloads.
-Don't add stop pairs to diagnostics, the recorder or any log above `debug`.
-
-**Tests.** `tests/test_adhoc.py` covers both commands and the planner. Its
-`_connect` helper authenticates the WebSocket client **before** freezing time.
-The auth token is stamped with the real clock, and a clock frozen earlier than
-that rejects it, so a new test that freezes first fails at login rather than at
-the assertion. On the card side, `src/route-card.test.ts` installs an in-memory
-`localStorage` in `beforeEach`, because happy-dom leaves it undefined.
+**Privacy.** A stop pair picked on a dashboard is a movement pattern. The card keeps the last pick in the browser's `localStorage`, and the backend keeps plans in memory for at most 5 minutes and clears them when the last entry unloads. Don't add stop pairs to diagnostics, the recorder or any log above `debug`.
 
 ## WebSocket API
 
-The cards reach the backend through three WebSocket commands. They are
-experimental and may change while routes are: the bundled cards are the
-intended callers, and a third-party card can use them on that understanding.
-Any signed-in user can call them, not only admins, so a wall tablet signed in
-as a regular user works.
+The cards reach the backend through three WebSocket commands. They are experimental and may change while routes are: the bundled cards are the intended callers, and a third-party card can use them on that understanding. Any signed-in user can call them, not only admins, so a wall tablet signed in as a regular user works.
 
-**`wiener_linien_austria/stops`** takes no fields. It returns every stop you can
-plan from, nearest to the Home Assistant location first: the same list the
-setup dialog offers.
+**`wiener_linien_austria/stops`** takes no fields. It returns every stop you can plan from, nearest to the Home Assistant location first: the same list the setup dialog offers.
 
 ```json
 {"stops": [{"value": "60201349", "label": "Hauptbahnhof (Wien) — 450 m"}]}
 ```
 
-**`wiener_linien_austria/plan`** plans connections between two stops, leaving
-now or at a chosen time.
+**`wiener_linien_austria/plan`** plans connections between two stops, leaving now or at a chosen time.
 
 | Field | Required | Values |
 |---|---|---|
@@ -292,20 +268,9 @@ now or at a chosen time.
 | `arrive_by` | no | `true` treats `datetime` as the latest arrival instead. Default `false`. |
 | `step_free` | no | `true` plans only step-free connections. Default `false`. |
 
-The answer has the same shape as the next-connection sensor's attributes, so
-one renderer handles both: `origin` and `destination` (stop names),
-`fetched_at`, `min_transfer_minutes`, `step_free`, `trips` (up to four),
-`line_colors`, `traffic_info`, `elevator_info` and `attribution`. `planned_for`
-echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan
-for a chosen time keeps every connection it found, even ones that already left.
-Two more fields cover a used-up allowance: `stale` is `true` when this is an
-older plan served in place of a new one, and `retry_after` then gives the
-seconds until a new one is possible. Otherwise `stale` is `false` and
-`retry_after` is `null`.
+The answer has the same shape as the next-connection sensor's attributes, so one renderer handles both: `origin` and `destination` (stop names), `fetched_at`, `min_transfer_minutes`, `step_free`, `trips` (up to four), `line_colors`, `traffic_info`, `elevator_info` and `attribution`. `planned_for` echoes the chosen time (`null` for now) and `arrive_by` how it was meant. A plan for a chosen time keeps every connection it found, even ones that already left. Two more fields cover a used-up allowance: `stale` is `true` when this is an older plan served in place of a new one, and `retry_after` then gives the seconds until a new one is possible. Otherwise `stale` is `false` and `retry_after` is `null`.
 
-`plan` shares the limits in the README's *Data updates* section: answers reused
-for a minute, and at most 60 requests an hour per user and 120 for all users
-together.
+`plan` shares the limits in the README's *Data updates* section: answers reused for a minute, and at most 60 requests an hour per user and 120 for all users together.
 
 Errors come back with one of these codes:
 
@@ -319,12 +284,9 @@ Errors come back with one of these codes:
 | `rate_limited` | The allowance is used up and there's no recent plan to fall back on. `translation_placeholders.retry_after` gives the seconds to wait. |
 | `upstream` | The trip planner couldn't be reached or sent an error. |
 
-A request that doesn't match the schema gets Home Assistant's own
-`invalid_format` error.
+A request that doesn't match the schema gets Home Assistant's own `invalid_format` error.
 
-**`wiener_linien_austria/run_times`** returns the scheduled minutes from a stop
-to every stop ahead, for each line and direction. The modern card calls it for
-`show_stop_times`.
+**`wiener_linien_austria/run_times`** returns the scheduled minutes from a stop to every stop ahead, for each line and direction. The modern card calls it for `show_stop_times`.
 
 | Field | Required | Values |
 |---|---|---|
@@ -340,46 +302,23 @@ to every stop ahead, for each line and direction. The modern card calls it for
 }
 ```
 
-`run_times` is keyed by line and direction, then by stop name as the
-stops-ahead trail spells it. The minutes can carry a decimal. Add a stop's
-minutes to a departure's `time_real`, or `time_planned` without one, to get its
-estimated arrival there. Ask again after `valid_until`. The README's *Data
-updates* section says when a call costs a request. It answers `not_loaded`,
-`catalogue_unavailable` and `upstream` like the commands above, and
-`invalid_stop` for a DIVA without a departure board.
+`run_times` is keyed by line and direction, then by stop name as the stops-ahead trail spells it. The minutes can carry a decimal. Add a stop's minutes to a departure's `time_real`, or `time_planned` without one, to get its estimated arrival there. Ask again after `valid_until`. The README's *Data updates* section says when a call costs a request. It answers `not_loaded`, `catalogue_unavailable` and `upstream` like the commands above, and `invalid_stop` for a DIVA without a departure board.
 
-## Snapshot tests
+## Style
 
-Diagnostics output is pinned via `syrupy`. Snapshots live under `tests/snapshots/`. After an intentional change to the diagnostics shape (new field, redaction-set drift), regenerate:
-
-```bash
-pytest tests/test_diagnostics.py --snapshot-update
-```
-
-Commit the updated `.ambr` file alongside the code change so the diff is reviewable.
-
-## Verification gate (must pass before pushing)
-
-```bash
-source .venv/bin/activate
-pytest tests/ -q
-python scripts/check_module_coverage.py   # per-module floor, reads coverage.json
-mypy --strict --ignore-missing-imports custom_components/wiener_linien_austria
-ruff check .
-ruff format --check .   # separate: `ruff check` never inspects formatting
-FLOOR=$(sed -n 's/^target-version = "py3\([0-9]*\)"/3.\1/p' pyproject.toml)
-uv run --python "$FLOOR" --no-project python -m compileall -q custom_components/wiener_linien_austria
-npx vp check            # format, lint, type-check
-npm test
-npm run test:coverage:gate
-npm run build           # commit the rebuilt www/*.js with any src/ change
-```
-
-CI runs the same checks plus hassfest + HACS validation, `npm audit`, a byte-for-byte check that the committed bundles match a fresh build, a syntax check of each bundle, and a guard that `_dev_fixture.py` is never committed. Failing locally wastes a push.
+- TypeScript strict; the `tsconfig.json` flags are not negotiable, and `vp check` reports no warnings (`denyWarnings`).
+- Comments say why, not what; identifiers carry the what.
+- The browser floor is ES2022: `sorted()` from `src/utils.ts` instead of `toSorted()`, and no other ES2023 built-in. Imports carry `.js` extensions, as the built bundle resolves them.
+- Runtime dependencies are `lit` and `qr-creator`; adding one goes through *Dependencies*.
+- Python: `pyproject.toml` is the source of truth for ruff, mypy and coverage; change rules there, never in CI flags or hook args. A rule that is noise in tests goes into `per-file-ignores`, not off.
+- German copy uses du.
 
 ## Reporting issues
 
 Open an issue with:
-- HA version + Wiener Linien Austria version
-- Diagnostics download (Settings → Devices & Services → Wiener Linien Austria → Download diagnostics) — coordinates are auto-redacted
-- Steps to reproduce
+
+- your Home Assistant version and the Wiener Linien Austria version
+- the diagnostics download: **Settings → Devices & services → Wiener Linien Austria** → ⋮ → **Download diagnostics**. Coordinates and the other fields in `TO_REDACT` are redacted before the file is written.
+- the steps to reproduce, and the log lines from `custom_components.wiener_linien_austria`
+
+A security problem goes through **Report a vulnerability** under the repository's **Security** tab, not a public issue.
