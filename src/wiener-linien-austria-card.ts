@@ -200,9 +200,6 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _devPaletteOpen = false;
 
   private _versionCheckDone = false;
-  // One-shot flag so the "configured entity missing → fell back to first WL
-  // sensor" warning doesn't spam the console on every re-render.
-  private _fallbackWarned = false;
 
   public setConfig(config: WienerLinienCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -236,15 +233,13 @@ export class WienerLinienAustriaCard extends LitElement {
     this._config = normalised;
     // Reset per-board UI state on config swap. Expand-Set keys embed
     // entity + time_planned, so a stale key would never re-hit but
-    // also never GC. Also clears _fallbackWarned so the next
-    // misconfiguration still warns.
+    // also never GC.
     this._expandedRows = new Set();
     this._expandedTraffic = new Set();
     this._expandedElevator = new Set();
     this._expandedTransfers = new Set();
     this._qrOpenFor = null;
     this._activeTab = 0;
-    this._fallbackWarned = false;
     this._debugTraffic = [];
     this._debugElevator = [];
   }
@@ -464,15 +459,12 @@ export class WienerLinienAustriaCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    return cardShouldUpdate(changed, this.hass, () => {
-      // The memo still holds the last render's stops, resolved against the
-      // previous hass. If that render found none (entity briefly missing
-      // after an HA restart), watching them would reject every tick and
-      // willUpdate, the only other place that clears it, would never run
-      // again (#125).
-      this._resolvedStopsMemo = null;
-      return this._resolveStops().map((s) => s.entity);
-    });
+    // Watch the configured ids, not the resolved ones: a stop that is
+    // missing right now still has to wake the card when it comes back
+    // (#125), and the resolved list would never name it.
+    return cardShouldUpdate(changed, this.hass, () =>
+      (this._config?.entities ?? []).map((s) => s.entity),
+    );
   }
 
   private _lang(): string {
@@ -503,27 +495,21 @@ export class WienerLinienAustriaCard extends LitElement {
     return result;
   }
 
+  /** The configured stops whose sensor is in hass.states. A stop that
+   *  isn't (renamed sensor, removed integration entry) is left out here
+   *  and named by `_missingStops`; the card never swaps in another
+   *  sensor for it, since a board quietly showing the wrong stop is
+   *  worse than one that says what is wrong. */
   private _computeResolvedStops(): NormalisedModernStop[] {
-    const picked = (this._config?.entities ?? []).filter((s) => this.hass?.states?.[s.entity]);
-    if (picked.length) return picked;
-    const available = findWienerLinienEntities(this.hass);
-    const first = available[0];
-    if (first) {
-      // Configured entity exists in the saved config but not in HA's
-      // current state map (renamed sensor, removed integration entry).
-      // Falling back to the first WL sensor keeps the card functional,
-      // but the user could be silently looking at the wrong stop —
-      // surface a one-shot console warning so the cause is debuggable.
-      if (!this._fallbackWarned && (this._config?.entities?.length ?? 0) > 0) {
-        this._fallbackWarned = true;
-        const requested = this._config?.entities.map((s) => s.entity).join(", ");
-        console.warn(
-          `[wiener-linien-austria-card] configured entity "${requested}" not in hass.states; falling back to "${first}"`,
-        );
-      }
-      return [{ entity: first }];
-    }
-    return [];
+    return (this._config?.entities ?? []).filter((s) => this.hass?.states?.[s.entity]);
+  }
+
+  /** The configured entity ids that are not in hass.states. */
+  private _missingStops(): string[] {
+    if (!this.hass) return [];
+    return (this._config?.entities ?? [])
+      .map((s) => s.entity)
+      .filter((eid) => !this.hass?.states?.[eid]);
   }
 
   private _attrs(entityId: string): WienerLinienAttrs {
@@ -541,6 +527,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const cfg = this._config;
     const stops = this._resolveStops();
+    const missing = this._missingStops();
     const useTabs = cfg.layout === "tabs" && stops.length >= 2;
 
     const attribution = cfg.hide_attribution
@@ -554,12 +541,13 @@ export class WienerLinienAustriaCard extends LitElement {
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
           ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
+          ${this._renderMissing(missing)}
           ${
             cfg.show_traffic_info
               ? this._renderTrafficBanner(this._bannerStops(stops, useTabs))
               : nothing
           }
-          ${this._renderBody(stops, useTabs)}
+          ${stops.length || !missing.length ? this._renderBody(stops, useTabs) : nothing}
           ${this._renderFooter(attribution)}
         </div>
       </ha-card>
@@ -607,6 +595,19 @@ export class WienerLinienAustriaCard extends LitElement {
       return html`${this._renderStop(active, this._activeTab)}`;
     }
     return html`${stops.map((s) => this._renderStop(s))}`;
+  }
+
+  /** One warning per missing sensor, the way HA's own cards name an
+   *  entity they can't find (hui-warning, which isn't public API; ha-alert
+   *  is the same component family and look). ha-alert carries
+   *  role="alert", so no role on the wrapper. The id is in the text:
+   *  it is what the user has to go and look up. */
+  private _renderMissing(missing: readonly string[]): TemplateResult | typeof nothing {
+    if (!missing.length) return nothing;
+    return html`${missing.map(
+      (eid) =>
+        html`<ha-alert alert-type="warning">${this._t("entity_missing", { entity: eid })}</ha-alert>`,
+    )}`;
   }
 
   private _renderEmpty(): TemplateResult {

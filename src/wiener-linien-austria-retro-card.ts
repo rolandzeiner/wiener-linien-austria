@@ -153,12 +153,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _anyViaInRows = false;
 
   private _versionCheckDone = false;
-  // One-shot flag so the "configured entity missing → fell back" console
-  // warning doesn't spam on every re-render.
-  private _fallbackWarned = false;
-  // Resolved entity id cached across hass ticks — _resolveEntity is hot
-  // path (called from both shouldUpdate and render) and was iterating
-  // hass.states for the fallback path on every tick.
+  // The auto-picked sensor of a card with no stop configured, cached
+  // across hass ticks: _resolveEntity runs from both shouldUpdate and
+  // render, and finding that sensor iterates hass.states.
   private _cachedEid: string | null = null;
   private _raceTimers = new Set<ReturnType<typeof setTimeout>>();
   // Trajectories for the race currently in flight, rolled in
@@ -236,7 +233,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._victoryEndAt = null;
     this._raceWinner = null;
     this._tickerActive = false;
-    this._fallbackWarned = false;
     this._cachedEid = null;
   }
 
@@ -367,7 +363,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     return cardShouldUpdate(changed, this.hass, () => {
-      const eid = this._resolveEntity();
+      // The configured id even while it is missing, so the card wakes
+      // when the sensor comes back; the auto-picked one otherwise.
+      const eid = this._config?.entity || this._resolveEntity();
       return eid ? [eid] : [];
     });
   }
@@ -456,35 +454,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     );
   }
 
-  /** Cache-aware: returns the configured entity if it's in hass.states,
-   *  else the first auto-discovered WL sensor as a fallback. Cached on
-   *  this._cachedEid because both shouldUpdate and render call it on
-   *  every hass tick — recomputing the fallback (which iterates
-   *  hass.states) on every tick adds up on large dashboards. The cache
-   *  is invalidated on setConfig and when the configured entity's
-   *  presence in hass.states changes. */
+  /** The configured sensor when it is in hass.states, null when it isn't:
+   *  the card then says so (`_renderMain`) rather than showing another
+   *  stop in its place. With no stop configured (the picker's stub state)
+   *  the first WL sensor stands in, so the preview has something to show;
+   *  that pick is cached on this._cachedEid and dropped on setConfig. */
   private _resolveEntity(): string | null {
     const configured = this._config?.entity;
-    if (configured && this.hass?.states?.[configured]) {
-      this._cachedEid = configured;
-      return configured;
-    }
+    if (configured) return this.hass?.states?.[configured] ? configured : null;
     if (this._cachedEid && this.hass?.states?.[this._cachedEid]) {
       return this._cachedEid;
     }
-    const available = findWienerLinienEntities(this.hass);
-    const first = available[0] ?? null;
-    if (first && configured && !this._fallbackWarned) {
-      // Configured entity is gone (rename, integration removal). The
-      // fallback keeps the card useful, but make the swap auditable so
-      // the user notices their dashboard is now showing a different stop.
-      this._fallbackWarned = true;
-      console.warn(
-        `[wiener-linien-austria-retro-card] configured entity "${configured}" not in hass.states; falling back to "${first}"`,
-      );
-    }
-    this._cachedEid = first;
-    return first;
+    this._cachedEid = findWienerLinienEntities(this.hass)[0] ?? null;
+    return this._cachedEid;
   }
 
   // ------------------------------------------------------------------
@@ -1121,8 +1103,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     lineColors: LineColorsMap,
     staleDropped: number,
   ): TemplateResult {
-    if (!eid)
+    if (!eid) {
+      // A configured sensor that is gone gets the warning HA's own cards
+      // show for an entity they can't find (ha-alert brings role="alert");
+      // nothing configured is a different state with a different fix.
+      const configured = this._config?.entity;
+      if (configured) {
+        return html`<div class="retro-missing">
+          <ha-alert alert-type="warning">${this._t("entity_missing", { entity: configured })}</ha-alert>
+        </div>`;
+      }
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
+    }
     if (rows.length === 0) {
       const key = allDisconnected(this.hass, [eid])
         ? "unavailable"
@@ -2194,6 +2186,13 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-size: 0.68em;
       letter-spacing: 1px;
       margin-bottom: 0;
+    }
+    /* The warning keeps HA's own colours on purpose: it is a config
+       error, not board content, so it doesn't wear the LED voice. */
+    .retro-missing {
+      flex: 1;
+      align-self: stretch;
+      padding: 8px 0;
     }
     .retro-empty {
       flex: 1;

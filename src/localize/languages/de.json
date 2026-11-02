@@ -315,7 +315,7 @@
     "version_update": "Klappanzeige wurde auf v{v} aktualisiert — bitte neu laden",
     "version_reload": "Neu laden",
     "version_reload_stuck": "Neu laden hat die neue Version nicht übernommen. Schließe diesen Browser-Tab und öffne das Dashboard erneut, oder lösche die Website-Daten für Home Assistant in den Browser-Einstellungen.",
-    "entity_missing": "Sensor {entity} existiert nicht mehr. Wähle oben einen anderen Sensor.",
+    "entity_missing": "Sensor {entity} existiert nicht mehr. Wähle einen anderen Sensor oder entferne ihn aus den Haltestellen dieser Karte.",
     "departures_list": "Kommende Abfahrten",
     "at_platform": "Einfahrt",
     "countdown_minutes": "{n} Minuten",

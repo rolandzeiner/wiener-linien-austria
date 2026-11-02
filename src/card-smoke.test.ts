@@ -294,6 +294,93 @@ function unavailableHass(): HomeAssistant {
   return hass;
 }
 
+describe("missing sensor", () => {
+  const OTHER = "sensor.praterstern_abfahrten";
+
+  /** The configured stop is gone (renamed sensor, removed entry) while
+   *  another Wiener Linien sensor still exists: the state in which the
+   *  cards used to swap in that other stop without saying so. */
+  function otherStopHass(): HomeAssistant {
+    const h = busyHass();
+    const stop = h.states[ENTITY]!;
+    const [first] = stop.attributes.departures as Array<Record<string, unknown>>;
+    delete h.states[ENTITY];
+    h.states[OTHER] = {
+      ...stop,
+      entity_id: OTHER,
+      attributes: {
+        ...stop.attributes,
+        stop_name: "Praterstern",
+        // What findWienerLinienEntities keys on; the busy fixture leaves it
+        // out because nothing else reads it.
+        next_by_line: {},
+        lines_at_stop: ["71"],
+        departures: [{ ...first, line: "71", towards: "Zentralfriedhof" }],
+      },
+    };
+    return h;
+  }
+
+  const warning = (el: CardElement) =>
+    [...shadow(el).querySelectorAll('ha-alert[alert-type="warning"]')].map(
+      (a) => a.textContent ?? "",
+    );
+  const rendered = (el: CardElement) => (shadow(el).textContent ?? "").replace(/\s+/g, "");
+
+  it.each([
+    [MODERN, { type: `custom:${MODERN}`, entities: [{ entity: ENTITY }] }, "71"],
+    [RETRO, { type: `custom:${RETRO}`, entity: ENTITY }, "71"],
+    [FLAP, { type: `custom:${FLAP}`, entities: [{ entity: ENTITY }] }, "7711"],
+  ])("%s names the missing sensor instead of showing another stop", async (tag, config, other) => {
+    const el = await mount(tag, otherStopHass(), config);
+    const alerts = warning(el);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toContain(`Sensor ${ENTITY} existiert nicht mehr`);
+    // Neither the other stop's board nor the "nothing picked" prompt,
+    // which would contradict the warning.
+    expect(rendered(el)).not.toContain(other);
+    expect(rendered(el)).not.toContain("KeineHaltestelleausgewählt");
+  });
+
+  it.each([
+    [MODERN, "U3"],
+    [FLAP, "UU33"],
+  ])("%s keeps the stops it has and warns about each one it hasn't", async (tag, expected) => {
+    const h = busyHass();
+    const el = await mount(tag, h, {
+      type: `custom:${tag}`,
+      entities: [{ entity: ENTITY }, { entity: OTHER }, { entity: "sensor.gone_abfahrten" }],
+    });
+    expect(warning(el)).toEqual([
+      expect.stringContaining(OTHER),
+      expect.stringContaining("sensor.gone_abfahrten"),
+    ]);
+    expect(rendered(el)).toContain(expected);
+  });
+
+  it.each([
+    [RETRO, { type: `custom:${RETRO}` }, "71"],
+    // The flap card reads its rows from the configured stops, so the
+    // auto-picked sensor fills only the station band.
+    [FLAP, { type: `custom:${FLAP}` }, "Praterstern"],
+  ])("%s still shows the first sensor while nothing is picked", async (tag, config, expected) => {
+    // The picker's stub state, not a missing sensor: the preview has to
+    // show something, and there is no id to warn about.
+    const el = await mount(tag, otherStopHass(), config);
+    expect(warning(el)).toHaveLength(0);
+    expect(rendered(el)).toContain(expected);
+  });
+
+  it.each(CARDS)("%s drops the warning once the sensor is back", async (tag, config, expected) => {
+    const el = await mount(tag, otherStopHass(), config);
+    expect(warning(el)).toHaveLength(1);
+    el.hass = busyHass();
+    await el.updateComplete;
+    expect(warning(el)).toHaveLength(0);
+    expect(rendered(el)).toContain(expected);
+  });
+});
+
 describe("lost connection", () => {
   // An outage used to read as "Keine Abfahrten verfügbar", which is what an
   // empty stop says too, so a dead API looked like a broken install.

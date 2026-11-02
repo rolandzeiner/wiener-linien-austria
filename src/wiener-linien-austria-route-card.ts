@@ -945,10 +945,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     attrs: RouteAttrs,
   ): TemplateResult {
     if (stateValue === undefined) {
-      return this._empty(
-        "mdi:help-circle-outline",
-        this._t("entity_missing", { entity: cfg.entity }),
-      );
+      // The warning HA's own cards show for an entity they can't find
+      // (ha-alert brings role="alert"); the other empty states below are
+      // runtime states, not config errors, and keep the status panel.
+      return html`<ha-alert alert-type="warning"
+        >${this._t("entity_missing", { entity: cfg.entity })}</ha-alert
+      >`;
     }
     if (!findRouteEntities(this.hass).includes(cfg.entity) && stateValue !== "unavailable") {
       // A departure board (or any other sensor) picked by hand in YAML. Say

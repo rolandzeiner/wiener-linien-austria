@@ -826,8 +826,16 @@ describe("rendering", () => {
     expect(root(el).querySelector(".hero-times")?.textContent).toContain("08:00");
   });
 
+  it("warns about a missing sensor the way HA's own cards do", async () => {
+    // A warning, not a status line: the sensor was renamed or removed and
+    // the user has to go and fix the config, so the alert names the id.
+    const el = await mount({ states: {}, language: "de" }, { entity: ENTITY });
+    const alert = root(el).querySelector('ha-alert[alert-type="warning"]');
+    expect(alert?.textContent).toContain(`Sensor ${ENTITY} existiert nicht mehr`);
+    expect(root(el).querySelector('[role="status"]')).toBeNull();
+  });
+
   it.each([
-    [{ entity: ENTITY }, { states: {} }, "existiert nicht mehr"],
     [{ entity: ENTITY }, hass("unavailable", {}), "Routenplaner nicht erreichbar"],
     [
       { entity: ENTITY },
