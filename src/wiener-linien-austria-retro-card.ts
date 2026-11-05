@@ -2012,6 +2012,25 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       animation: retroCountdownPunch 0.8s ease-out both;
       will-change: transform, opacity;
     }
+    /* Outside Pixel style the digit is drawn as lit dots: a dot gradient
+       clipped into the glyph, its pitch in em so the dots scale with the
+       digit. The heavy face stays on purpose, since WL Mono's strokes are
+       about one dot wide and a dotted 1 nearly vanishes. The glow moves
+       to filter because a text-shadow paints over the clipped dots.
+       Pixel style keeps the solid digit above: its screen door already
+       dots it, and two dot grids would beat against each other. The
+       background shorthand resets background-clip, so the clip comes
+       after it. */
+    .retro:not(.retro--style-pixel) .retro-countdown-digit {
+      color: transparent;
+      background: radial-gradient(circle, var(--led-amber) 46%, transparent 52%) 0 0 / 0.045em 0.045em;
+      -webkit-background-clip: text;
+      background-clip: text;
+      text-shadow: none;
+      filter:
+        drop-shadow(0 0 1px rgb(var(--led-glow-rgb) / 0.9))
+        drop-shadow(0 0 14px rgb(var(--led-glow-rgb) / 0.55));
+    }
     @keyframes retroCountdownPunch {
       0%   { opacity: 0; transform: scale(0.4); }
       18%  { opacity: 1; transform: scale(1.18); }

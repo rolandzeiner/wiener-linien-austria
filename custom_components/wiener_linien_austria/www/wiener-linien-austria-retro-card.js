@@ -1792,6 +1792,16 @@ text-shadow:
 animation: retroCountdownPunch 0.8s ease-out both;
 will-change: transform, opacity;
 }
+.retro:not(.retro--style-pixel) .retro-countdown-digit {
+color: transparent;
+background: radial-gradient(circle, var(--led-amber) 46%, transparent 52%) 0 0 / 0.045em 0.045em;
+-webkit-background-clip: text;
+background-clip: text;
+text-shadow: none;
+filter:
+drop-shadow(0 0 1px rgb(var(--led-glow-rgb) / 0.9))
+drop-shadow(0 0 14px rgb(var(--led-glow-rgb) / 0.55));
+}
 @keyframes retroCountdownPunch {
 0%   { opacity: 0; transform: scale(0.4); }
 18%  { opacity: 1; transform: scale(1.18); }
