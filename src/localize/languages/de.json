@@ -204,6 +204,8 @@
   "retro": {
     "editor": {
       "accessibility_only": "Nur barrierefreie Abfahrten anzeigen",
+      "bloom": "Stärkeres LED-Leuchten",
+      "bloom_helper": "Heller Kern und weicher Lichthof um die leuchtende Schrift, so wie eine echte LED-Anzeige leuchtet.",
       "chips": "Zusätzliche Beschriftungen",
       "date_format": "Datumsformat",
       "exit": "Ausgangssymbol",

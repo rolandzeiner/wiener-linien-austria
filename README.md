@@ -405,7 +405,7 @@ entities:
 
 An LED panel modelled on the amber-on-violet signs above Wiener Linien platforms. In the card picker it's **Wiener Linien Austria — Retro**. Filter it to one line and the station name takes that line's colour, blue and yellow for NightLines.
 
-- Three styles: classic, warm and dot matrix.
+- Three styles: classic, warm and dot matrix, with an optional stronger LED glow.
 - A GLEIS or STEIG tile when the stop reports a platform.
 - A station sign above the panel, with an exit, sign text, clock, date, WC, escalator and lift tiles, and your own icons and labels on either side.
 - Any set of lines on one panel, each with its own direction, or every direction.
@@ -436,6 +436,7 @@ direction: both
 | `accessibility_only` | `false` | Shows only step-free departures. |
 | `wheelchair_race` | `false` | Turns on the wheelchair race. |
 | `flicker` | `false` | Simulates LED flicker. |
+| `bloom` | `false` | Adds a bright core and a soft halo to the lit text. |
 | `message_ticker` | `false` | Scrolls `message_text` across the panel every 5 min. |
 | `message_text` | none | The scrolling message, up to 160 characters. |
 | `show_line_pill` | `false` | Shows the line as a badge in its line colour. |

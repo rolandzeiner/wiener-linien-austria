@@ -549,6 +549,7 @@ export interface NormalisedRetroConfigValidated {
   size: RetroSize;
   style: RetroStyle;
   flicker: boolean;
+  bloom: boolean;
   wheelchair_race: boolean;
   accessibility_only: boolean;
   message_ticker: boolean;
@@ -586,6 +587,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "size",
   "style",
   "flicker",
+  "bloom",
   "wheelchair_race",
   "accessibility_only",
   "message_ticker",
@@ -650,6 +652,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     size: oneOf(RETRO_SIZES, raw.size, CARD_DEFAULTS.size.retro),
     style: oneOf(RETRO_STYLES, raw.style, "classic"),
     flicker: raw.flicker === true,
+    bloom: raw.bloom === true,
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,
     message_ticker: raw.message_ticker === true,

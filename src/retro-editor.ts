@@ -252,6 +252,7 @@ export class WienerLinienAustriaRetroCardEditor extends BoardEditor<NormalisedRe
           show_line_pill: cfg.show_line_pill,
           line_stripe: cfg.line_stripe,
           housing: cfg.housing,
+          bloom: cfg.bloom,
           flicker: cfg.flicker,
         },
         schema: [
@@ -285,6 +286,7 @@ export class WienerLinienAustriaRetroCardEditor extends BoardEditor<NormalisedRe
           { name: "show_line_pill", selector: { boolean: {} } },
           { name: "line_stripe", selector: { boolean: {} } },
           { name: "housing", selector: { boolean: {} } },
+          { name: "bloom", selector: { boolean: {} } },
           { name: "flicker", selector: { boolean: {} } },
         ],
       })}

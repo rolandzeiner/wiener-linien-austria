@@ -204,6 +204,8 @@
   "retro": {
     "editor": {
       "accessibility_only": "Only show step-free departures",
+      "bloom": "Stronger LED glow",
+      "bloom_helper": "A bright core and a soft halo around the lit text, the way a real LED sign glows.",
       "chips": "Extra labels",
       "date_format": "Date format",
       "exit": "Exit icon",

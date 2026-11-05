@@ -29,6 +29,7 @@ describe("normaliseRetroConfig — defaults", () => {
     expect(c.size).toBe("regular");
     expect(c.style).toBe("classic");
     expect(c.flicker).toBe(false);
+    expect(c.bloom).toBe(false);
     expect(c.wheelchair_race).toBe(false);
     expect(c.accessibility_only).toBe(false);
     expect(c.message_ticker).toBe(false);
@@ -109,6 +110,11 @@ describe("normaliseRetroConfig — defaults", () => {
     expect(normaliseRetroConfig(retro({ show_station_name: 1 as never })).show_station_name).toBe(
       false,
     );
+  });
+
+  it("turns bloom on only for a literal true", () => {
+    expect(normaliseRetroConfig(retro({ bloom: true })).bloom).toBe(true);
+    expect(normaliseRetroConfig(retro({ bloom: "yes" as never })).bloom).toBe(false);
   });
 
   it("agrees with the other two cards on how a non-boolean is read", () => {

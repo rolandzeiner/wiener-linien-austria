@@ -523,6 +523,9 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   size?: RetroSize | undefined;
   style?: RetroStyle | undefined;
   flicker?: boolean | undefined;
+  /** Stronger glow on the lit LED text: a bright core and a soft halo
+   *  over the usual glow. Default `false`. */
+  bloom?: boolean | undefined;
   wheelchair_race?: boolean | undefined;
   accessibility_only?: boolean | undefined;
   /** When `true`, every 5 minutes the LED panel clears and

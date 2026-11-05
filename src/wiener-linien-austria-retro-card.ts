@@ -993,6 +993,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       [`retro--size-${cfg.size}`]: cfg.size !== "regular",
       [`retro--style-${cfg.style}`]: cfg.style !== "classic",
       "retro--flicker": cfg.flicker,
+      "retro--bloom": cfg.bloom,
       "retro--race-countdown": raceCountdown,
       "retro--race-active": raceActive,
       "retro--race-freeze": raceFreeze,
@@ -1373,6 +1374,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-size: 0.5px;
       --led-dot-edge: 1px;
       --led-dot-pitch: 4px;
+      /* Glow on lit text and icons. One token, so the bloom option can
+         swap it for every lit surface at once. */
+      --led-glow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      --led-glow-filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
 
       /* LED area inner padding. Lives on the LED element; declared here so
          size/gleis variants can override via the .retro cascade. */
@@ -1455,6 +1460,33 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-edge: 1.4px;
       --led-dot-pitch: 3px;
     }
+    /* Bloom option: a 1 px core and a faint wide halo around the usual
+       6 px glow, the way light spreads behind the glass of a real LED
+       sign. The halo steps down with the size variants so small text
+       stays crisp. In Pixel style the screen door dots the halo along
+       with everything else, so it reads as more lit dots around the
+       letters. */
+    .retro--bloom {
+      --led-glow:
+        0 0 1px rgb(var(--led-glow-rgb) / 0.95),
+        0 0 6px rgb(var(--led-glow-rgb) / 0.6),
+        0 0 16px rgb(var(--led-glow-rgb) / 0.28);
+      --led-glow-filter:
+        drop-shadow(0 0 1px rgb(var(--led-glow-rgb) / 0.9))
+        drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.55));
+    }
+    .retro--bloom.retro--size-medium {
+      --led-glow:
+        0 0 1px rgb(var(--led-glow-rgb) / 0.95),
+        0 0 5px rgb(var(--led-glow-rgb) / 0.6),
+        0 0 13px rgb(var(--led-glow-rgb) / 0.26);
+    }
+    .retro--bloom.retro--size-small {
+      --led-glow:
+        0 0 1px rgb(var(--led-glow-rgb) / 0.95),
+        0 0 4px rgb(var(--led-glow-rgb) / 0.6),
+        0 0 10px rgb(var(--led-glow-rgb) / 0.24);
+    }
     .retro--gleis-left .retro-gleis { order: -1; }
     .retro--gleis-right { --retro-pad-r: 14px; }
     .retro--gleis-left { --retro-pad-l: 14px; }
@@ -1465,7 +1497,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       justify-content: center;
       gap: 8px;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       font-size: 1.9em;
       line-height: 1;
       /* <ul> for semantic departure list — reset UA list chrome. */
@@ -1618,7 +1650,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       width: 0.9em;
       height: 0.9em;
       color: inherit;
-      filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
+      filter: var(--led-glow-filter);
       /* Optical-centre correction. WL Mono is a Courier-derived face
          with a tall ascender / shallow descender, so uppercase glyphs
          (SIMMERING) sit in the upper-middle of their line-box. An
@@ -1810,7 +1842,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-size: 1.9em;
       line-height: 1;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       text-transform: uppercase;
       will-change: transform;
       animation-name: retroTickerScroll;
@@ -2090,7 +2122,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       padding: 0 14px 0 18px;
       margin-left: 12px;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       transition: opacity 0.4s ease-out;
       /* Position context for the dotted-divider pseudo. The previous
          border-left: 1px hairline read as a CSS edge, not LED material.
@@ -2199,7 +2231,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-align: center;
       align-self: center;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       font-size: 1.4em;
       padding: 20px 0;
       letter-spacing: 2px;
