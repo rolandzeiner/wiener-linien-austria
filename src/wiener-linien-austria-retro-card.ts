@@ -22,7 +22,7 @@ import {
   type NormalisedRetroConfig,
 } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
-import { deriveRetroView, retroEmptyStateKey } from "./utils/retro-view.js";
+import { deriveRetroView, retroEmptyStateKey, tickerSteps } from "./utils/retro-view.js";
 import { allDisconnected, findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
@@ -384,6 +384,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // that carries the matching race class, so the racers are already
     // stacked above the finish strip on their first painted frame.
     if (changed.has("_raceState")) this._syncRaceAnimations();
+    if (changed.has("_tickerActive") && this._tickerActive) this._stepTicker();
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -582,6 +583,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   /** Scroll duration in seconds — proportional to message length so the
    *  reading pace stays roughly constant. Clamped so a one-word message
    *  still lingers and a maxed-out 160-char message doesn't crawl. */
+  /** Move the marquee one LED column per step instead of gliding at
+   *  sub-pixel positions, which reads as a web marquee and makes the
+   *  letters shimmer under Pixel's dot mask. The custom property goes on
+   *  the overlay, which has no style binding, so a re-render can't wipe
+   *  it, and the overlay is rebuilt for every run. */
+  private _stepTicker(): void {
+    const panel = this.renderRoot.querySelector<HTMLElement>(".retro-ticker");
+    const text = panel?.querySelector<HTMLElement>(".retro-ticker-text");
+    if (!panel || !text) return;
+    const pitch = Number.parseFloat(getComputedStyle(panel).getPropertyValue("--led-dot-pitch"));
+    const steps = tickerSteps(panel.clientWidth + text.offsetWidth, pitch);
+    if (steps !== null) panel.style.setProperty("--ticker-steps", `steps(${steps}, end)`);
+  }
+
   private _tickerDurationSeconds(text: string): number {
     return Math.min(40, Math.max(8, 5 + text.length * 0.18));
   }
@@ -1846,7 +1861,11 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       text-transform: uppercase;
       will-change: transform;
       animation-name: retroTickerScroll;
-      animation-timing-function: linear;
+      /* A real board shifts its text one LED column at a time. The card
+         sets --ticker-steps on the overlay once the text is laid out
+         (travel over dot pitch, see _stepTicker); linear is the
+         fallback for the first frame and for a panel with no layout. */
+      animation-timing-function: var(--ticker-steps, linear);
       animation-iteration-count: 1;
       /* both → text waits off-screen-right before the run and rests
          off-screen-left after it, with no flash at the layout origin.

@@ -117,3 +117,14 @@ export function retroEmptyStateKey(
   });
   return anyInDirection ? "no_data" : "no_data_wrong_direction";
 }
+
+/** How many steps the message marquee takes so it moves one LED column
+ *  at a time: the run's travel (panel width plus text width) over the dot
+ *  pitch. `null` when either measure is missing or not a positive finite
+ *  number (a panel that isn't laid out yet), so the card keeps the smooth
+ *  fallback rather than a single jump. */
+export function tickerSteps(travelPx: number, pitchPx: number): number | null {
+  if (!Number.isFinite(travelPx) || !Number.isFinite(pitchPx)) return null;
+  if (travelPx <= 0 || pitchPx <= 0) return null;
+  return Math.max(1, Math.round(travelPx / pitchPx));
+}
