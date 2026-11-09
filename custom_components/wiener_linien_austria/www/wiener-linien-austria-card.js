@@ -942,7 +942,16 @@ background: var(--card-background-color, var(--ha-card-background, #fff));
 box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
 }
 .stops-ahead-stop.skipped .stops-ahead-dot {
-visibility: hidden;
+left: calc(var(--stops-ahead-dot-size) / 2 - 4px);
+width: 8px;
+height: 20px;
+border-radius: 4px;
+background: repeating-linear-gradient(
+-45deg,
+var(--stops-ahead-line) 0 3px,
+var(--card-background-color, var(--ha-card-background, #fff)) 3px 6px
+);
+box-shadow: inset 0 0 0 1.5px var(--stops-ahead-line);
 }
 .stops-ahead-stop.skipped .stops-ahead-name {
 color: var(--secondary-text-color);
@@ -2861,7 +2870,7 @@ if(super(e),e.type!==R.PROPERTY&&e.type!==R.ATTRIBUTE&&e.type!==R.BOOLEAN_ATTRIB
               aria-hidden="true"
             ></ha-icon>`:N}
       </li>
-    `;return v?[w,this._renderStopsAheadPanel(`row`,e.stops_ahead,x,b,a,y,t,e)]:w}_renderStopAhead(e,t,n,r,i,a,o=!1,s=null){let c=this._config.stops_ahead_modes,l=(e.lines??[]).filter(e=>c.includes(vt(e))),u=this._isNightlineHour(),d=[],f=[];for(let e of l)/^[US]\d/.test(e)||u&&/^N\d/.test(e)?d.push(e):f.push(e);let p=this._transferKey(n,t),m=this._expandedTransfers.has(p),h={"stops-ahead-stop":!0,terminus:!!e.is_terminus,skipped:!!s,"transfers-expanded":m},g=s?s.until?this._t(`stop_skipped_until`,{date:or(s.until,this._lang(),Date.now())}):this._t(`stop_skipped`):``,_=d.length?j`<span class="stops-ahead-metros">
+    `;return v?[w,this._renderStopsAheadPanel(`row`,e.stops_ahead,x,b,a,y,t,e)]:w}_renderStopAhead(e,t,n,r,i,a,o=!1,s=null){let c=this._config.stops_ahead_modes,l=s?[]:(e.lines??[]).filter(e=>c.includes(vt(e))),u=this._isNightlineHour(),d=[],f=[];for(let e of l)/^[US]\d/.test(e)||u&&/^N\d/.test(e)?d.push(e):f.push(e);let p=this._transferKey(n,t),m=this._expandedTransfers.has(p),h={"stops-ahead-stop":!0,terminus:!!e.is_terminus,skipped:!!s,"transfers-expanded":m},g=s?s.until?this._t(`stop_skipped_until`,{date:or(s.until,this._lang(),Date.now())}):this._t(`stop_skipped`):``,_=d.length?j`<span class="stops-ahead-metros">
           ${d.map(e=>j`<span
               class="stops-ahead-line-chip"
               style=${B(q(e,r,i))}
@@ -2883,7 +2892,7 @@ if(super(e),e.type!==R.PROPERTY&&e.type!==R.ATTRIBUTE&&e.type!==R.BOOLEAN_ATTRIB
                 style=${B(q(e,r,i))}
                 >${e}</span
               >`)}
-          </div>`:N,b=f.length>0,x=a?.planned?this._t(`stop_time_late`,{time:a.planned.clock,n:a.planned.late}):``,S=a?[`${this._t(`stop_time_title`)} ${a.clock}`,x].filter(Boolean).join(`, `):``,C=b?[this._t(m?`stops_ahead_other_hide`:`stops_ahead_other_show`,{count:f.length,stop:e.name}),S,g].filter(Boolean).join(` · `):``,w=a?j`<time
+          </div>`:N,b=f.length>0,x=a?.planned?this._t(`stop_time_late`,{time:a.planned.clock,n:a.planned.late}):``,S=a?[`${this._t(`stop_time_title`)} ${a.clock}`,x].filter(Boolean).join(`, `):``,C=b?[this._t(m?`stops_ahead_other_hide`:`stops_ahead_other_show`,{count:f.length,stop:e.name}),S].filter(Boolean).join(` · `):``,w=a?j`<time
           class=${z({"stops-ahead-time":!0,late:!!a.planned&&this._config.show_delay_colors})}
           datetime=${a.iso}
           title=${S}

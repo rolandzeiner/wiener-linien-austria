@@ -2026,8 +2026,12 @@ export class WienerLinienAustriaCard extends LitElement {
     // `stops_ahead_modes` filters BEFORE the split, so hiding a category
     // removes it from the inline chips and the +N panel alike — a user who
     // switches off "Metro" means the U-chips, which are the inline half.
+    //
+    // A station the train goes through gets none: nobody changes there.
     const allowedModes = this._config!.stops_ahead_modes;
-    const allLines = (s.lines ?? []).filter((l) => allowedModes.includes(transferModeOf(l)));
+    const allLines = skip
+      ? []
+      : (s.lines ?? []).filter((l) => allowedModes.includes(transferModeOf(l)));
     const nightActive = this._isNightlineHour();
     const inlineLines: string[] = [];
     const otherLines: string[] = [];
@@ -2128,7 +2132,6 @@ export class WienerLinienAustriaCard extends LitElement {
             stop: s.name,
           }),
           etaLabel,
-          skipLabel,
         ]
           .filter(Boolean)
           .join(" · ")

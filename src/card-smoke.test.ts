@@ -1177,11 +1177,11 @@ describe("show_stop_times on a station the train goes through", () => {
     expect(notes(el)).toEqual(["Kein Halt bis 31.12.2099"]);
     // No time there; the slot stays so the names keep their column.
     expect(stopTimes(el)).toEqual(["16:40", "", "16:44"]);
-    // Its row is a button (13A behind +1), whose label stands in for it.
-    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
-    expect(row?.getAttribute("aria-label")).toBe(
-      "1 weitere Linien bei Neubaugasse anzeigen · Kein Halt bis 31.12.2099",
-    );
+    // Nobody changes where the train doesn't stop: the 13A behind +1 goes,
+    // and with it the row's button, so the note is read as it stands.
+    const row = shadow(el).querySelector(".stops-ahead-stop.skipped .stops-ahead-row");
+    expect(row?.getAttribute("role")).toBeNull();
+    expect(row?.querySelector(".stops-ahead-other-toggle, .stops-ahead-line-chip")).toBeNull();
   });
 
   it("says no stop without a date where no notice gives one", async () => {

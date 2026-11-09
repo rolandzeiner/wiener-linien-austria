@@ -1359,12 +1359,25 @@ export const cardStyles = css`
     background: var(--card-background-color, var(--ha-card-background, #fff));
     box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
   }
-  /* A station the train goes through without a call: no dot, so the line
-     runs on unbroken the way a line map draws it, and the name steps back
-     to the times' grey. The note keeps the body colour: it is what someone
-     acts on, and the grey on a light theme's tinted hero measures 4.1:1. */
+  /* A station the train goes through without a call. Its dot becomes a
+     short work-zone capsule on the line, striped like barrier tape in the
+     line's own colour: the line runs on through it, and the stop is
+     closed. The inner stripes take the card colour, as the terminus ring
+     does. 3px stripes stay distinct at 1x on a wall tablet. The name steps
+     back to the times' grey; the note keeps the body colour, since it is
+     what someone acts on and the grey on a light theme's tinted hero
+     measures 4.1:1. */
   .stops-ahead-stop.skipped .stops-ahead-dot {
-    visibility: hidden;
+    left: calc(var(--stops-ahead-dot-size) / 2 - 4px);
+    width: 8px;
+    height: 20px;
+    border-radius: 4px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--stops-ahead-line) 0 3px,
+      var(--card-background-color, var(--ha-card-background, #fff)) 3px 6px
+    );
+    box-shadow: inset 0 0 0 1.5px var(--stops-ahead-line);
   }
   .stops-ahead-stop.skipped .stops-ahead-name {
     color: var(--secondary-text-color);
