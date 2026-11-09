@@ -944,12 +944,12 @@ box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
 .stops-ahead-stop.skipped .stops-ahead-dot {
 visibility: hidden;
 }
-.stops-ahead-stop.skipped .stops-ahead-name,
-.stops-ahead-skip {
+.stops-ahead-stop.skipped .stops-ahead-name {
 color: var(--secondary-text-color);
 }
 .stops-ahead-skip {
 flex: 0 0 auto;
+color: var(--primary-text-color);
 font-size: 0.85em;
 white-space: nowrap;
 }

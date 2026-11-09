@@ -1361,16 +1361,17 @@ export const cardStyles = css`
   }
   /* A station the train goes through without a call: no dot, so the line
      runs on unbroken the way a line map draws it, and the name steps back
-     beside its note. */
+     to the times' grey. The note keeps the body colour: it is what someone
+     acts on, and the grey on a light theme's tinted hero measures 4.1:1. */
   .stops-ahead-stop.skipped .stops-ahead-dot {
     visibility: hidden;
   }
-  .stops-ahead-stop.skipped .stops-ahead-name,
-  .stops-ahead-skip {
+  .stops-ahead-stop.skipped .stops-ahead-name {
     color: var(--secondary-text-color);
   }
   .stops-ahead-skip {
     flex: 0 0 auto;
+    color: var(--primary-text-color);
     font-size: 0.85em;
     white-space: nowrap;
   }
