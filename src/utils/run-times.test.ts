@@ -7,7 +7,9 @@ import {
   runTimeKey,
   runTimesAnswered,
   runTimesFailed,
+  skipUntilText,
   stopEta,
+  stopSkip,
   type RunTimesAnswer,
   type RunTimesState,
 } from "./run-times.js";
@@ -30,6 +32,7 @@ function answer(overrides: Partial<RunTimesAnswer> = {}): RunTimesAnswer {
 function held(overrides: Partial<RunTimesState> = {}): RunTimesState {
   return {
     runTimes: { [U1]: { Leopoldau: 14 } },
+    noStop: {},
     validUntil: NOW + 6 * HOUR,
     asked: new Map(),
     ...overrides,
@@ -106,12 +109,26 @@ describe("runTimesAnswered", () => {
     );
     expect(state.runTimes).toEqual({});
   });
+
+  it("holds the stations passed without a call", () => {
+    const no_stop = { [U1]: { Messestraße: "2026-12-31T23:59:00+01:00" } };
+    const state = runTimesAnswered(undefined, U1, answer({ no_stop }), NOW);
+    expect(state.noStop).toEqual(no_stop);
+  });
+
+  it("reads an answer without them, from an older backend, as none", () => {
+    expect(runTimesAnswered(undefined, U1, answer(), NOW).noStop).toEqual({});
+    const broken = answer({ no_stop: "x" as unknown as NonNullable<RunTimesAnswer["no_stop"]> });
+    expect(runTimesAnswered(undefined, U1, broken, NOW).noStop).toEqual({});
+  });
 });
 
 describe("runTimesFailed", () => {
   it("keeps what was held and waits before the next ask", () => {
-    const state = runTimesFailed(held(), TRAM, NOW);
+    const prev = held({ noStop: { [U1]: { Messestraße: null } } });
+    const state = runTimesFailed(prev, TRAM, NOW);
     expect(state.runTimes[U1]).toEqual({ Leopoldau: 14 });
+    expect(state.noStop).toEqual(prev.noStop);
     expect(state.validUntil).toBe(NOW + RUN_TIMES_RETRY_MS);
     // Recorded, so the failure doesn't turn into an ask per render.
     expect(needsRunTimes(state, TRAM, NOW + 1)).toBe(false);
@@ -121,6 +138,7 @@ describe("runTimesFailed", () => {
   it("holds nothing after a first ask that failed", () => {
     const state = runTimesFailed(undefined, U1, NOW);
     expect(state.runTimes).toEqual({});
+    expect(state.noStop).toEqual({});
     expect(needsRunTimes(state, U1, NOW + 1)).toBe(false);
   });
 });
@@ -231,5 +249,48 @@ describe("stopEta", () => {
   it("has no time for a row with nothing to count from", () => {
     const blank = { time_planned: null, time_real: null, countdown: Number.NaN };
     expect(stopEta(blank, 7, NOW)).toBeNull();
+  });
+});
+
+describe("stopSkip", () => {
+  it("isn't a skip for a stop the answer doesn't name", () => {
+    expect(stopSkip(undefined, NOW)).toBeNull();
+  });
+
+  it("is a skip without a date where no notice gives one", () => {
+    expect(stopSkip(null, NOW)).toEqual({ until: null });
+    expect(stopSkip("someday", NOW)).toEqual({ until: null });
+  });
+
+  it("carries the date the stop is back", () => {
+    expect(stopSkip("2026-12-31T23:59:00+01:00", NOW)).toEqual({
+      until: new Date("2026-12-31T22:59:00Z"),
+    });
+  });
+
+  it("is no skip once that date has passed", () => {
+    // Run times held for a week can predate the stop's reopening.
+    expect(stopSkip("2026-10-08T10:30:00Z", NOW)).toBeNull();
+  });
+});
+
+describe("skipUntilText", () => {
+  const newYearsEve = new Date("2026-12-31T22:59:00Z");
+
+  it("prints the Vienna day, without the year when it is this one", () => {
+    expect(skipUntilText(newYearsEve, "de", NOW)).toBe("31.12.");
+    expect(skipUntilText(newYearsEve, "en", NOW)).toBe("31 Dec");
+  });
+
+  it("adds the year when it is another", () => {
+    const march = new Date("2027-03-01T03:00:00Z");
+    expect(skipUntilText(march, "de", NOW)).toBe("01.03.2027");
+    expect(skipUntilText(march, "en", NOW)).toBe("1 Mar 2027");
+  });
+
+  it("reads the day in Vienna, not in the browser's zone", () => {
+    // 23:30 UTC on the 31st is already 1 January in Vienna.
+    const late = new Date("2026-12-31T23:30:00Z");
+    expect(skipUntilText(late, "de", NOW)).toBe("01.01.2027");
   });
 });

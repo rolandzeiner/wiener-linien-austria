@@ -13,18 +13,26 @@ import type { DepartureAttr } from "../types.js";
  *  may carry a decimal. */
 export type RunTimesByLine = Record<string, Record<string, number>>;
 
+/** `"U6|H"` → stop name as the trail prints it → when its stop is back (ISO),
+ *  or null where no notice says so clearly. The stations the timetable has
+ *  the line going through without a call. */
+export type NoStopByLine = Record<string, Record<string, string | null>>;
+
 /** The `wiener_linien_austria/run_times` answer. */
 export interface RunTimesAnswer {
   diva: number;
   fetched_at: string | null;
   valid_until: string;
   run_times: RunTimesByLine;
+  /** Absent from a backend older than the feature. */
+  no_stop?: NoStopByLine;
   attribution?: string;
 }
 
 /** What a card holds per stop between asks. */
 export interface RunTimesState {
   runTimes: RunTimesByLine;
+  noStop: NoStopByLine;
   /** Epoch ms from which the answer is asked for again. */
   validUntil: number;
   /** Lines asked about under this answer, and when. A line the answer lacks
@@ -82,8 +90,10 @@ export function runTimesAnswered(
 ): RunTimesState {
   const until = Date.parse(answer.valid_until);
   const runTimes = answer.run_times;
+  const noStop = answer.no_stop;
   return {
     runTimes: runTimes && typeof runTimes === "object" ? runTimes : {},
+    noStop: noStop && typeof noStop === "object" ? noStop : {},
     validUntil: Number.isFinite(until) && until > nowMs ? until : nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };
@@ -98,6 +108,7 @@ export function runTimesFailed(
 ): RunTimesState {
   return {
     runTimes: prev?.runTimes ?? {},
+    noStop: prev?.noStop ?? {},
     validUntil: nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };
@@ -179,4 +190,40 @@ function departureMs(
     if (Number.isFinite(ts)) return ts;
   }
   return Number.isFinite(dep.countdown) ? nowMs + dep.countdown * 60_000 : null;
+}
+
+/** A station the trail passes without the train calling there. */
+export interface StopSkip {
+  /** When the stop is back, where a notice says so clearly. */
+  until: Date | null;
+}
+
+/** The answer's entry for a stop as a skip, or null when it isn't one.
+ *
+ *  An entry whose date has passed is no skip any more: the run times that
+ *  showed the gap can be days older than the stop's reopening, and an empty
+ *  time then claims less than "no stop" would. */
+export function stopSkip(entry: string | null | undefined, nowMs: number): StopSkip | null {
+  if (entry === undefined) return null;
+  if (entry === null) return { until: null };
+  const until = Date.parse(entry);
+  if (!Number.isFinite(until)) return { until: null };
+  return until > nowMs ? { until: new Date(until) } : null;
+}
+
+const VIENNA_YEAR = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  timeZone: "Europe/Vienna",
+});
+
+/** "31.12." / "31 Dec" in Vienna time, with the year when it isn't this one. */
+export function skipUntilText(until: Date, lang: string, nowMs: number): string {
+  const sameYear = VIENNA_YEAR.format(until) === VIENNA_YEAR.format(nowMs);
+  const en = lang === "en";
+  return new Intl.DateTimeFormat(en ? "en-GB" : "de-AT", {
+    day: en ? "numeric" : "2-digit",
+    month: en ? "short" : "2-digit",
+    ...(sameYear ? {} : { year: "numeric" }),
+    timeZone: "Europe/Vienna",
+  }).format(until);
 }

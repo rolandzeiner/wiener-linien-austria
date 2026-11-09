@@ -98,6 +98,8 @@
     "departure_time_title": "Estimated departure",
     "stop_time_title": "Estimated arrival",
     "stop_time_late": "scheduled {time}, {n} min late",
+    "stop_skipped": "No stop",
+    "stop_skipped_until": "No stop until {date}",
     "dir_h": "Outbound",
     "dir_r": "Return",
     "dir_h_short": "H",

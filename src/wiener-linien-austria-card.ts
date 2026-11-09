@@ -58,10 +58,13 @@ import {
   runTimeKey,
   runTimesAnswered,
   runTimesFailed,
+  skipUntilText,
   stopEta,
+  stopSkip,
   type RunTimesAnswer,
   type RunTimesState,
   type StopEta,
+  type StopSkip,
 } from "./utils/run-times.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
 import {
@@ -118,6 +121,13 @@ function platformLabelKey(type: string | undefined): string {
     return "platform_short_rail";
   }
   return "platform_short_bus";
+}
+
+/** A trail's lookups by stop name: the estimated arrival, and whether the
+ *  train goes through without a call. */
+interface StopTimes {
+  eta(stopName: string): StopEta | null;
+  skip(stopName: string): StopSkip | null;
 }
 
 // Cache `Intl.DateTimeFormat` instances by IANA timezone — building one
@@ -1410,11 +1420,11 @@ export class WienerLinienAustriaCard extends LitElement {
     currentLine: string,
     rowKey: string,
     entityId: string,
-    times: ((stopName: string) => StopEta | null) | null,
+    times: StopTimes | null,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
     const lineColors = lineColorsFor(this.hass, entityId);
-    const etas = stops.map((s) => (times ? times(s.name) : undefined));
+    const etas = stops.map((s) => (times ? times.eta(s.name) : undefined));
     // A late departure is late at every stop, so the trail is struck through
     // as a whole: one stop without a time then keeps a slot as wide as the
     // others' two, and the names stay in a column.
@@ -1427,15 +1437,25 @@ export class WienerLinienAustriaCard extends LitElement {
         })}
       >
         ${stops.map((s, idx) =>
-          this._renderStopAhead(s, idx, rowKey, overrides, lineColors, etas[idx], struck),
+          this._renderStopAhead(
+            s,
+            idx,
+            rowKey,
+            overrides,
+            lineColors,
+            etas[idx],
+            struck,
+            times?.skip(s.name) ?? null,
+          ),
         )}
       </ol>
     `;
   }
 
-  /** The estimated arrival per stop of a departure's trail, or null when the
-   *  trail shows no times: the option is off, the stop or the row can't be
-   *  asked for, or the answer has no such line.
+  /** The estimated arrival per stop of a departure's trail, and the stations
+   *  it passes without a call, or null when the trail shows no times: the
+   *  option is off, the stop or the row can't be asked for, or the answer
+   *  has no such line.
    *
    *  An open trail is noted in `_runTimeWants` for `updated()` to ask about.
    *  A closed one is not, but still renders whatever is already held, so
@@ -1444,11 +1464,7 @@ export class WienerLinienAustriaCard extends LitElement {
    *  Before the first answer for the stop the lookup yields null for every
    *  stop, which renders the time column empty: the names then sit where
    *  they will once the times arrive instead of jumping aside. */
-  private _stopTimes(
-    dep: DepartureAttr,
-    entityId: string,
-    open: boolean,
-  ): ((stopName: string) => StopEta | null) | null {
+  private _stopTimes(dep: DepartureAttr, entityId: string, open: boolean): StopTimes | null {
     if (!this._config!.show_stop_times) return null;
     const attrs = this.hass?.states[entityId]?.attributes as WienerLinienAttrs | undefined;
     const diva = attrs?.diva;
@@ -1458,10 +1474,15 @@ export class WienerLinienAustriaCard extends LitElement {
     if (direction !== "H" && direction !== "R") return null;
     if (open) this._runTimeWants.push({ diva, line, direction });
     const held = this._runTimes.get(diva);
-    const minutes = held?.runTimes[runTimeKey(line, direction)];
+    const key = runTimeKey(line, direction);
+    const minutes = held?.runTimes[key];
     if (held && !minutes) return null;
+    const skipped = held?.noStop[key];
     const now = Date.now();
-    return (stopName) => stopEta(dep, minutes?.[stopName], now);
+    return {
+      eta: (stopName) => stopEta(dep, minutes?.[stopName], now),
+      skip: (stopName) => stopSkip(skipped?.[stopName], now),
+    };
   }
 
   /** Ask for the run times the open trails need and the card doesn't hold. */
@@ -1993,6 +2014,8 @@ export class WienerLinienAustriaCard extends LitElement {
     // The trail's departure runs late and delays are shown: a time is the
     // timetable's arrival struck through, then the expected one.
     struck = false,
+    // The timetable has the train going through here without a call.
+    skip: StopSkip | null = null,
   ): TemplateResult {
     // Inline lines (always shown next to the station name): U-Bahn and
     // S-Bahn at any time, plus night lines (N-prefix + digit) WHEN
@@ -2020,8 +2043,16 @@ export class WienerLinienAustriaCard extends LitElement {
     const stopClasses = {
       "stops-ahead-stop": true,
       terminus: !!s.is_terminus,
+      skipped: !!skip,
       "transfers-expanded": transfersExpanded,
     };
+    const skipLabel = skip
+      ? skip.until
+        ? this._t("stop_skipped_until", {
+            date: skipUntilText(skip.until, this._lang(), Date.now()),
+          })
+        : this._t("stop_skipped")
+      : "";
 
     const metroChips = inlineLines.length
       ? html`<span class="stops-ahead-metros">
@@ -2097,6 +2128,7 @@ export class WienerLinienAustriaCard extends LitElement {
             stop: s.name,
           }),
           etaLabel,
+          skipLabel,
         ]
           .filter(Boolean)
           .join(" · ")
@@ -2163,6 +2195,7 @@ export class WienerLinienAustriaCard extends LitElement {
           <span class="stops-ahead-dot" aria-hidden="true"></span>
           ${time}
           <span class="stops-ahead-name">${deText(s.name)}</span>
+          ${skip ? html`<span class="stops-ahead-skip">${skipLabel}</span>` : nothing}
           ${metroChips} ${otherToggle}
         </div>
         ${otherPanel}

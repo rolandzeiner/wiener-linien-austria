@@ -1001,12 +1001,16 @@ function timesHass(callWS: CallWS, timeReal?: string): HomeAssistant {
   return { ...hass, callWS };
 }
 
-function runTimesAnswer(runTimes: Record<string, Record<string, number>>): unknown {
+function runTimesAnswer(
+  runTimes: Record<string, Record<string, number>>,
+  noStop?: Record<string, Record<string, string | null>>,
+): unknown {
   return {
     diva: 60200959,
     fetched_at: "2026-09-09T14:30:00+00:00",
     valid_until: "2099-01-01T00:00:00+00:00",
     run_times: runTimes,
+    ...(noStop ? { no_stop: noStop } : {}),
   };
 }
 
@@ -1146,6 +1150,61 @@ describe("show_stop_times", () => {
     await openTrail(el);
     expect(callWS).not.toHaveBeenCalled();
     expect(stopTimes(el)).toEqual([]);
+  });
+});
+
+describe("show_stop_times on a station the train goes through", () => {
+  // The timetable has no call at Neubaugasse: its run times skip it.
+  const U3 = { Zieglergasse: 2, Simmering: 6 };
+  const skipped = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".stops-ahead-stop.skipped .stops-ahead-name")].map(
+      (n) => n.textContent?.trim() ?? "",
+    );
+  const notes = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".stops-ahead-skip")].map((n) => n.textContent?.trim() ?? "");
+
+  it("says the train doesn't stop there, and until when where a notice says", async () => {
+    const callWS = vi
+      .fn()
+      .mockResolvedValue(
+        runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: "2099-12-31T23:59:00+01:00" } }),
+      );
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(skipped(el)).toEqual(["Neubaugasse"]);
+    // Another year than this one, so the date carries it.
+    expect(notes(el)).toEqual(["Kein Halt bis 31.12.2099"]);
+    // No time there; the slot stays so the names keep their column.
+    expect(stopTimes(el)).toEqual(["16:40", "", "16:44"]);
+    // Its row is a button (13A behind +1), whose label stands in for it.
+    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
+    expect(row?.getAttribute("aria-label")).toBe(
+      "1 weitere Linien bei Neubaugasse anzeigen · Kein Halt bis 31.12.2099",
+    );
+  });
+
+  it("says no stop without a date where no notice gives one", async () => {
+    const callWS = vi
+      .fn()
+      .mockResolvedValue(runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: null } }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(notes(el)).toEqual(["Kein Halt"]);
+  });
+
+  it("drops the note once the stop is back", async () => {
+    const callWS = vi
+      .fn()
+      .mockResolvedValue(
+        runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: "2020-01-01T00:00:00+01:00" } }),
+      );
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(skipped(el)).toEqual([]);
+    expect(notes(el)).toEqual([]);
   });
 });
 

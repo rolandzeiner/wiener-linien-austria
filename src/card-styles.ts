@@ -1359,6 +1359,21 @@ export const cardStyles = css`
     background: var(--card-background-color, var(--ha-card-background, #fff));
     box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
   }
+  /* A station the train goes through without a call: no dot, so the line
+     runs on unbroken the way a line map draws it, and the name steps back
+     beside its note. */
+  .stops-ahead-stop.skipped .stops-ahead-dot {
+    visibility: hidden;
+  }
+  .stops-ahead-stop.skipped .stops-ahead-name,
+  .stops-ahead-skip {
+    color: var(--secondary-text-color);
+  }
+  .stops-ahead-skip {
+    flex: 0 0 auto;
+    font-size: 0.85em;
+    white-space: nowrap;
+  }
   /* Transfer-line chips: small pill badges. U-Bahn chips sit inline
      immediately after the station name (always visible, brand-coloured).
      Tram/bus/night transfers sit behind the right-aligned toggle button
