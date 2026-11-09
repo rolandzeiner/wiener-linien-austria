@@ -428,6 +428,32 @@ RUN_TIME_SWITCH_SPREAD: Final = timedelta(minutes=15)
 # the stop: a sample minutes old would only return the same rows.
 RUN_TIME_TOP_UP_AFTER: Final = timedelta(hours=1)
 
+# --- `/newsList`, measured 2026-11-09 ---------------------------------
+#   https://www.wienerlinien.at/ogd_realtime/newsList?name=news
+#   Compression: honoured (gzip). 166,640 B identity -> 24,547 B on the
+#   wire (6.8x). `name=news` keeps the works and service notices (category
+#   `aktuelles`, 61 that day) and leaves out the 37 elevator-service ones;
+#   the unfiltered list is 193,823 B -> 27,922 B.
+#   Conditional GET: impossible -- no ETag, no Last-Modified, and the body
+#   isn't byte-stable between two requests (`serverTime`).
+#   A notice names its lines (`relatedLines`) and platforms
+#   (`relatedStops`, RBLs) and runs `time.start` to `time.end`. A category
+#   with nothing in it answers `{"data": {"pois": []}, "message":
+#   {"messageCode": 1}}`.
+#   Open-ended notices (moved bus stops, a missing lift) end at 11:11 on
+#   some date years out ("U2: Rathaus - Kein Aufzug", 2031-12-07 11:11);
+#   a dated one ends at its real time (U6 Neue Donau, 2026-12-31 23:59).
+#   Re-probe with api-polling's probe_endpoint.py before changing any of it.
+# ----------------------------------------------------------------
+# Fetched only when a trail a card asks run times for passes a station
+# without calling there, and kept this long: the notices are planned works,
+# posted weeks ahead and edited rarely. Most installs never fetch it.
+STOP_NOTICES_MAX_AGE: Final = timedelta(hours=6)
+# After a failed fetch, the next one waits this long. The trail still says
+# "no stop" meanwhile, only without the date.
+STOP_NOTICES_RETRY_AFTER: Final = timedelta(minutes=30)
+STOP_NOTICES_TIMEOUT_SECONDS: Final = 10
+
 # The timetable server speaks Vienna wall-clock time with no offset, no
 # matter which zone Home Assistant itself is configured in.
 ROUTING_TIME_ZONE: Final = "Europe/Vienna"

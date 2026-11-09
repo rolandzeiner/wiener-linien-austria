@@ -46,7 +46,11 @@ from custom_components.wiener_linien_austria.run_times import (
     regime_at,
     regime_ends,
 )
-from custom_components.wiener_linien_austria.static import StaticCatalogue, Station
+from custom_components.wiener_linien_austria.static import (
+    StaticCatalogue,
+    Station,
+    TripPattern,
+)
 from custom_components.wiener_linien_austria.timetable import (
     build_departure_params,
     parse_departure_body,
@@ -59,6 +63,7 @@ VIENNA = ZoneInfo("Europe/Vienna")
 PRATERSTERN = 60201040
 MEIDLING = 60201015
 VORGARTENSTRASSE = 60201433
+DONAUINSEL = 60200234
 LEOPOLDAU = 60200769
 WESTBAHNHOF = 60201468
 KRIEAU = 60201893
@@ -858,11 +863,85 @@ async def test_command_answers_by_the_names_the_trail_prints(
     )
     assert result["attribution"] == ATTRIBUTION
     assert dm_fetch.await_args.args[2] == USER_AGENT
+    # The catalogue's routes skip nothing, so no notices are asked for.
+    assert result["no_stop"] == {}
 
     # A second trail at the same stop is answered from the sample.
     again = await _ask(client, diva=PRATERSTERN, line="5", direction="H")
     assert again["result"]["run_times"] == result["run_times"]
     assert dm_fetch.await_count == 1
+
+
+async def test_command_names_the_stations_a_trail_passes_without_a_call(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+) -> None:
+    # The route lists a station between Vorgartenstraße (1 min) and
+    # Donauinsel (3 min), which the U1 runs in the capture call at back to
+    # back: the timetable has the trains going through it.
+    skipped = 60299999
+    _name_stops(
+        mock_static_catalogue,
+        {VORGARTENSTRASSE: "Vorgartenstraße", DONAUINSEL: "Donauinsel"},
+    )
+    mock_static_catalogue.stations_by_diva[skipped] = Station(
+        diva=skipped,
+        name="Messestraße",
+        municipality="Wien",
+        longitude=16.4,
+        latitude=48.22,
+        rbls=[93],
+    )
+    index = mock_static_catalogue.index_by_rbl()
+    for rbl, diva, name in (
+        (91, PRATERSTERN, "Praterstern"),
+        (92, VORGARTENSTRASSE, "Vorgartenstraße"),
+        (93, skipped, "Messestraße"),
+        (94, DONAUINSEL, "Donauinsel"),
+    ):
+        index[rbl] = (diva, name)
+    patterns = mock_static_catalogue.trip_patterns
+    assert patterns is not None
+    patterns.patterns_by_line[patterns.lines_by_label["U1"]].append(
+        TripPattern(line_id=1, pattern_id=104, direction=1, stops=(91, 92, 93, 94))
+    )
+    news = {
+        "data": {
+            "pois": [
+                {
+                    "relatedLines": ["U1"],
+                    "relatedStops": [93],
+                    "time": {
+                        "start": "2026-09-14T04:00:00.000+0200",
+                        "end": "2026-12-31T23:59:00.000+0100",
+                    },
+                }
+            ]
+        },
+        "message": {"messageCode": 1},
+    }
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    with patch(
+        "custom_components.wiener_linien_austria.skipped_stops.fetch_news",
+        new_callable=AsyncMock,
+        return_value=news,
+    ) as news_fetch:
+        response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+        again = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert response["success"], response
+    assert response["result"]["no_stop"] == {
+        "U1|H": {"Messestraße": "2026-12-31T23:59:00+01:00"}
+    }
+    assert again["result"]["no_stop"] == response["result"]["no_stop"]
+    assert news_fetch.await_count == 1
 
 
 async def test_command_passes_the_line_on_for_a_top_up(

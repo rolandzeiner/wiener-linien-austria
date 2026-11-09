@@ -18,8 +18,11 @@ user.
 - `wiener_linien_austria/run_times` — the scheduled minutes from a stop to
   every stop ahead, per line and direction, keyed by the stop names the
   stops-ahead trail prints. The modern card adds them to a departure's time
-  for an estimated arrival at each stop. Only for a stop with a departure
-  board set up; run_times.py says when it costs a request.
+  for an estimated arrival at each stop. `no_stop` names, the same way, the
+  stations a trail passes without the train calling there, each with the
+  date the stop is back where a notice says so clearly (skipped_stops.py).
+  Only for a stop with a departure board set up; run_times.py says when it
+  costs a request.
 
 Registered once per HA process in `async_setup`. `websocket_api` has no
 deregister hook, so the handlers outlive a removed integration; each one
@@ -29,6 +32,7 @@ then the card's resource is gone too, so nothing should be calling.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, Final
 
@@ -67,7 +71,8 @@ from .routing import (
     RoutingError,
     async_routing_zone,
 )
-from .run_times import async_get_run_times
+from .run_times import Pair, async_get_run_times
+from .skipped_stops import async_get_stop_notices, closed_until, skipped_stations
 from .static import StaticCatalogue
 from .stops import stop_options, trackable_station
 
@@ -343,6 +348,7 @@ async def _websocket_run_times(
     now = dt_util.utcnow()
     for board in boards:
         run_times.update(_timetable_run_times(board, now))
+    no_stop = await _async_no_stop(hass, catalogue, diva, answer.pairs)
 
     connection.send_result(
         msg_id,
@@ -351,9 +357,42 @@ async def _websocket_run_times(
             "fetched_at": answer.fetched_at.isoformat() if answer.fetched_at else None,
             "valid_until": answer.valid_until.isoformat(),
             "run_times": run_times,
+            "no_stop": no_stop,
             "attribution": ATTRIBUTION,
         },
     )
+
+
+async def _async_no_stop(
+    hass: HomeAssistant,
+    catalogue: StaticCatalogue,
+    diva: int,
+    pairs: Mapping[Pair, Mapping[int, float]],
+) -> dict[str, dict[str, str | None]]:
+    """Per line and direction, the stations passed without a call, by name.
+
+    Each maps to the ISO date the stop is back, or None where no notice
+    says so clearly. The S-Bahn's trails come from the same timetable as
+    their times, so they can't part from them and aren't asked about. The
+    notices are only fetched when something was skipped.
+    """
+    skipped = {
+        pair: stations
+        for pair, minutes in pairs.items()
+        if (stations := skipped_stations(catalogue, diva, *pair, minutes))
+    }
+    if not skipped:
+        return {}
+    notices = await async_get_stop_notices(hass).async_get() or []
+    now = dt_util.utcnow()
+    result: dict[str, dict[str, str | None]] = {}
+    for (label, way), stations in skipped.items():
+        named: dict[str, str | None] = {}
+        for name, station in stations.items():
+            until = closed_until(notices, label, station, now)
+            named[name] = until.isoformat() if until else None
+        result[f"{label}|{way}"] = named
+    return result
 
 
 def _stop_boards(

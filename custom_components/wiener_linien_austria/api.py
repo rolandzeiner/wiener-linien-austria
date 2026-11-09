@@ -3,7 +3,8 @@
 Three hosts' worth of endpoints, all on www.wienerlinien.at:
 
 - `ogd_realtime` — `/monitor` (departure boards, live times, the config
-  flow's line probe) and `/trafficInfoList` (disruptions, elevators).
+  flow's line probe), `/trafficInfoList` (disruptions, elevators) and
+  `/newsList` (planned works, for the stations a trail passes).
 - `ogd_routing` — the Mentz EFA server: `XML_TRIP_REQUEST2` (A→B trips) and
   `XML_DM_REQUEST` (planned S-Bahn departures).
 - `ogd_realtime/doku` — the weekly static CSVs and GTFS `routes.txt`.
@@ -87,6 +88,7 @@ import aiohttp
 API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"
 MONITOR_ENDPOINT: Final = "/monitor"
 TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
+NEWS_ENDPOINT: Final = "/newsList"
 
 ROUTING_BASE_URL: Final = "https://www.wienerlinien.at/ogd_routing"
 ROUTING_TRIP_ENDPOINT: Final = "/XML_TRIP_REQUEST2"
@@ -258,6 +260,22 @@ async def fetch_traffic_info(
         session,
         f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}",
         params=[("name", name) for name in names],
+        user_agent=user_agent,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+async def fetch_news(
+    session: aiohttp.ClientSession,
+    *,
+    user_agent: str,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """`/newsList` for the works and service notices, the `news` group."""
+    return await get_json(
+        session,
+        f"{API_BASE_URL}{NEWS_ENDPOINT}",
+        params=[("name", "news")],
         user_agent=user_agent,
         timeout_seconds=timeout_seconds,
     )

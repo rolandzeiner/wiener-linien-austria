@@ -26,7 +26,9 @@ timetable refresh (timetable.py) and the daily S-Bahn network sample
 no slot at all: `plan_trip` and the route card's From / To mode go through
 the cache, coalescing and token-bucket budget in adhoc.py instead, the run
 times a card asks for when a trail is opened are bounded by run_times.py's
-weekly samples, and the config flow's probes skip both slots. A cooldown
+weekly samples, the `/newsList` fetch a trail with a skipped station makes
+by skipped_stops.py's six-hour cache, and the config flow's probes skip
+both slots. A cooldown
 bounds what runs unattended; the budget bounds what people ask for.
 """
 
