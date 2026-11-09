@@ -409,7 +409,7 @@ An LED panel modelled on the amber-on-violet signs above Wiener Linien platforms
 - A GLEIS or STEIG tile when the stop reports a platform.
 - A station sign above the panel, with an exit, sign text, clock, date, WC, escalator and lift tiles, and your own icons and labels on either side.
 - Any set of lines on one panel, each with its own direction, or every direction.
-- A wheelchair race: when two or more departures are step free, a dot-matrix "3, 2, 1" countdown runs to a trophy finish. Tap to start it.
+- A wheelchair race: when two or more departures are step free, a "3, 2, 1" countdown runs to a trophy finish. Tap to start it.
 - A scrolling message every 5 minutes, between the live departures, moving one LED column at a time.
 
 ```yaml
