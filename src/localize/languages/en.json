@@ -479,6 +479,7 @@
     "page_every_seconds": "every {s} s",
     "page_every_minute": "a minute",
     "page_why": "Up to {max} requests in a row, then one {every}, so the card goes easy on the Wiener Linien trip planner.",
+    "page_why_label": "About the limit",
     "page_refill_in": "+1 in {s} s",
     "planned_departs": "Leave {day}",
     "planned_arrives": "Arrive {time}",

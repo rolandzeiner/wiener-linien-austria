@@ -479,6 +479,7 @@
     "page_every_seconds": "alle {s} s",
     "page_every_minute": "pro Minute",
     "page_why": "Bis zu {max} Abfragen am Stück, dann eine {every}. So schont die Karte den Routenplaner der Wiener Linien.",
+    "page_why_label": "Mehr zum Limit",
     "page_refill_in": "+1 in {s} s",
     "planned_departs": "Abfahrt {day}",
     "planned_arrives": "Ankunft {time}",

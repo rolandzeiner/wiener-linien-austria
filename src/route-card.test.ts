@@ -1475,7 +1475,7 @@ describe("earlier and later", () => {
   const DESTINATION = Number(PRATERSTERN);
 
   const pager = (el: CardElement): HTMLButtonElement[] => [
-    ...root(el).querySelectorAll<HTMLButtonElement>(".pager button"),
+    ...root(el).querySelectorAll<HTMLButtonElement>(".pager .page"),
   ];
   const inert = (el: CardElement): (string | null)[] =>
     pager(el).map((b) => b.getAttribute("aria-disabled"));
@@ -1517,8 +1517,8 @@ describe("earlier and later", () => {
   // Whitespace folded: numbers and units are held together by no-break spaces.
   const shown = (node: Element | null): string | undefined =>
     node?.textContent?.replace(/\s+/g, " ").trim();
-  const note = (el: CardElement) => shown(root(el).querySelector(".pager-note"));
-  const why = (el: CardElement) => shown(root(el).querySelector(".pager-why"));
+  const note = (el: CardElement) => shown(root(el).querySelector("#wl-pager-note"));
+  const why = (el: CardElement) => shown(root(el).querySelector("#wl-pager-why"));
   const status = (el: CardElement) => shown(root(el).querySelector('.wrap > [role="status"]'));
   const RULE = { requests_max: 10, requests_refill_s: 60 };
   const WHY =
@@ -1596,6 +1596,36 @@ describe("earlier and later", () => {
     await settle(el, 60_000);
     expect(note(el)).toBeUndefined();
     expect(why(el)).toBeUndefined();
+  });
+
+  it("keeps the rule behind an ⓘ that a mouse opens on hover", async () => {
+    const opened: HTMLElement[] = [];
+    const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
+    const saved = proto["showPopover"];
+    proto["showPopover"] = function (this: HTMLElement) {
+      opened.push(this);
+    };
+    try {
+      const { el } = await mountBudget([{ requests_left: 2, requests_next_in: 40 }]);
+      pager(el)[1]!.click();
+      await settle(el);
+      const button = root(el).querySelector<HTMLButtonElement>(".tip-button")!;
+      expect(button.getAttribute("aria-label")).toBe("Mehr zum Limit");
+      expect(button.getAttribute("popovertarget")).toBe("wl-pager-why");
+      const bubble = root(el).querySelector<HTMLElement>("#wl-pager-why")!;
+      expect(bubble.getAttribute("popover")).toBe("auto");
+      expect(why(el)).toBe(WHY);
+      // Nothing under the steps any more: the rule is only in the bubble.
+      expect(root(el).querySelector(".pager-why")).toBeNull();
+
+      const tip = root(el).querySelector<HTMLElement>(".tip")!;
+      tip.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "touch" }));
+      expect(opened).toHaveLength(0);
+      tip.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+      expect(opened).toEqual([bubble]);
+    } finally {
+      proto["showPopover"] = saved;
+    }
   });
 
   it("steps both ways through the answers it already has while the wait runs", async () => {

@@ -247,6 +247,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  an error's next try. Ticks only while one of them runs. */
   @state() private _secondNow = Date.now();
   private _countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  private _tipHideTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _tick: ReturnType<typeof setInterval> | null = null;
   private _versionCheckDone = false;
@@ -363,6 +364,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._stopAdhoc();
     if (this._countdownTimer !== null) clearTimeout(this._countdownTimer);
     this._countdownTimer = null;
+    if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = null;
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -1131,8 +1134,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  Between them, once few fresh plans are left, how many and when the
    *  next comes back; once none are, the seconds until a new one can go out.
    *  A step the card was answered recently still goes, either way: the
-   *  backend hands that plan out again. Under them, the rule and why. An
-   *  error says its own countdown, so the note stays out of it. */
+   *  backend hands that plan out again. The rule and why sit behind an ⓘ
+   *  beside it, which a refusal shows on its own: an error says its own
+   *  countdown, so the note stays out of it. */
   private _renderPager(): TemplateResult | typeof nothing {
     if (this._stops === null || !this._from || !this._to || this._from === this._to) {
       return nothing;
@@ -1158,12 +1162,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         <span>${this._t("page_earlier")}</span>
       </button>
       ${
-        note
-          ? html`<p class="pager-note" id="wl-pager-note">
-            ${
-              waiting ? html`<ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>` : nothing
-            }<span>${note}</span>
-          </p>`
+        note || why
+          ? html`<div class="pager-note">
+            ${waiting ? html`<ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>` : nothing}
+            ${note ? html`<span id="wl-pager-note">${note}</span>` : nothing}
+            ${why ? this._renderWhy(why) : nothing}
+          </div>`
           : nothing
       }
       <button
@@ -1176,9 +1180,74 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         <span>${this._t("page_later")}</span>
         <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
       </button>
-      ${why ? html`<p class="pager-why" id="wl-pager-why">${why}</p>` : nothing}
     </div>`;
   }
+
+  /** The ⓘ and its toggletip. A tap or a key opens and closes it; a mouse
+   *  opens it on hover, and a click then keeps it open rather than closing
+   *  it under the pointer. Esc or a tap elsewhere closes it (popover
+   *  "auto"), and the top layer keeps it clear of the card's edges. The
+   *  steps name it in their description, so a screen reader hears it
+   *  without opening it. */
+  private _renderWhy(why: string): TemplateResult {
+    return html`<span
+      class="tip"
+      @pointerenter=${this._onTipEnter}
+      @pointerleave=${this._onTipLeave}
+    >
+      <button
+        type="button"
+        class="tip-button"
+        popovertarget="wl-pager-why"
+        aria-label=${this._t("page_why_label")}
+        @click=${this._onTipClick}
+      >
+        <ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon>
+      </button>
+      <span class="tip-bubble" id="wl-pager-why" popover="auto">${why}</span>
+    </span>`;
+  }
+
+  private _tipBubble(): HTMLElement | null {
+    return this.renderRoot.querySelector<HTMLElement>("#wl-pager-why");
+  }
+
+  /** Whether the bubble is open; false where popovers aren't supported. */
+  private _tipShown(bubble: HTMLElement | null): boolean {
+    try {
+      return !!bubble?.matches(":popover-open");
+    } catch {
+      return false;
+    }
+  }
+
+  private _onTipEnter = (ev: PointerEvent): void => {
+    if (ev.pointerType !== "mouse") return;
+    if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = null;
+    const bubble = this._tipBubble();
+    if (typeof bubble?.showPopover === "function" && !this._tipShown(bubble)) {
+      bubble.showPopover();
+    }
+  };
+
+  /** A moment's grace, so the pointer can cross from the ⓘ to the bubble. */
+  private _onTipLeave = (ev: PointerEvent): void => {
+    if (ev.pointerType !== "mouse") return;
+    if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = setTimeout(() => {
+      this._tipHideTimer = null;
+      const bubble = this._tipBubble();
+      if (typeof bubble?.hidePopover === "function" && this._tipShown(bubble)) {
+        bubble.hidePopover();
+      }
+    }, 200);
+  };
+
+  /** Hover already opened it for a mouse; the click mustn't toggle it shut. */
+  private _onTipClick = (ev: PointerEvent): void => {
+    if (ev.pointerType === "mouse" && this._tipShown(this._tipBubble())) ev.preventDefault();
+  };
 
   /** One strings object per picker and language: a fresh object on every
    *  render (the clock ticks every 15 s) would re-render both pickers. */
@@ -3024,13 +3093,61 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       flex: none;
       --mdc-icon-size: 16px;
     }
-    .pager-why {
-      grid-column: 1 / -1;
-      margin: 0;
+    .tip {
+      display: inline-flex;
+      flex: none;
+    }
+    /* 24px clears the target minimum (WCAG 2.5.8) around a 16px icon. */
+    .tip-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: none;
       color: var(--secondary-text-color);
-      font-size: 0.8rem;
-      line-height: 1.35;
+      cursor: pointer;
+      anchor-name: --wl-pager-why;
+    }
+    @media (hover: hover) {
+      .tip-button:hover {
+        color: var(--primary-text-color);
+      }
+    }
+    /* Without anchor positioning the popover keeps its centred default, a
+       small box in the middle of the screen, which still reads fine. */
+    .tip-bubble {
+      box-sizing: border-box;
+      width: max-content;
+      max-width: min(18rem, calc(100vw - 32px));
+      padding: 8px 12px;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+      border-radius: var(--wl-radius-md);
+      background: var(--card-background-color, var(--ha-card-background, Canvas));
+      color: var(--primary-text-color, CanvasText);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+      font-size: 0.85rem;
+      font-weight: 400;
+      line-height: 1.4;
+      text-align: start;
       text-wrap: pretty;
+    }
+    @supports (anchor-name: --a) {
+      .tip-bubble {
+        inset: auto;
+        margin: 6px 0;
+        position-anchor: --wl-pager-why;
+        position-area: bottom;
+        position-try-fallbacks:
+          bottom span-left,
+          bottom span-right,
+          top,
+          top span-left,
+          top span-right;
+      }
     }
     .page ha-icon {
       display: block;
