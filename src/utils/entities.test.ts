@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { allDisconnected, departureBoardOptions, mergeLineColorsMaps } from "./entities.js";
+import {
+  allDisconnected,
+  departureBoardOptions,
+  mergeLineColorsMaps,
+  missingStopIds,
+} from "./entities.js";
 import type { HomeAssistant } from "../types.js";
 import { sorted } from "../utils.js";
 
@@ -156,5 +161,20 @@ describe("allDisconnected", () => {
     expect(allDisconnected(hass, ["sensor.gone"])).toBe(false);
     expect(allDisconnected(hass, [])).toBe(false);
     expect(allDisconnected(undefined, ["sensor.a"])).toBe(false);
+  });
+});
+
+describe("missingStopIds", () => {
+  const hass = {
+    states: { "sensor.a": { entity_id: "sensor.a", state: "3", attributes: {} } },
+  } as unknown as HomeAssistant;
+
+  it("names the configured stops with no state, in config order", () => {
+    const stops = [{ entity: "sensor.gone" }, { entity: "sensor.a" }, { entity: "sensor.old" }];
+    expect(missingStopIds(hass, stops)).toEqual(["sensor.gone", "sensor.old"]);
+  });
+
+  it("names nothing before hass arrives", () => {
+    expect(missingStopIds(undefined, [{ entity: "sensor.gone" }])).toEqual([]);
   });
 });

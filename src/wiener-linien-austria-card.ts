@@ -38,6 +38,7 @@ import {
   findWienerLinienEntities,
   mergeLineColorsMaps,
   lineColorsFor,
+  missingStopIds,
 } from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeDomId, toggleInSet } from "./utils/html.js";
@@ -508,19 +509,11 @@ export class WienerLinienAustriaCard extends LitElement {
 
   /** The configured stops whose sensor is in hass.states. A stop that
    *  isn't (renamed sensor, removed integration entry) is left out here
-   *  and named by `_missingStops`; the card never swaps in another
+   *  and named by `missingStopIds`; the card never swaps in another
    *  sensor for it, since a board quietly showing the wrong stop is
    *  worse than one that says what is wrong. */
   private _computeResolvedStops(): NormalisedModernStop[] {
     return (this._config?.entities ?? []).filter((s) => this.hass?.states?.[s.entity]);
-  }
-
-  /** The configured entity ids that are not in hass.states. */
-  private _missingStops(): string[] {
-    if (!this.hass) return [];
-    return (this._config?.entities ?? [])
-      .map((s) => s.entity)
-      .filter((eid) => !this.hass?.states?.[eid]);
   }
 
   private _attrs(entityId: string): WienerLinienAttrs {
@@ -538,7 +531,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const cfg = this._config;
     const stops = this._resolveStops();
-    const missing = this._missingStops();
+    const missing = missingStopIds(this.hass, cfg.entities);
     const useTabs = cfg.layout === "tabs" && stops.length >= 2;
 
     const attribution = cfg.hide_attribution

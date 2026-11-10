@@ -66,6 +66,17 @@ export function allDisconnected(hass: HomeAssistant | undefined, eids: readonly 
   return eids.length > 0 && eids.every((eid) => isDisconnected(hass, eid));
 }
 
+/** The configured stops' entity ids that have no state in Home Assistant.
+ *  Empty before `hass` arrives: nothing has been looked up yet, so nothing
+ *  counts as missing. */
+export function missingStopIds(
+  hass: HomeAssistant | undefined,
+  stops: ReadonlyArray<{ entity: string }>,
+): string[] {
+  if (!hass) return [];
+  return stops.map((s) => s.entity).filter((eid) => !hass.states?.[eid]);
+}
+
 /** Sensor entity ids whose attributes pass `matches`, sorted. The walk the
  *  stop and route cards share; each supplies its own fingerprint, which is
  *  the part that must keep the two from picking up each other's sensors. */

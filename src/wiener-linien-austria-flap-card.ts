@@ -35,6 +35,7 @@ import {
   allDisconnected,
   findWienerLinienEntities,
   mergeLineColorsMaps,
+  missingStopIds,
 } from "./utils/entities.js";
 import {
   normaliseFlapConfig,
@@ -481,7 +482,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   }
 
   /** Configured stop entity ids that actually exist in hass.states; the
-   *  ones that don't are named by `_missingStopEids` and never replaced
+   *  ones that don't are named by `missingStopIds` and never replaced
    *  by another sensor. When `entities` is empty (fresh card from the
    *  picker), the first auto-discovered WL sensor stands in so the
    *  preview is populated. */
@@ -494,14 +495,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       if (first) out.push(first);
     }
     return out;
-  }
-
-  /** The configured entity ids that are not in hass.states. */
-  private _missingStopEids(): string[] {
-    if (!this.hass) return [];
-    return (this._config?.entities ?? [])
-      .map((s) => s.entity)
-      .filter((eid) => !this.hass?.states?.[eid]);
   }
 
   /** Longest destination text across the merged row set — drives the
@@ -565,7 +558,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (!this._config) return nothing;
     const cfg = this._config;
     const eids = this._resolveStopEids();
-    const missing = this._missingStopEids();
+    const missing = missingStopIds(this.hass, cfg.entities);
     const rows = this._gatherRows();
     // Card-wide metadata sourced from the FIRST stop: WL-orange band
     // station name and server_time for the header chips.
