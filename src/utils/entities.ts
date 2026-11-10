@@ -66,8 +66,8 @@ export function allDisconnected(hass: HomeAssistant | undefined, eids: readonly 
   return eids.length > 0 && eids.every((eid) => isDisconnected(hass, eid));
 }
 
-/** The configured stops' entity ids that have no state in Home Assistant.
- *  Empty before `hass` arrives: nothing has been looked up yet, so nothing
+/** Entity ids from `stops` that have no state in Home Assistant, in the
+ *  order given. Empty before `hass` arrives: nothing has been looked up yet, so nothing
  *  counts as missing. */
 export function missingStopIds(
   hass: HomeAssistant | undefined,
