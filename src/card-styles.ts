@@ -2109,6 +2109,20 @@ export const cardStyles = css`
     outline-offset: 2px;
     border-radius: 6px;
   }
+  /* In a fixed-height cell the content scrolls, and a control that stops
+     within the ring's 4px of the visible edge counts as fully in view, so
+     focus wouldn't scroll and the edge would cut its ring. The margin makes
+     focus bring the ring into view as well. */
+  .tab,
+  .alert,
+  .dep-row.expandable,
+  .hero-entry.expandable,
+  .stops-ahead-other-toggle,
+  .icon-action,
+  a,
+  button {
+    scroll-margin-block: 4px;
+  }
   /* …except the round icon buttons, which would otherwise take a
      rounded-rect ring around a circular surface. */
   .icon-action:focus-visible {

@@ -1499,6 +1499,16 @@ outline: 2px solid var(--primary-color);
 outline-offset: 2px;
 border-radius: 6px;
 }
+.tab,
+.alert,
+.dep-row.expandable,
+.hero-entry.expandable,
+.stops-ahead-other-toggle,
+.icon-action,
+a,
+button {
+scroll-margin-block: 4px;
+}
 .icon-action:focus-visible {
 border-radius: 50%;
 }
