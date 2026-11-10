@@ -608,6 +608,26 @@ async def test_plan_at_a_chosen_time(
     assert response["result"]["planned_for"] is None
 
 
+async def test_a_plan_to_leave_at_a_time_offers_nothing_that_leaves_before_it(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+) -> None:
+    """The captured answer leaves at 07:57, 08:00, 08:03 and 08:05."""
+    client = await _connect(hass, hass_ws_client, freezer)
+    ends = {"origin": STEPHANSPLATZ, "destination": SCHWARZENBERGPLATZ}
+
+    leave = await _plan(client, **ends, datetime="2026-09-14T08:01")
+    assert [t["departure"][11:16] for t in leave["result"]["trips"]] == [
+        "08:03",
+        "08:05",
+    ]
+    # Arriving by a time isn't about when it leaves.
+    arrive = await _plan(client, **ends, datetime="2026-09-14T08:20", arrive_by=True)
+    assert len(arrive["result"]["trips"]) == 4
+
+
 async def test_a_plan_for_a_chosen_time_keeps_connections_that_left(
     hass: HomeAssistant,
     hass_ws_client: WebSocketGenerator,

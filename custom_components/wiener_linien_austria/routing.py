@@ -899,6 +899,7 @@ def usable_trips(
     now: datetime | None,
     *,
     arrive_by: datetime | None = None,
+    leave_at: datetime | None = None,
 ) -> list[Trip]:
     """The connections a query can offer, in `order_trips` order.
 
@@ -908,12 +909,19 @@ def usable_trips(
     caught, wants every connection the server found for that time. For an
     arrive-by query it also drops those the server times to arrive after
     `arrive_by`: asked to arrive by 08:00 it offered one arriving at 08:22
-    too (verified 2026-11-10).
+    too (verified 2026-11-10). For a leave-at query it drops those that
+    leave before `leave_at`, to the minute: asked to leave at 13:02 it
+    offered a tram at 12:50 too, and at 12:47 a U3 at 12:46 (verified
+    2026-11-10). By the timetable, since that is the time the query asks
+    about, and the one the route card's "Später" steps by: judged by its
+    live time, a late train would answer the step that was meant to leave
+    it behind.
 
     Nothing is compared here. That waits for live times (`best_trips`,
     called from live.py): a connection that looks dominated on the
     timetable can be the one that still works once a delay is known.
     """
+    leave_from = leave_at.replace(second=0, microsecond=0) if leave_at else None
     return order_trips(
         (
             trip
@@ -923,9 +931,18 @@ def usable_trips(
             and trip.arrival is not None
             and (now is None or trip.departure >= now - timedelta(minutes=1))
             and (arrive_by is None or trip.arrival <= arrive_by)
+            and (leave_from is None or _timetabled_departure(trip) >= leave_from)
         ),
         arrive_by=arrive_by,
     )
+
+
+def _timetabled_departure(trip: Trip) -> datetime:
+    """When a connection leaves by the timetable, its live time if unknown."""
+    planned = trip.legs[0].origin.planned if trip.legs else None
+    departure = planned or trip.departure
+    assert departure is not None  # usable_trips checks trip.departure first
+    return departure
 
 
 def best_trips(

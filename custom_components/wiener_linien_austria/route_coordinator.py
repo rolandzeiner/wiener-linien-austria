@@ -445,8 +445,8 @@ async def async_plan_trips(
     config flow's setup probe, so every caller sees the same connections
     for the same query. `planned` marks a query for a time the caller chose
     rather than "now": its connections are kept even when they left
-    already. An arrive-by query loses what arrives after `when`
-    (`usable_trips`). Comparing the rest waits for live times
+    already. An arrive-by query loses what arrives after `when`, a planned
+    leave-at query what leaves before it (`usable_trips`). Comparing the rest waits for live times
     (live.async_live_trips). Tests patch the fetch at
     `route_coordinator.async_fetch_trip_body`.
     """
@@ -465,6 +465,7 @@ async def async_plan_trips(
         trips,
         None if planned else dt_util.utcnow(),
         arrive_by=when if arrive_by else None,
+        leave_at=when if planned and not arrive_by else None,
     )
 
 
