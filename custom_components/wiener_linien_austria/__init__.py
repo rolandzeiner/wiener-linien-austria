@@ -69,7 +69,7 @@ from .s_bahn_network import (
     async_schedule_network_update,
 )
 from .services import async_setup_services
-from .skipped_stops import STOP_NOTICES_KEY
+from .skipped_stops import STOP_CALLS_KEY, STOP_NOTICES_KEY
 from .static import (
     BACKGROUND_REFRESH_TASK_KEY,
     CATALOGUE_KEY,
@@ -559,6 +559,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         # finishes and saves into it.
         RUN_TIMES_KEY,
         STOP_NOTICES_KEY,
+        STOP_CALLS_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)

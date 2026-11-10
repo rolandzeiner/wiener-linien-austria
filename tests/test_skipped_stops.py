@@ -13,26 +13,41 @@ import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
 
-from custom_components.wiener_linien_austria.api import ApiTimeoutError
+from custom_components.wiener_linien_austria.api import (
+    ROUTING_DEPARTURE_ENDPOINT,
+    ApiTimeoutError,
+)
 from custom_components.wiener_linien_austria.const import (
+    STOP_CALLS_DEPARTURES_REQUESTED,
+    STOP_CALLS_RETRY_AFTER,
     STOP_NOTICES_MAX_AGE,
     STOP_NOTICES_RETRY_AFTER,
     USER_AGENT,
 )
+from custom_components.wiener_linien_austria.routing import RoutingError
+from custom_components.wiener_linien_austria.run_times import RUN_TIME_EXCLUDED_MOTS
 from custom_components.wiener_linien_austria.skipped_stops import (
     NewsShapeError,
     SkippedStation,
     StopNotice,
+    async_get_stop_calls,
     async_get_stop_notices,
     closed_until,
+    noticed_stations,
     parse_news,
     skipped_stations,
+    stand_ins,
 )
 from custom_components.wiener_linien_austria.static import (
     StaticCatalogue,
     Station,
     TripPattern,
     TripPatternIndex,
+)
+from custom_components.wiener_linien_austria.timetable import (
+    LineCalls,
+    build_departure_params,
+    parse_line_calls,
 )
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -97,7 +112,10 @@ def test_a_station_between_two_calls_in_a_row_is_skipped() -> None:
 
     assert found == {
         "Neue Donau": SkippedStation(
-            rbls=frozenset({4644}), neighbour_rbls=frozenset({4643, 4645})
+            diva=NEUE_DONAU,
+            rbls=frozenset({4644}),
+            neighbour_rbls=frozenset({4643, 4645}),
+            between=(10.0, 13.0),
         )
     }
 
@@ -159,6 +177,49 @@ def test_a_catalogue_without_routes_reads_as_no_skip() -> None:
     catalogue.trip_patterns = None
 
     assert skipped_stations(catalogue, WESTBAHNHOF, "U6", "H", {HANDELSKAI: 1.0}) == {}
+
+
+# ---------------------------------------------------------------------------
+# A stop the timetable knows by another id
+# ---------------------------------------------------------------------------
+
+UNKNOWN, OTHER_UNKNOWN = 60201987, 60201988
+
+
+def test_a_route_end_the_timetable_calls_by_another_id_takes_its_time() -> None:
+    # N6: the route ends at Enkplatz, the timetable at Enkplatz/Grillgasse.
+    sample = {HANDELSKAI: 10.0, NEUE_DONAU: 12.0, UNKNOWN: 13.0}
+
+    found = stand_ins(_catalogue(), WESTBAHNHOF, "U6", "H", sample)
+
+    assert found == {"Floridsdorf": 13.0}
+
+
+def test_a_station_between_two_calls_takes_the_unknown_call_between() -> None:
+    sample = {HANDELSKAI: 10.0, UNKNOWN: 11.5, FLORIDSDORF: 13.0}
+
+    assert stand_ins(_catalogue(), WESTBAHNHOF, "U6", "H", sample) == {
+        "Neue Donau": 11.5
+    }
+    # The same station is no skip: the unknown call sits between.
+    assert skipped_stations(_catalogue(), WESTBAHNHOF, "U6", "H", sample) == {}
+
+
+@pytest.mark.parametrize(
+    "sample",
+    [
+        # Every call known: nothing stands in.
+        {HANDELSKAI: 10.0, FLORIDSDORF: 13.0},
+        # Two unknown calls in the same minute: which one is it?
+        {HANDELSKAI: 10.0, UNKNOWN: 11.5, OTHER_UNKNOWN: 11.5, FLORIDSDORF: 13.0},
+        # The next call after Handelskai is a known one.
+        {HANDELSKAI: 10.0, FLORIDSDORF: 13.0, UNKNOWN: 14.0},
+        # The station after isn't the call right after the unknown one.
+        {HANDELSKAI: 10.0, UNKNOWN: 11.0, OTHER_UNKNOWN: 12.0, FLORIDSDORF: 13.0},
+    ],
+)
+def test_no_clear_unknown_call_stands_in(sample: dict[int, float]) -> None:
+    assert stand_ins(_catalogue(), WESTBAHNHOF, "U6", "H", sample) == {}
 
 
 # ---------------------------------------------------------------------------
@@ -240,11 +301,55 @@ def test_a_body_without_the_envelope_is_no_answer(body: dict[str, Any]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# A notice contradicting the sample
+# ---------------------------------------------------------------------------
+
+# Meidling's U6 sample from 4 November: the trains still called at Neue
+# Donau when it was taken.
+CALLING = {HANDELSKAI: 10.0, NEUE_DONAU: 11.5, FLORIDSDORF: 13.0}
+
+
+def test_a_notice_shutting_a_called_station_marks_it() -> None:
+    found = noticed_stations(
+        _catalogue(), WESTBAHNHOF, "U6", "H", CALLING, [_notice()], NOW
+    )
+
+    assert found == {"Neue Donau": NEUE_DONAU_SKIP}
+
+
+@pytest.mark.parametrize(
+    ("sample", "notices"),
+    [
+        (CALLING, []),
+        (CALLING, [_notice(lines=frozenset({"N6"}))]),
+        (CALLING, [_notice(rbls=frozenset({4647}))]),
+        (CALLING, [_notice(rbls=frozenset({4643, 4644, 4645}))]),
+        (CALLING, [_notice(start=NOW + timedelta(days=1))]),
+        (CALLING, [_notice(end=NOW - timedelta(minutes=1))]),
+        # No call there: `skipped_stations` has it.
+        ({HANDELSKAI: 10.0, FLORIDSDORF: 13.0}, [_notice()]),
+        # A call out of order on the route.
+        ({HANDELSKAI: 10.0, NEUE_DONAU: 14.0, FLORIDSDORF: 13.0}, [_notice()]),
+    ],
+)
+def test_no_contradicting_notice_marks_nothing(
+    sample: dict[int, float], notices: list[StopNotice]
+) -> None:
+    assert (
+        noticed_stations(_catalogue(), WESTBAHNHOF, "U6", "H", sample, notices, NOW)
+        == {}
+    )
+
+
+# ---------------------------------------------------------------------------
 # Until when
 # ---------------------------------------------------------------------------
 
 NEUE_DONAU_SKIP = SkippedStation(
-    rbls=frozenset({4644}), neighbour_rbls=frozenset({4643, 4645})
+    diva=NEUE_DONAU,
+    rbls=frozenset({4644}),
+    neighbour_rbls=frozenset({4643, 4645}),
+    between=(10.0, 13.0),
 )
 
 
@@ -373,3 +478,231 @@ async def test_callers_asking_at_once_share_one_request(
 
     assert await second == [_notice()]
     assert news_fetch.await_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Which runs call at a skipped station after all
+# ---------------------------------------------------------------------------
+
+
+def _departure(
+    clock: str, line: str | None = "U6", direction: str | None = "H"
+) -> dict[str, Any]:
+    hour, minute = clock.split(":")
+    return {
+        "dateTime": {
+            "year": "2026",
+            "month": "11",
+            "day": "10",
+            "hour": hour,
+            "minute": minute,
+        },
+        "servingLine": {"number": line, "liErgRiProj": {"direction": direction}},
+    }
+
+
+def _at(clock: str) -> datetime:
+    hour, minute = clock.split(":")
+    return datetime(2026, 11, 10, int(hour), int(minute), tzinfo=VIENNA)
+
+
+# Neue Donau on a Tuesday evening: the Siebenhirten-bound trains all along,
+# the Floridsdorf-bound ones from 22:02, while the line runs single-track.
+NEUE_DONAU_EVENING = {
+    "departureList": [
+        _departure("21:58", direction="R"),
+        _departure("22:09"),
+        _departure("22:02"),
+        _departure("22:05", direction="R"),
+        _departure("22:07", line="BB"),
+        _departure("22:10", line=None),
+        {"dateTime": {"hour": "x"}, "servingLine": {"number": "U6"}},
+        "not a row",
+    ]
+}
+
+
+def test_a_stations_departures_parse_per_line_and_direction() -> None:
+    calls = parse_line_calls(NEUE_DONAU_EVENING, VIENNA)
+
+    assert calls == LineCalls(
+        calls={
+            ("U6", "H"): (_at("22:02"), _at("22:09")),
+            ("U6", "R"): (_at("21:58"), _at("22:05")),
+            ("WLB", "H"): (_at("22:07"),),
+        },
+        # A row without a line still says the answer reaches 22:10.
+        first=_at("21:58"),
+        last=_at("22:10"),
+    )
+
+
+def test_a_single_departure_arrives_unwrapped() -> None:
+    calls = parse_line_calls(
+        {"departureList": {"departure": _departure("22:02")}}, VIENNA
+    )
+
+    assert calls is not None
+    assert calls.calls == {("U6", "H"): (_at("22:02"),)}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"departureList": None}, {"departureList": []}, {"departureList": ["x"]}],
+)
+def test_an_answer_without_departures_says_nothing(body: dict[str, Any]) -> None:
+    assert parse_line_calls(body, VIENNA) is None
+
+
+_TRIP_FETCH = (
+    "custom_components.wiener_linien_austria.skipped_stops.async_fetch_trip_body"
+)
+EVENING = datetime(2026, 11, 10, 20, 0, tzinfo=VIENNA)
+
+
+@pytest.fixture
+def calls_fetch() -> Generator[AsyncMock]:
+    with patch(
+        _TRIP_FETCH, new_callable=AsyncMock, return_value=NEUE_DONAU_EVENING
+    ) as mock:
+        yield mock
+
+
+async def test_a_stations_departures_are_fetched_once_and_held(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, calls_fetch: AsyncMock
+) -> None:
+    freezer.move_to(EVENING)
+    cache = async_get_stop_calls(hass)
+
+    held = await cache.async_get(NEUE_DONAU)
+
+    assert held is not None
+    assert held.line_calls.calls[("U6", "H")] == (_at("22:02"), _at("22:09"))
+    # The run times' modes, no stop sequences: the rows only need a time.
+    assert calls_fetch.await_args.args[1] == build_departure_params(
+        NEUE_DONAU,
+        STOP_CALLS_DEPARTURES_REQUESTED,
+        excluded_mots=RUN_TIME_EXCLUDED_MOTS,
+    )
+    assert calls_fetch.await_args.args[2] == USER_AGENT
+    assert calls_fetch.await_args.kwargs["endpoint"] == ROUTING_DEPARTURE_ENDPOINT
+
+    # Reaching only to 22:10, it is asked again once less than 90 minutes
+    # of it are left, at 20:40.
+    freezer.tick(timedelta(minutes=39))
+    await cache.async_get(NEUE_DONAU)
+    assert calls_fetch.await_count == 1
+    freezer.tick(timedelta(minutes=1))
+    await cache.async_get(NEUE_DONAU)
+    assert calls_fetch.await_count == 2
+    # Another station is a request of its own.
+    await cache.async_get(HANDELSKAI)
+    assert calls_fetch.await_count == 3
+    assert async_get_stop_calls(hass) is cache
+
+
+@pytest.mark.parametrize(
+    ("last", "expires"),
+    [
+        # Reaching to 07:52 the next morning: six hours at most.
+        (datetime(2026, 11, 11, 7, 52, tzinfo=VIENNA), timedelta(hours=6)),
+        # To 23:00: once fewer than 90 minutes are left.
+        (datetime(2026, 11, 10, 23, 0, tzinfo=VIENNA), timedelta(minutes=90)),
+        # To 21:00: half an hour at least.
+        (datetime(2026, 11, 10, 21, 0, tzinfo=VIENNA), timedelta(minutes=30)),
+    ],
+)
+async def test_departures_are_held_by_how_far_they_reach(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    calls_fetch: AsyncMock,
+    last: datetime,
+    expires: timedelta,
+) -> None:
+    freezer.move_to(EVENING)
+    calls_fetch.return_value = {
+        "departureList": [
+            _departure("20:03"),
+            _departure(f"{last.hour}:{last.minute:02d}")
+            | {
+                "dateTime": {
+                    "year": str(last.year),
+                    "month": str(last.month),
+                    "day": str(last.day),
+                    "hour": str(last.hour),
+                    "minute": str(last.minute),
+                }
+            },
+        ]
+    }
+
+    held = await async_get_stop_calls(hass).async_get(NEUE_DONAU)
+
+    assert held is not None
+    assert held.expires_at == EVENING + expires
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        RoutingError("api_timeout", {"seconds": "20"}),
+        {"departureList": []},
+    ],
+)
+async def test_failed_departures_keep_what_was_held_and_wait(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    calls_fetch: AsyncMock,
+    failure: Any,
+) -> None:
+    freezer.move_to(EVENING)
+    cache = async_get_stop_calls(hass)
+    first = await cache.async_get(NEUE_DONAU)
+
+    freezer.tick(timedelta(minutes=40))
+    if isinstance(failure, Exception):
+        calls_fetch.side_effect = failure
+    else:
+        calls_fetch.return_value = failure
+    # Past its time, but still what there is: it reaches hours ahead.
+    assert await cache.async_get(NEUE_DONAU) is first
+    assert calls_fetch.await_count == 2
+
+    freezer.tick(STOP_CALLS_RETRY_AFTER - timedelta(seconds=1))
+    await cache.async_get(NEUE_DONAU)
+    assert calls_fetch.await_count == 2
+    freezer.tick(timedelta(seconds=1))
+    await cache.async_get(NEUE_DONAU)
+    assert calls_fetch.await_count == 3
+
+
+async def test_a_first_fetch_failing_gives_no_departures(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, calls_fetch: AsyncMock
+) -> None:
+    freezer.move_to(EVENING)
+    calls_fetch.side_effect = RoutingError("api_timeout", {"seconds": "20"})
+
+    assert await async_get_stop_calls(hass).async_get(NEUE_DONAU) is None
+
+
+async def test_callers_asking_for_a_station_at_once_share_one_request(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, calls_fetch: AsyncMock
+) -> None:
+    freezer.move_to(EVENING)
+    release = asyncio.Event()
+
+    async def slow(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        await release.wait()
+        return NEUE_DONAU_EVENING
+
+    calls_fetch.side_effect = slow
+    cache = async_get_stop_calls(hass)
+    first = hass.async_create_task(cache.async_get(NEUE_DONAU))
+    second = hass.async_create_task(cache.async_get(NEUE_DONAU))
+    await asyncio.sleep(0)
+
+    first.cancel()
+    release.set()
+
+    assert await second is not None
+    assert calls_fetch.await_count == 1

@@ -1004,6 +1004,7 @@ function timesHass(callWS: CallWS, timeReal?: string): HomeAssistant {
 function runTimesAnswer(
   runTimes: Record<string, Record<string, number>>,
   noStop?: Record<string, Record<string, string | null>>,
+  calling?: Record<string, Record<string, unknown>>,
 ): unknown {
   return {
     diva: 60200959,
@@ -1011,6 +1012,7 @@ function runTimesAnswer(
     valid_until: "2099-01-01T00:00:00+00:00",
     run_times: runTimes,
     ...(noStop ? { no_stop: noStop } : {}),
+    ...(calling ? { calling } : {}),
   };
 }
 
@@ -1192,6 +1194,48 @@ describe("show_stop_times on a station the train goes through", () => {
     await openTrail(el);
 
     expect(notes(el)).toEqual(["Kein Halt"]);
+  });
+
+  describe("where some runs call there after all", () => {
+    // The trail's departure is planned 16:38: Zieglergasse 16:40, Simmering
+    // 16:44. Neubaugasse's own departures cover the afternoon.
+    const station = (calls: string[]): Record<string, Record<string, unknown>> => ({
+      "U3|H": {
+        Neubaugasse: {
+          between: [2, 6],
+          calls,
+          from: "2026-09-09T16:00:00+02:00",
+          until: "2026-09-09T20:00:00+02:00",
+        },
+      },
+    });
+    const noStop = { "U3|H": { Neubaugasse: "2099-12-31T23:59:00+01:00" } };
+
+    it("shows the time for a run that calls there", async () => {
+      const callWS = vi
+        .fn()
+        .mockResolvedValue(
+          runTimesAnswer({ "U3|H": U3 }, noStop, station(["2026-09-09T16:42:00+02:00"])),
+        );
+      const el = await mountTimes(callWS);
+      await openTrail(el);
+
+      expect(skipped(el)).toEqual([]);
+      expect(stopTimes(el)).toEqual(["16:40", "16:42", "16:44"]);
+    });
+
+    it("says no stop for a run that goes through, without the date", async () => {
+      const callWS = vi
+        .fn()
+        .mockResolvedValue(
+          runTimesAnswer({ "U3|H": U3 }, noStop, station(["2026-09-09T16:50:00+02:00"])),
+        );
+      const el = await mountTimes(callWS);
+      await openTrail(el);
+
+      expect(skipped(el)).toEqual(["Neubaugasse"]);
+      expect(notes(el)).toEqual(["Kein Halt"]);
+    });
   });
 
   it("drops the note once the stop is back", async () => {

@@ -84,7 +84,7 @@ REGIME_NIGHT: Final = "night"
 # EFA `motType` codes left out of the request: trains (0), the S-Bahn (1) and
 # everything from regional buses up (6-11). What stays is what `/monitor`
 # lists: U-Bahn (2), Badner Bahn (3 / 4), tram (4) and city bus (5).
-_EXCLUDED_MOTS: Final = ("0", "1", *(str(code) for code in range(6, 12)))
+RUN_TIME_EXCLUDED_MOTS: Final = ("0", "1", *(str(code) for code in range(6, 12)))
 
 # A line and its `/monitor` direction code, e.g. `("U1", "H")`.
 type Pair = tuple[str, str]
@@ -111,6 +111,10 @@ class RunTimeAnswer:
     fetched_at: datetime | None
     # The card asks again after this.
     valid_until: datetime
+    # Every sample held for the stop, the current part of the day's first,
+    # unmerged: a station one of them shows skipped is worth a closer look
+    # even where the other has a run time for it.
+    samples: tuple[Mapping[Pair, Mapping[int, float]], ...] = ()
 
 
 @dataclass(slots=True)
@@ -249,7 +253,7 @@ class RunTimes:
                     diva,
                     RUN_TIME_DEPARTURES_REQUESTED,
                     with_stops=True,
-                    excluded_mots=_EXCLUDED_MOTS,
+                    excluded_mots=RUN_TIME_EXCLUDED_MOTS,
                 ),
                 USER_AGENT,
                 endpoint=ROUTING_DEPARTURE_ENDPOINT,
@@ -322,6 +326,12 @@ class RunTimes:
             pairs=merged,
             fetched_at=current.fetched_at if current is not None else None,
             valid_until=valid_until,
+            samples=tuple(
+                held.pairs
+                for _, held in sorted(
+                    state.samples.items(), key=lambda item: item[0] != regime
+                )
+            ),
         )
 
     async def _async_load(self) -> None:

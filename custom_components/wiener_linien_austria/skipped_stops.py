@@ -1,4 +1,4 @@
-"""Stations a ride passes without calling there, and until when.
+"""Stations a ride passes without calling there, until when, and exceptions.
 
 A stops-ahead trail names the stations of the line's static route
 (`fahrwegverlaeufe`); the times beside them are run times from the routing
@@ -12,21 +12,32 @@ A skipped station is one with no run time whose neighbours on the route
 are two calls in a row in the timetable (see `skipped_stations`). That
 keeps the end of a short run, a variant of the route the sampled trains
 didn't take and a stop the timetable knows by another id from reading as
-skips.
+skips. The last of those gets the other id's run time instead
+(`stand_ins`): N6 ends at Enkplatz on its route and at "Enkplatz/Grillgasse"
+in the timetable, an id the station list doesn't have.
 
-The date the stop is back comes from `/newsList`, and only when one notice
-answers it without doubt (see `closed_until`). The list is fetched on demand
-like the run times: only when an answer has a skipped station, at most every
-`STOP_NOTICES_MAX_AGE`, callers asking at once sharing one request. It takes
-no domain cooldown slot, for the reason `rate_limit.py` gives for the run
-times: someone has just opened a trail and is waiting.
+A run-time sample is one moment held for a week, and a works zone can close
+a platform at some hours only: Neue Donau is served towards Floridsdorf on
+some weeknights from 22:00 after all. Works also start in the middle of a
+sample's week, which then still has the trains calling. So for a station a
+sample shows skipped, or a notice in force says is shut for the line
+(`noticed_stations`), the station's own departures say which runs call there
+(`StopCalls`), and the card decides per departure.
+
+The notices come from `/newsList`, which also gives the date the stop is
+back where one notice answers it without doubt (see `closed_until`). Notices
+and calls are fetched on demand like the run times: when a card asks for a
+trail's run times, and the calls only for a station that needs them; held
+for a while, callers asking at once sharing one request. Neither takes a
+domain cooldown slot, for the reason `rate_limit.py` gives for the run times:
+someone has just opened a trail and is waiting.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Final
@@ -35,19 +46,28 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util import dt as dt_util
 
-from .api import WienerLinienApiError, fetch_news
+from .api import ROUTING_DEPARTURE_ENDPOINT, WienerLinienApiError, fetch_news
 from .const import (
     DOMAIN,
+    STOP_CALLS_AHEAD,
+    STOP_CALLS_DEPARTURES_REQUESTED,
+    STOP_CALLS_MAX_AGE,
+    STOP_CALLS_MIN_AGE,
+    STOP_CALLS_RETRY_AFTER,
     STOP_NOTICES_MAX_AGE,
     STOP_NOTICES_RETRY_AFTER,
     STOP_NOTICES_TIMEOUT_SECONDS,
     USER_AGENT,
 )
+from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
+from .run_times import RUN_TIME_EXCLUDED_MOTS
 from .static import StaticCatalogue
+from .timetable import LineCalls, build_departure_params, parse_line_calls
 
 _LOGGER = logging.getLogger(__name__)
 
 STOP_NOTICES_KEY: Final = "stop_notices"
+STOP_CALLS_KEY: Final = "stop_calls"
 
 # The wall-clock end Wiener Linien gives a notice that has no real end: a
 # moved bus stop or a missing lift "until" 11:11 on some date years out.
@@ -58,10 +78,14 @@ _OPEN_END: Final = (11, 11)
 class SkippedStation:
     """A station a line's route passes without the timetable calling there."""
 
+    diva: int
     # The route's platforms there, and those of the stations either side,
     # where the train does call.
     rbls: frozenset[int]
     neighbour_rbls: frozenset[int]
+    # Minutes from the board to the calls either side, from the sample it
+    # was found in: a run calling here does so in between.
+    between: tuple[float, float]
 
 
 def skipped_stations(
@@ -86,24 +110,11 @@ def skipped_stations(
     on the Ring during works), and a stop the timetable knows by another
     DIVA, which it lists at a time between the two.
     """
-    patterns = catalogue.trip_patterns
-    if patterns is None or direction not in ("H", "R"):
-        return {}
-    line_id = patterns.lines_by_label.get(line)
-    if line_id is None:
-        return {}
-    wanted = 1 if direction == "H" else 2
-    index = catalogue.index_by_rbl()
     calls = {**minutes, board_diva: 0.0}
-    found: dict[str, tuple[set[int], set[int]]] = {}
-    for pattern in patterns.patterns_by_line.get(line_id, ()):
-        if pattern.direction != wanted:
-            continue
-        stops = [(rbl, index.get(rbl)) for rbl in pattern.stops]
+    found: dict[str, tuple[int, set[int], set[int], tuple[float, float]]] = {}
+    for stops in _routes_from(catalogue, board_diva, line, direction):
         divas = [entry[0] if entry else None for _, entry in stops]
-        if board_diva not in divas:
-            continue
-        for at in range(divas.index(board_diva) + 1, len(stops) - 1):
+        for at in range(1, len(stops) - 1):
             rbl, entry = stops[at]
             before = _minutes_at(calls, divas[at - 1])
             after = _minutes_at(calls, divas[at + 1])
@@ -115,13 +126,84 @@ def skipped_stations(
                 or not _back_to_back(calls, before, after)
             ):
                 continue
-            platforms, neighbours = found.setdefault(entry[1], (set(), set()))
+            _, platforms, neighbours, _ = found.setdefault(
+                entry[1], (entry[0], set(), set(), (before, after))
+            )
             platforms.add(rbl)
             neighbours.update((stops[at - 1][0], stops[at + 1][0]))
     return {
-        name: SkippedStation(frozenset(rbls), frozenset(neighbours))
-        for name, (rbls, neighbours) in found.items()
+        name: SkippedStation(diva, frozenset(rbls), frozenset(neighbours), between)
+        for name, (diva, rbls, neighbours, between) in found.items()
     }
+
+
+def stand_ins(
+    catalogue: StaticCatalogue,
+    board_diva: int,
+    line: str,
+    direction: str,
+    minutes: Mapping[int, float],
+) -> dict[str, float]:
+    """Route stations the timetable calls at under an id the catalogue lacks.
+
+    N6 ends at Enkplatz (60200425) on its route; the timetable's last call
+    is "Enkplatz/Grillgasse", 60201987, which the open-data station list
+    doesn't have, so the trail's last stop had no time. A station without a
+    call of its own takes such a call's minutes when that call is the next
+    one after the route's station before it, alone in its minute, and the
+    route's station after it, if there is one, is the call right after.
+    Returns station name → minutes; same arguments as `skipped_stations`.
+    """
+    known = catalogue.stations_by_diva
+    if all(diva in known for diva in minutes):
+        return {}
+    calls = {**minutes, board_diva: 0.0}
+    found: dict[str, float] = {}
+    for stops in _routes_from(catalogue, board_diva, line, direction):
+        divas = [entry[0] if entry else None for _, entry in stops]
+        for at in range(1, len(stops)):
+            entry = stops[at][1]
+            before = _minutes_at(calls, divas[at - 1])
+            if entry is None or entry[0] in calls or before is None:
+                continue
+            later = [value for value in calls.values() if value > before]
+            if not later:
+                continue
+            nearest = min(later)
+            ids = [diva for diva, value in calls.items() if value == nearest]
+            if len(ids) != 1 or ids[0] in known:
+                continue
+            if at + 1 < len(stops):
+                after = _minutes_at(calls, divas[at + 1])
+                if after is None or not _back_to_back(calls, nearest, after):
+                    continue
+            found.setdefault(entry[1], nearest)
+    return found
+
+
+def _routes_from(
+    catalogue: StaticCatalogue, board_diva: int, line: str, direction: str
+) -> Iterator[list[tuple[int, tuple[int, str] | None]]]:
+    """Each route of the line that way passing the board, from the board on.
+
+    As (RBL, catalogue entry) pairs, the board first. A route listing the
+    board twice is read from its first call.
+    """
+    patterns = catalogue.trip_patterns
+    if patterns is None or direction not in ("H", "R"):
+        return
+    line_id = patterns.lines_by_label.get(line)
+    if line_id is None:
+        return
+    wanted = 1 if direction == "H" else 2
+    index = catalogue.index_by_rbl()
+    for pattern in patterns.patterns_by_line.get(line_id, ()):
+        if pattern.direction != wanted:
+            continue
+        stops = [(rbl, index.get(rbl)) for rbl in pattern.stops]
+        divas = [entry[0] if entry else None for _, entry in stops]
+        if board_diva in divas:
+            yield stops[divas.index(board_diva) :]
 
 
 def _minutes_at(calls: Mapping[int, float], diva: int | None) -> float | None:
@@ -141,6 +223,53 @@ class StopNotice:
     rbls: frozenset[int]
     start: datetime | None
     end: datetime | None
+
+
+def noticed_stations(
+    catalogue: StaticCatalogue,
+    board_diva: int,
+    line: str,
+    direction: str,
+    minutes: Mapping[int, float],
+    notices: Iterable[StopNotice],
+    now: datetime,
+) -> dict[str, SkippedStation]:
+    """Stations the sample has a call at that a notice says are shut for the line.
+
+    A sample is held for a week and works start in the middle of one:
+    Meidling's U6 sample from 4 November still had the trains calling at
+    Neue Donau after that platform had closed. A station counts when the
+    sample calls there between the calls either side of it on the route,
+    and a notice in force names the line and the station's platform on this
+    route but neither neighbour's (the test `closed_until` uses, without the
+    date). Same arguments as `skipped_stations`, plus the notices.
+    """
+    live = [notice for notice in notices if _in_force_for(notice, line, now)]
+    if not live:
+        return {}
+    calls = {**minutes, board_diva: 0.0}
+    found: dict[str, SkippedStation] = {}
+    for stops in _routes_from(catalogue, board_diva, line, direction):
+        divas = [entry[0] if entry else None for _, entry in stops]
+        for at in range(1, len(stops) - 1):
+            rbl, entry = stops[at]
+            if entry is None or entry[1] in found:
+                continue
+            own = calls.get(entry[0])
+            before = _minutes_at(calls, divas[at - 1])
+            after = _minutes_at(calls, divas[at + 1])
+            if own is None or before is None or after is None:
+                continue
+            if not before < own < after:
+                continue
+            neighbours = frozenset((stops[at - 1][0], stops[at + 1][0]))
+            if any(
+                rbl in notice.rbls and not notice.rbls & neighbours for notice in live
+            ):
+                found[entry[1]] = SkippedStation(
+                    entry[0], frozenset({rbl}), neighbours, (before, after)
+                )
+    return found
 
 
 class NewsShapeError(ValueError):
@@ -204,11 +333,9 @@ def closed_until(
     ends = {
         notice.end
         for notice in notices
-        if line in notice.lines
+        if _in_force_for(notice, line, now)
         and notice.rbls & station.rbls
         and not notice.rbls & station.neighbour_rbls
-        and (notice.start is None or notice.start <= now)
-        and (notice.end is None or notice.end > now)
     }
     if len(ends) != 1:
         return None
@@ -216,6 +343,14 @@ def closed_until(
     if end is None or (end.hour, end.minute) == _OPEN_END:
         return None
     return end
+
+
+def _in_force_for(notice: StopNotice, line: str, now: datetime) -> bool:
+    return (
+        line in notice.lines
+        and (notice.start is None or notice.start <= now)
+        and (notice.end is None or notice.end > now)
+    )
 
 
 class StopNotices:
@@ -274,6 +409,98 @@ def async_get_stop_notices(hass: HomeAssistant) -> StopNotices:
     cache = domain_data.get(STOP_NOTICES_KEY)
     if not isinstance(cache, StopNotices):
         cache = domain_data[STOP_NOTICES_KEY] = StopNotices(hass)
+    return cache
+
+
+@dataclass(slots=True, frozen=True)
+class CallsAt:
+    """A skipped station's departures, per line, as one answer gave them."""
+
+    fetched_at: datetime
+    line_calls: LineCalls
+
+    @property
+    def expires_at(self) -> datetime:
+        """When to ask again: before the answer runs short of the departures
+        a board shows, within the bounds `const.py` gives."""
+        return min(
+            max(
+                self.line_calls.last - STOP_CALLS_AHEAD,
+                self.fetched_at + STOP_CALLS_MIN_AGE,
+            ),
+            self.fetched_at + STOP_CALLS_MAX_AGE,
+        )
+
+
+@dataclass(slots=True)
+class _StationCalls:
+    held: CallsAt | None = None
+    not_before: datetime | None = None
+    in_flight: asyncio.Task[None] | None = None
+
+
+class StopCalls:
+    """Skipped stations' own departures, fetched when a trail needs them."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        self._hass = hass
+        self._stations: dict[int, _StationCalls] = {}
+
+    async def async_get(self, diva: int) -> CallsAt | None:
+        """The station's departures, fetching them when due; None if none held.
+
+        An answer past its time is still given while a refetch failed: it
+        covers hours ahead, and the card checks each departure against it.
+        """
+        state = self._stations.setdefault(diva, _StationCalls())
+        now = dt_util.utcnow()
+        due = state.held is None or now >= state.held.expires_at
+        waiting = state.not_before is not None and now < state.not_before
+        if due and not waiting:
+            # As in StopNotices: a finished task is no fetch to join.
+            task = state.in_flight
+            if task is None or task.done():
+                task = state.in_flight = self._hass.async_create_task(
+                    self._async_fetch(diva, state), name=f"{DOMAIN}_stop_calls_{diva}"
+                )
+            await asyncio.shield(task)
+        return state.held
+
+    async def _async_fetch(self, diva: int, state: _StationCalls) -> None:
+        started = dt_util.utcnow()
+        try:
+            body = await async_fetch_trip_body(
+                async_get_clientsession(self._hass),
+                build_departure_params(
+                    diva,
+                    STOP_CALLS_DEPARTURES_REQUESTED,
+                    excluded_mots=RUN_TIME_EXCLUDED_MOTS,
+                ),
+                USER_AGENT,
+                endpoint=ROUTING_DEPARTURE_ENDPOINT,
+            )
+            line_calls = parse_line_calls(body, await async_routing_zone())
+        except RoutingError as err:
+            line_calls = None
+            reason = f"{err.translation_key} {err.placeholders}"
+        else:
+            reason = "no departures in the answer"
+        if line_calls is None:
+            # Advisory: the trail falls back to the run-time sample.
+            _LOGGER.debug("Failed to fetch the calls at stop %s: %s", diva, reason)
+            state.not_before = dt_util.utcnow() + STOP_CALLS_RETRY_AFTER
+            return
+        state.held = CallsAt(fetched_at=started, line_calls=line_calls)
+        state.not_before = None
+
+
+@callback
+def async_get_stop_calls(hass: HomeAssistant) -> StopCalls:
+    """The instance's cache of skipped stations' departures, created on first use."""
+    domain_data = hass.data.setdefault(DOMAIN, {})
+    cache = domain_data.get(STOP_CALLS_KEY)
+    if not isinstance(cache, StopCalls):
+        cache = domain_data[STOP_CALLS_KEY] = StopCalls(hass)
     return cache
 
 

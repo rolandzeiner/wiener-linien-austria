@@ -60,7 +60,7 @@ import {
   runTimesFailed,
   skipUntilText,
   stopEta,
-  stopSkip,
+  stopVerdict,
   type RunTimesAnswer,
   type RunTimesState,
   type StopEta,
@@ -1478,10 +1478,13 @@ export class WienerLinienAustriaCard extends LitElement {
     const minutes = held?.runTimes[key];
     if (held && !minutes) return null;
     const skipped = held?.noStop[key];
+    const calling = held?.calling[key];
     const now = Date.now();
+    const verdict = (stopName: string) =>
+      stopVerdict(dep, minutes?.[stopName], skipped?.[stopName], calling?.[stopName], now);
     return {
-      eta: (stopName) => stopEta(dep, minutes?.[stopName], now),
-      skip: (stopName) => stopSkip(skipped?.[stopName], now),
+      eta: (stopName) => stopEta(dep, verdict(stopName).minutes, now),
+      skip: (stopName) => verdict(stopName).skip,
     };
   }
 

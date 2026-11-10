@@ -445,14 +445,48 @@ RUN_TIME_TOP_UP_AFTER: Final = timedelta(hours=1)
 #   a dated one ends at its real time (U6 Neue Donau, 2026-12-31 23:59).
 #   Re-probe with api-polling's probe_endpoint.py before changing any of it.
 # ----------------------------------------------------------------
-# Fetched only when a trail a card asks run times for passes a station
-# without calling there, and kept this long: the notices are planned works,
-# posted weeks ahead and edited rarely. Most installs never fetch it.
+# Fetched when a card asks for a trail's run times (U-Bahn, tram or bus),
+# and kept this long: the notices are planned works, posted weeks ahead and
+# edited rarely. Four requests a day at most, and none on a day nobody
+# opens a trail. They catch works that began after a run-time sample was
+# taken, which still has the trains calling there.
 STOP_NOTICES_MAX_AGE: Final = timedelta(hours=6)
 # After a failed fetch, the next one waits this long. The trail still says
 # "no stop" meanwhile, only without the date.
 STOP_NOTICES_RETRY_AFTER: Final = timedelta(minutes=30)
 STOP_NOTICES_TIMEOUT_SECONDS: Final = 10
+
+# Which runs call at a skipped station after all (skipped_stops.py). A works
+# zone can close a platform at some hours only: U6 Neue Donau towards
+# Floridsdorf is shut by day but served on some weeknights from 22:00, when
+# single-track working moves both directions to the other platform; the
+# timetable says which nights, week by week. A run-time sample (one moment,
+# held a week) can't tell one departure from the next, so the station's own
+# departures decide.
+# --- Upstream capabilities, measured 2026-11-10 -------------------
+#   XML_DM_REQUEST at the station, the run times' modes, no stop
+#   sequences, 200 rows:
+#     Neue Donau  09:00  6,774 B wire / 176,167 B identity, to 18:51
+#                 17:00  7,701 B, to 07:52 the next day
+#     Praterstern 09:00 11,297 B, to 11:00
+#                 17:00 10,800 B, to 18:38
+#   Compression: honoured (gzip). Conditional GET: impossible, no ETag or
+#   Last-Modified, `cache-control: no-cache`. ~0.3 s.
+#   `dateTime` is the planned departure, to the minute.
+# ----------------------------------------------------------------
+STOP_CALLS_DEPARTURES_REQUESTED: Final = 200
+# An answer is asked again once it reaches less than this far ahead: a
+# board shows departures up to about an hour out, plus the run to the
+# station…
+STOP_CALLS_AHEAD: Final = timedelta(minutes=90)
+# …but never sooner than this after the last fetch, where 200 rows cover
+# little more than that (Praterstern at 17:00), and never later than this,
+# so a timetable change shows the same day.
+STOP_CALLS_MIN_AGE: Final = timedelta(minutes=30)
+STOP_CALLS_MAX_AGE: Final = timedelta(hours=6)
+# After a failed fetch, the next one waits this long; the trail falls back
+# to the run-time sample meanwhile.
+STOP_CALLS_RETRY_AFTER: Final = timedelta(minutes=30)
 
 # The timetable server speaks Vienna wall-clock time with no offset, no
 # matter which zone Home Assistant itself is configured in.

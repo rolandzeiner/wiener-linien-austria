@@ -10,8 +10,10 @@ import {
   skipUntilText,
   stopEta,
   stopSkip,
+  stopVerdict,
   type RunTimesAnswer,
   type RunTimesState,
+  type StationCalls,
 } from "./run-times.js";
 
 const NOW = Date.parse("2026-10-08T10:30:00Z");
@@ -33,6 +35,7 @@ function held(overrides: Partial<RunTimesState> = {}): RunTimesState {
   return {
     runTimes: { [U1]: { Leopoldau: 14 } },
     noStop: {},
+    calling: {},
     validUntil: NOW + 6 * HOUR,
     asked: new Map(),
     ...overrides,
@@ -121,6 +124,21 @@ describe("runTimesAnswered", () => {
     const broken = answer({ no_stop: "x" as unknown as NonNullable<RunTimesAnswer["no_stop"]> });
     expect(runTimesAnswered(undefined, U1, broken, NOW).noStop).toEqual({});
   });
+
+  it("holds which runs call at those stations after all", () => {
+    const calling = {
+      [U1]: {
+        Messestraße: {
+          between: [1, 3] as [number, number],
+          calls: [],
+          from: "2026-10-08T10:30:00Z",
+          until: "2026-10-08T16:30:00Z",
+        },
+      },
+    };
+    expect(runTimesAnswered(undefined, U1, answer({ calling }), NOW).calling).toEqual(calling);
+    expect(runTimesAnswered(undefined, U1, answer(), NOW).calling).toEqual({});
+  });
 });
 
 describe("runTimesFailed", () => {
@@ -139,6 +157,7 @@ describe("runTimesFailed", () => {
     const state = runTimesFailed(undefined, U1, NOW);
     expect(state.runTimes).toEqual({});
     expect(state.noStop).toEqual({});
+    expect(state.calling).toEqual({});
     expect(needsRunTimes(state, U1, NOW + 1)).toBe(false);
   });
 });
@@ -271,6 +290,96 @@ describe("stopSkip", () => {
   it("is no skip once that date has passed", () => {
     // Run times held for a week can predate the stop's reopening.
     expect(stopSkip("2026-10-08T10:30:00Z", NOW)).toBeNull();
+  });
+});
+
+describe("stopVerdict", () => {
+  // U6 from Westbahnhof towards Floridsdorf on a Tuesday evening: Neue Donau
+  // is shut that way by day, and served from about 22:00 while the line runs
+  // single-track. Handelskai is 16 minutes out, Floridsdorf 19.
+  const UNTIL = "2026-12-31T23:59:00+01:00";
+  const evening = Date.parse("2026-11-10T20:00:00+01:00");
+  const neueDonau: StationCalls = {
+    between: [16, 19],
+    calls: ["2026-11-10T22:02:00+01:00", "2026-11-10T22:09:00+01:00"],
+    from: "2026-11-10T20:03:00+01:00",
+    until: "2026-11-11T07:52:00+01:00",
+  };
+  const leaving = (clock: string) => ({ time_planned: `2026-11-10T${clock}:00+01:00` });
+
+  it("shows the time at a station no notice or sample doubts", () => {
+    expect(stopVerdict(leaving("21:00"), 17, undefined, undefined, evening)).toEqual({
+      minutes: 17,
+      skip: null,
+    });
+  });
+
+  it("stops a run the station's departures list between the calls either side", () => {
+    // Leaves 21:45, Handelskai 22:01, Floridsdorf 22:04: the 22:02 call is it.
+    expect(stopVerdict(leaving("21:45"), undefined, UNTIL, neueDonau, evening)).toEqual({
+      minutes: 17,
+      skip: null,
+    });
+  });
+
+  it("prefers the sample's own minutes for a run that calls", () => {
+    expect(stopVerdict(leaving("21:45"), 17.4, UNTIL, neueDonau, evening).minutes).toBe(17.4);
+  });
+
+  it("allows for the seconds the timetable cuts off a call", () => {
+    // Handelskai at 22:02:30 by the averaged minutes; the call prints 22:02.
+    const late = { ...neueDonau, between: [16.5, 19] as [number, number] };
+    expect(stopVerdict(leaving("21:46"), undefined, UNTIL, late, evening).skip).toBeNull();
+  });
+
+  it("allows for a run a minute slower than the sample", () => {
+    // By the sample Floridsdorf is reached at 22:01; this run calls at
+    // Neue Donau at 22:02, timetabled slower at this hour.
+    expect(stopVerdict(leaving("21:42"), undefined, UNTIL, neueDonau, evening)).toEqual({
+      minutes: 20,
+      skip: null,
+    });
+  });
+
+  it("passes through on a run between the calls, without a date while others stop", () => {
+    // Leaves 21:30: Handelskai 21:46, Floridsdorf 21:49, no call between.
+    expect(stopVerdict(leaving("21:30"), undefined, UNTIL, neueDonau, evening)).toEqual({
+      skip: { until: null },
+    });
+  });
+
+  it("says until when the stop is back where no run calls there", () => {
+    const shut = { ...neueDonau, calls: [] };
+    expect(stopVerdict(leaving("21:30"), 17, UNTIL, shut, evening)).toEqual({
+      skip: { until: new Date(UNTIL) },
+    });
+  });
+
+  it("goes by the sample where the departures don't reach the run", () => {
+    const short = { ...neueDonau, until: "2026-11-10T21:00:00+01:00" };
+    expect(stopVerdict(leaving("21:30"), undefined, UNTIL, short, evening).skip).toEqual({
+      until: new Date(UNTIL),
+    });
+    expect(stopVerdict(leaving("21:30"), 17, UNTIL, short, evening).minutes).toBe(17);
+    // Nor before they start.
+    expect(stopVerdict(leaving("19:45"), 17, UNTIL, neueDonau, evening).minutes).toBe(17);
+  });
+
+  it("goes by the sample without the departures or a planned time", () => {
+    expect(stopVerdict(leaving("21:45"), undefined, null, undefined, evening)).toEqual({
+      skip: { until: null },
+    });
+    expect(stopVerdict({ time_planned: null }, 17, null, neueDonau, evening).minutes).toBe(17);
+    const broken = { ...neueDonau, between: null } as unknown as StationCalls;
+    expect(stopVerdict(leaving("21:30"), 17, null, broken, evening).minutes).toBe(17);
+  });
+
+  it("shows the time once the stop is back", () => {
+    const after = Date.parse("2027-01-02T10:00:00+01:00");
+    expect(stopVerdict(leaving("21:30"), 17, UNTIL, neueDonau, after)).toEqual({
+      minutes: 17,
+      skip: null,
+    });
   });
 });
 

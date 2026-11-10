@@ -15,8 +15,26 @@ export type RunTimesByLine = Record<string, Record<string, number>>;
 
 /** `"U6|H"` → stop name as the trail prints it → when its stop is back (ISO),
  *  or null where no notice says so clearly. The stations the timetable has
- *  the line going through without a call. */
+ *  the line going through without a call, at least at some hours, or a
+ *  notice says are shut for it. */
 export type NoStopByLine = Record<string, Record<string, string | null>>;
+
+/** Which runs of a line call at a station in `no_stop` after all: the
+ *  station's own departures, from the same timetable. */
+export interface StationCalls {
+  /** Minutes from here to the calls either side of the station on the
+   *  route: a run calling there does so in between. */
+  between: [number, number];
+  /** When the line leaves the station in this direction, planned, ISO. */
+  calls: string[];
+  /** The stretch of time the calls cover, ISO. Outside it they say
+   *  nothing. */
+  from: string;
+  until: string;
+}
+
+/** `"U6|H"` → stop name as the trail prints it → its calls. */
+export type CallingByLine = Record<string, Record<string, StationCalls>>;
 
 /** The `wiener_linien_austria/run_times` answer. */
 export interface RunTimesAnswer {
@@ -26,6 +44,9 @@ export interface RunTimesAnswer {
   run_times: RunTimesByLine;
   /** Absent from a backend older than the feature. */
   no_stop?: NoStopByLine;
+  /** Absent from a backend older than the feature, and for a station whose
+   *  departures couldn't be fetched. */
+  calling?: CallingByLine;
   attribution?: string;
 }
 
@@ -33,6 +54,7 @@ export interface RunTimesAnswer {
 export interface RunTimesState {
   runTimes: RunTimesByLine;
   noStop: NoStopByLine;
+  calling: CallingByLine;
   /** Epoch ms from which the answer is asked for again. */
   validUntil: number;
   /** Lines asked about under this answer, and when. A line the answer lacks
@@ -91,9 +113,11 @@ export function runTimesAnswered(
   const until = Date.parse(answer.valid_until);
   const runTimes = answer.run_times;
   const noStop = answer.no_stop;
+  const calling = answer.calling;
   return {
     runTimes: runTimes && typeof runTimes === "object" ? runTimes : {},
     noStop: noStop && typeof noStop === "object" ? noStop : {},
+    calling: calling && typeof calling === "object" ? calling : {},
     validUntil: Number.isFinite(until) && until > nowMs ? until : nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };
@@ -109,6 +133,7 @@ export function runTimesFailed(
   return {
     runTimes: prev?.runTimes ?? {},
     noStop: prev?.noStop ?? {},
+    calling: prev?.calling ?? {},
     validUntil: nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };
@@ -209,6 +234,75 @@ export function stopSkip(entry: string | null | undefined, nowMs: number): StopS
   const until = Date.parse(entry);
   if (!Number.isFinite(until)) return { until: null };
   return until > nowMs ? { until: new Date(until) } : null;
+}
+
+/** What a trail shows at one station for one departure: a time, from
+ *  `minutes`, or "no stop". */
+export interface StopVerdict {
+  minutes?: number | undefined;
+  skip: StopSkip | null;
+}
+
+/** How far outside the calls either side a run's call at the station may
+ *  print. Early: the timetable cuts the seconds off it. Late: the run times
+ *  are one sample, and a tram or bus runs to another timetable at other
+ *  hours, about a minute off by the middle of its line. A neighbouring
+ *  run's call lies a headway away, further than that. */
+const CALL_LEEWAY_MS = 60_000;
+
+/** Whether a departure calls at a station of its trail.
+ *
+ *  `minutes` is the run-time sample's for the station, `entry` its
+ *  `no_stop` entry, `calls` its `calling` one. A station not in `no_stop`
+ *  shows its time. One in it is decided by the station's own departures
+ *  where they cover this run: a run of the line leaving there between the
+ *  calls either side means a stop, none means "no stop". Where they can't
+ *  tell (not fetched, the run outside the stretch they cover, no planned
+ *  time), the sample decides, as it always did: a time if it has one.
+ *
+ *  "Until 31.12." stays off a "no stop" where some runs of the line do
+ *  call there: it would read as no train stopping before then. */
+export function stopVerdict(
+  dep: Pick<DepartureAttr, "time_planned">,
+  minutes: number | undefined,
+  entry: string | null | undefined,
+  calls: StationCalls | undefined,
+  nowMs: number,
+): StopVerdict {
+  const skip = stopSkip(entry, nowMs);
+  if (!skip) return { minutes, skip: null };
+  const call = callingRun(dep, calls);
+  if (call === undefined) {
+    return minutes === undefined ? { skip } : { minutes, skip: null };
+  }
+  if (call === null) {
+    return { skip: calls?.calls.length ? { until: null } : skip };
+  }
+  return { minutes: minutes ?? call, skip: null };
+}
+
+/** Minutes from here to the station for a run that calls there, null for
+ *  one that goes through, undefined when the calls can't tell. */
+function callingRun(
+  dep: Pick<DepartureAttr, "time_planned">,
+  calls: StationCalls | undefined,
+): number | null | undefined {
+  if (!calls || !Array.isArray(calls.between) || !Array.isArray(calls.calls)) {
+    return undefined;
+  }
+  const planned = dep.time_planned ? Date.parse(dep.time_planned) : Number.NaN;
+  const [before, after] = calls.between;
+  const from = Date.parse(calls.from);
+  const until = Date.parse(calls.until);
+  if (![planned, before, after, from, until].every(Number.isFinite)) return undefined;
+  const earliest = planned + before * 60_000 - CALL_LEEWAY_MS;
+  const latest = planned + after * 60_000 + CALL_LEEWAY_MS;
+  if (earliest < from || latest > until) return undefined;
+  for (const iso of calls.calls) {
+    const at = Date.parse(iso);
+    if (at >= earliest && at <= latest) return (at - planned) / 60_000;
+  }
+  return null;
 }
 
 const VIENNA_YEAR = new Intl.DateTimeFormat("en-GB", {
