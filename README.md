@@ -608,6 +608,8 @@ Where no train of the line stops there in the time those departures cover, "Kein
 
 A stop the timetable knows by an id the station list doesn't have takes the time of the call where the route has it: N6's last call is "Enkplatz/Grillgasse" in the timetable and Enkplatz on its route.
 
+The Badner Bahn's trails use Wiener Lokalbahnen's own stop names, as its trains, platforms and timetables print them: "Schedifkaplatz" and "Tribuswinkel Josefsthal", where Wiener Linien's open data has "Bhf. Meidling, Schedifkaplatz" and just "Bahnhof". Other lines through the same stops keep Wiener Linien's names.
+
 ### When Wiener Linien fails
 
 A single failed poll keeps the interval and serves the last successful board. The *Departure data stale* sensor catches that, or compare `server_time` to `now()` in a template. From the second failure in a row the interval doubles each time, up to 30 minutes, until a fetch succeeds. Because the request is shared, the backoff applies to the whole interval group.

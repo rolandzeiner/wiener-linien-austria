@@ -87,7 +87,7 @@ from .skipped_stops import (
     skipped_stations,
     stand_ins,
 )
-from .static import StaticCatalogue
+from .static import StaticCatalogue, trail_name
 from .stops import stop_options, trackable_station
 
 # Error codes the card maps onto its own copy. Stable: the card matches them.
@@ -347,15 +347,17 @@ async def _websocket_run_times(
         )
         return
 
-    # Keyed by stop label (`StaticCatalogue.stop_label`), the one thing a
+    # Keyed by the stop's trail name (`static.trail_name`), the one thing a
     # trail entry carries. Both sides read it from the same catalogue row,
     # so the join is exact; a DIVA the catalogue doesn't know has no trail
     # entry to join either.
     run_times: dict[str, dict[str, float]] = {}
+    patterns = catalogue.trip_patterns
     for (label, way), minutes_by_diva in answer.pairs.items():
         named: dict[str, float] = {}
+        line_id = patterns.lines_by_label.get(label) if patterns is not None else None
         for stop_diva, minutes in minutes_by_diva.items():
-            stop = catalogue.stop_label(stop_diva)
+            stop = trail_name(catalogue, line_id, stop_diva)
             if stop is not None:
                 named.setdefault(stop, minutes)
         # A stop the timetable knows by an id the catalogue lacks.

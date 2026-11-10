@@ -53,6 +53,7 @@ from .const import (
     GTFS_LINE_LABEL_ALIASES,
     LEGACY_LINE_LABELS,
     MAX_STOPS_AHEAD,
+    OPERATOR_STOP_NAMES,
     REALTIME_LINE_LABELS,
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
@@ -397,6 +398,30 @@ class StaticCatalogue:
     def index_by_rbl(self) -> dict[int, tuple[int, str]]:
         """Return the eager RBL → (DIVA, stop label) reverse index."""
         return self._rbl_index
+
+
+def trail_name(
+    catalogue: StaticCatalogue, line_id: int | None, diva: int
+) -> str | None:
+    """A stop's name on a trail of the line `line_id`.
+
+    The operator's own where it isn't Wiener Linien (`OPERATOR_STOP_NAMES`:
+    the Badner Bahn's "Schedifkaplatz", "Tribuswinkel Josefsthal"), else
+    the stop label. Trails, travel times and skipped stations all name a
+    stop through this, so the card can join them by name.
+    """
+    if line_id is not None:
+        own = OPERATOR_STOP_NAMES.get(line_id, {}).get(diva)
+        if own is not None:
+            return own
+    return catalogue.stop_label(diva)
+
+
+def _trail_name_for_rbl(
+    catalogue: StaticCatalogue, line_id: int | None, rbl: int
+) -> str | None:
+    diva = _diva_for_rbl(catalogue, rbl)
+    return trail_name(catalogue, line_id, diva) if diva is not None else None
 
 
 def _stop_labels(stations: Mapping[int, Station]) -> dict[int, str]:
@@ -1335,7 +1360,9 @@ def stops_ahead_for_match(
         wanted = _terminus_key(needle)
         partial: list[TripPattern] = []
         for pattern in matching:
-            terminus_name = _station_name_for_rbl(catalogue, pattern.stops[-1])
+            terminus_name = _trail_name_for_rbl(
+                catalogue, resolved_line_id, pattern.stops[-1]
+            )
             if not terminus_name:
                 continue
             terminus = _terminus_key(terminus_name)
@@ -1383,7 +1410,7 @@ def stops_ahead_for_match(
         primary = primary.strip()
         if primary:
             for i, rbl in enumerate(tail):
-                name = _station_name_for_rbl(catalogue, rbl) or ""
+                name = _trail_name_for_rbl(catalogue, best.line_id, rbl) or ""
                 if not name:
                     continue
                 if primary in name.casefold():
@@ -1404,7 +1431,7 @@ def stops_ahead_for_match(
     full: list[dict[str, Any]] = []
     last_idx = len(tail) - 1
     for i, rbl in enumerate(tail):
-        name = _station_name_for_rbl(catalogue, rbl) or ""
+        name = _trail_name_for_rbl(catalogue, best.line_id, rbl) or ""
         diva = _diva_for_rbl(catalogue, rbl)
         if diva is None or not name:
             # An unknown RBL would render as an empty bullet; skip it
@@ -1561,12 +1588,6 @@ def _mot_by_label(
         for label, line_id in lines_by_label.items()
         if (mot := means_by_line.get(line_id))
     }
-
-
-def _station_name_for_rbl(catalogue: StaticCatalogue, rbl: int) -> str | None:
-    """Station name for an RBL, or None. O(1) via the catalogue's index."""
-    entry = catalogue.index_by_rbl().get(rbl)
-    return entry[1] if entry is not None else None
 
 
 def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:

@@ -61,7 +61,7 @@ from .const import (
 )
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .run_times import RUN_TIME_EXCLUDED_MOTS
-from .static import StaticCatalogue
+from .static import StaticCatalogue, trail_name
 from .timetable import LineCalls, build_departure_params, parse_line_calls
 
 _LOGGER = logging.getLogger(__name__)
@@ -111,6 +111,7 @@ def skipped_stations(
     DIVA, which it lists at a time between the two.
     """
     calls = {**minutes, board_diva: 0.0}
+    line_id = _line_id(catalogue, line)
     found: dict[str, tuple[int, set[int], set[int], tuple[float, float]]] = {}
     for stops in _routes_from(catalogue, board_diva, line, direction):
         divas = [entry[0] if entry else None for _, entry in stops]
@@ -127,7 +128,8 @@ def skipped_stations(
             ):
                 continue
             _, platforms, neighbours, _ = found.setdefault(
-                entry[1], (entry[0], set(), set(), (before, after))
+                trail_name(catalogue, line_id, entry[0]) or entry[1],
+                (entry[0], set(), set(), (before, after)),
             )
             platforms.add(rbl)
             neighbours.update((stops[at - 1][0], stops[at + 1][0]))
@@ -158,6 +160,7 @@ def stand_ins(
     if all(diva in known for diva in minutes):
         return {}
     calls = {**minutes, board_diva: 0.0}
+    line_id = _line_id(catalogue, line)
     found: dict[str, float] = {}
     for stops in _routes_from(catalogue, board_diva, line, direction):
         divas = [entry[0] if entry else None for _, entry in stops]
@@ -177,8 +180,15 @@ def stand_ins(
                 after = _minutes_at(calls, divas[at + 1])
                 if after is None or not _back_to_back(calls, nearest, after):
                     continue
-            found.setdefault(entry[1], nearest)
+            found.setdefault(
+                trail_name(catalogue, line_id, entry[0]) or entry[1], nearest
+            )
     return found
+
+
+def _line_id(catalogue: StaticCatalogue, line: str) -> int | None:
+    patterns = catalogue.trip_patterns
+    return patterns.lines_by_label.get(line) if patterns is not None else None
 
 
 def _routes_from(
@@ -248,12 +258,16 @@ def noticed_stations(
     if not live:
         return {}
     calls = {**minutes, board_diva: 0.0}
+    line_id = _line_id(catalogue, line)
     found: dict[str, SkippedStation] = {}
     for stops in _routes_from(catalogue, board_diva, line, direction):
         divas = [entry[0] if entry else None for _, entry in stops]
         for at in range(1, len(stops) - 1):
             rbl, entry = stops[at]
-            if entry is None or entry[1] in found:
+            if entry is None:
+                continue
+            name = trail_name(catalogue, line_id, entry[0]) or entry[1]
+            if name in found:
                 continue
             own = calls.get(entry[0])
             before = _minutes_at(calls, divas[at - 1])
@@ -266,7 +280,7 @@ def noticed_stations(
             if any(
                 rbl in notice.rbls and not notice.rbls & neighbours for notice in live
             ):
-                found[entry[1]] = SkippedStation(
+                found[name] = SkippedStation(
                     entry[0], frozenset({rbl}), neighbours, (before, after)
                 )
     return found

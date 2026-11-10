@@ -53,6 +53,7 @@ from custom_components.wiener_linien_austria.static import (
     catalogue_is_stale,
     direction_at_platform,
     stops_ahead_for_match,
+    trail_name,
 )
 from tests.conftest import make_response_cm
 
@@ -972,6 +973,60 @@ def test_the_trail_names_each_stop_and_ends_a_short_run_at_its_town() -> None:
         "Josefsplatz",
     ]
     assert _names(short) == ["Wiener Neudorf Bahnhof"]
+
+
+def _shared_stations() -> StaticCatalogue:
+    """The Badner Bahn (LineID 399) and tram 62 through Bahnhof Meidling,
+    with the open data's names and DIVAs."""
+    stations = {
+        60200865: Station(60200865, "Dörfelstraße", "Wien", 16.33, 48.17, [1]),
+        60201015: Station(60201015, "Bhf. Meidling", "Wien", 16.33, 48.17, [2]),
+        60201160: Station(
+            60201160, "Bhf. Meidling, Schedifkaplatz", "Wien", 16.33, 48.17, [3]
+        ),
+        60205201: Station(60205201, "Bahnhof", "Wiener Neudorf", 16.32, 48.08, [4]),
+        60205022: Station(60205022, "Bahnhof", "Tribuswinkel", 16.27, 47.99, [5]),
+        70000001: Station(70000001, "Wienerbergbrücke", "Wien", 16.33, 48.16, [6]),
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            399: [TripPattern(399, 1, 1, (1, 2, 3, 4, 5))],
+            162: [TripPattern(162, 1, 1, (1, 2, 6))],
+        },
+        lines_by_label={"WLB": 399, "62": 162},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def test_an_operators_own_line_uses_its_stop_names() -> None:
+    catalogue = _shared_stations()
+
+    assert trail_name(catalogue, 399, 60201015) == "Bahnhof Meidling"
+    assert trail_name(catalogue, 399, 60205022) == "Tribuswinkel Josefsthal"
+    # Another line at the same stop, and no line: the open data's name.
+    assert trail_name(catalogue, 162, 60201015) == "Bhf. Meidling"
+    assert trail_name(catalogue, None, 60201015) == "Bhf. Meidling"
+    # The open data's label where the operator has no name of its own.
+    assert trail_name(catalogue, 399, 70000001) == "Wienerbergbrücke"
+
+
+def test_a_badner_bahn_trail_reads_like_its_trains() -> None:
+    catalogue = _shared_stations()
+
+    full = stops_ahead_for_match(catalogue, "WLB", [1], "Baden Josefspl.")
+    short = stops_ahead_for_match(catalogue, "WLB", [1], "Wiener Neudorf")
+    tram = stops_ahead_for_match(catalogue, "62", [1], "Wienerbergbrücke")
+
+    assert _names(full) == [
+        "Bahnhof Meidling",
+        "Schedifkaplatz",
+        "Wiener Neudorf",
+        "Tribuswinkel Josefsthal",
+    ]
+    assert _names(short)[-1] == "Wiener Neudorf"
+    assert _names(tram) == ["Bhf. Meidling", "Wienerbergbrücke"]
 
 
 def test_stops_ahead_short_turn_truncates_tail_at_towards() -> None:

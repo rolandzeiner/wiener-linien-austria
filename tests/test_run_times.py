@@ -1141,6 +1141,34 @@ async def test_command_times_a_stop_the_timetable_knows_by_another_id(
     }
 
 
+async def test_command_names_an_operators_stops_its_own_way(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+) -> None:
+    """Travel times join the trail by the names it prints, the operator's
+    where a line has its own (the Badner Bahn's in production)."""
+    _name_stops(mock_static_catalogue, {VORGARTENSTRASSE: "Vorgartenstraße"})
+    patterns = mock_static_catalogue.trip_patterns
+    assert patterns is not None
+    u1 = patterns.lines_by_label["U1"]
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    with patch.dict(
+        "custom_components.wiener_linien_austria.static.OPERATOR_STOP_NAMES",
+        {u1: {VORGARTENSTRASSE: "Vorgartenstraße (Messe)"}},
+    ):
+        response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert "Vorgartenstraße (Messe)" in response["result"]["run_times"]["U1|H"]
+    assert "Vorgartenstraße" not in response["result"]["run_times"]["U1|H"]
+
+
 async def test_command_passes_the_line_on_for_a_top_up(
     hass: HomeAssistant,
     hass_ws_client: WebSocketGenerator,

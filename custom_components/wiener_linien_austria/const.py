@@ -203,6 +203,58 @@ GTFS_LINE_LABEL_ALIASES: Final[dict[str, str]] = {
     "BB": "WLB",
 }
 
+# What an operator other than Wiener Linien calls its own stops, by LineID
+# (linien.csv, `/monitor`'s `lineId`) and DIVA. That line's trails and travel
+# times use these names, as its trains, platforms and timetables do; any
+# other line's trail through the same stop keeps the open data's name.
+# 399, the Badner Bahn: Wiener Lokalbahnen's stop posters, valid from
+# 14.12.2025 (https://www.wlb.at/fahrplan), in route order from Wien Oper,
+# with Karlsplatz served towards Wien only. The open data names four of
+# these stations "Lokalbahn" and two "Bahnhof". Checked against the posters
+# 2026-11-10; check again when the timetable changes in December.
+OPERATOR_STOP_NAMES: Final[dict[int, dict[int, str]]] = {
+    399: {
+        60200975: "Wien Oper",
+        60201094: "Resselgasse",
+        60200996: "Paulanergasse",
+        60200859: "Mayerhofgasse",
+        60200604: "Johann-Strauß-Gasse",
+        60200755: "Laurenzgasse",
+        60200689: "Kliebergasse",
+        60200849: "Matzleinsdorfer Platz",
+        60200267: "Eichenstraße",
+        60200844: "Marx-Meidlinger-Straße",
+        60200368: "Flurschützstr./Längenfeldg.",
+        60200103: "Aßmayergasse",
+        60200865: "Dörfelstraße",
+        60201015: "Bahnhof Meidling",
+        60201160: "Schedifkaplatz",
+        60201214: "Schöpfwerk",
+        60200444: "Gutheil-Schoder-Gasse",
+        60200585: "Inzersdorf Lokalbahn",
+        60200918: "Neu Erlaa",
+        60200759: "Schönbrunner Allee",
+        60205133: "Vösendorf Siebenhirten",
+        60205132: "Vösendorf Shopping City Süd",
+        60204164: "Maria Enzersdorf Südstadt",
+        60205201: "Wiener Neudorf",
+        60205200: "Griesfeld",
+        60204331: "Neu Guntramsdorf",
+        60203615: "Guntramsdorf Lokalbahn",
+        60204302: "Eigenheimsiedlung",
+        60204304: "Möllersdorf Lokalbahn",
+        60205001: "Traiskirchen Lokalbahn",
+        60205022: "Tribuswinkel Josefsthal",
+        60204536: "Pfaffstätten Rennplatz",
+        60205809: "Baden Melkergründe",
+        60206055: "Baden Landesklinikum",
+        60203142: "Leesdorf",
+        60203134: "Baden Viadukt",
+        60203121: "Baden Josefsplatz",
+        60200657: "Karlsplatz",
+    },
+}
+
 # --- A→B routing (experimental) -------------------------------------
 # A config entry is either a stop board (the original shape, which carries
 # no `entry_type` key at all) or a route between two stations. Absent means
