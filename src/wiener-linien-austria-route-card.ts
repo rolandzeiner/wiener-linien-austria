@@ -2281,6 +2281,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 18px;
       flex: none;
     }
+    .notice > span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
     /* Which lift and why, under the station name. Its own line rather
        than a longer first line: the station is what's scanned for, the
        location is what's read once it has been found. */
@@ -2679,8 +2683,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       cursor: pointer;
     }
 
+    /* At the narrowest cell the button goes under the text instead of
+       past the card's edge. */
     .banner {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
@@ -2690,7 +2697,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.85rem;
     }
     .banner > span {
-      flex: 1;
+      flex: 1 1 8rem;
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
     .banner > button {
       min-height: 32px;

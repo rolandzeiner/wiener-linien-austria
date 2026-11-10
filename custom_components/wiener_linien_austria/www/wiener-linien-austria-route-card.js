@@ -1032,6 +1032,10 @@ font-size: 0.85rem;
 --mdc-icon-size: 18px;
 flex: none;
 }
+.notice > span {
+min-width: 0;
+overflow-wrap: anywhere;
+}
 .notice-detail {
 display: block;
 margin-top: 2px;
@@ -1407,6 +1411,7 @@ cursor: pointer;
 }
 .banner {
 display: flex;
+flex-wrap: wrap;
 align-items: center;
 gap: 10px;
 padding: 10px 12px;
@@ -1416,7 +1421,9 @@ color: var(--primary-text-color);
 font-size: 0.85rem;
 }
 .banner > span {
-flex: 1;
+flex: 1 1 8rem;
+min-width: 0;
+overflow-wrap: anywhere;
 }
 .banner > button {
 min-height: 32px;
