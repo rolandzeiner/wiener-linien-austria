@@ -297,8 +297,12 @@ async def test_budget_says_what_a_user_has_left(
     await _load_route(hass)
     planner = adhoc.async_get_planner(hass)
     # Nothing spent yet: as many as a user may have, and none to wait for.
+    # One comes back a minute: the user's 60/h, the slower of the two rates.
     assert planner.budget("tablet") == adhoc.AdhocBudget(
-        left=adhoc.ADHOC_USER_BURST, next_in=None
+        left=adhoc.ADHOC_USER_BURST,
+        next_in=None,
+        capacity=adhoc.ADHOC_USER_BURST,
+        refill_seconds=60,
     )
 
     await planner.async_plan(_query(0), user_id="tablet")
@@ -546,9 +550,12 @@ async def test_plan_budget_runs_out_and_says_when(
             client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ
         )
         assert first["success"]
-        # The answer says the budget is spent, and when the next one is free.
+        # The answer says the budget is spent, when the next one is free,
+        # and the rule: one in a row here, then one every 60 s per user.
         assert first["result"]["requests_left"] == 0
         assert 0 < first["result"]["requests_next_in"] <= 30
+        assert first["result"]["requests_max"] == 1
+        assert first["result"]["requests_refill_s"] == 60
         # A cache hit costs nothing ...
         assert (
             await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)

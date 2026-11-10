@@ -112,11 +112,15 @@ class AdhocBudget:
 
     `left` counts requests both buckets allow right now; a cached answer
     costs none, so it is a floor. `next_in` is the seconds until `left` grows
-    by one, or None when it is already as high as it goes.
+    by one, or None when it is already as high as it goes. `capacity` is
+    that height, and `refill_seconds` how often one comes back once spent,
+    by the slower bucket: together the rule the card spells out.
     """
 
     left: int
     next_in: int | None
+    capacity: int
+    refill_seconds: int
 
 
 class AdhocRateLimited(Exception):
@@ -159,6 +163,11 @@ class _TokenBucket:
     def burst(self) -> int:
         """The most tokens the bucket holds."""
         return int(self._burst)
+
+    @property
+    def seconds_per_token(self) -> int:
+        """How often a token comes back."""
+        return math.ceil(1 / self._rate)
 
     def available(self, now: float) -> int:
         """Whole tokens there are now."""
@@ -397,11 +406,14 @@ class AdhocPlanner:
         loop_now = self._hass.loop.time()
         buckets = (self._user_bucket(user_id, loop_now), self._bucket)
         left = min(bucket.available(loop_now) for bucket in buckets)
-        if left >= min(bucket.burst for bucket in buckets):
-            return AdhocBudget(left=left, next_in=None)
+        capacity = min(bucket.burst for bucket in buckets)
         return AdhocBudget(
             left=left,
-            next_in=max(bucket.wait(loop_now, left + 1) for bucket in buckets),
+            next_in=None
+            if left >= capacity
+            else max(bucket.wait(loop_now, left + 1) for bucket in buckets),
+            capacity=capacity,
+            refill_seconds=max(bucket.seconds_per_token for bucket in buckets),
         )
 
     def _user_bucket(self, user_id: str | None, loop_now: float) -> _TokenBucket:

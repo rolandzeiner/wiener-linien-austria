@@ -294,6 +294,8 @@ async def _websocket_plan(
             "retry_after": plan.retry_after,
             "requests_left": budget.left,
             "requests_next_in": budget.next_in,
+            "requests_max": budget.capacity,
+            "requests_refill_s": budget.refill_seconds,
         },
     )
 
