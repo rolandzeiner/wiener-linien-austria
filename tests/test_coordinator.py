@@ -497,6 +497,12 @@ def _wlb_line(direction: str, towards: str, planned: str, *, live: bool) -> dict
     }
 
 
+# The feed's serverTime, just before its first departure. Without it the
+# parser falls back to the wall clock, and once 05:05 has passed it drops
+# every row as gone.
+WLB_SERVER_TIME = "2026-11-10T05:00:00.000+0100"
+
+
 def _wlb_feed() -> dict:
     """The Badner Bahn at Eichenstraße as /monitor answered on 2026-11-10:
     live rows coded H on the Oper-bound platform and R on the Baden-bound
@@ -524,7 +530,11 @@ def test_parse_monitor_body_trail_follows_the_platform_over_the_code() -> None:
     """A live row's code says H at the Oper-bound platform: the trail goes to
     the Oper, and travel times are asked for by the route's direction."""
     result = _parse_monitor_body(
-        _wlb_feed(), None, None, catalogue=_wlb_two_platforms(), entry_rbls=[399, 427]
+        _wlb_feed(),
+        None,
+        WLB_SERVER_TIME,
+        catalogue=_wlb_two_platforms(),
+        entry_rbls=[399, 427],
     )
 
     by_towards = {d.towards: d for d in result.departures}
@@ -550,7 +560,11 @@ def test_parse_monitor_body_lists_a_train_listed_twice_once() -> None:
     lines.reverse()
 
     result = _parse_monitor_body(
-        feed, None, None, catalogue=_wlb_two_platforms(), entry_rbls=[399, 427]
+        feed,
+        None,
+        WLB_SERVER_TIME,
+        catalogue=_wlb_two_platforms(),
+        entry_rbls=[399, 427],
     )
 
     oper = [d for d in result.departures if d.towards == "Wien Oper"]
@@ -566,7 +580,11 @@ def test_parse_monitor_body_keeps_the_code_where_the_platform_agrees() -> None:
     ]
 
     result = _parse_monitor_body(
-        feed, None, None, catalogue=_wlb_two_platforms(), entry_rbls=[399, 427]
+        feed,
+        None,
+        WLB_SERVER_TIME,
+        catalogue=_wlb_two_platforms(),
+        entry_rbls=[399, 427],
     )
 
     (oper,) = [d for d in result.departures if d.towards == "Wien Oper"]
