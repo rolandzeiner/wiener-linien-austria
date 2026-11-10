@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -33,6 +33,7 @@ from .const import (
     STALE_DEPARTURE_MAX_AGE,
 )
 from .parsing import as_int
+from .run_times import async_get_run_times
 from .s_bahn_network import current_lines_at_diva as current_s_bahn_lines
 from .s_bahn_network import merge_transfer_lines
 from .static import (
@@ -245,6 +246,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
     async def _async_setup(self) -> None:
         """Load the cached static catalogue and pluck this stop's coords.
 
+        Also reads the stored run-time samples (see `_parse_slice`).
+
         Auto-called by `async_config_entry_first_refresh()` per HA core
         contract — do NOT invoke from `async_setup_entry`. Failure is
         non-fatal: coords stay None and the sensor falls back to a
@@ -252,6 +255,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
+        # The run-time samples guide which route the trails show; reading
+        # them now saves the first polls after a restart from guessing.
+        await async_get_run_times(self.hass).async_load()
         try:
             catalogue = await async_get_catalogue(self.hass)
         except CATALOGUE_LOAD_ERRORS as err:
@@ -450,6 +456,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             entry_rbls=self._rbls,
             warned_lines=self._stops_ahead_warned_lines,
             s_bahn_lines_at_diva=current_s_bahn_lines(self.hass),
+            served=async_get_run_times(self.hass).served(self._diva),
         )
         self._note_stale_departures(data)
         self._last_monitor = data
@@ -625,6 +632,7 @@ def _parse_monitor_body(
     entry_rbls: list[int] | None = None,
     warned_lines: set[str] | None = None,
     s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
+    served: Mapping[tuple[str, str], Collection[int]] | None = None,
 ) -> MonitorData:
     """Parse a successful /monitor response into a MonitorData.
 
@@ -638,6 +646,10 @@ def _parse_monitor_body(
     rather than spamming on every poll.
 
     `s_bahn_lines_at_diva` adds the S-Bahn to the trails' transfer lines.
+
+    `served`, per line and direction, is the stops the timetable has the
+    line calling at from this stop (`RunTimes.served`): the trail shows the
+    route that agrees with it.
     """
     departures: list[Departure] = []
     stale_dropped = 0
@@ -757,6 +769,7 @@ def _parse_monitor_body(
                             live_direction=direction,
                             line_id=line_id,
                             s_bahn_lines_at_diva=s_bahn_lines_at_diva,
+                            served=(served or {}).get((line_name, direction or "")),
                         )
                     except Exception:
                         # Fail-soft: a single matcher hiccup must not poison

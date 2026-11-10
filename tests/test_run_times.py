@@ -364,6 +364,27 @@ async def test_first_ask_fetches_one_sample_for_the_whole_stop(
     assert answer.valid_until == datetime(2026, 10, 8, 19, 0, tzinfo=VIENNA)
 
 
+async def test_the_stops_served_are_read_from_the_samples_held(
+    hass: HomeAssistant,
+    board: MockConfigEntry,
+    dm_fetch: AsyncMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """What a departure board picks its trails' route by: no request."""
+    registry = async_get_run_times(hass)
+    assert registry.served(PRATERSTERN) == {}
+
+    freezer.move_to(DAY)
+    answer = await registry.async_get(PRATERSTERN)
+    served = registry.served(PRATERSTERN)
+
+    assert served[("U1", "H")] == frozenset(answer.pairs[("U1", "H")])
+    assert LEOPOLDAU in served[("U1", "H")]
+    assert set(served) == set(answer.pairs)
+    assert registry.served(MEIDLING) == {}
+    assert dm_fetch.await_count == 1
+
+
 async def test_answers_outlive_the_switch_by_a_random_spread(
     hass: HomeAssistant,
     board: MockConfigEntry,

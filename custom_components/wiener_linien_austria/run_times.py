@@ -159,6 +159,28 @@ class RunTimes:
         self._load_lock = asyncio.Lock()
         self._in_flight: dict[int, asyncio.Task[RoutingError | None]] = {}
 
+    async def async_load(self) -> None:
+        """Read the stored samples, once; the departure boards call it at setup
+        so their trails can follow the timetable's route from the start."""
+        await self._async_load()
+
+    @callback
+    def served(self, diva: int) -> dict[Pair, frozenset[int]]:
+        """The stops each line and direction calls at after `diva`, by DIVA.
+
+        From the samples held for the stop, both parts of the day; empty
+        when none are. No request: a departure board uses it on every poll
+        to pick the route its trails show (`static.stops_ahead_for_match`).
+        """
+        state = self._stops.get(diva)
+        if state is None:
+            return {}
+        served: dict[Pair, set[int]] = {}
+        for sample in state.samples.values():
+            for pair, minutes in sample.pairs.items():
+                served.setdefault(pair, set()).update(minutes)
+        return {pair: frozenset(divas) for pair, divas in served.items()}
+
     async def async_get(self, diva: int, pair: Pair | None = None) -> RunTimeAnswer:
         """Run times for the stop, fetching a sample only when one is due.
 

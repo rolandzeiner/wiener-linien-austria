@@ -779,6 +779,111 @@ def test_stops_ahead_for_match_terminus_substring_picks_branch() -> None:
     assert result[-1]["name"] == "Leopoldau"
 
 
+# Tram 6 from Eichenstraße towards Geiereckstraße, cut down: the trams run
+# Matzleinsdorfer Platz, Knöllgasse, Quellenplatz; the route data also keeps
+# detours via Hauptbahnhof and Quartier Belvedere that end at the same stop.
+_SIX = {
+    399: (1, "Eichenstraße"),
+    400: (2, "Matzleinsdorfer Platz"),
+    401: (3, "Knöllgasse"),
+    402: (4, "Quellenplatz"),
+    403: (5, "Geiereckstraße"),
+    500: (6, "Hauptbahnhof"),
+    501: (7, "Quartier Belvedere"),
+    502: (8, "Columbusplatz"),
+    600: (9, "Döblinger Friedhof"),
+    601: (10, "Döblinger Friedhof, Felix-Dahn-Str."),
+}
+_REGULAR = (399, 400, 401, 402, 403)
+_DETOUR = (399, 400, 500, 501, 502, 402, 403)
+
+
+def _six_catalogue(*patterns: tuple[int, tuple[int, ...]]) -> StaticCatalogue:
+    stations = {
+        diva: Station(diva, name, "Wien", 16.35, 48.18, [rbl])
+        for rbl, (diva, name) in _SIX.items()
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            106: [TripPattern(106, pid, 1, stops) for pid, stops in patterns]
+        },
+        lines_by_label={"6": 106},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def _names(result: list[dict[str, object]] | None) -> list[object]:
+    assert result is not None
+    return [stop["name"] for stop in result]
+
+
+def test_stops_ahead_takes_the_route_most_patterns_share() -> None:
+    """The longest variant to the terminus was a detour the trams don't take."""
+    catalogue = _six_catalogue(
+        (1, _REGULAR),
+        (14, (399, 400, 401, 402)),  # a short run to Quellenplatz
+        (92, _REGULAR),
+        (132, _DETOUR),
+    )
+
+    result = stops_ahead_for_match(
+        catalogue, "6", [399], "Geiereckstraße", live_direction="H"
+    )
+
+    assert _names(result) == [
+        "Matzleinsdorfer Platz",
+        "Knöllgasse",
+        "Quellenplatz",
+        "Geiereckstraße",
+    ]
+
+
+def test_stops_ahead_follows_the_timetable_where_detours_outnumber() -> None:
+    """Three detour variants, one regular route: the shared route is the
+    detour, and only the stops the timetable has the line calling at say
+    otherwise."""
+    catalogue = _six_catalogue(
+        (1, _REGULAR), (10, _DETOUR), (11, _DETOUR), (12, _DETOUR)
+    )
+
+    guessed = stops_ahead_for_match(catalogue, "6", [399], "Geiereckstraße")
+    served = stops_ahead_for_match(
+        catalogue, "6", [399], "Geiereckstraße", served={2, 3, 4, 5}
+    )
+
+    assert "Quartier Belvedere" in _names(guessed)
+    assert _names(served) == [
+        "Matzleinsdorfer Platz",
+        "Knöllgasse",
+        "Quellenplatz",
+        "Geiereckstraße",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("towards", "terminus"),
+    [
+        # The live feed's spelling of the 40A's terminus.
+        ("Döblinger Friedhof/Felix-Dahn-Straße", "Döblinger Friedhof, Felix-Dahn-Str."),
+        ("Döblinger Friedhof", "Döblinger Friedhof"),
+    ],
+)
+def test_stops_ahead_prefers_the_terminus_spelt_alike(
+    towards: str, terminus: str
+) -> None:
+    """A partial name match no longer wins over the whole name in another
+    spelling: the two stops are 200 m apart."""
+    catalogue = _six_catalogue(
+        (1, (399, 400, 600)), (2, (399, 400, 601)), (3, (399, 400, 601))
+    )
+
+    result = stops_ahead_for_match(catalogue, "6", [399], towards)
+
+    assert _names(result)[-1] == terminus
+
+
 def test_stops_ahead_short_turn_truncates_tail_at_towards() -> None:
     """When `towards` is a stop ON the pattern (not its terminus), truncate.
 
