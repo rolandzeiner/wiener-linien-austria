@@ -290,7 +290,7 @@ Names don't have to match the stop list exactly, since speech recognition rarely
 
 The response's `origin` and `destination` hold the stop names that were picked, so a reply can say them back. If no stop matches, or a name fits several different stops, the action fails with a message that lists them. Use a longer name or the DIVA number then; a departure sensor has its stop's DIVA in the `diva` attribute.
 
-Calling it again for the same route and time within a minute returns the same answer without a new request. A script can make 5 requests in a row, then about one a minute. Beyond that the action fails with a message saying when to try again. Automations, which run without a user, share one allowance. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
+Calling it again for the same route and time within a minute returns the same answer without a new request. A script can make 10 requests in a row, then about one a minute. Beyond that the action fails with a message saying when to try again. Automations, which run without a user, share one allowance. Targeting a departure board, or a route that isn't loaded, fails with a message saying so.
 
 The cards plan trips and look up travel times through three WebSocket commands. If you write your own card, they are documented in [CONTRIBUTING.md](https://github.com/rolandzeiner/wiener-linien-austria/blob/main/CONTRIBUTING.md).
 

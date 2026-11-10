@@ -88,12 +88,19 @@ ADHOC_CACHE_MAX_ENTRIES: Final = 32
 # makes 30-60. 120 leaves room for a busy
 # household and still caps a runaway client at a rate the upstream won't
 # notice.
+#
+# The bursts are sized for someone paging through connections: opening the
+# card and picking a time cost one each, then every Später or Früher past
+# the cache another. Five ran out four presses in, and paging is short and
+# deliberate, so ten per user, twenty for two people at once. The hourly
+# rates are what bound the steady load the upstream sees, and stay put: a
+# spent burst refills in ten minutes.
 ADHOC_BUDGET_PER_HOUR: Final = 120
-ADHOC_BURST: Final = 10
+ADHOC_BURST: Final = 20
 # Per HA user: one viewer's refresh rate plus room to pick a few pairs, so a
 # single user can never spend more than half the instance's budget.
 ADHOC_USER_BUDGET_PER_HOUR: Final = 60
-ADHOC_USER_BURST: Final = 5
+ADHOC_USER_BURST: Final = 10
 
 # Bucket for calls that carry no user, e.g. `plan_trip` from an automation.
 _NO_USER: Final = ""
