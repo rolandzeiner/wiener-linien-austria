@@ -820,6 +820,10 @@ export interface RouteAttrs {
   /** Ad-hoc only: seconds until `requests_left` grows by one; null when it is
    *  as high as it goes. */
   requests_next_in?: number | null;
+  /** Ad-hoc only: the most `requests_left` can be. */
+  requests_max?: number;
+  /** Ad-hoc only: how often one request comes back once spent (s). */
+  requests_refill_s?: number;
   /** Ad-hoc only: the chosen time the plan is for; null for "now". */
   planned_for?: string | null;
   /** Ad-hoc only, with `planned_for`: arriving by that time, not leaving. */

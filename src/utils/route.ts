@@ -541,6 +541,13 @@ export function adhocPlanRefreshDelay(plan: RouteAttrs, nowMs: number): number {
  *  presses of warning before a wait, and quiet while there's room. */
 export const ADHOC_REQUESTS_NOTE_AT = 2;
 
+/** How long a step back to a question the card was already answered can
+ *  go out with the budget spent. The backend keeps a plan five minutes
+ *  (`ADHOC_STALE_MAX_SECONDS` in adhoc.py) and hands it out then; half a
+ *  minute short of that, for clocks that disagree. Past it, a step only
+ *  waits longer than it had to. */
+export const ADHOC_HELD_MS = 4.5 * 60_000;
+
 /** How long a card with no loaded integration waits before asking again.
  *  Right after an HA restart the card can reach HA before the integration
  *  has loaded, so this can't be a dead end. */

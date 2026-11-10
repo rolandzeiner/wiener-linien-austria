@@ -1514,26 +1514,42 @@ describe("earlier and later", () => {
     expect(planCalls(callWS)).toHaveLength(1);
   });
 
-  const note = (el: CardElement): string | undefined =>
-    root(el).querySelector(".pager-note")?.textContent?.trim();
-  const status = (el: CardElement): string | undefined =>
-    root(el).querySelector('.wrap > [role="status"]')?.textContent?.trim();
+  // Whitespace folded: numbers and units are held together by no-break spaces.
+  const shown = (node: Element | null): string | undefined =>
+    node?.textContent?.replace(/\s+/g, " ").trim();
+  const note = (el: CardElement) => shown(root(el).querySelector(".pager-note"));
+  const why = (el: CardElement) => shown(root(el).querySelector(".pager-why"));
+  const status = (el: CardElement) => shown(root(el).querySelector('.wrap > [role="status"]'));
+  const RULE = { requests_max: 10, requests_refill_s: 60 };
+  const WHY =
+    "Bis zu 10 Abfragen am Stück, dann eine pro Minute. So schont die Karte den Routenplaner der Wiener Linien.";
 
-  /** `answer`, with the budget each plan request is answered with in turn. */
+  type Budget = { requests_left: number; requests_next_in: number | null; stale?: boolean };
+
+  /** `answer`, with the budget each plan request is answered with in turn;
+   *  the last one again for any further request. A plan for a time leaves
+   *  the minute after it, as the planner's do, so each "Später" asks
+   *  something new. */
   async function mountBudget(
-    budgets: Array<{ requests_left: number; requests_next_in: number | null }>,
+    budgets: Budget[],
   ): Promise<{ el: CardElement; callWS: ReturnType<typeof vi.fn> }> {
     remember(WESTBAHNHOF, PRATERSTERN);
-    const { h, callWS } = adhocHass(async (msg) => ({
-      ...(await answer(msg)),
-      ...budgets.shift(),
-    }));
+    const { h, callWS } = adhocHass(async (msg) => {
+      const base = await answer(msg);
+      const at = (msg as { datetime?: string }).datetime?.slice(11);
+      return {
+        ...base,
+        ...(at ? { trips: [trip(later(at, 1), later(at, 15))] } : {}),
+        ...RULE,
+        ...(budgets.length > 1 ? budgets.shift() : budgets[0]),
+      };
+    });
     const el = await mount(h, {});
     await settle(el);
     return { el, callWS };
   }
 
-  it("says how many fresh plans are left once few are, then counts down the wait", async () => {
+  it("says how many fresh plans are left once few are, and when the next comes back", async () => {
     const { el, callWS } = await mountBudget([
       { requests_left: 4, requests_next_in: 60 },
       { requests_left: 2, requests_next_in: 40 },
@@ -1541,56 +1557,104 @@ describe("earlier and later", () => {
       { requests_left: 0, requests_next_in: 20 },
     ]);
     expect(note(el)).toBeUndefined();
+    expect(why(el)).toBeUndefined();
 
     pager(el)[1]!.click();
     await settle(el);
-    expect(note(el)).toBe("Noch 2 Abfragen");
+    expect(note(el)).toBe("Noch 2 Abfragen, +1 in 40 s");
+    expect(why(el)).toBe(WHY);
     expect(pager(el).map((b) => b.getAttribute("aria-describedby"))).toEqual([
-      "wl-pager-note",
-      "wl-pager-note",
+      "wl-pager-note wl-pager-why",
+      "wl-pager-note wl-pager-why",
     ]);
-    expect(status(el)).toMatch(/\. Noch 2 Abfragen\.$/);
+    expect(status(el)).toMatch(/\. Noch 2 Abfragen, \+1 in 40 s\.$/);
 
     pager(el)[1]!.click();
     await settle(el);
-    expect(note(el)).toBe("Noch 1 Abfrage");
+    expect(note(el)).toBe("Noch 1 Abfrage, +1 in 30 s");
 
     pager(el)[1]!.click();
     await settle(el);
-    expect(note(el)).toBe("Weiter in 20 s");
+    expect(note(el)).toBe("Nächste Abfrage in 20 s");
     // Später needs a fresh plan; Früher retraces, which doesn't.
     expect(inert(el)).toEqual([null, "true"]);
     await settle(el, 1_000);
-    expect(note(el)).toBe("Weiter in 19 s");
+    expect(note(el)).toBe("Nächste Abfrage in 19 s");
 
     // A press says why nothing happens instead of asking.
     pager(el)[1]!.click();
     await settle(el);
     expect(planCalls(callWS)).toHaveLength(4);
-    expect(status(el)).toBe("Gerade zu viele Verbindungsabfragen. Weiter in 19 s.");
+    expect(status(el)).toBe("Gerade zu viele Verbindungsabfragen. Nächste Abfrage in 19 s.");
 
-    // The budget gives one back: Später steps again.
+    // One a minute comes back, until there's room again.
     await settle(el, 19_000);
-    expect(note(el)).toBe("Noch 1 Abfrage");
+    expect(note(el)).toBe("Noch 1 Abfrage, +1 in 60 s");
     expect(inert(el)).toEqual([null, null]);
+    await settle(el, 60_000);
+    expect(note(el)).toBe("Noch 2 Abfragen, +1 in 60 s");
+    await settle(el, 60_000);
+    expect(note(el)).toBeUndefined();
+    expect(why(el)).toBeUndefined();
   });
 
-  it("retraces Später with Früher while the wait runs", async () => {
+  it("steps both ways through the answers it already has while the wait runs", async () => {
     const { el, callWS } = await mountBudget([
       { requests_left: 1, requests_next_in: 30 },
       { requests_left: 0, requests_next_in: 45 },
-      { requests_left: 0, requests_next_in: 44 },
     ]);
     pager(el)[1]!.click();
     await settle(el);
-    expect(note(el)).toBe("Weiter in 45 s");
+    expect(note(el)).toBe("Nächste Abfrage in 45 s");
+    expect(inert(el)).toEqual([null, "true"]);
+
+    // Back to Jetzt, which the backend still has ...
     pager(el)[0]!.click();
     await settle(el);
     expect(planCalls(callWS)).toHaveLength(3);
     expect(planCalls(callWS).at(-1)).not.toHaveProperty("datetime");
-    // Back on Jetzt, nothing earlier to step to, and nothing later yet.
-    expect(inert(el)).toEqual(["true", "true"]);
-    expect(note(el)).toBe("Weiter in 44 s");
+    // ... and forward again to the step it has too.
+    expect(inert(el)).toEqual(["true", null]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(4);
+    expect(planCalls(callWS).at(-1)).toMatchObject({ datetime: "2026-09-14T07:58" });
+    // Past it, a fresh plan: that waits.
+    expect(inert(el)).toEqual([null, "true"]);
+  });
+
+  it("explains the rule in place of the stale note, and under a refusal", async () => {
+    const { el } = await mountBudget([
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 45, stale: true },
+    ]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(why(el)).toBe(WHY);
+    expect(text(el)).not.toContain("etwas älterer Stand");
+
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => {
+      throw { code: "rate_limited", translation_placeholders: { retry_after: "30" } };
+    });
+    const refused = await mount(h, {});
+    await settle(refused);
+    // No rule from the backend yet, so nothing to explain it with.
+    expect(why(refused)).toBeUndefined();
+
+    const { h: h2 } = adhocHass(async (msg) => {
+      if (msg.type === "wiener_linien_austria/plan" && (msg as { datetime?: string }).datetime) {
+        throw { code: "rate_limited", translation_placeholders: { retry_after: "30" } };
+      }
+      return { ...(await answer(msg)), ...RULE, requests_left: 1, requests_next_in: 30 };
+    });
+    const stepped = await mount(h2, {});
+    await settle(stepped);
+    pager(stepped)[1]!.click();
+    await settle(stepped);
+    expect(text(stepped)).toContain("Neuer Versuch in 30 s");
+    expect(note(stepped)).toBeUndefined();
+    expect(why(stepped)).toBe(WHY);
   });
 
   it("asks Später, at once, for the minute after the timetabled departure", async () => {

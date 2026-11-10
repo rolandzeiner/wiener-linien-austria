@@ -53,6 +53,7 @@ import {
   accessKey,
   ADHOC_DEBOUNCE_MS,
   ADHOC_IDLE_MS,
+  ADHOC_HELD_MS,
   ADHOC_REQUESTS_NOTE_AT,
   ADHOC_RETRY_MS,
   adhocPlanRefreshDelay,
@@ -148,6 +149,21 @@ function withRetryAt(error: AdhocError, spec: AdhocErrorSpec, delay: number | nu
 }
 type Which = "from" | "to";
 
+/** A question "Früher" or "Später" can step to. */
+interface PageStep {
+  timeMode: AdhocTimeMode;
+  when: string;
+}
+
+/** What a plan answer says about the request budget. */
+type BudgetAttrs = Pick<
+  RouteAttrs,
+  "requests_left" | "requests_next_in" | "requests_max" | "requests_refill_s"
+>;
+
+const isCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
+
 const TIME_MODES: readonly AdhocTimeMode[] = ["now", "depart", "arrive"];
 
 {
@@ -219,6 +235,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _requestsLeft: number | null = null;
   /** When the budget gives one more request back (epoch ms), or null. */
   private _requestsNextAt: number | null = null;
+  /** The rule behind the count: the most there can be, and how often one
+   *  comes back (s). From the backend, so the card never states a stale one. */
+  private _requestsMax: number | null = null;
+  private _requestsRefillS: number | null = null;
+  /** When the backend fetched each question this card was answered (epoch
+   *  ms, the earlier of its clock and ours). It hands that plan out again
+   *  with the budget spent, so stepping back to it needn't wait. */
+  private _answeredAt = new Map<string, number>();
   /** The clock the second-by-second countdowns read: the pager's wait and
    *  an error's next try. Ticks only while one of them runs. */
   @state() private _secondNow = Date.now();
@@ -238,7 +262,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  retrace before it asks for anything new. Any time, stop or mode set by
    *  hand starts it over. Not reactive: what the buttons show follows the
    *  time mode and the plan, and every step sets both. */
-  private _pageHistory: Array<{ timeMode: AdhocTimeMode; when: string }> = [];
+  private _pageHistory: PageStep[] = [];
   private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the scheduled refresh is due (epoch ms). Survives a disconnect, so
    *  a card HA re-attaches on a view switch waits out the rest instead of
@@ -552,7 +576,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._alternativesOpen = true;
       this._revealAlternatives = false;
     }
-    this._noteBudget(plan.requests_left, plan.requests_next_in);
+    const fetched = Date.parse(plan.fetched_at ?? "");
+    this._rememberAnswer(
+      key,
+      Number.isFinite(fetched) ? Math.min(Date.now(), fetched) : Date.now(),
+    );
+    this._noteBudget(plan);
     if (userInitiated) {
       const said = this._planAnnouncement(plan);
       const note = this._budgetNote();
@@ -562,13 +591,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   /** Takes in what an answer says about the request budget. An answer
-   *  without it, from an older integration, leaves the pager quiet. */
-  private _noteBudget(left: unknown, nextIn: unknown): void {
-    const known = typeof left === "number" && Number.isInteger(left) && left >= 0;
-    this._requestsLeft = known ? left : null;
+   *  without it, from an older integration, leaves the pager quiet. The rule
+   *  is kept when an answer (a refusal) doesn't repeat it. */
+  private _noteBudget(budget: BudgetAttrs): void {
+    const left = budget.requests_left;
+    const nextIn = budget.requests_next_in;
+    this._requestsLeft = isCount(left) ? left : null;
     this._requestsNextAt =
-      known && typeof nextIn === "number" && nextIn > 0 ? Date.now() + nextIn * 1000 : null;
+      isCount(left) && typeof nextIn === "number" && nextIn > 0 ? Date.now() + nextIn * 1000 : null;
+    if (isCount(budget.requests_max)) this._requestsMax = budget.requests_max;
+    if (isCount(budget.requests_refill_s)) this._requestsRefillS = budget.requests_refill_s;
     this._syncCountdown();
+  }
+
+  private _rememberAnswer(key: string, at: number): void {
+    const now = Date.now();
+    for (const [old, when] of this._answeredAt) {
+      if (now - when >= ADHOC_HELD_MS) this._answeredAt.delete(old);
+    }
+    this._answeredAt.set(key, at);
   }
 
   private _applyPlanError(err: unknown, userInitiated: boolean): void {
@@ -585,8 +626,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (userInitiated) this._announce(this._adhocError(error).title);
     if (delay !== null) this._schedule(delay);
     // Refused for the budget: nothing is left until the retry is due.
-    if (error.code === "rate_limited") this._noteBudget(0, (delay ?? ADHOC_RETRY_MS) / 1000);
-    else this._syncCountdown();
+    if (error.code === "rate_limited") {
+      this._noteBudget({ requests_left: 0, requests_next_in: (delay ?? ADHOC_RETRY_MS) / 1000 });
+    } else this._syncCountdown();
   }
 
   private _onPick(which: Which, value: unknown): void {
@@ -602,9 +644,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   /** Identifies what is being asked, so an answer for an older question
-   *  never stands in for the current one. */
-  private _queryKey(): string {
-    const when = this._timeMode === "now" ? "now" : `${this._timeMode}@${this._when}`;
+   *  never stands in for the current one. `step` asks it for a step instead
+   *  of the question on screen. */
+  private _queryKey(step: PageStep = { timeMode: this._timeMode, when: this._when }): string {
+    const when = step.timeMode === "now" ? "now" : `${step.timeMode}@${step.when}`;
     return `${this._from}>${this._to}|${when}|${this._config?.step_free ? "step-free" : ""}`;
   }
 
@@ -748,42 +791,60 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return this._pageHistory.length > 0 || (!!this._pageBase() && this._timeMode !== "now");
   }
 
-  /** The next connection: depart from the minute after this one leaves.
-   *  By the timetable, not the live time: the query reads the timetable, so
-   *  a late train must not push it past the one planned right behind it. */
-  private _later = (): void => {
+  /** Where "Später" goes: departing the minute after this one leaves. By
+   *  the timetable, not the live time: the query reads the timetable, so a
+   *  late train must not push it past the one planned right behind it. */
+  private _laterStep(): PageStep | null {
     const best = this._pageBase();
     const leaves = Date.parse(best?.legs[0]?.origin.planned ?? best?.departure ?? "");
-    if (!Number.isFinite(leaves) || this._sayWait()) return;
-    this._pageHistory = [...this._pageHistory, { timeMode: this._timeMode, when: this._when }];
-    this._step("depart", viennaInputAt(leaves + 60_000));
-  };
+    return Number.isFinite(leaves)
+      ? { timeMode: "depart", when: viennaInputAt(leaves + 60_000) }
+      : null;
+  }
 
-  /** The connection before: back through the "Später" steps first, exactly
+  /** Where "Früher" goes: back through the "Später" steps first, exactly
    *  as they were asked (back to "Jetzt" as well), then the one arriving
-   *  before this one does. Off for "Jetzt": what was earlier has left.
+   *  before this one does. None for "Jetzt": what was earlier has left.
    *
    *  Before the earlier of its timetable and live arrival: the planner
    *  drops what arrives after the time asked, by its own live time, so a
    *  train running early would otherwise come back as its own answer. */
-  private _earlier = (): void => {
-    if (!this._canGoEarlier()) return;
+  private _earlierStep(): PageStep | null {
+    if (!this._canGoEarlier()) return null;
     const back = this._pageHistory.at(-1);
-    if (back) {
-      this._pageHistory = this._pageHistory.slice(0, -1);
-      this._step(back.timeMode, back.when);
-      return;
-    }
-    if (this._sayWait()) return;
+    if (back) return back;
     const best = this._pageBase()!;
     const arrives = Math.min(
       ...[best.legs.at(-1)?.destination.planned, best.arrival]
         .map((iso) => Date.parse(iso ?? ""))
         .filter(Number.isFinite),
     );
-    if (!Number.isFinite(arrives)) return;
-    this._step("arrive", viennaInputAt(arrives - 60_000));
+    return Number.isFinite(arrives)
+      ? { timeMode: "arrive", when: viennaInputAt(arrives - 60_000) }
+      : null;
+  }
+
+  private _later = (): void => {
+    const step = this._laterStep();
+    if (!step || this._sayWait(step)) return;
+    this._pageHistory = [...this._pageHistory, { timeMode: this._timeMode, when: this._when }];
+    this._step(step.timeMode, step.when);
   };
+
+  private _earlier = (): void => {
+    const step = this._earlierStep();
+    if (!step || this._sayWait(step)) return;
+    if (step === this._pageHistory.at(-1)) this._pageHistory = this._pageHistory.slice(0, -1);
+    this._step(step.timeMode, step.when);
+  };
+
+  /** Whether `step` needs a fresh plan the budget can't give yet. One the
+   *  card was answered recently can go: the backend still hands it out. */
+  private _mustWait(step: PageStep, now = this._secondNow): boolean {
+    if (this._pagerWait(now) === 0) return false;
+    const answered = this._answeredAt.get(this._queryKey(step));
+    return answered === undefined || now - answered >= ADHOC_HELD_MS;
+  }
 
   /** A step goes out at once: it is one deliberate press, with nothing to
    *  wait for the way a typed time or a second pick is. */
@@ -801,50 +862,74 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return this._requestsLeft === 0 ? secondsUntil(this._requestsNextAt, now) : 0;
   }
 
-  /** "Noch 2 Abfragen" once few are left, "Weiter in 42 s" once none are,
-   *  empty while there is room. */
+  /** "Noch 2 Abfragen, +1 in 42 s" once few are left, "Nächste Abfrage in
+   *  42 s" once none are, empty while there is room. */
   private _budgetNote(): string {
     const wait = this._pagerWait();
     if (wait > 0) return this._t("page_wait", { s: wait });
     const left = this._requestsLeft;
     if (!left || left > ADHOC_REQUESTS_NOTE_AT) return "";
-    return left === 1
-      ? this._t("page_requests_left_one")
-      : this._t("page_requests_left", { n: left });
+    const count =
+      left === 1 ? this._t("page_requests_left_one") : this._t("page_requests_left", { n: left });
+    const next = secondsUntil(this._requestsNextAt, this._secondNow);
+    return next > 0 ? `${count}, ${this._t("page_refill_in", { s: next })}` : count;
+  }
+
+  /** The rule behind the note, and why there is one, under the steps while
+   *  the note shows and under a refusal for the budget. Empty without the
+   *  rule from the backend. */
+  private _budgetWhy(): string {
+    const max = this._requestsMax;
+    const refill = this._requestsRefillS;
+    if (!max || !refill) return "";
+    const refused = this._phase === "error" && this._error?.code === "rate_limited";
+    if (!refused && (this._phase === "error" || !this._budgetNote())) return "";
+    const every =
+      refill === 60 ? this._t("page_every_minute") : this._t("page_every_seconds", { s: refill });
+    return this._t("page_why", { max, every });
   }
 
   /** A press on a step the budget holds back: say why nothing happens, and
    *  for how long. True when it did. */
-  private _sayWait(): boolean {
-    const wait = this._pagerWait(Date.now());
-    if (wait === 0) return false;
+  private _sayWait(step: PageStep): boolean {
+    const now = Date.now();
+    if (!this._mustWait(step, now)) return false;
+    const wait = this._pagerWait(now);
     this._announce(`${this._t("adhoc_error_rate_limited")}. ${this._t("page_wait", { s: wait })}.`);
     return true;
   }
 
-  /** Brings the countdown clock to now, and keeps it ticking each second
-   *  while a countdown is on screen; otherwise wakes once, when the budget
-   *  gives a request back. Call after setting any of their deadlines. */
+  /** Brings the countdown clock to now, counts in the requests the budget
+   *  gave back since, and keeps ticking each second while a countdown is on
+   *  screen. Call after setting any of their deadlines. */
   private _syncCountdown(): void {
     if (this._countdownTimer !== null) clearTimeout(this._countdownTimer);
     this._countdownTimer = null;
     const now = Date.now();
     this._secondNow = now;
-    if (this._requestsNextAt !== null && this._requestsNextAt <= now) {
-      this._requestsNextAt = null;
-      if (this._requestsLeft !== null) this._requestsLeft += 1;
+    // One came back; the next follows a refill later, up to the most there
+    // can be. Without the rule, the next one isn't known.
+    while (this._requestsNextAt !== null && this._requestsNextAt <= now) {
+      const left = (this._requestsLeft ?? 0) + 1;
+      this._requestsLeft = left;
+      this._requestsNextAt =
+        this._requestsRefillS && this._requestsMax && left < this._requestsMax
+          ? this._requestsNextAt + this._requestsRefillS * 1000
+          : null;
     }
     if (!this.isConnected) return;
+    // Only what is on screen ticks: the note while it shows, and errors.
     const counting =
-      this._pagerWait(now) > 0 ||
+      (this._requestsNextAt !== null &&
+        this._requestsLeft !== null &&
+        this._requestsLeft <= ADHOC_REQUESTS_NOTE_AT) ||
       secondsUntil(this._error?.retryAt, now) > 0 ||
       secondsUntil(this._stopsError?.retryAt, now) > 0;
-    const wakeAt = counting ? now + 1000 : this._requestsNextAt;
-    if (wakeAt === null) return;
+    if (!counting) return;
     this._countdownTimer = setTimeout(() => {
       this._countdownTimer = null;
       this._syncCountdown();
-    }, wakeAt - now);
+    }, 1000);
   }
 
   /** Re-setting identical text wouldn't be announced, so nudge it. */
@@ -1043,20 +1128,24 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  to step through; inert, not disabled, while there is no connection to
    *  step from, so keyboard focus stays on the button between presses.
    *
-   *  Between them, once few fresh plans are left, how many; once none are,
-   *  the seconds until the next. "Später" always needs a fresh one, so it
-   *  waits; "Früher" only once it is past the steps it retraces, which the
-   *  backend still holds. An error says its own countdown, so the note
-   *  stays out of it. */
+   *  Between them, once few fresh plans are left, how many and when the
+   *  next comes back; once none are, the seconds until a new one can go out.
+   *  A step the card was answered recently still goes, either way: the
+   *  backend hands that plan out again. Under them, the rule and why. An
+   *  error says its own countdown, so the note stays out of it. */
   private _renderPager(): TemplateResult | typeof nothing {
     if (this._stops === null || !this._from || !this._to || this._from === this._to) {
       return nothing;
     }
     const waiting = this._pagerWait() > 0;
-    const laterOff = !this._pageBase() || waiting;
-    const earlierOff = !this._canGoEarlier() || (waiting && this._pageHistory.length === 0);
+    const later = this._laterStep();
+    const earlier = this._earlierStep();
+    const laterOff = !later || this._mustWait(later);
+    const earlierOff = !earlier || this._mustWait(earlier);
     const note = this._phase === "error" ? "" : this._budgetNote();
-    const describedBy = note ? "wl-pager-note" : nothing;
+    const why = this._budgetWhy();
+    const describedBy =
+      [note && "wl-pager-note", why && "wl-pager-why"].filter(Boolean).join(" ") || nothing;
     return html`<div class="pager" role="group" aria-label=${this._t("page_legend")}>
       <button
         type="button"
@@ -1087,6 +1176,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         <span>${this._t("page_later")}</span>
         <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
       </button>
+      ${why ? html`<p class="pager-why" id="wl-pager-why">${why}</p>` : nothing}
     </div>`;
   }
 
@@ -1158,9 +1248,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : html`${back}${this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false)}`;
     }
     // Budget spent: the plan on screen is older than usual. The header's
-    // "Zuletzt aktualisiert" already says how old; this says why.
+    // "Zuletzt aktualisiert" already says how old; this says why, unless the
+    // line under the steps already does.
     const stale =
-      plan.stale && this._phase !== "paused"
+      plan.stale && this._phase !== "paused" && !this._budgetWhy()
         ? html`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
             <span>${this._t("adhoc_stale")}</span>
@@ -2933,6 +3024,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       flex: none;
       --mdc-icon-size: 16px;
     }
+    .pager-why {
+      grid-column: 1 / -1;
+      margin: 0;
+      color: var(--secondary-text-color);
+      font-size: 0.8rem;
+      line-height: 1.35;
+      text-wrap: pretty;
+    }
     .page ha-icon {
       display: block;
       --mdc-icon-size: 18px;
@@ -3031,8 +3130,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         text-align: start;
       }
     }
-    /* Too narrow to sit between the steps: under them instead. */
-    @container (max-width: 240px) {
+    /* Too narrow to sit between the steps in two lines: under them. */
+    @container (max-width: 300px) {
       .pager-note {
         grid-column: 1 / -1;
         grid-row: 2;
