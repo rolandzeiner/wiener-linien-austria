@@ -58,7 +58,7 @@ Live departures for Vienna's public transport in Home Assistant, from the offici
 - Open a departure to see every stop ahead, with the lines you can change to, estimated arrival times and "Kein Halt" where it goes through.
 - Disruption, stop and lift notices for the lines and platforms you track.
 - Routes from A to B (experimental): live connections, a missed change moved to the next vehicle, a grade per change, and a time-to-leave sensor.
-- A `plan_trip` action that answers "when do I have to leave?" for scripts and Assist, between any two stops by name.
+- Plan between any two stops: on the route card, with earlier and later connections a tap away, or in scripts and Assist via `plan_trip`.
 - Visual card editors: pick lines as coloured chips, with a direction and walking time per line.
 - During an outage the last board stays on screen, a sensor flags it as stale, and a repair says whether Wiener Linien is down.
 
@@ -523,6 +523,7 @@ Picking stops on the card:
 - Type to narrow the list. Case and accents don't matter, so `wahringer strasse` finds Währinger Straße. The stops nearest your Home Assistant location come first.
 - **Swap** start and destination with one tap. The connections appear as soon as both stops are set.
 - Plan for **Now**, or pick a date and time with **Depart at** or **Arrive by**. Times are Vienna time, like the signs at the stop. After a reload the card starts at **Now** again.
+- **Earlier** and **Later** above the connection step to the one before or after it, without typing a time. **Earlier** first goes back through your **Later** taps, as far as **Now**. On **Now** it is off, since anything earlier has left.
 - With `replan_from_change` on, each change gets a **Search from here** button that looks up what else leaves that station, timed for when you'd get there. The trip planner keeps one onward ride per connection, so turn this on if your changes are often tight. One tap goes back to the journey you entered.
 - The card remembers your last pick on each device. In the card editor you can also preselect a start and destination.
 

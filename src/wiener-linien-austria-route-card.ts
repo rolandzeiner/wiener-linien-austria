@@ -82,6 +82,7 @@ import {
   walkAccess,
   viennaClock,
   viennaDayOffset,
+  viennaInputAt,
   viennaInputValue,
   viennaShortDate,
   windowDays,
@@ -204,6 +205,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  to `_replanFrom`: a later refresh must not re-open a list the person
    *  has since collapsed. */
   private _revealAlternatives = false;
+  /** The questions "Später" stepped away from, newest last, for "Früher" to
+   *  retrace before it asks for anything new. Any time, stop or mode set by
+   *  hand starts it over. Not reactive: what the buttons show follows the
+   *  time mode and the plan, and every step sets both. */
+  private _pageHistory: Array<{ timeMode: AdhocTimeMode; when: string }> = [];
   private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the scheduled refresh is due (epoch ms). Survives a disconnect, so
    *  a card HA re-attaches on a view switch waits out the rest instead of
@@ -234,6 +240,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     ) {
       if (cfg.from) this._from = cfg.from;
       if (cfg.to) this._to = cfg.to;
+      this._pageHistory = [];
       this._requestPlan(false);
     }
     this._startAdhoc();
@@ -538,6 +545,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     else this._to = next;
     this._replanFrom = null;
     this._revealAlternatives = false;
+    this._pageHistory = [];
     saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
@@ -556,6 +564,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._when = viennaInputValue(Date.now());
     }
     this._timeMode = mode;
+    this._pageHistory = [];
     this._lastInteraction = Date.now();
     this._requestPlan(true);
   }
@@ -566,6 +575,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // quietly planning for "now" under a "depart at" label.
     if (!isInputDateTime(value) || value === this._when) return;
     this._when = value;
+    this._pageHistory = [];
     this._lastInteraction = Date.now();
     this._requestPlan(true);
   };
@@ -574,6 +584,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     [this._from, this._to] = [this._to, this._from];
     this._replanFrom = null;
     this._revealAlternatives = false;
+    this._pageHistory = [];
     saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
@@ -639,6 +650,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     };
     this._from = diva;
     this._revealAlternatives = true;
+    this._pageHistory = [];
     this._timeMode = "depart";
     this._when = when;
     this._lastInteraction = Date.now();
@@ -653,12 +665,65 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (!origin) return;
     this._replanFrom = null;
     this._revealAlternatives = false;
+    this._pageHistory = [];
     this._from = origin.from;
     this._timeMode = origin.timeMode;
     this._when = origin.when;
     this._lastInteraction = Date.now();
     this._requestPlan(true);
   };
+
+  // ------------------------------------------------------------------
+  // Ad-hoc mode: the connection before or after
+  // ------------------------------------------------------------------
+
+  /** The connection "Früher" and "Später" step from: the one drawn as the
+   *  best, and only once it answers the question on screen. While a step
+   *  is on its way there is none, so a second click can't step again from
+   *  the connection it is about to replace. */
+  private _pageBase(): RouteTripAttr | undefined {
+    if (!this._plan || this._planKey !== this._queryKey()) return undefined;
+    return upcomingTrips(this._plan, this._now)[0];
+  }
+
+  /** The next connection: depart from the minute after this one leaves.
+   *  By the timetable, not the live time: the query reads the timetable, so
+   *  a late train must not push it past the one planned right behind it. */
+  private _later = (): void => {
+    const best = this._pageBase();
+    const leaves = Date.parse(best?.legs[0]?.origin.planned ?? best?.departure ?? "");
+    if (!Number.isFinite(leaves)) return;
+    this._pageHistory = [...this._pageHistory, { timeMode: this._timeMode, when: this._when }];
+    this._step("depart", viennaInputAt(leaves + 60_000));
+  };
+
+  /** The connection before: back through the "Später" steps first, exactly
+   *  as they were asked (back to "Jetzt" as well), then the one arriving
+   *  before this one does. Off for "Jetzt": what was earlier has left. */
+  private _earlier = (): void => {
+    const best = this._pageBase();
+    if (!best || this._timeMode === "now") return;
+    const back = this._pageHistory.at(-1);
+    if (back) {
+      this._pageHistory = this._pageHistory.slice(0, -1);
+      this._step(back.timeMode, back.when);
+      return;
+    }
+    const arrives = Date.parse(best.legs.at(-1)?.destination.planned ?? best.arrival ?? "");
+    if (!Number.isFinite(arrives)) return;
+    this._step("arrive", viennaInputAt(arrives - 60_000));
+  };
+
+  /** A step goes out at once: it is one deliberate press, with nothing to
+   *  wait for the way a typed time or a second pick is. */
+  private _step(mode: AdhocTimeMode, when: string): void {
+    this._timeMode = mode;
+    this._when = when;
+    this._lastInteraction = Date.now();
+    if (this._debounceTimer !== null) clearTimeout(this._debounceTimer);
+    this._debounceTimer = null;
+    void this._runPlan(true);
+  }
 
   /** Re-setting identical text wouldn't be announced, so nudge it. */
   private _announce(text: string): void {
@@ -757,7 +822,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           ${
             adhoc
               ? html`
-                ${this._renderPickers()} ${this._renderTimeControl()}
+                ${this._renderPickers()} ${this._renderTimeControl()} ${this._renderPager()}
                 <p class="sr-only" role="status" aria-live="polite">${this._announcement}</p>
                 <div class="results" aria-busy=${this._phase === "loading" ? "true" : "false"}>
                   ${this._renderAdhocBody(cfg)}
@@ -845,6 +910,40 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         }
       </fieldset>
     `;
+  }
+
+  /** "Früher" and "Später", above the connection rather than below it: the
+   *  strand's height changes with every answer, and a row above it stays
+   *  under the pointer for the next press. Shown once there is a question
+   *  to step through; inert, not disabled, while there is no connection to
+   *  step from, so keyboard focus stays on the button between presses. */
+  private _renderPager(): TemplateResult | typeof nothing {
+    if (this._stops === null || !this._from || !this._to || this._from === this._to) {
+      return nothing;
+    }
+    const base = this._pageBase();
+    const laterOff = !base;
+    const earlierOff = !base || this._timeMode === "now";
+    return html`<div class="pager" role="group" aria-label=${this._t("page_legend")}>
+      <button
+        type="button"
+        class="page"
+        aria-disabled=${earlierOff ? "true" : nothing}
+        @click=${this._earlier}
+      >
+        <ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon>
+        <span>${this._t("page_earlier")}</span>
+      </button>
+      <button
+        type="button"
+        class="page"
+        aria-disabled=${laterOff ? "true" : nothing}
+        @click=${this._later}
+      >
+        <span>${this._t("page_later")}</span>
+        <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+      </button>
+    </div>`;
   }
 
   /** One strings object per picker and language: a fresh object on every
@@ -2633,6 +2732,48 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       background: var(--card-background-color, transparent);
       color: var(--primary-text-color);
       font: inherit;
+    }
+    /* Früher at the start, Später at the end, as on a timeline. Text in
+       the body colour and the chevron in the accent, like the way back out
+       of a jump: the theme's primary on a light card is too pale for text
+       this size. 32px clears the target minimum (WCAG 2.5.8) without a box;
+       the chevron sits at the edge, so the row lines up with the content. */
+    .pager {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .page {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      min-height: 32px;
+      padding: 0 8px 0 0;
+      border: none;
+      border-radius: var(--wl-radius-sm);
+      background: none;
+      color: var(--primary-text-color);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .page:last-child {
+      padding: 0 0 0 8px;
+    }
+    .page ha-icon {
+      display: block;
+      --mdc-icon-size: 18px;
+      color: var(--primary-color);
+    }
+    .page[aria-disabled="true"] {
+      opacity: 0.5;
+      cursor: default;
+    }
+    @media (hover: hover) {
+      .page:hover:not([aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+      }
     }
     .picker-status {
       font-size: 0.85rem;

@@ -1447,6 +1447,142 @@ describe("ad-hoc mode", () => {
   });
 });
 
+describe("earlier and later", () => {
+  // The best connection as a live answer carries it: leaving 07:59 and
+  // arriving 08:13 by the live times, 07:57 and 08:11 by the timetable.
+  const LIVE_PLAN = {
+    ...PLAN,
+    trips: [
+      {
+        ...PLAN.trips[0]!,
+        departure: "2026-09-14T07:59:00+02:00",
+        arrival: "2026-09-14T08:13:00+02:00",
+      },
+      ...PLAN.trips.slice(1),
+    ],
+  };
+  const answer = async (msg: WsMessage & { datetime?: string; arrive_by?: boolean }) =>
+    msg.datetime
+      ? { ...LIVE_PLAN, planned_for: `${msg.datetime}:00+02:00`, arrive_by: !!msg.arrive_by }
+      : LIVE_PLAN;
+  const ORIGIN = Number(WESTBAHNHOF);
+  const DESTINATION = Number(PRATERSTERN);
+
+  const pager = (el: CardElement): HTMLButtonElement[] => [
+    ...root(el).querySelectorAll<HTMLButtonElement>(".pager button"),
+  ];
+  const inert = (el: CardElement): (string | null)[] =>
+    pager(el).map((b) => b.getAttribute("aria-disabled"));
+  const radios = (el: CardElement): HTMLInputElement[] => [
+    ...root(el).querySelectorAll<HTMLInputElement>('.when input[type="radio"]'),
+  ];
+  const field = (el: CardElement): HTMLInputElement | null =>
+    root(el).querySelector<HTMLInputElement>('input[type="datetime-local"]');
+
+  async function mountPlanned(): Promise<{ el: CardElement; callWS: ReturnType<typeof vi.fn> }> {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(answer);
+    const el = await mount(h, {});
+    await settle(el);
+    return { el, callWS };
+  }
+
+  async function pickMode(el: CardElement, index: number): Promise<void> {
+    radios(el)[index]!.checked = true;
+    radios(el)[index]!.dispatchEvent(new Event("change"));
+    await settle(el, ADHOC_DEBOUNCE_MS);
+    await settle(el);
+  }
+
+  it("names both steps, and leaves nothing earlier to step to from Jetzt", async () => {
+    const { el, callWS } = await mountPlanned();
+    expect(root(el).querySelector(".pager")?.getAttribute("aria-label")).toBe(
+      "Frühere oder spätere Verbindung",
+    );
+    expect(pager(el).map((b) => b.textContent?.trim())).toEqual(["Früher", "Später"]);
+    expect(inert(el)).toEqual(["true", null]);
+    pager(el)[0]!.click();
+    await settle(el, 1000);
+    expect(planCalls(callWS)).toHaveLength(1);
+  });
+
+  it("asks Später, at once, for the minute after the timetabled departure", async () => {
+    const { el, callWS } = await mountPlanned();
+    pager(el)[1]!.click();
+    await el.updateComplete;
+    // Out before any timer runs, and by the timetable's 07:57, not the
+    // live 07:59: that would skip a train planned for 07:58.
+    expect(planCalls(callWS).at(-1)).toEqual({
+      type: "wiener_linien_austria/plan",
+      origin: ORIGIN,
+      destination: DESTINATION,
+      datetime: "2026-09-14T07:58",
+      arrive_by: false,
+    });
+    expect(radios(el)[1]!.checked).toBe(true);
+    expect(field(el)?.value).toBe("2026-09-14T07:58");
+    // On its way: both inert, and pressing again asks nothing more.
+    expect(inert(el)).toEqual(["true", "true"]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(2);
+    expect(inert(el)).toEqual([null, null]);
+  });
+
+  it("retraces Später with Früher, back to Jetzt", async () => {
+    const { el, callWS } = await mountPlanned();
+    pager(el)[1]!.click();
+    await settle(el);
+    pager(el)[0]!.click();
+    await settle(el);
+    expect(planCalls(callWS).at(-1)).toEqual({
+      type: "wiener_linien_austria/plan",
+      origin: ORIGIN,
+      destination: DESTINATION,
+    });
+    expect(radios(el)[0]!.checked).toBe(true);
+    expect(inert(el)).toEqual(["true", null]);
+  });
+
+  it("asks Früher past the search for the connection that arrives before this one", async () => {
+    const { el, callWS } = await mountPlanned();
+    await pickMode(el, 1);
+    pager(el)[0]!.click();
+    await el.updateComplete;
+    // The timetable's 08:11, not the live 08:13.
+    expect(planCalls(callWS).at(-1)).toMatchObject({
+      datetime: "2026-09-14T08:10",
+      arrive_by: true,
+    });
+    expect(radios(el)[2]!.checked).toBe(true);
+    expect(field(el)?.value).toBe("2026-09-14T08:10");
+  });
+
+  it("starts the way back over once a time is set by hand", async () => {
+    const { el, callWS } = await mountPlanned();
+    pager(el)[1]!.click();
+    await settle(el);
+    field(el)!.value = "2026-09-14T09:00";
+    field(el)!.dispatchEvent(new Event("change"));
+    await settle(el, ADHOC_DEBOUNCE_MS);
+    await settle(el);
+    pager(el)[0]!.click();
+    await el.updateComplete;
+    expect(planCalls(callWS).at(-1)).toMatchObject({ arrive_by: true });
+  });
+
+  it("stays out of the way until there is a search, and on a route", async () => {
+    const { h } = adhocHass(answer);
+    const adhoc = await mount(h, {});
+    await settle(adhoc);
+    expect(root(adhoc).querySelector(".pager")).toBeNull();
+
+    const route = await mount(hass("07:57", ACTIVE), { entity: ENTITY });
+    expect(root(route).querySelector(".hero")).not.toBeNull();
+    expect(root(route).querySelector(".pager")).toBeNull();
+  });
+});
+
 describe("colour scheme parity", () => {
   it("uses the same semantic token values as the modern card", () => {
     const tokens = ["--wl-rt", "--wl-warning", "--wl-error", "--wl-radius-sm", "--wl-radius-md"];
