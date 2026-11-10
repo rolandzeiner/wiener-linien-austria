@@ -291,6 +291,49 @@ async def test_one_user_cannot_spend_everyones_budget(
     await planner.async_plan(_query(99), user_id="phone")
 
 
+async def test_budget_says_what_a_user_has_left(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+    # Nothing spent yet: as many as a user may have, and none to wait for.
+    assert planner.budget("tablet") == adhoc.AdhocBudget(
+        left=adhoc.ADHOC_USER_BURST, next_in=None
+    )
+
+    await planner.async_plan(_query(0), user_id="tablet")
+    budget = planner.budget("tablet")
+    assert budget.left == adhoc.ADHOC_USER_BURST - 1
+    # 60/h gives one back every 60 s.
+    assert budget.next_in is not None
+    assert 0 < budget.next_in <= 60
+    # A cached answer costs nothing.
+    await planner.async_plan(_query(0), user_id="tablet")
+    assert planner.budget("tablet").left == adhoc.ADHOC_USER_BURST - 1
+    # Each user counts their own share.
+    assert planner.budget("phone").left == adhoc.ADHOC_USER_BURST
+
+    for n in range(1, adhoc.ADHOC_USER_BURST):
+        await planner.async_plan(_query(n), user_id="tablet")
+    spent = planner.budget("tablet")
+    assert spent.left == 0
+    # Exactly when the next request would be let through.
+    with pytest.raises(adhoc.AdhocRateLimited) as err:
+        await planner.async_plan(_query(99), user_id="tablet")
+    assert spent.next_in == err.value.retry_after
+
+
+async def test_budget_is_capped_by_the_whole_instance(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+    for n in range(adhoc.ADHOC_BURST - 2):
+        await planner.async_plan(_query(n), user_id=f"user{n}")
+    # A new user has a full share of their own, but only two left overall.
+    assert planner.budget("someone_new").left == 2
+
+
 async def test_instance_budget_caps_all_users_together(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
@@ -499,9 +542,13 @@ async def test_plan_budget_runs_out_and_says_when(
     client = await _connect(hass, hass_ws_client, freezer)
     hass.data[DOMAIN].pop(adhoc.ADHOC_PLANNER_KEY, None)
     with patch.object(adhoc, "ADHOC_BURST", 1):
-        assert (
-            await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)
-        )["success"]
+        first = await _plan(
+            client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ
+        )
+        assert first["success"]
+        # The answer says the budget is spent, and when the next one is free.
+        assert first["result"]["requests_left"] == 0
+        assert 0 < first["result"]["requests_next_in"] <= 30
         # A cache hit costs nothing ...
         assert (
             await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)

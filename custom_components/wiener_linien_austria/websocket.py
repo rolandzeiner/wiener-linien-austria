@@ -241,10 +241,11 @@ async def _websocket_plan(
     options = RouteOptions.from_config(origin.diva, destination.diva, msg)
     when = await _async_vienna_time(msg.get("datetime"))
     arrive_by = bool(msg["arrive_by"])
+    planner = async_get_planner(hass)
     try:
         # A stale plan beats an error on a dashboard: the card shows when it
         # was fetched and refreshes once the budget allows.
-        plan = await async_get_planner(hass).async_plan(
+        plan = await planner.async_plan(
             options,
             user_id=connection.user.id,
             when=when,
@@ -274,6 +275,9 @@ async def _websocket_plan(
         )
         return
 
+    # What is left after this answer, so the card can say so before the
+    # budget runs out instead of after.
+    budget = planner.budget(connection.user.id)
     connection.send_result(
         msg_id,
         {
@@ -288,6 +292,8 @@ async def _websocket_plan(
             "attribution": ATTRIBUTION,
             "stale": plan.stale,
             "retry_after": plan.retry_after,
+            "requests_left": budget.left,
+            "requests_next_in": budget.next_in,
         },
     )
 
