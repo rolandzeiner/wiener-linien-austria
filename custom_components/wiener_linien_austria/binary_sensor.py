@@ -255,6 +255,12 @@ class WienerLinienRouteRiskBinarySensor(
     The trip planner sends no live times, but live.py applies the departure
     boards' ones to U-Bahn, tram and bus rides, so a late vehicle can turn it
     on. S-Bahn and train rides are graded on the timetable.
+
+    "Best" is the first connection ahead in `order_trips` order, which puts
+    every connection whose changes still fit before one whose change
+    doesn't. So it turns on only when no connection ahead in the list
+    works on current times; while one does, it is the next connection the
+    other route sensors show.
     """
 
     _attr_has_entity_name = True

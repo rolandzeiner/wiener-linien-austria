@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import replace
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,6 +23,7 @@ from custom_components.wiener_linien_austria.routing import (
     assess_transfers,
     async_fetch_trip_body,
     build_trip_params,
+    order_trips,
     parse_time_option,
     parse_trip_body,
     rank_trips,
@@ -300,6 +302,31 @@ def test_rank_keeps_a_safer_alternative() -> None:
     assert risky.risk == "tight"
     assert safe.risk == "ok"
     assert rank_trips([risky, safe], now) == [risky, safe]
+
+
+def test_order_puts_a_missed_change_behind_working_connections() -> None:
+    """Soonest first on effective times; a change that no longer fits goes last."""
+    # Planned first, but live it leaves after the next connection.
+    late = Trip(
+        legs=[
+            replace(
+                _leg(_at(8, 0), _at(8, 20)), origin=_stop("A", _at(8, 0), _at(8, 12))
+            )
+        ]
+    )
+    on_time = Trip(legs=[_leg(_at(8, 5), _at(8, 25))])
+    slower = Trip(legs=[_leg(_at(8, 5), _at(8, 30))])
+    # Leaves first of all, but its change no longer fits.
+    broken = Trip(legs=[_leg(_at(8, 1), _at(8, 10)), _leg(_at(8, 9), _at(8, 18))])
+    broken.transfers = assess_transfers(broken.legs, 2)
+    assert broken.risk == "at_risk"
+    assert order_trips([late, broken, slower, on_time]) == [
+        on_time,
+        slower,
+        late,
+        broken,
+    ]
+    assert rank_trips([broken, on_time], _at(8, 0)) == [on_time, broken]
 
 
 def test_trip_without_legs_has_no_times() -> None:

@@ -32,6 +32,7 @@ EFA server already has. Measured and decided 2026-09-14.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, tzinfo
@@ -895,7 +896,7 @@ def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
        strictly better on at least one of those. Departure counts in the
        leaving-later direction, so the next few connections in time all
        survive; only a strictly worse alternative to one of them goes.
-    3. Order by departure, then arrival.
+    3. Order them with `order_trips`.
     """
     candidates = [
         trip
@@ -928,8 +929,31 @@ def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
             for other_key, other in scored
         )
     ]
-    survivors.sort(key=lambda trip: (trip.departure, trip.arrival))
-    return survivors
+    return order_trips(survivors)
+
+
+def order_trips(trips: Iterable[Trip]) -> list[Trip]:
+    """Connections best first: the first one is the one to take.
+
+    Soonest departure first, then soonest arrival, except that a connection
+    with a change that no longer fits (`at_risk`) goes behind every one
+    whose changes still hold. Its arrival counts on a vehicle it can no
+    longer catch, so it can't answer "when do I get there".
+
+    live.py orders again once live times are in: a late first ride can
+    leave after the next connection's first ride does, and a delay can
+    break a change.
+    """
+
+    def key(trip: Trip) -> tuple[bool, float, float]:
+        departure, arrival = trip.departure, trip.arrival
+        return (
+            trip.risk == "at_risk",
+            departure.timestamp() if departure is not None else math.inf,
+            arrival.timestamp() if arrival is not None else math.inf,
+        )
+
+    return sorted(trips, key=key)
 
 
 # ---------------------------------------------------------------------------

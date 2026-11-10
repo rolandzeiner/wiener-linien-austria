@@ -56,7 +56,7 @@ from .const import (
 )
 from .parsing import as_int, as_mapping
 from .rate_limit import async_enforce_domain_cooldown
-from .routing import Trip, assess_transfers
+from .routing import Trip, assess_transfers, order_trips
 from .static import StaticCatalogue, current_catalogue
 
 _LOGGER = logging.getLogger(__name__)
@@ -199,8 +199,11 @@ def apply_live(
     A matched ride takes its live departure, and its arrival moves by the
     same delay (`/monitor` has no arrival times); that is the estimate the
     next change is scored against. Every ride with rows, matched or not, gets
-    its next departures and how often it runs. The input is never mutated,
-    so a caller keeps the timetable plan and re-applies fresher rows to it.
+    its next departures and how often it runs. The copies come back in
+    `order_trips` order on the live times, so a connection whose first ride
+    is late, or whose change no longer fits, stops being offered first. The
+    input is never mutated, so a caller keeps the timetable plan and
+    re-applies fresher rows to it.
     """
     index: dict[tuple[str, str, str], list[LiveRow]] = {}
     for row in rows:
@@ -263,7 +266,7 @@ def apply_live(
         live_trip = Trip(legs=legs)
         live_trip.transfers = assess_transfers(legs, min_transfer_minutes)
         result.append(live_trip)
-    return result
+    return order_trips(result)
 
 
 def _match(group: Sequence[LiveRow], planned: datetime) -> LiveRow | None:

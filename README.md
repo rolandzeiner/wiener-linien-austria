@@ -57,7 +57,7 @@ Live departures for Vienna's public transport in Home Assistant, from the offici
 - Four cards: a modern board, a retro LED sign, a split-flap board and a route card, all in the official line colours.
 - Open a departure to see every stop ahead, with the lines you can change to, estimated arrival times and "Kein Halt" where it goes through.
 - Disruption, stop and lift notices for the lines and platforms you track.
-- Routes from A to B (experimental): the next connections with live times, a grade for every change, and a time-to-leave sensor.
+- Routes from A to B (experimental): the next connections on live times, working ones first, with a grade for every change and a time-to-leave sensor.
 - A `plan_trip` action that answers "when do I have to leave?" for scripts and Assist, between any two stops by name.
 - Visual card editors: pick lines as coloured chips, with a direction and walking time per line.
 - During an outage the last board stays on screen, a sensor flags it as stale, and a repair says whether Wiener Linien is down.
@@ -209,7 +209,7 @@ Use it in place of the departure sensor's availability. The departure sensor sta
 | `fetched_at` | When the trip planner last answered. |
 | `arrival`, `duration_minutes`, `interchanges`, `risk` | The best connection's arrival, length, number of changes and worst change (`ok`, `tight` or `at_risk`). |
 | `min_transfer_minutes`, `step_free` | The route's transfer buffer and step-free setting. |
-| `trips` | Up to four connections, best first. See *Trip shape*. |
+| `trips` | Up to four connections, best first: soonest departure on current times, with any connection whose change no longer fits after those that still work. See *Trip shape*. |
 | `last_connection` | From 22:00 to 03:00, the night's last connection without a bus. |
 | `line_colors` | The official colours of the lines the trips use. |
 | `traffic_info` | Disruptions on those lines, shaped as on the departure sensor. |
@@ -242,7 +242,7 @@ In `trips` and the `plan_trip` response, every stop on the Wiener Linien stop li
 
 ### Connection at risk
 
-Turns on only when the current times say a change no longer fits. A `tight` change doesn't count: the trip planner often plans changes with no time to spare, so the sensor would be on most of the day. Live times count for U-Bahn, tram and bus rides. They come from the departure boards, because the trip planner sends none. Attributes: `risk` (the best connection's grade), `transfer_at` and `slack_minutes` (where its tightest change is, and how many minutes it leaves).
+Turns on only when the current times say a change no longer fits on the best connection. Connections that still work come first, so this means none of the connections ahead in `trips` works as planned. A `tight` change doesn't count: the trip planner often plans changes with no time to spare, so the sensor would be on most of the day. Live times count for U-Bahn, tram and bus rides. They come from the departure boards, because the trip planner sends none. Attributes: `risk` (the best connection's grade), `transfer_at` and `slack_minutes` (where its tightest change is, and how many minutes it leaves).
 
 ### Time to leave
 
@@ -252,7 +252,7 @@ Turns on the set number of minutes before the next connection leaves, and off wh
 
 ### `wiener_linien_austria.plan_trip`
 
-Plans connections for a route you've set up, or between any two stops, and returns them soonest first, in the same shape as the sensor's `trips` attribute.
+Plans connections for a route you've set up, or between any two stops, and returns them best first, ordered and shaped like the sensor's `trips` attribute.
 
 | Field | Label | Required | Description |
 |---|---|---|---|

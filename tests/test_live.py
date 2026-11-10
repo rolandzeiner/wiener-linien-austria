@@ -204,6 +204,27 @@ def test_a_delay_moves_the_arrival_and_rescores_the_change() -> None:
     assert timetable[2].risk == "tight"
 
 
+def test_a_change_broken_by_a_delay_stops_being_offered_first() -> None:
+    timetable = _trips()
+    assert timetable[0].risk == "tight"
+    # The 06:11 tram, 3 min late: still the first to leave, but it reaches
+    # Volkstheater after the U2 it was planned onto.
+    late = LiveRow(
+        str(BREITENSEE),
+        "49",
+        "R",
+        datetime(2026, 9, 15, 6, 11, 30, tzinfo=VIENNA),
+        datetime(2026, 9, 15, 6, 14, 30, tzinfo=VIENNA),
+    )
+    trips = apply_live(timetable, [late], 2)
+    assert [trip.departure for trip in trips] == [
+        datetime(2026, 9, 15, 6, 16, tzinfo=VIENNA),
+        datetime(2026, 9, 15, 6, 17, tzinfo=VIENNA),
+        datetime(2026, 9, 15, 6, 14, tzinfo=VIENNA),
+    ]
+    assert [trip.risk for trip in trips] == ["ok", "tight", "at_risk"]
+
+
 def test_directions_at_one_station_stay_apart() -> None:
     only_h = [row for row in _rows() if row.direction == "H"]
     trip = apply_live(_trips(), only_h, 2)[2]
