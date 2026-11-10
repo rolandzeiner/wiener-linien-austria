@@ -537,6 +537,10 @@ export function adhocPlanRefreshDelay(plan: RouteAttrs, nowMs: number): number {
   return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.max(base, retryAfter * 1000) : base;
 }
 
+/** The pager says how many fresh plans are left once this few are: two
+ *  presses of warning before a wait, and quiet while there's room. */
+export const ADHOC_REQUESTS_NOTE_AT = 2;
+
 /** How long a card with no loaded integration waits before asking again.
  *  Right after an HA restart the card can reach HA before the integration
  *  has loaded, so this can't be a dead end. */

@@ -1157,8 +1157,14 @@ describe("ad-hoc mode", () => {
     await settle(el);
     expect(text(el)).toContain("Gerade zu viele Verbindungsabfragen");
     expect(text(el)).toContain("Neuer Versuch in 30 s");
+    // Counted down by the second, and said once, by the error alone.
+    await settle(el, 1_000);
+    expect(text(el)).toContain("Neuer Versuch in 29 s");
+    await settle(el, 10_000);
+    expect(text(el)).toContain("Neuer Versuch in 19 s");
+    expect(root(el).querySelector(".pager-note")).toBeNull();
     limited = false;
-    await settle(el, 30_000);
+    await settle(el, 19_000);
     expect(planCalls(callWS)).toHaveLength(2);
     expect(text(el)).toContain("Abfahrt in");
   });
@@ -1501,9 +1507,90 @@ describe("earlier and later", () => {
     );
     expect(pager(el).map((b) => b.textContent?.trim())).toEqual(["Früher", "Später"]);
     expect(inert(el)).toEqual(["true", null]);
+    // Plenty left, or an integration too old to say: nothing about it.
+    expect(root(el).querySelector(".pager-note")).toBeNull();
     pager(el)[0]!.click();
     await settle(el, 1000);
     expect(planCalls(callWS)).toHaveLength(1);
+  });
+
+  const note = (el: CardElement): string | undefined =>
+    root(el).querySelector(".pager-note")?.textContent?.trim();
+  const status = (el: CardElement): string | undefined =>
+    root(el).querySelector('.wrap > [role="status"]')?.textContent?.trim();
+
+  /** `answer`, with the budget each plan request is answered with in turn. */
+  async function mountBudget(
+    budgets: Array<{ requests_left: number; requests_next_in: number | null }>,
+  ): Promise<{ el: CardElement; callWS: ReturnType<typeof vi.fn> }> {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async (msg) => ({
+      ...(await answer(msg)),
+      ...budgets.shift(),
+    }));
+    const el = await mount(h, {});
+    await settle(el);
+    return { el, callWS };
+  }
+
+  it("says how many fresh plans are left once few are, then counts down the wait", async () => {
+    const { el, callWS } = await mountBudget([
+      { requests_left: 4, requests_next_in: 60 },
+      { requests_left: 2, requests_next_in: 40 },
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 20 },
+    ]);
+    expect(note(el)).toBeUndefined();
+
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Noch 2 Abfragen");
+    expect(pager(el).map((b) => b.getAttribute("aria-describedby"))).toEqual([
+      "wl-pager-note",
+      "wl-pager-note",
+    ]);
+    expect(status(el)).toMatch(/\. Noch 2 Abfragen\.$/);
+
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Noch 1 Abfrage");
+
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Weiter in 20 s");
+    // Später needs a fresh plan; Früher retraces, which doesn't.
+    expect(inert(el)).toEqual([null, "true"]);
+    await settle(el, 1_000);
+    expect(note(el)).toBe("Weiter in 19 s");
+
+    // A press says why nothing happens instead of asking.
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(4);
+    expect(status(el)).toBe("Gerade zu viele Verbindungsabfragen. Weiter in 19 s.");
+
+    // The budget gives one back: Später steps again.
+    await settle(el, 19_000);
+    expect(note(el)).toBe("Noch 1 Abfrage");
+    expect(inert(el)).toEqual([null, null]);
+  });
+
+  it("retraces Später with Früher while the wait runs", async () => {
+    const { el, callWS } = await mountBudget([
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 45 },
+      { requests_left: 0, requests_next_in: 44 },
+    ]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Weiter in 45 s");
+    pager(el)[0]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(3);
+    expect(planCalls(callWS).at(-1)).not.toHaveProperty("datetime");
+    // Back on Jetzt, nothing earlier to step to, and nothing later yet.
+    expect(inert(el)).toEqual(["true", "true"]);
+    expect(note(el)).toBe("Weiter in 44 s");
   });
 
   it("asks Später, at once, for the minute after the timetabled departure", async () => {

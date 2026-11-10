@@ -53,10 +53,12 @@ import {
   accessKey,
   ADHOC_DEBOUNCE_MS,
   ADHOC_IDLE_MS,
+  ADHOC_REQUESTS_NOTE_AT,
   ADHOC_RETRY_MS,
   adhocPlanRefreshDelay,
   adhocErrorSpec,
   adhocRetryDelay,
+  type AdhocErrorSpec,
   type AdhocTimeMode,
   catchableDeparture,
   clockOf,
@@ -111,11 +113,13 @@ interface ReplanOrigin {
 
 /** A backend error as the card keeps it: the WebSocket code, how long the
  *  backend asked to wait, and its translation key where the code alone
- *  doesn't say enough (`invalid_query`). */
+ *  doesn't say enough (`invalid_query`). `retryAt` is when the card asks
+ *  again (epoch ms), for the errors that count down to it. */
 interface AdhocError {
   code: string;
   retryAfter: number | null;
   translationKey: string | null;
+  retryAt: number | null;
 }
 
 function adhocErrorOf(err: unknown): AdhocError {
@@ -125,7 +129,22 @@ function adhocErrorOf(err: unknown): AdhocError {
     code: typeof wsError?.code === "string" ? wsError.code : "unknown",
     retryAfter: Number.isFinite(retryAfter) ? retryAfter : null,
     translationKey: wsError?.translation_key ?? null,
+    retryAt: null,
   };
+}
+
+/** Whole seconds from `now` to `at`, rounded up; 0 once it has passed, or
+ *  without one. */
+function secondsUntil(at: number | null | undefined, now: number): number {
+  return at == null || at <= now ? 0 : Math.ceil((at - now) / 1000);
+}
+
+/** `error` with the moment its "Neuer Versuch in … s" counts down to, for
+ *  the errors that say one. */
+function withRetryAt(error: AdhocError, spec: AdhocErrorSpec, delay: number | null): AdhocError {
+  return spec.retry === "countdown" && delay !== null
+    ? { ...error, retryAt: Date.now() + delay }
+    : error;
 }
 type Which = "from" | "to";
 
@@ -194,6 +213,16 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _phase: AdhocPhase = "idle";
   @state() private _error: AdhocError | null = null;
   @state() private _announcement = "";
+  /** Fresh plans this HA user may still ask for before the backend makes
+   *  them wait: the last answer's count, plus one each time
+   *  `_requestsNextAt` passes. Null until an answer says. */
+  @state() private _requestsLeft: number | null = null;
+  /** When the budget gives one more request back (epoch ms), or null. */
+  private _requestsNextAt: number | null = null;
+  /** The clock the second-by-second countdowns read: the pager's wait and
+   *  an error's next try. Ticks only while one of them runs. */
+  @state() private _secondNow = Date.now();
+  private _countdownTimer: ReturnType<typeof setTimeout> | null = null;
 
   private _tick: ReturnType<typeof setInterval> | null = null;
   private _versionCheckDone = false;
@@ -299,6 +328,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._lastInteraction = Date.now();
     document.addEventListener("visibilitychange", this._onVisibilityChange);
     this._startAdhoc();
+    this._syncCountdown();
   }
 
   public override disconnectedCallback(): void {
@@ -307,6 +337,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._tick = null;
     document.removeEventListener("visibilitychange", this._onVisibilityChange);
     this._stopAdhoc();
+    if (this._countdownTimer !== null) clearTimeout(this._countdownTimer);
+    this._countdownTimer = null;
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -443,8 +475,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._stopsError = null;
     } catch (err) {
       const error = adhocErrorOf(err);
-      this._stopsError = error;
-      const delay = adhocRetryDelay(adhocErrorSpec(error.code), error.retryAfter);
+      const spec = adhocErrorSpec(error.code);
+      const delay = adhocRetryDelay(spec, error.retryAfter);
+      this._stopsError = withRetryAt(error, spec, delay);
+      this._syncCountdown();
       if (delay !== null && this._adhocStarted) {
         this._stopsRetryTimer = setTimeout(() => {
           this._stopsRetryTimer = null;
@@ -492,7 +526,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._phase = "idle";
       return false;
     }
-    this._error = { code: "same_stop", retryAfter: null, translationKey: null };
+    this._error = { code: "same_stop", retryAfter: null, translationKey: null, retryAt: null };
     this._phase = "error";
     if (userInitiated) this._announce(this._adhocError(this._error).title);
     return false;
@@ -518,13 +552,30 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._alternativesOpen = true;
       this._revealAlternatives = false;
     }
-    if (userInitiated) this._announce(this._planAnnouncement(plan));
+    this._noteBudget(plan.requests_left, plan.requests_next_in);
+    if (userInitiated) {
+      const said = this._planAnnouncement(plan);
+      const note = this._budgetNote();
+      this._announce(note ? `${said}. ${note}.` : said);
+    }
     this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
+  }
+
+  /** Takes in what an answer says about the request budget. An answer
+   *  without it, from an older integration, leaves the pager quiet. */
+  private _noteBudget(left: unknown, nextIn: unknown): void {
+    const known = typeof left === "number" && Number.isInteger(left) && left >= 0;
+    this._requestsLeft = known ? left : null;
+    this._requestsNextAt =
+      known && typeof nextIn === "number" && nextIn > 0 ? Date.now() + nextIn * 1000 : null;
+    this._syncCountdown();
   }
 
   private _applyPlanError(err: unknown, userInitiated: boolean): void {
     const error = adhocErrorOf(err);
-    this._error = error;
+    const spec = adhocErrorSpec(error.code, error.translationKey);
+    const delay = adhocRetryDelay(spec, error.retryAfter);
+    this._error = withRetryAt(error, spec, delay);
     this._revealAlternatives = false;
     // A stale plan through an outage reads as "these still run"; show the
     // problem instead, as the route sensor does when it goes unavailable.
@@ -532,11 +583,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._planKey = "";
     this._phase = "error";
     if (userInitiated) this._announce(this._adhocError(error).title);
-    const delay = adhocRetryDelay(
-      adhocErrorSpec(error.code, error.translationKey),
-      error.retryAfter,
-    );
     if (delay !== null) this._schedule(delay);
+    // Refused for the budget: nothing is left until the retry is due.
+    if (error.code === "rate_limited") this._noteBudget(0, (delay ?? ADHOC_RETRY_MS) / 1000);
+    else this._syncCountdown();
   }
 
   private _onPick(which: Which, value: unknown): void {
@@ -704,7 +754,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _later = (): void => {
     const best = this._pageBase();
     const leaves = Date.parse(best?.legs[0]?.origin.planned ?? best?.departure ?? "");
-    if (!Number.isFinite(leaves)) return;
+    if (!Number.isFinite(leaves) || this._sayWait()) return;
     this._pageHistory = [...this._pageHistory, { timeMode: this._timeMode, when: this._when }];
     this._step("depart", viennaInputAt(leaves + 60_000));
   };
@@ -724,6 +774,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._step(back.timeMode, back.when);
       return;
     }
+    if (this._sayWait()) return;
     const best = this._pageBase()!;
     const arrives = Math.min(
       ...[best.legs.at(-1)?.destination.planned, best.arrival]
@@ -743,6 +794,57 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (this._debounceTimer !== null) clearTimeout(this._debounceTimer);
     this._debounceTimer = null;
     void this._runPlan(true);
+  }
+
+  /** Seconds until the pager may ask for a fresh plan again; 0 once it may. */
+  private _pagerWait(now = this._secondNow): number {
+    return this._requestsLeft === 0 ? secondsUntil(this._requestsNextAt, now) : 0;
+  }
+
+  /** "Noch 2 Abfragen" once few are left, "Weiter in 42 s" once none are,
+   *  empty while there is room. */
+  private _budgetNote(): string {
+    const wait = this._pagerWait();
+    if (wait > 0) return this._t("page_wait", { s: wait });
+    const left = this._requestsLeft;
+    if (!left || left > ADHOC_REQUESTS_NOTE_AT) return "";
+    return left === 1
+      ? this._t("page_requests_left_one")
+      : this._t("page_requests_left", { n: left });
+  }
+
+  /** A press on a step the budget holds back: say why nothing happens, and
+   *  for how long. True when it did. */
+  private _sayWait(): boolean {
+    const wait = this._pagerWait(Date.now());
+    if (wait === 0) return false;
+    this._announce(`${this._t("adhoc_error_rate_limited")}. ${this._t("page_wait", { s: wait })}.`);
+    return true;
+  }
+
+  /** Brings the countdown clock to now, and keeps it ticking each second
+   *  while a countdown is on screen; otherwise wakes once, when the budget
+   *  gives a request back. Call after setting any of their deadlines. */
+  private _syncCountdown(): void {
+    if (this._countdownTimer !== null) clearTimeout(this._countdownTimer);
+    this._countdownTimer = null;
+    const now = Date.now();
+    this._secondNow = now;
+    if (this._requestsNextAt !== null && this._requestsNextAt <= now) {
+      this._requestsNextAt = null;
+      if (this._requestsLeft !== null) this._requestsLeft += 1;
+    }
+    if (!this.isConnected) return;
+    const counting =
+      this._pagerWait(now) > 0 ||
+      secondsUntil(this._error?.retryAt, now) > 0 ||
+      secondsUntil(this._stopsError?.retryAt, now) > 0;
+    const wakeAt = counting ? now + 1000 : this._requestsNextAt;
+    if (wakeAt === null) return;
+    this._countdownTimer = setTimeout(() => {
+      this._countdownTimer = null;
+      this._syncCountdown();
+    }, wakeAt - now);
   }
 
   /** Re-setting identical text wouldn't be announced, so nudge it. */
@@ -772,7 +874,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const detail =
       spec.retry === "countdown"
         ? this._t("adhoc_error_retry_detail", {
-            s: error.retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000),
+            s:
+              error.retryAt !== null
+                ? Math.max(1, secondsUntil(error.retryAt, this._secondNow))
+                : (error.retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000)),
           })
         : spec.detail && this._t(spec.detail);
     return { icon: spec.icon, title: this._t(spec.title), ...(detail ? { detail } : {}) };
@@ -936,27 +1041,47 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  strand's height changes with every answer, and a row above it stays
    *  under the pointer for the next press. Shown once there is a question
    *  to step through; inert, not disabled, while there is no connection to
-   *  step from, so keyboard focus stays on the button between presses. */
+   *  step from, so keyboard focus stays on the button between presses.
+   *
+   *  Between them, once few fresh plans are left, how many; once none are,
+   *  the seconds until the next. "Später" always needs a fresh one, so it
+   *  waits; "Früher" only once it is past the steps it retraces, which the
+   *  backend still holds. An error says its own countdown, so the note
+   *  stays out of it. */
   private _renderPager(): TemplateResult | typeof nothing {
     if (this._stops === null || !this._from || !this._to || this._from === this._to) {
       return nothing;
     }
-    const laterOff = !this._pageBase();
-    const earlierOff = !this._canGoEarlier();
+    const waiting = this._pagerWait() > 0;
+    const laterOff = !this._pageBase() || waiting;
+    const earlierOff = !this._canGoEarlier() || (waiting && this._pageHistory.length === 0);
+    const note = this._phase === "error" ? "" : this._budgetNote();
+    const describedBy = note ? "wl-pager-note" : nothing;
     return html`<div class="pager" role="group" aria-label=${this._t("page_legend")}>
       <button
         type="button"
-        class="page"
+        class="page page--earlier"
         aria-disabled=${earlierOff ? "true" : nothing}
+        aria-describedby=${describedBy}
         @click=${this._earlier}
       >
         <ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon>
         <span>${this._t("page_earlier")}</span>
       </button>
+      ${
+        note
+          ? html`<p class="pager-note" id="wl-pager-note">
+            ${
+              waiting ? html`<ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>` : nothing
+            }<span>${note}</span>
+          </p>`
+          : nothing
+      }
       <button
         type="button"
-        class="page"
+        class="page page--later"
         aria-disabled=${laterOff ? "true" : nothing}
+        aria-describedby=${describedBy}
         @click=${this._later}
       >
         <span>${this._t("page_later")}</span>
@@ -2758,8 +2883,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
        this size. 32px clears the target minimum (WCAG 2.5.8) without a box;
        the chevron sits at the edge, so the row lines up with the content. */
     .pager {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr minmax(0, auto) 1fr;
+      align-items: center;
       gap: 8px;
     }
     .page {
@@ -2777,8 +2903,35 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-weight: 600;
       cursor: pointer;
     }
-    .page:last-child {
+    .page--earlier {
+      grid-column: 1;
+      justify-self: start;
+    }
+    .page--later {
+      grid-column: 3;
+      justify-self: end;
       padding: 0 0 0 8px;
+    }
+    /* What's left of the request budget, between the two steps it limits.
+       Body weight against the buttons' 600, so it can't pass for a third
+       one; at this line height two lines still fit the 32px row. Tabular
+       figures keep the countdown from jittering as the seconds change. */
+    .pager-note {
+      grid-column: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin: 0;
+      color: var(--secondary-text-color);
+      font-size: 0.8rem;
+      line-height: 1.2;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .pager-note ha-icon {
+      flex: none;
+      --mdc-icon-size: 16px;
     }
     .page ha-icon {
       display: block;
@@ -2876,6 +3029,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     @container (max-width: 320px) {
       .hero-meta {
         text-align: start;
+      }
+    }
+    /* Too narrow to sit between the steps: under them instead. */
+    @container (max-width: 240px) {
+      .pager-note {
+        grid-column: 1 / -1;
+        grid-row: 2;
       }
     }
 

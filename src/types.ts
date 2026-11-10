@@ -814,6 +814,12 @@ export interface RouteAttrs {
   stale?: boolean;
   /** Ad-hoc only, with `stale`: seconds until a fresh plan can be had. */
   retry_after?: number | null;
+  /** Ad-hoc only: fresh plans this HA user may still ask for before the
+   *  backend makes them wait. A cached answer costs none, so it's a floor. */
+  requests_left?: number;
+  /** Ad-hoc only: seconds until `requests_left` grows by one; null when it is
+   *  as high as it goes. */
+  requests_next_in?: number | null;
   /** Ad-hoc only: the chosen time the plan is for; null for "now". */
   planned_for?: string | null;
   /** Ad-hoc only, with `planned_for`: arriving by that time, not leaving. */
