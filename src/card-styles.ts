@@ -1388,6 +1388,25 @@ export const cardStyles = css`
     font-size: 0.85em;
     white-space: nowrap;
   }
+  /* On a narrow card the note would squeeze the name down to "Neu…",
+     which no longer says which station is skipped. There it takes a line
+     of its own under the name, after any chips; the stop grows, and its
+     segments and capsule follow, as they do for open transfers. Past an
+     empty time slot (show_stop_times) it indents by that slot, 5ch of
+     the row's type in the note's smaller ch. */
+  @container wlcard (inline-size < 360px) {
+    .stops-ahead-stop.skipped .stops-ahead-row {
+      flex-wrap: wrap;
+      row-gap: 0;
+    }
+    .stops-ahead-stop.skipped .stops-ahead-skip {
+      flex-basis: 100%;
+      order: 1;
+    }
+    .stops-ahead-stop.skipped .stops-ahead-time + .stops-ahead-name + .stops-ahead-skip {
+      padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
+    }
+  }
   /* Transfer-line chips: small pill badges. U-Bahn chips sit inline
      immediately after the station name (always visible, brand-coloured).
      Tram/bus/night transfers sit behind the right-aligned toggle button
