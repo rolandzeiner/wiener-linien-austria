@@ -12,6 +12,7 @@ import asyncio
 import copy
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -60,7 +61,7 @@ from .test_batch import _member, _ok_response, _patch_get
 
 VIENNA = ZoneInfo("Europe/Vienna")
 NOW = datetime(2026, 9, 15, 6, 15, tzinfo=VIENNA)
-BREITENSEE, VOLKSTHEATER = 60200166, 60201430
+BREITENSEE, VOLKSTHEATER, SCHOTTENTOR = 60200166, 60201430, 60201184
 TRAM_49_R, TRAM_49_H, U2_R = 1471, 1452, 4206
 # Bound before the autouse `live_fetch` fixture patches the module attribute.
 REAL_MONITOR_FETCH = live.async_fetch_monitor_body
@@ -194,7 +195,13 @@ def test_a_delay_moves_the_arrival_and_rescores_the_change() -> None:
     late = _delay(
         _monitor_body(), TRAM_49_R, "2026-09-15T06:17", "2026-09-15T06:20:30.000+0200"
     )
-    trip = apply_live(timetable, _rows(late), 2)[2]
+    # Only the U2 the plan names is on the board: nothing later to move to.
+    rows = [row for row in _rows(late) if row.line != "U2" or row.planned.minute == 39]
+    trip = next(
+        t
+        for t in apply_live(timetable, rows, 2)
+        if t.legs[0].line == "49" and t.legs[0].origin.planned == timetable[2].departure
+    )
     tram = trip.legs[0]
     assert tram.origin.delay_minutes == 3
     assert tram.destination.estimated == datetime(2026, 9, 15, 6, 39, tzinfo=VIENNA)
@@ -202,6 +209,32 @@ def test_a_delay_moves_the_arrival_and_rescores_the_change() -> None:
     assert trip.transfers[0].risk == "at_risk"
     assert trip.risk == "at_risk"
     assert timetable[2].risk == "tight"
+
+
+def test_a_missed_change_moves_to_the_next_vehicle_it_can_catch() -> None:
+    timetable = _trips()
+    late = _delay(
+        _monitor_body(), TRAM_49_R, "2026-09-15T06:17", "2026-09-15T06:20:30.000+0200"
+    )
+    trip = next(
+        t
+        for t in apply_live(timetable, _rows(late), 2)
+        if t.legs[0].line == "49" and t.legs[0].origin.planned == timetable[2].departure
+    )
+    metro = trip.legs[1]
+    # Arrive 06:39, walk 3 min: the 06:39:30 U2 is gone, the 06:44:30 one
+    # is the first it can catch, and the trip arrives that much later.
+    assert metro.origin.planned == datetime(2026, 9, 15, 6, 44, tzinfo=VIENNA)
+    assert metro.origin.delay_minutes == 0
+    planned_run = (
+        timetable[2].legs[1].destination.planned - timetable[2].legs[1].origin.planned
+    )
+    assert metro.destination.planned == metro.origin.planned + planned_run
+    assert metro.realtime is True
+    assert [t.strftime("%H:%M") for t in metro.next_departures] == ["06:49", "06:53"]
+    assert trip.transfers[0].risk == "ok"
+    assert trip.transfers[0].slack_minutes == 2
+    assert trip.arrival == metro.destination.estimated
 
 
 def test_a_change_broken_by_a_delay_stops_being_offered_first() -> None:
@@ -223,6 +256,96 @@ def test_a_change_broken_by_a_delay_stops_being_offered_first() -> None:
         datetime(2026, 9, 15, 6, 14, tzinfo=VIENNA),
     ]
     assert [trip.risk for trip in trips] == ["ok", "tight", "at_risk"]
+
+
+def _late_tram_rows() -> list[LiveRow]:
+    """The board with the 06:17 tram 3 min late: it misses its 06:39 U2."""
+    return _rows(
+        _delay(
+            _monitor_body(),
+            TRAM_49_R,
+            "2026-09-15T06:17",
+            "2026-09-15T06:20:30.000+0200",
+        )
+    )
+
+
+def _the_0617(trips: list[Trip]) -> Trip:
+    start = datetime(2026, 9, 15, 6, 17, tzinfo=VIENNA)
+    return next(trip for trip in trips if trip.legs[0].origin.planned == start)
+
+
+def test_a_train_for_another_terminus_needs_the_routes_to_say_it_calls() -> None:
+    # The 06:44 U2 turns at Schottentor; the one the plan named runs on.
+    rows = [
+        replace(row, towards="Schottentor")
+        if row.line == "U2" and row.planned.minute == 44
+        else row
+        for row in _late_tram_rows()
+    ]
+    metro = _the_0617(apply_live(_trips(), rows, 2)).legs[1]
+    assert metro.origin.planned is not None
+    assert metro.origin.planned.minute == 49
+    catalogue = StaticCatalogue(
+        stations_by_diva={
+            VOLKSTHEATER: Station(
+                VOLKSTHEATER, "Volkstheater", "Wien", 16.36, 48.21, [U2_R]
+            ),
+            SCHOTTENTOR: Station(
+                SCHOTTENTOR, "Schottentor", "Wien", 16.36, 48.21, [4999]
+            ),
+        },
+        last_fetched="2026-09-15T00:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={302: [TripPattern(302, 1, 2, (U2_R, 4999))]},
+            lines_by_label={"U2": 302},
+        ),
+    )
+    metro = _the_0617(apply_live(_trips(), rows, 2, catalogue=catalogue)).legs[1]
+    assert metro.origin.planned is not None
+    assert metro.origin.planned.minute == 44
+    assert metro.towards == "Schottentor"
+
+
+def test_a_step_free_route_moves_only_to_a_step_free_vehicle() -> None:
+    rows = _late_tram_rows()
+    # The board doesn't say whether these trains are step-free: no move.
+    trip = _the_0617(apply_live(_trips(), rows, 2, step_free=True))
+    assert trip.risk == "at_risk"
+    rows = [
+        replace(row, barrier_free=row.planned.minute != 44) if row.line == "U2" else row
+        for row in rows
+    ]
+    metro = _the_0617(apply_live(_trips(), rows, 2, step_free=True)).legs[1]
+    assert metro.origin.planned is not None
+    assert metro.origin.planned.minute == 49
+    assert metro.low_floor is True
+
+
+def test_walks_after_a_late_ride_move_with_it() -> None:
+    trip = _trips()[2]
+    metro = trip.legs[1]
+    assert metro.destination.planned is not None
+    walk = replace(
+        metro,
+        walk=True,
+        line=None,
+        direction=None,
+        wiener_linien=False,
+        origin=replace(metro.destination, estimated=None),
+        destination=replace(
+            metro.destination,
+            planned=metro.destination.planned + timedelta(minutes=4),
+            estimated=None,
+        ),
+    )
+    late = _delay(
+        _monitor_body(), U2_R, "2026-09-15T06:39", "2026-09-15T06:41:30.000+0200"
+    )
+    live = apply_live([Trip(legs=[*trip.legs, walk])], _rows(late), 2)[0]
+    assert live.legs[1].origin.delay_minutes == 2
+    assert live.legs[2].duration_minutes == 4
+    assert live.arrival == metro.destination.planned + timedelta(minutes=6)
 
 
 def test_directions_at_one_station_stay_apart() -> None:
@@ -433,15 +556,38 @@ async def test_route_follows_the_board_without_replanning(
     assert legs[("49", "06:17")]["headway_minutes"] == 5
     at_risk = "binary_sensor.westbahnhof_praterstern_connection_at_risk"
 
-    # A board answer with the tram late flips the at-risk sensor, with no new
-    # trip request and no request of its own.
+    # Board answers move the route along with no new trip request and no
+    # request of their own. The tram 3 min late misses its U2, so the change
+    # moves to the next U2 and the connection still works.
     trips_before = fetch.await_count
-    late = _delay(
-        _monitor_body(), TRAM_49_R, "2026-09-15T06:17", "2026-09-15T06:20:30.000+0200"
-    )
     board = async_get_live_board(hass)
     assert hass.states.get(at_risk).state == "off"
-    board.ingest(late)
+    board.ingest(
+        _delay(
+            _monitor_body(),
+            TRAM_49_R,
+            "2026-09-15T06:17",
+            "2026-09-15T06:20:30.000+0200",
+        )
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(at_risk).state == "off"
+    sensor = hass.states.get("sensor.westbahnhof_praterstern_next_connection")
+    assert sensor is not None
+    rides = [
+        (leg["line"], leg["origin"]["planned"][11:16])
+        for leg in sensor.attributes["trips"][0]["legs"]
+    ]
+    assert rides == [("49", "06:17"), ("U2", "06:44")]
+    # 20 min late, no U2 the board lists can be caught: at risk.
+    board.ingest(
+        _delay(
+            _monitor_body(),
+            TRAM_49_R,
+            "2026-09-15T06:17",
+            "2026-09-15T06:37:30.000+0200",
+        )
+    )
     await hass.async_block_till_done()
     assert hass.states.get(at_risk).state == "on"
     assert fetch.await_count == trips_before

@@ -54,6 +54,7 @@ from custom_components.wiener_linien_austria.static import (
     direction_at_platform,
     stops_ahead_for_match,
     trail_name,
+    vehicle_reaches,
 )
 from tests.conftest import make_response_cm
 
@@ -727,6 +728,49 @@ def test_trip_pattern_index_round_trips_colors_through_store() -> None:
     assert restored.trip_patterns is not None
     assert restored.trip_patterns.colors_by_line == bg
     assert restored.trip_patterns.text_colors_by_line == fg
+
+
+def _short_turn_catalogue(*, diversion: bool = False) -> StaticCatalogue:
+    """U1 from Reumannplatz: on to Oberlaa, or turning at Alaudagasse."""
+    stations = {
+        1: Station(1, "Reumannplatz", "Wien", 16.37, 48.17, [11, 21]),
+        2: Station(2, "Keplerplatz", "Wien", 16.37, 48.16, [12, 22]),
+        3: Station(3, "Alaudagasse", "Wien", 16.38, 48.15, [13, 23]),
+        4: Station(4, "Oberlaa", "Wien", 16.40, 48.14, [14, 24]),
+        5: Station(5, "Ersatzhalt", "Wien", 16.39, 48.15, [15]),
+    }
+    patterns = [
+        TripPattern(301, 1, 1, (11, 12, 13, 14)),
+        TripPattern(301, 2, 1, (11, 12, 13)),
+        TripPattern(301, 3, 2, (24, 23, 22, 21)),
+    ]
+    if diversion:
+        patterns.append(TripPattern(301, 4, 1, (11, 15, 14)))
+    return StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="2026-11-10T00:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={301: patterns}, lines_by_label={"U1": 301}
+        ),
+    )
+
+
+def test_vehicle_reaches_a_stop_only_when_every_route_for_its_terminus_does() -> None:
+    catalogue = _short_turn_catalogue()
+    # Both kinds of train call at Alaudagasse; only one goes on to Oberlaa.
+    assert vehicle_reaches(catalogue, "U1", 11, "Oberlaa", "H", 3)
+    assert vehicle_reaches(catalogue, "U1", 11, "Alaudagasse", "H", 3)
+    assert vehicle_reaches(catalogue, "U1", 11, "Oberlaa", "H", 4)
+    assert not vehicle_reaches(catalogue, "U1", 11, "Alaudagasse", "H", 4)
+    # A stop behind the platform, a terminus no route has, an unknown line.
+    assert not vehicle_reaches(catalogue, "U1", 13, "Oberlaa", "H", 2)
+    assert not vehicle_reaches(catalogue, "U1", 11, "Leopoldau", "H", 3)
+    assert not vehicle_reaches(catalogue, "U1", 11, "", "H", 3)
+    assert not vehicle_reaches(catalogue, "U99", 11, "Oberlaa", "H", 3)
+    # One route to Oberlaa leaves Alaudagasse out, so not every train calls.
+    diverted = _short_turn_catalogue(diversion=True)
+    assert not vehicle_reaches(diverted, "U1", 11, "Oberlaa", "H", 3)
+    assert vehicle_reaches(diverted, "U1", 11, "Oberlaa", "H", 4)
 
 
 def test_stops_ahead_for_match_returns_tail_after_current_rbl() -> None:

@@ -822,9 +822,8 @@ def assess_transfers(
             arrival = previous.destination.effective
             departure = leg.origin.effective
             if arrival is not None and departure is not None:
-                gap = round((departure - arrival).total_seconds() / 60)
                 total_walk = previous.walk_after_minutes + walk
-                slack = gap - total_walk
+                slack = transfer_slack(arrival, departure, total_walk)
                 risk: RiskLevel
                 if slack < 0:
                     risk = "at_risk"
@@ -884,13 +883,59 @@ def _longest_wait(trip: Trip) -> timedelta:
     return longest
 
 
-def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
-    """Keep the useful connections, soonest first.
+def transfer_slack(arrival: datetime, departure: datetime, walk_minutes: int) -> int:
+    """Minutes to spare on a change; below zero the walk no longer fits.
 
-    1. Drop cancelled connections, and those that have already left `now`.
-       A query for a chosen time passes `now=None`: someone planning
-       tomorrow's trip, or checking what they could have caught, wants
-       every connection the server found for that time.
+    The gap between arriving and leaving, rounded to whole minutes the way
+    the server's own stamps are, less the walk. `assess_transfers` grades
+    by it and live.py moves a missed change onto a later vehicle by it, so
+    a change counts as missed by one rule everywhere.
+    """
+    return round((departure - arrival).total_seconds() / 60) - walk_minutes
+
+
+def usable_trips(
+    trips: Iterable[Trip],
+    now: datetime | None,
+    *,
+    arrive_by: datetime | None = None,
+) -> list[Trip]:
+    """The connections a query can offer, in `order_trips` order.
+
+    Drops cancelled connections, those without times, and those that have
+    already left `now`. A query for a chosen time passes `now=None`:
+    someone planning tomorrow's trip, or checking what they could have
+    caught, wants every connection the server found for that time. For an
+    arrive-by query it also drops those the server times to arrive after
+    `arrive_by`: asked to arrive by 08:00 it offered one arriving at 08:22
+    too (verified 2026-11-10).
+
+    Nothing is compared here. That waits for live times (`best_trips`,
+    called from live.py): a connection that looks dominated on the
+    timetable can be the one that still works once a delay is known.
+    """
+    return order_trips(
+        (
+            trip
+            for trip in trips
+            if not trip.cancelled
+            and trip.departure is not None
+            and trip.arrival is not None
+            and (now is None or trip.departure >= now - timedelta(minutes=1))
+            and (arrive_by is None or trip.arrival <= arrive_by)
+        ),
+        arrive_by=arrive_by,
+    )
+
+
+def best_trips(
+    trips: Iterable[Trip], *, arrive_by: datetime | None = None
+) -> list[Trip]:
+    """Keep the useful connections, best first.
+
+    1. Drop cancelled connections, those without times, and repeats: the
+       same rides in the same order, which two connections moved onto the
+       same later vehicles can turn into.
     2. Drop dominated ones: B is dominated when some A departs no earlier,
        arrives no later, changes no more often and is no riskier — and is
        strictly better on at least one of those. Departure counts in the
@@ -898,14 +943,19 @@ def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
        survive; only a strictly worse alternative to one of them goes.
     3. Order them with `order_trips`.
     """
-    candidates = [
-        trip
-        for trip in trips
-        if not trip.cancelled
-        and trip.departure is not None
-        and trip.arrival is not None
-        and (now is None or trip.departure >= now - timedelta(minutes=1))
-    ]
+    candidates: list[Trip] = []
+    seen: set[tuple[Any, ...]] = set()
+    for trip in trips:
+        rides = _rides(trip)
+        if (
+            trip.cancelled
+            or trip.departure is None
+            or trip.arrival is None
+            or rides in seen
+        ):
+            continue
+        seen.add(rides)
+        candidates.append(trip)
 
     def criteria(trip: Trip) -> tuple[float, float, int, int]:
         assert trip.departure is not None
@@ -929,31 +979,54 @@ def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
             for other_key, other in scored
         )
     ]
-    return order_trips(survivors)
+    return order_trips(survivors, arrive_by=arrive_by)
 
 
-def order_trips(trips: Iterable[Trip]) -> list[Trip]:
+def order_trips(
+    trips: Iterable[Trip], *, arrive_by: datetime | None = None
+) -> list[Trip]:
     """Connections best first: the first one is the one to take.
 
-    Soonest departure first, then soonest arrival, except that a connection
-    with a change that no longer fits (`at_risk`) goes behind every one
-    whose changes still hold. Its arrival counts on a vehicle it can no
-    longer catch, so it can't answer "when do I get there".
+    Leaving now or at a chosen time, the soonest departure comes first.
+    Arriving by a chosen time, the latest departure does: it still makes
+    it without leaving earlier than needed. Ties go to the sooner arrival.
 
-    live.py orders again once live times are in: a late first ride can
-    leave after the next connection's first ride does, and a delay can
-    break a change.
+    Either way, a connection that no longer works goes behind every one
+    that does: one with a change that no longer fits (`at_risk`), whose
+    arrival counts on a vehicle it can no longer catch, and one that a
+    delay makes arrive after `arrive_by`.
     """
 
-    def key(trip: Trip) -> tuple[bool, float, float]:
+    def key(trip: Trip) -> tuple[bool, bool, float, float]:
         departure, arrival = trip.departure, trip.arrival
+        misses = trip.risk == "at_risk" or (
+            arrive_by is not None and arrival is not None and arrival > arrive_by
+        )
+        leaves = departure.timestamp() if departure is not None else 0.0
+        arrives = arrival.timestamp() if arrival is not None else math.inf
         return (
-            trip.risk == "at_risk",
-            departure.timestamp() if departure is not None else math.inf,
-            arrival.timestamp() if arrival is not None else math.inf,
+            misses,
+            departure is None,
+            -leaves if arrive_by is not None else leaves,
+            arrives,
         )
 
     return sorted(trips, key=key)
+
+
+def _rides(trip: Trip) -> tuple[Any, ...]:
+    """The vehicles a connection uses: line, direction, where and when."""
+    return tuple(
+        (
+            leg.line,
+            leg.direction,
+            leg.origin.stop_id,
+            leg.origin.planned,
+            leg.destination.stop_id,
+        )
+        for leg in trip.legs
+        if not leg.walk
+    )
 
 
 # ---------------------------------------------------------------------------

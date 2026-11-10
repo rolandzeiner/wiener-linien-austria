@@ -56,8 +56,16 @@ from .const import (
 )
 from .parsing import as_int, as_mapping
 from .rate_limit import async_enforce_domain_cooldown
-from .routing import Trip, assess_transfers, order_trips
-from .static import StaticCatalogue, current_catalogue
+from .routing import (
+    LegStop,
+    RouteLeg,
+    RouteStop,
+    Trip,
+    assess_transfers,
+    best_trips,
+    transfer_slack,
+)
+from .static import StaticCatalogue, current_catalogue, vehicle_reaches
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,6 +105,13 @@ class LiveRow:
     direction: str
     planned: datetime
     real: datetime | None
+    # Where this vehicle ends (`vehicle.towards`, else the line's), whether
+    # it is step-free (`vehicle.barrierFree`, None when not given), and the
+    # platform it leaves from. What a later vehicle needs to stand in for a
+    # missed one.
+    towards: str = ""
+    barrier_free: bool | None = None
+    rbl: int | None = None
 
 
 def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
@@ -126,12 +141,16 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
             direction = str(line.get("direction") or "").strip()
             if not name or not direction:
                 continue
+            line_towards = str(line.get("towards") or "").strip()
+            line_step_free = line.get("barrierFree")
             departures = as_mapping(line.get("departures")).get("departure")
             for departure in departures if isinstance(departures, list) else []:
                 stamps = as_mapping(as_mapping(departure).get("departureTime"))
                 planned = _parse_stamp(stamps.get("timePlanned"))
                 if planned is None:
                     continue
+                vehicle = as_mapping(as_mapping(departure).get("vehicle"))
+                step_free = vehicle.get("barrierFree", line_step_free)
                 rows.append(
                     LiveRow(
                         diva=diva,
@@ -139,6 +158,10 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
                         direction=direction,
                         planned=planned,
                         real=_parse_stamp(stamps.get("timeReal")),
+                        towards=str(vehicle.get("towards") or "").strip()
+                        or line_towards,
+                        barrier_free=step_free if isinstance(step_free, bool) else None,
+                        rbl=rbl,
                     )
                 )
     return by_rbl
@@ -193,80 +216,254 @@ def apply_live(
     trips: Sequence[Trip],
     rows: Iterable[LiveRow],
     min_transfer_minutes: int,
+    *,
+    catalogue: StaticCatalogue | None = None,
+    arrive_by: datetime | None = None,
+    step_free: bool = False,
 ) -> list[Trip]:
-    """Copies of `trips` with live departures, frequencies and re-scored changes.
+    """Copies of `trips` on live times, the best connection first.
 
     A matched ride takes its live departure, and its arrival moves by the
     same delay (`/monitor` has no arrival times); that is the estimate the
-    next change is scored against. Every ride with rows, matched or not, gets
-    its next departures and how often it runs. The copies come back in
-    `order_trips` order on the live times, so a connection whose first ride
-    is late, or whose change no longer fits, stops being offered first. The
-    input is never mutated, so a caller keeps the timetable plan and
-    re-applies fresher rows to it.
+    next change is scored against. When a delay makes a ride's change miss
+    it, the ride moves to the first later vehicle of its line that can
+    still be caught (`_catch_later`), so the connection shows when it
+    really gets there, not an arrival on a vehicle that has left. Walks
+    after a ride move with its arrival. Every ride with rows gets its next
+    departures and how often it runs.
+
+    Then `best_trips` compares the connections on these times, with
+    `arrive_by` for an arrive-by query. The input is never mutated, so a
+    caller keeps the timetable plan and re-applies fresher rows to it.
     """
     index: dict[tuple[str, str, str], list[LiveRow]] = {}
     for row in rows:
         index.setdefault((row.diva, row.line, row.direction), []).append(row)
     for departures in index.values():
         departures.sort(key=lambda row: row.planned)
+    return best_trips(
+        (
+            _live_trip(trip, index, min_transfer_minutes, catalogue, step_free)
+            for trip in trips
+        ),
+        arrive_by=arrive_by,
+    )
 
-    result: list[Trip] = []
-    for trip in trips:
-        legs = []
-        for leg in trip.legs:
-            planned = leg.origin.planned
-            group: list[LiveRow] | None = (
-                index.get((leg.origin.stop_id, leg.line, leg.direction))
-                if leg.origin.stop_id and leg.line and leg.direction and not leg.walk
-                else None
-            )
-            if not group or planned is None:
-                legs.append(leg)
-                continue
-            match = _match(group, planned)
-            origin, destination, realtime = leg.origin, leg.destination, leg.realtime
-            stops = leg.stops
-            if match is not None and match.real is not None:
-                # The delay, not the raw real time: `/monitor` plans to the
-                # second (06:17:30) and the planner to the minute (06:17), so
-                # a tram 1 s late would otherwise read as a minute late.
-                delay = match.real - match.planned
-                origin = replace(origin, estimated=planned + delay)
-                stops = tuple(
-                    replace(stop, time=stop.time + delay)
-                    if stop.time is not None
-                    else stop
-                    for stop in stops
+
+def _live_trip(
+    trip: Trip,
+    index: Mapping[tuple[str, str, str], list[LiveRow]],
+    min_transfer_minutes: int,
+    catalogue: StaticCatalogue | None,
+    step_free: bool,
+) -> Trip:
+    """One connection on live times, with missed changes moved on."""
+    legs: list[RouteLeg] = []
+    previous: RouteLeg | None = None
+    # How far the last ride's arrival moved, which the walks after it share.
+    moved = timedelta(0)
+    walk = 0
+    for leg in trip.legs:
+        if leg.walk:
+            if previous is not None and moved:
+                leg = _shifted(leg, moved)
+            legs.append(leg)
+            walk += leg.duration_minutes or 0
+            continue
+        group = (
+            index.get((leg.origin.stop_id, leg.line, leg.direction))
+            if leg.origin.stop_id and leg.line and leg.direction
+            else None
+        )
+        ride, match = _live_ride(leg, group)
+        if group and previous is not None and leg.origin.planned is not None:
+            arrival = previous.destination.effective
+            departure = ride.origin.effective
+            ready = previous.walk_after_minutes + walk
+            if (
+                arrival is not None
+                and departure is not None
+                and transfer_slack(arrival, departure, ready) < 0
+            ):
+                later = _catch_later(
+                    ride, match, group, arrival, ready, catalogue, step_free
                 )
-                if destination.planned is not None:
-                    destination = replace(
-                        destination, estimated=destination.planned + delay
-                    )
-                realtime = True
-            later = [
-                row
-                for row in group
-                if row is not match and _minute(row.planned) > _minute(planned)
-            ]
-            legs.append(
-                replace(
-                    leg,
-                    origin=origin,
-                    destination=destination,
-                    realtime=realtime,
-                    stops=stops,
-                    next_departures=tuple(
-                        (row.real or row.planned).astimezone(planned.tzinfo)
-                        for row in later[:MAX_NEXT_DEPARTURES]
-                    ),
-                    headway_minutes=_headway(group),
-                )
+                if later is not None:
+                    ride = _board(ride, later, group)
+        arrived, timetable = ride.destination.effective, leg.destination.effective
+        moved = (
+            arrived - timetable
+            if arrived is not None and timetable is not None
+            else timedelta(0)
+        )
+        legs.append(ride)
+        previous = ride
+        walk = 0
+    live = Trip(legs=legs)
+    live.transfers = assess_transfers(legs, min_transfer_minutes)
+    return live
+
+
+def _live_ride(
+    leg: RouteLeg, group: Sequence[LiveRow] | None
+) -> tuple[RouteLeg, LiveRow | None]:
+    """A ride with its live departure, next departures and frequency.
+
+    Also returns the row it matched, the vehicle the planner chose.
+    """
+    planned = leg.origin.planned
+    if not group or planned is None:
+        return leg, None
+    match = _match(group, planned)
+    origin, destination, realtime = leg.origin, leg.destination, leg.realtime
+    stops = leg.stops
+    if match is not None and match.real is not None:
+        # The delay, not the raw real time: `/monitor` plans to the second
+        # (06:17:30) and the planner to the minute (06:17), so a tram 1 s
+        # late would otherwise read as a minute late.
+        delay = match.real - match.planned
+        origin = replace(origin, estimated=planned + delay)
+        stops = _shifted_stops(stops, delay)
+        if destination.planned is not None:
+            destination = replace(destination, estimated=destination.planned + delay)
+        realtime = True
+    ride = replace(
+        leg,
+        origin=origin,
+        destination=destination,
+        realtime=realtime,
+        stops=stops,
+        next_departures=_after(group, planned, match),
+        headway_minutes=_headway(group),
+    )
+    return ride, match
+
+
+def _catch_later(
+    ride: RouteLeg,
+    match: LiveRow | None,
+    group: Sequence[LiveRow],
+    arrival: datetime,
+    walk: int,
+    catalogue: StaticCatalogue | None,
+    step_free: bool,
+) -> LiveRow | None:
+    """The first vehicle of `ride`'s line still reachable after a missed change.
+
+    Reachable by the rule `assess_transfers` grades with, so a vehicle
+    picked here never shows as missed. It has to call where the ride gets
+    off: it ends where the planned vehicle does, or the static routes say
+    every vehicle for its terminus passes the stop (`vehicle_reaches`).
+    On a step-free route it has to be a step-free vehicle by `/monitor`'s
+    own word. None when no listed vehicle qualifies; the change then stays
+    missed.
+    """
+    alight = as_int(ride.destination.stop_id)
+    reachable: list[tuple[datetime, LiveRow]] = []
+    for row in group:
+        if row is match:
+            continue
+        departs = _departure(row, ride)
+        if transfer_slack(arrival, departs, walk) < 0:
+            continue
+        if step_free and row.barrier_free is not True:
+            continue
+        same_end = (
+            match is not None and bool(row.towards) and row.towards == match.towards
+        )
+        if not same_end and not (
+            catalogue is not None
+            and alight is not None
+            and row.rbl is not None
+            and ride.line is not None
+            and vehicle_reaches(
+                catalogue, ride.line, row.rbl, row.towards, row.direction, alight
             )
-        live_trip = Trip(legs=legs)
-        live_trip.transfers = assess_transfers(legs, min_transfer_minutes)
-        result.append(live_trip)
-    return order_trips(result)
+        ):
+            continue
+        reachable.append((departs, row))
+    return min(reachable, key=lambda item: item[0])[1] if reachable else None
+
+
+def _board(ride: RouteLeg, row: LiveRow, group: Sequence[LiveRow]) -> RouteLeg:
+    """`ride` on the vehicle `row` instead, its timetable run time kept."""
+    planned = ride.origin.planned
+    end = ride.destination.planned
+    zone = planned.tzinfo if planned is not None else None
+    leaves = _minute(row.planned).astimezone(zone)
+    delay = row.real - row.planned if row.real is not None else None
+    run = end - planned if end is not None and planned is not None else None
+    origin = replace(
+        ride.origin,
+        planned=leaves,
+        estimated=leaves + delay if delay is not None else None,
+    )
+    destination = replace(
+        ride.destination,
+        planned=leaves + run if run is not None else None,
+        estimated=leaves + run + delay
+        if run is not None and delay is not None
+        else None,
+    )
+    before, after = ride.origin.effective, origin.effective
+    shift = after - before if before is not None and after is not None else None
+    return replace(
+        ride,
+        origin=origin,
+        destination=destination,
+        towards=row.towards or ride.towards,
+        realtime=delay is not None,
+        low_floor=row.barrier_free is True,
+        stops=_shifted_stops(ride.stops, shift) if shift is not None else ride.stops,
+        next_departures=_after(group, leaves, row),
+    )
+
+
+def _departure(row: LiveRow, ride: RouteLeg) -> datetime:
+    """When a row's vehicle leaves, the way a matched ride's estimate reads."""
+    leaves = _minute(row.planned)
+    if row.real is not None:
+        leaves += row.real - row.planned
+    zone = ride.origin.planned.tzinfo if ride.origin.planned else None
+    return leaves.astimezone(zone) if zone is not None else leaves
+
+
+def _after(
+    group: Sequence[LiveRow], planned: datetime, match: LiveRow | None
+) -> tuple[datetime, ...]:
+    """The next departures after the vehicle planned at `planned`."""
+    later = [
+        row
+        for row in group
+        if row is not match and _minute(row.planned) > _minute(planned)
+    ]
+    return tuple(
+        (row.real or row.planned).astimezone(planned.tzinfo)
+        for row in later[:MAX_NEXT_DEPARTURES]
+    )
+
+
+def _shifted(leg: RouteLeg, by: timedelta) -> RouteLeg:
+    """A walk moved by `by`, its length kept."""
+    return replace(
+        leg,
+        origin=_shifted_stop(leg.origin, by),
+        destination=_shifted_stop(leg.destination, by),
+    )
+
+
+def _shifted_stop(stop: RouteStop, by: timedelta) -> RouteStop:
+    """A stop expected `by` later than its timetable time says."""
+    if stop.planned is None:
+        return stop
+    return replace(stop, estimated=(stop.estimated or stop.planned) + by)
+
+
+def _shifted_stops(stops: tuple[LegStop, ...], by: timedelta) -> tuple[LegStop, ...]:
+    return tuple(
+        replace(stop, time=stop.time + by) if stop.time is not None else stop
+        for stop in stops
+    )
 
 
 def _match(group: Sequence[LiveRow], planned: datetime) -> LiveRow | None:
@@ -507,15 +704,28 @@ async def async_live_trips(
     *,
     cooldown: bool,
     lease_seconds: float | None = None,
+    arrive_by: datetime | None = None,
+    step_free: bool = False,
 ) -> list[Trip]:
-    """Lease the stops `trips` need, make sure they have rows, apply them."""
+    """Lease the stops `trips` need, make sure they have rows, apply them.
+
+    Without a stop to ask about (a plan for tomorrow, S-Bahn only) the
+    connections are still compared and ordered, on the timetable.
+    """
     board = async_get_live_board(hass)
-    rbls = rbls_for_trips(current_catalogue(hass), trips, dt_util.utcnow())
+    catalogue = current_catalogue(hass)
+    rbls = rbls_for_trips(catalogue, trips, dt_util.utcnow())
     board.lease(owner, rbls, lease_seconds)
-    if not rbls:
-        return list(trips)
-    await board.async_ensure(rbls, cooldown=cooldown)
-    return apply_live(trips, board.rows_for(rbls), min_transfer_minutes)
+    if rbls:
+        await board.async_ensure(rbls, cooldown=cooldown)
+    return apply_live(
+        trips,
+        board.rows_for(rbls),
+        min_transfer_minutes,
+        catalogue=catalogue,
+        arrive_by=arrive_by,
+        step_free=step_free,
+    )
 
 
 def _row_max_age(hass: HomeAssistant) -> float:

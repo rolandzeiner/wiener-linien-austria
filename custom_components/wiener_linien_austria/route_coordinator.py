@@ -58,7 +58,7 @@ from .routing import (
     last_connection,
     parse_time_option,
     parse_trip_body,
-    rank_trips,
+    usable_trips,
     within_window,
 )
 from .static import current_catalogue, line_colors_for
@@ -224,12 +224,15 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         if data is None or not data.active or not self._timetable:
             return
         board = async_get_live_board(self.hass)
-        rbls = rbls_for_trips(
-            current_catalogue(self.hass), self._timetable, dt_util.utcnow()
-        )
+        catalogue = current_catalogue(self.hass)
+        rbls = rbls_for_trips(catalogue, self._timetable, dt_util.utcnow())
         data.trips = apply_live(
-            self._timetable, board.rows_for(rbls), self.options.min_transfer_minutes
-        )
+            self._timetable,
+            board.rows_for(rbls),
+            self.options.min_transfer_minutes,
+            catalogue=catalogue,
+            step_free=self.options.step_free,
+        )[:MAX_TRIPS_PUBLISHED]
         self.async_update_listeners()
 
     @property
@@ -276,14 +279,19 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 translation_placeholders=err.placeholders,
             ) from err
 
-        self._timetable = trips[:MAX_TRIPS_PUBLISHED]
-        published = await async_live_trips(
-            self.hass,
-            self._live_owner,
-            self._timetable,
-            self.options.min_transfer_minutes,
-            cooldown=True,
-        )
+        # Every connection the planner offered, not just the four published:
+        # on live times one of the others can be the one that still works.
+        self._timetable = trips
+        published = (
+            await async_live_trips(
+                self.hass,
+                self._live_owner,
+                self._timetable,
+                self.options.min_transfer_minutes,
+                cooldown=True,
+                step_free=self.options.step_free,
+            )
+        )[:MAX_TRIPS_PUBLISHED]
         self._note_success(published)
         return RouteData(
             trips=published,
@@ -368,7 +376,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         connection don't all ask in the same second.
 
         Only a connection still ahead counts, the same rule the route card
-        uses. `rank_trips` keeps one for a minute after it leaves, and the
+        uses. `usable_trips` keeps one for a minute after it leaves, and the
         refresh just after a departure gets it back from the planner, so
         timing from it scheduled a second refresh 60 s later on every
         rollover: 24 requests an hour instead of 12 on a line every 5 minutes.
@@ -430,14 +438,17 @@ async def async_plan_trips(
     arrive_by: bool = False,
     planned: bool = False,
 ) -> list[Trip]:
-    """Fetch, parse and rank one trip request. No cooldown, no state.
+    """Fetch, parse and filter one trip request. No cooldown, no state.
 
     The one planning path shared by route entries, the `plan_trip` action
     and the route card's ad-hoc mode (the last two via adhoc.py), plus the
     config flow's setup probe, so every caller sees the same connections
     for the same query. `planned` marks a query for a time the caller chose
     rather than "now": its connections are kept even when they left
-    already. Tests patch the fetch at `route_coordinator.async_fetch_trip_body`.
+    already. An arrive-by query loses what arrives after `when`
+    (`usable_trips`). Comparing the rest waits for live times
+    (live.async_live_trips). Tests patch the fetch at
+    `route_coordinator.async_fetch_trip_body`.
     """
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),
@@ -450,7 +461,11 @@ async def async_plan_trips(
         USER_AGENT,
     )
     trips = parse_trip_body(body, tz, min_transfer_minutes=options.min_transfer_minutes)
-    return rank_trips(trips, None if planned else dt_util.utcnow())
+    return usable_trips(
+        trips,
+        None if planned else dt_util.utcnow(),
+        arrive_by=when if arrive_by else None,
+    )
 
 
 def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[str, Any]:

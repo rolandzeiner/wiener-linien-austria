@@ -57,7 +57,7 @@ Live departures for Vienna's public transport in Home Assistant, from the offici
 - Four cards: a modern board, a retro LED sign, a split-flap board and a route card, all in the official line colours.
 - Open a departure to see every stop ahead, with the lines you can change to, estimated arrival times and "Kein Halt" where it goes through.
 - Disruption, stop and lift notices for the lines and platforms you track.
-- Routes from A to B (experimental): the next connections on live times, working ones first, with a grade for every change and a time-to-leave sensor.
+- Routes from A to B (experimental): live connections, a missed change moved to the next vehicle, a grade per change, and a time-to-leave sensor.
 - A `plan_trip` action that answers "when do I have to leave?" for scripts and Assist, between any two stops by name.
 - Visual card editors: pick lines as coloured chips, with a direction and walking time per line.
 - During an outage the last board stays on screen, a sensor flags it as stale, and a repair says whether Wiener Linien is down.
@@ -234,15 +234,16 @@ Each leg has:
 - `stop_count`, `duration_minutes`, `walk_after_minutes` (the walk to the next ride) and `cancelled`.
 - `stops`: the stops between boarding and getting off, each with `name`, `stop_id` and `time`.
 - `realtime`: `true` when the ride has a live time. Its `estimated` departure is then live, and its arrival and `stops` times move by the same delay.
+- When a delay makes the walk to a ride too long, the ride moves to the first later vehicle of its line that the departure boards list and that still reaches the stop: one going where the planned one goes, or one the route data says calls there. On a step-free route it also has to be step-free. `origin`, `destination`, `towards` and `low_floor` are then that vehicle's, and walks after a ride move with its arrival. With no such vehicle listed, the change stays `at_risk`.
 - `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line usually runs there), from the departure boards.
-- `low_floor`: planned with a low-floor vehicle.
+- `low_floor`: a low-floor vehicle, as planned, or as the departure board lists the vehicle the ride moved to.
 - `access`: the lifts and stairs on the leg's own walk, each with `kind` (such as `elevator` or `stairs`), `level` (`up` or `down`) and the station's `stop_id`. A change's `access` lists the ones between two rides. A lift outage in `elevator_info` is matched by station, so it can concern a different lift at the same station.
 
 In `trips` and the `plan_trip` response, every stop on the Wiener Linien stop list also has `latitude` and `longitude`, whether it's a leg's `origin`, its `destination` or one of its `stops`. Other stops, such as S-Bahn-only stations, have neither.
 
 ### Connection at risk
 
-Turns on only when the current times say a change no longer fits on the best connection. Connections that still work come first, so this means none of the connections ahead in `trips` works as planned. A `tight` change doesn't count: the trip planner often plans changes with no time to spare, so the sensor would be on most of the day. Live times count for U-Bahn, tram and bus rides. They come from the departure boards, because the trip planner sends none. Attributes: `risk` (the best connection's grade), `transfer_at` and `slack_minutes` (where its tightest change is, and how many minutes it leaves).
+Turns on only when the current times say a change no longer fits on the best connection. A change a delay breaks first moves to the next vehicle that can still be caught (see *Trip shape*), and connections that still work come first, so this means none of the connections ahead in `trips` works on current times. A `tight` change doesn't count: the trip planner often plans changes with no time to spare, so the sensor would be on most of the day. Live times count for U-Bahn, tram and bus rides. They come from the departure boards, because the trip planner sends none. Attributes: `risk` (the best connection's grade), `transfer_at` and `slack_minutes` (where its tightest change is, and how many minutes it leaves).
 
 ### Time to leave
 
@@ -252,7 +253,7 @@ Turns on the set number of minutes before the next connection leaves, and off wh
 
 ### `wiener_linien_austria.plan_trip`
 
-Plans connections for a route you've set up, or between any two stops, and returns them best first, ordered and shaped like the sensor's `trips` attribute.
+Plans connections for a route you've set up, or between any two stops, and returns them best first, ordered and shaped like the sensor's `trips` attribute. With `arrive_by`, the latest departure that still arrives in time comes first, and connections the trip planner times to arrive later are left out.
 
 | Field | Label | Required | Description |
 |---|---|---|---|

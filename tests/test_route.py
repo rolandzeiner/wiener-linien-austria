@@ -574,16 +574,24 @@ async def test_plan_trip_returns_connections(
 ) -> None:
     entry = route_entry()
     await async_setup_entry_and_wait(hass, entry)
+    by = {"datetime": "2026-09-14T08:30:00+02:00", "arrive_by": True}
     response = await hass.services.async_call(
         DOMAIN,
         "plan_trip",
-        {"config_entry_id": entry.entry_id, "arrive_by": True},
+        {"config_entry_id": entry.entry_id, **by},
         blocking=True,
         return_response=True,
     )
     assert response is not None
     assert response["origin"] == "Westbahnhof"
     assert len(response["trips"]) == 4
+    # Arriving by a time, the latest departure that makes it comes first.
+    assert [trip["departure"][11:16] for trip in response["trips"]] == [
+        "08:05",
+        "08:03",
+        "08:00",
+        "07:57",
+    ]
     assert dict(fetch.call_args.args[1])["itdTripDateTimeDepArr"] == "arr"
     # The same shape as the sensor's trips, so no catalogue means no coordinates.
     assert "latitude" not in response["trips"][0]["legs"][0]["origin"]
@@ -604,7 +612,7 @@ async def test_plan_trip_returns_connections(
     response = await hass.services.async_call(
         DOMAIN,
         "plan_trip",
-        {"config_entry_id": entry.entry_id, "arrive_by": True},
+        {"config_entry_id": entry.entry_id, **by},
         blocking=True,
         return_response=True,
     )
@@ -737,7 +745,12 @@ async def test_plan_trip_between_two_stops_by_name(
         DOMAIN,
         "plan_trip",
         # As a voice assistant hands it over: lower case, no accents needed.
-        {"origin": "stephansplatz", "destination": "60200123", "arrive_by": True},
+        {
+            "origin": "stephansplatz",
+            "destination": "60200123",
+            "datetime": "2026-09-14T08:30:00+02:00",
+            "arrive_by": True,
+        },
         blocking=True,
         return_response=True,
     )

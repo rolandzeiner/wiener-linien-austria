@@ -1469,6 +1469,76 @@ def _terminus_key(name: str) -> str:
     return _TERMINUS_SEPARATORS.sub(" ", key).strip()
 
 
+def vehicle_reaches(
+    catalogue: StaticCatalogue,
+    line_label: str,
+    board_rbl: int,
+    towards: str,
+    live_direction: str | None,
+    alight_diva: int,
+) -> bool:
+    """Whether a live vehicle leaving `board_rbl` for `towards` calls at `alight_diva`.
+
+    live.py moves a missed connection onto a later vehicle by this, so a
+    wrong yes is the costly answer: it would send someone onto a
+    short-working that turns before their stop (half the U1 trains at
+    Reumannplatz end at Alaudagasse). Unlike `stops_ahead_for_match`, which
+    has to show some trail and so settles for the likeliest route, this
+    asks every route of the line that leaves the platform that way, cut
+    where `towards` names a stop on it, and says yes only when all of them
+    reach `alight_diva`. A `towards` no route has a stop for is a no.
+
+    `fahrwegverlaeufe` keeps every variant a line has run, diversions
+    included (three of tram 11's routes to Otto-Probst-Platz skip
+    Reumannplatz), so for many tram and bus lines this says no. That is
+    the safe answer: the caller then keeps to vehicles going where the
+    planned one goes. On the U-Bahn, where the variants are the
+    short-workings themselves, it says yes where it should (checked
+    against the 2026-11-10 data: U1 to Alaudagasse and to Oberlaa both
+    reach Alaudagasse from Reumannplatz).
+    """
+    patterns = catalogue.trip_patterns
+    wanted = _terminus_key(towards or "")
+    if patterns is None or not wanted:
+        return False
+    line_id = patterns.lines_by_label.get(line_label)
+    if line_id is None:
+        return False
+    candidates = [
+        pattern
+        for pattern in patterns.patterns_by_line.get(line_id, ())
+        if board_rbl in pattern.stops[:-1]
+    ]
+    # H="hin" is CSV Direction 1, R="retour" 2; lines that buck the
+    # convention fall back to every route through the platform.
+    if live_direction in ("H", "R"):
+        target = 1 if live_direction == "H" else 2
+        candidates = [p for p in candidates if p.direction == target] or candidates
+    runs: list[list[int | None]] = []
+    for pattern in candidates:
+        tail = pattern.stops[pattern.stops.index(board_rbl) + 1 :]
+        divas = [_diva_for_rbl(catalogue, rbl) for rbl in tail]
+        names = [
+            _terminus_key(_trail_name_for_rbl(catalogue, line_id, rbl) or "")
+            for rbl in tail
+        ]
+        # Where a vehicle for `towards` ends on this route: the stop named
+        # like it, spelled the same before one that only contains it.
+        end = next((i for i, name in enumerate(names) if name == wanted), None)
+        if end is None:
+            end = next(
+                (
+                    i
+                    for i, name in enumerate(names)
+                    if name and (wanted in name or name in wanted)
+                ),
+                None,
+            )
+        if end is not None:
+            runs.append(divas[: end + 1])
+    return bool(runs) and all(alight_diva in run for run in runs)
+
+
 def direction_at_platform(
     catalogue: StaticCatalogue,
     line_label: str,

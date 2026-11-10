@@ -112,13 +112,15 @@ class AdhocPlan:
     """Ranked connections and when the upstream produced them.
 
     `stale` marks a plan served past its TTL because the budget was spent;
-    `retry_after` then says when a fresh one can be had.
+    `retry_after` then says when a fresh one can be had. `arrive_by` is the
+    deadline of an arrive-by query, which live times are ranked against.
     """
 
     trips: tuple[Trip, ...]
     fetched_at: datetime
     stale: bool = False
     retry_after: int | None = None
+    arrive_by: datetime | None = None
 
 
 class _TokenBucket:
@@ -233,6 +235,8 @@ class AdhocPlanner:
             key[0].min_transfer_minutes,
             cooldown=False,
             lease_seconds=ADHOC_LEASE_SECONDS,
+            arrive_by=plan.arrive_by,
+            step_free=key[0].step_free,
         )
         return replace(plan, trips=tuple(trips))
 
@@ -243,14 +247,16 @@ class AdhocPlanner:
         No request: whatever the shared `/monitor` answer holds is used.
         """
         board = async_get_live_board(self._hass)
-        rbls = rbls_for_trips(
-            current_catalogue(self._hass), plan.trips, dt_util.utcnow()
-        )
+        catalogue = current_catalogue(self._hass)
+        rbls = rbls_for_trips(catalogue, plan.trips, dt_util.utcnow())
         board.lease(_lease_owner(key), rbls, ADHOC_LEASE_SECONDS)
-        if not rbls:
-            return plan
         trips = apply_live(
-            plan.trips, board.rows_for(rbls), key[0].min_transfer_minutes
+            plan.trips,
+            board.rows_for(rbls),
+            key[0].min_transfer_minutes,
+            catalogue=catalogue,
+            arrive_by=plan.arrive_by,
+            step_free=key[0].step_free,
         )
         return replace(plan, trips=tuple(trips))
 
@@ -270,7 +276,11 @@ class AdhocPlanner:
                 raise
             # Nothing left tonight is an answer, and worth caching.
             trips = []
-        plan = AdhocPlan(trips=tuple(trips), fetched_at=dt_util.utcnow())
+        plan = AdhocPlan(
+            trips=tuple(trips),
+            fetched_at=dt_util.utcnow(),
+            arrive_by=at if key[2] else None,
+        )
         if generation == self._generation:
             self._store(key, plan)
         return plan
@@ -319,7 +329,7 @@ class AdhocPlanner:
     def _drop_departed(plan: AdhocPlan, now: datetime) -> AdhocPlan:
         """Serve a cached plan without connections that left since.
 
-        Same one-minute grace as `rank_trips`. Returns `plan` itself when
+        Same one-minute grace as `usable_trips`. Returns `plan` itself when
         nothing left, so callers sharing a plan keep sharing the object.
         """
         cutoff = now - timedelta(minutes=1)
