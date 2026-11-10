@@ -100,6 +100,7 @@
     "stop_time_late": "scheduled {time}, {n} min late",
     "stop_skipped": "No stop",
     "stop_skipped_until": "No stop until {date}",
+    "stop_skipped_until_time": "No stop until {time}",
     "dir_h": "Outbound",
     "dir_r": "Return",
     "dir_h_short": "H",

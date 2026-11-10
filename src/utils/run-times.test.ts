@@ -11,6 +11,7 @@ import {
   stopEta,
   stopSkip,
   stopVerdict,
+  viennaClock,
   type RunTimesAnswer,
   type RunTimesState,
   type StationCalls,
@@ -341,9 +342,17 @@ describe("stopVerdict", () => {
     });
   });
 
-  it("passes through on a run between the calls, without a date while others stop", () => {
+  it("passes through on a run between the calls, naming the next that stops", () => {
     // Leaves 21:30: Handelskai 21:46, Floridsdorf 21:49, no call between.
+    // The notice's date would say nothing stops before 31.12.
     expect(stopVerdict(leaving("21:30"), undefined, UNTIL, neueDonau, evening)).toEqual({
+      skip: { until: null, next: new Date("2026-11-10T22:02:00+01:00") },
+    });
+  });
+
+  it("says no stop alone once the runs that call there are past", () => {
+    // Leaves 22:00: Handelskai 22:16, after the last call listed, 22:09.
+    expect(stopVerdict(leaving("22:00"), undefined, UNTIL, neueDonau, evening)).toEqual({
       skip: { until: null },
     });
   });
@@ -380,6 +389,12 @@ describe("stopVerdict", () => {
       minutes: 17,
       skip: null,
     });
+  });
+});
+
+describe("viennaClock", () => {
+  it("prints the Vienna time", () => {
+    expect(viennaClock(new Date("2026-11-10T21:02:00Z"))).toBe("22:02");
   });
 });
 

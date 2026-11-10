@@ -221,6 +221,9 @@ function departureMs(
 export interface StopSkip {
   /** When the stop is back, where a notice says so clearly. */
   until: Date | null;
+  /** When the next run of the line does call there, planned, where the
+   *  station's own departures show one. */
+  next?: Date;
 }
 
 /** The answer's entry for a stop as a skip, or null when it isn't one.
@@ -250,6 +253,11 @@ export interface StopVerdict {
  *  run's call lies a headway away, further than that. */
 const CALL_LEEWAY_MS = 60_000;
 
+/** "22:02", Vienna time, like the times on the trail. */
+export function viennaClock(at: Date): string {
+  return VIENNA_CLOCK.format(at);
+}
+
 /** Whether a departure calls at a station of its trail.
  *
  *  `minutes` is the run-time sample's for the station, `entry` its
@@ -260,8 +268,10 @@ const CALL_LEEWAY_MS = 60_000;
  *  tell (not fetched, the run outside the stretch they cover, no planned
  *  time), the sample decides, as it always did: a time if it has one.
  *
- *  "Until 31.12." stays off a "no stop" where some runs of the line do
- *  call there: it would read as no train stopping before then. */
+ *  A "no stop" names the next run of the line that does call there, where
+ *  the departures show one ("until 22:02"). The notice's date stays off
+ *  wherever some runs call there: "until 31.12." would read as no train
+ *  stopping before then. */
 export function stopVerdict(
   dep: Pick<DepartureAttr, "time_planned">,
   minutes: number | undefined,
@@ -275,18 +285,18 @@ export function stopVerdict(
   if (call === undefined) {
     return minutes === undefined ? { skip } : { minutes, skip: null };
   }
-  if (call === null) {
-    return { skip: calls?.calls.length ? { until: null } : skip };
-  }
-  return { minutes: minutes ?? call, skip: null };
+  if ("minutes" in call) return { minutes: minutes ?? call.minutes, skip: null };
+  if (call.next) return { skip: { until: null, next: call.next } };
+  return { skip: calls?.calls.length ? { until: null } : skip };
 }
 
-/** Minutes from here to the station for a run that calls there, null for
- *  one that goes through, undefined when the calls can't tell. */
+/** For a run that calls at the station, the minutes from here; for one
+ *  that goes through, the next call there after it, if any; undefined when
+ *  the calls can't tell. */
 function callingRun(
   dep: Pick<DepartureAttr, "time_planned">,
   calls: StationCalls | undefined,
-): number | null | undefined {
+): { minutes: number } | { next: Date | null } | undefined {
   if (!calls || !Array.isArray(calls.between) || !Array.isArray(calls.calls)) {
     return undefined;
   }
@@ -298,11 +308,13 @@ function callingRun(
   const earliest = planned + before * 60_000 - CALL_LEEWAY_MS;
   const latest = planned + after * 60_000 + CALL_LEEWAY_MS;
   if (earliest < from || latest > until) return undefined;
+  let next: number | null = null;
   for (const iso of calls.calls) {
     const at = Date.parse(iso);
-    if (at >= earliest && at <= latest) return (at - planned) / 60_000;
+    if (at >= earliest && at <= latest) return { minutes: (at - planned) / 60_000 };
+    if (at > latest && (next === null || at < next)) next = at;
   }
-  return null;
+  return { next: next === null ? null : new Date(next) };
 }
 
 const VIENNA_YEAR = new Intl.DateTimeFormat("en-GB", {

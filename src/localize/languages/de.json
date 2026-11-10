@@ -100,6 +100,7 @@
     "stop_time_late": "geplant {time}, {n} min später",
     "stop_skipped": "Kein Halt",
     "stop_skipped_until": "Kein Halt bis {date}",
+    "stop_skipped_until_time": "Kein Halt bis {time}",
     "dir_h": "Hinfahrt",
     "dir_r": "Rückfahrt",
     "dir_h_short": "H",

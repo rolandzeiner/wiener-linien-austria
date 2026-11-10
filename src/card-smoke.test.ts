@@ -1224,7 +1224,7 @@ describe("show_stop_times on a station the train goes through", () => {
       expect(stopTimes(el)).toEqual(["16:40", "16:42", "16:44"]);
     });
 
-    it("says no stop for a run that goes through, without the date", async () => {
+    it("says until when for a run that goes through, by the next that stops", async () => {
       const callWS = vi
         .fn()
         .mockResolvedValue(
@@ -1234,6 +1234,18 @@ describe("show_stop_times on a station the train goes through", () => {
       await openTrail(el);
 
       expect(skipped(el)).toEqual(["Neubaugasse"]);
+      expect(notes(el)).toEqual(["Kein Halt bis 16:50"]);
+    });
+
+    it("says no stop alone, without the date, once the runs that stop are past", async () => {
+      const callWS = vi
+        .fn()
+        .mockResolvedValue(
+          runTimesAnswer({ "U3|H": U3 }, noStop, station(["2026-09-09T16:20:00+02:00"])),
+        );
+      const el = await mountTimes(callWS);
+      await openTrail(el);
+
       expect(notes(el)).toEqual(["Kein Halt"]);
     });
   });

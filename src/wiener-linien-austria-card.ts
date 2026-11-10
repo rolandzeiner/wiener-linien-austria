@@ -61,6 +61,7 @@ import {
   skipUntilText,
   stopEta,
   stopVerdict,
+  viennaClock,
   type RunTimesAnswer,
   type RunTimesState,
   type StopEta,
@@ -2054,11 +2055,13 @@ export class WienerLinienAustriaCard extends LitElement {
       "transfers-expanded": transfersExpanded,
     };
     const skipLabel = skip
-      ? skip.until
-        ? this._t("stop_skipped_until", {
-            date: skipUntilText(skip.until, this._lang(), Date.now()),
-          })
-        : this._t("stop_skipped")
+      ? skip.next
+        ? this._t("stop_skipped_until_time", { time: viennaClock(skip.next) })
+        : skip.until
+          ? this._t("stop_skipped_until", {
+              date: skipUntilText(skip.until, this._lang(), Date.now()),
+            })
+          : this._t("stop_skipped")
       : "";
 
     const metroChips = inlineLines.length
