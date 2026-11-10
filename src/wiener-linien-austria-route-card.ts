@@ -677,13 +677,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   // Ad-hoc mode: the connection before or after
   // ------------------------------------------------------------------
 
+  /** Whether the plan on screen answers the question asked. Not while a
+   *  step is on its way, so a second click can't step again from the
+   *  connection it is about to replace, and not after an error. */
+  private _answered(): boolean {
+    return !!this._plan && this._planKey === this._queryKey();
+  }
+
   /** The connection "Früher" and "Später" step from: the one drawn as the
-   *  best, and only once it answers the question on screen. While a step
-   *  is on its way there is none, so a second click can't step again from
-   *  the connection it is about to replace. */
+   *  best, once the plan answers the question. None for an answer without
+   *  connections, which "Früher" can still retrace its way out of. */
   private _pageBase(): RouteTripAttr | undefined {
-    if (!this._plan || this._planKey !== this._queryKey()) return undefined;
-    return upcomingTrips(this._plan, this._now)[0];
+    return this._answered() ? upcomingTrips(this._plan!, this._now)[0] : undefined;
+  }
+
+  /** "Früher" has somewhere to go: a "Später" to retrace, or a connection
+   *  to find the one before of, unless the question is "Jetzt". */
+  private _canGoEarlier(): boolean {
+    if (!this._answered()) return false;
+    return this._pageHistory.length > 0 || (!!this._pageBase() && this._timeMode !== "now");
   }
 
   /** The next connection: depart from the minute after this one leaves.
@@ -699,17 +711,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   /** The connection before: back through the "Später" steps first, exactly
    *  as they were asked (back to "Jetzt" as well), then the one arriving
-   *  before this one does. Off for "Jetzt": what was earlier has left. */
+   *  before this one does. Off for "Jetzt": what was earlier has left.
+   *
+   *  Before the earlier of its timetable and live arrival: the planner
+   *  drops what arrives after the time asked, by its own live time, so a
+   *  train running early would otherwise come back as its own answer. */
   private _earlier = (): void => {
-    const best = this._pageBase();
-    if (!best || this._timeMode === "now") return;
+    if (!this._canGoEarlier()) return;
     const back = this._pageHistory.at(-1);
     if (back) {
       this._pageHistory = this._pageHistory.slice(0, -1);
       this._step(back.timeMode, back.when);
       return;
     }
-    const arrives = Date.parse(best.legs.at(-1)?.destination.planned ?? best.arrival ?? "");
+    const best = this._pageBase()!;
+    const arrives = Math.min(
+      ...[best.legs.at(-1)?.destination.planned, best.arrival]
+        .map((iso) => Date.parse(iso ?? ""))
+        .filter(Number.isFinite),
+    );
     if (!Number.isFinite(arrives)) return;
     this._step("arrive", viennaInputAt(arrives - 60_000));
   };
@@ -921,9 +941,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (this._stops === null || !this._from || !this._to || this._from === this._to) {
       return nothing;
     }
-    const base = this._pageBase();
-    const laterOff = !base;
-    const earlierOff = !base || this._timeMode === "now";
+    const laterOff = !this._pageBase();
+    const earlierOff = !this._canGoEarlier();
     return html`<div class="pager" role="group" aria-label=${this._t("page_legend")}>
       <button
         type="button"

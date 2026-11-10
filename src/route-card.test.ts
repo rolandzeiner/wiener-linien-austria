@@ -1558,6 +1558,50 @@ describe("earlier and later", () => {
     expect(field(el)?.value).toBe("2026-09-14T08:10");
   });
 
+  it("asks Früher before the live arrival when the train runs early", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const early = { ...LIVE_PLAN.trips[0]!, arrival: "2026-09-14T08:09:00+02:00" };
+    const { h, callWS } = adhocHass(async (msg: WsMessage & { datetime?: string }) => ({
+      ...LIVE_PLAN,
+      trips: [early, ...LIVE_PLAN.trips.slice(1)],
+      ...(msg.datetime ? { planned_for: `${msg.datetime}:00+02:00` } : {}),
+    }));
+    const el = await mount(h, {});
+    await settle(el);
+    await pickMode(el, 1);
+    pager(el)[0]!.click();
+    await el.updateComplete;
+    // Asked by the timetable's 08:11, the planner, which goes by the live
+    // 08:09, would answer with this very connection.
+    expect(planCalls(callWS).at(-1)).toMatchObject({
+      datetime: "2026-09-14T08:08",
+      arrive_by: true,
+    });
+  });
+
+  it("retraces Später out of an answer with no connection", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async (msg: WsMessage & { datetime?: string }) =>
+      msg.datetime
+        ? { ...LIVE_PLAN, trips: [], planned_for: `${msg.datetime}:00+02:00` }
+        : LIVE_PLAN,
+    );
+    const el = await mount(h, {});
+    await settle(el);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(text(el)).toContain("Keine Verbindung");
+    expect(inert(el)).toEqual([null, "true"]);
+    pager(el)[0]!.click();
+    await settle(el);
+    expect(planCalls(callWS).at(-1)).toEqual({
+      type: "wiener_linien_austria/plan",
+      origin: ORIGIN,
+      destination: DESTINATION,
+    });
+    expect(radios(el)[0]!.checked).toBe(true);
+  });
+
   it("starts the way back over once a time is set by hand", async () => {
     const { el, callWS } = await mountPlanned();
     pager(el)[1]!.click();
