@@ -51,6 +51,7 @@ from custom_components.wiener_linien_austria.static import (
     canonical_line_key,
     canonical_line_label,
     catalogue_is_stale,
+    direction_at_platform,
     stops_ahead_for_match,
 )
 from tests.conftest import make_response_cm
@@ -882,6 +883,95 @@ def test_stops_ahead_prefers_the_terminus_spelt_alike(
     result = stops_ahead_for_match(catalogue, "6", [399], towards)
 
     assert _names(result)[-1] == terminus
+
+
+@pytest.mark.parametrize(
+    ("rbl", "direction"),
+    [
+        (399, "H"),  # only Direction 1 patterns leave it
+        (403, None),  # a terminus every pattern ends at, never leaves from
+        (999, None),  # no route passes it
+    ],
+)
+def test_direction_at_platform(rbl: int, direction: str | None) -> None:
+    catalogue = _six_catalogue((1, _REGULAR), (2, (500, 501, 502)))
+
+    assert direction_at_platform(catalogue, "6", rbl) == direction
+
+
+def test_direction_at_platform_both_ways_says_nothing() -> None:
+    catalogue = _six_catalogue((1, _REGULAR))
+    assert catalogue.trip_patterns is not None
+    catalogue.trip_patterns.patterns_by_line[106].append(
+        TripPattern(106, 2, 2, (403, 402, 401, 400, 399))
+    )
+
+    # Left both ways; 399 only ends the reverse route, so it stays H.
+    assert direction_at_platform(catalogue, "6", 400) is None
+    assert direction_at_platform(catalogue, "6", 399) == "H"
+    assert direction_at_platform(catalogue, "9", 400) is None
+
+
+def _badner_bahn() -> StaticCatalogue:
+    """The Badner Bahn's names as the open data has them: two stations
+    called "Lokalbahn" and one "Bahnhof", the town in `municipality`."""
+    stations = {
+        1: Station(1, "Eichenstraße", "Wien", 16.34, 48.18, [427]),
+        2: Station(2, "Bahnhof", "Wiener Neudorf", 16.32, 48.08, [10]),
+        3: Station(3, "Lokalbahn", "Guntramsdorf", 16.31, 48.05, [11]),
+        4: Station(4, "Lokalbahn", "Traiskirchen", 16.29, 48.01, [12]),
+        5: Station(5, "Josefsplatz", "Baden bei Wien", 16.23, 48.01, [13]),
+        6: Station(6, "Berggasse", "Wien", 16.36, 48.22, [14]),
+        7: Station(7, "Berggasse", "Wien", 16.30, 48.15, [15]),
+        8: Station(8, "Bahnhof", "Wiener Neudorf", 16.32, 48.08, [16]),
+    }
+    index = TripPatternIndex(
+        patterns_by_line={399: [TripPattern(399, 1, 1, (427, 10, 11, 12, 13))]},
+        lines_by_label={"WLB": 399},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def test_stops_sharing_a_name_outside_vienna_carry_their_town() -> None:
+    catalogue = _badner_bahn()
+
+    assert catalogue.stop_label(3) == "Guntramsdorf Lokalbahn"
+    assert catalogue.stop_label(4) == "Traiskirchen Lokalbahn"
+    assert catalogue.stop_label(2) == "Wiener Neudorf Bahnhof"
+    # A name no other stop has, Vienna's own namesakes, and a stop of
+    # another catalogue row: as the open data spells them.
+    assert catalogue.stop_label(5) == "Josefsplatz"
+    assert catalogue.stop_label(6) == "Berggasse"
+    assert catalogue.stop_label(99) is None
+    assert catalogue.index_by_rbl()[11] == (3, "Guntramsdorf Lokalbahn")
+    # The stop picker keeps the open data's name.
+    assert catalogue.stations_by_diva[3].name == "Lokalbahn"
+
+
+def test_a_stop_added_after_the_catalogue_was_built_reads_by_its_name() -> None:
+    catalogue = _badner_bahn()
+    catalogue.stations_by_diva[50] = Station(
+        50, "Lokalbahn", "Möllersdorf", 16.3, 48.0, []
+    )
+
+    assert catalogue.stop_label(50) == "Lokalbahn"
+
+
+def test_the_trail_names_each_stop_and_ends_a_short_run_at_its_town() -> None:
+    catalogue = _badner_bahn()
+
+    full = stops_ahead_for_match(catalogue, "WLB", [427], "Baden Josefspl.")
+    short = stops_ahead_for_match(catalogue, "WLB", [427], "Wiener Neudorf")
+
+    assert _names(full) == [
+        "Wiener Neudorf Bahnhof",
+        "Guntramsdorf Lokalbahn",
+        "Traiskirchen Lokalbahn",
+        "Josefsplatz",
+    ]
+    assert _names(short) == ["Wiener Neudorf Bahnhof"]
 
 
 def test_stops_ahead_short_turn_truncates_tail_at_towards() -> None:

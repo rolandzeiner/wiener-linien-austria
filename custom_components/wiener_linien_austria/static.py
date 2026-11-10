@@ -344,7 +344,7 @@ class StaticCatalogue:
     stations_by_diva: dict[int, Station]
     last_fetched: str  # ISO 8601 UTC
     trip_patterns: TripPatternIndex | None = None
-    # Reverse index: RBL → (DIVA, station name). Built eagerly in
+    # Reverse index: RBL → (DIVA, stop label, see `stop_label`). Built eagerly in
     # `__post_init__` so concurrent first-access from two coroutines
     # can't both trigger a rebuild (lazy initialisation was a benign
     # but wasteful race). Survives every poll and only rebuilds when a
@@ -354,15 +354,33 @@ class StaticCatalogue:
     _rbl_index: dict[int, tuple[int, str]] = field(
         default_factory=dict, repr=False, compare=False
     )
+    _labels: dict[int, str] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Build the RBL→(DIVA, name) index once at construction."""
+        """Build the stop labels and the RBL→(DIVA, label) index once."""
+        if not self._labels:
+            self._labels = _stop_labels(self.stations_by_diva)
         if not self._rbl_index:
             self._rbl_index = {
-                rbl: (diva, station.name)
+                rbl: (diva, self._labels[diva])
                 for diva, station in self.stations_by_diva.items()
                 for rbl in station.rbls
             }
+
+    def stop_label(self, diva: int) -> str | None:
+        """A stop's name as trails, travel times and notices print it.
+
+        The station name, with its town in front where stops outside
+        Vienna share a name: the Badner Bahn passes four stations called
+        just "Lokalbahn" in the open data (Neu-Guntramsdorf, Guntramsdorf,
+        Möllersdorf, Traiskirchen) and two called "Bahnhof", and the
+        timetable names them "Traiskirchen Lokalbahn" and "Wiener
+        Neudorf". The stop picker and entity names keep `Station.name`.
+        """
+        label = self._labels.get(diva)
+        if label is None and (station := self.stations_by_diva.get(diva)):
+            return station.name
+        return label
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
         """Return stations whose name contains the query (case-insensitive)."""
@@ -377,8 +395,29 @@ class StaticCatalogue:
         return results[:limit]
 
     def index_by_rbl(self) -> dict[int, tuple[int, str]]:
-        """Return the eager RBL → (DIVA, station name) reverse index."""
+        """Return the eager RBL → (DIVA, stop label) reverse index."""
         return self._rbl_index
+
+
+def _stop_labels(stations: Mapping[int, Station]) -> dict[int, str]:
+    """DIVA → `StaticCatalogue.stop_label`."""
+    uses: dict[str, int] = {}
+    for station in stations.values():
+        uses[station.name] = uses.get(station.name, 0) + 1
+    labels: dict[int, str] = {}
+    for diva, station in stations.items():
+        town = station.municipality
+        shared = uses[station.name] > 1
+        if (
+            shared
+            and town
+            and town != "Wien"
+            and town.casefold() not in station.name.casefold()
+        ):
+            labels[diva] = f"{town} {station.name}"
+        else:
+            labels[diva] = station.name
+    return labels
 
 
 # What `async_get_catalogue` can raise when neither the cache nor the network
@@ -1401,6 +1440,42 @@ def _terminus_key(name: str) -> str:
     """
     key = name.casefold().replace("straße", "str").replace("str.", "str")
     return _TERMINUS_SEPARATORS.sub(" ", key).strip()
+
+
+def direction_at_platform(
+    catalogue: StaticCatalogue,
+    line_label: str,
+    rbl: int,
+    line_id: int | None = None,
+) -> str | None:
+    """The one direction ("H" or "R") a line's routes leave a platform in.
+
+    None when its routes pass the platform both ways (a terminus loop, a
+    single-track section) or none passes it. A live row's direction code
+    can contradict it: the Badner Bahn's live rows carry H on the
+    platform its Oper-bound trains use and R on the Baden-bound one, the
+    reverse of its route data and timetable (1,237 live rows at 173
+    platforms on 2026-11-10: every contradiction was one of those). The
+    platform is where the train is, so the trail goes by it.
+    """
+    patterns = catalogue.trip_patterns
+    if patterns is None:
+        return None
+    resolved = line_id if line_id in patterns.patterns_by_line else None
+    if resolved is None:
+        resolved = patterns.lines_by_label.get(line_label)
+    if resolved is None:
+        return None
+    directions = {
+        pattern.direction
+        for pattern in patterns.patterns_by_line.get(resolved, ())
+        if rbl in pattern.stops[:-1]
+    }
+    if directions == {1}:
+        return "H"
+    if directions == {2}:
+        return "R"
+    return None
 
 
 def _shared_route(

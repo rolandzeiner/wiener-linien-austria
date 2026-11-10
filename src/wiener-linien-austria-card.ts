@@ -1469,7 +1469,10 @@ export class WienerLinienAustriaCard extends LitElement {
     if (!this._config!.show_stop_times) return null;
     const attrs = this.hass?.states[entityId]?.attributes as WienerLinienAttrs | undefined;
     const diva = attrs?.diva;
-    const { line, direction } = dep;
+    const { line } = dep;
+    // The route's direction where the feed's code contradicts the platform:
+    // the run times are keyed by the timetable's.
+    const direction = dep.route_direction ?? dep.direction;
     if (typeof diva !== "number" || !line) return null;
     // The command takes the two direction codes /monitor uses and nothing else.
     if (direction !== "H" && direction !== "R") return null;

@@ -262,6 +262,10 @@ export interface DepartureAttr {
   // Optional per-departure list of upcoming stops on this trip. Absent
   // (or empty) means "no panel" — the row renders without a chevron.
   stops_ahead?: StopAheadAttr[];
+  /** The direction the route data has this row's platform in, present only
+   *  where the feed's `direction` says otherwise (the Badner Bahn's live
+   *  rows). The trail follows it, and travel times are asked for by it. */
+  route_direction?: "H" | "R";
   /** A planned S-Bahn row from the timetable, not a live `/monitor` row.
    *  Absent on live rows. Its countdown runs off the planned time, so the
    *  cards mark it rather than let it pass for live. */

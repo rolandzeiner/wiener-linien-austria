@@ -347,16 +347,17 @@ async def _websocket_run_times(
         )
         return
 
-    # Keyed by station name, the one thing a trail entry carries. Both
-    # sides read it from the same catalogue row, so the join is exact; a
-    # DIVA the catalogue doesn't know has no trail entry to join either.
+    # Keyed by stop label (`StaticCatalogue.stop_label`), the one thing a
+    # trail entry carries. Both sides read it from the same catalogue row,
+    # so the join is exact; a DIVA the catalogue doesn't know has no trail
+    # entry to join either.
     run_times: dict[str, dict[str, float]] = {}
     for (label, way), minutes_by_diva in answer.pairs.items():
         named: dict[str, float] = {}
         for stop_diva, minutes in minutes_by_diva.items():
-            station = catalogue.stations_by_diva.get(stop_diva)
-            if station is not None:
-                named.setdefault(station.name, minutes)
+            stop = catalogue.stop_label(stop_diva)
+            if stop is not None:
+                named.setdefault(stop, minutes)
         # A stop the timetable knows by an id the catalogue lacks.
         for name, minutes in stand_ins(
             catalogue, diva, label, way, minutes_by_diva

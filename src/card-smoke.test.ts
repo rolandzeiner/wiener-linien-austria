@@ -1087,6 +1087,24 @@ describe("show_stop_times", () => {
     expect(time?.getAttribute("title")).toBe("Voraussichtliche Ankunft 16:40");
   });
 
+  it("asks by the route's direction where the feed's code contradicts the platform", async () => {
+    // The Badner Bahn's live rows: H on the platform its trains leave R from.
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|R": U3 }));
+    const hass = timesHass(callWS);
+    (
+      hass.states[ENTITY]!.attributes as { departures: Array<{ route_direction?: string }> }
+    ).departures[0]!.route_direction = "R";
+    const el = await mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_stop_times: true,
+    });
+    await openTrail(el);
+
+    expect(callWS).toHaveBeenCalledWith(expect.objectContaining({ direction: "R" }));
+    expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
+  });
+
   it("answers later renders and reopened trails from what it holds", async () => {
     const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
     const el = await mountTimes(callWS);
