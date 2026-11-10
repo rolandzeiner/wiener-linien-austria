@@ -1252,7 +1252,7 @@ describe("show_stop_times on a station the train goes through", () => {
       await openTrail(el);
 
       expect(skipped(el)).toEqual(["Neubaugasse"]);
-      expect(notes(el)).toEqual(["Kein Halt bis 16:50"]);
+      expect(notes(el)).toEqual(["Kein Halt bis 16:50 Uhr"]);
     });
 
     it("says no stop alone, without the date, once the runs that stop are past", async () => {

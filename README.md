@@ -603,7 +603,7 @@ The trail lists the stations of the line's route, and the timetable lists only t
 
 Works don't always close a station all day. U6 Neue Donau towards Floridsdorf was shut by day in late 2026 but served on some weeknights from 22:00, when the line ran single-track; the timetable said which nights, week by week. Travel times fetched once a week can't tell one departure from the next, so for such a station the card asks for that station's own next 200 departures, a few kilobytes, and decides per departure. A train of the line leaving there between the calls either side means a stop, and the trail shows its time. If there isn't one, it reads "Kein Halt". If those departures can't be fetched, or don't reach as far as the departure, the travel times decide as before.
 
-Where a later train of the line does stop there, "Kein Halt" says when: "Kein Halt bis 22:02". Notice texts can't give this. They say "fallweise ab 22:00" in prose and not which nights; the timetable says which train.
+Where a later train of the line does stop there, "Kein Halt" says when: "Kein Halt bis 22:02 Uhr". Notice texts can't give this. They say "fallweise ab 22:00" in prose and not which nights; the timetable says which train.
 
 Where no train of the line stops there in the time those departures cover, "Kein Halt" carries the date the stop is back. That needs exactly one notice in force that names that platform and that line, without naming the stations either side, and gives a real end. Open-ended notices end at 11:11 on some date years away, and those don't count. While other trains of the line do stop there, the date is left off, so it doesn't read as no train stopping before then.
 
