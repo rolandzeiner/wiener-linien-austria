@@ -195,7 +195,7 @@ When the timetable has a matching trip, `stops_ahead` lists the stops down to th
 
 ### Departure data stale
 
-Turns on when the board stops being refreshed: a poll failed, or the last `serverTime` is older than three polling intervals. Its attributes give the reason: `server_time`, `seconds_since_server_time`, `stale_after_seconds` and `last_update_success`.
+Turns on when the board stops being refreshed: a poll failed, or the last `serverTime` is older than three polling intervals. Its attributes give the reason: `last_update_success` and `stale_after_seconds`. The time of the last answer is the departure sensor's `server_time` attribute.
 
 Use it in place of the departure sensor's availability. The departure sensor stays available through a short outage so your cards keep the last board instead of going blank, which means `is_state(..., 'unavailable')` and `availability_template` never fire for it.
 

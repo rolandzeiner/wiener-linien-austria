@@ -94,6 +94,10 @@ class WienerLinienStopSensor(
             "lines_at_stop",
             "tracked_lines",
             "tracked_line_keys",
+            # Changes on every poll. Recorded, it made each state row carry
+            # a unique attributes row (~1,400 a day per stop, 2026-11-11);
+            # excluded, the rows share one. The card reads it live.
+            "server_time",
         }
     )
 
