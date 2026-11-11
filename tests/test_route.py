@@ -70,6 +70,7 @@ from custom_components.wiener_linien_austria.routing import (
     RoutingError,
     parse_trip_body,
 )
+from custom_components.wiener_linien_austria.sensor import WienerLinienRouteSensor
 from custom_components.wiener_linien_austria.static import (
     CATALOGUE_KEY,
     StaticCatalogue,
@@ -182,6 +183,9 @@ async def test_sensors_name_the_next_connection_not_one_that_left(
     assert hass.states.get(risk).attributes["risk"] == ahead.risk
     # The card filters the list itself and still gets all of it.
     assert len(state.attributes["trips"]) == 4
+    # Live, but kept out of history: it moves on every refresh.
+    assert "fetched_at" in state.attributes
+    assert "fetched_at" in WienerLinienRouteSensor._unrecorded_attributes
 
     # A live-time update writes the state too, with no refresh in between.
     # Ahead reaches 30 s past the departure, as on the card.

@@ -372,7 +372,17 @@ class WienerLinienRouteSensor(
     _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _unrecorded_attributes = frozenset(
-        {"trips", "line_colors", "traffic_info", "elevator_info", "last_connection"}
+        {
+            "trips",
+            "line_colors",
+            "traffic_info",
+            "elevator_info",
+            "last_connection",
+            # Changes on every refresh even when the connection does not, so
+            # recorded it gave each row its own attributes row (~10k in 30
+            # days on the live box, 2026-11-11). Nothing reads it from history.
+            "fetched_at",
+        }
     )
 
     def __init__(
