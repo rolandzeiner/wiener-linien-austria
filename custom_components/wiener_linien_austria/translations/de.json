@@ -276,7 +276,7 @@
   "services": {
     "plan_trip": {
       "name": "Fahrt planen",
-      "description": "Sucht Fahrten für eine eingerichtete Verbindung oder zwischen zwei Haltestellen, die früheste zuerst.",
+      "description": "Sucht Fahrten für eine eingerichtete Verbindung oder zwischen zwei Haltestellen, die beste zuerst.",
       "fields": {
         "config_entry_id": {
           "name": "Verbindung",

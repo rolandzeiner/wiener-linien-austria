@@ -276,7 +276,7 @@
   "services": {
     "plan_trip": {
       "name": "Plan trip",
-      "description": "Finds trips for a configured route or between two stops, soonest first.",
+      "description": "Finds trips for a configured route or between two stops, best first.",
       "fields": {
         "config_entry_id": {
           "name": "Route",
