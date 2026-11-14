@@ -401,7 +401,7 @@ async def _websocket_run_times(
 class _Works:
     """The stations a stop's trails pass without a call, as the card gets them."""
 
-    # "U6|H" → station → ISO date the stop is back, or None.
+    # "U6|H" → station → when the stop is back (ISO datetime), or None.
     no_stop: dict[str, dict[str, str | None]] = field(default_factory=dict)
     # "U6|H" → station → which runs call there after all.
     calling: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)

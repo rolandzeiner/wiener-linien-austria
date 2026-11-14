@@ -474,9 +474,9 @@ async def async_fetch_trip_body(
     """GET one request from the routing server and return the decoded JSON body.
 
     A trip request by default; timetable.py passes the departure-monitor
-    endpoint, which answers in the same envelope. Raises `RoutingError` for every failure so callers map one exception
-    type onto their own surface (UpdateFailed for the coordinator,
-    HomeAssistantError for the action).
+    endpoint, which answers in the same envelope. Raises `RoutingError` for
+    every failure so callers map one exception type onto their own surface
+    (UpdateFailed for the coordinator, HomeAssistantError for the action).
     """
     try:
         return await fetch_routing(

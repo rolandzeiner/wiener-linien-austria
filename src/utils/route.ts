@@ -137,7 +137,7 @@ export function clockOf(iso: string | null | undefined): string {
   return match?.[1] ?? "";
 }
 
-/** The connections still ahead, soonest first. The sensor already ranks
+/** The connections still ahead, best first. The sensor already ranks
  *  them; this only drops the ones that have left since its last refresh.
  *  A plan for a chosen time (`planned_for`) keeps them all: that is what
  *  was asked for, whatever the clock says now. */

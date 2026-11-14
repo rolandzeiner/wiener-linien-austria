@@ -350,7 +350,7 @@ class StaticCatalogue:
     # can't both trigger a rebuild (lazy initialisation was a benign
     # but wasteful race). Survives every poll and only rebuilds when a
     # new catalogue is fetched (which replaces the whole instance).
-    # Tens of thousands of `_diva_for_rbl` / `_station_name_for_rbl`
+    # Tens of thousands of `_diva_for_rbl` / `_trail_name_for_rbl`
     # calls per coordinator tick collapse to dict lookups.
     _rbl_index: dict[int, tuple[int, str]] = field(
         default_factory=dict, repr=False, compare=False
@@ -1299,8 +1299,8 @@ def stops_ahead_for_match(
     Linien convention: H=1, R=2) BEFORE the RBL-containment match. Without
     this filter, an entry that tracks both platforms at one DIVA (e.g.
     Taubstummengasse RBLs [4107 north, 4122 south]) would match patterns
-    in both directions and the longest-tail tiebreaker could pick the
-    wrong one for branching termini.
+    in both directions and the route picked among them (`_shared_route`)
+    could be the wrong one for branching termini.
 
     Returns None when no pattern matched (unknown line, replacement service,
     short-turn variant not in the schedule), an empty list when the matched

@@ -194,7 +194,7 @@ class WienerLinienStaleBinarySensor(
         Cadence is the entry's own scan interval, so the worst-case
         detection lag is one interval past the threshold. Writes happen
         only on a transition: writing unconditionally would refresh
-        `last_updated` every interval, forever, on an entity whose whole
+        `last_reported` every interval, forever, on an entity whose whole
         point is to be boring.
         """
         await super().async_added_to_hass()

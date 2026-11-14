@@ -454,7 +454,7 @@ async def test_a_connection_that_left_does_not_time_the_rollover(
     pinned_spread: None,
 ) -> None:
     # 07:57:30: the 07:57 connection left 30 s ago but is still in the list
-    # (rank_trips keeps it for a minute). The refresh waits for the 08:00 one
+    # (usable_trips keeps it for a minute). The refresh waits for the 08:00 one
     # rather than coming back in 60 s, which doubled the trip requests on a
     # frequent line.
     freezer.move_to("2026-09-14 05:57:30+00:00")

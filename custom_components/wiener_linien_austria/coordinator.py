@@ -709,7 +709,7 @@ def _parse_monitor_body(
     # (older payloads, hand-built test fixtures) falls through to
     # include-all.
     rbl_filter: set[int] | None = set(entry_rbls) if entry_rbls else None
-    # One departure per platform, line, terminus and planned minute: the
+    # One departure per platform, line, terminus and planned time: the
     # Badner Bahn's feed lists each Oper-bound train twice at a platform,
     # live and as a timetable-only row. The live one stays.
     seen: dict[tuple[int, str, str, str], int] = {}

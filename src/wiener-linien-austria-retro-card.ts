@@ -580,9 +580,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
   };
 
-  /** Scroll duration in seconds — proportional to message length so the
-   *  reading pace stays roughly constant. Clamped so a one-word message
-   *  still lingers and a maxed-out 160-char message doesn't crawl. */
   /** Move the marquee one LED column per step instead of gliding at
    *  sub-pixel positions, which reads as a web marquee and makes the
    *  letters shimmer under Pixel's dot mask. The custom property goes on
@@ -597,6 +594,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     if (steps !== null) panel.style.setProperty("--ticker-steps", `steps(${steps}, end)`);
   }
 
+  /** Scroll duration in seconds — proportional to message length so the
+   *  reading pace stays roughly constant. Clamped so a one-word message
+   *  still lingers and a maxed-out 160-char message doesn't crawl. */
   private _tickerDurationSeconds(text: string): number {
     return Math.min(40, Math.max(8, 5 + text.length * 0.18));
   }

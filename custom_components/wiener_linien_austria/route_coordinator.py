@@ -446,9 +446,9 @@ async def async_plan_trips(
     for the same query. `planned` marks a query for a time the caller chose
     rather than "now": its connections are kept even when they left
     already. An arrive-by query loses what arrives after `when`, a planned
-    leave-at query what leaves before it (`usable_trips`). Comparing the rest waits for live times
-    (live.async_live_trips). Tests patch the fetch at
-    `route_coordinator.async_fetch_trip_body`.
+    leave-at query what leaves before it (`usable_trips`). Comparing the
+    rest waits for live times (live.async_live_trips). Tests patch the
+    fetch at `route_coordinator.async_fetch_trip_body`.
     """
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),
