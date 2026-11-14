@@ -57,11 +57,44 @@ Could add, all in requests the integration already makes:
   `I20261114-0026-F01` and carries `parentName` `I20261114-0026`; the
   first message has both equal. Check whether the list ever holds a
   message and its follow-up at once, and if so show one disruption once.
-- [ ] **A structured cause: `reasonName`, `alertCause`.** On all 32
-  notices, e.g. "Rettungseinsatz" / "emergency medical services"; lift and
-  escalator notices have "undefined". Could pick an icon or a filter in
-  place of reading the title. Collect the values over a week first. The
-  documentation spells one field `alterCause`; the API sends `alertCause`.
+- [ ] **A structured cause: `reasonName`, `alertCause`.** Each notice
+  carries a coarse English category (`alertCauseId` / `alertCause`) and
+  Wiener Linien's own finer German reason (`reasonId` / `reasonName`).
+  Could pick an icon or a filter in place of reading the title. The
+  documentation spells one field `alterCause`; the API sends `alertCause`,
+  and gives no list of values. See the table below for what was seen.
+
+  Seen on 14.11.2026 in two `/trafficInfoList` requests and one
+  `/newsList` (about 240 notices): 7 categories and 10 reasons. The ids
+  run to 258, so this is a small part of the list; collect them for a few
+  weeks before fixing a mapping. Icon names checked against MDI 7.4.47,
+  the set Home Assistant ships.
+
+  | `alertCauseId` | `alertCause` | `reasonId` | `reasonName` | Seen in | Icon |
+  |---|---|---|---|---|---|
+  | 14 | emergency medical services | 9 | Rettungseinsatz | disruptions | `mdi:ambulance` |
+  | 77 | accident | 12 | Verkehrsunfall | disruptions | `mdi:car-emergency` |
+  | 77 | accident | 13 | Fremder Verkehrsunfall | disruptions | `mdi:car-emergency` |
+  | 71 | vehicle on the line | 25 | Falschparker | disruptions | `mdi:tow-truck` (or `mdi:car-off`) |
+  | 45 | construction work | 21 | Bauarbeiten | disruptions (documentation), news | `mdi:traffic-cone` |
+  | 45 | construction work | 27 | Gleisbauarbeiten | disruptions, news | `mdi:traffic-cone` (or `mdi:excavator`) |
+  | 120 | special event | 35 | Veranstaltung | news | `mdi:calendar-star` |
+  | 0 | unknown | 223 | Haltestellenverlegung | news | `mdi:bus-stop` |
+  | 255 | undefined alert cause | 258 | Netzänderung | news | `mdi:transit-detour` |
+  | 255 | undefined alert cause | 0 | undefined | every lift, escalator and `stoerungkurz` notice, some disruptions, most news | none: keep today's icon |
+
+  Things to settle:
+  - Map by `reasonId`, with `alertCauseId` as the fallback for a reason
+    not in the table. Two rows show why: Haltestellenverlegung and
+    Netzänderung have a reason but "unknown" / "undefined" as category.
+  - An id not in the table, and 255 / 0, keep the icon the card uses
+    today (`mdi:alert-outline` and its relatives), so a new value never
+    leaves a notice without one.
+  - Whether the ids are stable. Only the pairs above were seen; nothing
+    says the numbers won't move between releases, so key on the id and
+    keep the name in a comment and a test fixture.
+  - The cards read `/trafficInfoList` only. The three news-only rows
+    matter once `/newsList` texts are shown beyond the works notices.
 - [ ] **`elevatorId`.** On lift notices, e.g. "JS 02". A stable id per
   lift, if `elevator_info` ever needs to tell two lifts of a station apart.
 - [ ] **The `/version` endpoint.** Gives the current version, its history
