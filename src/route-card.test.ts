@@ -1653,7 +1653,7 @@ describe("earlier and later", () => {
     expect(inert(el)).toEqual([null, "true"]);
   });
 
-  it("explains the rule in place of the stale note, and under a refusal", async () => {
+  it("explains the rule beside the stale note, and under a refusal", async () => {
     const { el } = await mountBudget([
       { requests_left: 1, requests_next_in: 30 },
       { requests_left: 0, requests_next_in: 45, stale: true },
@@ -1661,7 +1661,9 @@ describe("earlier and later", () => {
     pager(el)[1]!.click();
     await settle(el);
     expect(why(el)).toBe(WHY);
-    expect(text(el)).not.toContain("etwas älterer Stand");
+    // The rule is in a closed toggletip, so the note still has to say that
+    // the plan on screen is an older one.
+    expect(root(el).querySelector(".stale-note")?.textContent).toContain("etwas älterer Stand");
 
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h } = adhocHass(async () => {

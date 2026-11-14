@@ -293,7 +293,7 @@ if(super(e),e.type!==Pe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
             <ha-icon icon="mdi:pause-circle-outline" aria-hidden="true"></ha-icon>
             <span>${this._t(`adhoc_paused`)}</span>
             <button type="button" @click=${this._onCardActivity}>${this._t(`adhoc_resume`)}</button>
-          </div>`:k,r=this._plan;if(!r)return this._phase===`paused`?D`${t}${n}`:D`${t}${this._empty(`mdi:timer-sand`,this._t(`adhoc_loading`),void 0,!1)}`;let i=r.stale&&this._phase!==`paused`&&!this._budgetWhy()?D`<p class="stale-note">
+          </div>`:k,r=this._plan;if(!r)return this._phase===`paused`?D`${t}${n}`:D`${t}${this._empty(`mdi:timer-sand`,this._t(`adhoc_loading`),void 0,!1)}`;let i=r.stale&&this._phase!==`paused`?D`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
             <span>${this._t(`adhoc_stale`)}</span>
           </p>`:k,a=H(r,this._now);return a[0]?D`${t}${n}${i}${this._renderTrips(a,r,e)}`:D`${t}${n}${i}${this._empty(`mdi:timetable`,this._t(`adhoc_no_trips`),this._t(`adhoc_no_trips_detail`),!1)}`}_renderBody(e,t,n){if(t===void 0)return D`<ha-alert alert-type="warning"

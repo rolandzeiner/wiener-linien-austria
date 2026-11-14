@@ -878,9 +878,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return next > 0 ? `${count}, ${this._t("page_refill_in", { s: next })}` : count;
   }
 
-  /** The rule behind the note, and why there is one, under the steps while
-   *  the note shows and under a refusal for the budget. Empty without the
-   *  rule from the backend. */
+  /** The rule behind the note, and why there is one: the text of the ⓘ's
+   *  toggletip, offered while the note shows and under a refusal for the
+   *  budget. Empty without the rule from the backend. */
   private _budgetWhy(): string {
     const max = this._requestsMax;
     const refill = this._requestsRefillS;
@@ -1317,10 +1317,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : html`${back}${this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false)}`;
     }
     // Budget spent: the plan on screen is older than usual. The header's
-    // "Zuletzt aktualisiert" already says how old; this says why, unless the
-    // line under the steps already does.
+    // "Zuletzt aktualisiert" already says how old; this says why. The pager's
+    // countdown says when the next request can go out, not that the plan
+    // shown is an older one, and the rule sits in a closed toggletip.
     const stale =
-      plan.stale && this._phase !== "paused" && !this._budgetWhy()
+      plan.stale && this._phase !== "paused"
         ? html`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
             <span>${this._t("adhoc_stale")}</span>
