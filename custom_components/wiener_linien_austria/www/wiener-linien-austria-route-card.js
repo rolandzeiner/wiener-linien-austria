@@ -296,7 +296,7 @@ if(super(e),e.type!==Pe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
           </div>`:k,r=this._plan;if(!r)return this._phase===`paused`?D`${t}${n}`:D`${t}${this._empty(`mdi:timer-sand`,this._t(`adhoc_loading`),void 0,!1)}`;let i=r.stale&&this._phase!==`paused`?D`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
             <span>${this._staleNote(r)}</span>
-          </p>`:k,a=H(r,this._now);return a[0]?D`${t}${n}${i}${this._renderTrips(a,r,e)}`:D`${t}${n}${i}${this._empty(`mdi:timetable`,this._t(`adhoc_no_trips`),this._t(`adhoc_no_trips_detail`),!1)}`}_renderBody(e,t,n){if(t===void 0)return D`<ha-alert alert-type="warning"
+          </p>`:k,a=H(r,this._now);return a[0]?D`${t}${n}${i}${this._renderTrips(a,r,e)}`:this._phase===`paused`?D`${t}${n}`:D`${t}${n}${i}${this._empty(`mdi:timetable`,this._t(`adhoc_no_trips`),this._t(`adhoc_no_trips_detail`),!1)}`}_renderBody(e,t,n){if(t===void 0)return D`<ha-alert alert-type="warning"
         >${this._t(`entity_missing`,{entity:e.entity})}</ha-alert
       >`;if(!z(this.hass).includes(e.entity)&&t!==`unavailable`)return this._empty(`mdi:swap-horizontal`,this._t(`not_a_route`));if(t===`unavailable`)return this._empty(`mdi:cloud-off-outline`,this._t(`unavailable`),this._t(`unavailable_detail`));if(n.active===!1){let e=[Mt(n.active_window,this._lang),At(n.active_window)].filter(Boolean).join(` `);return this._empty(`mdi:sleep`,this._t(`inactive`),e?this._t(`inactive_detail`,{when:e}):void 0)}let r=H(n,this._now);return r[0]?this._renderTrips(r,n,e):this._empty(`mdi:timetable`,this._t(`no_trips`),this._t(`no_trips_detail`))}_renderTrips(e,t,n){let r=e[0],i=e.slice(1,1+n.alternatives);return D`
       ${this._renderHero(r,t)}

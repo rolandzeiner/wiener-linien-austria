@@ -1342,6 +1342,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : nothing;
     const trips = upcomingTrips(plan, this._now);
     if (!trips[0]) {
+      // Paused, the plan isn't refreshed while its connections go on
+      // leaving. Once the last has, "none found, try another stop" would be
+      // false: the card stopped asking. The banner is the whole story.
+      if (this._phase === "paused") return html`${back}${paused}`;
       return html`${back}${paused}${stale}${this._empty(
         "mdi:timetable",
         this._t("adhoc_no_trips"),

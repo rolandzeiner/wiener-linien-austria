@@ -1309,6 +1309,18 @@ describe("ad-hoc mode", () => {
     }
   });
 
+  it("says only that it is paused once the paused plan's connections have left", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    // Paused at 08:22; the last connection of the plan left at 08:03.
+    await settle(el, 32 * 60_000);
+    expect(text(el)).toContain("Aktualisierung pausiert");
+    expect(text(el)).not.toContain("Keine Verbindung gefunden");
+    expect(text(el)).not.toContain("Probier eine andere Haltestelle");
+  });
+
   it("stops every timer once removed", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h, callWS } = adhocHass();
