@@ -155,6 +155,14 @@ function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
   return fmt;
 }
 
+/** One lift or escalator outage as the card lists it. `planned` is when an
+ *  outage only announced begins, null for one that is out now. */
+interface OutageRow {
+  info: ElevatorInfoAttr;
+  kind: "elevator" | "escalator";
+  planned: number | null;
+}
+
 /** Icon and label for a broken escalator, by the way it runs. MDI has no
  *  crossed-out escalator, so the direction is the icon: an escalator that
  *  no longer carries people up matters more than one that no longer
@@ -958,14 +966,7 @@ export class WienerLinienAustriaCard extends LitElement {
       accessibility_only: this._config!.accessibility_only,
     });
 
-    const realElevator = Array.isArray(attrs.elevator_info) ? attrs.elevator_info : [];
-    const debugElevator = this._debugElevator.filter((e) => e.__debug_entity === stopCfg.entity);
-    const elevatorInfos: ElevatorInfoAttr[] = [...realElevator, ...debugElevator];
-    const showElevator = this._config!.show_elevator_info && elevatorInfos.length > 0;
-    const realEscalator = Array.isArray(attrs.escalator_info) ? attrs.escalator_info : [];
-    const debugEscalator = this._debugEscalator.filter((e) => e.__debug_entity === stopCfg.entity);
-    const escalatorInfos: ElevatorInfoAttr[] = [...realEscalator, ...debugEscalator];
-    const showEscalator = this._config!.show_escalator_info && escalatorInfos.length > 0;
+    const outages = this._outagesFor(stopCfg, attrs);
 
     const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     // Phone-first QR target: geo: URI hands off to the user's default
@@ -1054,14 +1055,7 @@ export class WienerLinienAustriaCard extends LitElement {
             ? this._renderStopHero(stopCfg, heroGroup, heroValue, heroUnit)
             : nothing
         }
-        ${
-          showElevator || showEscalator
-            ? this._renderOutages(
-                showElevator ? elevatorInfos : [],
-                showEscalator ? escalatorInfos : [],
-              )
-            : nothing
-        }
+        ${outages.length ? this._renderOutages(outages) : nothing}
         ${
           this._config!.show_departures && this._config!.max_departures > 0
             ? rows.length
@@ -1134,55 +1128,56 @@ export class WienerLinienAustriaCard extends LitElement {
     </div>`;
   }
 
-  /** Lift and escalator outages in one list: what is out now first, then
-   *  what is only announced, soonest first. Lifts lead within each, since
-   *  for someone who needs one there is no way round. */
-  private _renderOutages(
-    lifts: ElevatorInfoAttr[],
-    escalators: ElevatorInfoAttr[],
-  ): TemplateResult {
+  /** The lift and escalator outages a stop shows, each kind only with its
+   *  switch on: what is out now first, then what is only announced, soonest
+   *  first. Lifts lead within each, since for someone who needs one there
+   *  is no way round. */
+  private _outagesFor(stopCfg: NormalisedModernStop, attrs: WienerLinienAttrs): OutageRow[] {
+    const cfg = this._config!;
     const now = Date.now();
+    const own = (
+      real: ElevatorInfoAttr[] | undefined,
+      debug: Array<ElevatorInfoAttr & { __debug_entity?: string }>,
+      kind: OutageRow["kind"],
+    ): OutageRow[] =>
+      [
+        ...(Array.isArray(real) ? real : []),
+        ...debug.filter((e) => e.__debug_entity === stopCfg.entity),
+      ].map((info) => ({ info, kind, planned: upcomingStart(info.time_start, now) }));
     const rows = [
-      ...lifts.map((info) => ({ info, kind: "elevator" as const })),
-      ...escalators.map((info) => ({ info, kind: "escalator" as const })),
-    ].map((row) => ({ ...row, startsAt: upcomingStart(row.info.time_start, now) }));
+      ...(cfg.show_elevator_info ? own(attrs.elevator_info, this._debugElevator, "elevator") : []),
+      ...(cfg.show_escalator_info
+        ? own(attrs.escalator_info, this._debugEscalator, "escalator")
+        : []),
+    ];
     // Array.prototype.sort is stable, so lifts stay ahead of escalators.
-    rows.sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0));
+    rows.sort((a, b) => (a.planned ?? 0) - (b.planned ?? 0));
+    return rows;
+  }
+
+  private _renderOutages(rows: OutageRow[]): TemplateResult {
     return html`
       <div class="alert-list">
-        ${rows.map((row) => this._renderOutage(row.info, row.kind, row.startsAt !== null))}
+        ${rows.map((row) => this._renderOutage(row))}
       </div>
     `;
   }
 
-  private _renderOutage(
-    e: ElevatorInfoAttr,
-    kind: "elevator" | "escalator",
-    planned: boolean,
-  ): TemplateResult {
+  private _renderOutage({ info: e, kind, planned }: OutageRow): TemplateResult {
     const location = e.description || e.station || "";
     // An escalator's text is a sentence, not a path: the direction it runs
     // in is the part that matters, so it leads as the icon and the label.
     const escalator = kind === "escalator" ? parseEscalatorNotice(location) : null;
-    // The lift feed writes the location as a path through the station;
-    // showing the segments separately makes "which lift is this" answerable
-    // at a glance. Falls back to a single segment when there's no separator.
-    const path = escalator ? [] : splitLocationPath(location);
     const look = escalator ? ESCALATOR_LOOK[escalator.direction ?? "unknown"] : null;
     const kindLabel = look ? this._t(look.label) : "";
-    const icon = look ? look.icon : "mdi:elevator-passenger-off";
-    const notes = escalator?.notes ?? [];
-    const reason = e.reason || "";
-    const reasonIcon = iconForElevatorReason(reason);
-    const from = planned ? formatTime(e.time_start, this._lang()) : "";
-    const until = formatTime(e.time_end, this._lang());
-    const hasDetail = Boolean(reason || until || notes.length);
+    const detail = this._renderOutageDetail(e, escalator?.notes ?? []);
+    const hasDetail = detail !== nothing;
     const key = `${kind}:${e.name}`;
     const expanded = this._expandedElevator.has(key);
     const classes = {
       alert: true,
       expanded,
-      planned,
+      planned: planned !== null,
       "no-detail": !hasDetail,
     };
     return html`
@@ -1196,68 +1191,22 @@ export class WienerLinienAustriaCard extends LitElement {
         @keydown=${(ev: KeyboardEvent) =>
           this._onExpanderKeydown(ev, hasDetail, () => this._toggleElevator(key))}
       >
-        <ha-icon icon=${icon} aria-hidden="true"></ha-icon>
+        <ha-icon icon=${look ? look.icon : "mdi:elevator-passenger-off"} aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
             <div class="alert-title">
-              ${
-                escalator
-                  ? html`<span>${kindLabel}</span>${
-                      escalator.where
-                        ? html` <span lang="de" class="outage-where">${escalator.where}</span>`
-                        : nothing
-                    }`
-                  : html`<span lang="de" class="lift-path"
-                      >${path.map(
-                        (seg, i) =>
-                          html`${
-                            i
-                              ? html`<span class="lift-path-sep" aria-hidden="true">›</span>`
-                              : nothing
-                          }<span>${seg}</span>`,
-                      )}</span
-                    >`
-              }
+              ${escalator ? this._renderEscalatorTitle(kindLabel, escalator.where) : this._renderLiftPath(location)}
             </div>
             ${
-              from
+              planned !== null
                 ? html`<div class="alert-meta outage-planned">
                     <ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon>
-                    <span>${this._t("outage_planned", { time: from })}</span>
+                    <span>${this._t("outage_planned", { time: formatTime(e.time_start, this._lang()) })}</span>
                   </div>`
                 : nothing
             }
           </div>
-          ${
-            hasDetail
-              ? html`<div class="alert-detail">
-                <div class="alert-detail-inner">
-                  ${
-                    notes.length
-                      ? html`<div class="alert-desc" lang="de">
-                          ${notes.map((note) => html`<p>${note}</p>`)}
-                        </div>`
-                      : nothing
-                  }
-                  ${
-                    reason
-                      ? html`<div class="alert-desc lift-reason">
-                        <ha-icon icon=${reasonIcon} aria-hidden="true"></ha-icon>
-                        <span lang="de">${reason}</span>
-                      </div>`
-                      : nothing
-                  }
-                  ${
-                    until
-                      ? html`<div class="alert-meta">
-                        <span>${this._t("elevator_until")} ${until}</span>
-                      </div>`
-                      : nothing
-                  }
-                </div>
-              </div>`
-              : nothing
-          }
+          ${detail}
         </div>
         ${
           hasDetail
@@ -1266,6 +1215,66 @@ export class WienerLinienAustriaCard extends LitElement {
         }
       </div>
     `;
+  }
+
+  /** "Rolltreppe aufwärts" in the card's language, then the feed's German
+   *  for where it runs. */
+  private _renderEscalatorTitle(kindLabel: string, where: string): TemplateResult {
+    return html`<span>${kindLabel}</span>${
+      where ? html` <span lang="de" class="outage-where">${where}</span>` : nothing
+    }`;
+  }
+
+  /** The lift feed writes the location as a path through the station;
+   *  showing the segments separately makes "which lift is this" answerable
+   *  at a glance. A location with no separator is a single segment. */
+  private _renderLiftPath(location: string): TemplateResult {
+    return html`<span lang="de" class="lift-path"
+      >${splitLocationPath(location).map(
+        (seg, i) =>
+          html`${
+            i ? html`<span class="lift-path-sep" aria-hidden="true">›</span>` : nothing
+          }<span>${seg}</span>`,
+      )}</span
+    >`;
+  }
+
+  /** What an outage row unfolds to: an escalator's extra sentences, the
+   *  reason with its icon, and when it ends. `nothing` when the feed gave
+   *  none of them, and the row then doesn't expand. */
+  private _renderOutageDetail(
+    e: ElevatorInfoAttr,
+    notes: string[],
+  ): TemplateResult | typeof nothing {
+    const reason = e.reason || "";
+    const until = formatTime(e.time_end, this._lang());
+    if (!reason && !until && !notes.length) return nothing;
+    return html`<div class="alert-detail">
+      <div class="alert-detail-inner">
+        ${
+          notes.length
+            ? html`<div class="alert-desc" lang="de">
+                ${notes.map((note) => html`<p>${note}</p>`)}
+              </div>`
+            : nothing
+        }
+        ${
+          reason
+            ? html`<div class="alert-desc lift-reason">
+                <ha-icon icon=${iconForElevatorReason(reason)} aria-hidden="true"></ha-icon>
+                <span lang="de">${reason}</span>
+              </div>`
+            : nothing
+        }
+        ${
+          until
+            ? html`<div class="alert-meta">
+                <span>${this._t("elevator_until")} ${until}</span>
+              </div>`
+            : nothing
+        }
+      </div>
+    </div>`;
   }
 
   private _toggleElevator(name: string): void {
