@@ -1,7 +1,7 @@
 # Open checks from the 2.4.0 audit
 
 Left over from the audit of `audit/2.4.0-fixes` on 14.11.2026. Delete this
-file once the two checks are done.
+file once the count is done.
 
 ## Needs a running Home Assistant
 
@@ -14,15 +14,6 @@ file once the two checks are done.
   `logger.set_level` (it lasts until the next restart), count the lines
   per endpoint after a day and compare. Look for what the rules don't
   predict: retries, restarts, a second request per rollover.
-
-## Needs a real device
-
-- [ ] **Route card in the Companion app on Android.** The stale note
-  ("Älterer Stand von 07:49") and the pager note were checked in desktop
-  Chromium only, at 280 to 400 px, in German and English, with icon
-  placeholders. Check the same on a phone in the Android System WebView,
-  with the real icons: the stale note on one line, the pager note on two
-  at most.
 
 ## Not built, on purpose (open-data check of 14.11.2026)
 
@@ -37,3 +28,10 @@ file once the two checks are done.
 - A cause the icon table doesn't know shows with the neutral icon. Add
   its wording to `REASON_ICONS` in `src/utils/traffic-notice.ts` when one
   turns up; the sensors publish it as `reason`.
+
+## Checked on a device
+
+- Android: the cards were checked in the Companion app on a Samsung
+  tablet on 14.11.2026, escalator row included. No Android phone was at
+  hand, so the route card's stale note and pager note at phone width
+  (280 to 400 px) are still only checked in desktop Chromium.
