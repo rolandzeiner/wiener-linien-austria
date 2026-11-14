@@ -203,7 +203,7 @@ if(super(e),e.type!==Pe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
           ${a?D`<div class="attribution">${a}</div>`:k}
         </div>
       </ha-card>
-    `}_staleNote(e){if(this._pagerWait()===0)return this._t(`adhoc_stale`);let t=Pt(e.fetched_at);return t?this._t(`adhoc_stale_short_at`,{time:t}):this._t(`adhoc_stale_short`)}_renderUpdated(e){let t=Pt(e);return!t||!e?k:D`<p class="updated">
+    `}_staleNote(e){if(this._requestsLeft===null)return this._t(`adhoc_stale`);let t=Pt(e.fetched_at);return t?this._t(`adhoc_stale_short_at`,{time:t}):this._t(`adhoc_stale_short`)}_renderUpdated(e){let t=Pt(e);return!t||!e?k:D`<p class="updated">
       <ha-icon icon="mdi:update" aria-hidden="true"></ha-icon>
       <time datetime=${e}>${this._t(`updated`,{time:t})}</time>
     </p>`}_renderPickers(){return this._stops===null?this._stopsError?D``:D`<p class="picker-status">${this._t(`adhoc_stops_loading`)}</p>`:D`

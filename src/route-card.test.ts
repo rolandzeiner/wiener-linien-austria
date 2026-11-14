@@ -1708,6 +1708,37 @@ describe("earlier and later", () => {
     expect(root(el).querySelector(".stale-note")?.textContent?.trim()).toBe("Etwas älterer Stand");
   });
 
+  it("keeps the stale note short once the countdown has run out", async () => {
+    const { el, callWS } = await mountBudget([
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 20, stale: true },
+    ]);
+    pager(el)[1]!.click();
+    await settle(el);
+    const stale = () => root(el).querySelector(".stale-note")?.textContent?.trim();
+    expect(note(el)).toBe("Nächste Abfrage in 20 s");
+    expect(stale()).toBe("Älterer Stand von 07:49");
+
+    // A request is back, but the plan for a chosen time isn't asked for
+    // again for minutes: it is still the older one, and "gerade zu viele
+    // Verbindungsabfragen" would no longer be true.
+    await settle(el, 21_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+    expect(note(el)).toBe("Noch 1 Abfrage, +1 in 59 s");
+    expect(stale()).toBe("Älterer Stand von 07:49");
+  });
+
+  it("says the whole reason in the stale note without a budget from the backend", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => ({ ...PLAN, stale: true, retry_after: 45 }));
+    const el = await mount(h, {});
+    await settle(el);
+    expect(note(el)).toBeUndefined();
+    expect(root(el).querySelector(".stale-note")?.textContent?.trim()).toBe(
+      "Gerade zu viele Verbindungsabfragen, darum ein etwas älterer Stand.",
+    );
+  });
+
   it("asks Später, at once, for the minute after the timetabled departure", async () => {
     const { el, callWS } = await mountPlanned();
     pager(el)[1]!.click();

@@ -1049,11 +1049,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
-  /** What a stale plan's note says: the whole reason without a countdown
-   *  beside the steps, else "Älterer Stand von 07:47", without the time
-   *  where the plan doesn't carry one. */
+  /** What a stale plan's note says: the whole reason from a backend that
+   *  sends no budget, so no pager note stands beside the steps; else
+   *  "Älterer Stand von 07:47", without the time where the plan doesn't
+   *  carry one. Not by the countdown: the plan stays on screen after it
+   *  ends, and "too many requests right now" is no longer true then. */
   private _staleNote(plan: RouteAttrs): string {
-    if (this._pagerWait() === 0) return this._t("adhoc_stale");
+    if (this._requestsLeft === null) return this._t("adhoc_stale");
     const time = viennaClock(plan.fetched_at);
     return time ? this._t("adhoc_stale_short_at", { time }) : this._t("adhoc_stale_short");
   }
@@ -1326,8 +1328,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : html`${back}${this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false)}`;
     }
     // Budget spent: the plan on screen is older than usual. The header's
-    // "Zuletzt aktualisiert" already says how old; this says why. While the
-    // pager counts down to the next request, that and its ⓘ are the why, so
+    // "Zuletzt aktualisiert" already says how old; this says why. With a
+    // budget from the backend, the pager's note and its ⓘ are the why, so
     // the note keeps to the one thing they don't say: that the plan shown
     // is an older one, and from when. The header has that time too, but
     // this is the line read with the connection it qualifies.
