@@ -408,8 +408,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._observer.observe(this);
     }
     if (this._from && this._to) {
-      // Reconnecting with a plan already on screen: refresh only once due.
-      if (this._plan && this._planKey === this._queryKey()) {
+      // Reconnecting with a plan already on screen, or with an error still
+      // counting down to its retry: ask only once due. A dashboard takes
+      // the card out and puts it back on every change of view, and asking
+      // each time would make the wait an error states mean nothing.
+      const held = this._plan
+        ? this._planKey === this._queryKey()
+        : this._phase === "error" && this._nextRefreshAt !== null;
+      if (held) {
         const remaining = this._nextRefreshAt === null ? 0 : this._nextRefreshAt - Date.now();
         if (remaining > 0) {
           this._schedule(remaining);

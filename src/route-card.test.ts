@@ -1321,6 +1321,44 @@ describe("ad-hoc mode", () => {
     expect(text(el)).not.toContain("Probier eine andere Haltestelle");
   });
 
+  it("waits out an error's retry when the card is taken out and put back", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => {
+      throw { code: "upstream" };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    await settle(el, 10_000);
+    expect(text(el)).toContain("Neuer Versuch in 50 s");
+
+    // What a dashboard does on a change of view.
+    el.remove();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(1);
+    expect(text(el)).toContain("Neuer Versuch in 50 s");
+    await settle(el, 1_000);
+    expect(text(el)).toContain("Neuer Versuch in 49 s");
+
+    await settle(el, 49_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+  });
+
+  it("asks at once when put back after an error's retry was due", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => {
+      throw { code: "upstream" };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    el.remove();
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(planCalls(callWS)).toHaveLength(1);
+    document.body.appendChild(el);
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(2);
+  });
+
   it("stops every timer once removed", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h, callWS } = adhocHass();
