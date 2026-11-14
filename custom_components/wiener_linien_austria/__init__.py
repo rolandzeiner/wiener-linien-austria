@@ -41,6 +41,7 @@ from .const import (
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
     ENTRY_TYPE_ROUTE,
+    ESCALATOR_INFO_KEY,
     FLAP_CARD_VERSION,
     RESOURCES_REGISTERED_KEY,
     RETRO_CARD_VERSION,
@@ -543,6 +544,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     for stale_key in (
         TRAFFIC_INFO_KEY,
         ELEVATOR_INFO_KEY,
+        ESCALATOR_INFO_KEY,
         DOMAIN_LAST_CALL_KEY,
         LOCK_KEY,
         LOCK_LOOP_KEY,

@@ -7,7 +7,7 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .alerts import get_alerts_for, line_names_from_keys
+from .alerts import get_alerts_for, get_escalators_for, line_names_from_keys
 from .const import ATTRIBUTION, CONF_LINES, CONF_RBLS
 from .coordinator import WienerLinienConfigEntry
 from .route_coordinator import WienerLinienRouteCoordinator
@@ -61,6 +61,7 @@ async def async_get_config_entry_diagnostics(
     line_names = line_names_from_keys(config.get(CONF_LINES))
     rbls = {int(r) for r in config.get(CONF_RBLS) or []}
     traffic, elevator = get_alerts_for(hass, line_names, rbls)
+    escalator = get_escalators_for(hass, line_names, rbls)
 
     # Surface trip-pattern index health so user-reported "stops_ahead is
     # missing" issues can be triaged from a redacted dump alone — the
@@ -128,6 +129,7 @@ async def async_get_config_entry_diagnostics(
         "alerts": {
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
+            "escalator_info": [e.to_dict() for e in escalator],
         },
     }
 

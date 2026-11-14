@@ -1,10 +1,11 @@
-"""Traffic disruptions and elevator status from the Wiener Linien `/trafficInfoList` endpoint.
+"""Disruptions, lift and escalator outages from `/trafficInfoList`.
 
-Both user-visible alert types are surfaced by the same endpoint, just via the
+The user-visible alert types are surfaced by the same endpoint, just via the
 `name=` filter:
 
 - `stoerunglang` — line/route disruptions (scope: city-wide)
 - `aufzugsinfo` — elevator out-of-service notices (scope: per station + per RBL)
+- `fahrtreppeninfo` — escalator out-of-service notices, in the same shape
 
 All names travel in ONE request. `name=` may be repeated (Schnittstellen-
 dokumentation V1.5 §4.2.1), and the response tags every entry with a
@@ -21,13 +22,14 @@ than a few times an hour and aggregating across all entries keeps the
 integration's outbound request rate trivial. Each sensor filters the cached
 lists by its own (lines, RBLs) at attribute-read time.
 
-A third user-visible feed, `stoerungkurz` (the stop display's own short
+A further user-visible feed, `stoerungkurz` (the stop display's own short
 text, scoped to platforms), rides along in the same request — see
-`_parse_traffic_short`. One further category exists and is deliberately not
-requested yet: `fahrtreppeninfo` (escalator outages; parses with the same
-shape as `aufzugsinfo`). It would ride along for zero extra requests, but it
-needs sensor attributes, translations and card rendering to be useful, so it
-is its own change.
+`_parse_traffic_short`.
+
+Lift and escalator notices are not all current outages: both feeds also
+announce maintenance windows days ahead (2026-11-14: a lift "außer Betrieb"
+from 16.11. 20:45 to 00:45, an escalator for a night ten days out). They
+keep their `time_start`, and the card says "planned" until it has passed.
 """
 
 from __future__ import annotations
@@ -48,11 +50,13 @@ from .api import (
 )
 from .const import (
     ALERT_FEED_ELEVATOR,
+    ALERT_FEED_ESCALATOR,
     ALERT_FEED_TRAFFIC,
     ALERT_FEED_TRAFFIC_SHORT,
     ALERTS_SEQ_KEY,
     DOMAIN,
     ELEVATOR_INFO_KEY,
+    ESCALATOR_INFO_KEY,
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
@@ -148,7 +152,7 @@ class TrafficInfo:
 
 @dataclass(slots=True)
 class ElevatorInfo:
-    """One elevator outage."""
+    """One lift outage, or one escalator outage: the feeds share a shape."""
 
     name: str
     station: str
@@ -210,6 +214,7 @@ _REQUESTED_FEEDS: Final[tuple[str, ...]] = (
     ALERT_FEED_TRAFFIC,
     ALERT_FEED_TRAFFIC_SHORT,
     ALERT_FEED_ELEVATOR,
+    ALERT_FEED_ESCALATOR,
 )
 
 
@@ -302,7 +307,7 @@ def _split_by_category(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 
 async def async_refresh_alerts(hass: HomeAssistant) -> bool:
-    """Refresh the traffic (long + short) and elevator alerts into hass.data.
+    """Refresh the traffic, lift and escalator alerts into hass.data.
 
     Safe to call whenever; a failed fetch keeps the previous cache. Returns
     False only for a failed fetch, which is what the periodic tick backs
@@ -326,7 +331,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
         return True
     domain_data = hass.data[DOMAIN]
 
-    # Fetch/parse failure → leave both caches exactly as they were. Only an
+    # Fetch/parse failure → leave the caches exactly as they were. Only an
     # actual successful 200 (possibly empty) overwrites — a legitimately
     # empty list must clear stale resolved entries. All feeds travel in one
     # request, so they succeed or fail together.
@@ -349,9 +354,13 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
         domain_data[ELEVATOR_INFO_KEY] = [
             _parse_elevator(x) for x in result[ALERT_FEED_ELEVATOR]
         ]
+        domain_data[ESCALATOR_INFO_KEY] = [
+            _parse_elevator(x) for x in result[ALERT_FEED_ESCALATOR]
+        ]
     else:
         domain_data.setdefault(TRAFFIC_INFO_KEY, [])
         domain_data.setdefault(ELEVATOR_INFO_KEY, [])
+        domain_data.setdefault(ESCALATOR_INFO_KEY, [])
 
     # Bump even on the failure path: the sensor cache treats "alerts seq
     # advanced" as "rebuild," and that's the cheapest signal we have. A
@@ -360,9 +369,10 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
     domain_data[ALERTS_SEQ_KEY] = int(domain_data.get(ALERTS_SEQ_KEY, 0)) + 1
 
     _LOGGER.debug(
-        "Alerts refreshed: %d traffic, %d elevator (failed=%s)",
+        "Alerts refreshed: %d traffic, %d elevator, %d escalator (failed=%s)",
         len(domain_data.get(TRAFFIC_INFO_KEY, [])),
         len(domain_data.get(ELEVATOR_INFO_KEY, [])),
+        len(domain_data.get(ESCALATOR_INFO_KEY, [])),
         failed,
     )
     return not failed
@@ -565,10 +575,13 @@ def _absorb_short(target: TrafficInfo, other: TrafficInfo) -> None:
 
 
 def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
-    """Parse one trafficInfos entry for name=aufzugsinfo.
+    """Parse one trafficInfos entry for name=aufzugsinfo or fahrtreppeninfo.
 
     Shape is less regular than stoerunglang — pulls fallbacks from
-    `attributes` when top-level fields are absent.
+    `attributes` when top-level fields are absent. An escalator's
+    description is a sentence or two with stray line breaks ("Diese Anlage
+    wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt
+    …\n\n"); the breaks between sentences are kept, the padding is not.
     """
     attrs = raw.get("attributes") or {}
     time = raw.get("time") or {}
@@ -581,7 +594,13 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
     )
 
     station = str(attrs.get("station") or raw.get("title") or "").strip()
-    description = str(raw.get("description") or attrs.get("location") or "").strip()
+    description = "\n".join(
+        line
+        for part in str(
+            raw.get("description") or attrs.get("location") or ""
+        ).splitlines()
+        if (line := _collapse_ws(part))
+    )
     reason = str(attrs.get("reason") or "").strip()
     status = str(attrs.get("status") or "").strip()
 
@@ -696,9 +715,7 @@ def get_alerts_for(
       Every matched short entry also gets `location` set to its platform's
       station name, since upstream publishes none for this feed. Both
       additions land on a copy; the shared cache is never touched.
-    - Elevator: match if any `related_stops` overlaps `rbls`. If `rbls` is
-      empty/None, return []. An elevator outage with no `related_stops` is
-      only surfaced when it also matches on `related_lines`.
+    - Elevator: see `_match_outages`.
     """
     domain_data = hass.data.get(DOMAIN, {})
     all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
@@ -726,18 +743,74 @@ def get_alerts_for(
                     continue
         matched_traffic.append(_with_stop_context(t, hit, catalogue, inferred))
 
-    matched_elevator: list[ElevatorInfo] = []
-    if rbls:
-        for e in all_elevator:
-            stop_hit = bool(e.related_stops_set & rbls)
-            if stop_hit:
-                matched_elevator.append(e)
-                continue
-            # No explicit RBL match — fall back to line match if present.
-            if not e.related_stops and lines and e.related_lines_set & lines:
-                matched_elevator.append(e)
+    return matched_traffic, _match_outages(all_elevator, lines, rbls, catalogue)
 
-    return matched_traffic, matched_elevator
+
+def get_escalators_for(
+    hass: HomeAssistant,
+    lines: set[str] | None,
+    rbls: set[int] | None,
+) -> list[ElevatorInfo]:
+    """Escalator outages relevant to a given stop, matched like the lifts."""
+    all_escalator: list[ElevatorInfo] = (
+        hass.data.get(DOMAIN, {}).get(ESCALATOR_INFO_KEY, []) or []
+    )
+    return _match_outages(all_escalator, lines, rbls, current_catalogue(hass))
+
+
+def _match_outages(
+    outages: list[ElevatorInfo],
+    lines: set[str] | None,
+    rbls: set[int] | None,
+    catalogue: StaticCatalogue | None,
+) -> list[ElevatorInfo]:
+    """The lift or escalator outages at the platforms `rbls`.
+
+    Match if any `related_stops` overlaps `rbls`; with no `rbls`, nothing.
+
+    Some outages name no platforms, only a station and its lines (2026-11-14:
+    a lift at "Bahnhof Meidling" on the U6, an escalator at "Karlsplatz" on
+    the U1). Those need a line hit and their station to be this stop's own.
+    The line alone put the Meidling lift on every U6 stop. The station is
+    compared by name, the catalogue's "Bhf. Meidling" against the feed's
+    "Bahnhof Meidling" (`_station_key`). Without a catalogue there is no
+    name to compare, and the line decides as before: a missing catalogue
+    must not hide an outage.
+    """
+    if not rbls:
+        return []
+    own_stations: set[str] | None = None
+    if catalogue is not None:
+        index = catalogue.index_by_rbl()
+        own_stations = {
+            _station_key(entry[1])
+            for rbl in rbls
+            if (entry := index.get(rbl)) is not None
+        }
+    return [
+        outage
+        for outage in outages
+        if outage.related_stops_set & rbls
+        or (
+            not outage.related_stops
+            and lines
+            and outage.related_lines_set & lines
+            and (not own_stations or _station_key(outage.station) in own_stations)
+        )
+    ]
+
+
+def _station_key(name: str) -> str:
+    """A station name as the outage feeds and the catalogue both spell it.
+
+    The catalogue abbreviates ("Bhf. Meidling") and marks interchanges
+    ("Karlsplatz U", "Praterstern S U"); the feeds write "Bahnhof Meidling",
+    "Karlsplatz", "Praterstern".
+    """
+    words = name.casefold().replace("bahnhof", "bhf").replace(".", " ").split()
+    while words and words[-1] in {"s", "u"}:
+        words.pop()
+    return " ".join(words)
 
 
 def _lines_at_platforms(

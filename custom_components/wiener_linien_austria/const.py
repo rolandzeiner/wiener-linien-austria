@@ -107,6 +107,7 @@ ALERTS_REFRESH_SECONDS: Final = 300
 # hass.data keys for the shared alert caches + scheduler unsub.
 TRAFFIC_INFO_KEY: Final = "traffic_info"
 ELEVATOR_INFO_KEY: Final = "elevator_info"
+ESCALATOR_INFO_KEY: Final = "escalator_info"
 ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
 # Monotonic counter bumped on every successful alerts refresh. Sensors
 # memoise their `extra_state_attributes` dict (which embeds the matched
@@ -114,11 +115,14 @@ ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
 # refresh on their own ~5-min cadence (independent of the per-stop
 # coordinator tick), the sensor sees the bump and rebuilds.
 ALERTS_SEQ_KEY: Final = "alerts_seq"
-# `/trafficInfoList` feed names. Both travel as repeated `name=` params in
+# `/trafficInfoList` feed names. All travel as repeated `name=` params in
 # ONE request; the response tags each entry with a `refTrafficInfoCategoryId`
 # resolved through `data.trafficInfoCategories`. See alerts.py.
 ALERT_FEED_TRAFFIC: Final = "stoerunglang"
 ALERT_FEED_ELEVATOR: Final = "aufzugsinfo"
+# Escalator outages, in the same shape as the lift ones. They ride in the
+# same request, so they cost no request of their own.
+ALERT_FEED_ESCALATOR: Final = "fahrtreppeninfo"
 # The text the physical stop display shows — works detours, moved boarding
 # points, permanently closed stops. Scoped to individual platforms rather
 # than whole lines, so it is matched on RBL. Surfaced in the same card

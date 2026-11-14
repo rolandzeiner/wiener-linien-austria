@@ -22,14 +22,17 @@ from custom_components.wiener_linien_austria.alerts import (
     _split_by_category,
     async_refresh_alerts,
     get_alerts_for,
+    get_escalators_for,
 )
 from custom_components.wiener_linien_austria.const import (
     ALERT_FEED_ELEVATOR,
+    ALERT_FEED_ESCALATOR,
     ALERT_FEED_TRAFFIC,
     ALERT_FEED_TRAFFIC_SHORT,
     DOMAIN,
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
+    ESCALATOR_INFO_KEY,
     TRAFFIC_INFO_KEY,
 )
 from custom_components.wiener_linien_austria.static import (
@@ -218,9 +221,11 @@ def _combined_body(
     elevator: list[dict[str, Any]] | None = None,
     short: list[dict[str, Any]] | None = None,
     *,
+    escalator: list[dict[str, Any]] | None = None,
     traffic_id: int = 2,
     elevator_id: int = 1,
     short_id: int = 3,
+    escalator_id: int = 4,
 ) -> dict[str, Any]:
     """Build a realistic multi-`name` /trafficInfoList payload.
 
@@ -242,6 +247,9 @@ def _combined_body(
     if short is not None:
         categories.append({"id": short_id, "name": ALERT_FEED_TRAFFIC_SHORT})
         infos += [{**t, "refTrafficInfoCategoryId": short_id} for t in short]
+    if escalator is not None:
+        categories.append({"id": escalator_id, "name": ALERT_FEED_ESCALATOR})
+        infos += [{**e, "refTrafficInfoCategoryId": escalator_id} for e in escalator]
     return {
         "message": {"messageCode": 1},
         "data": {"trafficInfos": infos, "trafficInfoCategories": categories},
@@ -291,6 +299,27 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
                 "time": {},
             }
         ],
+        escalator=[
+            # As the feed sent it on 2026-11-14, stray line breaks included.
+            {
+                "name": "ftazS_760",
+                "title": "Enkplatz",
+                "description": (
+                    "Diese Anlage wird betriebsabhängig auf- oder abwärts "
+                    "geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom "
+                    "Bahnsteig in das Zwischengeschoß.\n\n"
+                ),
+                "attributes": {
+                    "station": "Enkplatz",
+                    "reason": "An der Instandsetzung wird bereits gearbeitet.",
+                    "relatedLines": ["U3"],
+                    "relatedStops": [4936, 4939],
+                    "status": "außer Betrieb",
+                },
+                "relatedLines": ["U3"],
+                "relatedStops": [4936, 4939],
+            }
+        ],
     )
 
     fake_session = MagicMock()
@@ -302,13 +331,25 @@ async def test_async_refresh_alerts_populates_caches(hass: HomeAssistant) -> Non
     ):
         assert await async_refresh_alerts(hass) is True
 
-    assert fake_session.get.call_count == 1, "both feeds must ride in one request"
+    assert fake_session.get.call_count == 1, "every feed must ride in one request"
     params = fake_session.get.call_args.kwargs["params"]
     assert [v for k, v in params if k == "name"] == [
         ALERT_FEED_TRAFFIC,
         ALERT_FEED_TRAFFIC_SHORT,
         ALERT_FEED_ELEVATOR,
+        ALERT_FEED_ESCALATOR,
     ]
+
+    escalator = hass.data[DOMAIN][ESCALATOR_INFO_KEY]
+    assert [e.name for e in escalator] == ["ftazS_760"]
+    assert escalator[0].description == (
+        "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\n"
+        "Fahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß."
+    )
+    # Escalators stay out of the lift list, and are matched like the lifts.
+    assert get_escalators_for(hass, {"U3"}, {4936}) == escalator
+    assert get_escalators_for(hass, {"U3"}, {4111}) == []
+    assert get_alerts_for(hass, {"U3"}, {4936})[1] == []
 
     traffic = hass.data[DOMAIN][TRAFFIC_INFO_KEY]
     elevator = hass.data[DOMAIN][ELEVATOR_INFO_KEY]
@@ -1106,8 +1147,10 @@ def test_split_by_category_absent_category_yields_empty_list() -> None:
         ALERT_FEED_TRAFFIC,
         ALERT_FEED_TRAFFIC_SHORT,
         ALERT_FEED_ELEVATOR,
+        ALERT_FEED_ESCALATOR,
     }
     assert out[ALERT_FEED_ELEVATOR] == []
+    assert out[ALERT_FEED_ESCALATOR] == []
 
 
 def test_split_by_category_drops_unknown_and_malformed() -> None:
@@ -1142,35 +1185,84 @@ def test_split_by_category_handles_empty_payload() -> None:
         ALERT_FEED_TRAFFIC: [],
         ALERT_FEED_TRAFFIC_SHORT: [],
         ALERT_FEED_ELEVATOR: [],
+        ALERT_FEED_ESCALATOR: [],
     }
 
 
-async def test_get_alerts_for_elevator_line_fallback(hass: HomeAssistant) -> None:
-    """An elevator outage with no RBL mapping still matches via related_lines.
+def _stopless(name: str, station: str, line: str) -> ElevatorInfo:
+    """An outage that names a station and a line but no platforms."""
+    return ElevatorInfo(
+        name=name,
+        station=station,
+        description="",
+        reason="",
+        status="außer Betrieb",
+        related_lines=[line],
+        related_stops=[],
+        time_start=None,
+        time_end=None,
+    )
 
-    Upstream sometimes publishes elevator alerts that carry a line list but
-    no `relatedStops` — e.g. "elevators on U1 in general". The line-fallback
-    branch of `get_alerts_for` surfaces those when any of the user's tracked
-    RBLs is set AND a line matches. Without this branch, the user would see
-    no elevator warning at all for line-scoped outages.
-    """
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][TRAFFIC_INFO_KEY] = []
-    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = [
-        ElevatorInfo(
-            name="LINE_ONLY",
-            station="U1",
-            description="line-wide note",
-            reason="",
-            status="außer Betrieb",
-            related_lines=["U1"],
-            related_stops=[],  # no RBL mapping
-            time_start=None,
-            time_end=None,
+
+def _seed_u6_catalogue(hass: HomeAssistant) -> None:
+    """Two U6 stations, named as `haltestellen.csv` names them."""
+    stations = {
+        60201015: Station(
+            diva=60201015,
+            name="Bhf. Meidling",
+            municipality="Wien",
+            longitude=16.33,
+            latitude=48.17,
+            rbls=[4621, 4632],
         ),
+        60200657: Station(
+            diva=60200657,
+            name="Karlsplatz U",
+            municipality="Wien",
+            longitude=16.37,
+            latitude=48.20,
+            rbls=[4101, 4128],
+        ),
+    }
+    hass.data.setdefault(DOMAIN, {})[CATALOGUE_KEY] = StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=None
+    )
+
+
+async def test_stopless_outage_shows_at_its_own_station_only(
+    hass: HomeAssistant,
+) -> None:
+    """The feed's lift at "Bahnhof Meidling" (U6, no platforms, 2026-11-14)
+    belongs to the catalogue's "Bhf. Meidling" and to no other U6 stop."""
+    _seed_u6_catalogue(hass)
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = [
+        _stopless("MEIDLING", "Bahnhof Meidling", "U6")
     ]
-    _traffic, elevator = get_alerts_for(hass, {"U1"}, {4111})
-    assert [e.name for e in elevator] == ["LINE_ONLY"]
+    hass.data[DOMAIN][ESCALATOR_INFO_KEY] = [
+        _stopless("KARLSPLATZ", "Karlsplatz", "U1")
+    ]
+
+    assert [e.name for e in get_alerts_for(hass, {"U6"}, {4621})[1]] == ["MEIDLING"]
+    # Another station, same line.
+    assert get_alerts_for(hass, {"U6"}, {4101})[1] == []
+    # Its own station, but the line isn't tracked there.
+    assert get_alerts_for(hass, {"U4"}, {4621})[1] == []
+    assert [e.name for e in get_escalators_for(hass, {"U1"}, {4101})] == ["KARLSPLATZ"]
+    assert get_escalators_for(hass, {"U1"}, {4621}) == []
+
+
+async def test_stopless_outage_matches_on_line_without_a_catalogue(
+    hass: HomeAssistant,
+) -> None:
+    """With no catalogue there is no station name to compare, so the line
+    decides: a missing catalogue must not hide an outage."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][ELEVATOR_INFO_KEY] = [
+        _stopless("MEIDLING", "Bahnhof Meidling", "U6")
+    ]
+    assert [e.name for e in get_alerts_for(hass, {"U6"}, {4101})[1]] == ["MEIDLING"]
+    assert get_alerts_for(hass, {"U1"}, {4101})[1] == []
+    assert get_alerts_for(hass, {"U6"}, set())[1] == []
 
 
 def test_line_names_from_keys_canonicalises_legacy_labels() -> None:

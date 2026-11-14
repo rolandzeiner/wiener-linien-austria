@@ -4,6 +4,8 @@
     'alerts': dict({
       'elevator_info': list([
       ]),
+      'escalator_info': list([
+      ]),
       'traffic_info': list([
       ]),
     }),
