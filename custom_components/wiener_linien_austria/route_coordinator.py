@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from . import static
-from .alerts import get_alerts_for
+from .alerts import get_alerts_for, get_escalators_for, outage_station_matches
 from .const import (
     CONF_ACTIVE_DAYS,
     CONF_ACTIVE_FROM,
@@ -479,7 +479,7 @@ async def async_plan_trips(
 
 
 def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[str, Any]:
-    """`trips`, `line_colors`, `traffic_info` and `elevator_info` for connections.
+    """`trips`, `line_colors` and the notices and outages for connections.
 
     Shared by the route sensor and the route card's ad-hoc answer
     (websocket.py), so both modes of the card read the same shape.
@@ -496,7 +496,8 @@ def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[st
         "trips": rendered,
         "line_colors": line_colors_for(hass, labels),
         "traffic_info": [t.to_dict() for t in traffic],
-        "elevator_info": _lift_outages(hass, trips),
+        "elevator_info": _access_outages(hass, trips, "elevator"),
+        "escalator_info": _access_outages(hass, trips, "escalator"),
     }
 
 
@@ -523,20 +524,27 @@ def add_stop_coordinates(hass: HomeAssistant, trips: list[dict[str, Any]]) -> No
                     stop["longitude"] = station.longitude
 
 
-def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, Any]]:
-    """Lift outages at the stations whose lifts these trips rely on.
+def _access_outages(
+    hass: HomeAssistant, trips: Sequence[Trip], kind: str
+) -> list[dict[str, Any]]:
+    """Outages at the stations whose lifts or escalators these trips use.
 
-    The trip names each lift by its station (DIVA); the outage feed names the
-    platforms (RBLs) it affects. The catalogue joins the two, so this is
+    `kind` is the step kind, `elevator` or `escalator`. The trip names each
+    by its station (DIVA); the outage feed names the platforms (RBLs) it
+    affects, or only the station. The catalogue joins them, so this is
     station-level: an outage anywhere at a station a planned lift belongs to
     counts, and `stop_ids` says which of the trip's stations it is about.
+
+    An outage only announced for later is left out: the feeds list
+    maintenance days ahead as "außer Betrieb", and the lift on this trip
+    still runs.
     """
     stations = {
         diva
         for trip in trips
         for leg in trip.legs
         for step in (*leg.access, *leg.access_after)
-        if step.kind == "elevator" and (diva := as_int(step.stop_id)) is not None
+        if step.kind == kind and (diva := as_int(step.stop_id)) is not None
     }
     catalogue = current_catalogue(hass)
     if not stations or catalogue is None:
@@ -547,21 +555,33 @@ def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, 
         if (station := catalogue.stations_by_diva.get(diva)) is not None
         for rbl in station.rbls
     }
-    _traffic, outages = get_alerts_for(hass, None, set(rbl_to_diva))
-    return [
-        {
-            **outage.to_dict(),
-            "stop_ids": sorted(
-                {
-                    str(rbl_to_diva[rbl])
-                    for rbl in outage.related_stops
-                    if rbl in rbl_to_diva
-                }
-            ),
+    rbls = set(rbl_to_diva)
+    outages = (
+        get_alerts_for(hass, None, rbls)[1]
+        if kind == "elevator"
+        else get_escalators_for(hass, None, rbls)
+    )
+    now = dt_util.utcnow()
+    found: list[dict[str, Any]] = []
+    for outage in outages:
+        start = dt_util.parse_datetime(outage.time_start or "")
+        if start is not None and start > now:
+            continue
+        divas = {
+            rbl_to_diva[rbl] for rbl in outage.related_stops if rbl in rbl_to_diva
+        } or {
+            # Named by station only: every one of the trip's stations that
+            # the outage matched through.
+            diva
+            for diva in stations
+            if (station := catalogue.stations_by_diva.get(diva)) is not None
+            and outage_station_matches(outage, station.name)
         }
-        for outage in outages
-        if outage.related_stops_set & rbl_to_diva.keys()
-    ]
+        if divas:
+            found.append(
+                {**outage.to_dict(), "stop_ids": sorted(str(diva) for diva in divas)}
+            )
+    return found
 
 
 def route_device_info(entry: ConfigEntry) -> DeviceInfo:

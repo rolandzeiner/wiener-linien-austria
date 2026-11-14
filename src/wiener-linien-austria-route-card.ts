@@ -92,6 +92,7 @@ import {
   windowRange,
   type NormalisedRouteConfig,
 } from "./utils/route.js";
+import { parseEscalatorNotice } from "./utils/traffic-notice.js";
 
 // The countdown only shows whole minutes, so a 15 s tick is at most a quarter
 // minute stale while costing nothing measurable.
@@ -1539,12 +1540,20 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         .filter(Boolean)
         .join(" · "),
     }));
+    const escalators = this._escalatorOutages(trip, attrs).map((outage) => ({
+      title: this._t("escalator_out_notice", { station: outage.station ?? "" }),
+      detail: [outage.description, outage.reason]
+        .map((part) => (part ?? "").replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join(" · "),
+    }));
+    const outages = [...lifts, ...escalators];
     const notices = [
-      ...lifts,
+      ...outages,
       ...(attrs.traffic_info ?? [])
         .filter((n) => (n.related_lines ?? []).some((line) => lines.has(line)))
         .map((n) => ({ title: n.title, detail: "" })),
-    ].slice(0, MAX_NOTICES + lifts.length);
+    ].slice(0, MAX_NOTICES + outages.length);
     if (!notices.length) return nothing;
     return html`
       <ul class="notices">
@@ -1578,8 +1587,38 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     );
   }
 
-  /** "Aufzug nach unten" and friends, with "außer Betrieb" on a lift at a
-   *  station that has an outage. Words and an icon, never colour alone. */
+  /** Escalator outages that can be the escalator this trip takes: at one of
+   *  its stations and running the way the trip goes (see `_escalatorOut`). */
+  private _escalatorOutages(
+    trip: RouteTripAttr,
+    attrs: RouteAttrs,
+  ): NonNullable<RouteAttrs["escalator_info"]> {
+    const steps = tripAccessSteps(trip);
+    return (attrs.escalator_info ?? []).filter((outage) =>
+      steps.some((step) => this._escalatorOut(step, [outage])),
+    );
+  }
+
+  /** Whether an escalator step has an outage to answer for. The trip names
+   *  its escalators by station and by up or down; the feed says which way
+   *  each broken one runs. So unlike a lift, an escalator going the other
+   *  way is ruled out, and only one the feed gives no direction for, or
+   *  one switched either way, counts for both. */
+  private _escalatorOut(
+    step: RouteAccessStepAttr,
+    outages: NonNullable<RouteAttrs["escalator_info"]>,
+  ): boolean {
+    if (step.kind !== "escalator" || !step.stop_id) return false;
+    return outages.some((outage) => {
+      if (!(outage.stop_ids ?? []).includes(step.stop_id!)) return false;
+      const runs = parseEscalatorNotice(outage.description).direction;
+      return !runs || runs === "both" || !step.level || runs === step.level;
+    });
+  }
+
+  /** "Aufzug nach unten" and friends, with "außer Betrieb" on a lift or an
+   *  escalator at a station that has an outage. Words and an icon, never
+   *  colour alone. */
   private _renderAccess(
     steps: RouteAccessStepAttr[] | undefined,
     attrs: RouteAttrs,
@@ -1588,7 +1627,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (!known.length) return nothing;
     const broken = new Set((attrs.elevator_info ?? []).flatMap((outage) => outage.stop_ids ?? []));
     return html`${known.map((step) => {
-      const out = step.kind === "elevator" && !!step.stop_id && broken.has(step.stop_id);
+      const out =
+        (step.kind === "elevator" && !!step.stop_id && broken.has(step.stop_id)) ||
+        this._escalatorOut(step, attrs.escalator_info ?? []);
       return html`<span class=${out ? "access access--out" : "access"}>
         <ha-icon
           class=${!out && step.kind === "ramp" ? "access-icon--ramp" : ""}

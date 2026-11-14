@@ -380,6 +380,7 @@ class WienerLinienRouteSensor(
             "line_colors",
             "traffic_info",
             "elevator_info",
+            "escalator_info",
             "last_connection",
             # Changes on every refresh even when the connection does not, so
             # recorded it gave each row its own attributes row (~10k in 30

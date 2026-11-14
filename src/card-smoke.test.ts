@@ -442,8 +442,8 @@ describe("lift and escalator outages", () => {
     });
     expect(titles(el)).toEqual([
       "U1 Mittelbahnsteig›Ausgang Keplerplatz",
-      "Fahrtreppe aufwärts vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße",
-      "Fahrtreppe auf- und abwärts vom Bahnsteig in das Zwischengeschoß",
+      "Rolltreppe aufwärts vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße",
+      "Rolltreppe auf- und abwärts vom Bahnsteig in das Zwischengeschoß",
       "U6 Bahnsteig Richtung Siebenhirten›Ausgang Neulerchenfelder Straße",
     ]);
     expect(icons(el)).toEqual([

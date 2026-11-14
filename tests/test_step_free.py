@@ -7,6 +7,7 @@ a lift up at the Volkstheater change and a lift up at Praterstern.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock
@@ -17,7 +18,11 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.typing import WebSocketGenerator
 
 from custom_components.wiener_linien_austria.alerts import ElevatorInfo
-from custom_components.wiener_linien_austria.const import DOMAIN, ELEVATOR_INFO_KEY
+from custom_components.wiener_linien_austria.const import (
+    DOMAIN,
+    ELEVATOR_INFO_KEY,
+    ESCALATOR_INFO_KEY,
+)
 from custom_components.wiener_linien_austria.route_coordinator import (
     route_trip_attributes,
 )
@@ -136,6 +141,31 @@ async def test_lift_outages_on_the_trip_are_published(hass: HomeAssistant) -> No
     outages = route_trip_attributes(hass, [trip])["elevator_info"]
     assert [outage["station"] for outage in outages] == ["Volkstheater"]
     assert outages[0]["stop_ids"] == [VOLKSTHEATER]
+
+    # A lift only announced for a later day still runs on this trip.
+    later = _outage([4909])
+    later.time_start = "2099-01-01T01:15:00.000+0100"
+    domain_data[ELEVATOR_INFO_KEY] = [later]
+    assert route_trip_attributes(hass, [trip])["elevator_info"] == []
+    domain_data[ELEVATOR_INFO_KEY] = [_outage([4909])]
+
+    # Escalators only where the trip takes one, and it takes none.
+    domain_data[ESCALATOR_INFO_KEY] = [_outage([4909])]
+    assert route_trip_attributes(hass, [trip])["escalator_info"] == []
+    # With one on the way, by platform or by the station's name alone.
+    walk = trip.legs[0]
+    stepped = replace(
+        trip,
+        legs=[
+            replace(
+                walk, access=(*walk.access, AccessStep("escalator", "up", VOLKSTHEATER))
+            ),
+            *trip.legs[1:],
+        ],
+    )
+    domain_data[ESCALATOR_INFO_KEY] = [_outage([4909]), _outage([], "Volkstheater")]
+    found = route_trip_attributes(hass, [stepped])["escalator_info"]
+    assert [outage["stop_ids"] for outage in found] == [[VOLKSTHEATER], [VOLKSTHEATER]]
 
     # No catalogue, or no lift on the trip: nothing to match.
     del domain_data[CATALOGUE_KEY]

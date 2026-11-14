@@ -80,10 +80,16 @@ save no bytes, because the body has to be downloaded either way.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Sequence
 from typing import Any, Final
 
 import aiohttp
+
+# One debug line per request, before it is sent, so a day of them can be
+# counted per endpoint (`logger.set_level` on this module). The URL only:
+# the query names the stops asked for.
+_LOGGER = logging.getLogger(__name__)
 
 API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"
 MONITOR_ENDPOINT: Final = "/monitor"
@@ -179,6 +185,7 @@ async def get_json(
     `any_content_type` skips aiohttp's `application/json` check. The routing
     server labels its JSON `text/html`, so it needs this, not as a defence.
     """
+    _LOGGER.debug("GET %s", url)
     try:
         async with session.get(
             url,
@@ -211,6 +218,7 @@ async def get_text(
     session: aiohttp.ClientSession, url: str, *, user_agent: str, timeout_seconds: float
 ) -> str:
     """GET `url` and return its body as text, or raise a WienerLinienApiError."""
+    _LOGGER.debug("GET %s", url)
     try:
         async with session.get(
             url,

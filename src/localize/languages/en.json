@@ -513,6 +513,7 @@
     "access_ramp_down": "Ramp down",
     "lift_out": "out of service",
     "lift_out_notice": "Lift out of service: {station}",
+    "escalator_out_notice": "Escalator out of service: {station}",
     "low_floor": "Low-floor vehicle",
     "stops_between": "Stops in between, {line}",
     "last_connection": "Last connection without night bus {time}",

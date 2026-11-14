@@ -214,9 +214,10 @@ Use it in place of the departure sensor's availability. The departure sensor sta
 | `last_connection` | From 22:00 to 03:00, the night's last connection without a bus. |
 | `line_colors` | The official colours of the lines the trips use. |
 | `traffic_info` | Disruptions on those lines, shaped as on the departure sensor. |
-| `elevator_info` | Lift outages at stations whose lifts the trips use, each with `stop_ids` naming those stations. Empty unless a trip lists lifts, which step-free trips do. |
+| `elevator_info` | Lift outages at stations whose lifts the trips use, each with `stop_ids` naming those stations. Empty unless a trip lists lifts, which step-free trips do. An outage only announced for a later day is left out. |
+| `escalator_info` | Escalator outages at stations where the trips take an escalator, in the same shape. |
 
-`trips`, `last_connection`, `line_colors`, `traffic_info` and `elevator_info` aren't recorded in history.
+`trips`, `last_connection`, `line_colors`, `traffic_info`, `elevator_info` and `escalator_info` aren't recorded in history.
 
 `last_connection` has the same shape as a trip, or is `null`. The integration asks the trip planner to arrive by 04:00 with buses left out, and drops trips that wait for the first morning train. On nights the U-Bahn runs through (Friday, Saturday and before public holidays) there is no last connection, and it is `null` when the route is served all night.
 
@@ -238,7 +239,7 @@ Each leg has:
 - When a delay makes the walk to a ride too long, the ride moves to the first later vehicle of its line that the departure boards list and that still reaches the stop: one going where the planned one goes, or one the route data says calls there. On a step-free route it also has to be step-free. `origin`, `destination`, `towards` and `low_floor` are then that vehicle's, and walks after a ride move with its arrival. With no such vehicle listed, the change stays `at_risk`.
 - `next_departures` (the next two, as ISO times) and `headway_minutes` (how often the line usually runs there), from the departure boards.
 - `low_floor`: a low-floor vehicle, as planned, or as the departure board lists the vehicle the ride moved to.
-- `access`: the lifts and stairs on the leg's own walk, each with `kind` (such as `elevator` or `stairs`), `level` (`up` or `down`) and the station's `stop_id`. A change's `access` lists the ones between two rides. A lift outage in `elevator_info` is matched by station, so it can concern a different lift at the same station.
+- `access`: the lifts and stairs on the leg's own walk, each with `kind` (such as `elevator` or `stairs`), `level` (`up` or `down`) and the station's `stop_id`. A change's `access` lists the ones between two rides. A lift outage in `elevator_info` is matched by station, so it can concern a different lift at the same station. An escalator outage is matched by station and by the direction it runs in.
 
 In `trips` and the `plan_trip` response, every stop on the Wiener Linien stop list also has `latitude` and `longitude`, whether it's a leg's `origin`, its `destination` or one of its `stops`. Other stops, such as S-Bahn-only stations, have neither.
 

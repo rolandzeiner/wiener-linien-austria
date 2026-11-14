@@ -816,6 +816,14 @@ export interface RouteAttrs {
     reason?: string;
     stop_ids?: string[];
   }>;
+  /** Escalator outages at stations where the trips take an escalator, in
+   *  the same shape. `description` says which way the broken one runs. */
+  escalator_info?: Array<{
+    station?: string;
+    description?: string;
+    reason?: string;
+    stop_ids?: string[];
+  }>;
   /** Planned step-free. */
   step_free?: boolean;
   /** Route entities, late evening: the night's last connection without a

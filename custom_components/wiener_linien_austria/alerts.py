@@ -840,6 +840,11 @@ def _match_outages(
     ]
 
 
+def outage_station_matches(outage: ElevatorInfo, station_name: str) -> bool:
+    """Whether an outage names `station_name` (a catalogue name) as its station."""
+    return _station_key(outage.station) == _station_key(station_name)
+
+
 def _station_key(name: str) -> str:
     """A station name as the outage feeds and the catalogue both spell it.
 

@@ -406,6 +406,47 @@ describe("step-free", () => {
     expect(root(el).querySelectorAll(".access--out")).toHaveLength(1);
   });
 
+  it("flags a broken escalator only when it runs the way the trip goes", async () => {
+    const escalator = (level: string): RouteAccessStepAttr => ({
+      kind: "escalator",
+      level,
+      stop_id: "60201320",
+    });
+    const stepped = stepFreeTrip();
+    stepped.legs[0]!.access = [escalator("up")];
+    const outage = (description: string): Record<string, unknown> => ({
+      ...ACTIVE,
+      trips: [stepped],
+      traffic_info: [],
+      elevator_info: [],
+      escalator_info: [
+        { station: "Stephansplatz", description, reason: "", stop_ids: ["60201320"] },
+      ],
+    });
+    const up = await mount(
+      hass(
+        "2026-09-14T05:50:00+00:00",
+        outage("Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig in das Zwischengeschoß."),
+      ),
+      { entity: ENTITY },
+    );
+    expect(text(up)).toContain("Rolltreppe nach oben · außer Betrieb");
+    expect(text(up)).toContain(
+      "Rolltreppe außer Betrieb: Stephansplatz Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
+    );
+
+    document.body.innerHTML = "";
+    const down = await mount(
+      hass(
+        "2026-09-14T05:50:00+00:00",
+        outage("Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig."),
+      ),
+      { entity: ENTITY },
+    );
+    expect(text(down)).toContain("Rolltreppe nach oben");
+    expect(text(down)).not.toContain("außer Betrieb");
+  });
+
   it("names which lift is out and why, not just the station", async () => {
     // The feed is per lift, the trip names its lifts per station, so the
     // match is station-wide. Printing the location is what tells someone
