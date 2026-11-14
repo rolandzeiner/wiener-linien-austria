@@ -27,12 +27,14 @@ from custom_components.wiener_linien_austria.const import (
 from custom_components.wiener_linien_austria.routing import RoutingError
 from custom_components.wiener_linien_austria.run_times import RUN_TIME_EXCLUDED_MOTS
 from custom_components.wiener_linien_austria.skipped_stops import (
+    NOTICE_TEXT_MAX,
     NewsShapeError,
     SkippedStation,
     StopNotice,
     async_get_stop_calls,
     async_get_stop_notices,
     closed_until,
+    notice_shutting,
     noticed_stations,
     parse_news,
     skipped_stations,
@@ -227,6 +229,14 @@ def test_no_clear_unknown_call_stands_in(sample: dict[int, float]) -> None:
 # ---------------------------------------------------------------------------
 
 
+NEUE_DONAU_TITLE = "U6: Neue Donau, kein Halt Richtung Floridsdorf ab 14.09.2026"
+# The start of the notice's text as `/newsList` sent it on 2026-11-14.
+NEUE_DONAU_TEXT = (
+    "<h2>Bahnsteigsanierung</h2>\r\n<p>Wegen Sanierung des Bahnsteigs h&auml;lt "
+    "die Linie U6 die Station Neue Donau U nur in Richtung Siebenhirten U ein.</p>"
+)
+
+
 def _poi(
     lines: Any = ("U6",),
     stops: Any = (4644,),
@@ -234,7 +244,8 @@ def _poi(
     end: str | None = "2026-12-31T23:59:00.000+0100",
 ) -> dict[str, Any]:
     return {
-        "title": "U6: Neue Donau, kein Halt Richtung Floridsdorf ab 14.09.2026",
+        "title": NEUE_DONAU_TITLE,
+        "description": NEUE_DONAU_TEXT,
         "relatedLines": list(lines) if lines is not None else None,
         "relatedStops": list(stops) if stops is not None else None,
         "time": {"start": start, "end": end},
@@ -254,8 +265,18 @@ def _notice(
     start: datetime | None = datetime(2026, 8, 13, 12, 0, tzinfo=VIENNA),
     end: datetime | None = datetime(2026, 12, 31, 23, 59, tzinfo=VIENNA),
     no_call: bool = True,
+    title: str = NEUE_DONAU_TITLE,
+    text: str = NEUE_DONAU_TEXT,
 ) -> StopNotice:
-    return StopNotice(lines=lines, rbls=rbls, start=start, end=end, no_call=no_call)
+    return StopNotice(
+        lines=lines,
+        rbls=rbls,
+        start=start,
+        end=end,
+        no_call=no_call,
+        title=title,
+        text=text,
+    )
 
 
 def test_news_answer_parses_to_notices_naming_platforms() -> None:
@@ -385,6 +406,36 @@ def test_no_contradicting_notice_marks_nothing(
         noticed_stations(_catalogue(), WESTBAHNHOF, "U6", "H", sample, notices, NOW)
         == {}
     )
+
+
+def test_the_notice_shutting_a_station_is_the_one_about_not_calling() -> None:
+    shut = _notice()
+    lift = _notice(no_call=False, title="U6: Neue Donau - Kein Aufzug", text="<p>x</p>")
+
+    assert notice_shutting([lift, shut], "U6", NEUE_DONAU_SKIP, NOW) is shut
+    # Not a lift notice, not one for another line, not one out of force,
+    # not one naming the neighbours too, and not one with nothing to show.
+    assert notice_shutting([lift], "U6", NEUE_DONAU_SKIP, NOW) is None
+    assert notice_shutting([shut], "N6", NEUE_DONAU_SKIP, NOW) is None
+    for other in (
+        _notice(end=NOW - timedelta(minutes=1)),
+        _notice(rbls=frozenset({4643, 4644, 4645})),
+        _notice(text=""),
+    ):
+        assert notice_shutting([other], "U6", NEUE_DONAU_SKIP, NOW) is None
+    # Two that fit: which works a station shows must not be a guess.
+    assert (
+        notice_shutting([shut, _notice(text="<p>y</p>")], "U6", NEUE_DONAU_SKIP, NOW)
+        is None
+    )
+
+
+def test_a_long_notice_text_is_cut() -> None:
+    (notice,) = parse_news(
+        _news({**_poi(), "description": "x" * (NOTICE_TEXT_MAX + 50)})
+    )
+
+    assert len(notice.text) == NOTICE_TEXT_MAX
 
 
 # ---------------------------------------------------------------------------

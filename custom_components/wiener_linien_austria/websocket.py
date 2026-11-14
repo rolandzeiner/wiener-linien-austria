@@ -83,6 +83,7 @@ from .skipped_stops import (
     async_get_stop_calls,
     async_get_stop_notices,
     closed_until,
+    notice_shutting,
     noticed_stations,
     skipped_stations,
     stand_ins,
@@ -392,6 +393,7 @@ async def _websocket_run_times(
             "run_times": run_times,
             "no_stop": works.no_stop,
             "calling": works.calling,
+            "notices": works.notices,
             "attribution": ATTRIBUTION,
         },
     )
@@ -405,6 +407,9 @@ class _Works:
     no_stop: dict[str, dict[str, str | None]] = field(default_factory=dict)
     # "U6|H" → station → which runs call there after all.
     calling: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    # "U6|H" → station → the works notice behind it, in Wiener Linien's
+    # words: `title` and `text` (HTML as the feed sends it).
+    notices: dict[str, dict[str, dict[str, str]]] = field(default_factory=dict)
     # When the card should ask again for fresher calls.
     refresh_by: datetime | None = None
 
@@ -464,6 +469,12 @@ async def _async_works(
             works.no_stop.setdefault(key, {})[name] = (
                 until.isoformat() if until else None
             )
+            notice = notice_shutting(notices, label, station, now)
+            if notice is not None:
+                works.notices.setdefault(key, {})[name] = {
+                    "title": notice.title,
+                    "text": notice.text,
+                }
             calls = calls_by_diva[station.diva]
             if calls is None:
                 refresh.append(now + STOP_CALLS_RETRY_AFTER)

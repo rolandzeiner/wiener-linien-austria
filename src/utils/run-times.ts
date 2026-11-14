@@ -36,6 +36,16 @@ export interface StationCalls {
 /** `"U6|H"` → stop name as the trail prints it → its calls. */
 export type CallingByLine = Record<string, Record<string, StationCalls>>;
 
+/** The works notice behind a station in `no_stop`, in Wiener Linien's own
+ *  words: the headline and the text, HTML as the feed sends it. */
+export interface StationNotice {
+  title?: string;
+  text?: string;
+}
+
+/** `"U6|H"` → stop name as the trail prints it → its notice. */
+export type NoticesByLine = Record<string, Record<string, StationNotice>>;
+
 /** The `wiener_linien_austria/run_times` answer. */
 export interface RunTimesAnswer {
   diva: number;
@@ -47,6 +57,9 @@ export interface RunTimesAnswer {
   /** Absent from a backend older than the feature, and for a station whose
    *  departures couldn't be fetched. */
   calling?: CallingByLine;
+  /** Absent from a backend older than the feature, and for a station no
+   *  single notice explains. */
+  notices?: NoticesByLine;
   attribution?: string;
 }
 
@@ -55,6 +68,7 @@ export interface RunTimesState {
   runTimes: RunTimesByLine;
   noStop: NoStopByLine;
   calling: CallingByLine;
+  notices: NoticesByLine;
   /** Epoch ms from which the answer is asked for again. */
   validUntil: number;
   /** Lines asked about under this answer, and when. A line the answer lacks
@@ -114,10 +128,12 @@ export function runTimesAnswered(
   const runTimes = answer.run_times;
   const noStop = answer.no_stop;
   const calling = answer.calling;
+  const notices = answer.notices;
   return {
     runTimes: runTimes && typeof runTimes === "object" ? runTimes : {},
     noStop: noStop && typeof noStop === "object" ? noStop : {},
     calling: calling && typeof calling === "object" ? calling : {},
+    notices: notices && typeof notices === "object" ? notices : {},
     validUntil: Number.isFinite(until) && until > nowMs ? until : nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };
@@ -134,6 +150,7 @@ export function runTimesFailed(
     runTimes: prev?.runTimes ?? {},
     noStop: prev?.noStop ?? {},
     calling: prev?.calling ?? {},
+    notices: prev?.notices ?? {},
     validUntil: nowMs + RUN_TIMES_RETRY_MS,
     asked: askedWith(prev, key, nowMs),
   };

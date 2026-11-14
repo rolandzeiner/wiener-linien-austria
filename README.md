@@ -358,7 +358,7 @@ The four cards install and register with the integration, and find your Wiener L
 The everyday departure board. In the card picker it's **Wiener Linien Austria**. It follows your theme, and each stop takes the colour of its next line.
 
 - Several stops, stacked or in tabs, with up to 20 departures each and the next one shown large.
-- Select a departure to see its stops down to the terminus, with transfer chips and, if you turn them on, estimated arrival times and "Kein Halt" at a station the train goes through.
+- Select a departure to see its stops down to the terminus, with transfer chips and, if you turn them on, estimated arrival times and "Kein Halt" at a station the train goes through. Where Wiener Linien's works notice says why, "Kein Halt" has an ⓘ: tap it to read the notice under the station.
 - A walking time per line hides departures you can't reach.
 - A QR button encodes the stop's position for your phone.
 - Disruption and lift notices fold out above the board.
@@ -610,6 +610,8 @@ Works don't always close a station all day. U6 Neue Donau towards Floridsdorf wa
 Where a later train of the line does stop there, "Kein Halt" says when: "Kein Halt bis 22:02 Uhr". Notice texts can't give this. They say "fallweise ab 22:00" in prose and not which nights; the timetable says which train.
 
 Where no train of the line stops there in the time those departures cover, "Kein Halt" carries the date the stop is back. That needs exactly one notice in force that names that platform and that line, without naming the stations either side, and gives a real end. Open-ended notices end at 11:11 on some date years away, and those don't count. While other trains of the line do stop there, the date is left off, so it doesn't read as no train stopping before then.
+
+The same notice, where it says the line doesn't stop there, unfolds under the station when you tap the ⓘ after "Kein Halt": what is being done, for how long, and what to take instead, in Wiener Linien's own words (German only, as the feed has no other). It arrives with the trail's travel times, so it costs no request of its own. A notice about something else at that platform, such as a missing lift, is not shown there.
 
 A stop the timetable knows by an id the station list doesn't have takes the time of the call where the route has it: N6's last call is "Enkplatz/Grillgasse" in the timetable and Enkplatz on its route.
 

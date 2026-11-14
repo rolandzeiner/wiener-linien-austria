@@ -238,6 +238,11 @@ class StopNotice:
     end: datetime | None
     # Whether the notice says vehicles don't call there (`_NO_CALL_RE`).
     no_call: bool = False
+    # Wiener Linien's own words, for the card to show under a station the
+    # notice shuts: the headline, and the text as the feed sends it (HTML,
+    # cut at `NOTICE_TEXT_MAX`).
+    title: str = ""
+    text: str = ""
 
 
 def noticed_stations(
@@ -335,9 +340,47 @@ def parse_news(body: Mapping[str, Any]) -> list[StopNotice]:
                 start=parse_aware_datetime(span.get("start")),
                 end=parse_aware_datetime(span.get("end")),
                 no_call=_says_no_call(poi),
+                title=_text(poi.get("title")),
+                text=_text(poi.get("description"))[:NOTICE_TEXT_MAX],
             )
         )
     return notices
+
+
+# The longest notice text passed on to a card. Neue Donau's is about 1,200
+# characters of HTML; a whole-line works notice can run to several
+# thousand, but those name many platforms and never shut one station.
+NOTICE_TEXT_MAX: Final = 4000
+
+
+def _text(value: Any) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def notice_shutting(
+    notices: Iterable[StopNotice],
+    line: str,
+    station: SkippedStation,
+    now: datetime,
+) -> StopNotice | None:
+    """The notice that says why a skipped station isn't served, if one does.
+
+    By `closed_until`'s test (in force, names the line and one of the
+    station's platforms on this route, neither neighbour), and it has to be
+    about not calling there: a missing-lift notice at the same platform
+    explains nothing about a train going through. None unless exactly one
+    notice fits, so the card never shows the wrong works under a station.
+    """
+    fitting = [
+        notice
+        for notice in notices
+        if notice.no_call
+        and notice.text
+        and _in_force_for(notice, line, now)
+        and notice.rbls & station.rbls
+        and not notice.rbls & station.neighbour_rbls
+    ]
+    return fitting[0] if len(fitting) == 1 else None
 
 
 # How Wiener Linien word a stop the vehicles pass: "kein Halt Richtung

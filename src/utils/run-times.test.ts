@@ -37,6 +37,7 @@ function held(overrides: Partial<RunTimesState> = {}): RunTimesState {
     runTimes: { [U1]: { Leopoldau: 14 } },
     noStop: {},
     calling: {},
+    notices: {},
     validUntil: NOW + 6 * HOUR,
     asked: new Map(),
     ...overrides,

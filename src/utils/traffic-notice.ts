@@ -503,6 +503,65 @@ export function parseTrafficNotice(raw: unknown, title?: unknown, reason?: unkno
   return { blocks, facts };
 }
 
+/** A works notice from `/newsList`, laid out: what it is, the opening
+ *  sentences, and its labelled parts. */
+export interface WorksNotice {
+  /** "Bahnsteigsanierung": the notice's own headline, or "". */
+  heading: string;
+  paras: string[];
+  /** "Zeitraum" → "Montag, 14. September 2026 bis Ende 2026." */
+  facts: Array<{ label: string; value: string }>;
+}
+
+/** "Zeitraum:", "Maßnahmen:", "Ersatz:", "Hinweis:", and on the bus stop
+ *  notices "Haltestelle: Habsburgergasse", "Dauer: …", "Grund: …". A label
+ *  is a word or three starting with a capital; a sentence that happens to
+ *  hold a colon is longer than that. */
+const WORKS_LABEL_RE = /^(\p{Lu}[\p{L} /-]{1,23}):\s*(.*)$/u;
+
+/** A headline is short and doesn't end like a sentence. */
+const WORKS_HEADING_MAX = 48;
+
+/** Lay out a works notice's text.
+ *
+ *  The operator writes these to one template: a headline, a sentence or two,
+ *  then parts under underlined labels, each label on a line of its own with
+ *  its text after a break ("Zeitraum:" / "Montag, 14. September 2026 bis
+ *  Ende 2026."), or label and text on one line ("Dauer: Ab 19. Jänner
+ *  2026"). The markup carrying that is presentation only, so it goes
+ *  through `toLines` like a disruption's text: nothing from upstream is
+ *  ever interpreted as markup. A text off the template comes out as plain
+ *  paragraphs. */
+export function parseWorksNotice(raw: unknown): WorksNotice {
+  const lines = toLines(typeof raw === "string" ? raw : "");
+  const notice: WorksNotice = { heading: "", paras: [], facts: [] };
+  const first = lines[0];
+  if (
+    first !== undefined &&
+    lines.length > 1 &&
+    first.length <= WORKS_HEADING_MAX &&
+    !/[.!?:]$/.test(first)
+  ) {
+    notice.heading = first;
+    lines.shift();
+  }
+  let open: { label: string; value: string } | null = null;
+  for (const line of lines) {
+    const label = WORKS_LABEL_RE.exec(line);
+    if (label?.[1]) {
+      open = { label: label[1], value: label[2] ?? "" };
+      notice.facts.push(open);
+    } else if (open) {
+      open.value = open.value ? `${open.value} ${line}` : line;
+    } else {
+      notice.paras.push(line);
+    }
+  }
+  // A label with nothing under it says nothing.
+  notice.facts = notice.facts.filter((fact) => fact.value);
+  return notice;
+}
+
 /** Line-list prefix on an alert title: "11A, 59A, 48A: Verkehrsüberlastung",
  *  "U1: Verspätungen", "Linien 40, 41: Umleitung". The operator writes the
  *  affected lines into the title, and the departure board already shows them

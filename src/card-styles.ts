@@ -1417,6 +1417,70 @@ export const cardStyles = css`
     font-size: 0.85em;
     white-space: nowrap;
   }
+  /* The note as a button, where Wiener Linien's notice says why: the text
+     itself is the control, with an ⓘ after it. No pill and no fill: among
+     the transfer chips it must still read as a remark about the stop, not
+     as another line to change to. 24px tall for a finger (the row itself
+     is only as tall as the dot). */
+  .stops-ahead-skip--more {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.85em;
+    text-align: start;
+    cursor: pointer;
+  }
+  .stops-ahead-skip--more ha-icon {
+    --mdc-icon-size: 15px;
+    flex-shrink: 0;
+    color: var(--secondary-text-color);
+  }
+  .stops-ahead-stop.notice-expanded .stops-ahead-skip--more ha-icon {
+    color: var(--primary-text-color);
+  }
+  /* With its notice open, the work-zone capsule runs the whole height of
+     the stop: the striped stretch of line is as long as the text about it,
+     and the notice needs no box or rule of its own to belong to it. The
+     text starts in the times' column, like everything else at a stop, in
+     the card's notice type, the labels in the small caps the disruption
+     facts use. */
+  .stops-ahead-stop.skipped.notice-expanded .stops-ahead-dot {
+    top: 1px;
+    bottom: 1px;
+    height: auto;
+    transform: none;
+  }
+  .stops-ahead-notice {
+    margin: 0 0 var(--ha-space-2, 8px);
+    color: var(--secondary-text-color);
+    font-size: 0.85em;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .stops-ahead-notice p {
+    margin: 0 0 6px;
+  }
+  .stops-ahead-notice-heading {
+    color: var(--primary-text-color);
+    font-weight: 600;
+  }
+  .stops-ahead-notice-facts {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+  }
+  /* One column: the labels differ too much in length ("Ersatz",
+     "Maßnahmen") for a shared label column in a panel this narrow. */
+  .stops-ahead-notice-facts .alert-fact {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
   /* On a narrow card the note would squeeze the name down to "Neu…",
      which no longer says which station is skipped. There it takes a line
      of its own under the name, after any chips; the stop grows, and its

@@ -46,10 +46,12 @@ import { stopMapUrl } from "./utils/map-url.js";
 import {
   iconForElevatorReason,
   parseEscalatorNotice,
+  parseWorksNotice,
   parseTrafficNotice,
   splitLocationPath,
   trimTitleLinePrefix,
   type TrafficNotice,
+  type WorksNotice,
 } from "./utils/traffic-notice.js";
 import { mdiPathForIcon } from "./utils/mdi-paths.js";
 import { arrowStep, revealOffset, tabEdges, type TabEdges } from "./utils/tab-scroll.js";
@@ -67,6 +69,7 @@ import {
   type RunTimesAnswer,
   type RunTimesState,
   type StopEta,
+  type StationNotice,
   type StopSkip,
 } from "./utils/run-times.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
@@ -131,6 +134,8 @@ function platformLabelKey(type: string | undefined): string {
 interface StopTimes {
   eta(stopName: string): StopEta | null;
   skip(stopName: string): StopSkip | null;
+  /** The works notice behind a skipped stop, where one explains it. */
+  notice(stopName: string): StationNotice | null;
 }
 
 // Cache `Intl.DateTimeFormat` instances by IANA timezone — building one
@@ -212,6 +217,7 @@ export class WienerLinienAustriaCard extends LitElement {
   // tram/bus transfers; collapsing them by default keeps the trail
   // readable, U-Bahn chips always stay inline.
   @state() private _expandedTransfers = new Set<string>();
+  @state() private _expandedNotices = new Set<string>();
   // Scheduled minutes to the stops ahead, per stop (DIVA), for
   // show_stop_times. Asked for over the run_times WebSocket command the
   // first time a trail is opened; see utils/run-times.ts. Kept across
@@ -271,6 +277,7 @@ export class WienerLinienAustriaCard extends LitElement {
     this._expandedTraffic = new Set();
     this._expandedElevator = new Set();
     this._expandedTransfers = new Set();
+    this._expandedNotices = new Set();
     this._qrOpenFor = null;
     this._activeTab = 0;
     this._debugTraffic = [];
@@ -1527,6 +1534,7 @@ export class WienerLinienAustriaCard extends LitElement {
             etas[idx],
             struck,
             times?.skip(s.name) ?? null,
+            times?.notice(s.name) ?? null,
           ),
         )}
       </ol>
@@ -1566,9 +1574,11 @@ export class WienerLinienAustriaCard extends LitElement {
     const now = Date.now();
     const verdict = (stopName: string) =>
       stopVerdict(dep, minutes?.[stopName], skipped?.[stopName], calling?.[stopName], now);
+    const notices = held?.notices[key];
     return {
       eta: (stopName) => stopEta(dep, verdict(stopName).minutes, now),
       skip: (stopName) => verdict(stopName).skip,
+      notice: (stopName) => notices?.[stopName] ?? null,
     };
   }
 
@@ -2103,6 +2113,8 @@ export class WienerLinienAustriaCard extends LitElement {
     struck = false,
     // The timetable has the train going through here without a call.
     skip: StopSkip | null = null,
+    // Wiener Linien's notice saying why, where one does.
+    stationNotice: StationNotice | null = null,
   ): TemplateResult {
     // Inline lines (always shown next to the station name): U-Bahn and
     // S-Bahn at any time, plus night lines (N-prefix + digit) WHEN
@@ -2131,11 +2143,18 @@ export class WienerLinienAustriaCard extends LitElement {
     }
     const transferKey = this._transferKey(rowKey, idx);
     const transfersExpanded = this._expandedTransfers.has(transferKey);
+    // The notice unfolds under a skipped stop. Its key is the transfers'
+    // key: a skipped stop has no transfers to open, so the two never meet.
+    const works = skip && stationNotice?.text ? parseWorksNotice(stationNotice.text) : null;
+    const hasNotice = !!works && (works.paras.length > 0 || works.facts.length > 0);
+    const noticeOpen = hasNotice && this._expandedNotices.has(transferKey);
+    const noticeId = `wl-stop-notice-${transferKey.replace(/[^\w-]/g, "_")}`;
     const stopClasses = {
       "stops-ahead-stop": true,
       terminus: !!s.is_terminus,
       skipped: !!skip,
       "transfers-expanded": transfersExpanded,
+      "notice-expanded": noticeOpen,
     };
     const skipLabel = skip
       ? skip.next
@@ -2287,11 +2306,58 @@ export class WienerLinienAustriaCard extends LitElement {
           <span class="stops-ahead-dot" aria-hidden="true"></span>
           ${time}
           <span class="stops-ahead-name">${deText(s.name)}</span>
-          ${skip ? html`<span class="stops-ahead-skip">${skipLabel}</span>` : nothing}
+          ${
+            !skip
+              ? nothing
+              : hasNotice
+                ? html`<button
+                    type="button"
+                    class="stops-ahead-skip stops-ahead-skip--more"
+                    aria-expanded=${noticeOpen ? "true" : "false"}
+                    aria-controls=${noticeId}
+                    @click=${(ev: MouseEvent) => {
+                      ev.stopPropagation();
+                      this._expandedNotices = toggleInSet(this._expandedNotices, transferKey);
+                    }}
+                    @keydown=${(ev: KeyboardEvent) => ev.stopPropagation()}
+                  >
+                    <span>${skipLabel}</span>
+                    <span class="sr-only">, ${this._t("stop_notice")}</span>
+                    <ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon>
+                  </button>`
+                : html`<span class="stops-ahead-skip">${skipLabel}</span>`
+          }
           ${metroChips} ${otherToggle}
         </div>
         ${otherPanel}
+        ${noticeOpen && works ? this._renderStopNotice(works, noticeId) : nothing}
       </li>
+    `;
+  }
+
+  /** Wiener Linien's works notice under a station the line goes through:
+   *  what is being done, then its labelled parts (Zeitraum, Maßnahmen,
+   *  Ersatz, Hinweis). German whatever the dashboard's language, as the
+   *  feed has no other; plain text bindings, never markup. */
+  private _renderStopNotice(works: WorksNotice, id: string): TemplateResult {
+    return html`
+      <div class="stops-ahead-notice" id=${id} lang="de">
+        <p class="sr-only" lang=${this._lang()}>${this._t("stop_notice")}</p>
+        ${works.heading ? html`<p class="stops-ahead-notice-heading">${works.heading}</p>` : nothing}
+        ${works.paras.map((para) => html`<p>${para}</p>`)}
+        ${
+          works.facts.length
+            ? html`<dl class="stops-ahead-notice-facts">
+                ${works.facts.map(
+                  (fact) => html`<div class="alert-fact">
+                    <dt>${fact.label}</dt>
+                    <dd>${fact.value}</dd>
+                  </div>`,
+                )}
+              </dl>`
+            : nothing
+        }
+      </div>
     `;
   }
 

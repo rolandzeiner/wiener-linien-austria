@@ -962,6 +962,7 @@ def _messestrasse_news() -> dict[str, Any]:
             "pois": [
                 {
                     "title": "U1: Messestraße, kein Halt Richtung Oberlaa",
+                    "description": "<h2>Bahnsteigsanierung</h2><p>Kein Halt.</p>",
                     "relatedLines": ["U1"],
                     "relatedStops": [93],
                     "time": {
@@ -1020,6 +1021,14 @@ async def test_command_names_the_stations_a_trail_passes_without_a_call(
     assert response["success"], response
     result = response["result"]
     assert result["no_stop"] == {"U1|H": {"Messestraße": "2026-12-31T23:59:00+01:00"}}
+    assert result["notices"] == {
+        "U1|H": {
+            "Messestraße": {
+                "title": "U1: Messestraße, kein Halt Richtung Oberlaa",
+                "text": "<h2>Bahnsteigsanierung</h2><p>Kein Halt.</p>",
+            }
+        }
+    }
     assert result["calling"] == {
         "U1|H": {
             "Messestraße": {

@@ -9,6 +9,7 @@ import {
   iconForElevatorReason,
   parseEscalatorNotice,
   parseTrafficNotice,
+  parseWorksNotice,
   splitLocationPath,
   trimTitleLinePrefix,
 } from "./traffic-notice.js";
@@ -309,6 +310,63 @@ describe("parseEscalatorNotice", () => {
     });
     expect(parseEscalatorNotice("")).toEqual({ where: "", notes: [] });
     expect(parseEscalatorNotice(undefined)).toEqual({ where: "", notes: [] });
+  });
+});
+
+describe("parseWorksNotice", () => {
+  it("lays out a notice with labels on their own lines", () => {
+    // U6 Neue Donau, `/newsList`, 2026-11-14.
+    const raw =
+      "<h2>Bahnsteigsanierung</h2>\r\n<p>Wegen Sanierung des Bahnsteigs h&auml;lt die Linie U6 die Station Neue Donau U nur in Richtung Siebenhirten U ein.<br />Sie erreichen die Station Neue Donau mit der U6 von Floridsdorf.</p>\r\n" +
+      '<p><span style="text-decoration: underline;"><strong>Zeitraum:</strong></span><br />Montag, 14. September 2026 bis Ende 2026.</p>\r\n' +
+      '<p><span style="text-decoration: underline;"><strong>Ma&szlig;nahmen:</strong></span><br />Die Station Neue Donau U wird in Richtung Floridsdorf U durchfahren.</p>';
+    expect(parseWorksNotice(raw)).toEqual({
+      heading: "Bahnsteigsanierung",
+      paras: [
+        "Wegen Sanierung des Bahnsteigs hält die Linie U6 die Station Neue Donau U nur in Richtung Siebenhirten U ein.",
+        "Sie erreichen die Station Neue Donau mit der U6 von Floridsdorf.",
+      ],
+      facts: [
+        { label: "Zeitraum", value: "Montag, 14. September 2026 bis Ende 2026." },
+        {
+          label: "Maßnahmen",
+          value: "Die Station Neue Donau U wird in Richtung Floridsdorf U durchfahren.",
+        },
+      ],
+    });
+  });
+
+  it("reads a label and its text on one line", () => {
+    // N31 Stammersdorf, the bus-stop notices' shape.
+    const raw =
+      "<p>Haltestellenauflassung der Linie N31 in Richtung Schwedenplatz U</p><p>Haltestelle: Stammersdorf<br />Dauer: Ab 30. September 2026, etwa 13:00 Uhr<br />Grund: Rohrleitungsarbeiten</p>";
+    expect(parseWorksNotice(raw)).toEqual({
+      heading: "",
+      paras: ["Haltestellenauflassung der Linie N31 in Richtung Schwedenplatz U"],
+      facts: [
+        { label: "Haltestelle", value: "Stammersdorf" },
+        { label: "Dauer", value: "Ab 30. September 2026, etwa 13:00 Uhr" },
+        { label: "Grund", value: "Rohrleitungsarbeiten" },
+      ],
+    });
+  });
+
+  it("keeps a text off the template as paragraphs, and a sentence with a colon whole", () => {
+    expect(
+      parseWorksNotice(
+        "<p>Die Station wird bis auf Weiteres ohne Halt durchfahren: bitte ausweichen.</p>",
+      ),
+    ).toEqual({
+      heading: "",
+      paras: ["Die Station wird bis auf Weiteres ohne Halt durchfahren: bitte ausweichen."],
+      facts: [],
+    });
+    expect(parseWorksNotice("")).toEqual({ heading: "", paras: [], facts: [] });
+    expect(parseWorksNotice(undefined)).toEqual({ heading: "", paras: [], facts: [] });
+  });
+
+  it("drops a label with nothing under it", () => {
+    expect(parseWorksNotice("<p>Sperre.</p><p>Hinweis:</p>").facts).toEqual([]);
   });
 });
 

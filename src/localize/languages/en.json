@@ -101,6 +101,7 @@
     "stop_skipped": "No stop",
     "stop_skipped_until": "No stop until {date}",
     "stop_skipped_until_time": "No stop until {time}",
+    "stop_notice": "Wiener Linien notice",
     "dir_h": "Outbound",
     "dir_r": "Return",
     "dir_h_short": "H",

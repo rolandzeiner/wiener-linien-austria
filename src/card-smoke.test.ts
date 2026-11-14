@@ -1108,6 +1108,7 @@ function runTimesAnswer(
   runTimes: Record<string, Record<string, number>>,
   noStop?: Record<string, Record<string, string | null>>,
   calling?: Record<string, Record<string, unknown>>,
+  notices?: Record<string, Record<string, { title: string; text: string }>>,
 ): unknown {
   return {
     diva: 60200959,
@@ -1116,6 +1117,7 @@ function runTimesAnswer(
     run_times: runTimes,
     ...(noStop ? { no_stop: noStop } : {}),
     ...(calling ? { calling } : {}),
+    ...(notices ? { notices } : {}),
   };
 }
 
@@ -1305,6 +1307,76 @@ describe("show_stop_times on a station the train goes through", () => {
     const row = shadow(el).querySelector(".stops-ahead-stop.skipped .stops-ahead-row");
     expect(row?.getAttribute("role")).toBeNull();
     expect(row?.querySelector(".stops-ahead-other-toggle, .stops-ahead-line-chip")).toBeNull();
+  });
+
+  describe("with Wiener Linien's notice", () => {
+    // Neue Donau's notice as `/newsList` sent it on 2026-11-14, shortened.
+    const TEXT = [
+      "<h2>Bahnsteigsanierung</h2>\r\n<p>Wegen Sanierung des Bahnsteigs h&auml;lt die Linie U6",
+      "die Station Neue Donau U nur in Richtung Siebenhirten U ein.</p>\r\n",
+      '<p><span style="text-decoration: underline;"><strong>Zeitraum:</strong></span><br />',
+      "Montag, 14. September 2026 bis Ende 2026.</p>\r\n",
+      '<p><span style="text-decoration: underline;"><strong>Ersatz:</strong></span><br />',
+      "Fahren Sie weiter bis Floridsdorf U.</p><script>alert(1)</script>",
+    ].join(" ");
+    const answer = (text: string): unknown =>
+      runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: null } }, undefined, {
+        "U3|H": { Neubaugasse: { title: "U3: Neubaugasse, kein Halt", text } },
+      });
+    const noteButton = (el: CardElement): HTMLButtonElement | null =>
+      shadow(el).querySelector<HTMLButtonElement>("button.stops-ahead-skip--more");
+    const panel = (el: CardElement): HTMLElement | null =>
+      shadow(el).querySelector<HTMLElement>(".stops-ahead-notice");
+
+    it("turns the note into a button that unfolds the notice under the stop", async () => {
+      const el = await mountTimes(vi.fn().mockResolvedValue(answer(TEXT)));
+      await openTrail(el);
+
+      const button = noteButton(el)!;
+      expect(button.textContent?.replace(/\s+/g, " ").trim()).toBe(
+        "Kein Halt , Hinweis der Wiener Linien",
+      );
+      expect(button.getAttribute("aria-expanded")).toBe("false");
+      expect(panel(el)).toBeNull();
+
+      button.click();
+      await el.updateComplete;
+
+      expect(button.getAttribute("aria-expanded")).toBe("true");
+      const open = panel(el)!;
+      expect(button.getAttribute("aria-controls")).toBe(open.id);
+      expect(open.getAttribute("lang")).toBe("de");
+      expect(open.querySelector(".stops-ahead-notice-heading")?.textContent).toBe(
+        "Bahnsteigsanierung",
+      );
+      expect(
+        [...open.querySelectorAll(".alert-fact")].map((fact) => [
+          fact.querySelector("dt")?.textContent,
+          fact.querySelector("dd")?.textContent,
+        ]),
+      ).toEqual([
+        ["Zeitraum", "Montag, 14. September 2026 bis Ende 2026."],
+        ["Ersatz", "Fahren Sie weiter bis Floridsdorf U."],
+      ]);
+      // The feed's text is read as text: entities decoded, no markup kept.
+      expect(open.textContent).toContain("hält die Linie U6");
+      expect(open.querySelector("script, strong, h2")).toBeNull();
+      expect(open.textContent).not.toContain("alert(1)");
+      // The trail's own row stays shut: the tap was for the note.
+      expect(shadow(el).querySelector(".stops-ahead")).not.toBeNull();
+
+      button.click();
+      await el.updateComplete;
+      expect(panel(el)).toBeNull();
+    });
+
+    it("leaves the note as plain text where the notice has nothing to show", async () => {
+      const el = await mountTimes(vi.fn().mockResolvedValue(answer("")));
+      await openTrail(el);
+
+      expect(noteButton(el)).toBeNull();
+      expect(notes(el)).toEqual(["Kein Halt"]);
+    });
   });
 
   it("says no stop without a date where no notice gives one", async () => {
