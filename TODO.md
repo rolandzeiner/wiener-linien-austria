@@ -52,23 +52,31 @@ Could add, all in requests the integration already makes:
   the same shape as `aufzugsinfo`. `alerts.py` already names it as a later
   change: it needs sensor attributes, translations and card rendering.
   Check first how many a stop gets on a normal day, so the card isn't
-  flooded.
+  flooded. A second request on the evening of 14.11.2026 had 15 notices
+  at 13 stations, two at most per station (Enkplatz, Frankhplatz). Some
+  are announcements: one was for a night ten days ahead (24.11., 01:15
+  to 05:15), so filter on `time.start` as for the lifts.
 - [ ] **Group follow-up messages by `parentName`.** A follow-up is named
   `I20261114-0026-F01` and carries `parentName` `I20261114-0026`; the
   first message has both equal. Check whether the list ever holds a
   message and its follow-up at once, and if so show one disruption once.
+  It didn't in either request of 14.11.2026; the evening one had no
+  follow-up at all (5 disruptions, each its own parent).
 - [ ] **A structured cause: `reasonName`, `alertCause`.** Each notice
   carries a coarse English category (`alertCauseId` / `alertCause`) and
   Wiener Linien's own finer German reason (`reasonId` / `reasonName`).
-  The cards already pick a cause icon, but from the wording of the
-  description's "Grund:" line (`REASON_ICONS` in
-  `src/utils/traffic-notice.ts`); these fields would cover the notices
-  that have no such line. The
+  The cards pick a cause icon from the wording (`REASON_ICONS` in
+  `src/utils/traffic-notice.ts`): from the description's "Grund:" line,
+  and since 14.11.2026 from the title ("25: Rettungseinsatz") when the
+  description has none, with Falschparker added. That covered all 8
+  active disruptions of that day, one more than the new fields would
+  have, so the fields are only worth reading if titles turn up that name
+  no cause. The
   documentation spells one field `alterCause`; the API sends `alertCause`,
   and gives no list of values. See the table below for what was seen.
 
-  Seen on 14.11.2026 in two `/trafficInfoList` requests and one
-  `/newsList` (about 240 notices): 7 categories and 10 reasons. The ids
+  Seen on 14.11.2026 in three `/trafficInfoList` requests and one
+  `/newsList` (about 300 notices): 8 categories and 11 reasons. The ids
   run to 258, so this is a small part of the list; collect them for a few
   weeks before fixing a mapping. Icon names checked against MDI 7.4.47,
   the set Home Assistant ships.
@@ -78,7 +86,8 @@ Could add, all in requests the integration already makes:
   | 14 | emergency medical services | 9 | Rettungseinsatz | disruptions | `mdi:ambulance` (as today) |
   | 77 | accident | 12 | Verkehrsunfall | disruptions | `mdi:car-emergency` (as today) |
   | 77 | accident | 13 | Fremder Verkehrsunfall | disruptions | `mdi:car-emergency` (as today) |
-  | 71 | vehicle on the line | 25 | Falschparker | disruptions | `mdi:tow-truck` (or `mdi:car-off`); none today |
+  | 71 | vehicle on the line | 25 | Falschparker | disruptions | `mdi:tow-truck` (as today) |
+  | 3 | police activity | 47 | Polizeieinsatz | disruptions | `mdi:police-badge` (as today) |
   | 45 | construction work | 21 | Bauarbeiten | disruptions (documentation), news | `mdi:excavator` (as today) |
   | 45 | construction work | 27 | Gleisbauarbeiten | disruptions, news | `mdi:excavator` (as today) |
   | 120 | special event | 35 | Veranstaltung | news | `mdi:account-group` (as today) |
@@ -86,27 +95,18 @@ Could add, all in requests the integration already makes:
   | 255 | undefined alert cause | 258 | Netzänderung | news | `mdi:transit-detour`; none today |
   | 255 | undefined alert cause | 0 | undefined | every lift, escalator and `stoerungkurz` notice, some disruptions, most news | none: keep today's icon |
 
-  Against today's behaviour, on the 11 distinct disruptions of that day
-  (8 active, 3 resolved; the backend keeps only the active ones):
+  On the 11 distinct disruptions of that day (8 active, 3 resolved; the
+  backend keeps only the active ones), before the title was read:
 
   | | of 8 active | of all 11 |
   |---|---|---|
-  | Cause icon today, from the "Grund:" line | 3 | 4 |
+  | Cause icon from the "Grund:" line | 3 | 4 |
   | Cause icon from `reasonId` alone | 6 | 9 |
   | Both together | 7 | 10 |
-  | Newly given an icon | 4 | 6 |
 
-  The ones gained are follow-ups whose text no longer names the cause:
-  "25: Rettungseinsatz" with the description "Nach einer Fahrtbehinderung
-  kommt es zu unterschiedlichen Intervallen", and "60: Falschparker",
-  which `REASON_ICONS` has no pattern for. One notice went the other way:
-  "25, 26, 27: Gleisbauarbeiten" has a "Grund:" line but `reasonId` 0, so
-  the text has to stay as the fallback. "26E: Gleisbauarbeiten" has
-  neither. A cheaper half-step without the new fields: run `REASON_ICONS`
-  over the title when the description has no "Grund:" line, and add
-  Falschparker to it. On that day every one of the 8 active titles named
-  its cause, "26E: Gleisbauarbeiten" included, so this would have covered
-  all 8, one more than the new fields. Try that first.
+  `reasonId` is no replacement for the text: "25, 26, 27:
+  Gleisbauarbeiten" has a "Grund:" line but `reasonId` 0, and "26E:
+  Gleisbauarbeiten" has neither, only the title.
 
   Things to settle:
   - Map by `reasonId`, with `alertCauseId` as the fallback for a reason
@@ -131,8 +131,9 @@ Could add, all in requests the integration already makes:
 Documented in V1.6 but empty in that request, so not usable yet:
 
 - [ ] **English notice texts (`languageId=en`, `languages`).** `languages`
-  was null on all 32 notices with `languageId=en` sent. Ask again in a few
-  weeks; if it fills, the English cards could show English notices.
+  was null on all 32 notices with `languageId=en` sent, and on all 63 of
+  a second request that evening. Ask again in a few weeks; if it fills,
+  the English cards could show English notices.
 - [ ] **`relatedLinesDetails.relatedStops`, `scenarioId`,
   `scenarioName`.** Not in that request; `relatedLinesDetails` had only
   `lineId`, `lineName` and `vehicleType`.
@@ -146,12 +147,3 @@ Checked, nothing to do:
 - Of the open-data CSVs the integration leaves three alone:
   `-verbindungen`, `-gps-punkte` (the lines' geometry, about 70,000 rows)
   and `-steige`. None is new.
-
-## Not looked at yet
-
-- [ ] **"Last connection of the night" on weekend nights.** It asks once
-  between 22:00 and 03:00 for a trip arriving by 04:00
-  (`route_coordinator.py`, `LAST_CONNECTION_*`). On Friday and Saturday
-  nights and before public holidays the U-Bahn runs through, so there may
-  be no last connection to show. Read the code and its tests for what the
-  card says then. This one needs no device; it just wasn't done.
