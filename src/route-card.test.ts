@@ -1653,7 +1653,7 @@ describe("earlier and later", () => {
     expect(inert(el)).toEqual([null, "true"]);
   });
 
-  it("explains the rule beside the stale note, and under a refusal", async () => {
+  it("explains the rule beside a short stale note, and under a refusal", async () => {
     const { el } = await mountBudget([
       { requests_left: 1, requests_next_in: 30 },
       { requests_left: 0, requests_next_in: 45, stale: true },
@@ -1662,8 +1662,11 @@ describe("earlier and later", () => {
     await settle(el);
     expect(why(el)).toBe(WHY);
     // The rule is in a closed toggletip, so the note still has to say that
-    // the plan on screen is an older one.
-    expect(root(el).querySelector(".stale-note")?.textContent).toContain("etwas älterer Stand");
+    // the plan on screen is an older one. Only that: the countdown beside
+    // the steps already says there were too many requests.
+    const stale = root(el).querySelector(".stale-note")?.textContent ?? "";
+    expect(stale).toContain("Etwas älterer Stand");
+    expect(stale).not.toContain("zu viele");
 
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h } = adhocHass(async () => {

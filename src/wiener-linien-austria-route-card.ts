@@ -1317,14 +1317,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : html`${back}${this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false)}`;
     }
     // Budget spent: the plan on screen is older than usual. The header's
-    // "Zuletzt aktualisiert" already says how old; this says why. The pager's
-    // countdown says when the next request can go out, not that the plan
-    // shown is an older one, and the rule sits in a closed toggletip.
+    // "Zuletzt aktualisiert" already says how old; this says why. While the
+    // pager counts down to the next request, that and its ⓘ are the why, so
+    // the note keeps to the one thing they don't say: that the plan shown
+    // is an older one.
     const stale =
       plan.stale && this._phase !== "paused"
         ? html`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
-            <span>${this._t("adhoc_stale")}</span>
+            <span>${this._t(this._pagerWait() > 0 ? "adhoc_stale_short" : "adhoc_stale")}</span>
           </p>`
         : nothing;
     const trips = upcomingTrips(plan, this._now);
