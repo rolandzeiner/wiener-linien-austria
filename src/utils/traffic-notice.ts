@@ -190,10 +190,11 @@ export function iconForElevatorReason(reason: string): string {
 }
 
 /** Which way a broken escalator runs. `both` is one switched to suit the
- *  crowd; `null` when the feed's text doesn't say. */
+ *  crowd. */
 export type EscalatorDirection = "up" | "down" | "both";
 
 export interface EscalatorNotice {
+  /** Null when the feed's text doesn't say. */
   direction: EscalatorDirection | null;
   /** Where it runs, without the words the direction already covers:
    *  "vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße". */
@@ -213,7 +214,7 @@ const ESCALATOR_DIRECTION_RE = /\bin\s+(Auf\/Ab|Auf|Ab)wärtsrichtung\b/i;
  *  Aufwärtsrichtung in das …"). The direction is what a traveller needs
  *  first, so it comes out as its own value for the icon and the label, and
  *  the rest of that sentence is the place. A text that doesn't follow the
- *  template is kept whole as the place. */
+ *  template gives its first line as the place and the rest as notes. */
 export function parseEscalatorNotice(description: unknown): EscalatorNotice {
   const lines = (typeof description === "string" ? description : "")
     .split(/\n+/)

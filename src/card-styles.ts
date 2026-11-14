@@ -845,7 +845,7 @@ export const cardStyles = css`
     font-weight: 400;
   }
   /* "Geplant ab …" under the title of an outage that hasn't begun. The row
-     keeps its place in the list but steps back: nothing is out yet. */
+     comes after what is out now and steps back: nothing is out yet. */
   .alert-meta.outage-planned {
     display: flex;
     gap: 4px;
@@ -865,7 +865,8 @@ export const cardStyles = css`
     gap: 6px;
   }
   /* The feed shouts some reasons as one long word
-     ("FAHRTREPPENERNEUERUNG"), which ran out of a narrow card. */
+     ("FAHRTREPPENERNEUERUNG"), wider than a narrow card: let the span
+     shrink and break inside the word. */
   .lift-reason span {
     min-width: 0;
     overflow-wrap: anywhere;

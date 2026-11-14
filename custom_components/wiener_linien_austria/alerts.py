@@ -744,7 +744,7 @@ def get_alerts_for(
       its DIVA. The tracked lines found there go out as `inferred_lines`
       so the card can badge a notice that otherwise names nothing. When
       the catalogue isn't loaded or doesn't know the platform, the entry
-      matches on RBL alone as before — a missing schedule must not hide
+      matches on RBL alone — a missing schedule must not hide
       notices.
 
       Every matched short entry also gets `location` set to its platform's
@@ -811,9 +811,10 @@ def _match_outages(
     line is no help beside the station either: the Eichenstraße escalator
     names "Unterflurstrassenbahn", which no tracked line is called. The
     station is compared by name, the catalogue's "Bhf. Meidling" against
-    the feed's "Bahnhof Meidling" (`_station_key`). Without a catalogue
-    there is no name to compare, and the line decides as before: a missing
-    catalogue must not hide an outage.
+    the feed's "Bahnhof Meidling" (`_station_key`). Without a catalogue,
+    or with one that knows none of these platforms, there is no name to
+    compare, and the line decides: a missing catalogue must not hide an
+    outage.
     """
     if not rbls:
         return []

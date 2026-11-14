@@ -1130,8 +1130,8 @@ export class WienerLinienAustriaCard extends LitElement {
 
   /** The lift and escalator outages a stop shows, each kind only with its
    *  switch on: what is out now first, then what is only announced, soonest
-   *  first. Lifts lead within each, since for someone who needs one there
-   *  is no way round. */
+   *  first. Among what is out now, lifts lead, since for someone who needs
+   *  one there is no way round. */
   private _outagesFor(stopCfg: NormalisedModernStop, attrs: WienerLinienAttrs): OutageRow[] {
     const cfg = this._config!;
     const now = Date.now();
@@ -1150,7 +1150,8 @@ export class WienerLinienAustriaCard extends LitElement {
         ? own(attrs.escalator_info, this._debugEscalator, "escalator")
         : []),
     ];
-    // Array.prototype.sort is stable, so lifts stay ahead of escalators.
+    // Array.prototype.sort is stable, so among the outages that are out now
+    // (all key 0) lifts stay ahead of escalators.
     rows.sort((a, b) => (a.planned ?? 0) - (b.planned ?? 0));
     return rows;
   }
@@ -1277,8 +1278,8 @@ export class WienerLinienAustriaCard extends LitElement {
     </div>`;
   }
 
-  private _toggleElevator(name: string): void {
-    this._expandedElevator = toggleInSet(this._expandedElevator, name);
+  private _toggleElevator(key: string): void {
+    this._expandedElevator = toggleInSet(this._expandedElevator, key);
   }
 
   // Shared Enter/Space handler for expander rows whose parent element is

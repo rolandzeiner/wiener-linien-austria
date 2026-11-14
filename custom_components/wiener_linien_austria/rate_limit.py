@@ -10,7 +10,7 @@ Four callers, each taking exactly one slot per request:
 
 - batch.py — one combined `/monitor` request per interval group per tick.
 - alerts.py — one combined `/trafficInfoList` request per 5-minute cycle
-  (all three feed names ride in it as repeated `name=` params).
+  (every feed name rides in it as repeated `name=` params).
 - static.py — one slot for the whole weekly five-file burst, taken before
   the `asyncio.gather` rather than per file. Per-file would serialise a
   fail-soft background refresh into 5 x 15 s of held lock and stall every
