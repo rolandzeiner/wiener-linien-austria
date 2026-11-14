@@ -61,6 +61,7 @@ from .const import (
     DEFAULT_WALK_SPEED,
     EXCLUDABLE_MEANS,
     MAX_CHANGES_ANY,
+    ROUTE_KEEP_DEPARTED_SECONDS,
     ROUTE_TYPES,
     ROUTING_REQUEST_TIMEOUT_SECONDS,
     ROUTING_TIME_ZONE,
@@ -874,7 +875,7 @@ def last_connection(
         if not trip.cancelled
         and trip.departure is not None
         and trip.arrival is not None
-        and trip.departure >= now - timedelta(minutes=1)
+        and trip.departure >= now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
         and trip.arrival <= arrive_by
         and _longest_wait(trip) <= max_wait
     ]
@@ -942,7 +943,11 @@ def usable_trips(
             if not trip.cancelled
             and trip.departure is not None
             and trip.arrival is not None
-            and (now is None or trip.departure >= now - timedelta(minutes=1))
+            and (
+                now is None
+                or trip.departure
+                >= now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
+            )
             and (arrive_by is None or trip.arrival <= arrive_by)
             and (leave_from is None or _timetabled_departure(trip) >= leave_from)
         ),

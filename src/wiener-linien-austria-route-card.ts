@@ -645,12 +645,24 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const next = typeof value === "string" || typeof value === "number" ? String(value) : "";
     if (which === "from") this._from = next;
     else this._to = next;
-    this._replanFrom = null;
-    this._revealAlternatives = false;
+    this._askForNewStops();
+  }
+
+  /** A question the person just changed: the pages of the old one are
+   *  gone, they are plainly there, and the plan is asked for. */
+  private _askAnew(): void {
     this._pageHistory = [];
-    saveAdhocSelection({ from: this._from, to: this._to });
     this._lastInteraction = Date.now();
     this._requestPlan(true);
+  }
+
+  /** The same for a change of the stops themselves, which also ends a
+   *  search from a change and is what the card remembers on this device. */
+  private _askForNewStops(): void {
+    this._replanFrom = null;
+    this._revealAlternatives = false;
+    saveAdhocSelection({ from: this._from, to: this._to });
+    this._askAnew();
   }
 
   /** Identifies what is being asked, so an answer for an older question
@@ -667,9 +679,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._when = viennaInputValue(Date.now());
     }
     this._timeMode = mode;
-    this._pageHistory = [];
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askAnew();
   }
 
   private _onWhen = (ev: Event): void => {
@@ -678,19 +688,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // quietly planning for "now" under a "depart at" label.
     if (!isInputDateTime(value) || value === this._when) return;
     this._when = value;
-    this._pageHistory = [];
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askAnew();
   };
 
   private _swap = (): void => {
     [this._from, this._to] = [this._to, this._from];
-    this._replanFrom = null;
-    this._revealAlternatives = false;
-    this._pageHistory = [];
-    saveAdhocSelection({ from: this._from, to: this._to });
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askForNewStops();
   };
 
   // ------------------------------------------------------------------
@@ -753,14 +756,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     };
     this._from = diva;
     this._revealAlternatives = true;
-    this._pageHistory = [];
     this._timeMode = "depart";
     this._when = when;
-    this._lastInteraction = Date.now();
     // The plan's own announcement follows a second later; this one covers the
     // debounce and the request, where the card would otherwise sit silent.
     this._announce(this._t("replan_announce", { stop: stop.name }));
-    this._requestPlan(true);
+    this._askAnew();
   }
 
   private _backToOrigin = (): void => {
@@ -768,12 +769,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (!origin) return;
     this._replanFrom = null;
     this._revealAlternatives = false;
-    this._pageHistory = [];
     this._from = origin.from;
     this._timeMode = origin.timeMode;
     this._when = origin.when;
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askAnew();
   };
 
   // ------------------------------------------------------------------
@@ -1603,7 +1602,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  its escalators by station and by up or down; the feed says which way
    *  each broken one runs. So unlike a lift, an escalator going the other
    *  way is ruled out, and only one the feed gives no direction for, or
-   *  one switched either way, counts for both. */
+   *  one switched either way, counts for both. A step the trip gives no
+   *  direction for matches any outage at its station. */
   private _escalatorOut(
     step: RouteAccessStepAttr,
     outages: NonNullable<RouteAttrs["escalator_info"]>,

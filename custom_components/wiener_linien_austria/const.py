@@ -109,7 +109,7 @@ TRAFFIC_INFO_KEY: Final = "traffic_info"
 ELEVATOR_INFO_KEY: Final = "elevator_info"
 ESCALATOR_INFO_KEY: Final = "escalator_info"
 ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
-# Monotonic counter bumped on every successful alerts refresh. Sensors
+# Monotonic counter bumped on every alerts refresh, failed ones included. Sensors
 # memoise their `extra_state_attributes` dict (which embeds the matched
 # alerts) and use this counter as the cache-validity tag — when alerts
 # refresh on their own ~5-min cadence (independent of the per-stop
@@ -361,6 +361,14 @@ MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
 # second refresh 60 s later: 10 of 26 such refreshes in that measurement.
 # Two seconds puts every one of them past the 30 s.
 ROUTE_ROLLOVER_SPREAD_SECONDS: Final = (2.0, 30.0)
+# A connection counts as the one still ahead until this long after it
+# leaves: the sensors' "next connection", the rollover above and the route
+# card's `upcomingTrips` all turn to the following one at the same moment.
+ROUTE_DEPARTED_GRACE_SECONDS: Final = 30
+# The planner's lists keep a connection this long after it leaves, longer
+# than the grace above, so a refresh just after a departure still holds the
+# connection the entities are about to let go of.
+ROUTE_KEEP_DEPARTED_SECONDS: Final = 60
 
 # Planned S-Bahn departures on a departure board (timetable.py), from the
 # same routing server's departure monitor.

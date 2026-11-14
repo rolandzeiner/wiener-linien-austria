@@ -54,7 +54,7 @@ from .const import (
     DOMAIN,
     USER_AGENT,
 )
-from .parsing import as_int, as_mapping
+from .parsing import as_int, as_mapping, parse_aware_datetime
 from .rate_limit import async_enforce_domain_cooldown
 from .routing import (
     LegStop,
@@ -146,7 +146,7 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
             departures = as_mapping(line.get("departures")).get("departure")
             for departure in departures if isinstance(departures, list) else []:
                 stamps = as_mapping(as_mapping(departure).get("departureTime"))
-                planned = _parse_stamp(stamps.get("timePlanned"))
+                planned = parse_aware_datetime(stamps.get("timePlanned"))
                 if planned is None:
                     continue
                 vehicle = as_mapping(as_mapping(departure).get("vehicle"))
@@ -157,7 +157,7 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
                         line=name,
                         direction=direction,
                         planned=planned,
-                        real=_parse_stamp(stamps.get("timeReal")),
+                        real=parse_aware_datetime(stamps.get("timeReal")),
                         towards=str(vehicle.get("towards") or "").strip()
                         or line_towards,
                         barrier_free=step_free if isinstance(step_free, bool) else None,
@@ -755,13 +755,3 @@ def _batch_running(hass: HomeAssistant) -> bool:
 
 def _minute(value: datetime) -> datetime:
     return value.replace(second=0, microsecond=0)
-
-
-def _parse_stamp(value: Any) -> datetime | None:
-    if not isinstance(value, str):
-        return None
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo is not None else None

@@ -97,12 +97,7 @@ async def async_get_config_entry_diagnostics(
 
     return {
         "attribution": ATTRIBUTION,
-        "entry": {
-            "title": entry.title,
-            "version": entry.version,
-            "data": async_redact_data(dict(entry.data), TO_REDACT),
-            "options": async_redact_data(dict(entry.options), TO_REDACT),
-        },
+        "entry": _entry_block(entry),
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
             # `repr()` preserves both the exception class name and its args
@@ -134,6 +129,16 @@ async def async_get_config_entry_diagnostics(
     }
 
 
+def _entry_block(entry: WienerLinienConfigEntry) -> dict[str, Any]:
+    """The entry as every dump shows it, redacted in one place."""
+    return {
+        "title": entry.title,
+        "version": entry.version,
+        "data": async_redact_data(dict(entry.data), TO_REDACT),
+        "options": async_redact_data(dict(entry.options), TO_REDACT),
+    }
+
+
 def _route_diagnostics(
     entry: WienerLinienConfigEntry, coordinator: WienerLinienRouteCoordinator
 ) -> dict[str, Any]:
@@ -149,12 +154,7 @@ def _route_diagnostics(
     trips = data.trips if data is not None else []
     return {
         "attribution": ATTRIBUTION,
-        "entry": {
-            "title": entry.title,
-            "version": entry.version,
-            "data": async_redact_data(dict(entry.data), TO_REDACT),
-            "options": async_redact_data(dict(entry.options), TO_REDACT),
-        },
+        "entry": _entry_block(entry),
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
             "last_exception": repr(coordinator.last_exception),

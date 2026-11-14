@@ -56,7 +56,7 @@ from typing import Final
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, ROUTE_KEEP_DEPARTED_SECONDS
 from .live import (
     ADHOC_LEASE_SECONDS,
     apply_live,
@@ -378,7 +378,7 @@ class AdhocPlanner:
         Same one-minute grace as `usable_trips`. Returns `plan` itself when
         nothing left, so callers sharing a plan keep sharing the object.
         """
-        cutoff = now - timedelta(minutes=1)
+        cutoff = now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
         kept = tuple(
             trip
             for trip in plan.trips

@@ -59,6 +59,7 @@ from .const import (
     STOP_NOTICES_TIMEOUT_SECONDS,
     USER_AGENT,
 )
+from .parsing import parse_aware_datetime
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .run_times import RUN_TIME_EXCLUDED_MOTS
 from .static import StaticCatalogue, trail_name
@@ -323,8 +324,8 @@ def parse_news(body: Mapping[str, Any]) -> list[StopNotice]:
             StopNotice(
                 lines=lines,
                 rbls=rbls,
-                start=_parse_time(span.get("start")),
-                end=_parse_time(span.get("end")),
+                start=parse_aware_datetime(span.get("start")),
+                end=parse_aware_datetime(span.get("end")),
             )
         )
     return notices
@@ -528,14 +529,3 @@ def _ints(value: Any) -> Iterable[int]:
             yield item
         elif isinstance(item, str) and item.isdigit():
             yield int(item)
-
-
-def _parse_time(value: Any) -> datetime | None:
-    """`2026-12-31T23:59:00.000+0100` → aware datetime; None if unreadable."""
-    if not isinstance(value, str):
-        return None
-    try:
-        parsed = datetime.fromisoformat(value)
-    except ValueError:
-        return None
-    return parsed if parsed.tzinfo is not None else None

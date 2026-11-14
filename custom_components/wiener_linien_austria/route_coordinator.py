@@ -35,6 +35,8 @@ from .const import (
     MAX_ROUTE_POLL_SECONDS,
     MIN_ROUTE_POLL_SECONDS,
     MIN_ROUTE_ROLLOVER_SECONDS,
+    ROUTE_DEPARTED_GRACE_SECONDS,
+    ROUTE_KEEP_DEPARTED_SECONDS,
     ROUTE_ROLLOVER_SPREAD_SECONDS,
     USER_AGENT,
 )
@@ -78,8 +80,8 @@ LAST_CONNECTION_UNTIL = time(3, 0)
 # and the first morning trains don't arrive yet.
 LAST_CONNECTION_ARRIVE_BY = time(4, 0)
 LAST_CONNECTION_MAX_WAIT = timedelta(minutes=60)
-# A trip arriving in the last hour before that means the service runs through
-# the night (the U-Bahn before Saturdays, Sundays and public holidays), so
+# A trip arriving in the last hour before `LAST_CONNECTION_ARRIVE_BY` means
+# the service runs through the night (the U-Bahn before Saturdays, Sundays and public holidays), so
 # there is no last connection to show. On a weeknight nothing without a bus
 # arrives between about 01:00 and 04:30.
 LAST_CONNECTION_THROUGH_MARGIN = timedelta(minutes=60)
@@ -113,7 +115,7 @@ class RouteData:
         a departure gets it back from the planner, so the first entry is
         often one that has gone.
         """
-        cutoff = now - timedelta(seconds=30)
+        cutoff = now - timedelta(seconds=ROUTE_DEPARTED_GRACE_SECONDS)
         return next(
             (
                 trip
@@ -355,7 +357,8 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         trip = self._last_connection
         if trip is None or trip.departure is None:
             return None
-        return trip if trip.departure >= now - timedelta(minutes=1) else None
+        kept_from = now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
+        return trip if trip.departure >= kept_from else None
 
     async def async_plan(
         self, when: datetime, *, arrive_by: bool = False
@@ -401,14 +404,16 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 trip.departure
                 for trip in trips
                 if trip.departure is not None
-                and (trip.departure - now).total_seconds() + 30 > 0
+                and (trip.departure - now).total_seconds()
+                + ROUTE_DEPARTED_GRACE_SECONDS
+                > 0
             ),
             None,
         )
         if departure is not None:
             until = (
                 (departure - now).total_seconds()
-                + 30
+                + ROUTE_DEPARTED_GRACE_SECONDS
                 + random.uniform(*ROUTE_ROLLOVER_SPREAD_SECONDS)
             )
             rollover = timedelta(seconds=max(MIN_ROUTE_ROLLOVER_SECONDS, until))
@@ -532,11 +537,12 @@ def _access_outages(
     `kind` is the step kind, `elevator` or `escalator`. The trip names each
     by its station (DIVA); the outage feed names the platforms (RBLs) it
     affects, or only the station. The catalogue joins them, so this is
-    station-level: an outage anywhere at a station a planned lift belongs to
-    counts, and `stop_ids` says which of the trip's stations it is about.
+    station-level: an outage anywhere at a station a planned lift or
+    escalator belongs to counts, and `stop_ids` says which of the trip's
+    stations it is about.
 
     An outage only announced for later is left out: the feeds list
-    maintenance days ahead as "außer Betrieb", and the lift on this trip
+    maintenance days ahead as "außer Betrieb", and the one on this trip
     still runs.
     """
     stations = {

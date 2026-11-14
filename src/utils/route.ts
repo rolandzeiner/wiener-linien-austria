@@ -137,6 +137,11 @@ export function clockOf(iso: string | null | undefined): string {
   return match?.[1] ?? "";
 }
 
+/** A connection counts as still ahead until this long after it leaves, the
+ *  backend's `ROUTE_DEPARTED_GRACE_SECONDS`: the card and the route's
+ *  sensors turn to the following connection at the same moment. */
+export const DEPARTED_GRACE_MS = 30_000;
+
 /** The connections still ahead, best first. The sensor already ranks
  *  them; this only drops the ones that have left since its last refresh.
  *  A plan for a chosen time (`planned_for`) keeps them all: that is what
@@ -148,7 +153,7 @@ export function upcomingTrips(attrs: RouteAttrs | undefined, nowMs: number): Rou
     if (trip.cancelled) return false;
     if (planned) return true;
     const ts = trip.departure ? Date.parse(trip.departure) : Number.NaN;
-    return !Number.isFinite(ts) || ts >= nowMs - 30_000;
+    return !Number.isFinite(ts) || ts >= nowMs - DEPARTED_GRACE_MS;
   });
 }
 
@@ -516,9 +521,9 @@ export function adhocRefreshDelay(
   const next = trips
     .filter((trip) => !trip.cancelled && trip.departure)
     .map((trip) => Date.parse(trip.departure!))
-    .find((ts) => Number.isFinite(ts) && ts + 30_000 > nowMs);
+    .find((ts) => Number.isFinite(ts) && ts + DEPARTED_GRACE_MS > nowMs);
   if (next === undefined) return ADHOC_REFRESH_MS;
-  const untilRollover = next + 30_000 + jitterMs - nowMs;
+  const untilRollover = next + DEPARTED_GRACE_MS + jitterMs - nowMs;
   return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
 }
 
