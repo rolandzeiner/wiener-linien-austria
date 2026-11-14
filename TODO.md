@@ -104,7 +104,9 @@ Could add, all in requests the integration already makes:
   the text has to stay as the fallback. "26E: Gleisbauarbeiten" has
   neither. A cheaper half-step without the new fields: run `REASON_ICONS`
   over the title when the description has no "Grund:" line, and add
-  Falschparker to it; on that day it would have given the same 7 of 8.
+  Falschparker to it. On that day every one of the 8 active titles named
+  its cause, "26E: Gleisbauarbeiten" included, so this would have covered
+  all 8, one more than the new fields. Try that first.
 
   Things to settle:
   - Map by `reasonId`, with `alertCauseId` as the fallback for a reason
