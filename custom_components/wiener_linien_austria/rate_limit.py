@@ -2,8 +2,9 @@
 
 Every outbound call this integration makes stays above the 15-second
 minimum interval of Wiener Linien's fair-use rule for the OGD real-time
-data (see `MIN_POLL_SECONDS` in const.py), *in aggregate*. An asyncio.Lock serialises the check-then-update, so concurrent
-callers can't both observe the same `last_call_ts` and skip the sleep.
+data (see `MIN_POLL_SECONDS` in const.py), *in aggregate*. An asyncio.Lock
+serialises the check-then-update, so concurrent callers can't both observe
+the same `last_call_ts` and skip the sleep.
 
 Four callers, each taking exactly one slot per request:
 
