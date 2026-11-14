@@ -595,6 +595,8 @@ flex-wrap: wrap;
 gap: 6px 8px;
 }
 .alert-title {
+min-width: 0;
+overflow-wrap: anywhere;
 font-weight: 600;
 color: var(--primary-text-color);
 }

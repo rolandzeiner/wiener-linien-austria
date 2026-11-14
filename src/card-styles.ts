@@ -818,7 +818,12 @@ export const cardStyles = css`
     flex-wrap: wrap;
     gap: 6px 8px;
   }
+  /* A flex item stops shrinking at its longest word, and at the narrowest
+     cell "Hauptstraße" in bold is wider than the row: let it shrink, and
+     break inside a word only when the word alone doesn't fit. */
   .alert-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-weight: 600;
     color: var(--primary-text-color);
   }
