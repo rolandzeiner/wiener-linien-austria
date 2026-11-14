@@ -1049,6 +1049,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
+  /** What a stale plan's note says: the whole reason without a countdown
+   *  beside the steps, else "Älterer Stand von 07:47", without the time
+   *  where the plan doesn't carry one. */
+  private _staleNote(plan: RouteAttrs): string {
+    if (this._pagerWait() === 0) return this._t("adhoc_stale");
+    const time = viennaClock(plan.fetched_at);
+    return time ? this._t("adhoc_stale_short_at", { time }) : this._t("adhoc_stale_short");
+  }
+
   /** "Zuletzt aktualisiert 07:40": when the upstream last answered, so a
    *  plan kept on screen through an outage can't pass for a fresh one. */
   private _renderUpdated(fetchedAt: string | null | undefined): TemplateResult | typeof nothing {
@@ -1320,12 +1329,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // "Zuletzt aktualisiert" already says how old; this says why. While the
     // pager counts down to the next request, that and its ⓘ are the why, so
     // the note keeps to the one thing they don't say: that the plan shown
-    // is an older one.
+    // is an older one, and from when. The header has that time too, but
+    // this is the line read with the connection it qualifies.
     const stale =
       plan.stale && this._phase !== "paused"
         ? html`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
-            <span>${this._t(this._pagerWait() > 0 ? "adhoc_stale_short" : "adhoc_stale")}</span>
+            <span>${this._staleNote(plan)}</span>
           </p>`
         : nothing;
     const trips = upcomingTrips(plan, this._now);

@@ -1662,10 +1662,10 @@ describe("earlier and later", () => {
     await settle(el);
     expect(why(el)).toBe(WHY);
     // The rule is in a closed toggletip, so the note still has to say that
-    // the plan on screen is an older one. Only that: the countdown beside
-    // the steps already says there were too many requests.
+    // the plan on screen is an older one, and from when. Only that: the
+    // countdown beside the steps already says there were too many requests.
     const stale = root(el).querySelector(".stale-note")?.textContent ?? "";
-    expect(stale).toContain("Etwas älterer Stand");
+    expect(stale).toMatch(/Älterer Stand von \d{2}:\d{2}/);
     expect(stale).not.toContain("zu viele");
 
     remember(WESTBAHNHOF, PRATERSTERN);
@@ -1690,6 +1690,22 @@ describe("earlier and later", () => {
     expect(text(stepped)).toContain("Neuer Versuch in 30 s");
     expect(note(stepped)).toBeUndefined();
     expect(why(stepped)).toBe(WHY);
+  });
+
+  it("leaves the time out of the stale note for a plan that carries none", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => ({
+      ...PLAN,
+      ...RULE,
+      fetched_at: null,
+      stale: true,
+      retry_after: 45,
+      requests_left: 0,
+      requests_next_in: 45,
+    }));
+    const el = await mount(h, {});
+    await settle(el);
+    expect(root(el).querySelector(".stale-note")?.textContent?.trim()).toBe("Etwas älterer Stand");
   });
 
   it("asks Später, at once, for the minute after the timetabled departure", async () => {
