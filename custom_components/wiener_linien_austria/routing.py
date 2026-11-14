@@ -851,6 +851,7 @@ def last_connection(
     now: datetime,
     arrive_by: datetime,
     max_wait: timedelta,
+    through_margin: timedelta,
 ) -> Trip | None:
     """The latest usable trip from an arrive-by query for the small hours.
 
@@ -859,6 +860,13 @@ def last_connection(
     00:50 S45, then 41 to 01:16, then U6 at 04:43, arriving 04:59). Those
     are dropped: any wait between two rides longer than `max_wait`, or an
     arrival after `arrive_by`. Of the rest, the one leaving last still ahead.
+
+    None when a usable trip arrives within `through_margin` of `arrive_by`:
+    the service then runs through the night and there is no last connection.
+    On the nights before Saturdays, Sundays and public holidays the U-Bahn
+    does (verified 2026-11-14, a Saturday: Westbahnhof to Praterstern every
+    15 minutes, the latest arriving 03:59), and the latest trip the server
+    finds is just the one before the query's own deadline.
     """
     usable = [
         trip
@@ -870,6 +878,11 @@ def last_connection(
         and trip.arrival <= arrive_by
         and _longest_wait(trip) <= max_wait
     ]
+    if any(
+        trip.arrival is not None and trip.arrival > arrive_by - through_margin
+        for trip in usable
+    ):
+        return None
     return max(usable, key=lambda trip: trip.departure or now, default=None)
 
 

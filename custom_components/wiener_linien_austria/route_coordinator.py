@@ -78,6 +78,11 @@ LAST_CONNECTION_UNTIL = time(3, 0)
 # and the first morning trains don't arrive yet.
 LAST_CONNECTION_ARRIVE_BY = time(4, 0)
 LAST_CONNECTION_MAX_WAIT = timedelta(minutes=60)
+# A trip arriving in the last hour before that means the service runs through
+# the night (the U-Bahn before Saturdays, Sundays and public holidays), so
+# there is no last connection to show. On a weeknight nothing without a bus
+# arrives between about 01:00 and 04:30.
+LAST_CONNECTION_THROUGH_MARGIN = timedelta(minutes=60)
 # City, regional and express buses (EFA motType 5, 6, 7). Night buses are
 # city buses to the trip planner, so leaving them out means all buses.
 LAST_CONNECTION_EXCLUDED_MEANS = ("5", "6", "7")
@@ -341,7 +346,11 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 _LOGGER.debug("No last connection tonight: %s", err.translation_key)
             else:
                 self._last_connection = last_connection(
-                    trips, now, arrive_by, LAST_CONNECTION_MAX_WAIT
+                    trips,
+                    now,
+                    arrive_by,
+                    LAST_CONNECTION_MAX_WAIT,
+                    LAST_CONNECTION_THROUGH_MARGIN,
                 )
         trip = self._last_connection
         if trip is None or trip.departure is None:

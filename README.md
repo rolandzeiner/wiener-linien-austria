@@ -217,7 +217,7 @@ Use it in place of the departure sensor's availability. The departure sensor sta
 
 `trips`, `last_connection`, `line_colors`, `traffic_info` and `elevator_info` aren't recorded in history.
 
-`last_connection` has the same shape as a trip, or is `null`. The integration asks the trip planner to arrive by 04:00 with buses left out, and drops trips that wait for the first morning train. On nights the U-Bahn runs through (Friday, Saturday and before public holidays) it can be a U-Bahn shortly before 04:00.
+`last_connection` has the same shape as a trip, or is `null`. The integration asks the trip planner to arrive by 04:00 with buses left out, and drops trips that wait for the first morning train. On nights the U-Bahn runs through (Friday, Saturday and before public holidays) there is no last connection, and it is `null` when the route is served all night.
 
 #### Trip shape
 
