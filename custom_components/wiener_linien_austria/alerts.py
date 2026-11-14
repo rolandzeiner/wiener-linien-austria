@@ -770,12 +770,15 @@ def _match_outages(
 
     Some outages name no platforms, only a station and its lines (2026-11-14:
     a lift at "Bahnhof Meidling" on the U6, an escalator at "Karlsplatz" on
-    the U1). Those need a line hit and their station to be this stop's own.
-    The line alone put the Meidling lift on every U6 stop. The station is
-    compared by name, the catalogue's "Bhf. Meidling" against the feed's
-    "Bahnhof Meidling" (`_station_key`). Without a catalogue there is no
-    name to compare, and the line decides as before: a missing catalogue
-    must not hide an outage.
+    the U1). Those show where their station is this stop's own, which is as
+    wide as a platform match: `rbls` holds every platform of the station.
+    Matched on the line alone, the Meidling lift was on every U6 stop. The
+    line is no help beside the station either: the Eichenstraße escalator
+    names "Unterflurstrassenbahn", which no tracked line is called. The
+    station is compared by name, the catalogue's "Bhf. Meidling" against
+    the feed's "Bahnhof Meidling" (`_station_key`). Without a catalogue
+    there is no name to compare, and the line decides as before: a missing
+    catalogue must not hide an outage.
     """
     if not rbls:
         return []
@@ -793,9 +796,11 @@ def _match_outages(
         if outage.related_stops_set & rbls
         or (
             not outage.related_stops
-            and lines
-            and outage.related_lines_set & lines
-            and (not own_stations or _station_key(outage.station) in own_stations)
+            and (
+                _station_key(outage.station) in own_stations
+                if own_stations
+                else bool(lines and outage.related_lines_set & lines)
+            )
         )
     ]
 

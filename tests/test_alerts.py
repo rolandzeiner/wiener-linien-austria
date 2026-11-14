@@ -1245,8 +1245,9 @@ async def test_stopless_outage_shows_at_its_own_station_only(
     assert [e.name for e in get_alerts_for(hass, {"U6"}, {4621})[1]] == ["MEIDLING"]
     # Another station, same line.
     assert get_alerts_for(hass, {"U6"}, {4101})[1] == []
-    # Its own station, but the line isn't tracked there.
-    assert get_alerts_for(hass, {"U4"}, {4621})[1] == []
+    # Its own station counts whatever the feed calls the line: the
+    # Eichenstraße escalator's is "Unterflurstrassenbahn".
+    assert [e.name for e in get_alerts_for(hass, {"62"}, {4621})[1]] == ["MEIDLING"]
     assert [e.name for e in get_escalators_for(hass, {"U1"}, {4101})] == ["KARLSPLATZ"]
     assert get_escalators_for(hass, {"U1"}, {4621}) == []
 
