@@ -33,6 +33,7 @@ import "./wiener-linien-austria-flap-card.js";
 
 import type { HomeAssistant } from "./types.js";
 import { sorted } from "./utils.js";
+import { formatTime } from "./utils/time.js";
 
 interface CardElement extends HTMLElement {
   hass: HomeAssistant | undefined;
@@ -462,9 +463,12 @@ describe("lift and escalator outages", () => {
     const el = await mount(MODERN, outageHass(), CARDS[0]![1]);
     const rows = [...shadow(el).querySelectorAll(".alert")];
     expect(rows.map((row) => row.classList.contains("planned"))).toEqual([false, true]);
-    expect(rows[1]!.querySelector(".outage-planned")?.textContent?.trim()).toMatch(
-      /^Geplant ab 16\.11\., 20:45$/,
+    // The card prints the start in the viewer's own time zone, so the
+    // expected text is built the same way: 20:45 here, 19:45 on a UTC runner.
+    expect(rows[1]!.querySelector(".outage-planned")?.textContent?.trim()).toBe(
+      `Geplant ab ${formatTime(LIFT_PLANNED.time_start, "de")}`,
     );
+    expect(formatTime(LIFT_PLANNED.time_start, "de")).toMatch(/^\d{2}\.11\., \d{2}:45$/);
     expect(rows[0]!.querySelector(".outage-planned")).toBeNull();
   });
 
