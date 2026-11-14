@@ -119,6 +119,58 @@ def test_parse_elevator_pulls_attributes_fallback() -> None:
     assert e.related_stops == [4629]
 
 
+def test_parse_reads_the_fields_api_v1_6_added() -> None:
+    """Cause, lift number and direction, as sent on 2026-11-14."""
+    falschparker = _parse_traffic(
+        {
+            "name": "I20261114-0026-F01",
+            "title": "60: Falschparker",
+            "alertCauseId": 71,
+            "alertCause": "vehicle on the line",
+            "reasonId": 25,
+            "reasonName": "Falschparker",
+            "status": "active",
+        }
+    )
+    assert (falschparker.reason, falschparker.cause) == (
+        "Falschparker",
+        "vehicle on the line",
+    )
+    assert falschparker.to_dict()["reason"] == "Falschparker"
+
+    # What the feed writes where it has no cause is no cause.
+    works = _parse_traffic(
+        {
+            "name": "I20260925-0011",
+            "title": "26E: Gleisbauarbeiten",
+            "alertCauseId": 255,
+            "alertCause": "undefined alert cause",
+            "reasonId": 0,
+            "reasonName": "undefined",
+        }
+    )
+    assert (works.reason, works.cause) == (None, None)
+    # A real reason beside the category "unknown" (seen in /newsList).
+    moved = _parse_traffic(
+        {"alertCause": "unknown", "reasonName": "Haltestellenverlegung"}
+    )
+    assert (moved.reason, moved.cause) == ("Haltestellenverlegung", None)
+    assert _parse_traffic({"name": "old"}).reason is None
+
+    lift = _parse_elevator(
+        {
+            "name": "ftazS_37",
+            "title": "Josefstädter Straße",
+            "elevatorId": "JS 02",
+            "attributes": {"towards": "U6 Siebenhirten", "relatedStops": [4607]},
+        }
+    )
+    assert (lift.elevator_id, lift.towards) == ("JS 02", "U6 Siebenhirten")
+    assert lift.to_dict()["elevator_id"] == "JS 02"
+    escalator = _parse_elevator({"name": "ftazS_759", "attributes": {"towards": ""}})
+    assert (escalator.elevator_id, escalator.towards) == (None, None)
+
+
 def test_parse_elevator_tolerates_missing_fields() -> None:
     """Entries with no attributes at all still parse without raising."""
     e = _parse_elevator({"name": "x"})

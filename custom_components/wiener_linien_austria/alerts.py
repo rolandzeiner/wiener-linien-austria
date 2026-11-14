@@ -106,6 +106,12 @@ class TrafficInfo:
     time_last_update: str | None = None  # when the alert was last edited
     category: str = ALERT_FEED_TRAFFIC
     related_stops: list[int] = field(default_factory=list)  # RBLs (short feed)
+    # The operator's own cause, since API V1.6: `reasonName` in German
+    # ("Rettungseinsatz", "Falschparker") and the coarser English
+    # `alertCause` ("accident"). None where the feed says "undefined" or
+    # "unknown", which it does on every short notice and some long ones.
+    reason: str | None = None
+    cause: str | None = None
     # Tracked lines calling at the matched platform, for a short notice that
     # names no lines of its own. Never set on the shared cache — only on the
     # per-sensor copy `get_alerts_for` hands out, because which lines count
@@ -147,6 +153,8 @@ class TrafficInfo:
             "time_last_update": self.time_last_update,
             "status": self.status,
             "category": self.category,
+            "reason": self.reason,
+            "cause": self.cause,
         }
 
 
@@ -163,6 +171,12 @@ class ElevatorInfo:
     related_stops: list[int]  # RBLs where this elevator applies
     time_start: str | None
     time_end: str | None
+    # Which trains it serves, as the feed words it: "U6 Siebenhirten",
+    # "U1 beide Richtungen".
+    towards: str | None = None
+    # The lift's own number at its station ("JS 02"), since API V1.6.
+    # Escalators carry none.
+    elevator_id: str | None = None
     # Pre-computed frozensets — see `TrafficInfo.related_lines_set` for
     # the rationale. Both the line and stop list participate in the
     # `get_alerts_for` matcher's intersection per attribute read.
@@ -189,6 +203,8 @@ class ElevatorInfo:
             "related_stops": list(self.related_stops),
             "time_start": self.time_start,
             "time_end": self.time_end,
+            "towards": self.towards,
+            "elevator_id": self.elevator_id,
         }
 
 
@@ -411,6 +427,8 @@ def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
         time_created=_str_or_none(time.get("created")),
         time_last_update=_str_or_none(time.get("lastUpdate")),
         status=str(raw.get("status") or ""),
+        reason=_named_cause(raw.get("reasonName")),
+        cause=_named_cause(raw.get("alertCause")),
     )
 
 
@@ -614,7 +632,24 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
         related_stops=related_stops,
         time_start=_str_or_none(time.get("start")),
         time_end=_str_or_none(time.get("end")),
+        towards=_str_or_none(attrs.get("towards")),
+        elevator_id=_str_or_none(raw.get("elevatorId")),
     )
+
+
+# What the feed writes where it has no cause: `reasonName` "undefined",
+# `alertCause` "undefined alert cause" or "unknown" (ids 0 and 255).
+_NO_CAUSE: Final = frozenset({"undefined", "undefined alert cause", "unknown"})
+
+
+def _named_cause(val: Any) -> str | None:
+    """A `reasonName` / `alertCause` that names a cause, else None.
+
+    Told by the wording, not the id: the documentation lists no ids, and a
+    notice was seen with a real reason beside the category "unknown".
+    """
+    text = _str_or_none(val)
+    return None if text is None or text.casefold() in _NO_CAUSE else text
 
 
 def _as_str_list(val: Any) -> list[str]:

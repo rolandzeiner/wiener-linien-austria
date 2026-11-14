@@ -295,11 +295,19 @@ export interface TrafficInfoAttr {
   // side). Both render in the same banner; the field is here so a
   // consumer can tell them apart.
   category?: string;
+  /** The operator's own cause ("Rettungseinsatz"), where the feed names one. */
+  reason?: string | null;
+  /** The coarser English category ("accident"), where the feed names one. */
+  cause?: string | null;
 }
 
 export interface ElevatorInfoAttr {
   name: string;
   station: string;
+  /** Which trains it serves: "U6 Siebenhirten", "U1 beide Richtungen". */
+  towards?: string | null;
+  /** The lift's own number at its station ("JS 02"). */
+  elevator_id?: string | null;
   description?: string;
   reason?: string;
   status?: string;

@@ -238,6 +238,26 @@ describe("parseTrafficNotice — the cause from the title", () => {
     expect(parseTrafficNotice(FOLLOW_UP, title).facts).toEqual([]);
   });
 
+  it("prefers the feed's own reason over the title", () => {
+    // 2026-11-14: the title is the line's, the reason field the operator's.
+    expect(parseTrafficNotice(FOLLOW_UP, "60: Fahrtbehinderung", "Falschparker").facts).toEqual([
+      { label: "Grund", value: "Falschparker", icon: "mdi:tow-truck" },
+    ]);
+    // A reason the icon table doesn't know still shows.
+    expect(parseTrafficNotice(FOLLOW_UP, "U1: Verspätungen", "Fahrgastwechsel").facts).toEqual([
+      { label: "Grund", value: "Fahrgastwechsel", icon: "mdi:information-outline" },
+    ]);
+    expect(parseTrafficNotice(FOLLOW_UP, "3A: Umleitung", "Netzänderung").facts[0]?.icon).toBe(
+      "mdi:transit-detour",
+    );
+  });
+
+  it("keeps the text's fuller cause over the reason field", () => {
+    expect(parseTrafficNotice(TEMPLATED, "D: Gleisschaden", "Gleisschaden").facts).toEqual(
+      parseTrafficNotice(TEMPLATED).facts,
+    );
+  });
+
   it("adds nothing to a notice without a text", () => {
     expect(parseTrafficNotice("", "25: Rettungseinsatz")).toEqual({ blocks: [], facts: [] });
   });

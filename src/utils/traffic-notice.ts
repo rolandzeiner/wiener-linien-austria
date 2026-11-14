@@ -157,6 +157,9 @@ const REASON_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   // A wrongly parked car on the tracks: its own cause in the feed
   // (`reasonName` "Falschparker"), and written into the title that way.
   [/falschparker|falsch\s+geparkt|verparkt/i, "mdi:tow-truck"],
+  // Two of the feed's own reasons (`reasonName`) for planned changes.
+  [/haltestellenverlegung|verlegung der haltestelle/i, "mdi:bus-stop"],
+  [/netz(ä|ae)nderung/i, "mdi:transit-detour"],
   [/demonstration|kundgebung|veranstaltung|umzug|marathon/i, "mdi:account-group"],
   // "eis" and "glatt" are anchored to a word start: as bare substrings they
   // fire on "Gleisschaden", "Preis", "Kreis" and "Reisende" — a track defect
@@ -433,15 +436,27 @@ function causeFromTitle(title: unknown): TrafficFact | null {
   return null;
 }
 
+/** The feed's own `reason` as a "Grund" fact. Unlike a title, it is a cause
+ *  by definition, so one the icon table doesn't know still shows, with the
+ *  neutral icon. */
+function causeFromReason(reason: unknown): TrafficFact | null {
+  const value = typeof reason === "string" ? reason.trim() : "";
+  return value ? { label: "Grund", value, icon: iconForFact("Grund", value) } : null;
+}
+
 /** Parse one disruption description into headings, prose and labelled facts.
  *  Returns empty collections for empty input — callers can test
  *  `blocks.length || facts.length` for "is there anything to show".
  *
- *  `title` is the notice's title. When the description names no cause, the
- *  one in the title is added as the "Grund" fact (see `causeFromTitle`). A
- *  notice with no description stays empty: the title alone is already on
- *  screen, and repeating it would only make the row expandable. */
-export function parseTrafficNotice(raw: unknown, title?: unknown): TrafficNotice {
+ *  When the description names no cause, the "Grund" fact comes from the
+ *  feed's own `reason` field ("Rettungseinsatz", since API V1.6), and
+ *  failing that from the `title` (see `causeFromTitle`): the field is the
+ *  operator's statement, the title only our reading of one. Neither
+ *  replaces the description's own line, which says more ("Gleisbauarbeiten
+ *  im Bereich Stefan-Fadinger-Platz"). A notice with no description stays
+ *  empty: the title alone is already on screen, and repeating it would
+ *  only make the row expandable. */
+export function parseTrafficNotice(raw: unknown, title?: unknown, reason?: unknown): TrafficNotice {
   const blocks: TrafficBlock[] = [];
   const facts: TrafficFact[] = [];
   const seenFacts = new Set<string>();
@@ -488,7 +503,7 @@ export function parseTrafficNotice(raw: unknown, title?: unknown): TrafficNotice
   }
 
   if (!seenFacts.has("Grund") && (blocks.length || facts.length)) {
-    const cause = causeFromTitle(title);
+    const cause = causeFromReason(reason) ?? causeFromTitle(title);
     if (cause) facts.push(cause);
   }
 

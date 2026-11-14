@@ -60,18 +60,15 @@ Could add, all in requests the integration already makes:
   message and its follow-up at once, and if so show one disruption once.
   It didn't in either request of 14.11.2026; the evening one had no
   follow-up at all (5 disruptions, each its own parent).
-- [ ] **A structured cause: `reasonName`, `alertCause`.** Each notice
-  carries a coarse English category (`alertCauseId` / `alertCause`) and
-  Wiener Linien's own finer German reason (`reasonId` / `reasonName`).
-  The cards pick a cause icon from the wording (`REASON_ICONS` in
-  `src/utils/traffic-notice.ts`): from the description's "Grund:" line,
-  and since 14.11.2026 from the title ("25: Rettungseinsatz") when the
-  description has none, with Falschparker added. That covered all 8
-  active disruptions of that day, one more than the new fields would
-  have, so the fields are only worth reading if titles turn up that name
-  no cause. The
-  documentation spells one field `alterCause`; the API sends `alertCause`,
-  and gives no list of values. See the table below for what was seen.
+- [ ] **More causes for the icon table.** The sensors publish the
+  feed's `reasonName` and `alertCause` as `reason` and `cause` since
+  14.11.2026, and the card shows `reason` as the Grund row when the
+  description has none (then the title's cause, as before). The icon
+  still comes from the wording (`REASON_ICONS` in
+  `src/utils/traffic-notice.ts`), so a reason not in it gets the neutral
+  icon. The documentation spells one field `alterCause`; the API sends
+  `alertCause`, and gives no list of values. Collect the reasons for a
+  few weeks and add the ones that turn up.
 
   Seen on 14.11.2026 in three `/trafficInfoList` requests and one
   `/newsList` (about 300 notices): 8 categories and 11 reasons. The ids
@@ -89,8 +86,8 @@ Could add, all in requests the integration already makes:
   | 45 | construction work | 21 | Bauarbeiten | disruptions (documentation), news | `mdi:excavator` (as today) |
   | 45 | construction work | 27 | Gleisbauarbeiten | disruptions, news | `mdi:excavator` (as today) |
   | 120 | special event | 35 | Veranstaltung | news | `mdi:account-group` (as today) |
-  | 0 | unknown | 223 | Haltestellenverlegung | news | `mdi:bus-stop`; none today |
-  | 255 | undefined alert cause | 258 | Netzänderung | news | `mdi:transit-detour`; none today |
+  | 0 | unknown | 223 | Haltestellenverlegung | news | `mdi:bus-stop` (as today) |
+  | 255 | undefined alert cause | 258 | Netzänderung | news | `mdi:transit-detour` (as today) |
   | 255 | undefined alert cause | 0 | undefined | every lift, escalator and `stoerungkurz` notice, some disruptions, most news | none: keep today's icon |
 
   On the 11 distinct disruptions of that day (8 active, 3 resolved; the
@@ -105,25 +102,10 @@ Could add, all in requests the integration already makes:
   `reasonId` is no replacement for the text: "25, 26, 27:
   Gleisbauarbeiten" has a "Grund:" line but `reasonId` 0, and "26E:
   Gleisbauarbeiten" has neither, only the title.
-
-  Things to settle:
-  - Map by `reasonId`, with `alertCauseId` as the fallback for a reason
-    not in the table. Two rows show why: Haltestellenverlegung and
-    Netzänderung have a reason but "unknown" / "undefined" as category.
-  - An id not in the table, and 255 / 0, keep the icon the card uses
-    today (`mdi:alert-outline` and its relatives), so a new value never
-    leaves a notice without one.
-  - Whether the ids are stable. Only the pairs above were seen; nothing
-    says the numbers won't move between releases, so key on the id and
-    keep the name in a comment and a test fixture.
-  - The cards read `/trafficInfoList` only. The three news-only rows
-    matter once `/newsList` texts are shown beyond the works notices.
 - [ ] **Escalators on the route card.** The stop sensors publish
   `escalator_info` since 14.11.2026 and the modern card shows it
   (`show_escalator_info`). A trip's steps name escalators too (`kind`
   `escalator`); the route card could flag a broken one as it does a lift.
-- [ ] **`elevatorId`.** On lift notices, e.g. "JS 02". A stable id per
-  lift, if `elevator_info` ever needs to tell two lifts of a station apart.
 - [ ] **The `/version` endpoint.** Gives the current version, its history
   and a `comingSoon` entry (V1.7.0 that day, with placeholder text only).
   An occasional check could log or raise a repair when the version moves,
