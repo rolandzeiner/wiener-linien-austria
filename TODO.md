@@ -60,7 +60,10 @@ Could add, all in requests the integration already makes:
 - [ ] **A structured cause: `reasonName`, `alertCause`.** Each notice
   carries a coarse English category (`alertCauseId` / `alertCause`) and
   Wiener Linien's own finer German reason (`reasonId` / `reasonName`).
-  Could pick an icon or a filter in place of reading the title. The
+  The cards already pick a cause icon, but from the wording of the
+  description's "Grund:" line (`REASON_ICONS` in
+  `src/utils/traffic-notice.ts`); these fields would cover the notices
+  that have no such line. The
   documentation spells one field `alterCause`; the API sends `alertCause`,
   and gives no list of values. See the table below for what was seen.
 
@@ -72,16 +75,36 @@ Could add, all in requests the integration already makes:
 
   | `alertCauseId` | `alertCause` | `reasonId` | `reasonName` | Seen in | Icon |
   |---|---|---|---|---|---|
-  | 14 | emergency medical services | 9 | Rettungseinsatz | disruptions | `mdi:ambulance` |
-  | 77 | accident | 12 | Verkehrsunfall | disruptions | `mdi:car-emergency` |
-  | 77 | accident | 13 | Fremder Verkehrsunfall | disruptions | `mdi:car-emergency` |
-  | 71 | vehicle on the line | 25 | Falschparker | disruptions | `mdi:tow-truck` (or `mdi:car-off`) |
-  | 45 | construction work | 21 | Bauarbeiten | disruptions (documentation), news | `mdi:traffic-cone` |
-  | 45 | construction work | 27 | Gleisbauarbeiten | disruptions, news | `mdi:traffic-cone` (or `mdi:excavator`) |
-  | 120 | special event | 35 | Veranstaltung | news | `mdi:calendar-star` |
-  | 0 | unknown | 223 | Haltestellenverlegung | news | `mdi:bus-stop` |
-  | 255 | undefined alert cause | 258 | Netzänderung | news | `mdi:transit-detour` |
+  | 14 | emergency medical services | 9 | Rettungseinsatz | disruptions | `mdi:ambulance` (as today) |
+  | 77 | accident | 12 | Verkehrsunfall | disruptions | `mdi:car-emergency` (as today) |
+  | 77 | accident | 13 | Fremder Verkehrsunfall | disruptions | `mdi:car-emergency` (as today) |
+  | 71 | vehicle on the line | 25 | Falschparker | disruptions | `mdi:tow-truck` (or `mdi:car-off`); none today |
+  | 45 | construction work | 21 | Bauarbeiten | disruptions (documentation), news | `mdi:excavator` (as today) |
+  | 45 | construction work | 27 | Gleisbauarbeiten | disruptions, news | `mdi:excavator` (as today) |
+  | 120 | special event | 35 | Veranstaltung | news | `mdi:account-group` (as today) |
+  | 0 | unknown | 223 | Haltestellenverlegung | news | `mdi:bus-stop`; none today |
+  | 255 | undefined alert cause | 258 | Netzänderung | news | `mdi:transit-detour`; none today |
   | 255 | undefined alert cause | 0 | undefined | every lift, escalator and `stoerungkurz` notice, some disruptions, most news | none: keep today's icon |
+
+  Against today's behaviour, on the 11 distinct disruptions of that day
+  (8 active, 3 resolved; the backend keeps only the active ones):
+
+  | | of 8 active | of all 11 |
+  |---|---|---|
+  | Cause icon today, from the "Grund:" line | 3 | 4 |
+  | Cause icon from `reasonId` alone | 6 | 9 |
+  | Both together | 7 | 10 |
+  | Newly given an icon | 4 | 6 |
+
+  The ones gained are follow-ups whose text no longer names the cause:
+  "25: Rettungseinsatz" with the description "Nach einer Fahrtbehinderung
+  kommt es zu unterschiedlichen Intervallen", and "60: Falschparker",
+  which `REASON_ICONS` has no pattern for. One notice went the other way:
+  "25, 26, 27: Gleisbauarbeiten" has a "Grund:" line but `reasonId` 0, so
+  the text has to stay as the fallback. "26E: Gleisbauarbeiten" has
+  neither. A cheaper half-step without the new fields: run `REASON_ICONS`
+  over the title when the description has no "Grund:" line, and add
+  Falschparker to it; on that day it would have given the same 7 of 8.
 
   Things to settle:
   - Map by `reasonId`, with `alertCauseId` as the fallback for a reason
