@@ -1287,7 +1287,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const inferred = Array.isArray(t.inferred_lines) ? t.inferred_lines : [];
     const lines = related.length ? related : inferred;
     const descSource = t.description_html || t.description || "";
-    const notice = parseTrafficNotice(descSource);
+    const notice = parseTrafficNotice(descSource, t.title);
     const hasNotice = notice.blocks.length > 0 || notice.facts.length > 0;
     const until = formatTime(t.time_end, this._lang());
     const updatedRaw = formatTime(t.time_last_update, this._lang());

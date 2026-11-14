@@ -194,6 +194,54 @@ describe("reason pictograms — substring landmines", () => {
   });
 });
 
+describe("parseTrafficNotice — the cause from the title", () => {
+  // Both from the live feed on 2026-11-14.
+  const FOLLOW_UP = "Nach einer Fahrtbehinderung kommt es zu unterschiedlichen Intervallen.";
+
+  it("takes the cause from the title when the text names none", () => {
+    const { facts } = parseTrafficNotice(FOLLOW_UP, "25: Rettungseinsatz");
+    expect(facts).toEqual([{ label: "Grund", value: "Rettungseinsatz", icon: "mdi:ambulance" }]);
+  });
+
+  it("knows a wrongly parked car", () => {
+    const { facts } = parseTrafficNotice(FOLLOW_UP, "60: Falschparker");
+    expect(facts).toEqual([{ label: "Grund", value: "Falschparker", icon: "mdi:tow-truck" }]);
+  });
+
+  it("reads a title naming several lines", () => {
+    const { facts } = parseTrafficNotice(FOLLOW_UP, "25, 26, 27: Gleisbauarbeiten");
+    expect(facts[0]).toMatchObject({ value: "Gleisbauarbeiten", icon: "mdi:excavator" });
+  });
+
+  it("keeps the cause the text gives, in either form", () => {
+    expect(parseTrafficNotice(TEMPLATED, "U1: Rettungseinsatz").facts).toEqual(
+      parseTrafficNotice(TEMPLATED).facts,
+    );
+    expect(parseTrafficNotice(PROSE, "U1: Polizeieinsatz").facts).toEqual(
+      parseTrafficNotice(PROSE).facts,
+    );
+  });
+
+  it("leaves a title alone that names an effect, not a cause", () => {
+    expect(parseTrafficNotice(FOLLOW_UP, "U1: Verspätungen").facts).toEqual([]);
+    expect(parseTrafficNotice(FOLLOW_UP, "Rettungseinsatz").facts).toEqual([]);
+  });
+
+  it("leaves a stop-display title alone, which is the notice's whole text", () => {
+    const title = "Gleisbauarbeiten\nBetrieb ab Knöllgasse";
+    expect(parseTrafficNotice(title, title).facts).toEqual([]);
+  });
+
+  it("leaves a sentence alone that merely contains a cause", () => {
+    const title = "13A: Umleitung über die Neubaugasse wegen einer Baustelle in der Kirchengasse";
+    expect(parseTrafficNotice(FOLLOW_UP, title).facts).toEqual([]);
+  });
+
+  it("adds nothing to a notice without a text", () => {
+    expect(parseTrafficNotice("", "25: Rettungseinsatz")).toEqual({ blocks: [], facts: [] });
+  });
+});
+
 describe("lift helpers", () => {
   it("maps a lift reason onto the shared reason table", () => {
     expect(iconForElevatorReason("wegen Bauarbeiten")).toBe("mdi:excavator");

@@ -154,6 +154,9 @@ const REASON_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/rettung|sanit(ä|ae)|notarzt/i, "mdi:ambulance"],
   [/feuerwehr|brand/i, "mdi:fire-truck"],
   [/polizei/i, "mdi:police-badge"],
+  // A wrongly parked car on the tracks: its own cause in the feed
+  // (`reasonName` "Falschparker"), and written into the title that way.
+  [/falschparker|falsch\s+geparkt|verparkt/i, "mdi:tow-truck"],
   [/demonstration|kundgebung|veranstaltung|umzug|marathon/i, "mdi:account-group"],
   // "eis" and "glatt" are anchored to a word start: as bare substrings they
   // fire on "Gleisschaden", "Preis", "Kreis" and "Reisende" — a track defect
@@ -358,10 +361,43 @@ function splitRunOns(line: string): string[] {
   return out;
 }
 
+/** The longest title remainder still read as a cause. The operator's causes
+ *  are a word or two ("Rettungseinsatz", "Fremder Verkehrsunfall"); a longer
+ *  remainder is a sentence that happens to contain one. */
+const TITLE_CAUSE_MAX_LENGTH = 40;
+
+/** The cause a disruption's title names, as a "Grund" fact.
+ *
+ *  The operator titles a disruption "<lines>: <cause>" ("25:
+ *  Rettungseinsatz", "26E: Gleisbauarbeiten"), and a follow-up message often
+ *  keeps the cause there only: its text moves on to the consequences ("Nach
+ *  einer Fahrtbehinderung kommt es zu unterschiedlichen Intervallen"). On
+ *  2026-11-14 all 8 active disruptions named their cause in the title, 3 of
+ *  them in a "Grund:" line as well.
+ *
+ *  Only the "<lines>: <cause>" form, on one line, and only when the cause
+ *  matches {@link REASON_ICONS}. Stop-display notices carry their whole text
+ *  as a multi-line title ("Gleisbauarbeiten\nBetrieb ab Knöllgasse"), and a
+ *  title like "U1: Verspätungen" names an effect, not a cause. */
+function causeFromTitle(title: unknown): TrafficFact | null {
+  if (typeof title !== "string" || /[\r\n]/.test(title.trim())) return null;
+  const cause = TITLE_LINE_PREFIX_RE.exec(title.trim())?.[2]?.trim();
+  if (!cause || cause.length > TITLE_CAUSE_MAX_LENGTH) return null;
+  for (const [pattern, icon] of REASON_ICONS) {
+    if (pattern.test(cause)) return { label: "Grund", value: trimTerminalPeriod(cause), icon };
+  }
+  return null;
+}
+
 /** Parse one disruption description into headings, prose and labelled facts.
  *  Returns empty collections for empty input — callers can test
- *  `blocks.length || facts.length` for "is there anything to show". */
-export function parseTrafficNotice(raw: unknown): TrafficNotice {
+ *  `blocks.length || facts.length` for "is there anything to show".
+ *
+ *  `title` is the notice's title. When the description names no cause, the
+ *  one in the title is added as the "Grund" fact (see `causeFromTitle`). A
+ *  notice with no description stays empty: the title alone is already on
+ *  screen, and repeating it would only make the row expandable. */
+export function parseTrafficNotice(raw: unknown, title?: unknown): TrafficNotice {
   const blocks: TrafficBlock[] = [];
   const facts: TrafficFact[] = [];
   const seenFacts = new Set<string>();
@@ -405,6 +441,11 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
       }
       blocks.push({ kind: "para", text: piece });
     }
+  }
+
+  if (!seenFacts.has("Grund") && (blocks.length || facts.length)) {
+    const cause = causeFromTitle(title);
+    if (cause) facts.push(cause);
   }
 
   return { blocks, facts };
