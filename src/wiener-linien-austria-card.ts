@@ -62,7 +62,7 @@ import {
   skipUntilText,
   stopEta,
   stopVerdict,
-  viennaClock,
+  viennaClockAt,
   type RunTimesAnswer,
   type RunTimesState,
   type StopEta,
@@ -2052,7 +2052,7 @@ export class WienerLinienAustriaCard extends LitElement {
     };
     const skipLabel = skip
       ? skip.next
-        ? this._t("stop_skipped_until_time", { time: viennaClock(skip.next) })
+        ? this._t("stop_skipped_until_time", { time: viennaClockAt(skip.next) })
         : skip.until
           ? this._t("stop_skipped_until", {
               date: skipUntilText(skip.until, this._lang(), Date.now()),

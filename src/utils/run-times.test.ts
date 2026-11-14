@@ -11,7 +11,7 @@ import {
   stopEta,
   stopSkip,
   stopVerdict,
-  viennaClock,
+  viennaClockAt,
   type RunTimesAnswer,
   type RunTimesState,
   type StationCalls,
@@ -392,9 +392,9 @@ describe("stopVerdict", () => {
   });
 });
 
-describe("viennaClock", () => {
+describe("viennaClockAt", () => {
   it("prints the Vienna time", () => {
-    expect(viennaClock(new Date("2026-11-10T21:02:00Z"))).toBe("22:02");
+    expect(viennaClockAt(new Date("2026-11-10T21:02:00Z"))).toBe("22:02");
   });
 });
 

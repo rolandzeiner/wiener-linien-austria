@@ -254,7 +254,7 @@ export interface StopVerdict {
 const CALL_LEEWAY_MS = 60_000;
 
 /** "22:02", Vienna time, like the times on the trail. */
-export function viennaClock(at: Date): string {
+export function viennaClockAt(at: Date): string {
   return VIENNA_CLOCK.format(at);
 }
 
