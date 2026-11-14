@@ -835,12 +835,35 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
     font-weight: 400;
   }
+  /* An escalator's place follows its bold kind label in running text. */
+  .outage-where {
+    font-weight: 400;
+  }
+  /* "Geplant ab …" under the title of an outage that hasn't begun. The row
+     keeps its place in the list but steps back: nothing is out yet. */
+  .alert-meta.outage-planned {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  .outage-planned ha-icon {
+    --mdc-icon-size: 14px;
+  }
+  .alert.planned > ha-icon:first-child {
+    color: var(--secondary-text-color);
+  }
   /* Reason line with its category pictogram. flex-start keeps the icon on
      the first line when the reason wraps to several. */
   .lift-reason {
     display: flex;
     align-items: flex-start;
     gap: 6px;
+  }
+  /* The feed shouts some reasons as one long word
+     ("FAHRTREPPENERNEUERUNG"), which ran out of a narrow card. */
+  .lift-reason span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .lift-reason ha-icon {
     --mdc-icon-size: 16px;

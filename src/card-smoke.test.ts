@@ -381,6 +381,103 @@ describe("missing sensor", () => {
   });
 });
 
+describe("lift and escalator outages", () => {
+  // The escalator texts and the lift announced for a later night are from
+  // the live feed on 2026-11-14.
+  const LIFT = {
+    name: "ftazS_711",
+    station: "Keplerplatz",
+    description: "U1 Mittelbahnsteig - Ausgang Keplerplatz",
+    reason: "An der Instandsetzung wird bereits gearbeitet.",
+  };
+  const LIFT_PLANNED = {
+    name: "ftazS_37",
+    station: "Josefstädter Straße",
+    description: "U6 Bahnsteig Richtung Siebenhirten - Ausgang Neulerchenfelder Straße",
+    reason: "An der Instandsetzung wird bereits gearbeitet.",
+    time_start: "2099-11-16T20:45:00.000+0100",
+    time_end: "2099-11-17T00:45:00.000+0100",
+  };
+  const ESCALATOR_UP = {
+    name: "ftazS_759",
+    station: "Enkplatz",
+    description:
+      "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße.",
+    reason: "An der Instandsetzung wird bereits gearbeitet.",
+  };
+  const ESCALATOR_BOTH = {
+    name: "ftazS_760",
+    station: "Enkplatz",
+    description:
+      "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
+    reason: "",
+  };
+
+  function outageHass(): HomeAssistant {
+    const hass = busyHass();
+    Object.assign(hass.states[ENTITY]!.attributes, {
+      elevator_info: [LIFT_PLANNED, LIFT],
+      escalator_info: [ESCALATOR_UP, ESCALATOR_BOTH],
+    });
+    return hass;
+  }
+  const titles = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".alert-title")].map((t) =>
+      (t.textContent ?? "").replace(/\s+/g, " ").trim(),
+    );
+  const icons = (el: CardElement): Array<string | null> =>
+    [...shadow(el).querySelectorAll(".alert > ha-icon:first-child")].map((i) =>
+      i.getAttribute("icon"),
+    );
+
+  it("leaves escalators out until their switch is on", async () => {
+    const el = await mount(MODERN, outageHass(), CARDS[0]![1]);
+    expect(icons(el)).toEqual(["mdi:elevator-passenger-off", "mdi:elevator-passenger-off"]);
+  });
+
+  it("lists escalators after the lifts, with the direction as icon and label", async () => {
+    const el = await mount(MODERN, outageHass(), {
+      ...CARDS[0]![1],
+      show_escalator_info: true,
+    });
+    expect(titles(el)).toEqual([
+      "U1 Mittelbahnsteig›Ausgang Keplerplatz",
+      "Fahrtreppe aufwärts vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße",
+      "Fahrtreppe auf- und abwärts vom Bahnsteig in das Zwischengeschoß",
+      "U6 Bahnsteig Richtung Siebenhirten›Ausgang Neulerchenfelder Straße",
+    ]);
+    expect(icons(el)).toEqual([
+      "mdi:elevator-passenger-off",
+      "mdi:escalator-up",
+      "mdi:escalator",
+      "mdi:elevator-passenger-off",
+    ]);
+    // The feed's other sentence is in the detail, not lost.
+    expect(shadow(el).querySelector(".alert-detail .alert-desc p")?.textContent).toBe(
+      "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.",
+    );
+  });
+
+  it("says an announced outage is planned, and puts it last", async () => {
+    const el = await mount(MODERN, outageHass(), CARDS[0]![1]);
+    const rows = [...shadow(el).querySelectorAll(".alert")];
+    expect(rows.map((row) => row.classList.contains("planned"))).toEqual([false, true]);
+    expect(rows[1]!.querySelector(".outage-planned")?.textContent?.trim()).toMatch(
+      /^Geplant ab 16\.11\., 20:45$/,
+    );
+    expect(rows[0]!.querySelector(".outage-planned")).toBeNull();
+  });
+
+  it("shows escalators alone when the lifts are switched off", async () => {
+    const el = await mount(MODERN, outageHass(), {
+      ...CARDS[0]![1],
+      show_elevator_info: false,
+      show_escalator_info: true,
+    });
+    expect(icons(el)).toEqual(["mdi:escalator-up", "mdi:escalator"]);
+  });
+});
+
 describe("lost connection", () => {
   // An outage used to read as "Keine Abfahrten verfügbar", which is what an
   // empty stop says too, so a dead API looked like a broken install.
@@ -1799,7 +1896,7 @@ describe("modern card dev mode", () => {
   it("injects a test disruption and lift outage, and opens the colour palette", async () => {
     const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
     const root = shadow(el);
-    const [traffic, elevator, colours] =
+    const [traffic, elevator, escalator, colours] =
       root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
     const alerts = (): number => root.querySelectorAll(".alert-title").length;
     const before = alerts();
@@ -1811,6 +1908,11 @@ describe("modern card dev mode", () => {
     elevator!.click();
     await el.updateComplete;
     expect(root.querySelectorAll(".lift-path")).toHaveLength(1);
+
+    // The escalator shows only with its own switch on, which is off here.
+    escalator!.click();
+    await el.updateComplete;
+    expect(root.querySelectorAll(".outage-where")).toHaveLength(0);
 
     colours!.click();
     await el.updateComplete;

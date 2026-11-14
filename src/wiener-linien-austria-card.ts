@@ -45,6 +45,7 @@ import { safeDomId, toggleInSet } from "./utils/html.js";
 import { stopMapUrl } from "./utils/map-url.js";
 import {
   iconForElevatorReason,
+  parseEscalatorNotice,
   parseTrafficNotice,
   splitLocationPath,
   trimTitleLinePrefix,
@@ -52,7 +53,7 @@ import {
 } from "./utils/traffic-notice.js";
 import { mdiPathForIcon } from "./utils/mdi-paths.js";
 import { arrowStep, revealOffset, tabEdges, type TabEdges } from "./utils/tab-scroll.js";
-import { formatTime } from "./utils/time.js";
+import { formatTime, upcomingStart } from "./utils/time.js";
 import { deriveRowState } from "./utils/row-state.js";
 import {
   needsRunTimes,
@@ -154,6 +155,17 @@ function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
   return fmt;
 }
 
+/** Icon and label for a broken escalator, by the way it runs. MDI has no
+ *  crossed-out escalator, so the direction is the icon: an escalator that
+ *  no longer carries people up matters more than one that no longer
+ *  carries them down. Keys written out so each is findable. */
+const ESCALATOR_LOOK = {
+  up: { icon: "mdi:escalator-up", label: "escalator_up" },
+  down: { icon: "mdi:escalator-down", label: "escalator_down" },
+  both: { icon: "mdi:escalator", label: "escalator_both" },
+  unknown: { icon: "mdi:escalator", label: "escalator" },
+} as const;
+
 @customElement("wiener-linien-austria-card")
 export class WienerLinienAustriaCard extends LitElement {
   @property({ attribute: false }) public hass?: HomeAssistant;
@@ -206,6 +218,7 @@ export class WienerLinienAustriaCard extends LitElement {
   private _runTimeWants: Array<{ diva: number; line: string; direction: string }> = [];
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
+  @state() private _debugEscalator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
   // QR dialog open state, keyed by stop entity_id. null = closed.
   // Per-stop so that in `tabs` layout each tab keeps its own dialog.
   @state() private _qrOpenFor: string | null = null;
@@ -254,6 +267,7 @@ export class WienerLinienAustriaCard extends LitElement {
     this._activeTab = 0;
     this._debugTraffic = [];
     this._debugElevator = [];
+    this._debugEscalator = [];
   }
 
   public getCardSize(): number {
@@ -948,6 +962,10 @@ export class WienerLinienAustriaCard extends LitElement {
     const debugElevator = this._debugElevator.filter((e) => e.__debug_entity === stopCfg.entity);
     const elevatorInfos: ElevatorInfoAttr[] = [...realElevator, ...debugElevator];
     const showElevator = this._config!.show_elevator_info && elevatorInfos.length > 0;
+    const realEscalator = Array.isArray(attrs.escalator_info) ? attrs.escalator_info : [];
+    const debugEscalator = this._debugEscalator.filter((e) => e.__debug_entity === stopCfg.entity);
+    const escalatorInfos: ElevatorInfoAttr[] = [...realEscalator, ...debugEscalator];
+    const showEscalator = this._config!.show_escalator_info && escalatorInfos.length > 0;
 
     const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     // Phone-first QR target: geo: URI hands off to the user's default
@@ -1036,7 +1054,14 @@ export class WienerLinienAustriaCard extends LitElement {
             ? this._renderStopHero(stopCfg, heroGroup, heroValue, heroUnit)
             : nothing
         }
-        ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
+        ${
+          showElevator || showEscalator
+            ? this._renderOutages(
+                showElevator ? elevatorInfos : [],
+                showEscalator ? escalatorInfos : [],
+              )
+            : nothing
+        }
         ${
           this._config!.show_departures && this._config!.max_departures > 0
             ? rows.length
@@ -1109,28 +1134,55 @@ export class WienerLinienAustriaCard extends LitElement {
     </div>`;
   }
 
-  private _renderElevatorDetails(infos: ElevatorInfoAttr[]): TemplateResult {
+  /** Lift and escalator outages in one list: what is out now first, then
+   *  what is only announced, soonest first. Lifts lead within each, since
+   *  for someone who needs one there is no way round. */
+  private _renderOutages(
+    lifts: ElevatorInfoAttr[],
+    escalators: ElevatorInfoAttr[],
+  ): TemplateResult {
+    const now = Date.now();
+    const rows = [
+      ...lifts.map((info) => ({ info, kind: "elevator" as const })),
+      ...escalators.map((info) => ({ info, kind: "escalator" as const })),
+    ].map((row) => ({ ...row, startsAt: upcomingStart(row.info.time_start, now) }));
+    // Array.prototype.sort is stable, so lifts stay ahead of escalators.
+    rows.sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0));
     return html`
       <div class="alert-list">
-        ${infos.map((e) => this._renderElevatorDetail(e))}
+        ${rows.map((row) => this._renderOutage(row.info, row.kind, row.startsAt !== null))}
       </div>
     `;
   }
 
-  private _renderElevatorDetail(e: ElevatorInfoAttr): TemplateResult {
+  private _renderOutage(
+    e: ElevatorInfoAttr,
+    kind: "elevator" | "escalator",
+    planned: boolean,
+  ): TemplateResult {
     const location = e.description || e.station || "";
-    // The feed writes the location as a path through the station; showing
-    // the segments separately makes "which lift is this" answerable at a
-    // glance. Falls back to a single segment when there's no separator.
-    const path = splitLocationPath(location);
+    // An escalator's text is a sentence, not a path: the direction it runs
+    // in is the part that matters, so it leads as the icon and the label.
+    const escalator = kind === "escalator" ? parseEscalatorNotice(location) : null;
+    // The lift feed writes the location as a path through the station;
+    // showing the segments separately makes "which lift is this" answerable
+    // at a glance. Falls back to a single segment when there's no separator.
+    const path = escalator ? [] : splitLocationPath(location);
+    const look = escalator ? ESCALATOR_LOOK[escalator.direction ?? "unknown"] : null;
+    const kindLabel = look ? this._t(look.label) : "";
+    const icon = look ? look.icon : "mdi:elevator-passenger-off";
+    const notes = escalator?.notes ?? [];
     const reason = e.reason || "";
     const reasonIcon = iconForElevatorReason(reason);
+    const from = planned ? formatTime(e.time_start, this._lang()) : "";
     const until = formatTime(e.time_end, this._lang());
-    const hasDetail = Boolean(reason || until);
-    const expanded = this._expandedElevator.has(e.name);
+    const hasDetail = Boolean(reason || until || notes.length);
+    const key = `${kind}:${e.name}`;
+    const expanded = this._expandedElevator.has(key);
     const classes = {
       alert: true,
       expanded,
+      planned,
       "no-detail": !hasDetail,
     };
     return html`
@@ -1139,29 +1191,54 @@ export class WienerLinienAustriaCard extends LitElement {
         role=${hasDetail ? "button" : "group"}
         tabindex=${hasDetail ? "0" : "-1"}
         aria-expanded=${hasDetail ? (expanded ? "true" : "false") : nothing}
-        aria-label=${location}
-        @click=${() => hasDetail && this._toggleElevator(e.name)}
+        aria-label=${[kindLabel, escalator ? escalator.where : location].filter(Boolean).join(", ")}
+        @click=${() => hasDetail && this._toggleElevator(key)}
         @keydown=${(ev: KeyboardEvent) =>
-          this._onExpanderKeydown(ev, hasDetail, () => this._toggleElevator(e.name))}
+          this._onExpanderKeydown(ev, hasDetail, () => this._toggleElevator(key))}
       >
-        <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
+        <ha-icon icon=${icon} aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
             <div class="alert-title">
-              <span lang="de" class="lift-path"
-                >${path.map(
-                  (seg, i) =>
-                    html`${
-                      i ? html`<span class="lift-path-sep" aria-hidden="true">›</span>` : nothing
-                    }<span>${seg}</span>`,
-                )}</span
-              >
+              ${
+                escalator
+                  ? html`<span>${kindLabel}</span>${
+                      escalator.where
+                        ? html` <span lang="de" class="outage-where">${escalator.where}</span>`
+                        : nothing
+                    }`
+                  : html`<span lang="de" class="lift-path"
+                      >${path.map(
+                        (seg, i) =>
+                          html`${
+                            i
+                              ? html`<span class="lift-path-sep" aria-hidden="true">›</span>`
+                              : nothing
+                          }<span>${seg}</span>`,
+                      )}</span
+                    >`
+              }
             </div>
+            ${
+              from
+                ? html`<div class="alert-meta outage-planned">
+                    <ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon>
+                    <span>${this._t("outage_planned", { time: from })}</span>
+                  </div>`
+                : nothing
+            }
           </div>
           ${
             hasDetail
               ? html`<div class="alert-detail">
                 <div class="alert-detail-inner">
+                  ${
+                    notes.length
+                      ? html`<div class="alert-desc" lang="de">
+                          ${notes.map((note) => html`<p>${note}</p>`)}
+                        </div>`
+                      : nothing
+                  }
                   ${
                     reason
                       ? html`<div class="alert-desc lift-reason">
@@ -2362,6 +2439,7 @@ export class WienerLinienAustriaCard extends LitElement {
         <span class="dev-strip-label">${this._t("devmode_title")}</span>
         <button type="button" @click=${this._devTestTraffic}>${this._t("devmode_traffic_btn")}</button>
         <button type="button" @click=${this._devTestElevator}>${this._t("devmode_elevator_btn")}</button>
+        <button type="button" @click=${this._devTestEscalator}>${this._t("devmode_escalator_btn")}</button>
         <button
           type="button"
           aria-expanded=${this._devPaletteOpen ? "true" : "false"}
@@ -2665,9 +2743,53 @@ export class WienerLinienAustriaCard extends LitElement {
     ];
   };
 
+  /** Escalator outages as the feed words them (2026-11-14): one up, one
+   *  switched either way with its extra sentence, and one only announced. */
+  private _devEscalatorVariant = 0;
+  private _devTestEscalator = (): void => {
+    const pick = this._randomFrom(this._resolveStops());
+    if (!pick) return;
+    const station = this._attrs(pick.entity).stop_name || pick.entity;
+    const now = Date.now();
+    const hour = 60 * 60_000;
+    const shapes: ReadonlyArray<{ description: string; reason: string; startIn: number }> = [
+      {
+        description: `Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang ${station}.`,
+        reason: "An der Instandsetzung wird bereits gearbeitet.",
+        startIn: -hour,
+      },
+      {
+        description: `Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.`,
+        reason: "FAHRTREPPENERNEUERUNG Voraussichtlich bis 21.12.2026 außer Betrieb!",
+        startIn: -hour,
+      },
+      {
+        description: "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig.",
+        reason: "Geplante Wartung wird durchgeführt.",
+        startIn: 30 * hour,
+      },
+    ];
+    const shape = shapes[this._devEscalatorVariant % shapes.length]!;
+    this._devEscalatorVariant += 1;
+    this._debugEscalator = [
+      ...this._debugEscalator,
+      {
+        __debug_entity: pick.entity,
+        name: `DEBUG-F-${now}`,
+        station,
+        description: shape.description,
+        reason: shape.reason,
+        status: "außer Betrieb",
+        time_start: new Date(now + shape.startIn).toISOString(),
+        time_end: new Date(now + shape.startIn + 4 * hour).toISOString(),
+      },
+    ];
+  };
+
   private _devClear = (): void => {
     this._debugTraffic = [];
     this._debugElevator = [];
+    this._debugEscalator = [];
     this._devPaletteOpen = false;
   };
 

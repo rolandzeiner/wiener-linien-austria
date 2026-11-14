@@ -137,3 +137,11 @@ export function formatDate(date: Date, format: string, lang = "de"): string {
   }
   return result;
 }
+
+/** When an outage only announced begins, as a timestamp; null once it has
+ *  begun, and for one with no start or an unreadable one: those are out now. */
+export function upcomingStart(iso: string | null | undefined, now: number): number | null {
+  if (!iso) return null;
+  const ts = Date.parse(iso);
+  return Number.isFinite(ts) && ts > now ? ts : null;
+}

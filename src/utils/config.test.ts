@@ -177,6 +177,7 @@ describe("normaliseModernConfig — defaults", () => {
     expect(c.show_cooling).toBe(false);
     expect(c.show_traffic_info).toBe(true);
     expect(c.show_elevator_info).toBe(true);
+    expect(c.show_escalator_info).toBe(false);
     expect(c.show_delay).toBe(true);
     expect(c.show_delay_colors).toBe(true);
     expect(c.show_type_icon).toBe(false);

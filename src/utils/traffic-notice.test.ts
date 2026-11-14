@@ -7,6 +7,7 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   iconForElevatorReason,
+  parseEscalatorNotice,
   parseTrafficNotice,
   splitLocationPath,
   trimTitleLinePrefix,
@@ -239,6 +240,59 @@ describe("parseTrafficNotice — the cause from the title", () => {
 
   it("adds nothing to a notice without a text", () => {
     expect(parseTrafficNotice("", "25: Rettungseinsatz")).toEqual({ blocks: [], facts: [] });
+  });
+});
+
+describe("parseEscalatorNotice", () => {
+  // All from the live feed on 2026-11-14.
+  it("takes the direction out of the place", () => {
+    expect(
+      parseEscalatorNotice(
+        "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße.",
+      ),
+    ).toEqual({
+      direction: "up",
+      where: "vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße",
+      notes: [],
+    });
+    expect(
+      parseEscalatorNotice(
+        "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß/Passage zum U1 Bahnsteig.",
+      ),
+    ).toMatchObject({ direction: "down", where: "vom Zwischengeschoß/Passage zum U1 Bahnsteig" });
+  });
+
+  it("finds the direction after the origin", () => {
+    expect(
+      parseEscalatorNotice(
+        "Fahrtreppe fährt vom Zwischengeschoß N-3 in Aufwärtsrichtung in das Zwischengeschoß N-1 (Stationswart).",
+      ),
+    ).toMatchObject({
+      direction: "up",
+      where: "vom Zwischengeschoß N-3 in das Zwischengeschoß N-1 (Stationswart)",
+    });
+  });
+
+  it("keeps the extra sentence of an escalator switched either way", () => {
+    expect(
+      parseEscalatorNotice(
+        "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
+      ),
+    ).toEqual({
+      direction: "both",
+      where: "vom Bahnsteig in das Zwischengeschoß",
+      notes: ["Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet."],
+    });
+  });
+
+  it("keeps a text whole that doesn't follow the template", () => {
+    expect(parseEscalatorNotice("Fahrtreppe beim Ausgang Ost")).toEqual({
+      direction: null,
+      where: "Fahrtreppe beim Ausgang Ost",
+      notes: [],
+    });
+    expect(parseEscalatorNotice("")).toEqual({ direction: null, where: "", notes: [] });
+    expect(parseEscalatorNotice(undefined)).toEqual({ direction: null, where: "", notes: [] });
   });
 });
 

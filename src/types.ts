@@ -358,6 +358,8 @@ export interface WienerLinienAttrs {
   line_colors?: LineColorsMap;
   traffic_info?: TrafficInfoAttr[];
   elevator_info?: ElevatorInfoAttr[];
+  /** Escalator outages, in the lift outages' shape. */
+  escalator_info?: ElevatorInfoAttr[];
 }
 
 // ---------------------------------------------------------------------------
@@ -397,6 +399,8 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_cooling?: boolean | undefined;
   show_traffic_info?: boolean | undefined;
   show_elevator_info?: boolean | undefined;
+  /** Show escalator outages beside the lift ones. Off by default. */
+  show_escalator_info?: boolean | undefined;
   show_delay?: boolean | undefined;
   /** Colour the countdown red when late / green when early. */
   show_delay_colors?: boolean | undefined;

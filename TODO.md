@@ -42,20 +42,18 @@ dataset on data.gv.at
 Every figure below is from one live `/trafficInfoList` request that day
 (32 notices). Check each against a few more days before building on it.
 
+Done: escalator outages (`fahrtreppeninfo`) ride in the same
+`/trafficInfoList` request as the lifts. With them: an outage that names
+no platforms now needs its station to be the stop's own (a lift at
+Bahnhof Meidling was on every U6 stop), and a lift or escalator only
+announced for a later day says "Geplant ab …".
+
 Done: the fair-use rule (15 s between requests, only the stops needed, an
 IP may be blocked) is written on the dataset page, and the README, the
 comments and the UI strings now say so instead of "convention".
 
 Could add, all in requests the integration already makes:
 
-- [ ] **Escalator outages (`fahrtreppeninfo`).** 16 notices that day,
-  the same shape as `aufzugsinfo`. `alerts.py` already names it as a later
-  change: it needs sensor attributes, translations and card rendering.
-  Check first how many a stop gets on a normal day, so the card isn't
-  flooded. A second request on the evening of 14.11.2026 had 15 notices
-  at 13 stations, two at most per station (Enkplatz, Frankhplatz). Some
-  are announcements: one was for a night ten days ahead (24.11., 01:15
-  to 05:15), so filter on `time.start` as for the lifts.
 - [ ] **Group follow-up messages by `parentName`.** A follow-up is named
   `I20261114-0026-F01` and carries `parentName` `I20261114-0026`; the
   first message has both equal. Check whether the list ever holds a
@@ -120,6 +118,10 @@ Could add, all in requests the integration already makes:
     keep the name in a comment and a test fixture.
   - The cards read `/trafficInfoList` only. The three news-only rows
     matter once `/newsList` texts are shown beyond the works notices.
+- [ ] **Escalators on the route card.** The stop sensors publish
+  `escalator_info` since 14.11.2026 and the modern card shows it
+  (`show_escalator_info`). A trip's steps name escalators too (`kind`
+  `escalator`); the route card could flag a broken one as it does a lift.
 - [ ] **`elevatorId`.** On lift notices, e.g. "JS 02". A stable id per
   lift, if `elevator_info` ever needs to tell two lifts of a station apart.
 - [ ] **The `/version` endpoint.** Gives the current version, its history

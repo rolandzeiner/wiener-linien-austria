@@ -186,6 +186,50 @@ export function iconForElevatorReason(reason: string): string {
   return FALLBACK_ICON;
 }
 
+/** Which way a broken escalator runs. `both` is one switched to suit the
+ *  crowd; `null` when the feed's text doesn't say. */
+export type EscalatorDirection = "up" | "down" | "both";
+
+export interface EscalatorNotice {
+  direction: EscalatorDirection | null;
+  /** Where it runs, without the words the direction already covers:
+   *  "vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße". */
+  where: string;
+  /** The feed's other sentences ("Diese Anlage wird betriebsabhängig auf-
+   *  oder abwärts geschaltet."). */
+  notes: string[];
+}
+
+const ESCALATOR_DIRECTION_RE = /\bin\s+(Auf\/Ab|Auf|Ab)wärtsrichtung\b/i;
+
+/** Read an escalator outage's description.
+ *
+ *  All 12 described escalators of 2026-11-14 follow one template, "Fahrtreppe
+ *  fährt in Aufwärtsrichtung vom … zum …", with the direction phrase
+ *  sometimes after the origin ("fährt vom Zwischengeschoß N-3 in
+ *  Aufwärtsrichtung in das …"). The direction is what a traveller needs
+ *  first, so it comes out as its own value for the icon and the label, and
+ *  the rest of that sentence is the place. A text that doesn't follow the
+ *  template is kept whole as the place. */
+export function parseEscalatorNotice(description: unknown): EscalatorNotice {
+  const lines = (typeof description === "string" ? description : "")
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const at = lines.findIndex((line) => /^Fahrtreppe fährt\b/i.test(line));
+  const main = lines[at === -1 ? 0 : at] ?? "";
+  const notes = lines.filter((_line, i) => i !== (at === -1 ? 0 : at));
+  const found = ESCALATOR_DIRECTION_RE.exec(main)?.[1]?.toLowerCase();
+  const direction: EscalatorDirection | null =
+    found === "auf/ab" ? "both" : found === "auf" ? "up" : found === "ab" ? "down" : null;
+  const where = main
+    .replace(/^Fahrtreppe fährt\s*/i, "")
+    .replace(ESCALATOR_DIRECTION_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return { direction, where: trimTerminalPeriod(where), notes };
+}
+
 /** Split a lift location into its path segments.
  *
  *  The feed writes these as a route through the station — "U3

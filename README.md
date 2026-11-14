@@ -56,7 +56,7 @@ Live departures for Vienna's public transport in Home Assistant, from the offici
 - Live departures for every U-Bahn, tram, bus and NightLine stop, plus S-Bahn timetable times where the S-Bahn stops.
 - Four cards: a modern board, a retro LED sign, a split-flap board and a route card, all in the official line colours.
 - Open a departure to see every stop ahead, with the lines you can change to, estimated arrival times and "Kein Halt" where it goes through.
-- Disruption, stop and lift notices for the lines and platforms you track.
+- Disruption, stop, lift and escalator notices for the lines and platforms you track.
 - Routes from A to B (experimental): live connections, a missed change moved to the next vehicle, a grade per change, and a time-to-leave sensor.
 - Plan between any two stops: on the route card, with earlier and later connections a tap away, or in scripts and Assist via `plan_trip`.
 - Visual card editors: pick lines as coloured chips, with a direction and walking time per line.
@@ -177,9 +177,10 @@ Home Assistant names the entities in your interface language. If you're not sure
 | `stale_since` | ISO string \| None | The newest planned time among those dropped: roughly when the feed froze. |
 | `connection_lost_since` | ISO string \| None | When polling started failing, once two polls in a row have failed. The other attributes then hold the last board that arrived. `None` while polls succeed. |
 | `traffic_info` | list[dict] | Disruptions. `category` says which feed a notice came from. `stoerunglang` matches your tracked lines. `stoerungkurz` is the stop's own display text, shown when it names one of this stop's platforms (RBLs) and one of your tracked lines, or names no line and the timetable has a tracked line calling at that platform. A notice with no lines of its own lists those tracked lines in `inferred_lines`, which the card shows as badges. Every `stoerungkurz` notice has the platform's station name in `location`. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `inferred_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`. |
-| `elevator_info` | list[dict] | Lift outages on this stop's platforms. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. |
+| `elevator_info` | list[dict] | Lift outages on this stop's platforms. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`. The list also holds announced maintenance: an entry whose `time_start` lies ahead is not out of service yet. |
+| `escalator_info` | list[dict] | Escalator outages on this stop's platforms, with the same fields and the same announced entries. `description` says which way the escalator runs and between which levels. |
 
-`departures`, `next_by_line`, `line_colors`, `lines_at_stop`, `tracked_lines`, `tracked_line_keys`, `traffic_info` and `elevator_info` aren't recorded in history, since they are large at busy stops.
+`departures`, `next_by_line`, `line_colors`, `lines_at_stop`, `tracked_lines`, `tracked_line_keys`, `traffic_info`, `elevator_info` and `escalator_info` aren't recorded in history, since they are large at busy stops.
 
 #### Departure shape
 
@@ -397,7 +398,8 @@ entities:
 | `accessibility_only` | `false` | Shows only step-free departures. Needs `show_accessibility`. |
 | `show_cooling` | `false` | Shows a snowflake for air-conditioned vehicles. |
 | `show_traffic_info` | `true` | Shows disruption alerts. |
-| `show_elevator_info` | `true` | Shows elevator outages. |
+| `show_elevator_info` | `true` | Shows elevator outages. One that is only announced is marked *Planned from* with its start. |
+| `show_escalator_info` | `false` | Shows escalator outages below the elevator ones, each with the direction the escalator runs in. |
 | `show_qr_button` | `true` | Shows the QR-code button. |
 | `hide_header` | `false` | Hides the card's title bar. |
 | `hide_attribution` | `false` | Hides the data-source credit. |
@@ -560,7 +562,7 @@ Five live endpoints and five static files, each on its own schedule:
 | What | Endpoint | Cadence |
 |---|---|---|
 | Live departures | `/monitor?stopId=…` | One request per interval group, default 60 s (30–600 s) |
-| Disruption, stop and lift notices | `/trafficInfoList` (`stoerunglang`, `stoerungkurz` and `aufzugsinfo` in one request) | Every 5 min, shared by all entries. From the second failed request in a row the wait doubles, up to about 30 min, until it answers again |
+| Disruption, stop, lift and escalator notices | `/trafficInfoList` (`stoerunglang`, `stoerungkurz`, `aufzugsinfo` and `fahrtreppeninfo` in one request) | Every 5 min, shared by all entries. From the second failed request in a row the wait doubles, up to about 30 min, until it answers again |
 | Stop list | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, counted from the last download, cached in Home Assistant's storage |
 | Line list and trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached. Used for the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached. Used for `line_colors` |
@@ -584,7 +586,7 @@ Scheduled requests share a 15 s cooldown across all entries, plus a 30 s minimum
 
 Responses arrive gzip-compressed, which does most of the work: a 60-stop `/monitor` response measures 345,872 bytes raw against 20,894 on the wire. Requests send no conditional-GET validators, because the upstream can't answer them. `/monitor`, `/trafficInfoList` and `/newsList` return no `ETag` or `Last-Modified` at all, and the static CSVs return both but ignore them, answering `200` even to `If-None-Match: *`. Every request carries an identifying User-Agent (`HomeAssistant/{ver} wiener_linien_austria/{ver}`), so Wiener Linien can tell this integration's traffic apart and throttle it on its own.
 
-After a Home Assistant restart, departures load right away. The notices (`traffic_info` and `elevator_info`) follow within 5 minutes.
+After a Home Assistant restart, departures load right away. The notices (`traffic_info`, `elevator_info` and `escalator_info`) follow within 5 minutes.
 
 ### Routes and trip planning
 
