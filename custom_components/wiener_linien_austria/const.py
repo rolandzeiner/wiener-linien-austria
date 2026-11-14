@@ -47,12 +47,13 @@ NEARBY_STOP_LIMIT: Final = 10
 NEARBY_STOP_MAX_METERS: Final = 2000
 
 # Polling policy.
-# The conventional minimum interval circulated for the Wiener Linien OGD
-# real-time endpoint is 15 s — the WL `open-data` page documents the
-# CC-BY licence and "no API key required" but does not currently publish
-# a numeric request-rate cap, so 15 s is convention rather than written
-# rule. We enforce 30 s as a hard floor (twice the conventional minimum)
-# so two concurrent entries still leave headroom. Default is 60 s.
+# Wiener Linien's fair-use rule for the OGD real-time data, as the dataset
+# "Wiener Linien Echtzeitdaten via Datendrehscheibe Wien" states it on
+# data.gv.at (read 2026-11-14): "Das Intervall der Abfragen sollte 15
+# Sekunden nicht unterschreiten", only the stops needed for personal
+# information are to be asked for, and an IP address that breaks the rule
+# may be blocked. We enforce 30 s as a hard floor (twice that minimum) so
+# two concurrent entries still leave headroom. Default is 60 s.
 MIN_POLL_SECONDS: Final = 30
 DEFAULT_SCAN_INTERVAL: Final = 60  # seconds
 MAX_POLL_SECONDS: Final = 600
@@ -613,10 +614,9 @@ S_BAHN_TEXT_COLOR: Final = "FFFFFF"
 # Response attribution (CC-BY mandated)
 ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 
-# Error code 316 = rate limit exceeded — observed empirically from the
-# OGD real-time endpoint when the conventional 15-second minimum
-# interval is breached (the public dataset page does not currently
-# publish the exact threshold, but 316 is what the API returns).
+# Error code 316 = "Abfragelimit erreicht" in the real-time documentation
+# (V1.6, 19.10.2026). The dataset page asks for 15 s between requests; the
+# threshold at which the API answers 316 is not published.
 ERR_RATE_LIMIT: Final = 316
 
 # Translation key for the 316 raise. Named here rather than inlined at the

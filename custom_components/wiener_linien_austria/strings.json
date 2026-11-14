@@ -34,7 +34,7 @@
           "scan_interval": "Update interval (seconds)"
         },
         "data_description": {
-          "scan_interval": "Minimum 30 seconds — twice the conventional 15-second floor circulated for the OGD endpoint, for safety margin under shared-IP scenarios."
+          "scan_interval": "Minimum 30 seconds — twice the 15 seconds Wiener Linien's fair-use rule asks for between requests, for safety margin under shared-IP scenarios."
         }
       },
       "route": {
@@ -217,7 +217,7 @@
   "issues": {
     "rate_limited": {
       "title": "Wiener Linien rate limit hit",
-      "description": "Wiener Linien replied with error 316 (rate limit exceeded) to polls for **{entry_title}**. The conventional minimum interval circulated for the OGD endpoint is 15 s; this integration defaults to 60 s and enforces a 30 s floor, so normally this issue only appears when many HA instances share the same outbound IP. Raise the scan interval or reduce the number of concurrent entries."
+      "description": "Wiener Linien replied with error 316 (rate limit exceeded) to polls for **{entry_title}**. Wiener Linien's fair-use rule asks for at least 15 s between requests; this integration defaults to 60 s and enforces a 30 s floor, so normally this issue only appears when many HA instances share the same outbound IP. Raise the scan interval or reduce the number of concurrent entries."
     },
     "catalogue_unavailable": {
       "title": "Wiener Linien stop catalogue unavailable",

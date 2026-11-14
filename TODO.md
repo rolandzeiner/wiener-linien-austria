@@ -31,15 +31,63 @@ device, or a document it couldn't open. Delete this file once they're done.
   tap the card says "Aktualisierung pausiert" and nothing else, also once
   every connection of the plan has left. Confirm on the tablet.
 
-## Needs a source the session couldn't read
+## From the open-data check of 14.11.2026
 
-- [ ] **Is there a written request limit?** The 15 s floor in
-  `rate_limit.py` is a convention; no official number was found. Read the
-  current real-time documentation
-  (<https://www.wienerlinien.at/ogd_realtime/doku/ogd/wienerlinien-echtzeitdaten-dokumentation.pdf>)
-  and the terms on <https://www.wienerlinien.at/open-data>. If they name
-  an interval or a limit, bring `const.py`, the README's *Data updates*
-  and CONTRIBUTING in line.
+The real-time API went to V1.6.0 on 19.10.2026 (the maintenance). Sources:
+the documentation V1.6
+(<https://www.wienerlinien.at/ogd_realtime/doku/ogd/wienerlinien-echtzeitdaten-dokumentation.pdf>),
+`https://www.wienerlinien.at/ogd_realtime/version?history=1`, and the
+dataset on data.gv.at
+(<https://www.data.gv.at/katalog/datasets/cfba4373-a654-3e0b-80f8-348738169f95>).
+Every figure below is from one live `/trafficInfoList` request that day
+(32 notices). Check each against a few more days before building on it.
+
+Done: the fair-use rule (15 s between requests, only the stops needed, an
+IP may be blocked) is written on the dataset page, and the README, the
+comments and the UI strings now say so instead of "convention".
+
+Could add, all in requests the integration already makes:
+
+- [ ] **Escalator outages (`fahrtreppeninfo`).** 16 notices that day,
+  the same shape as `aufzugsinfo`. `alerts.py` already names it as a later
+  change: it needs sensor attributes, translations and card rendering.
+  Check first how many a stop gets on a normal day, so the card isn't
+  flooded.
+- [ ] **Group follow-up messages by `parentName`.** A follow-up is named
+  `I20261114-0026-F01` and carries `parentName` `I20261114-0026`; the
+  first message has both equal. Check whether the list ever holds a
+  message and its follow-up at once, and if so show one disruption once.
+- [ ] **A structured cause: `reasonName`, `alertCause`.** On all 32
+  notices, e.g. "Rettungseinsatz" / "emergency medical services"; lift and
+  escalator notices have "undefined". Could pick an icon or a filter in
+  place of reading the title. Collect the values over a week first. The
+  documentation spells one field `alterCause`; the API sends `alertCause`.
+- [ ] **`elevatorId`.** On lift notices, e.g. "JS 02". A stable id per
+  lift, if `elevator_info` ever needs to tell two lifts of a station apart.
+- [ ] **The `/version` endpoint.** Gives the current version, its history
+  and a `comingSoon` entry (V1.7.0 that day, with placeholder text only).
+  An occasional check could log or raise a repair when the version moves,
+  before a change surprises the parser. Decide how often; once a day would
+  be plenty.
+
+Documented in V1.6 but empty in that request, so not usable yet:
+
+- [ ] **English notice texts (`languageId=en`, `languages`).** `languages`
+  was null on all 32 notices with `languageId=en` sent. Ask again in a few
+  weeks; if it fills, the English cards could show English notices.
+- [ ] **`relatedLinesDetails.relatedStops`, `scenarioId`,
+  `scenarioName`.** Not in that request; `relatedLinesDetails` had only
+  `lineId`, `lineName` and `vehicleType`.
+
+Checked, nothing to do:
+
+- XML responses were removed in V1.6. The integration asks for JSON only.
+- `cooling` and `onStop` (V1.5.0, 21.05.2026) are already read.
+- data.gv.at lists 17 Wiener Linien datasets. Only the real-time one
+  changed recently (12.10.2026). No GTFS-Realtime, no vehicle positions.
+- Of the open-data CSVs the integration leaves three alone:
+  `-verbindungen`, `-gps-punkte` (the lines' geometry, about 70,000 rows)
+  and `-steige`. None is new.
 
 ## Not looked at yet
 
