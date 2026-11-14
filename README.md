@@ -178,7 +178,7 @@ Home Assistant names the entities in your interface language. If you're not sure
 | `connection_lost_since` | ISO string \| None | When polling started failing, once two polls in a row have failed. The other attributes then hold the last board that arrived. `None` while polls succeed. |
 | `traffic_info` | list[dict] | Disruptions. `category` says which feed a notice came from. `stoerunglang` matches your tracked lines. `stoerungkurz` is the stop's own display text, shown when it names one of this stop's platforms (RBLs) and one of your tracked lines, or names no line and the timetable has a tracked line calling at that platform. A notice with no lines of its own lists those tracked lines in `inferred_lines`, which the card shows as badges. Every `stoerungkurz` notice has the platform's station name in `location`. Fields: `name`, `title`, `description`, `description_html`, `related_lines`, `related_stops`, `inferred_lines`, `line_types`, `location`, `time_start`, `time_end`, `time_created`, `time_last_update`, `status`, `category`, and where Wiener Linien name a cause, `reason` (their own, such as `Rettungseinsatz`) and `cause` (the coarser English category, such as `accident`). |
 | `elevator_info` | list[dict] | Lift outages on this stop's platforms. Fields: `name`, `station`, `description`, `reason`, `status`, `related_lines`, `related_stops`, `time_start`, `time_end`, `towards` (the trains it serves, such as `U6 Siebenhirten`) and `elevator_id` (the lift's number at its station, such as `JS 02`; `None` for escalators). The list also holds announced maintenance: an entry whose `time_start` lies ahead is not out of service yet. |
-| `escalator_info` | list[dict] | Escalator outages on this stop's platforms, with the same fields and the same announced entries. `description` says which way the escalator runs and between which levels. |
+| `escalator_info` | list[dict] | Escalator outages on this stop's platforms, with the same fields and the same announced entries. `direction` is the way the broken escalator runs (`up`, `down`, or `both` for one switched to suit the crowd; `None` where the text doesn't say), and `description` says between which levels. |
 
 `departures`, `next_by_line`, `line_colors`, `lines_at_stop`, `tracked_lines`, `tracked_line_keys`, `traffic_info`, `elevator_info` and `escalator_info` aren't recorded in history, since they are large at busy stops.
 
@@ -215,7 +215,7 @@ Use it in place of the departure sensor's availability. The departure sensor sta
 | `line_colors` | The official colours of the lines the trips use. |
 | `traffic_info` | Disruptions on those lines, shaped as on the departure sensor. |
 | `elevator_info` | Lift outages at stations whose lifts the trips use, each with `stop_ids` naming those stations. Empty unless a trip lists lifts, which step-free trips do. An outage only announced for a later day is left out. |
-| `escalator_info` | Escalator outages at stations where the trips take an escalator, in the same shape. |
+| `escalator_info` | Escalator outages at stations where the trips take an escalator the way the broken one runs, in the same shape, with `direction`. |
 
 `trips`, `last_connection`, `line_colors`, `traffic_info`, `elevator_info` and `escalator_info` aren't recorded in history.
 

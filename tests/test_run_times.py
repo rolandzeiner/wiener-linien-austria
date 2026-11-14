@@ -384,6 +384,13 @@ async def test_the_stops_served_are_read_from_the_samples_held(
     assert registry.served(MEIDLING) == {}
     assert dm_fetch.await_count == 1
 
+    # A sample nobody renewed stops steering the route after its week.
+    freezer.move_to(DAY + RUN_TIME_MAX_AGE - timedelta(minutes=1))
+    assert registry.served(PRATERSTERN) == served
+    freezer.move_to(DAY + RUN_TIME_MAX_AGE)
+    assert registry.served(PRATERSTERN) == {}
+    assert dm_fetch.await_count == 1
+
 
 async def test_answers_outlive_the_switch_by_a_random_spread(
     hass: HomeAssistant,
@@ -954,6 +961,7 @@ def _messestrasse_news() -> dict[str, Any]:
         "data": {
             "pois": [
                 {
+                    "title": "U1: Messestraße, kein Halt Richtung Oberlaa",
                     "relatedLines": ["U1"],
                     "relatedStops": [93],
                     "time": {

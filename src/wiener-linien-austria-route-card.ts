@@ -92,7 +92,6 @@ import {
   windowRange,
   type NormalisedRouteConfig,
 } from "./utils/route.js";
-import { parseEscalatorNotice } from "./utils/traffic-notice.js";
 
 // The countdown only shows whole minutes, so a 15 s tick is at most a quarter
 // minute stale while costing nothing measurable.
@@ -249,6 +248,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _secondNow = Date.now();
   private _countdownTimer: ReturnType<typeof setTimeout> | null = null;
   private _tipHideTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A mouse is over the ⓘ and has opened its bubble by hovering. */
+  private _tipHovered = false;
 
   private _tick: ReturnType<typeof setInterval> | null = null;
   private _versionCheckDone = false;
@@ -1240,6 +1241,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   private _onTipEnter = (ev: PointerEvent): void => {
     if (ev.pointerType !== "mouse") return;
+    this._tipHovered = true;
     if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
     this._tipHideTimer = null;
     const bubble = this._tipBubble();
@@ -1251,6 +1253,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   /** A moment's grace, so the pointer can cross from the ⓘ to the bubble. */
   private _onTipLeave = (ev: PointerEvent): void => {
     if (ev.pointerType !== "mouse") return;
+    this._tipHovered = false;
     if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
     this._tipHideTimer = setTimeout(() => {
       this._tipHideTimer = null;
@@ -1261,9 +1264,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }, 200);
   };
 
-  /** Hover already opened it for a mouse; the click mustn't toggle it shut. */
-  private _onTipClick = (ev: PointerEvent): void => {
-    if (ev.pointerType === "mouse" && this._tipShown(this._tipBubble())) ev.preventDefault();
+  /** Hover already opened it for a mouse; the click mustn't toggle it shut.
+   *  Told by the hover itself, not by the click's `pointerType`: a browser
+   *  that still sends `click` as a plain MouseEvent has none. */
+  private _onTipClick = (ev: Event): void => {
+    if (this._tipHovered && this._tipShown(this._tipBubble())) ev.preventDefault();
   };
 
   /** One strings object per picker and language: a fresh object on every
@@ -1611,7 +1616,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (step.kind !== "escalator" || !step.stop_id) return false;
     return outages.some((outage) => {
       if (!(outage.stop_ids ?? []).includes(step.stop_id!)) return false;
-      const runs = parseEscalatorNotice(outage.description).direction;
+      const runs = outage.direction;
       return !runs || runs === "both" || !step.level || runs === step.level;
     });
   }

@@ -713,6 +713,14 @@ def _parse_monitor_body(
     # Badner Bahn's feed lists each Oper-bound train twice at a platform,
     # live and as a timetable-only row. The live one stays.
     seen: dict[tuple[int, str, str, str], int] = {}
+    # One route choice per platform, line, terminus and direction: every
+    # row of the same run pattern gets the same trail, and at a hub the
+    # choice (`static._shared_route` over all the line's route variants)
+    # was repeated for each of some forty rows on every poll. The rows
+    # share the list; nothing changes it after this.
+    trails: dict[
+        tuple[int | None, str, str, str | None], list[dict[str, Any]] | None
+    ] = {}
 
     for monitor in monitors:
         monitor_rbl = as_int(
@@ -783,7 +791,10 @@ def _parse_monitor_body(
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
                 resolved_towards = vehicle_towards or line_towards
                 stops_ahead: list[dict[str, Any]] | None = None
-                if pattern_catalogue is not None and entry_rbls:
+                trail_key = (monitor_rbl, line_name, resolved_towards, trail_direction)
+                if trail_key in trails:
+                    stops_ahead = trails[trail_key]
+                elif pattern_catalogue is not None and entry_rbls:
                     try:
                         # The row's own platform first: the board's other
                         # platforms carry other routes. All of them where
@@ -808,6 +819,7 @@ def _parse_monitor_body(
                             )
                             if stops_ahead is not None:
                                 break
+                        trails[trail_key] = stops_ahead
                     except Exception:
                         # Fail-soft: a single matcher hiccup must not poison
                         # the rest of the parse. `except Exception` (not

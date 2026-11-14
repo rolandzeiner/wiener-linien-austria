@@ -253,8 +253,9 @@ def _notice(
     rbls: frozenset[int] = frozenset({4644}),
     start: datetime | None = datetime(2026, 8, 13, 12, 0, tzinfo=VIENNA),
     end: datetime | None = datetime(2026, 12, 31, 23, 59, tzinfo=VIENNA),
+    no_call: bool = True,
 ) -> StopNotice:
-    return StopNotice(lines=lines, rbls=rbls, start=start, end=end)
+    return StopNotice(lines=lines, rbls=rbls, start=start, end=end, no_call=no_call)
 
 
 def test_news_answer_parses_to_notices_naming_platforms() -> None:
@@ -272,6 +273,49 @@ def test_news_answer_parses_to_notices_naming_platforms() -> None:
         _notice(),
         _notice(rbls=frozenset({4700})),
     ]
+
+
+@pytest.mark.parametrize(
+    ("title", "description", "no_call"),
+    [
+        # All four as `/newsList` sent them on 2026-11-14.
+        ("U6: Neue Donau, kein Halt Richtung Floridsdorf ab 14.09.2026", "", True),
+        (
+            "U6: Neue Donau",
+            "Die Station Neue Donau U wird in Richtung Floridsdorf U durchfahren.",
+            True,
+        ),
+        ("N31: Stammersdorf ersatzlos aufgelassen", "", True),
+        (
+            "95B: Amongasse",
+            "Haltestellenauflassung der Linie 95B in Richtung Hausfeldstra&szlig;e U",
+            True,
+        ),
+        (
+            "U2: Rathaus - Kein Aufzug am Bahnsteig Richtung Seestadt",
+            "Bei der Station Rathaus steht kein Aufzug zur Verf&uuml;gung.",
+            False,
+        ),
+        (
+            "1A: Habsburgergasse",
+            "Haltestellenverlegung der Linie 1A in Richtung Stephansplatz U",
+            False,
+        ),
+        (
+            "U1: Nestroyplatz, Aufgangssperre ab 12.10.2026",
+            "Wegen Sanierungsarbeiten wird ein Aufgang gesperrt.",
+            False,
+        ),
+        ("11: Wienerfeldgasse", None, False),
+    ],
+)
+def test_only_a_notice_about_not_calling_counts_as_one(
+    title: str, description: str | None, no_call: bool
+) -> None:
+    poi = {**_poi(), "title": title, "description": description}
+    (notice,) = parse_news(_news(poi))
+
+    assert notice.no_call is no_call
 
 
 def test_unreadable_times_parse_as_unknown() -> None:
@@ -326,6 +370,8 @@ def test_a_notice_shutting_a_called_station_marks_it() -> None:
         (CALLING, [_notice(rbls=frozenset({4643, 4644, 4645}))]),
         (CALLING, [_notice(start=NOW + timedelta(days=1))]),
         (CALLING, [_notice(end=NOW - timedelta(minutes=1))]),
+        # About the stop, but not about calling there: a missing lift.
+        (CALLING, [_notice(no_call=False)]),
         # No call there: `skipped_stations` has it.
         ({HANDELSKAI: 10.0, FLORIDSDORF: 13.0}, [_notice()]),
         # A call out of order on the route.

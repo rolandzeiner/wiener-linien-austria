@@ -171,12 +171,21 @@ class RunTimes:
         From the samples held for the stop, both parts of the day; empty
         when none are. No request: a departure board uses it on every poll
         to pick the route its trails show (`static.stops_ahead_for_match`).
+
+        A sample past `RUN_TIME_MAX_AGE` no longer counts. Samples are only
+        renewed when a card opens a trail with stop times on, so one taken
+        during a diversion would otherwise steer the trail along that route
+        for good on a dashboard that never asks again, against a route list
+        that is itself renewed every week.
         """
         state = self._stops.get(diva)
         if state is None:
             return {}
+        now = dt_util.utcnow()
         served: dict[Pair, set[int]] = {}
         for sample in state.samples.values():
+            if now - sample.fetched_at >= RUN_TIME_MAX_AGE:
+                continue
             for pair, minutes in sample.pairs.items():
                 served.setdefault(pair, set()).update(minutes)
         return {pair: frozenset(divas) for pair, divas in served.items()}

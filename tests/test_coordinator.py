@@ -609,6 +609,34 @@ def test_parse_monitor_body_enriches_with_stops_ahead() -> None:
     assert sa[-1].get("is_terminus") is True
 
 
+def test_parse_monitor_body_chooses_a_trail_once_for_like_rows() -> None:
+    """Rows of one line, platform and terminus share a route choice: the
+    matcher ran once per row before, some forty times a poll at a hub."""
+    from custom_components.wiener_linien_austria.static import stops_ahead_for_match
+
+    body = _u1_h_body()
+    rows = body["data"]["monitors"][0]["lines"][0]["departures"]["departure"]
+    rows.extend({"departureTime": {"countdown": minutes}} for minutes in (6, 10))
+
+    with patch(
+        "custom_components.wiener_linien_austria.coordinator.stops_ahead_for_match",
+        wraps=stops_ahead_for_match,
+    ) as matcher:
+        result = _parse_monitor_body(
+            body,
+            None,
+            None,
+            catalogue=_u1_catalogue_for_coord(),
+            entry_rbls=[4111, 4118],
+        )
+
+    assert len(result.departures) == 3
+    assert matcher.call_count == 1
+    trails = [d.stops_ahead for d in result.departures]
+    assert trails[0] is not None
+    assert trails[0] == trails[1] == trails[2]
+
+
 def test_parse_monitor_body_omits_stops_ahead_for_unknown_line() -> None:
     """Unknown line label → stops_ahead absent on the dict, None on the dataclass."""
     catalogue = _u1_catalogue_for_coord()

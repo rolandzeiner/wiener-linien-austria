@@ -402,6 +402,7 @@ describe("lift and escalator outages", () => {
   const ESCALATOR_UP = {
     name: "ftazS_759",
     station: "Enkplatz",
+    direction: "up",
     description:
       "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße.",
     reason: "An der Instandsetzung wird bereits gearbeitet.",
@@ -409,6 +410,7 @@ describe("lift and escalator outages", () => {
   const ESCALATOR_BOTH = {
     name: "ftazS_760",
     station: "Enkplatz",
+    direction: "both",
     description:
       "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
     reason: "",

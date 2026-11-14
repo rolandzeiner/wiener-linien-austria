@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
@@ -60,6 +61,7 @@ from .const import (
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
+from .parsing import as_int_list, as_str_list
 from .rate_limit import async_enforce_domain_cooldown
 from .static import (
     StaticCatalogue,
@@ -177,6 +179,10 @@ class ElevatorInfo:
     # The lift's own number at its station ("JS 02"), since API V1.6.
     # Escalators carry none.
     elevator_id: str | None = None
+    # Which way a broken escalator runs: "up", "down", or "both" for one
+    # switched to suit the crowd. None for a lift, and where the text
+    # doesn't say (`_escalator_direction`).
+    direction: str | None = None
     # Pre-computed frozensets — see `TrafficInfo.related_lines_set` for
     # the rationale. Both the line and stop list participate in the
     # `get_alerts_for` matcher's intersection per attribute read.
@@ -205,6 +211,7 @@ class ElevatorInfo:
             "time_end": self.time_end,
             "towards": self.towards,
             "elevator_id": self.elevator_id,
+            "direction": self.direction,
         }
 
 
@@ -402,7 +409,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
 def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
     """Parse one trafficInfos entry for name=stoerunglang."""
     time = raw.get("time") or {}
-    related_lines = _as_str_list(raw.get("relatedLines"))
+    related_lines = as_str_list(raw.get("relatedLines"))
     attrs = raw.get("attributes") or {}
     line_types_raw = attrs.get("relatedLineTypes") or {}
     line_types: dict[str, str] = (
@@ -462,8 +469,8 @@ def _parse_traffic_short(raw: dict[str, Any]) -> TrafficInfo:
         name=str(raw.get("name") or ""),
         title=title,
         description=description,
-        related_lines=_as_str_list(raw.get("relatedLines")),
-        related_stops=_as_int_list(raw.get("relatedStops")),
+        related_lines=as_str_list(raw.get("relatedLines")),
+        related_stops=as_int_list(raw.get("relatedStops")),
         time_start=_str_or_none(time.get("start")),
         time_end=_str_or_none(time.get("end")),
         # No upstream status on this feed. "active" is the honest value:
@@ -604,10 +611,10 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
     attrs = raw.get("attributes") or {}
     time = raw.get("time") or {}
 
-    related_lines = _as_str_list(raw.get("relatedLines")) or _as_str_list(
+    related_lines = as_str_list(raw.get("relatedLines")) or as_str_list(
         attrs.get("relatedLines")
     )
-    related_stops = _as_int_list(raw.get("relatedStops")) or _as_int_list(
+    related_stops = as_int_list(raw.get("relatedStops")) or as_int_list(
         attrs.get("relatedStops")
     )
 
@@ -634,7 +641,26 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
         time_end=_str_or_none(time.get("end")),
         towards=_str_or_none(attrs.get("towards")),
         elevator_id=_str_or_none(raw.get("elevatorId")),
+        direction=_escalator_direction(description),
     )
+
+
+# "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig …", "… in
+# Abwärtsrichtung …", "… in Auf/Abwärtsrichtung …": the template all 12
+# described escalators followed on 2026-11-14, the phrase sometimes after
+# the origin ("fährt vom Zwischengeschoß N-3 in Aufwärtsrichtung in das …").
+# The feed has no field for the direction, so it is read here once, for the
+# cards, the route's outage match and anyone reading the attribute.
+_ESCALATOR_DIRECTION_RE: Final = re.compile(
+    r"\bin\s+(auf/ab|auf|ab)wärtsrichtung\b", re.IGNORECASE
+)
+_ESCALATOR_DIRECTIONS: Final = {"auf": "up", "ab": "down", "auf/ab": "both"}
+
+
+def _escalator_direction(description: str) -> str | None:
+    """Which way the escalator a notice describes runs, if its text says."""
+    match = _ESCALATOR_DIRECTION_RE.search(description)
+    return _ESCALATOR_DIRECTIONS[match.group(1).lower()] if match else None
 
 
 # What the feed writes where it has no cause: `reasonName` "undefined",
@@ -650,28 +676,6 @@ def _named_cause(val: Any) -> str | None:
     """
     text = _str_or_none(val)
     return None if text is None or text.casefold() in _NO_CAUSE else text
-
-
-def _as_str_list(val: Any) -> list[str]:
-    """Coerce to a list of non-empty stripped strings."""
-    if isinstance(val, list):
-        return [str(x).strip() for x in val if isinstance(x, str) and x.strip()]
-    if isinstance(val, dict):
-        return [str(k).strip() for k in val if isinstance(k, str) and k.strip()]
-    return []
-
-
-def _as_int_list(val: Any) -> list[int]:
-    """Coerce to a list of ints, dropping non-numeric entries."""
-    if not isinstance(val, list):
-        return []
-    out: list[int] = []
-    for item in val:
-        try:
-            out.append(int(item))
-        except (ValueError, TypeError):
-            continue
-    return out
 
 
 def _str_or_none(val: Any) -> str | None:

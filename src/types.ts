@@ -308,6 +308,9 @@ export interface ElevatorInfoAttr {
   towards?: string | null;
   /** The lift's own number at its station ("JS 02"). */
   elevator_id?: string | null;
+  /** Which way a broken escalator runs; `both` is one switched to suit the
+   *  crowd. Null for a lift and where the feed's text doesn't say. */
+  direction?: "up" | "down" | "both" | null;
   description?: string;
   reason?: string;
   status?: string;
@@ -816,10 +819,11 @@ export interface RouteAttrs {
     reason?: string;
     stop_ids?: string[];
   }>;
-  /** Escalator outages at stations where the trips take an escalator, in
-   *  the same shape. `description` says which way the broken one runs. */
+  /** Escalator outages at stations where the trips take an escalator the
+   *  way the broken one runs (`direction`), in the same shape. */
   escalator_info?: Array<{
     station?: string;
+    direction?: "up" | "down" | "both" | null;
     description?: string;
     reason?: string;
     stop_ids?: string[];

@@ -414,19 +414,19 @@ describe("step-free", () => {
     });
     const stepped = stepFreeTrip();
     stepped.legs[0]!.access = [escalator("up")];
-    const outage = (description: string): Record<string, unknown> => ({
+    const outage = (direction: string, description: string): Record<string, unknown> => ({
       ...ACTIVE,
       trips: [stepped],
       traffic_info: [],
       elevator_info: [],
       escalator_info: [
-        { station: "Stephansplatz", description, reason: "", stop_ids: ["60201320"] },
+        { station: "Stephansplatz", direction, description, reason: "", stop_ids: ["60201320"] },
       ],
     });
     const up = await mount(
       hass(
         "2026-09-14T05:50:00+00:00",
-        outage("Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig in das Zwischengeschoß."),
+        outage("up", "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig in das Zwischengeschoß."),
       ),
       { entity: ENTITY },
     );
@@ -439,7 +439,7 @@ describe("step-free", () => {
     const down = await mount(
       hass(
         "2026-09-14T05:50:00+00:00",
-        outage("Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig."),
+        outage("down", "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig."),
       ),
       { entity: ENTITY },
     );
@@ -1714,6 +1714,19 @@ describe("earlier and later", () => {
       expect(opened).toHaveLength(0);
       tip.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
       expect(opened).toEqual([bubble]);
+
+      // Open by hover, a click must not toggle it shut, also where the
+      // browser sends `click` as a plain MouseEvent with no pointerType.
+      const open = vi.spyOn(bubble, "matches").mockReturnValue(true);
+      const hovering = new MouseEvent("click", { cancelable: true, bubbles: true });
+      button.dispatchEvent(hovering);
+      expect(hovering.defaultPrevented).toBe(true);
+      // Once the mouse has left, a click (a key press, say) toggles as usual.
+      tip.dispatchEvent(new PointerEvent("pointerleave", { pointerType: "mouse" }));
+      const after = new MouseEvent("click", { cancelable: true, bubbles: true });
+      button.dispatchEvent(after);
+      expect(after.defaultPrevented).toBe(false);
+      open.mockRestore();
     } finally {
       proto["showPopover"] = saved;
     }

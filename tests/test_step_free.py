@@ -149,6 +149,13 @@ async def test_lift_outages_on_the_trip_are_published(hass: HomeAssistant) -> No
     assert route_trip_attributes(hass, [trip])["elevator_info"] == []
     domain_data[ELEVATOR_INFO_KEY] = [_outage([4909])]
 
+    # A start without an offset is unreadable, not an error: out now.
+    undated = _outage([4909])
+    undated.time_start = "2026-11-16T20:45:00"
+    domain_data[ELEVATOR_INFO_KEY] = [undated]
+    assert len(route_trip_attributes(hass, [trip])["elevator_info"]) == 1
+    domain_data[ELEVATOR_INFO_KEY] = [_outage([4909])]
+
     # Escalators only where the trip takes one, and it takes none.
     domain_data[ESCALATOR_INFO_KEY] = [_outage([4909])]
     assert route_trip_attributes(hass, [trip])["escalator_info"] == []
@@ -166,6 +173,17 @@ async def test_lift_outages_on_the_trip_are_published(hass: HomeAssistant) -> No
     domain_data[ESCALATOR_INFO_KEY] = [_outage([4909]), _outage([], "Volkstheater")]
     found = route_trip_attributes(hass, [stepped])["escalator_info"]
     assert [outage["stop_ids"] for outage in found] == [[VOLKSTHEATER], [VOLKSTHEATER]]
+
+    # The trip goes up there: one running down is not on its way, one
+    # running up or switched either way is.
+    def running(direction: str) -> ElevatorInfo:
+        outage = _outage([4909])
+        outage.direction = direction
+        return outage
+
+    domain_data[ESCALATOR_INFO_KEY] = [running("down"), running("up"), running("both")]
+    found = route_trip_attributes(hass, [stepped])["escalator_info"]
+    assert [outage["direction"] for outage in found] == ["up", "both"]
 
     # No catalogue, or no lift on the trip: nothing to match.
     del domain_data[CATALOGUE_KEY]

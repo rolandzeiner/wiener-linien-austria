@@ -48,7 +48,7 @@ from .live import (
     async_live_trips,
     rbls_for_trips,
 )
-from .parsing import as_int
+from .parsing import as_int, parse_aware_datetime
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
 from .routing import (
     RouteOptions,
@@ -539,19 +539,21 @@ def _access_outages(
     affects, or only the station. The catalogue joins them, so this is
     station-level: an outage anywhere at a station a planned lift or
     escalator belongs to counts, and `stop_ids` says which of the trip's
-    stations it is about.
+    stations it is about. An escalator outage counts only where a trip
+    takes an escalator the way the broken one runs (`ElevatorInfo.direction`).
 
     An outage only announced for later is left out: the feeds list
     maintenance days ahead as "außer Betrieb", and the one on this trip
     still runs.
     """
-    stations = {
-        diva
-        for trip in trips
-        for leg in trip.legs
-        for step in (*leg.access, *leg.access_after)
-        if step.kind == kind and (diva := as_int(step.stop_id)) is not None
-    }
+    # Per station, the ways the trips take one there; None is a step the
+    # planner gave no direction for.
+    stations: dict[int, set[str | None]] = {}
+    for trip in trips:
+        for leg in trip.legs:
+            for step in (*leg.access, *leg.access_after):
+                if step.kind == kind and (diva := as_int(step.stop_id)) is not None:
+                    stations.setdefault(diva, set()).add(step.level)
     catalogue = current_catalogue(hass)
     if not stations or catalogue is None:
         return []
@@ -570,7 +572,7 @@ def _access_outages(
     now = dt_util.utcnow()
     found: list[dict[str, Any]] = []
     for outage in outages:
-        start = dt_util.parse_datetime(outage.time_start or "")
+        start = parse_aware_datetime(outage.time_start)
         if start is not None and start > now:
             continue
         divas = {
@@ -583,6 +585,12 @@ def _access_outages(
             if (station := catalogue.stations_by_diva.get(diva)) is not None
             and outage_station_matches(outage, station.name)
         }
+        # An escalator running the other way is not the one on the trip.
+        # One with no direction, or switched either way, can be.
+        if outage.direction in ("up", "down"):
+            divas = {
+                diva for diva in divas if stations[diva] & {outage.direction, None}
+            }
         if divas:
             found.append(
                 {**outage.to_dict(), "stop_ids": sorted(str(diva) for diva in divas)}

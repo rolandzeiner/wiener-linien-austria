@@ -44,6 +44,7 @@ from custom_components.wiener_linien_austria.static import (
     _parse_haltestellen,
     _parse_route_colors,
     _parse_trip_patterns,
+    _terminus_key,
     async_get_catalogue,
     async_load_catalogue,
     async_refresh_catalogue,
@@ -906,6 +907,17 @@ def test_stops_ahead_follows_the_timetable_where_detours_outnumber() -> None:
         "Quellenplatz",
         "Geiereckstraße",
     ]
+
+
+def test_terminus_key_reads_strasse_and_str_as_one() -> None:
+    """ "Straße" casefolds to "strasse", which the key has to shorten too:
+    the 40A's two spellings didn't compare equal, and the exact match the
+    test below relies on never happened."""
+    assert _terminus_key("Döblinger Friedhof/Felix-Dahn-Straße") == _terminus_key(
+        "Döblinger Friedhof, Felix-Dahn-Str."
+    )
+    assert _terminus_key("Felix-Dahn-Strasse") == _terminus_key("Felix-Dahn-Str.")
+    assert _terminus_key("Neustiftgasse") != _terminus_key("Neustift")
 
 
 @pytest.mark.parametrize(

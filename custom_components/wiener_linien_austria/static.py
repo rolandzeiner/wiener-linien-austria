@@ -1465,7 +1465,8 @@ def _terminus_key(name: str) -> str:
     The live feed and the station list write the same stop differently:
     "/" or ", " between its parts, "Straße" or "Str.".
     """
-    key = name.casefold().replace("straße", "str").replace("str.", "str")
+    # casefold() has already turned "ß" into "ss" by the time this compares.
+    key = name.casefold().replace("strasse", "str").replace("str.", "str")
     return _TERMINUS_SEPARATORS.sub(" ", key).strip()
 
 

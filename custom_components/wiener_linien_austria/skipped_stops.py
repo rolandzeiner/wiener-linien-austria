@@ -36,7 +36,9 @@ someone has just opened a trail and is waiting.
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
+import re
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -59,7 +61,7 @@ from .const import (
     STOP_NOTICES_TIMEOUT_SECONDS,
     USER_AGENT,
 )
-from .parsing import parse_aware_datetime
+from .parsing import as_int_list, as_str_list, parse_aware_datetime
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .run_times import RUN_TIME_EXCLUDED_MOTS
 from .static import StaticCatalogue, trail_name
@@ -234,6 +236,8 @@ class StopNotice:
     rbls: frozenset[int]
     start: datetime | None
     end: datetime | None
+    # Whether the notice says vehicles don't call there (`_NO_CALL_RE`).
+    no_call: bool = False
 
 
 def noticed_stations(
@@ -253,9 +257,17 @@ def noticed_stations(
     sample calls there between the calls either side of it on the route,
     and a notice in force names the line and the station's platform on this
     route but neither neighbour's (the test `closed_until` uses, without the
-    date). Same arguments as `skipped_stations`, plus the notices.
+    date), and says the line doesn't call there. Most notices naming one
+    platform say something else: of 34 on 2026-11-14, one was Neue Donau's
+    "kein Halt", the rest moved bus stops, a missing lift and a closed
+    entrance, all at stops the vehicles serve. Same arguments as
+    `skipped_stations`, plus the notices.
     """
-    live = [notice for notice in notices if _in_force_for(notice, line, now)]
+    live = [
+        notice
+        for notice in notices
+        if notice.no_call and _in_force_for(notice, line, now)
+    ]
     if not live:
         return {}
     calls = {**minutes, board_diva: 0.0}
@@ -310,12 +322,8 @@ def parse_news(body: Mapping[str, Any]) -> list[StopNotice]:
     for poi in pois:
         if not isinstance(poi, Mapping):
             continue
-        rbls = frozenset(_ints(poi.get("relatedStops")))
-        lines = frozenset(
-            line
-            for line in _list(poi.get("relatedLines"))
-            if isinstance(line, str) and line
-        )
+        rbls = frozenset(as_int_list(poi.get("relatedStops")))
+        lines = frozenset(as_str_list(poi.get("relatedLines")))
         if not rbls or not lines:
             continue
         time = poi.get("time")
@@ -326,9 +334,34 @@ def parse_news(body: Mapping[str, Any]) -> list[StopNotice]:
                 rbls=rbls,
                 start=parse_aware_datetime(span.get("start")),
                 end=parse_aware_datetime(span.get("end")),
+                no_call=_says_no_call(poi),
             )
         )
     return notices
+
+
+# How Wiener Linien word a stop the vehicles pass: "kein Halt Richtung
+# Floridsdorf" and "wird … durchfahren" (U6 Neue Donau), "ersatzlos
+# aufgelassen" and "Haltestellenauflassung" (N31 Stammersdorf), all from
+# `/newsList` on 2026-11-14. A wording not in here leaves the station to the
+# run-time sample, which catches it within its week.
+_NO_CALL_RE: Final = re.compile(
+    r"kein(?:en)?\s+halt|h(?:ä|ae)lt\s+nicht|halten\s+nicht|durchf(?:a|ä|ae)hr"
+    r"|aufgelassen|auflassung",
+    re.IGNORECASE,
+)
+
+
+def _says_no_call(poi: Mapping[str, Any]) -> bool:
+    """Whether a notice's title or text says vehicles don't call at the stop.
+
+    The text is HTML with entities (`h&auml;lt`); unescaped, the tags don't
+    get in the way of these words.
+    """
+    return any(
+        isinstance(text, str) and _NO_CALL_RE.search(html.unescape(text))
+        for text in (poi.get("title"), poi.get("description"))
+    )
 
 
 def closed_until(
@@ -392,7 +425,7 @@ class StopNotices:
             # suspends is finished before its callback gets a turn.
             task = self._in_flight
             if task is None or task.done():
-                task = self._in_flight = self._hass.async_create_task(
+                task = self._in_flight = self._hass.async_create_background_task(
                     self._async_fetch(), name=f"{DOMAIN}_stop_notices"
                 )
             # Shielded: a caller that goes away mustn't cancel the others' fetch.
@@ -475,7 +508,7 @@ class StopCalls:
             # As in StopNotices: a finished task is no fetch to join.
             task = state.in_flight
             if task is None or task.done():
-                task = state.in_flight = self._hass.async_create_task(
+                task = state.in_flight = self._hass.async_create_background_task(
                     self._async_fetch(diva, state), name=f"{DOMAIN}_stop_calls_{diva}"
                 )
             await asyncio.shield(task)
@@ -517,15 +550,3 @@ def async_get_stop_calls(hass: HomeAssistant) -> StopCalls:
     if not isinstance(cache, StopCalls):
         cache = domain_data[STOP_CALLS_KEY] = StopCalls(hass)
     return cache
-
-
-def _list(value: Any) -> list[Any]:
-    return value if isinstance(value, list) else []
-
-
-def _ints(value: Any) -> Iterable[int]:
-    for item in _list(value):
-        if isinstance(item, int) and not isinstance(item, bool):
-            yield item
-        elif isinstance(item, str) and item.isdigit():
-            yield int(item)

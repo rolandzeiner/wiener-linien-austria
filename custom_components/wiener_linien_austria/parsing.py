@@ -56,3 +56,34 @@ def parse_aware_datetime(value: Any) -> datetime | None:
     except ValueError:
         return None
     return parsed if parsed.tzinfo is not None else None
+
+
+def as_str_list(value: Any) -> list[str]:
+    """The non-empty strings of a list (or the keys of a mapping), stripped.
+
+    For `relatedLines` in `/trafficInfoList` and `/newsList`, which arrives
+    as a list of labels and, on some lift notices, as a mapping keyed by
+    them.
+    """
+    if isinstance(value, (list, Mapping)):
+        return [
+            item.strip() for item in value if isinstance(item, str) and item.strip()
+        ]
+    return []
+
+
+def as_int_list(value: Any) -> list[int]:
+    """The whole numbers of a list, as ints; everything else is dropped.
+
+    For `relatedStops` (RBLs), sent as numbers and now and then as digit
+    strings. A bool is not a platform number.
+    """
+    if not isinstance(value, list):
+        return []
+    found: list[int] = []
+    for item in value:
+        if isinstance(item, int) and not isinstance(item, bool):
+            found.append(item)
+        elif isinstance(item, str) and item.strip().isdigit():
+            found.append(int(item))
+    return found

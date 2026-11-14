@@ -171,6 +171,43 @@ def test_parse_reads_the_fields_api_v1_6_added() -> None:
     assert (escalator.elevator_id, escalator.towards) == (None, None)
 
 
+@pytest.mark.parametrize(
+    ("description", "direction"),
+    [
+        # As the feed worded them on 2026-11-14.
+        (
+            "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche.",
+            "up",
+        ),
+        (
+            "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß/Passage zum U1 Bahnsteig.",
+            "down",
+        ),
+        (
+            "Fahrtreppe fährt vom Zwischengeschoß N-3 in Aufwärtsrichtung in das Zwischengeschoß N-1.",
+            "up",
+        ),
+        (
+            (
+                "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\n"
+                "Fahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das "
+                "Zwischengeschoß."
+            ),
+            "both",
+        ),
+        # A lift's path, and an escalator notice with no text at all.
+        ("U1 Mittelbahnsteig - Ausgang Keplerplatz", None),
+        ("", None),
+    ],
+)
+def test_parse_reads_which_way_an_escalator_runs(
+    description: str, direction: str | None
+) -> None:
+    outage = _parse_elevator({"name": "x", "description": description})
+    assert outage.direction == direction
+    assert outage.to_dict()["direction"] == direction
+
+
 def test_parse_elevator_tolerates_missing_fields() -> None:
     """Entries with no attributes at all still parse without raising."""
     e = _parse_elevator({"name": "x"})

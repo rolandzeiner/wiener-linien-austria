@@ -1169,7 +1169,7 @@ export class WienerLinienAustriaCard extends LitElement {
     // An escalator's text is a sentence, not a path: the direction it runs
     // in is the part that matters, so it leads as the icon and the label.
     const escalator = kind === "escalator" ? parseEscalatorNotice(location) : null;
-    const look = escalator ? ESCALATOR_LOOK[escalator.direction ?? "unknown"] : null;
+    const look = escalator ? ESCALATOR_LOOK[e.direction ?? "unknown"] : null;
     const kindLabel = look ? this._t(look.label) : "";
     const detail = this._renderOutageDetail(e, escalator?.notes ?? []);
     const hasDetail = detail !== nothing;
@@ -2762,18 +2762,26 @@ export class WienerLinienAustriaCard extends LitElement {
     const station = this._attrs(pick.entity).stop_name || pick.entity;
     const now = Date.now();
     const hour = 60 * 60_000;
-    const shapes: ReadonlyArray<{ description: string; reason: string; startIn: number }> = [
+    const shapes: ReadonlyArray<{
+      direction: NonNullable<ElevatorInfoAttr["direction"]>;
+      description: string;
+      reason: string;
+      startIn: number;
+    }> = [
       {
+        direction: "up",
         description: `Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang ${station}.`,
         reason: "An der Instandsetzung wird bereits gearbeitet.",
         startIn: -hour,
       },
       {
+        direction: "both",
         description: `Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.`,
         reason: "FAHRTREPPENERNEUERUNG Voraussichtlich bis 21.12.2026 außer Betrieb!",
         startIn: -hour,
       },
       {
+        direction: "down",
         description: "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig.",
         reason: "Geplante Wartung wird durchgeführt.",
         startIn: 30 * hour,
@@ -2787,6 +2795,7 @@ export class WienerLinienAustriaCard extends LitElement {
         __debug_entity: pick.entity,
         name: `DEBUG-F-${now}`,
         station,
+        direction: shape.direction,
         description: shape.description,
         reason: shape.reason,
         status: "außer Betrieb",
