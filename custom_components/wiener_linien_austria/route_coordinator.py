@@ -89,7 +89,26 @@ LAST_CONNECTION_THROUGH_MARGIN = timedelta(minutes=60)
 # city buses to the trip planner, so leaving them out means all buses.
 LAST_CONNECTION_EXCLUDED_MEANS = ("5", "6", "7")
 
+# Home Assistant runs a coordinator on a whole second of its loop clock, up
+# to a second before the interval is over. A refresh this close to the time
+# it was pulled up to is that refresh; any earlier one was asked for.
+ROLLOVER_EARLY_SECONDS = 1.5
+
 type WienerLinienRouteConfigEntry = ConfigEntry[WienerLinienRouteCoordinator]
+
+
+def _ahead(trips: Sequence[Trip], now: datetime) -> list[Trip]:
+    """The connections still ahead of `now`, in the order given.
+
+    Ahead reaches `ROUTE_DEPARTED_GRACE_SECONDS` past the departure, the
+    rule `RouteData.next_trip` and the route card apply to the same list.
+    """
+    return [
+        trip
+        for trip in trips
+        if trip.departure is not None
+        and (trip.departure - now).total_seconds() + ROUTE_DEPARTED_GRACE_SECONDS > 0
+    ]
 
 
 @dataclass(slots=True)
@@ -175,6 +194,12 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         # not: one request a night, never a retry loop.
         self._last_connection_day: date | None = None
         self._last_connection: Trip | None = None
+        # Set while the next refresh is one pulled up to a departure: when
+        # it is due, how many connections were ahead when it was timed, and
+        # when the configured interval asks regardless (`_await_departure`).
+        self._rollover_at: datetime | None = None
+        self._ahead_when_timed = 0
+        self._regular_due: datetime | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -263,10 +288,14 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         now = dt_util.utcnow().astimezone(self._tz)
         if not self.is_active(now):
             self._failures = 0
+            self._rollover_at = None
             self.update_interval = self.scan_interval
             self._timetable = []
             async_get_live_board(self.hass).release(self._live_owner)
             return RouteData(trips=[], active=False, fetched_at=None)
+
+        if self._await_departure():
+            return self.data
 
         await async_enforce_routing_cooldown(self.hass)
         try:
@@ -399,26 +428,53 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         self._failures = 0
         interval = self.scan_interval
         now = dt_util.utcnow()
-        departure = next(
-            (
-                trip.departure
-                for trip in trips
-                if trip.departure is not None
-                and (trip.departure - now).total_seconds()
-                + ROUTE_DEPARTED_GRACE_SECONDS
-                > 0
-            ),
-            None,
-        )
-        if departure is not None:
-            until = (
-                (departure - now).total_seconds()
-                + ROUTE_DEPARTED_GRACE_SECONDS
-                + random.uniform(*ROUTE_ROLLOVER_SPREAD_SECONDS)
+        self._rollover_at = None
+        ahead = _ahead(trips, now)
+        if ahead:
+            rollover = timedelta(
+                seconds=max(
+                    MIN_ROUTE_ROLLOVER_SECONDS, _rollover_seconds(ahead[0], now)
+                )
             )
-            rollover = timedelta(seconds=max(MIN_ROUTE_ROLLOVER_SECONDS, until))
-            interval = min(interval, rollover)
+            if rollover < interval:
+                interval = rollover
+                self._rollover_at = now + rollover
+                self._ahead_when_timed = len(ahead)
+                self._regular_due = now + self.scan_interval
         self.update_interval = interval
+
+    def _await_departure(self) -> bool:
+        """Whether the refresh now due can wait, because nothing has left yet.
+
+        A refresh pulled up to a departure is timed from the time that
+        connection had when the plan was fetched. Every `/monitor` answer
+        since has moved the published times (`_on_live_times`) but not the
+        timer, so for a vehicle running later than it did then the refresh
+        came while it was still ahead, got the same plan back, and timed a
+        second one 60 s later: 7 of about 52 scheduled requests on a live
+        route with a tram every 10 minutes (measured 2026-11-15). With as
+        many connections ahead as when the timer was set, none has left and
+        the planner has nothing new to say, so the refresh moves to the
+        first one's time as it stands now, without a request. The times on
+        screen are the live ones either way.
+
+        Never past the configured interval, and only for the pulled-up
+        refresh itself: one asked for in between (`update_entity`, a
+        reload) asks the planner.
+        """
+        if self._rollover_at is None or self._regular_due is None:
+            return False
+        now = dt_util.utcnow()
+        data = self.data
+        remaining = (self._regular_due - now).total_seconds()
+        early = (self._rollover_at - now).total_seconds() > ROLLOVER_EARLY_SECONDS
+        ahead = [] if data is None or not data.active else _ahead(data.trips, now)
+        if early or remaining <= 0 or len(ahead) != self._ahead_when_timed:
+            return False
+        wait = max(1.0, min(remaining, _rollover_seconds(ahead[0], now)))
+        self._rollover_at = now + timedelta(seconds=wait)
+        self.update_interval = timedelta(seconds=wait)
+        return True
 
     def _note_failure(self) -> None:
         """Stretch the interval from the second consecutive failure on.
@@ -428,6 +484,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         retry shouldn't inherit that.
         """
         self._failures += 1
+        self._rollover_at = None
         if self._failures < 2:
             self.update_interval = self.scan_interval
             return
@@ -441,6 +498,16 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 seconds,
             )
         self.update_interval = timedelta(seconds=seconds)
+
+
+def _rollover_seconds(trip: Trip, now: datetime) -> float:
+    """Seconds from `now` to the refresh after `trip` leaves, spread included."""
+    assert trip.departure is not None
+    return (
+        (trip.departure - now).total_seconds()
+        + ROUTE_DEPARTED_GRACE_SECONDS
+        + random.uniform(*ROUTE_ROLLOVER_SPREAD_SECONDS)
+    )
 
 
 async def async_plan_trips(
