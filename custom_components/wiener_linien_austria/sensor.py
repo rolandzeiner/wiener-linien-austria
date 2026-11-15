@@ -99,8 +99,23 @@ class WienerLinienStopSensor(
             # a unique attributes row (~1,400 a day per stop, 2026-11-11);
             # excluded, the rows share one. The card reads it live.
             "server_time",
+            # The stop this entry is set up for. The same on every row, and
+            # nothing reads it back from history. What stays recorded is
+            # what happened: the state, `stale_departures`, `stale_since`
+            # and `connection_lost_since`.
+            "diva",
+            "stop_name",
+            "latitude",
+            "longitude",
         }
     )
+    # Measured on the live box, 2026-11-15 (five stops, 60 s polls): 1,431
+    # rows a day per stop, 19 % of all state rows written there, and since
+    # `server_time` left the recorder (2026-11-11) one shared attributes row
+    # per stop. Between 6 % and 37 % of a stop's rows repeat the minute
+    # before: `server_time` and the board moved, the countdown did not. No
+    # setting here avoids those rows; a row is written whenever a live
+    # attribute changes, recorded or not.
 
     def __init__(
         self,
@@ -386,6 +401,20 @@ class WienerLinienRouteSensor(
             # recorded it gave each row its own attributes row (~10k in 30
             # days on the live box, 2026-11-11). Nothing reads it from history.
             "fetched_at",
+            # Different for every connection, like the state it belongs to:
+            # 1,114 values in 1,120 attributes rows over three days, so the
+            # rows still didn't share (10,489 rows, 4.3 MB in 30 days; live
+            # box, 2026-11-15). Without it they repeat per combination of
+            # `active`, `duration_minutes`, `interchanges` and `risk`.
+            "arrival",
+            # The route as set up, the same on every row. The time window is
+            # the one part of it the entity's name doesn't already give
+            # away, and a history export has no use for it.
+            "origin",
+            "destination",
+            "active_window",
+            "min_transfer_minutes",
+            "step_free",
         }
     )
 

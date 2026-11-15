@@ -32,6 +32,10 @@ from custom_components.wiener_linien_austria.api import (
     ApiTimeoutError,
     WienerLinienApiError,
 )
+from custom_components.wiener_linien_austria.binary_sensor import (
+    WienerLinienRouteLeaveBinarySensor,
+    WienerLinienRouteRiskBinarySensor,
+)
 from custom_components.wiener_linien_austria.config_flow import _probe_route
 from custom_components.wiener_linien_austria.const import (
     CONF_ACTIVE_DAYS,
@@ -98,7 +102,7 @@ ROLLOVER_SPREAD = (
 
 
 def _entity_id(hass: HomeAssistant, entry: MockConfigEntry, suffix: str) -> str:
-    platform = "binary_sensor" if suffix == "route_at_risk" else "sensor"
+    platform = "sensor" if suffix == "route" else "binary_sensor"
     entity_id = er.async_get(hass).async_get_entity_id(
         platform, DOMAIN, f"{entry.entry_id}_{suffix}"
     )
@@ -150,6 +154,50 @@ async def test_route_entry_sets_up_sensor_and_risk(
     params = dict(fetch.call_args.args[1])
     assert params["name_origin"] == "60201468"
     assert params["itdTime"] == "0750"
+
+
+async def test_route_history_keeps_the_outcome_not_the_times(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """What the recorder stores for a route's three entities, as whole sets.
+
+    Left out: what differs for every connection (`arrival`, `leave_at`,
+    `departure`, which gave each row an attributes row of its own), what
+    only the card reads, and the route's settings. All of it stays on the
+    live state.
+    """
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    # What Home Assistant adds to every state.
+    core = {"friendly_name", "device_class", "attribution"}
+
+    def recorded(suffix: str, entity: type) -> set[str]:
+        state = hass.states.get(_entity_id(hass, entry, suffix))
+        assert state is not None
+        unrecorded: frozenset[str] = entity._unrecorded_attributes
+        # Nothing is listed that the entity no longer has.
+        assert unrecorded <= set(state.attributes)
+        return set(state.attributes) - unrecorded - core
+
+    assert recorded("route", WienerLinienRouteSensor) == {
+        "active",
+        "duration_minutes",
+        "interchanges",
+        "risk",
+    }
+    assert recorded("route_leave_now", WienerLinienRouteLeaveBinarySensor) == {"lines"}
+    assert recorded("route_at_risk", WienerLinienRouteRiskBinarySensor) == {
+        "risk",
+        "transfer_at",
+        "slack_minutes",
+    }
+    live = hass.states.get(_entity_id(hass, entry, "route")).attributes
+    assert live["origin"] == "Westbahnhof"
+    assert live["arrival"] is not None
+    assert live["active_window"] == entry.runtime_data.active_window
+    leave = hass.states.get(_entity_id(hass, entry, "route_leave_now")).attributes
+    assert leave["leave_at"] is not None
+    assert leave["departure"] is not None
 
 
 async def test_sensors_name_the_next_connection_not_one_that_left(
