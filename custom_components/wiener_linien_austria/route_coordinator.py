@@ -101,7 +101,8 @@ def _ahead(trips: Sequence[Trip], now: datetime) -> list[Trip]:
     """The connections still ahead of `now`, in the order given.
 
     Ahead reaches `ROUTE_DEPARTED_GRACE_SECONDS` past the departure, the
-    rule `RouteData.next_trip` and the route card apply to the same list.
+    time rule `RouteData.next_trip` and the route card apply to the same
+    list. Unlike `next_trip`, a cancelled connection counts.
     """
     return [
         trip
@@ -284,7 +285,12 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         )
 
     async def _async_update_data(self) -> RouteData:
-        """Fetch and rank connections, or idle outside the window."""
+        """Fetch and rank connections, or idle outside the window.
+
+        A refresh pulled up to a departure that turns out to be running
+        late returns the held data, `fetched_at` included, without a
+        request (`_await_departure`).
+        """
         now = dt_util.utcnow().astimezone(self._tz)
         if not self.is_active(now):
             self._failures = 0
@@ -424,6 +430,9 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         Ahead here reaches 30 s past the departure, and the random wait is
         what keeps the rollover refresh clear of those 30 s; see the constant
         for why exactly 30 s wasn't enough.
+
+        Timed from the departure as it stood at this fetch;
+        `_await_departure` moves it when live times put it later.
         """
         self._failures = 0
         interval = self.scan_interval
@@ -448,14 +457,14 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
 
         A refresh pulled up to a departure is timed from the time that
         connection had when the plan was fetched. Every `/monitor` answer
-        since has moved the published times (`_on_live_times`) but not the
-        timer, so for a vehicle running later than it did then the refresh
-        came while it was still ahead, got the same plan back, and timed a
-        second one 60 s later: 7 of about 52 scheduled requests on a live
-        route with a tram every 10 minutes (measured 2026-11-15). With as
-        many connections ahead as when the timer was set, none has left and
-        the planner has nothing new to say, so the refresh moves to the
-        first one's time as it stands now, without a request. The times on
+        since moves the published times (`_on_live_times`) but not the
+        timer, so without this a refresh for a vehicle now running later
+        arrives while it is still ahead, gets the same plan back, and times
+        another 60 s later: 7 of about 52 scheduled requests on a live
+        route with a tram every 10 minutes (measured 2026-11-15). As many
+        connections ahead as when the timer was set is taken to mean none
+        has left and the planner has nothing new to say, so the refresh
+        moves to the first one's time as it stands now, without a request. The times on
         screen are the live ones either way.
 
         Never past the configured interval, and only for the pulled-up

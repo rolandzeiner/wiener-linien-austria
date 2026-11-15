@@ -20,8 +20,10 @@ Five callers, each taking exactly one slot per request:
   aren't in a batch answer (see live.py for when). An on-demand plan's
   request doesn't take it.
 - skipped_stops.py — the `/newsList` fetch that goes with a trail's run
-  times, at most once in six hours. It waits in the background; the trail
-  is answered without it and asked for again.
+  times: once in six hours while it succeeds, 30 minutes after a failure.
+  It waits for the slot in a background task; a trail waits
+  `STOP_NOTICES_WAIT_SECONDS` for it, then goes out without and is asked
+  for again.
 
 The routing backend has a separate 15 s slot
 (`async_enforce_routing_cooldown`), taken by route refreshes, the S-Bahn
@@ -30,8 +32,8 @@ timetable refresh (timetable.py) and the daily S-Bahn network sample
 no slot at all: `plan_trip` and the route card's From / To mode go through
 the cache, coalescing and token-bucket budget in adhoc.py instead, the run
 times a card asks for when a trail is opened are bounded by run_times.py's
-weekly samples, the departures of a station a trail
-passes without a call by the same module's per-station cache, and the
+weekly samples, the departures of a station a trail passes without a call
+by skipped_stops.py's per-station cache, and the
 config flow's probes skip both slots. A cooldown bounds what runs
 unattended; the budget bounds what people ask for.
 """

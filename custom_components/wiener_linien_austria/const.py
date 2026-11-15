@@ -521,13 +521,14 @@ STOP_NOTICES_MAX_AGE: Final = timedelta(hours=6)
 STOP_NOTICES_RETRY_AFTER: Final = timedelta(minutes=30)
 STOP_NOTICES_TIMEOUT_SECONDS: Final = 10
 # `/newsList` is on the real-time backend, so its request takes the 15 s
-# domain cooldown slot like every other one there: on 2026-11-15 one went
-# out 10 s after a `/trafficInfoList`, under the fair-use minimum. The slot
-# can be up to 15 s away, and the trail somebody has just opened doesn't
-# wait for it. A trail's answer gives the notices this long to arrive…
+# domain cooldown slot like every other one there. A taken slot is up to
+# 15 s away, longer with a departure poll queued for it too, and the trail
+# somebody has just opened doesn't wait that out. A trail's answer gives
+# the notices this long to arrive…
 STOP_NOTICES_WAIT_SECONDS: Final = 2.0
 # …and otherwise goes out with the notices held so far, valid only this
-# long, so the card asks again once the slot and the request are through.
+# long, so the card asks again. By then the fetch is usually through; when
+# it isn't, that answer is short-lived the same way.
 # Until then a stop shut by works that began after the run times were
 # sampled still shows its time.
 STOP_NOTICES_ASK_AGAIN: Final = timedelta(seconds=20)

@@ -440,7 +440,8 @@ async def _async_works(
     notices = await notices_cache.async_get() or []
     now = dt_util.utcnow()
     works = _Works()
-    # Notices still on their way: the answer holds until they are in.
+    # Notices still being fetched: the answer is valid only for
+    # `STOP_NOTICES_ASK_AGAIN`, so the card asks again.
     pending = notices_cache.pending_until(now)
     works.refresh_by = pending
     skipped: dict[Pair, dict[str, SkippedStation]] = {}
