@@ -6,7 +6,7 @@ data (see `MIN_POLL_SECONDS` in const.py), *in aggregate*. An asyncio.Lock
 serialises the check-then-update, so concurrent callers can't both observe
 the same `last_call_ts` and skip the sleep.
 
-Four callers, each taking exactly one slot per request:
+Five callers, each taking exactly one slot per request:
 
 - batch.py — one combined `/monitor` request per interval group per tick.
 - alerts.py — one combined `/trafficInfoList` request per 5-minute cycle
@@ -19,6 +19,9 @@ Four callers, each taking exactly one slot per request:
 - live.py — the `/monitor` request a route refresh makes when its stops
   aren't in a batch answer (see live.py for when). An on-demand plan's
   request doesn't take it.
+- skipped_stops.py — the `/newsList` fetch that goes with a trail's run
+  times, at most once in six hours. It waits in the background; the trail
+  is answered without it and asked for again.
 
 The routing backend has a separate 15 s slot
 (`async_enforce_routing_cooldown`), taken by route refreshes, the S-Bahn
@@ -27,8 +30,7 @@ timetable refresh (timetable.py) and the daily S-Bahn network sample
 no slot at all: `plan_trip` and the route card's From / To mode go through
 the cache, coalescing and token-bucket budget in adhoc.py instead, the run
 times a card asks for when a trail is opened are bounded by run_times.py's
-weekly samples, the `/newsList` fetch that goes with them by
-skipped_stops.py's six-hour cache, the departures of a station a trail
+weekly samples, the departures of a station a trail
 passes without a call by the same module's per-station cache, and the
 config flow's probes skip both slots. A cooldown bounds what runs
 unattended; the budget bounds what people ask for.

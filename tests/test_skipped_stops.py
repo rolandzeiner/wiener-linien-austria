@@ -12,6 +12,7 @@ from zoneinfo import ZoneInfo
 import pytest
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 from custom_components.wiener_linien_austria.api import (
     ROUTING_DEPARTURE_ENDPOINT,
@@ -20,6 +21,7 @@ from custom_components.wiener_linien_austria.api import (
 from custom_components.wiener_linien_austria.const import (
     STOP_CALLS_DEPARTURES_REQUESTED,
     STOP_CALLS_RETRY_AFTER,
+    STOP_NOTICES_ASK_AGAIN,
     STOP_NOTICES_MAX_AGE,
     STOP_NOTICES_RETRY_AFTER,
     USER_AGENT,
@@ -542,6 +544,62 @@ async def test_a_failed_fetch_keeps_what_was_held_and_waits(
     news_fetch.return_value = {"error": "maintenance"}
     assert await cache.async_get() == [_notice()]
     assert news_fetch.await_count == 3
+
+
+_COOLDOWN = (
+    "custom_components.wiener_linien_austria.skipped_stops"
+    ".async_enforce_domain_cooldown"
+)
+_WAIT = (
+    "custom_components.wiener_linien_austria.skipped_stops.STOP_NOTICES_WAIT_SECONDS"
+)
+
+
+async def test_the_fetch_takes_the_realtime_cooldown_slot(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, news_fetch: AsyncMock
+) -> None:
+    freezer.move_to(NOW)
+    order: list[str] = []
+    news_fetch.side_effect = lambda *_a, **_k: order.append("fetch") or _news(_poi())
+
+    async def slot(_hass: HomeAssistant) -> None:
+        order.append("slot")
+
+    with patch(_COOLDOWN, side_effect=slot) as cooldown:
+        cache = async_get_stop_notices(hass)
+        assert await cache.async_get() == [_notice()]
+        # Held: no second slot, no second request.
+        await cache.async_get()
+    assert order == ["slot", "fetch"]
+    assert cooldown.await_count == 1
+    assert cache.pending_until(dt_util.utcnow()) is None
+
+
+async def test_a_slot_that_is_not_free_does_not_hold_the_answer_up(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, news_fetch: AsyncMock
+) -> None:
+    freezer.move_to(NOW)
+    free = asyncio.Event()
+
+    async def slot(_hass: HomeAssistant) -> None:
+        await free.wait()
+
+    with patch(_COOLDOWN, side_effect=slot), patch(_WAIT, 0):
+        cache = async_get_stop_notices(hass)
+        # Nothing held yet, and nothing asked of the upstream either.
+        assert await cache.async_get() is None
+        assert news_fetch.await_count == 0
+        assert cache.pending_until(NOW) == NOW + STOP_NOTICES_ASK_AGAIN
+
+        # A second caller joins the same fetch instead of queueing another.
+        assert await cache.async_get() is None
+        free.set()
+        await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert news_fetch.await_count == 1
+    assert cache.pending_until(NOW) is None
+    assert await cache.async_get() == [_notice()]
+    assert news_fetch.await_count == 1
 
 
 async def test_a_first_fetch_failing_gives_nothing(

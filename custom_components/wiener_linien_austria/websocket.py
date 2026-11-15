@@ -410,7 +410,8 @@ class _Works:
     # "U6|H" → station → the works notice behind it, in Wiener Linien's
     # words: `title` and `text` (HTML as the feed sends it).
     notices: dict[str, dict[str, dict[str, str]]] = field(default_factory=dict)
-    # When the card should ask again for fresher calls.
+    # When the card should ask again: for fresher calls, or for notices
+    # that were still being fetched.
     refresh_by: datetime | None = None
 
 
@@ -435,8 +436,13 @@ async def _async_works(
     """
     if not answer.pairs:
         return _Works()
-    notices = await async_get_stop_notices(hass).async_get() or []
+    notices_cache = async_get_stop_notices(hass)
+    notices = await notices_cache.async_get() or []
     now = dt_util.utcnow()
+    works = _Works()
+    # Notices still on their way: the answer holds until they are in.
+    pending = notices_cache.pending_until(now)
+    works.refresh_by = pending
     skipped: dict[Pair, dict[str, SkippedStation]] = {}
     for pair, merged in answer.pairs.items():
         stations: dict[str, SkippedStation] = {}
@@ -452,7 +458,6 @@ async def _async_works(
             stations.setdefault(name, station)
         if stations:
             skipped[pair] = stations
-    works = _Works()
     if not skipped:
         return works
     calls_cache = async_get_stop_calls(hass)
@@ -461,7 +466,7 @@ async def _async_works(
     )
     held = await asyncio.gather(*(calls_cache.async_get(station) for station in divas))
     calls_by_diva = dict(zip(divas, held, strict=True))
-    refresh = []
+    refresh = [pending] if pending is not None else []
     for (label, way), stations in skipped.items():
         key = f"{label}|{way}"
         for name, station in stations.items():

@@ -28,14 +28,17 @@ The notices come from `/newsList`, which also gives the date the stop is
 back where one notice answers it without doubt (see `closed_until`). Notices
 and calls are fetched on demand like the run times: when a card asks for a
 trail's run times, and the calls only for a station that needs them; held
-for a while, callers asking at once sharing one request. Neither takes a
-domain cooldown slot, for the reason `rate_limit.py` gives for the run times:
-someone has just opened a trail and is waiting.
+for a while, callers asking at once sharing one request. The calls take no
+cooldown slot, for the reason `rate_limit.py` gives for the run times:
+someone has just opened a trail and is waiting. The notices take the
+real-time one, in the background: a trail goes out without them when the
+slot is not free yet, and the card asks again (`StopNotices.pending_until`).
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import html
 import logging
 import re
@@ -56,12 +59,15 @@ from .const import (
     STOP_CALLS_MAX_AGE,
     STOP_CALLS_MIN_AGE,
     STOP_CALLS_RETRY_AFTER,
+    STOP_NOTICES_ASK_AGAIN,
     STOP_NOTICES_MAX_AGE,
     STOP_NOTICES_RETRY_AFTER,
     STOP_NOTICES_TIMEOUT_SECONDS,
+    STOP_NOTICES_WAIT_SECONDS,
     USER_AGENT,
 )
 from .parsing import as_int_list, as_str_list, parse_aware_datetime
+from .rate_limit import async_enforce_domain_cooldown
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .run_times import RUN_TIME_EXCLUDED_MOTS
 from .static import StaticCatalogue, trail_name
@@ -455,7 +461,13 @@ class StopNotices:
         self._in_flight: asyncio.Task[None] | None = None
 
     async def async_get(self) -> list[StopNotice] | None:
-        """The notices, fetching them when stale; None when there are none to give."""
+        """The notices, fetching them when stale; None when there are none to give.
+
+        Waits `STOP_NOTICES_WAIT_SECONDS` for a fetch, which covers one whose
+        cooldown slot is free. Past that the held notices are the answer,
+        the fetch goes on in the background, and `pending_until` says when
+        to ask again.
+        """
         now = dt_util.utcnow()
         fresh = (
             self._fetched_at is not None
@@ -471,11 +483,21 @@ class StopNotices:
                 task = self._in_flight = self._hass.async_create_background_task(
                     self._async_fetch(), name=f"{DOMAIN}_stop_notices"
                 )
-            # Shielded: a caller that goes away mustn't cancel the others' fetch.
-            await asyncio.shield(task)
+            # Shielded: a caller that goes away, or stops waiting, mustn't
+            # cancel the others' fetch.
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(asyncio.shield(task), STOP_NOTICES_WAIT_SECONDS)
         return self._notices
 
+    def pending_until(self, now: datetime) -> datetime | None:
+        """When to ask again for notices still being fetched, else None."""
+        task = self._in_flight
+        if task is None or task.done():
+            return None
+        return now + STOP_NOTICES_ASK_AGAIN
+
     async def _async_fetch(self) -> None:
+        await async_enforce_domain_cooldown(self._hass)
         try:
             body = await fetch_news(
                 async_get_clientsession(self._hass),

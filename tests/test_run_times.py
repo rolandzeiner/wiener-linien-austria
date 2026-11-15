@@ -31,6 +31,7 @@ from custom_components.wiener_linien_austria.const import (
     RUN_TIME_MAX_AGE,
     RUN_TIME_SWITCH_SPREAD,
     RUN_TIME_TOP_UP_AFTER,
+    STOP_NOTICES_ASK_AGAIN,
     TIMETABLE_RETRY_AFTER,
     USER_AGENT,
 )
@@ -921,6 +922,53 @@ async def test_command_answers_by_the_names_the_trail_prints(
     again = await _ask(client, diva=PRATERSTERN, line="5", direction="H")
     assert again["result"]["run_times"] == result["run_times"]
     assert dm_fetch.await_count == 1
+
+
+async def test_command_answers_before_the_notices_and_asks_to_be_asked_again(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+    news_fetch: AsyncMock,
+) -> None:
+    _name_stops(
+        mock_static_catalogue,
+        {VORGARTENSTRASSE: "Vorgartenstraße", LEOPOLDAU: "Leopoldau"},
+    )
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+    free = asyncio.Event()
+
+    async def slot(_hass: HomeAssistant) -> None:
+        await free.wait()
+
+    with (
+        patch(f"{_STOPS}.async_enforce_domain_cooldown", side_effect=slot),
+        patch(f"{_STOPS}.STOP_NOTICES_WAIT_SECONDS", 0),
+    ):
+        # The real-time slot is taken: the times go out, the notices follow.
+        result = (await _ask(client, diva=PRATERSTERN, line="U1", direction="H"))[
+            "result"
+        ]
+        assert result["run_times"]["U1|H"] == {"Vorgartenstraße": 1, "Leopoldau": 14.4}
+        assert news_fetch.await_count == 0
+        assert (
+            datetime.fromisoformat(result["valid_until"])
+            == DAY + STOP_NOTICES_ASK_AGAIN
+        )
+
+        free.set()
+        await hass.async_block_till_done(wait_background_tasks=True)
+        result = (await _ask(client, diva=PRATERSTERN, line="U1", direction="H"))[
+            "result"
+        ]
+    assert news_fetch.await_count == 1
+    assert datetime.fromisoformat(result["valid_until"]) == datetime(
+        2026, 10, 8, 19, 0, tzinfo=VIENNA
+    )
 
 
 def _messestrasse(catalogue: StaticCatalogue) -> int:
