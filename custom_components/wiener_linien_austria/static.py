@@ -1669,8 +1669,10 @@ def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:
 
 def _catalogue_to_store(catalogue: StaticCatalogue) -> dict[str, Any]:
     """Serialise a StaticCatalogue for Store-backed persistence."""
+    # No `version` key of its own: one was written from v0.1.0 on and never
+    # read (the Store envelope carries the version). An older file still has
+    # it; `_catalogue_from_store` ignores it.
     payload: dict[str, Any] = {
-        "version": 1,
         "last_fetched": catalogue.last_fetched,
         "stations": [
             {
