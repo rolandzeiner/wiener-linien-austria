@@ -689,3 +689,68 @@ async def test_remove_last_entry_unregisters_resources(
     registration.return_value.async_unregister.assert_awaited_once()
     deleted = {call.args[2] for call in delete_issue.call_args_list}
     assert deleted == {f"rate_limited_{entry.entry_id}", OUTAGE_ISSUE_ID}
+
+
+_STORE_KEYS = (
+    "wiener_linien_austria_static",
+    "wiener_linien_austria_s_bahn_network",
+    "wiener_linien_austria_run_times",
+)
+
+
+async def test_remove_last_entry_deletes_the_stored_caches(
+    hass: HomeAssistant, mock_fetch, hass_storage: dict[str, Any]
+) -> None:
+    """The three `.storage` files go with the integration.
+
+    They are caches of public timetable data that only this integration
+    reads. Left behind, 3 MB of them stayed in `.storage` for good.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    for key in _STORE_KEYS:
+        hass_storage[key] = {"version": 1, "key": key, "data": {"kept": True}}
+
+    with patch("custom_components.wiener_linien_austria.JSModuleRegistration") as reg:
+        reg.return_value.async_unregister = AsyncMock()
+        await hass.config_entries.async_remove(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert not set(_STORE_KEYS) & set(hass_storage)
+
+
+async def test_remove_entry_keeps_the_caches_while_another_entry_remains(
+    hass: HomeAssistant, mock_fetch, hass_storage: dict[str, Any]
+) -> None:
+    """One stop of two going away must not cost the other its catalogue."""
+    first = _make_entry()
+    first.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(first.entry_id)
+    await hass.async_block_till_done()
+    second = _make_entry({"diva": 60200123, "stop_name": "Schwarzenbergplatz"})
+    second.add_to_hass(hass)
+    await hass.async_block_till_done()
+    for key in _STORE_KEYS[:2]:
+        hass_storage[key] = {"version": 1, "key": key, "data": {"kept": True}}
+
+    await hass.config_entries.async_remove(first.entry_id)
+    await hass.async_block_till_done()
+
+    assert set(_STORE_KEYS[:2]) <= set(hass_storage)
+
+
+async def test_a_store_that_cannot_be_removed_does_not_fail_the_removal(
+    hass: HomeAssistant, mock_fetch, caplog
+) -> None:
+    """A read-only `.storage` is logged, and the entry still goes."""
+    from custom_components.wiener_linien_austria import _async_remove_stores
+
+    with patch(
+        "custom_components.wiener_linien_austria.Store.async_remove",
+        side_effect=OSError("read-only"),
+    ):
+        await _async_remove_stores(hass)
+
+    assert "Could not remove the stored wiener_linien_austria_static" in caplog.text

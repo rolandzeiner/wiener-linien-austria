@@ -383,16 +383,41 @@ class RunTimes:
             except (KeyError, TypeError, ValueError, AttributeError) as err:
                 _LOGGER.warning("Ignoring corrupt stored run times (%s)", err)
 
-    async def _async_save(self) -> None:
-        """Persist the samples of the stops that still have a departure board."""
-        configured = {
-            as_int({**entry.data, **entry.options}.get(CONF_DIVA))
+    async def async_prune(self) -> None:
+        """Drop the stored samples of stops whose departure board is gone.
+
+        Called when an entry is removed. A save does the same, but a save
+        only happens when a card asks for run times, and a dashboard that
+        never opens a trail would keep a removed stop's samples for good.
+        """
+        await self._async_load()
+        configured = self._configured()
+        if any(diva not in configured for diva in self._stops):
+            await self._async_save()
+
+    def _configured(self) -> set[int]:
+        """The stops that have a departure board."""
+        return {
+            diva
             for entry in self._hass.config_entries.async_entries(DOMAIN)
+            if (diva := as_int({**entry.data, **entry.options}.get(CONF_DIVA)))
+            is not None
         }
+
+    async def _async_save(self) -> None:
+        """Persist the samples of the stops that still have a departure board.
+
+        With no board left the file goes instead: this also covers a request
+        that was still on the wire when the last entry was removed.
+        """
+        configured = self._configured()
         for diva in [diva for diva in self._stops if diva not in configured]:
             del self._stops[diva]
         try:
-            await self._store.async_save(_stops_to_store(self._stops))
+            if configured:
+                await self._store.async_save(_stops_to_store(self._stops))
+            else:
+                await self._store.async_remove()
         except OSError as err:
             _LOGGER.warning("Failed to persist run times (%s); in-memory only", err)
 
