@@ -1046,6 +1046,21 @@ order: 1;
 padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
 }
 }
+@container wlcard (inline-size < 360px) {
+.stops-ahead-stop.timed .stops-ahead-row {
+flex-wrap: wrap;
+row-gap: 2px;
+}
+.stops-ahead-stop.timed .stops-ahead-name {
+flex: 1 0 50%;
+}
+.stops-ahead-stop.timed .stops-ahead-metros {
+margin-inline-start: auto;
+}
+.stops-ahead-stop.timed .stops-ahead-metros + .stops-ahead-other-toggle {
+margin-left: 0;
+}
+}
 .stops-ahead-metros {
 display: inline-flex;
 flex-wrap: wrap;
@@ -2972,7 +2987,7 @@ Fahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.
               aria-hidden="true"
             ></ha-icon>`:P}
       </li>
-    `;return v?[w,this._renderStopsAheadPanel(`row`,e.stops_ahead,x,b,a,y,t,e)]:w}_renderStopAhead(e,t,n,r,i,a,o=!1,s=null,c=null){let l=this._config.stops_ahead_modes,u=s?[]:(e.lines??[]).filter(e=>l.includes(_t(e))),d=this._isNightlineHour(),f=[],p=[];for(let e of u)/^[US]\d/.test(e)||d&&/^N\d/.test(e)?f.push(e):p.push(e);let m=this._transferKey(n,t),h=this._expandedTransfers.has(m),g=s&&c?.text?Bn(c.text):null,_=!!g&&(g.paras.length>0||g.facts.length>0),v=_&&this._expandedNotices.has(m),y=`wl-stop-notice-${m.replace(/[^\w-]/g,`_`)}`,b={"stops-ahead-stop":!0,terminus:!!e.is_terminus,skipped:!!s,"transfers-expanded":h,"notice-expanded":v},x=s?s.next?this._t(`stop_skipped_until_time`,{time:hr(s.next)}):s.until?this._t(`stop_skipped_until`,{date:yr(s.until,this._lang(),Date.now())}):this._t(`stop_skipped`):``,S=f.length?M`<span class="stops-ahead-metros">
+    `;return v?[w,this._renderStopsAheadPanel(`row`,e.stops_ahead,x,b,a,y,t,e)]:w}_renderStopAhead(e,t,n,r,i,a,o=!1,s=null,c=null){let l=this._config.stops_ahead_modes,u=s?[]:(e.lines??[]).filter(e=>l.includes(_t(e))),d=this._isNightlineHour(),f=[],p=[];for(let e of u)/^[US]\d/.test(e)||d&&/^N\d/.test(e)?f.push(e):p.push(e);let m=this._transferKey(n,t),h=this._expandedTransfers.has(m),g=s&&c?.text?Bn(c.text):null,_=!!g&&(g.paras.length>0||g.facts.length>0),v=_&&this._expandedNotices.has(m),y=`wl-stop-notice-${m.replace(/[^\w-]/g,`_`)}`,b={"stops-ahead-stop":!0,terminus:!!e.is_terminus,skipped:!!s,"transfers-expanded":h,"notice-expanded":v,timed:!1},x=s?s.next?this._t(`stop_skipped_until_time`,{time:hr(s.next)}):s.until?this._t(`stop_skipped_until`,{date:yr(s.until,this._lang(),Date.now())}):this._t(`stop_skipped`):``,S=f.length?M`<span class="stops-ahead-metros">
           ${f.map(e=>M`<span
               class="stops-ahead-line-chip"
               style=${V(J(e,r,i))}
@@ -2999,7 +3014,7 @@ Fahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.
           datetime=${a.iso}
           title=${D}
           >${a.clock}</time
-        >`:P,ee=a===void 0?P:a===null?M`<span
+        >`:P;b.timed=a!==void 0;let ee=a===void 0?P:a===null?M`<span
               class=${B({"stops-ahead-time":!0,"stops-ahead-time--pair":o})}
               aria-hidden="true"
             ></span>`:o&&a.planned?M`<span class="stops-ahead-times">

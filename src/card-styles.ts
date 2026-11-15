@@ -1500,6 +1500,27 @@ export const cardStyles = css`
       padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
     }
   }
+  /* With a time in front, a narrow row has no room left for the chips: at
+     240 px the U-Bahn chips took the name's whole width ("16:20 [U3] [S45]"
+     with no station) and pushed the +N toggle 15 px out of the row. There
+     the name keeps at least half the row, and chips that don't fit beside
+     it wrap under it, at the row's end. A row with nothing after the name
+     looks as before. */
+  @container wlcard (inline-size < 360px) {
+    .stops-ahead-stop.timed .stops-ahead-row {
+      flex-wrap: wrap;
+      row-gap: 2px;
+    }
+    .stops-ahead-stop.timed .stops-ahead-name {
+      flex: 1 0 50%;
+    }
+    .stops-ahead-stop.timed .stops-ahead-metros {
+      margin-inline-start: auto;
+    }
+    .stops-ahead-stop.timed .stops-ahead-metros + .stops-ahead-other-toggle {
+      margin-left: 0;
+    }
+  }
   /* Transfer-line chips: small pill badges. U-Bahn chips sit inline
      immediately after the station name (always visible, brand-coloured).
      Tram/bus/night transfers sit behind the right-aligned toggle button

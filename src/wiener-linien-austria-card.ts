@@ -2155,6 +2155,8 @@ export class WienerLinienAustriaCard extends LitElement {
       skipped: !!skip,
       "transfers-expanded": transfersExpanded,
       "notice-expanded": noticeOpen,
+      // A time slot in front of the name; set below, once it is known.
+      timed: false,
     };
     const skipLabel = skip
       ? skip.next
@@ -2257,6 +2259,7 @@ export class WienerLinienAustriaCard extends LitElement {
           >${eta.clock}</time
         >`
       : nothing;
+    stopClasses.timed = eta !== undefined;
     const time =
       eta === undefined
         ? nothing
