@@ -1495,6 +1495,10 @@ export const cardStyles = css`
     .stops-ahead-stop.skipped .stops-ahead-skip {
       flex-basis: 100%;
       order: 1;
+      /* The indent below is padding: without this it comes on top of the
+         100 % and the note's box runs that far past the row (41 px at
+         324 px, measured on the box 2026-11-15). */
+      box-sizing: border-box;
     }
     .stops-ahead-stop.skipped .stops-ahead-time + .stops-ahead-name + .stops-ahead-skip {
       padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));

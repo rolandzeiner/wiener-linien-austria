@@ -1041,6 +1041,7 @@ row-gap: 0;
 .stops-ahead-stop.skipped .stops-ahead-skip {
 flex-basis: 100%;
 order: 1;
+box-sizing: border-box;
 }
 .stops-ahead-stop.skipped .stops-ahead-time + .stops-ahead-name + .stops-ahead-skip {
 padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
