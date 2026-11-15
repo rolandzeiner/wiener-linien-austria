@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 
-import { deriveRetroView, retroEmptyStateKey } from "./retro-view.js";
+import { deriveRetroView, retroEmptyStateKey, tickerSteps } from "./retro-view.js";
 import { normaliseRetroConfig } from "./config.js";
 import type { DepartureAttr, WienerLinienAttrs, WienerLinienRetroCardConfig } from "../types.js";
 
@@ -185,5 +185,26 @@ describe("retroEmptyStateKey", () => {
     ],
   ] as const)("names %s", (_label, config, departures, serverTime, staleDropped, key) => {
     expect(retroEmptyStateKey(config, departures, serverTime, staleDropped)).toBe(key);
+  });
+});
+
+describe("tickerSteps", () => {
+  it("moves one dot column per step", () => {
+    // 500 px panel + 400 px text over a 3 px pitch.
+    expect(tickerSteps(900, 3)).toBe(300);
+    expect(tickerSteps(901, 4)).toBe(225);
+  });
+
+  it("never asks for fewer than one step", () => {
+    expect(tickerSteps(1, 4)).toBe(1);
+  });
+
+  it.each([
+    ["no layout yet", 0, 3],
+    ["missing pitch", 900, Number.NaN],
+    ["zero pitch", 900, 0],
+    ["infinite travel", Number.POSITIVE_INFINITY, 3],
+  ] as const)("keeps the smooth fallback for %s", (_label, travel, pitch) => {
+    expect(tickerSteps(travel, pitch)).toBeNull();
   });
 });

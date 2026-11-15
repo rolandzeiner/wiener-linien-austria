@@ -53,10 +53,13 @@ import {
   accessKey,
   ADHOC_DEBOUNCE_MS,
   ADHOC_IDLE_MS,
+  ADHOC_HELD_MS,
+  ADHOC_REQUESTS_NOTE_AT,
   ADHOC_RETRY_MS,
   adhocPlanRefreshDelay,
   adhocErrorSpec,
   adhocRetryDelay,
+  type AdhocErrorSpec,
   type AdhocTimeMode,
   catchableDeparture,
   clockOf,
@@ -82,6 +85,7 @@ import {
   walkAccess,
   viennaClock,
   viennaDayOffset,
+  viennaInputAt,
   viennaInputValue,
   viennaShortDate,
   windowDays,
@@ -110,11 +114,13 @@ interface ReplanOrigin {
 
 /** A backend error as the card keeps it: the WebSocket code, how long the
  *  backend asked to wait, and its translation key where the code alone
- *  doesn't say enough (`invalid_query`). */
+ *  doesn't say enough (`invalid_query`). `retryAt` is when the card asks
+ *  again (epoch ms), for the errors that count down to it. */
 interface AdhocError {
   code: string;
   retryAfter: number | null;
   translationKey: string | null;
+  retryAt: number | null;
 }
 
 function adhocErrorOf(err: unknown): AdhocError {
@@ -124,9 +130,39 @@ function adhocErrorOf(err: unknown): AdhocError {
     code: typeof wsError?.code === "string" ? wsError.code : "unknown",
     retryAfter: Number.isFinite(retryAfter) ? retryAfter : null,
     translationKey: wsError?.translation_key ?? null,
+    retryAt: null,
   };
 }
+
+/** Whole seconds from `now` to `at`, rounded up; 0 once it has passed, or
+ *  without one. */
+function secondsUntil(at: number | null | undefined, now: number): number {
+  return at == null || at <= now ? 0 : Math.ceil((at - now) / 1000);
+}
+
+/** `error` with the moment its "Neuer Versuch in … s" counts down to, for
+ *  the errors that say one. */
+function withRetryAt(error: AdhocError, spec: AdhocErrorSpec, delay: number | null): AdhocError {
+  return spec.retry === "countdown" && delay !== null
+    ? { ...error, retryAt: Date.now() + delay }
+    : error;
+}
 type Which = "from" | "to";
+
+/** A question "Früher" or "Später" can step to. */
+interface PageStep {
+  timeMode: AdhocTimeMode;
+  when: string;
+}
+
+/** What a plan answer says about the request budget. */
+type BudgetAttrs = Pick<
+  RouteAttrs,
+  "requests_left" | "requests_next_in" | "requests_max" | "requests_refill_s"
+>;
+
+const isCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isInteger(value) && value >= 0;
 
 const TIME_MODES: readonly AdhocTimeMode[] = ["now", "depart", "arrive"];
 
@@ -193,6 +229,27 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @state() private _phase: AdhocPhase = "idle";
   @state() private _error: AdhocError | null = null;
   @state() private _announcement = "";
+  /** Fresh plans this HA user may still ask for before the backend makes
+   *  them wait: the last answer's count, plus one each time
+   *  `_requestsNextAt` passes. Null until an answer says. */
+  @state() private _requestsLeft: number | null = null;
+  /** When the budget gives one more request back (epoch ms), or null. */
+  private _requestsNextAt: number | null = null;
+  /** The rule behind the count: the most there can be, and how often one
+   *  comes back (s). From the backend, so the card never states a stale one. */
+  private _requestsMax: number | null = null;
+  private _requestsRefillS: number | null = null;
+  /** When the backend fetched each question this card was answered (epoch
+   *  ms, the earlier of its clock and ours). It hands that plan out again
+   *  with the budget spent, so stepping back to it needn't wait. */
+  private _answeredAt = new Map<string, number>();
+  /** The clock the second-by-second countdowns read: the pager's wait and
+   *  an error's next try. Ticks only while one of them runs. */
+  @state() private _secondNow = Date.now();
+  private _countdownTimer: ReturnType<typeof setTimeout> | null = null;
+  private _tipHideTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A mouse is over the ⓘ and has opened its bubble by hovering. */
+  private _tipHovered = false;
 
   private _tick: ReturnType<typeof setInterval> | null = null;
   private _versionCheckDone = false;
@@ -204,6 +261,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  to `_replanFrom`: a later refresh must not re-open a list the person
    *  has since collapsed. */
   private _revealAlternatives = false;
+  /** The questions "Später" stepped away from, newest last, for "Früher" to
+   *  retrace before it asks for anything new. Any time, stop or mode set by
+   *  hand starts it over. Not reactive: what the buttons show follows the
+   *  time mode and the plan, and every step sets both. */
+  private _pageHistory: PageStep[] = [];
   private _refreshTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the scheduled refresh is due (epoch ms). Survives a disconnect, so
    *  a card HA re-attaches on a view switch waits out the rest instead of
@@ -234,6 +296,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     ) {
       if (cfg.from) this._from = cfg.from;
       if (cfg.to) this._to = cfg.to;
+      this._pageHistory = [];
       this._requestPlan(false);
     }
     this._startAdhoc();
@@ -292,6 +355,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._lastInteraction = Date.now();
     document.addEventListener("visibilitychange", this._onVisibilityChange);
     this._startAdhoc();
+    this._syncCountdown();
   }
 
   public override disconnectedCallback(): void {
@@ -300,6 +364,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._tick = null;
     document.removeEventListener("visibilitychange", this._onVisibilityChange);
     this._stopAdhoc();
+    if (this._countdownTimer !== null) clearTimeout(this._countdownTimer);
+    this._countdownTimer = null;
+    if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = null;
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -342,8 +410,14 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._observer.observe(this);
     }
     if (this._from && this._to) {
-      // Reconnecting with a plan already on screen: refresh only once due.
-      if (this._plan && this._planKey === this._queryKey()) {
+      // Reconnecting with a plan already on screen, or with an error still
+      // counting down to its retry: ask only once due. A dashboard takes
+      // the card out and puts it back on every change of view, and asking
+      // each time would make the wait an error states mean nothing.
+      const held = this._plan
+        ? this._planKey === this._queryKey()
+        : this._phase === "error" && this._nextRefreshAt !== null;
+      if (held) {
         const remaining = this._nextRefreshAt === null ? 0 : this._nextRefreshAt - Date.now();
         if (remaining > 0) {
           this._schedule(remaining);
@@ -436,8 +510,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._stopsError = null;
     } catch (err) {
       const error = adhocErrorOf(err);
-      this._stopsError = error;
-      const delay = adhocRetryDelay(adhocErrorSpec(error.code), error.retryAfter);
+      const spec = adhocErrorSpec(error.code);
+      const delay = adhocRetryDelay(spec, error.retryAfter);
+      this._stopsError = withRetryAt(error, spec, delay);
+      this._syncCountdown();
       if (delay !== null && this._adhocStarted) {
         this._stopsRetryTimer = setTimeout(() => {
           this._stopsRetryTimer = null;
@@ -485,7 +561,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._phase = "idle";
       return false;
     }
-    this._error = { code: "same_stop", retryAfter: null, translationKey: null };
+    this._error = { code: "same_stop", retryAfter: null, translationKey: null, retryAt: null };
     this._phase = "error";
     if (userInitiated) this._announce(this._adhocError(this._error).title);
     return false;
@@ -511,13 +587,47 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._alternativesOpen = true;
       this._revealAlternatives = false;
     }
-    if (userInitiated) this._announce(this._planAnnouncement(plan));
+    const fetched = Date.parse(plan.fetched_at ?? "");
+    this._rememberAnswer(
+      key,
+      Number.isFinite(fetched) ? Math.min(Date.now(), fetched) : Date.now(),
+    );
+    this._noteBudget(plan);
+    if (userInitiated) {
+      const said = this._planAnnouncement(plan);
+      const note = this._budgetNote();
+      this._announce(note ? `${said}. ${note}.` : said);
+    }
     this._schedule(adhocPlanRefreshDelay(plan, Date.now()));
+  }
+
+  /** Takes in what an answer says about the request budget. An answer
+   *  without it, from an older integration, leaves the pager quiet. The rule
+   *  is kept when an answer (a refusal) doesn't repeat it. */
+  private _noteBudget(budget: BudgetAttrs): void {
+    const left = budget.requests_left;
+    const nextIn = budget.requests_next_in;
+    this._requestsLeft = isCount(left) ? left : null;
+    this._requestsNextAt =
+      isCount(left) && typeof nextIn === "number" && nextIn > 0 ? Date.now() + nextIn * 1000 : null;
+    if (isCount(budget.requests_max)) this._requestsMax = budget.requests_max;
+    if (isCount(budget.requests_refill_s)) this._requestsRefillS = budget.requests_refill_s;
+    this._syncCountdown();
+  }
+
+  private _rememberAnswer(key: string, at: number): void {
+    const now = Date.now();
+    for (const [old, when] of this._answeredAt) {
+      if (now - when >= ADHOC_HELD_MS) this._answeredAt.delete(old);
+    }
+    this._answeredAt.set(key, at);
   }
 
   private _applyPlanError(err: unknown, userInitiated: boolean): void {
     const error = adhocErrorOf(err);
-    this._error = error;
+    const spec = adhocErrorSpec(error.code, error.translationKey);
+    const delay = adhocRetryDelay(spec, error.retryAfter);
+    this._error = withRetryAt(error, spec, delay);
     this._revealAlternatives = false;
     // A stale plan through an outage reads as "these still run"; show the
     // problem instead, as the route sensor does when it goes unavailable.
@@ -525,28 +635,42 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._planKey = "";
     this._phase = "error";
     if (userInitiated) this._announce(this._adhocError(error).title);
-    const delay = adhocRetryDelay(
-      adhocErrorSpec(error.code, error.translationKey),
-      error.retryAfter,
-    );
     if (delay !== null) this._schedule(delay);
+    // Refused for the budget: nothing is left until the retry is due.
+    if (error.code === "rate_limited") {
+      this._noteBudget({ requests_left: 0, requests_next_in: (delay ?? ADHOC_RETRY_MS) / 1000 });
+    } else this._syncCountdown();
   }
 
   private _onPick(which: Which, value: unknown): void {
     const next = typeof value === "string" || typeof value === "number" ? String(value) : "";
     if (which === "from") this._from = next;
     else this._to = next;
-    this._replanFrom = null;
-    this._revealAlternatives = false;
-    saveAdhocSelection({ from: this._from, to: this._to });
+    this._askForNewStops();
+  }
+
+  /** A question the person just changed: the pages of the old one are
+   *  gone, they are plainly there, and the plan is asked for. */
+  private _askAnew(): void {
+    this._pageHistory = [];
     this._lastInteraction = Date.now();
     this._requestPlan(true);
   }
 
+  /** The same for a change of the stops themselves, which also ends a
+   *  search from a change and is what the card remembers on this device. */
+  private _askForNewStops(): void {
+    this._replanFrom = null;
+    this._revealAlternatives = false;
+    saveAdhocSelection({ from: this._from, to: this._to });
+    this._askAnew();
+  }
+
   /** Identifies what is being asked, so an answer for an older question
-   *  never stands in for the current one. */
-  private _queryKey(): string {
-    const when = this._timeMode === "now" ? "now" : `${this._timeMode}@${this._when}`;
+   *  never stands in for the current one. `step` asks it for a step instead
+   *  of the question on screen. */
+  private _queryKey(step: PageStep = { timeMode: this._timeMode, when: this._when }): string {
+    const when = step.timeMode === "now" ? "now" : `${step.timeMode}@${step.when}`;
     return `${this._from}>${this._to}|${when}|${this._config?.step_free ? "step-free" : ""}`;
   }
 
@@ -556,8 +680,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       this._when = viennaInputValue(Date.now());
     }
     this._timeMode = mode;
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askAnew();
   }
 
   private _onWhen = (ev: Event): void => {
@@ -566,17 +689,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // quietly planning for "now" under a "depart at" label.
     if (!isInputDateTime(value) || value === this._when) return;
     this._when = value;
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askAnew();
   };
 
   private _swap = (): void => {
     [this._from, this._to] = [this._to, this._from];
-    this._replanFrom = null;
-    this._revealAlternatives = false;
-    saveAdhocSelection({ from: this._from, to: this._to });
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askForNewStops();
   };
 
   // ------------------------------------------------------------------
@@ -641,11 +759,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._revealAlternatives = true;
     this._timeMode = "depart";
     this._when = when;
-    this._lastInteraction = Date.now();
     // The plan's own announcement follows a second later; this one covers the
     // debounce and the request, where the card would otherwise sit silent.
     this._announce(this._t("replan_announce", { stop: stop.name }));
-    this._requestPlan(true);
+    this._askAnew();
   }
 
   private _backToOrigin = (): void => {
@@ -656,9 +773,174 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._from = origin.from;
     this._timeMode = origin.timeMode;
     this._when = origin.when;
-    this._lastInteraction = Date.now();
-    this._requestPlan(true);
+    this._askAnew();
   };
+
+  // ------------------------------------------------------------------
+  // Ad-hoc mode: the connection before or after
+  // ------------------------------------------------------------------
+
+  /** Whether the plan on screen answers the question asked. Not while a
+   *  step is on its way, so a second click can't step again from the
+   *  connection it is about to replace, and not after an error. */
+  private _answered(): boolean {
+    return !!this._plan && this._planKey === this._queryKey();
+  }
+
+  /** The connection "Früher" and "Später" step from: the one drawn as the
+   *  best, once the plan answers the question. None for an answer without
+   *  connections, which "Früher" can still retrace its way out of. */
+  private _pageBase(): RouteTripAttr | undefined {
+    return this._answered() ? upcomingTrips(this._plan!, this._now)[0] : undefined;
+  }
+
+  /** "Früher" has somewhere to go: a "Später" to retrace, or a connection
+   *  to find the one before of, unless the question is "Jetzt". */
+  private _canGoEarlier(): boolean {
+    if (!this._answered()) return false;
+    return this._pageHistory.length > 0 || (!!this._pageBase() && this._timeMode !== "now");
+  }
+
+  /** Where "Später" goes: departing the minute after this one leaves. By
+   *  the timetable, not the live time: the query reads the timetable, so a
+   *  late train must not push it past the one planned right behind it. */
+  private _laterStep(): PageStep | null {
+    const best = this._pageBase();
+    const leaves = Date.parse(best?.legs[0]?.origin.planned ?? best?.departure ?? "");
+    return Number.isFinite(leaves)
+      ? { timeMode: "depart", when: viennaInputAt(leaves + 60_000) }
+      : null;
+  }
+
+  /** Where "Früher" goes: back through the "Später" steps first, exactly
+   *  as they were asked (back to "Jetzt" as well), then the one arriving
+   *  before this one does. None for "Jetzt": what was earlier has left.
+   *
+   *  Before the earlier of its timetable and live arrival: the planner
+   *  drops what arrives after the time asked, by its own live time, so a
+   *  train running early would otherwise come back as its own answer. */
+  private _earlierStep(): PageStep | null {
+    if (!this._canGoEarlier()) return null;
+    const back = this._pageHistory.at(-1);
+    if (back) return back;
+    const best = this._pageBase()!;
+    const arrives = Math.min(
+      ...[best.legs.at(-1)?.destination.planned, best.arrival]
+        .map((iso) => Date.parse(iso ?? ""))
+        .filter(Number.isFinite),
+    );
+    return Number.isFinite(arrives)
+      ? { timeMode: "arrive", when: viennaInputAt(arrives - 60_000) }
+      : null;
+  }
+
+  private _later = (): void => {
+    const step = this._laterStep();
+    if (!step || this._sayWait(step)) return;
+    this._pageHistory = [...this._pageHistory, { timeMode: this._timeMode, when: this._when }];
+    this._step(step.timeMode, step.when);
+  };
+
+  private _earlier = (): void => {
+    const step = this._earlierStep();
+    if (!step || this._sayWait(step)) return;
+    if (step === this._pageHistory.at(-1)) this._pageHistory = this._pageHistory.slice(0, -1);
+    this._step(step.timeMode, step.when);
+  };
+
+  /** Whether `step` needs a fresh plan the budget can't give yet. One the
+   *  card was answered recently can go: the backend still hands it out. */
+  private _mustWait(step: PageStep, now = this._secondNow): boolean {
+    if (this._pagerWait(now) === 0) return false;
+    const answered = this._answeredAt.get(this._queryKey(step));
+    return answered === undefined || now - answered >= ADHOC_HELD_MS;
+  }
+
+  /** A step goes out at once: it is one deliberate press, with nothing to
+   *  wait for the way a typed time or a second pick is. */
+  private _step(mode: AdhocTimeMode, when: string): void {
+    this._timeMode = mode;
+    this._when = when;
+    this._lastInteraction = Date.now();
+    if (this._debounceTimer !== null) clearTimeout(this._debounceTimer);
+    this._debounceTimer = null;
+    void this._runPlan(true);
+  }
+
+  /** Seconds until the pager may ask for a fresh plan again; 0 once it may. */
+  private _pagerWait(now = this._secondNow): number {
+    return this._requestsLeft === 0 ? secondsUntil(this._requestsNextAt, now) : 0;
+  }
+
+  /** "Noch 2 Abfragen, +1 in 42 s" once few are left, "Nächste Abfrage in
+   *  42 s" once none are, empty while there is room. */
+  private _budgetNote(): string {
+    const wait = this._pagerWait();
+    if (wait > 0) return this._t("page_wait", { s: wait });
+    const left = this._requestsLeft;
+    if (!left || left > ADHOC_REQUESTS_NOTE_AT) return "";
+    const count =
+      left === 1 ? this._t("page_requests_left_one") : this._t("page_requests_left", { n: left });
+    const next = secondsUntil(this._requestsNextAt, this._secondNow);
+    return next > 0 ? `${count}, ${this._t("page_refill_in", { s: next })}` : count;
+  }
+
+  /** The rule behind the note, and why there is one: the text of the ⓘ's
+   *  toggletip, offered while the note shows and under a refusal for the
+   *  budget. Empty without the rule from the backend. */
+  private _budgetWhy(): string {
+    const max = this._requestsMax;
+    const refill = this._requestsRefillS;
+    if (!max || !refill) return "";
+    const refused = this._phase === "error" && this._error?.code === "rate_limited";
+    if (!refused && (this._phase === "error" || !this._budgetNote())) return "";
+    const every =
+      refill === 60 ? this._t("page_every_minute") : this._t("page_every_seconds", { s: refill });
+    return this._t("page_why", { max, every });
+  }
+
+  /** A press on a step the budget holds back: say why nothing happens, and
+   *  for how long. True when it did. */
+  private _sayWait(step: PageStep): boolean {
+    const now = Date.now();
+    if (!this._mustWait(step, now)) return false;
+    const wait = this._pagerWait(now);
+    this._announce(`${this._t("adhoc_error_rate_limited")}. ${this._t("page_wait", { s: wait })}.`);
+    return true;
+  }
+
+  /** Brings the countdown clock to now, counts in the requests the budget
+   *  gave back since, and keeps ticking each second while a countdown is on
+   *  screen. Call after setting any of their deadlines. */
+  private _syncCountdown(): void {
+    if (this._countdownTimer !== null) clearTimeout(this._countdownTimer);
+    this._countdownTimer = null;
+    const now = Date.now();
+    this._secondNow = now;
+    // One came back; the next follows a refill later, up to the most there
+    // can be. Without the rule, the next one isn't known.
+    while (this._requestsNextAt !== null && this._requestsNextAt <= now) {
+      const left = (this._requestsLeft ?? 0) + 1;
+      this._requestsLeft = left;
+      this._requestsNextAt =
+        this._requestsRefillS && this._requestsMax && left < this._requestsMax
+          ? this._requestsNextAt + this._requestsRefillS * 1000
+          : null;
+    }
+    if (!this.isConnected) return;
+    // Only what is on screen ticks: the note while it shows, and errors.
+    const counting =
+      (this._requestsNextAt !== null &&
+        this._requestsLeft !== null &&
+        this._requestsLeft <= ADHOC_REQUESTS_NOTE_AT) ||
+      secondsUntil(this._error?.retryAt, now) > 0 ||
+      secondsUntil(this._stopsError?.retryAt, now) > 0;
+    if (!counting) return;
+    this._countdownTimer = setTimeout(() => {
+      this._countdownTimer = null;
+      this._syncCountdown();
+    }, 1000);
+  }
 
   /** Re-setting identical text wouldn't be announced, so nudge it. */
   private _announce(text: string): void {
@@ -687,7 +969,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const detail =
       spec.retry === "countdown"
         ? this._t("adhoc_error_retry_detail", {
-            s: error.retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000),
+            s:
+              error.retryAt !== null
+                ? Math.max(1, secondsUntil(error.retryAt, this._secondNow))
+                : (error.retryAfter ?? Math.round(ADHOC_RETRY_MS / 1000)),
           })
         : spec.detail && this._t(spec.detail);
     return { icon: spec.icon, title: this._t(spec.title), ...(detail ? { detail } : {}) };
@@ -757,7 +1042,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           ${
             adhoc
               ? html`
-                ${this._renderPickers()} ${this._renderTimeControl()}
+                ${this._renderPickers()} ${this._renderTimeControl()} ${this._renderPager()}
                 <p class="sr-only" role="status" aria-live="polite">${this._announcement}</p>
                 <div class="results" aria-busy=${this._phase === "loading" ? "true" : "false"}>
                   ${this._renderAdhocBody(cfg)}
@@ -769,6 +1054,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         </div>
       </ha-card>
     `;
+  }
+
+  /** What a stale plan's note says: the whole reason from a backend that
+   *  sends no budget, so no pager note stands beside the steps; else
+   *  "Älterer Stand von 07:47", without the time where the plan doesn't
+   *  carry one. Not by the countdown: the plan stays on screen after it
+   *  ends, and "too many requests right now" is no longer true then. */
+  private _staleNote(plan: RouteAttrs): string {
+    if (this._requestsLeft === null) return this._t("adhoc_stale");
+    const time = viennaClock(plan.fetched_at);
+    return time ? this._t("adhoc_stale_short_at", { time }) : this._t("adhoc_stale_short");
   }
 
   /** "Zuletzt aktualisiert 07:40": when the upstream last answered, so a
@@ -847,6 +1143,134 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
+  /** "Früher" and "Später", above the connection rather than below it: the
+   *  strand's height changes with every answer, and a row above it stays
+   *  under the pointer for the next press. Shown once there is a question
+   *  to step through; inert, not disabled, while there is no connection to
+   *  step from, so keyboard focus stays on the button between presses.
+   *
+   *  Between them, once few fresh plans are left, how many and when the
+   *  next comes back; once none are, the seconds until a new one can go out.
+   *  A step the card was answered recently still goes, either way: the
+   *  backend hands that plan out again. The rule and why sit behind an ⓘ
+   *  beside it, which a refusal shows on its own: an error says its own
+   *  countdown, so the note stays out of it. */
+  private _renderPager(): TemplateResult | typeof nothing {
+    if (this._stops === null || !this._from || !this._to || this._from === this._to) {
+      return nothing;
+    }
+    const waiting = this._pagerWait() > 0;
+    const later = this._laterStep();
+    const earlier = this._earlierStep();
+    const laterOff = !later || this._mustWait(later);
+    const earlierOff = !earlier || this._mustWait(earlier);
+    const note = this._phase === "error" ? "" : this._budgetNote();
+    const why = this._budgetWhy();
+    const describedBy =
+      [note && "wl-pager-note", why && "wl-pager-why"].filter(Boolean).join(" ") || nothing;
+    return html`<div class="pager" role="group" aria-label=${this._t("page_legend")}>
+      <button
+        type="button"
+        class="page page--earlier"
+        aria-disabled=${earlierOff ? "true" : nothing}
+        aria-describedby=${describedBy}
+        @click=${this._earlier}
+      >
+        <ha-icon icon="mdi:chevron-left" aria-hidden="true"></ha-icon>
+        <span>${this._t("page_earlier")}</span>
+      </button>
+      ${
+        note || why
+          ? html`<div class="pager-note">
+            ${waiting ? html`<ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>` : nothing}
+            ${note ? html`<span id="wl-pager-note">${note}</span>` : nothing}
+            ${why ? this._renderWhy(why) : nothing}
+          </div>`
+          : nothing
+      }
+      <button
+        type="button"
+        class="page page--later"
+        aria-disabled=${laterOff ? "true" : nothing}
+        aria-describedby=${describedBy}
+        @click=${this._later}
+      >
+        <span>${this._t("page_later")}</span>
+        <ha-icon icon="mdi:chevron-right" aria-hidden="true"></ha-icon>
+      </button>
+    </div>`;
+  }
+
+  /** The ⓘ and its toggletip. A tap or a key opens and closes it; a mouse
+   *  opens it on hover, and a click then keeps it open rather than closing
+   *  it under the pointer. Esc or a tap elsewhere closes it (popover
+   *  "auto"), and the top layer keeps it clear of the card's edges. The
+   *  steps name it in their description, so a screen reader hears it
+   *  without opening it. */
+  private _renderWhy(why: string): TemplateResult {
+    return html`<span
+      class="tip"
+      @pointerenter=${this._onTipEnter}
+      @pointerleave=${this._onTipLeave}
+    >
+      <button
+        type="button"
+        class="tip-button"
+        popovertarget="wl-pager-why"
+        aria-label=${this._t("page_why_label")}
+        @click=${this._onTipClick}
+      >
+        <ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon>
+      </button>
+      <span class="tip-bubble" id="wl-pager-why" popover="auto">${why}</span>
+    </span>`;
+  }
+
+  private _tipBubble(): HTMLElement | null {
+    return this.renderRoot.querySelector<HTMLElement>("#wl-pager-why");
+  }
+
+  /** Whether the bubble is open; false where popovers aren't supported. */
+  private _tipShown(bubble: HTMLElement | null): boolean {
+    try {
+      return !!bubble?.matches(":popover-open");
+    } catch {
+      return false;
+    }
+  }
+
+  private _onTipEnter = (ev: PointerEvent): void => {
+    if (ev.pointerType !== "mouse") return;
+    this._tipHovered = true;
+    if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = null;
+    const bubble = this._tipBubble();
+    if (typeof bubble?.showPopover === "function" && !this._tipShown(bubble)) {
+      bubble.showPopover();
+    }
+  };
+
+  /** A moment's grace, so the pointer can cross from the ⓘ to the bubble. */
+  private _onTipLeave = (ev: PointerEvent): void => {
+    if (ev.pointerType !== "mouse") return;
+    this._tipHovered = false;
+    if (this._tipHideTimer !== null) clearTimeout(this._tipHideTimer);
+    this._tipHideTimer = setTimeout(() => {
+      this._tipHideTimer = null;
+      const bubble = this._tipBubble();
+      if (typeof bubble?.hidePopover === "function" && this._tipShown(bubble)) {
+        bubble.hidePopover();
+      }
+    }, 200);
+  };
+
+  /** Hover already opened it for a mouse; the click mustn't toggle it shut.
+   *  Told by the hover itself, not by the click's `pointerType`: a browser
+   *  that still sends `click` as a plain MouseEvent has none. */
+  private _onTipClick = (ev: Event): void => {
+    if (this._tipHovered && this._tipShown(this._tipBubble())) ev.preventDefault();
+  };
+
   /** One strings object per picker and language: a fresh object on every
    *  render (the clock ticks every 15 s) would re-render both pickers. */
   private _comboStrings(label: string): StopComboboxStrings {
@@ -915,16 +1339,24 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         : html`${back}${this._empty("mdi:timer-sand", this._t("adhoc_loading"), undefined, false)}`;
     }
     // Budget spent: the plan on screen is older than usual. The header's
-    // "Zuletzt aktualisiert" already says how old; this says why.
+    // "Zuletzt aktualisiert" already says how old; this says why. With a
+    // budget from the backend, the pager's note and its ⓘ are the why, so
+    // the note keeps to the one thing they don't say: that the plan shown
+    // is an older one, and from when. The header has that time too, but
+    // this is the line read with the connection it qualifies.
     const stale =
       plan.stale && this._phase !== "paused"
         ? html`<p class="stale-note">
             <ha-icon icon="mdi:timer-sand" aria-hidden="true"></ha-icon>
-            <span>${this._t("adhoc_stale")}</span>
+            <span>${this._staleNote(plan)}</span>
           </p>`
         : nothing;
     const trips = upcomingTrips(plan, this._now);
     if (!trips[0]) {
+      // Paused, the plan isn't refreshed while its connections go on
+      // leaving. Once the last has, "none found, try another stop" would be
+      // false: the card stopped asking. The banner is the whole story.
+      if (this._phase === "paused") return html`${back}${paused}`;
       return html`${back}${paused}${stale}${this._empty(
         "mdi:timetable",
         this._t("adhoc_no_trips"),
@@ -945,10 +1377,12 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     attrs: RouteAttrs,
   ): TemplateResult {
     if (stateValue === undefined) {
-      return this._empty(
-        "mdi:help-circle-outline",
-        this._t("entity_missing", { entity: cfg.entity }),
-      );
+      // The warning HA's own cards show for an entity they can't find
+      // (ha-alert brings role="alert"); the other empty states below are
+      // runtime states, not config errors, and keep the status panel.
+      return html`<ha-alert alert-type="warning"
+        >${this._t("entity_missing", { entity: cfg.entity })}</ha-alert
+      >`;
     }
     if (!findRouteEntities(this.hass).includes(cfg.entity) && stateValue !== "unavailable") {
       // A departure board (or any other sensor) picked by hand in YAML. Say
@@ -1110,12 +1544,20 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         .filter(Boolean)
         .join(" · "),
     }));
+    const escalators = this._escalatorOutages(trip, attrs).map((outage) => ({
+      title: this._t("escalator_out_notice", { station: outage.station ?? "" }),
+      detail: [outage.description, outage.reason]
+        .map((part) => (part ?? "").replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+        .join(" · "),
+    }));
+    const outages = [...lifts, ...escalators];
     const notices = [
-      ...lifts,
+      ...outages,
       ...(attrs.traffic_info ?? [])
         .filter((n) => (n.related_lines ?? []).some((line) => lines.has(line)))
         .map((n) => ({ title: n.title, detail: "" })),
-    ].slice(0, MAX_NOTICES + lifts.length);
+    ].slice(0, MAX_NOTICES + outages.length);
     if (!notices.length) return nothing;
     return html`
       <ul class="notices">
@@ -1149,8 +1591,39 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     );
   }
 
-  /** "Aufzug nach unten" and friends, with "außer Betrieb" on a lift at a
-   *  station that has an outage. Words and an icon, never colour alone. */
+  /** Escalator outages that can be the escalator this trip takes: at one of
+   *  its stations and running the way the trip goes (see `_escalatorOut`). */
+  private _escalatorOutages(
+    trip: RouteTripAttr,
+    attrs: RouteAttrs,
+  ): NonNullable<RouteAttrs["escalator_info"]> {
+    const steps = tripAccessSteps(trip);
+    return (attrs.escalator_info ?? []).filter((outage) =>
+      steps.some((step) => this._escalatorOut(step, [outage])),
+    );
+  }
+
+  /** Whether an escalator step has an outage to answer for. The trip names
+   *  its escalators by station and by up or down; the feed says which way
+   *  each broken one runs. So unlike a lift, an escalator going the other
+   *  way is ruled out, and only one the feed gives no direction for, or
+   *  one switched either way, counts for both. A step the trip gives no
+   *  direction for matches any outage at its station. */
+  private _escalatorOut(
+    step: RouteAccessStepAttr,
+    outages: NonNullable<RouteAttrs["escalator_info"]>,
+  ): boolean {
+    if (step.kind !== "escalator" || !step.stop_id) return false;
+    return outages.some((outage) => {
+      if (!(outage.stop_ids ?? []).includes(step.stop_id!)) return false;
+      const runs = outage.direction;
+      return !runs || runs === "both" || !step.level || runs === step.level;
+    });
+  }
+
+  /** "Aufzug nach unten" and friends, with "außer Betrieb" on a lift or an
+   *  escalator at a station that has an outage. Words and an icon, never
+   *  colour alone. */
   private _renderAccess(
     steps: RouteAccessStepAttr[] | undefined,
     attrs: RouteAttrs,
@@ -1159,7 +1632,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     if (!known.length) return nothing;
     const broken = new Set((attrs.elevator_info ?? []).flatMap((outage) => outage.stop_ids ?? []));
     return html`${known.map((step) => {
-      const out = step.kind === "elevator" && !!step.stop_id && broken.has(step.stop_id);
+      const out =
+        (step.kind === "elevator" && !!step.stop_id && broken.has(step.stop_id)) ||
+        this._escalatorOut(step, attrs.escalator_info ?? []);
       return html`<span class=${out ? "access access--out" : "access"}>
         <ha-icon
           class=${!out && step.kind === "ramp" ? "access-icon--ramp" : ""}
@@ -2279,6 +2754,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 18px;
       flex: none;
     }
+    .notice > span {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
     /* Which lift and why, under the station name. Its own line rather
        than a longer first line: the station is what's scanned for, the
        location is what's read once it has been found. */
@@ -2628,6 +3107,132 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--primary-text-color);
       font: inherit;
     }
+    /* Früher at the start, Später at the end, as on a timeline. Text in
+       the body colour and the chevron in the accent, like the way back out
+       of a jump: the theme's primary on a light card is too pale for text
+       this size. 32px clears the target minimum (WCAG 2.5.8) without a box;
+       the chevron sits at the edge, so the row lines up with the content. */
+    .pager {
+      display: grid;
+      grid-template-columns: 1fr minmax(0, auto) 1fr;
+      align-items: center;
+      gap: 8px;
+    }
+    .page {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      min-height: 32px;
+      padding: 0 8px 0 0;
+      border: none;
+      border-radius: var(--wl-radius-sm);
+      background: none;
+      color: var(--primary-text-color);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .page--earlier {
+      grid-column: 1;
+      justify-self: start;
+    }
+    .page--later {
+      grid-column: 3;
+      justify-self: end;
+      padding: 0 0 0 8px;
+    }
+    /* What's left of the request budget, between the two steps it limits.
+       Body weight against the buttons' 600, so it can't pass for a third
+       one; at this line height two lines still fit the 32px row. Tabular
+       figures keep the countdown from jittering as the seconds change. */
+    .pager-note {
+      grid-column: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      margin: 0;
+      color: var(--secondary-text-color);
+      font-size: 0.8rem;
+      line-height: 1.2;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .pager-note ha-icon {
+      flex: none;
+      --mdc-icon-size: 16px;
+    }
+    .tip {
+      display: inline-flex;
+      flex: none;
+    }
+    /* 24px clears the target minimum (WCAG 2.5.8) around a 16px icon. */
+    .tip-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: none;
+      color: var(--secondary-text-color);
+      cursor: pointer;
+      anchor-name: --wl-pager-why;
+    }
+    @media (hover: hover) {
+      .tip-button:hover {
+        color: var(--primary-text-color);
+      }
+    }
+    /* Without anchor positioning the popover keeps its centred default, a
+       small box in the middle of the screen, which still reads fine. */
+    .tip-bubble {
+      box-sizing: border-box;
+      width: max-content;
+      max-width: min(18rem, calc(100vw - 32px));
+      padding: 8px 12px;
+      border: 1px solid var(--divider-color, rgba(127, 127, 127, 0.3));
+      border-radius: var(--wl-radius-md);
+      background: var(--card-background-color, var(--ha-card-background, Canvas));
+      color: var(--primary-text-color, CanvasText);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.24);
+      font-size: 0.85rem;
+      font-weight: 400;
+      line-height: 1.4;
+      text-align: start;
+      text-wrap: pretty;
+    }
+    @supports (anchor-name: --a) {
+      .tip-bubble {
+        inset: auto;
+        margin: 6px 0;
+        position-anchor: --wl-pager-why;
+        position-area: bottom;
+        position-try-fallbacks:
+          bottom span-left,
+          bottom span-right,
+          top,
+          top span-left,
+          top span-right;
+      }
+    }
+    .page ha-icon {
+      display: block;
+      --mdc-icon-size: 18px;
+      color: var(--primary-color);
+    }
+    .page[aria-disabled="true"] {
+      opacity: 0.5;
+      cursor: default;
+    }
+    @media (hover: hover) {
+      .page:hover:not([aria-disabled="true"]) {
+        background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+      }
+    }
     .picker-status {
       font-size: 0.85rem;
       color: var(--secondary-text-color);
@@ -2677,8 +3282,11 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       cursor: pointer;
     }
 
+    /* At the narrowest cell the button goes under the text instead of
+       past the card's edge. */
     .banner {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 10px;
       padding: 10px 12px;
@@ -2688,7 +3296,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       font-size: 0.85rem;
     }
     .banner > span {
-      flex: 1;
+      flex: 1 1 8rem;
+      min-width: 0;
+      overflow-wrap: anywhere;
     }
     .banner > button {
       min-height: 32px;
@@ -2705,6 +3315,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     @container (max-width: 320px) {
       .hero-meta {
         text-align: start;
+      }
+    }
+    /* Too narrow to sit between the steps in two lines: under them. */
+    @container (max-width: 300px) {
+      .pager-note {
+        grid-column: 1 / -1;
+        grid-row: 2;
       }
     }
 

@@ -452,6 +452,146 @@ def test_parse_monitor_body_stops_ahead_uses_line_id_for_aliased_line() -> None:
     assert [s["name"] for s in sa] == ["Wien Oper"]
 
 
+def _wlb_two_platforms():
+    """Eichenstraße's Badner Bahn platforms as the route data has them:
+    399 Oper-bound (Direction 2), 427 Baden-bound (Direction 1)."""
+    from custom_components.wiener_linien_austria.static import (
+        StaticCatalogue,
+        Station,
+        TripPattern,
+        TripPatternIndex,
+    )
+
+    stations = {
+        1: Station(1, "Eichenstraße", "Wien", 16.34, 48.18, [399, 427]),
+        2: Station(2, "Matzleinsdorfer Platz", "Wien", 16.35, 48.18, [400]),
+        3: Station(3, "Oper, Karlsplatz", "Wien", 16.37, 48.20, [401]),
+        4: Station(4, "Bhf. Meidling", "Wien", 16.33, 48.17, [428]),
+        5: Station(5, "Josefsplatz", "Baden", 16.23, 48.01, [429]),
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            399: [
+                TripPattern(399, 1, 1, (427, 428, 429)),
+                TripPattern(399, 2, 2, (399, 400, 401)),
+            ]
+        },
+        lines_by_label={"WLB": 399},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def _wlb_line(direction: str, towards: str, planned: str, *, live: bool) -> dict:
+    time = {"countdown": 5, "timePlanned": f"2026-11-10T{planned}:00.000+0100"}
+    if live:
+        time["timeReal"] = f"2026-11-10T{planned}:30.000+0100"
+    return {
+        "name": "WLB",
+        "lineId": 399,
+        "towards": towards,
+        "direction": direction,
+        "type": "ptTramWLB",
+        "departures": {"departure": [{"departureTime": time}]},
+    }
+
+
+# The feed's serverTime, just before its first departure. Without it the
+# parser falls back to the wall clock, and once 05:05 has passed it drops
+# every row as gone.
+WLB_SERVER_TIME = "2026-11-10T05:00:00.000+0100"
+
+
+def _wlb_feed() -> dict:
+    """The Badner Bahn at Eichenstraße as /monitor answered on 2026-11-10:
+    live rows coded H on the Oper-bound platform and R on the Baden-bound
+    one, and each Oper-bound train once more, timetable-only, coded R."""
+    return {
+        "data": {
+            "monitors": [
+                {
+                    "locationStop": {"properties": {"attributes": {"rbl": 399}}},
+                    "lines": [
+                        _wlb_line("H", "Wien Oper", "05:05", live=True),
+                        _wlb_line("R", "Wien Oper", "05:05", live=False),
+                    ],
+                },
+                {
+                    "locationStop": {"properties": {"attributes": {"rbl": 427}}},
+                    "lines": [_wlb_line("R", "Baden Josefspl.", "05:25", live=True)],
+                },
+            ]
+        }
+    }
+
+
+def test_parse_monitor_body_trail_follows_the_platform_over_the_code() -> None:
+    """A live row's code says H at the Oper-bound platform: the trail goes to
+    the Oper, and travel times are asked for by the route's direction."""
+    result = _parse_monitor_body(
+        _wlb_feed(),
+        None,
+        WLB_SERVER_TIME,
+        catalogue=_wlb_two_platforms(),
+        entry_rbls=[399, 427],
+    )
+
+    by_towards = {d.towards: d for d in result.departures}
+    oper, baden = by_towards["Wien Oper"], by_towards["Baden Josefspl."]
+    assert (oper.direction, oper.route_direction) == ("H", "R")
+    assert [s["name"] for s in oper.stops_ahead or []] == [
+        "Matzleinsdorfer Platz",
+        "Oper, Karlsplatz",
+    ]
+    assert oper.to_dict()["route_direction"] == "R"
+    assert (baden.direction, baden.route_direction) == ("R", "H")
+    assert [s["name"] for s in baden.stops_ahead or []] == [
+        "Bhf. Meidling",
+        "Josefsplatz",
+    ]
+
+
+def test_parse_monitor_body_lists_a_train_listed_twice_once() -> None:
+    """The timetable-only copy of a live row at the same platform goes; the
+    live one stays, whichever comes first."""
+    feed = _wlb_feed()
+    lines = feed["data"]["monitors"][0]["lines"]
+    lines.reverse()
+
+    result = _parse_monitor_body(
+        feed,
+        None,
+        WLB_SERVER_TIME,
+        catalogue=_wlb_two_platforms(),
+        entry_rbls=[399, 427],
+    )
+
+    oper = [d for d in result.departures if d.towards == "Wien Oper"]
+    assert len(oper) == 1
+    assert oper[0].time_real is not None
+
+
+def test_parse_monitor_body_keeps_the_code_where_the_platform_agrees() -> None:
+    """No route_direction where the feed and the route data agree."""
+    feed = _wlb_feed()
+    feed["data"]["monitors"][0]["lines"] = [
+        _wlb_line("R", "Wien Oper", "05:05", live=True)
+    ]
+
+    result = _parse_monitor_body(
+        feed,
+        None,
+        WLB_SERVER_TIME,
+        catalogue=_wlb_two_platforms(),
+        entry_rbls=[399, 427],
+    )
+
+    (oper,) = [d for d in result.departures if d.towards == "Wien Oper"]
+    assert oper.route_direction is None
+    assert "route_direction" not in oper.to_dict()
+
+
 def test_parse_monitor_body_enriches_with_stops_ahead() -> None:
     """When catalogue + entry_rbls are passed, departures get stops_ahead."""
     catalogue = _u1_catalogue_for_coord()
@@ -467,6 +607,34 @@ def test_parse_monitor_body_enriches_with_stops_ahead() -> None:
     assert sa is not None
     assert [s["name"] for s in sa] == ["Praterstern", "Leopoldau"]
     assert sa[-1].get("is_terminus") is True
+
+
+def test_parse_monitor_body_chooses_a_trail_once_for_like_rows() -> None:
+    """Rows of one line, platform and terminus share a route choice: the
+    matcher ran once per row before, some forty times a poll at a hub."""
+    from custom_components.wiener_linien_austria.static import stops_ahead_for_match
+
+    body = _u1_h_body()
+    rows = body["data"]["monitors"][0]["lines"][0]["departures"]["departure"]
+    rows.extend({"departureTime": {"countdown": minutes}} for minutes in (6, 10))
+
+    with patch(
+        "custom_components.wiener_linien_austria.coordinator.stops_ahead_for_match",
+        wraps=stops_ahead_for_match,
+    ) as matcher:
+        result = _parse_monitor_body(
+            body,
+            None,
+            None,
+            catalogue=_u1_catalogue_for_coord(),
+            entry_rbls=[4111, 4118],
+        )
+
+    assert len(result.departures) == 3
+    assert matcher.call_count == 1
+    trails = [d.stops_ahead for d in result.departures]
+    assert trails[0] is not None
+    assert trails[0] == trails[1] == trails[2]
 
 
 def test_parse_monitor_body_omits_stops_ahead_for_unknown_line() -> None:

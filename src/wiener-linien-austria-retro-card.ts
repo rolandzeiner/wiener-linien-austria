@@ -22,7 +22,7 @@ import {
   type NormalisedRetroConfig,
 } from "./utils/config.js";
 import { filterDepartures, stubDirection } from "./utils/departures.js";
-import { deriveRetroView, retroEmptyStateKey } from "./utils/retro-view.js";
+import { deriveRetroView, retroEmptyStateKey, tickerSteps } from "./utils/retro-view.js";
 import { allDisconnected, findWienerLinienEntities } from "./utils/entities.js";
 import type { LineColorsMap } from "./types.js";
 import { registerWlFonts } from "./font-face.js";
@@ -153,12 +153,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   private _anyViaInRows = false;
 
   private _versionCheckDone = false;
-  // One-shot flag so the "configured entity missing → fell back" console
-  // warning doesn't spam on every re-render.
-  private _fallbackWarned = false;
-  // Resolved entity id cached across hass ticks — _resolveEntity is hot
-  // path (called from both shouldUpdate and render) and was iterating
-  // hass.states for the fallback path on every tick.
+  // The auto-picked sensor of a card with no stop configured, cached
+  // across hass ticks: _resolveEntity runs from both shouldUpdate and
+  // render, and finding that sensor iterates hass.states.
   private _cachedEid: string | null = null;
   private _raceTimers = new Set<ReturnType<typeof setTimeout>>();
   // Trajectories for the race currently in flight, rolled in
@@ -236,7 +233,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._victoryEndAt = null;
     this._raceWinner = null;
     this._tickerActive = false;
-    this._fallbackWarned = false;
     this._cachedEid = null;
   }
 
@@ -367,7 +363,9 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
     return cardShouldUpdate(changed, this.hass, () => {
-      const eid = this._resolveEntity();
+      // The configured id even while it is missing, so the card wakes
+      // when the sensor comes back; the auto-picked one otherwise.
+      const eid = this._config?.entity || this._resolveEntity();
       return eid ? [eid] : [];
     });
   }
@@ -386,6 +384,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     // that carries the matching race class, so the racers are already
     // stacked above the finish strip on their first painted frame.
     if (changed.has("_raceState")) this._syncRaceAnimations();
+    if (changed.has("_tickerActive") && this._tickerActive) this._stepTicker();
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -456,35 +455,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     );
   }
 
-  /** Cache-aware: returns the configured entity if it's in hass.states,
-   *  else the first auto-discovered WL sensor as a fallback. Cached on
-   *  this._cachedEid because both shouldUpdate and render call it on
-   *  every hass tick — recomputing the fallback (which iterates
-   *  hass.states) on every tick adds up on large dashboards. The cache
-   *  is invalidated on setConfig and when the configured entity's
-   *  presence in hass.states changes. */
+  /** The configured sensor when it is in hass.states, null when it isn't:
+   *  the card then says so (`_renderMain`) rather than showing another
+   *  stop in its place. With no stop configured (the picker's stub state)
+   *  the first WL sensor stands in, so the preview has something to show;
+   *  that pick is cached on this._cachedEid and dropped on setConfig. */
   private _resolveEntity(): string | null {
     const configured = this._config?.entity;
-    if (configured && this.hass?.states?.[configured]) {
-      this._cachedEid = configured;
-      return configured;
-    }
+    if (configured) return this.hass?.states?.[configured] ? configured : null;
     if (this._cachedEid && this.hass?.states?.[this._cachedEid]) {
       return this._cachedEid;
     }
-    const available = findWienerLinienEntities(this.hass);
-    const first = available[0] ?? null;
-    if (first && configured && !this._fallbackWarned) {
-      // Configured entity is gone (rename, integration removal). The
-      // fallback keeps the card useful, but make the swap auditable so
-      // the user notices their dashboard is now showing a different stop.
-      this._fallbackWarned = true;
-      console.warn(
-        `[wiener-linien-austria-retro-card] configured entity "${configured}" not in hass.states; falling back to "${first}"`,
-      );
-    }
-    this._cachedEid = first;
-    return first;
+    this._cachedEid = findWienerLinienEntities(this.hass)[0] ?? null;
+    return this._cachedEid;
   }
 
   // ------------------------------------------------------------------
@@ -596,6 +579,20 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     this._tickerActive = false;
     this._scheduleTicker(MESSAGE_TICKER_INTERVAL_MS);
   };
+
+  /** Move the marquee one LED column per step instead of gliding at
+   *  sub-pixel positions, which reads as a web marquee and makes the
+   *  letters shimmer under Pixel's dot mask. The custom property goes on
+   *  the overlay, which has no style binding, so a re-render can't wipe
+   *  it, and the overlay is rebuilt for every run. */
+  private _stepTicker(): void {
+    const panel = this.renderRoot.querySelector<HTMLElement>(".retro-ticker");
+    const text = panel?.querySelector<HTMLElement>(".retro-ticker-text");
+    if (!panel || !text) return;
+    const pitch = Number.parseFloat(getComputedStyle(panel).getPropertyValue("--led-dot-pitch"));
+    const steps = tickerSteps(panel.clientWidth + text.offsetWidth, pitch);
+    if (steps !== null) panel.style.setProperty("--ticker-steps", `steps(${steps}, end)`);
+  }
 
   /** Scroll duration in seconds — proportional to message length so the
    *  reading pace stays roughly constant. Clamped so a one-word message
@@ -1011,6 +1008,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       [`retro--size-${cfg.size}`]: cfg.size !== "regular",
       [`retro--style-${cfg.style}`]: cfg.style !== "classic",
       "retro--flicker": cfg.flicker,
+      "retro--bloom": cfg.bloom,
       "retro--race-countdown": raceCountdown,
       "retro--race-active": raceActive,
       "retro--race-freeze": raceFreeze,
@@ -1121,8 +1119,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     lineColors: LineColorsMap,
     staleDropped: number,
   ): TemplateResult {
-    if (!eid)
+    if (!eid) {
+      // A configured sensor that is gone gets the warning HA's own cards
+      // show for an entity they can't find (ha-alert brings role="alert");
+      // nothing configured is a different state with a different fix.
+      const configured = this._config?.entity;
+      if (configured) {
+        return html`<div class="retro-missing">
+          <ha-alert alert-type="warning">${this._t("entity_missing", { entity: configured })}</ha-alert>
+        </div>`;
+      }
       return html`<div class="retro-empty" role="status" aria-live="polite">${this._t("no_entity")}</div>`;
+    }
     if (rows.length === 0) {
       const key = allDisconnected(this.hass, [eid])
         ? "unavailable"
@@ -1381,6 +1389,10 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-size: 0.5px;
       --led-dot-edge: 1px;
       --led-dot-pitch: 4px;
+      /* Glow on lit text and icons. One token, so the bloom option can
+         swap it for every lit surface at once. */
+      --led-glow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      --led-glow-filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
 
       /* LED area inner padding. Lives on the LED element; declared here so
          size/gleis variants can override via the .retro cascade. */
@@ -1463,6 +1475,33 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       --led-dot-edge: 1.4px;
       --led-dot-pitch: 3px;
     }
+    /* Bloom option: a 1 px core and a faint wide halo around the usual
+       6 px glow, the way light spreads behind the glass of a real LED
+       sign. The halo steps down with the size variants so small text
+       stays crisp. In Pixel style the screen door dots the halo along
+       with everything else, so it reads as more lit dots around the
+       letters. */
+    .retro--bloom {
+      --led-glow:
+        0 0 1px rgb(var(--led-glow-rgb) / 0.95),
+        0 0 6px rgb(var(--led-glow-rgb) / 0.6),
+        0 0 16px rgb(var(--led-glow-rgb) / 0.28);
+      --led-glow-filter:
+        drop-shadow(0 0 1px rgb(var(--led-glow-rgb) / 0.9))
+        drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.55));
+    }
+    .retro--bloom.retro--size-medium {
+      --led-glow:
+        0 0 1px rgb(var(--led-glow-rgb) / 0.95),
+        0 0 5px rgb(var(--led-glow-rgb) / 0.6),
+        0 0 13px rgb(var(--led-glow-rgb) / 0.26);
+    }
+    .retro--bloom.retro--size-small {
+      --led-glow:
+        0 0 1px rgb(var(--led-glow-rgb) / 0.95),
+        0 0 4px rgb(var(--led-glow-rgb) / 0.6),
+        0 0 10px rgb(var(--led-glow-rgb) / 0.24);
+    }
     .retro--gleis-left .retro-gleis { order: -1; }
     .retro--gleis-right { --retro-pad-r: 14px; }
     .retro--gleis-left { --retro-pad-l: 14px; }
@@ -1473,7 +1512,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       justify-content: center;
       gap: 8px;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       font-size: 1.9em;
       line-height: 1;
       /* <ul> for semantic departure list — reset UA list chrome. */
@@ -1626,7 +1665,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       width: 0.9em;
       height: 0.9em;
       color: inherit;
-      filter: drop-shadow(0 0 6px rgb(var(--led-glow-rgb) / 0.7));
+      filter: var(--led-glow-filter);
       /* Optical-centre correction. WL Mono is a Courier-derived face
          with a tall ascender / shallow descender, so uppercase glyphs
          (SIMMERING) sit in the upper-middle of their line-box. An
@@ -1818,11 +1857,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       font-size: 1.9em;
       line-height: 1;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       text-transform: uppercase;
       will-change: transform;
       animation-name: retroTickerScroll;
-      animation-timing-function: linear;
+      /* A real board shifts its text one LED column at a time. The card
+         sets --ticker-steps on the overlay once the text is laid out
+         (travel over dot pitch, see _stepTicker); linear is the
+         fallback for the first frame and for a panel with no layout. */
+      animation-timing-function: var(--ticker-steps, linear);
       animation-iteration-count: 1;
       /* both → text waits off-screen-right before the run and rests
          off-screen-left after it, with no flash at the layout origin.
@@ -2098,7 +2141,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       padding: 0 14px 0 18px;
       margin-left: 12px;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       transition: opacity 0.4s ease-out;
       /* Position context for the dotted-divider pseudo. The previous
          border-left: 1px hairline read as a CSS edge, not LED material.
@@ -2195,12 +2238,19 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       letter-spacing: 1px;
       margin-bottom: 0;
     }
+    /* The warning keeps HA's own colours on purpose: it is a config
+       error, not board content, so it doesn't wear the LED voice. */
+    .retro-missing {
+      flex: 1;
+      align-self: stretch;
+      padding: 8px 0;
+    }
     .retro-empty {
       flex: 1;
       text-align: center;
       align-self: center;
       color: var(--led-amber);
-      text-shadow: 0 0 6px rgb(var(--led-glow-rgb) / 0.7);
+      text-shadow: var(--led-glow);
       font-size: 1.4em;
       padding: 20px 0;
       letter-spacing: 2px;

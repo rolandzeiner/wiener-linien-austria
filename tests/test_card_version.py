@@ -206,3 +206,35 @@ def test_route_card_version_matches_ts() -> None:
         f"ROUTE_CARD_VERSION literal not found in {_TS_CONST}; regex may be stale"
     )
     assert match.group(1) == _expected_version()
+
+
+# Route timing parity. The route card plans on the spot by the rules the
+# route entities follow, so four timings live in const.py and again in
+# src/utils/route.ts, in milliseconds there. A card that turned to the next
+# connection at another moment than the sensors, or refreshed on another
+# floor, would disagree with the entity beside it on the same dashboard.
+_ROUTE_TS = Path(__file__).parent.parent / "src" / "utils" / "route.ts"
+
+
+def _ts_ms(name: str) -> list[int]:
+    """The millisecond literal(s) of `export const <name> = …;` in route.ts."""
+    source = _ROUTE_TS.read_text(encoding="utf-8")
+    match = re.search(rf"export const {name}\b[^=]*=\s*([^;]+);", source)
+    assert match is not None, f"{name} not found in {_ROUTE_TS}; regex may be stale"
+    return [int(n.replace("_", "")) for n in re.findall(r"\d[\d_]*", match.group(1))]
+
+
+def test_route_timings_match_python_and_ts() -> None:
+    """The card's route timings equal the backend's, second for second."""
+    from custom_components.wiener_linien_austria import const as py_const
+
+    pairs: dict[str, list[float]] = {
+        "ADHOC_REFRESH_MS": [py_const.MIN_ROUTE_POLL_SECONDS],
+        "ADHOC_ROLLOVER_FLOOR_MS": [py_const.MIN_ROUTE_ROLLOVER_SECONDS],
+        "ADHOC_ROLLOVER_SPREAD_MS": list(py_const.ROUTE_ROLLOVER_SPREAD_SECONDS),
+        "DEPARTED_GRACE_MS": [py_const.ROUTE_DEPARTED_GRACE_SECONDS],
+    }
+    for name, seconds in pairs.items():
+        assert _ts_ms(name) == [int(value * 1000) for value in seconds], (
+            f"{name} drift between const.py and src/utils/route.ts"
+        )

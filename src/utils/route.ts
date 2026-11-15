@@ -137,7 +137,12 @@ export function clockOf(iso: string | null | undefined): string {
   return match?.[1] ?? "";
 }
 
-/** The connections still ahead, soonest first. The sensor already ranks
+/** A connection counts as still ahead until this long after it leaves, the
+ *  backend's `ROUTE_DEPARTED_GRACE_SECONDS`: the card and the route's
+ *  sensors turn to the following connection at the same moment. */
+export const DEPARTED_GRACE_MS = 30_000;
+
+/** The connections still ahead, best first. The sensor already ranks
  *  them; this only drops the ones that have left since its last refresh.
  *  A plan for a chosen time (`planned_for`) keeps them all: that is what
  *  was asked for, whatever the clock says now. */
@@ -148,7 +153,7 @@ export function upcomingTrips(attrs: RouteAttrs | undefined, nowMs: number): Rou
     if (trip.cancelled) return false;
     if (planned) return true;
     const ts = trip.departure ? Date.parse(trip.departure) : Number.NaN;
-    return !Number.isFinite(ts) || ts >= nowMs - 30_000;
+    return !Number.isFinite(ts) || ts >= nowMs - DEPARTED_GRACE_MS;
   });
 }
 
@@ -415,7 +420,7 @@ export function viennaInputValue(nowMs: number): string {
  *  is right for "pick a time" but wrong for "plan from the minute this ride
  *  gets in": that would push the query up to five minutes past the arrival
  *  and hide the connections leaving in between. */
-function viennaInputAt(ms: number): string {
+export function viennaInputAt(ms: number): string {
   const p = viennaParts(ms);
   return `${p["year"]}-${p["month"]}-${p["day"]}T${p["hour"]}:${p["minute"]}`;
 }
@@ -516,9 +521,9 @@ export function adhocRefreshDelay(
   const next = trips
     .filter((trip) => !trip.cancelled && trip.departure)
     .map((trip) => Date.parse(trip.departure!))
-    .find((ts) => Number.isFinite(ts) && ts + 30_000 > nowMs);
+    .find((ts) => Number.isFinite(ts) && ts + DEPARTED_GRACE_MS > nowMs);
   if (next === undefined) return ADHOC_REFRESH_MS;
-  const untilRollover = next + 30_000 + jitterMs - nowMs;
+  const untilRollover = next + DEPARTED_GRACE_MS + jitterMs - nowMs;
   return Math.min(ADHOC_REFRESH_MS, Math.max(ADHOC_ROLLOVER_FLOOR_MS, untilRollover));
 }
 
@@ -536,6 +541,17 @@ export function adhocPlanRefreshDelay(plan: RouteAttrs, nowMs: number): number {
   const retryAfter = plan.stale ? Number(plan.retry_after) : NaN;
   return Number.isFinite(retryAfter) && retryAfter > 0 ? Math.max(base, retryAfter * 1000) : base;
 }
+
+/** The pager says how many fresh plans are left once this few are: two
+ *  presses of warning before a wait, and quiet while there's room. */
+export const ADHOC_REQUESTS_NOTE_AT = 2;
+
+/** How long a step back to a question the card was already answered can
+ *  go out with the budget spent. The backend keeps a plan five minutes
+ *  (`ADHOC_STALE_MAX_SECONDS` in adhoc.py) and hands it out then; half a
+ *  minute short of that, for clocks that disagree. Past it, a step only
+ *  waits longer than it had to. */
+export const ADHOC_HELD_MS = 4.5 * 60_000;
 
 /** How long a card with no loaded integration waits before asking again.
  *  Right after an HA restart the card can reach HA before the integration

@@ -1,0 +1,523 @@
+{
+  "itdMessageList": [],
+  "trips": [
+    {
+      "legs": [
+        {
+          "points": [
+            {
+              "name": "Wien Westbahnhof",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:02",
+                "timeSec": "03:02:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:02",
+                "rtTimeSec": "03:02:00"
+              },
+              "ref": {
+                "id": "60201468"
+              }
+            },
+            {
+              "name": "Wien Handelskai",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:19",
+                "timeSec": "03:19:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:19",
+                "rtTimeSec": "03:19:00"
+              },
+              "ref": {
+                "id": "60201705"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U6",
+            "number": "U6",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Floridsdorf",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          },
+          "footpath": [
+            {
+              "position": "AFTER",
+              "duration": "4"
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "name": "Wien Handelskai",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:25",
+                "timeSec": "03:25:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:25",
+                "rtTimeSec": "03:25:00"
+              },
+              "ref": {
+                "id": "60201705"
+              }
+            },
+            {
+              "name": "Wien Praterstern",
+              "platformName": "2",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:29",
+                "timeSec": "03:29:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:29",
+                "rtTimeSec": "03:29:00"
+              },
+              "ref": {
+                "id": "60201040"
+              }
+            }
+          ],
+          "mode": {
+            "name": "S-Bahn S1",
+            "number": "S1",
+            "product": "S-Bahn",
+            "type": "2",
+            "code": "1",
+            "destination": "Wien Praterstern",
+            "realtime": "0",
+            "diva": {
+              "dir": "H"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "legs": [
+        {
+          "points": [
+            {
+              "name": "Wien Westbahnhof",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:11",
+                "timeSec": "03:11:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:11",
+                "rtTimeSec": "03:11:00"
+              },
+              "ref": {
+                "id": "60201468"
+              }
+            },
+            {
+              "name": "Wien Stephansplatz",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:18",
+                "timeSec": "03:18:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:18",
+                "rtTimeSec": "03:18:00"
+              },
+              "ref": {
+                "id": "60201320"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U3",
+            "number": "U3",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Simmering",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          },
+          "footpath": [
+            {
+              "position": "AFTER",
+              "duration": "4"
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "name": "Wien Stephansplatz",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:28",
+                "timeSec": "03:28:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:28",
+                "rtTimeSec": "03:28:00"
+              },
+              "ref": {
+                "id": "60201320"
+              }
+            },
+            {
+              "name": "Wien Praterstern",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:31",
+                "timeSec": "03:31:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:31",
+                "rtTimeSec": "03:31:00"
+              },
+              "ref": {
+                "id": "60201040"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U1",
+            "number": "U1",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Leopoldau",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "legs": [
+        {
+          "points": [
+            {
+              "name": "Wien Westbahnhof",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:26",
+                "timeSec": "03:26:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:26",
+                "rtTimeSec": "03:26:00"
+              },
+              "ref": {
+                "id": "60201468"
+              }
+            },
+            {
+              "name": "Wien Stephansplatz",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:33",
+                "timeSec": "03:33:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:33",
+                "rtTimeSec": "03:33:00"
+              },
+              "ref": {
+                "id": "60201320"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U3",
+            "number": "U3",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Simmering",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          },
+          "footpath": [
+            {
+              "position": "AFTER",
+              "duration": "4"
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "name": "Wien Stephansplatz",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:43",
+                "timeSec": "03:43:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:43",
+                "rtTimeSec": "03:43:00"
+              },
+              "ref": {
+                "id": "60201320"
+              }
+            },
+            {
+              "name": "Wien Praterstern",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:46",
+                "timeSec": "03:46:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:46",
+                "rtTimeSec": "03:46:00"
+              },
+              "ref": {
+                "id": "60201040"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U1",
+            "number": "U1",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Leopoldau",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "legs": [
+        {
+          "points": [
+            {
+              "name": "Wien Westbahnhof",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:32",
+                "timeSec": "03:32:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:32",
+                "rtTimeSec": "03:32:00"
+              },
+              "ref": {
+                "id": "60201468"
+              }
+            },
+            {
+              "name": "Wien Handelskai",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:49",
+                "timeSec": "03:49:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:49",
+                "rtTimeSec": "03:49:00"
+              },
+              "ref": {
+                "id": "60201705"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U6",
+            "number": "U6",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Floridsdorf",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          },
+          "footpath": [
+            {
+              "position": "AFTER",
+              "duration": "4"
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "name": "Wien Handelskai",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:55",
+                "timeSec": "03:55:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:55",
+                "rtTimeSec": "03:55:00"
+              },
+              "ref": {
+                "id": "60201705"
+              }
+            },
+            {
+              "name": "Wien Praterstern",
+              "platformName": "2",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:59",
+                "timeSec": "03:59:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:59",
+                "rtTimeSec": "03:59:00"
+              },
+              "ref": {
+                "id": "60201040"
+              }
+            }
+          ],
+          "mode": {
+            "name": "S-Bahn S1",
+            "number": "S1",
+            "product": "S-Bahn",
+            "type": "2",
+            "code": "1",
+            "destination": "Wien Praterstern",
+            "realtime": "0",
+            "diva": {
+              "dir": "H"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "legs": [
+        {
+          "points": [
+            {
+              "name": "Wien Westbahnhof",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:41",
+                "timeSec": "03:41:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:41",
+                "rtTimeSec": "03:41:00"
+              },
+              "ref": {
+                "id": "60201468"
+              }
+            },
+            {
+              "name": "Wien Stephansplatz",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:48",
+                "timeSec": "03:48:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:48",
+                "rtTimeSec": "03:48:00"
+              },
+              "ref": {
+                "id": "60201320"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U3",
+            "number": "U3",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Simmering",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          },
+          "footpath": [
+            {
+              "position": "AFTER",
+              "duration": "4"
+            }
+          ]
+        },
+        {
+          "points": [
+            {
+              "name": "Wien Stephansplatz",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "03:58",
+                "timeSec": "03:58:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "03:58",
+                "rtTimeSec": "03:58:00"
+              },
+              "ref": {
+                "id": "60201320"
+              }
+            },
+            {
+              "name": "Wien Praterstern",
+              "platformName": "1",
+              "dateTime": {
+                "date": "15.11.2026",
+                "time": "04:01",
+                "timeSec": "04:01:00",
+                "rtDate": "15.11.2026",
+                "rtTime": "04:01",
+                "rtTimeSec": "04:01:00"
+              },
+              "ref": {
+                "id": "60201040"
+              }
+            }
+          ],
+          "mode": {
+            "name": "U-Bahn U1",
+            "number": "U1",
+            "product": "U-Bahn",
+            "type": "1",
+            "code": "2",
+            "destination": "Wien Leopoldau",
+            "realtime": "0",
+            "diva": {
+              "dir": "H",
+              "opPublicCode": "WL"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

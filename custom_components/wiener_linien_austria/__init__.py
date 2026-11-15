@@ -41,6 +41,7 @@ from .const import (
     ELEVATOR_INFO_KEY,
     ENTRY_COUNT_KEY,
     ENTRY_TYPE_ROUTE,
+    ESCALATOR_INFO_KEY,
     FLAP_CARD_VERSION,
     RESOURCES_REGISTERED_KEY,
     RETRO_CARD_VERSION,
@@ -69,6 +70,7 @@ from .s_bahn_network import (
     async_schedule_network_update,
 )
 from .services import async_setup_services
+from .skipped_stops import STOP_CALLS_KEY, STOP_NOTICES_KEY
 from .static import (
     BACKGROUND_REFRESH_TASK_KEY,
     CATALOGUE_KEY,
@@ -542,6 +544,7 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
     for stale_key in (
         TRAFFIC_INFO_KEY,
         ELEVATOR_INFO_KEY,
+        ESCALATOR_INFO_KEY,
         DOMAIN_LAST_CALL_KEY,
         LOCK_KEY,
         LOCK_LOOP_KEY,
@@ -557,6 +560,8 @@ def _teardown_domain_state(domain_data: dict[str, Any]) -> None:
         # The samples stay in their Store; a request still on the wire
         # finishes and saves into it.
         RUN_TIMES_KEY,
+        STOP_NOTICES_KEY,
+        STOP_CALLS_KEY,
         RESOURCES_REGISTERED_KEY,
     ):
         domain_data.pop(stale_key, None)

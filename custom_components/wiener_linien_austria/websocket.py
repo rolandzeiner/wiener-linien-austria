@@ -18,8 +18,15 @@ user.
 - `wiener_linien_austria/run_times` — the scheduled minutes from a stop to
   every stop ahead, per line and direction, keyed by the stop names the
   stops-ahead trail prints. The modern card adds them to a departure's time
-  for an estimated arrival at each stop. Only for a stop with a departure
-  board set up; run_times.py says when it costs a request.
+  for an estimated arrival at each stop. `no_stop` names, the same way, the
+  stations a trail passes without the train calling there, each with the
+  date the stop is back where a notice says so clearly (skipped_stops.py).
+  `calling` says, for those stations, which runs call there after all:
+  the station's planned departures of that line and direction, the stretch
+  of time they cover, and the minutes from here to the calls either side,
+  so the card can tell one departure from the next. Only for a stop with a
+  departure board set up; run_times.py and skipped_stops.py say when it
+  costs a request.
 
 Registered once per HA process in `async_setup`. `websocket_api` has no
 deregister hook, so the handlers outlive a removed integration; each one
@@ -29,6 +36,8 @@ then the card's resource is gone too, so nothing should be calling.
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Final
 
@@ -57,6 +66,7 @@ from .const import (
     MAX_CHANGES_CHOICES,
     MAX_MIN_TRANSFER_MINUTES,
     ROUTE_TYPES,
+    STOP_CALLS_RETRY_AFTER,
     WALK_SPEEDS,
 )
 from .coordinator import WienerLinienAustriaCoordinator
@@ -67,8 +77,18 @@ from .routing import (
     RoutingError,
     async_routing_zone,
 )
-from .run_times import async_get_run_times
-from .static import StaticCatalogue
+from .run_times import Pair, RunTimeAnswer, async_get_run_times
+from .skipped_stops import (
+    SkippedStation,
+    async_get_stop_calls,
+    async_get_stop_notices,
+    closed_until,
+    notice_shutting,
+    noticed_stations,
+    skipped_stations,
+    stand_ins,
+)
+from .static import StaticCatalogue, trail_name
 from .stops import stop_options, trackable_station
 
 # Error codes the card maps onto its own copy. Stable: the card matches them.
@@ -222,10 +242,11 @@ async def _websocket_plan(
     options = RouteOptions.from_config(origin.diva, destination.diva, msg)
     when = await _async_vienna_time(msg.get("datetime"))
     arrive_by = bool(msg["arrive_by"])
+    planner = async_get_planner(hass)
     try:
         # A stale plan beats an error on a dashboard: the card shows when it
         # was fetched and refreshes once the budget allows.
-        plan = await async_get_planner(hass).async_plan(
+        plan = await planner.async_plan(
             options,
             user_id=connection.user.id,
             when=when,
@@ -255,6 +276,9 @@ async def _websocket_plan(
         )
         return
 
+    # What is left after this answer, so the card can say so before the
+    # budget runs out instead of after.
+    budget = planner.budget(connection.user.id)
     connection.send_result(
         msg_id,
         {
@@ -269,6 +293,10 @@ async def _websocket_plan(
             "attribution": ATTRIBUTION,
             "stale": plan.stale,
             "retry_after": plan.retry_after,
+            "requests_left": budget.left,
+            "requests_next_in": budget.next_in,
+            "requests_max": budget.capacity,
+            "requests_refill_s": budget.refill_seconds,
         },
     )
 
@@ -328,32 +356,153 @@ async def _websocket_run_times(
         )
         return
 
-    # Keyed by station name, the one thing a trail entry carries. Both
-    # sides read it from the same catalogue row, so the join is exact; a
-    # DIVA the catalogue doesn't know has no trail entry to join either.
+    # Keyed by the stop's trail name (`static.trail_name`), the one thing a
+    # trail entry carries. Both sides read it from the same catalogue row,
+    # so the join is exact; a DIVA the catalogue doesn't know has no trail
+    # entry to join either.
     run_times: dict[str, dict[str, float]] = {}
+    patterns = catalogue.trip_patterns
     for (label, way), minutes_by_diva in answer.pairs.items():
         named: dict[str, float] = {}
+        line_id = patterns.lines_by_label.get(label) if patterns is not None else None
         for stop_diva, minutes in minutes_by_diva.items():
-            station = catalogue.stations_by_diva.get(stop_diva)
-            if station is not None:
-                named.setdefault(station.name, minutes)
+            stop = trail_name(catalogue, line_id, stop_diva)
+            if stop is not None:
+                named.setdefault(stop, minutes)
+        # A stop the timetable knows by an id the catalogue lacks.
+        for name, minutes in stand_ins(
+            catalogue, diva, label, way, minutes_by_diva
+        ).items():
+            named.setdefault(name, minutes)
         if named:
             run_times[f"{label}|{way}"] = named
     now = dt_util.utcnow()
     for board in boards:
         run_times.update(_timetable_run_times(board, now))
+    works = await _async_works(hass, catalogue, diva, answer)
+    valid_until = answer.valid_until
+    if works.refresh_by is not None:
+        valid_until = min(valid_until, works.refresh_by)
 
     connection.send_result(
         msg_id,
         {
             "diva": diva,
             "fetched_at": answer.fetched_at.isoformat() if answer.fetched_at else None,
-            "valid_until": answer.valid_until.isoformat(),
+            "valid_until": valid_until.isoformat(),
             "run_times": run_times,
+            "no_stop": works.no_stop,
+            "calling": works.calling,
+            "notices": works.notices,
             "attribution": ATTRIBUTION,
         },
     )
+
+
+@dataclass(slots=True)
+class _Works:
+    """The stations a stop's trails pass without a call, as the card gets them."""
+
+    # "U6|H" → station → when the stop is back (ISO datetime), or None.
+    no_stop: dict[str, dict[str, str | None]] = field(default_factory=dict)
+    # "U6|H" → station → which runs call there after all.
+    calling: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    # "U6|H" → station → the works notice behind it, in Wiener Linien's
+    # words: `title` and `text` (HTML as the feed sends it).
+    notices: dict[str, dict[str, dict[str, str]]] = field(default_factory=dict)
+    # When the card should ask again: for fresher calls, or for notices
+    # that were still being fetched.
+    refresh_by: datetime | None = None
+
+
+async def _async_works(
+    hass: HomeAssistant,
+    catalogue: StaticCatalogue,
+    diva: int,
+    answer: RunTimeAnswer,
+) -> _Works:
+    """Per line and direction, the stations passed without a call, by name.
+
+    A station counts when any held sample shows it skipped, the current
+    part of the day's first, or when the sample has a call there that a
+    notice in force contradicts: a sample is one moment held for a week, a
+    platform shut by day may be served at night (U6 Neue Donau), and works
+    start in the middle of a sample's week. Each such station maps to the
+    date its stop is back, or None where no notice says so clearly, and,
+    where its own departures could be fetched, to the runs that call there
+    after all. The S-Bahn's trails come from the same timetable as their
+    times, so they can't part from them and aren't asked about. Calls are
+    only fetched for a station that counts.
+    """
+    if not answer.pairs:
+        return _Works()
+    notices_cache = async_get_stop_notices(hass)
+    notices = await notices_cache.async_get() or []
+    now = dt_util.utcnow()
+    works = _Works()
+    # Notices still being fetched: the answer is valid only for
+    # `STOP_NOTICES_ASK_AGAIN`, so the card asks again.
+    pending = notices_cache.pending_until(now)
+    works.refresh_by = pending
+    skipped: dict[Pair, dict[str, SkippedStation]] = {}
+    for pair, merged in answer.pairs.items():
+        stations: dict[str, SkippedStation] = {}
+        for sample in answer.samples or (answer.pairs,):
+            if (minutes := sample.get(pair)) is not None:
+                for name, station in skipped_stations(
+                    catalogue, diva, *pair, minutes
+                ).items():
+                    stations.setdefault(name, station)
+        for name, station in noticed_stations(
+            catalogue, diva, *pair, merged, notices, now
+        ).items():
+            stations.setdefault(name, station)
+        if stations:
+            skipped[pair] = stations
+    if not skipped:
+        return works
+    calls_cache = async_get_stop_calls(hass)
+    divas = sorted(
+        {station.diva for stations in skipped.values() for station in stations.values()}
+    )
+    held = await asyncio.gather(*(calls_cache.async_get(station) for station in divas))
+    calls_by_diva = dict(zip(divas, held, strict=True))
+    refresh = [pending] if pending is not None else []
+    for (label, way), stations in skipped.items():
+        key = f"{label}|{way}"
+        for name, station in stations.items():
+            until = closed_until(notices, label, station, now)
+            works.no_stop.setdefault(key, {})[name] = (
+                until.isoformat() if until else None
+            )
+            notice = notice_shutting(notices, label, station, now)
+            if notice is not None:
+                works.notices.setdefault(key, {})[name] = {
+                    "title": notice.title,
+                    "text": notice.text,
+                }
+            calls = calls_by_diva[station.diva]
+            if calls is None:
+                refresh.append(now + STOP_CALLS_RETRY_AFTER)
+                continue
+            # Past its time only while a refetch is failing: ask once that
+            # may have changed.
+            refresh.append(
+                calls.expires_at
+                if calls.expires_at > now
+                else now + STOP_CALLS_RETRY_AFTER
+            )
+            line_calls = calls.line_calls
+            works.calling.setdefault(key, {})[name] = {
+                "between": list(station.between),
+                "calls": [
+                    when.isoformat() for when in line_calls.calls.get((label, way), ())
+                ],
+                "from": line_calls.first.isoformat(),
+                "until": line_calls.last.isoformat(),
+            }
+    works.refresh_by = min(refresh)
+    return works
 
 
 def _stop_boards(

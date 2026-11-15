@@ -154,6 +154,12 @@ const REASON_ICONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/rettung|sanit(ä|ae)|notarzt/i, "mdi:ambulance"],
   [/feuerwehr|brand/i, "mdi:fire-truck"],
   [/polizei/i, "mdi:police-badge"],
+  // A wrongly parked car on the tracks: its own cause in the feed
+  // (`reasonName` "Falschparker"), and written into the title that way.
+  [/falschparker|falsch\s+geparkt|verparkt/i, "mdi:tow-truck"],
+  // Two of the feed's own reasons (`reasonName`) for planned changes.
+  [/haltestellenverlegung|verlegung der haltestelle/i, "mdi:bus-stop"],
+  [/netz(ä|ae)nderung/i, "mdi:transit-detour"],
   [/demonstration|kundgebung|veranstaltung|umzug|marathon/i, "mdi:account-group"],
   // "eis" and "glatt" are anchored to a word start: as bare substrings they
   // fire on "Gleisschaden", "Preis", "Kreis" and "Reisende" — a track defect
@@ -181,6 +187,43 @@ export function iconForElevatorReason(reason: string): string {
     if (pattern.test(reason)) return icon;
   }
   return FALLBACK_ICON;
+}
+
+export interface EscalatorNotice {
+  /** Where it runs, without the words the direction already covers:
+   *  "vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße". */
+  where: string;
+  /** The feed's other sentences ("Diese Anlage wird betriebsabhängig auf-
+   *  oder abwärts geschaltet."). */
+  notes: string[];
+}
+
+const ESCALATOR_DIRECTION_RE = /\bin\s+(Auf\/Ab|Auf|Ab)wärtsrichtung\b/i;
+
+/** Lay out an escalator outage's description for a title.
+ *
+ *  All 12 described escalators of 2026-11-14 follow one template, "Fahrtreppe
+ *  fährt in Aufwärtsrichtung vom … zum …", with the direction phrase
+ *  sometimes after the origin ("fährt vom Zwischengeschoß N-3 in
+ *  Aufwärtsrichtung in das …"). The direction comes from the backend as its
+ *  own value (`direction`), for the icon and the label, so here the phrase
+ *  only leaves the sentence, and what remains is the place. A text that
+ *  doesn't follow the template gives its first line as the place and the
+ *  rest as notes. */
+export function parseEscalatorNotice(description: unknown): EscalatorNotice {
+  const lines = (typeof description === "string" ? description : "")
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const at = lines.findIndex((line) => /^Fahrtreppe fährt\b/i.test(line));
+  const main = lines[at === -1 ? 0 : at] ?? "";
+  const notes = lines.filter((_line, i) => i !== (at === -1 ? 0 : at));
+  const where = main
+    .replace(/^Fahrtreppe fährt\s*/i, "")
+    .replace(ESCALATOR_DIRECTION_RE, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return { where: trimTerminalPeriod(where), notes };
 }
 
 /** Split a lift location into its path segments.
@@ -358,10 +401,55 @@ function splitRunOns(line: string): string[] {
   return out;
 }
 
+/** The longest title remainder still read as a cause. The operator's causes
+ *  are a word or two ("Rettungseinsatz", "Fremder Verkehrsunfall"); a longer
+ *  remainder is a sentence that happens to contain one. */
+const TITLE_CAUSE_MAX_LENGTH = 40;
+
+/** The cause a disruption's title names, as a "Grund" fact.
+ *
+ *  The operator titles a disruption "<lines>: <cause>" ("25:
+ *  Rettungseinsatz", "26E: Gleisbauarbeiten"), and a follow-up message often
+ *  keeps the cause there only: its text moves on to the consequences ("Nach
+ *  einer Fahrtbehinderung kommt es zu unterschiedlichen Intervallen"). On
+ *  2026-11-14 all 8 active disruptions named their cause in the title, 3 of
+ *  them in a "Grund:" line as well.
+ *
+ *  Only the "<lines>: <cause>" form, on one line, and only when the cause
+ *  matches {@link REASON_ICONS}. Stop-display notices carry their whole text
+ *  as a multi-line title ("Gleisbauarbeiten\nBetrieb ab Knöllgasse"), and a
+ *  title like "U1: Verspätungen" names an effect, not a cause. */
+function causeFromTitle(title: unknown): TrafficFact | null {
+  if (typeof title !== "string" || /[\r\n]/.test(title.trim())) return null;
+  const cause = TITLE_LINE_PREFIX_RE.exec(title.trim())?.[2]?.trim();
+  if (!cause || cause.length > TITLE_CAUSE_MAX_LENGTH) return null;
+  for (const [pattern, icon] of REASON_ICONS) {
+    if (pattern.test(cause)) return { label: "Grund", value: trimTerminalPeriod(cause), icon };
+  }
+  return null;
+}
+
+/** The feed's own `reason` as a "Grund" fact. Unlike a title, it is a cause
+ *  by definition, so one the icon table doesn't know still shows, with the
+ *  neutral icon. */
+function causeFromReason(reason: unknown): TrafficFact | null {
+  const value = typeof reason === "string" ? reason.trim() : "";
+  return value ? { label: "Grund", value, icon: iconForFact("Grund", value) } : null;
+}
+
 /** Parse one disruption description into headings, prose and labelled facts.
  *  Returns empty collections for empty input — callers can test
- *  `blocks.length || facts.length` for "is there anything to show". */
-export function parseTrafficNotice(raw: unknown): TrafficNotice {
+ *  `blocks.length || facts.length` for "is there anything to show".
+ *
+ *  When the description names no cause, the "Grund" fact comes from the
+ *  feed's own `reason` field ("Rettungseinsatz", since API V1.6), and
+ *  failing that from the `title` (see `causeFromTitle`): the field is the
+ *  operator's statement, the title only our reading of one. Neither
+ *  replaces the description's own line, which says more ("Gleisbauarbeiten
+ *  im Bereich Stefan-Fadinger-Platz"). A notice with no description stays
+ *  empty: the title alone is already on screen, and repeating it would
+ *  only make the row expandable. */
+export function parseTrafficNotice(raw: unknown, title?: unknown, reason?: unknown): TrafficNotice {
   const blocks: TrafficBlock[] = [];
   const facts: TrafficFact[] = [];
   const seenFacts = new Set<string>();
@@ -407,7 +495,71 @@ export function parseTrafficNotice(raw: unknown): TrafficNotice {
     }
   }
 
+  if (!seenFacts.has("Grund") && (blocks.length || facts.length)) {
+    const cause = causeFromReason(reason) ?? causeFromTitle(title);
+    if (cause) facts.push(cause);
+  }
+
   return { blocks, facts };
+}
+
+/** A works notice from `/newsList`, laid out: what it is, the opening
+ *  sentences, and its labelled parts. */
+export interface WorksNotice {
+  /** "Bahnsteigsanierung": the notice's own headline, or "". */
+  heading: string;
+  paras: string[];
+  /** "Zeitraum" → "Montag, 14. September 2026 bis Ende 2026." */
+  facts: Array<{ label: string; value: string }>;
+}
+
+/** "Zeitraum:", "Maßnahmen:", "Ersatz:", "Hinweis:", and on the bus stop
+ *  notices "Haltestelle: Habsburgergasse", "Dauer: …", "Grund: …". A label
+ *  is a word or three starting with a capital; a sentence that happens to
+ *  hold a colon is longer than that. */
+const WORKS_LABEL_RE = /^(\p{Lu}[\p{L} /-]{1,23}):\s*(.*)$/u;
+
+/** A headline is short and doesn't end like a sentence. */
+const WORKS_HEADING_MAX = 48;
+
+/** Lay out a works notice's text.
+ *
+ *  The operator writes these to one template: a headline, a sentence or two,
+ *  then parts under underlined labels, each label on a line of its own with
+ *  its text after a break ("Zeitraum:" / "Montag, 14. September 2026 bis
+ *  Ende 2026."), or label and text on one line ("Dauer: Ab 19. Jänner
+ *  2026"). The markup carrying that is presentation only, so it goes
+ *  through `toLines` like a disruption's text: nothing from upstream is
+ *  ever interpreted as markup. A text off the template comes out as plain
+ *  paragraphs. */
+export function parseWorksNotice(raw: unknown): WorksNotice {
+  const lines = toLines(typeof raw === "string" ? raw : "");
+  const notice: WorksNotice = { heading: "", paras: [], facts: [] };
+  const first = lines[0];
+  if (
+    first !== undefined &&
+    lines.length > 1 &&
+    first.length <= WORKS_HEADING_MAX &&
+    !/[.!?:]$/.test(first)
+  ) {
+    notice.heading = first;
+    lines.shift();
+  }
+  let open: { label: string; value: string } | null = null;
+  for (const line of lines) {
+    const label = WORKS_LABEL_RE.exec(line);
+    if (label?.[1]) {
+      open = { label: label[1], value: label[2] ?? "" };
+      notice.facts.push(open);
+    } else if (open) {
+      open.value = open.value ? `${open.value} ${line}` : line;
+    } else {
+      notice.paras.push(line);
+    }
+  }
+  // A label with nothing under it says nothing.
+  notice.facts = notice.facts.filter((fact) => fact.value);
+  return notice;
 }
 
 /** Line-list prefix on an alert title: "11A, 59A, 48A: Verkehrsüberlastung",

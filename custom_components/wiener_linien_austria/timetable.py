@@ -268,6 +268,57 @@ def parse_run_times(
     }
 
 
+@dataclass(slots=True, frozen=True)
+class LineCalls:
+    """When each line leaves a stop, over the stretch one answer covers."""
+
+    # (line, direction) → planned departures there, in order.
+    calls: dict[tuple[str, str], tuple[datetime, ...]]
+    # The first and last departure the answer lists, any line. Between the
+    # two it lists every one, so a line missing there doesn't call there;
+    # outside them it says nothing.
+    first: datetime
+    last: datetime
+
+
+def parse_line_calls(body: Mapping[str, Any], tz: tzinfo) -> LineCalls | None:
+    """Every line's planned departures out of a departure-monitor answer.
+
+    For a station a trail passes without a call (skipped_stops.py): the
+    rows say which runs of a line do call there, and when. Labels are
+    mapped like `parse_run_times` maps them. None for an answer without a
+    readable row, which says nothing, least of all that no line calls.
+    """
+    raw = body.get("departureList")
+    if isinstance(raw, Mapping):
+        raw = [raw.get("departure")]
+    if not isinstance(raw, list):
+        return None
+    calls: dict[tuple[str, str], list[datetime]] = {}
+    seen: list[datetime] = []
+    for row in raw:
+        if not isinstance(row, Mapping):
+            continue
+        planned = _parse_date_time(row.get("dateTime"), tz)
+        if planned is None:
+            continue
+        seen.append(planned)
+        line = as_mapping(row.get("servingLine"))
+        label = as_text(line.get("number"))
+        direction = as_text(as_mapping(line.get("liErgRiProj")).get("direction"))
+        if label is None or direction is None:
+            continue
+        label = GTFS_LINE_LABEL_ALIASES.get(label, label)
+        calls.setdefault((label, direction), []).append(planned)
+    if not seen:
+        return None
+    return LineCalls(
+        calls={pair: tuple(sorted(times)) for pair, times in calls.items()},
+        first=min(seen),
+        last=max(seen),
+    )
+
+
 def _typical_minutes(minutes: list[int]) -> float:
     """One run time out of several vehicles' whole-minute ones, to a tenth.
 

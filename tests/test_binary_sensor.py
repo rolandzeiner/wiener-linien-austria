@@ -199,12 +199,12 @@ async def test_attributes_expose_the_inputs_behind_the_state(
 
     attrs = sensor.extra_state_attributes
 
-    assert attrs["server_time"] == server_time
-    assert attrs["last_update_success"] is True
-    assert 10 <= attrs["seconds_since_server_time"] <= 15
-    assert attrs["stale_after_seconds"] == int(
-        coordinator.scan_interval.total_seconds() * STALE_INTERVAL_MULTIPLIER
-    )
+    assert attrs == {
+        "last_update_success": True,
+        "stale_after_seconds": int(
+            coordinator.scan_interval.total_seconds() * STALE_INTERVAL_MULTIPLIER
+        ),
+    }
 
 
 async def test_threshold_tracks_the_entry_cadence(hass: HomeAssistant) -> None:
@@ -312,11 +312,10 @@ async def test_the_recheck_does_not_write_state_when_nothing_changed(
 ) -> None:
     """The independent clock must stay quiet while the board is healthy.
 
-    `seconds_since_server_time` moves on every evaluation, so writing
-    unconditionally would push a state change — and a recorder row —
-    every scan interval, forever, on an entity whose entire value is
-    being boring. That is a worse bug than the one the clock fixes,
-    because it is silent and permanent rather than conditional.
+    Writing unconditionally would refresh the entity every scan interval,
+    forever, on an entity whose entire value is being boring. That is a
+    worse bug than the one the clock fixes, because it is silent and
+    permanent rather than conditional.
     """
     entry = _make_entry()
     entry.add_to_hass(hass)
@@ -337,6 +336,40 @@ async def test_the_recheck_does_not_write_state_when_nothing_changed(
         group.stop()
     freezer.tick(coordinator.scan_interval)
     async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    after = hass.states.get(entity_id)
+    assert after.state == STATE_OFF
+    assert after.last_updated == before.last_updated
+
+
+async def test_a_healthy_poll_does_not_write_the_flag_again(
+    hass: HomeAssistant, mock_fetch, freezer: FrozenDateTimeFactory
+) -> None:
+    """A fresh `server_time` on every push must not reach this entity.
+
+    HA writes a state, and the recorder a row, whenever an attribute
+    changes. With a per-poll timestamp among the attributes that was
+    ~1,400 rows a day per stop for a flag that read `off` all day.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = entry.runtime_data
+    entity_id = "binary_sensor.stephansplatz_departure_data_stale"
+
+    coordinator.apply_upstream_meta(_fresh(0), None)
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    before = hass.states.get(entity_id)
+    assert before.state == STATE_OFF
+
+    # The next poll: a newer serverTime, otherwise nothing changed.
+    freezer.tick(timedelta(seconds=30))
+    coordinator.apply_upstream_meta(_fresh(0), None)
+    coordinator.async_set_updated_data(coordinator.data)
     await hass.async_block_till_done()
 
     after = hass.states.get(entity_id)

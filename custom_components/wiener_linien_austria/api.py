@@ -3,7 +3,8 @@
 Three hosts' worth of endpoints, all on www.wienerlinien.at:
 
 - `ogd_realtime` — `/monitor` (departure boards, live times, the config
-  flow's line probe) and `/trafficInfoList` (disruptions, elevators).
+  flow's line probe), `/trafficInfoList` (disruptions, elevators) and
+  `/newsList` (planned works, for the stations a trail passes).
 - `ogd_routing` — the Mentz EFA server: `XML_TRIP_REQUEST2` (A→B trips) and
   `XML_DM_REQUEST` (planned S-Bahn departures).
 - `ogd_realtime/doku` — the weekly static CSVs and GTFS `routes.txt`.
@@ -79,14 +80,21 @@ save no bytes, because the body has to be downloaded either way.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable, Sequence
 from typing import Any, Final
 
 import aiohttp
 
+# One debug line per request, before it is sent, so a day of them can be
+# counted per endpoint (`logger.set_level` on this module). The URL only:
+# the query names the stops asked for.
+_LOGGER = logging.getLogger(__name__)
+
 API_BASE_URL: Final = "https://www.wienerlinien.at/ogd_realtime"
 MONITOR_ENDPOINT: Final = "/monitor"
 TRAFFIC_INFO_ENDPOINT: Final = "/trafficInfoList"
+NEWS_ENDPOINT: Final = "/newsList"
 
 ROUTING_BASE_URL: Final = "https://www.wienerlinien.at/ogd_routing"
 ROUTING_TRIP_ENDPOINT: Final = "/XML_TRIP_REQUEST2"
@@ -177,6 +185,7 @@ async def get_json(
     `any_content_type` skips aiohttp's `application/json` check. The routing
     server labels its JSON `text/html`, so it needs this, not as a defence.
     """
+    _LOGGER.debug("GET %s", url)
     try:
         async with session.get(
             url,
@@ -209,6 +218,7 @@ async def get_text(
     session: aiohttp.ClientSession, url: str, *, user_agent: str, timeout_seconds: float
 ) -> str:
     """GET `url` and return its body as text, or raise a WienerLinienApiError."""
+    _LOGGER.debug("GET %s", url)
     try:
         async with session.get(
             url,
@@ -258,6 +268,22 @@ async def fetch_traffic_info(
         session,
         f"{API_BASE_URL}{TRAFFIC_INFO_ENDPOINT}",
         params=[("name", name) for name in names],
+        user_agent=user_agent,
+        timeout_seconds=timeout_seconds,
+    )
+
+
+async def fetch_news(
+    session: aiohttp.ClientSession,
+    *,
+    user_agent: str,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """`/newsList` for the works and service notices, the `news` group."""
+    return await get_json(
+        session,
+        f"{API_BASE_URL}{NEWS_ENDPOINT}",
+        params=[("name", "news")],
         user_agent=user_agent,
         timeout_seconds=timeout_seconds,
     )

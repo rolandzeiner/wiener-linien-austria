@@ -262,6 +262,10 @@ export interface DepartureAttr {
   // Optional per-departure list of upcoming stops on this trip. Absent
   // (or empty) means "no panel" — the row renders without a chevron.
   stops_ahead?: StopAheadAttr[];
+  /** The direction the route data has this row's platform in, present only
+   *  where the feed's `direction` says otherwise (the Badner Bahn's live
+   *  rows). The trail follows it, and travel times are asked for by it. */
+  route_direction?: "H" | "R";
   /** A planned S-Bahn row from the timetable, not a live `/monitor` row.
    *  Absent on live rows. Its countdown runs off the planned time, so the
    *  cards mark it rather than let it pass for live. */
@@ -291,11 +295,22 @@ export interface TrafficInfoAttr {
   // side). Both render in the same banner; the field is here so a
   // consumer can tell them apart.
   category?: string;
+  /** The operator's own cause ("Rettungseinsatz"), where the feed names one. */
+  reason?: string | null;
+  /** The coarser English category ("accident"), where the feed names one. */
+  cause?: string | null;
 }
 
 export interface ElevatorInfoAttr {
   name: string;
   station: string;
+  /** Which trains it serves: "U6 Siebenhirten", "U1 beide Richtungen". */
+  towards?: string | null;
+  /** The lift's own number at its station ("JS 02"). */
+  elevator_id?: string | null;
+  /** Which way a broken escalator runs; `both` is one switched to suit the
+   *  crowd. Null for a lift and where the feed's text doesn't say. */
+  direction?: "up" | "down" | "both" | null;
   description?: string;
   reason?: string;
   status?: string;
@@ -354,6 +369,8 @@ export interface WienerLinienAttrs {
   line_colors?: LineColorsMap;
   traffic_info?: TrafficInfoAttr[];
   elevator_info?: ElevatorInfoAttr[];
+  /** Escalator outages, in the lift outages' shape. */
+  escalator_info?: ElevatorInfoAttr[];
 }
 
 // ---------------------------------------------------------------------------
@@ -393,6 +410,8 @@ export interface WienerLinienCardConfig extends LovelaceCardConfig {
   show_cooling?: boolean | undefined;
   show_traffic_info?: boolean | undefined;
   show_elevator_info?: boolean | undefined;
+  /** Show escalator outages beside the lift ones. Off by default. */
+  show_escalator_info?: boolean | undefined;
   show_delay?: boolean | undefined;
   /** Colour the countdown red when late / green when early. */
   show_delay_colors?: boolean | undefined;
@@ -523,6 +542,9 @@ export interface WienerLinienRetroCardConfig extends LovelaceCardConfig {
   size?: RetroSize | undefined;
   style?: RetroStyle | undefined;
   flicker?: boolean | undefined;
+  /** Stronger glow on the lit LED text: a bright core and a soft halo
+   *  over the usual glow. Default `false`. */
+  bloom?: boolean | undefined;
   wheelchair_race?: boolean | undefined;
   accessibility_only?: boolean | undefined;
   /** When `true`, every 5 minutes the LED panel clears and
@@ -797,6 +819,15 @@ export interface RouteAttrs {
     reason?: string;
     stop_ids?: string[];
   }>;
+  /** Escalator outages at stations where the trips take an escalator the
+   *  way the broken one runs (`direction`), in the same shape. */
+  escalator_info?: Array<{
+    station?: string;
+    direction?: "up" | "down" | "both" | null;
+    description?: string;
+    reason?: string;
+    stop_ids?: string[];
+  }>;
   /** Planned step-free. */
   step_free?: boolean;
   /** Route entities, late evening: the night's last connection without a
@@ -807,6 +838,16 @@ export interface RouteAttrs {
   stale?: boolean;
   /** Ad-hoc only, with `stale`: seconds until a fresh plan can be had. */
   retry_after?: number | null;
+  /** Ad-hoc only: fresh plans this HA user may still ask for before the
+   *  backend makes them wait. A cached answer costs none, so it's a floor. */
+  requests_left?: number;
+  /** Ad-hoc only: seconds until `requests_left` grows by one; null when it is
+   *  as high as it goes. */
+  requests_next_in?: number | null;
+  /** Ad-hoc only: the most `requests_left` can be. */
+  requests_max?: number;
+  /** Ad-hoc only: how often one request comes back once spent (s). */
+  requests_refill_s?: number;
   /** Ad-hoc only: the chosen time the plan is for; null for "now". */
   planned_for?: string | null;
   /** Ad-hoc only, with `planned_for`: arriving by that time, not leaving. */

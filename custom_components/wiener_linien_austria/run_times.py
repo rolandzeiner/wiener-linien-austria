@@ -84,7 +84,7 @@ REGIME_NIGHT: Final = "night"
 # EFA `motType` codes left out of the request: trains (0), the S-Bahn (1) and
 # everything from regional buses up (6-11). What stays is what `/monitor`
 # lists: U-Bahn (2), Badner Bahn (3 / 4), tram (4) and city bus (5).
-_EXCLUDED_MOTS: Final = ("0", "1", *(str(code) for code in range(6, 12)))
+RUN_TIME_EXCLUDED_MOTS: Final = ("0", "1", *(str(code) for code in range(6, 12)))
 
 # A line and its `/monitor` direction code, e.g. `("U1", "H")`.
 type Pair = tuple[str, str]
@@ -111,6 +111,10 @@ class RunTimeAnswer:
     fetched_at: datetime | None
     # The card asks again after this.
     valid_until: datetime
+    # Every sample held for the stop, the current part of the day's first,
+    # unmerged: a station one of them shows skipped is worth a closer look
+    # even where the other has a run time for it.
+    samples: tuple[Mapping[Pair, Mapping[int, float]], ...] = ()
 
 
 @dataclass(slots=True)
@@ -154,6 +158,37 @@ class RunTimes:
         self._loaded = False
         self._load_lock = asyncio.Lock()
         self._in_flight: dict[int, asyncio.Task[RoutingError | None]] = {}
+
+    async def async_load(self) -> None:
+        """Read the stored samples, once; the departure boards call it at setup
+        so their trails can follow the timetable's route from the start."""
+        await self._async_load()
+
+    @callback
+    def served(self, diva: int) -> dict[Pair, frozenset[int]]:
+        """The stops each line and direction calls at after `diva`, by DIVA.
+
+        From the samples held for the stop, both parts of the day; empty
+        when none are. No request: a departure board uses it on every poll
+        to pick the route its trails show (`static.stops_ahead_for_match`).
+
+        A sample past `RUN_TIME_MAX_AGE` no longer counts. Samples are only
+        renewed when a card opens a trail with stop times on, so one taken
+        during a diversion would otherwise steer the trail along that route
+        for good on a dashboard that never asks again, against a route list
+        that is itself renewed every week.
+        """
+        state = self._stops.get(diva)
+        if state is None:
+            return {}
+        now = dt_util.utcnow()
+        served: dict[Pair, set[int]] = {}
+        for sample in state.samples.values():
+            if now - sample.fetched_at >= RUN_TIME_MAX_AGE:
+                continue
+            for pair, minutes in sample.pairs.items():
+                served.setdefault(pair, set()).update(minutes)
+        return {pair: frozenset(divas) for pair, divas in served.items()}
 
     async def async_get(self, diva: int, pair: Pair | None = None) -> RunTimeAnswer:
         """Run times for the stop, fetching a sample only when one is due.
@@ -249,7 +284,7 @@ class RunTimes:
                     diva,
                     RUN_TIME_DEPARTURES_REQUESTED,
                     with_stops=True,
-                    excluded_mots=_EXCLUDED_MOTS,
+                    excluded_mots=RUN_TIME_EXCLUDED_MOTS,
                 ),
                 USER_AGENT,
                 endpoint=ROUTING_DEPARTURE_ENDPOINT,
@@ -322,6 +357,12 @@ class RunTimes:
             pairs=merged,
             fetched_at=current.fetched_at if current is not None else None,
             valid_until=valid_until,
+            samples=tuple(
+                held.pairs
+                for _, held in sorted(
+                    state.samples.items(), key=lambda item: item[0] != regime
+                )
+            ),
         )
 
     async def _async_load(self) -> None:

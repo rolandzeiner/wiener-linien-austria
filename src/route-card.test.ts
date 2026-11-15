@@ -406,6 +406,47 @@ describe("step-free", () => {
     expect(root(el).querySelectorAll(".access--out")).toHaveLength(1);
   });
 
+  it("flags a broken escalator only when it runs the way the trip goes", async () => {
+    const escalator = (level: string): RouteAccessStepAttr => ({
+      kind: "escalator",
+      level,
+      stop_id: "60201320",
+    });
+    const stepped = stepFreeTrip();
+    stepped.legs[0]!.access = [escalator("up")];
+    const outage = (direction: string, description: string): Record<string, unknown> => ({
+      ...ACTIVE,
+      trips: [stepped],
+      traffic_info: [],
+      elevator_info: [],
+      escalator_info: [
+        { station: "Stephansplatz", direction, description, reason: "", stop_ids: ["60201320"] },
+      ],
+    });
+    const up = await mount(
+      hass(
+        "2026-09-14T05:50:00+00:00",
+        outage("up", "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig in das Zwischengeschoß."),
+      ),
+      { entity: ENTITY },
+    );
+    expect(text(up)).toContain("Rolltreppe nach oben · außer Betrieb");
+    expect(text(up)).toContain(
+      "Rolltreppe außer Betrieb: Stephansplatz Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
+    );
+
+    document.body.innerHTML = "";
+    const down = await mount(
+      hass(
+        "2026-09-14T05:50:00+00:00",
+        outage("down", "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig."),
+      ),
+      { entity: ENTITY },
+    );
+    expect(text(down)).toContain("Rolltreppe nach oben");
+    expect(text(down)).not.toContain("außer Betrieb");
+  });
+
   it("names which lift is out and why, not just the station", async () => {
     // The feed is per lift, the trip names its lifts per station, so the
     // match is station-wide. Printing the location is what tells someone
@@ -826,8 +867,16 @@ describe("rendering", () => {
     expect(root(el).querySelector(".hero-times")?.textContent).toContain("08:00");
   });
 
+  it("warns about a missing sensor the way HA's own cards do", async () => {
+    // A warning, not a status line: the sensor was renamed or removed and
+    // the user has to go and fix the config, so the alert names the id.
+    const el = await mount({ states: {}, language: "de" }, { entity: ENTITY });
+    const alert = root(el).querySelector('ha-alert[alert-type="warning"]');
+    expect(alert?.textContent).toContain(`Sensor ${ENTITY} existiert nicht mehr`);
+    expect(root(el).querySelector('[role="status"]')).toBeNull();
+  });
+
   it.each([
-    [{ entity: ENTITY }, { states: {} }, "existiert nicht mehr"],
     [{ entity: ENTITY }, hass("unavailable", {}), "Routenplaner nicht erreichbar"],
     [
       { entity: ENTITY },
@@ -1149,8 +1198,14 @@ describe("ad-hoc mode", () => {
     await settle(el);
     expect(text(el)).toContain("Gerade zu viele Verbindungsabfragen");
     expect(text(el)).toContain("Neuer Versuch in 30 s");
+    // Counted down by the second, and said once, by the error alone.
+    await settle(el, 1_000);
+    expect(text(el)).toContain("Neuer Versuch in 29 s");
+    await settle(el, 10_000);
+    expect(text(el)).toContain("Neuer Versuch in 19 s");
+    expect(root(el).querySelector(".pager-note")).toBeNull();
     limited = false;
-    await settle(el, 30_000);
+    await settle(el, 19_000);
     expect(planCalls(callWS)).toHaveLength(2);
     expect(text(el)).toContain("Abfahrt in");
   });
@@ -1295,6 +1350,56 @@ describe("ad-hoc mode", () => {
     }
   });
 
+  it("says only that it is paused once the paused plan's connections have left", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass();
+    const el = await mount(h, {});
+    await settle(el);
+    // Paused at 08:22; the last connection of the plan left at 08:03.
+    await settle(el, 32 * 60_000);
+    expect(text(el)).toContain("Aktualisierung pausiert");
+    expect(text(el)).not.toContain("Keine Verbindung gefunden");
+    expect(text(el)).not.toContain("Probier eine andere Haltestelle");
+  });
+
+  it("waits out an error's retry when the card is taken out and put back", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => {
+      throw { code: "upstream" };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    await settle(el, 10_000);
+    expect(text(el)).toContain("Neuer Versuch in 50 s");
+
+    // What a dashboard does on a change of view.
+    el.remove();
+    document.body.appendChild(el);
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(1);
+    expect(text(el)).toContain("Neuer Versuch in 50 s");
+    await settle(el, 1_000);
+    expect(text(el)).toContain("Neuer Versuch in 49 s");
+
+    await settle(el, 49_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+  });
+
+  it("asks at once when put back after an error's retry was due", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async () => {
+      throw { code: "upstream" };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    el.remove();
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(planCalls(callWS)).toHaveLength(1);
+    document.body.appendChild(el);
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(2);
+  });
+
   it("stops every timer once removed", async () => {
     remember(WESTBAHNHOF, PRATERSTERN);
     const { h, callWS } = adhocHass();
@@ -1436,6 +1541,426 @@ describe("ad-hoc mode", () => {
     await typeInto(el, from, "gasse");
     expect(options(el, "from")).toHaveLength(50);
     expect(text(el)).toContain("50 von 80 Treffern");
+  });
+});
+
+describe("earlier and later", () => {
+  // The best connection as a live answer carries it: leaving 07:59 and
+  // arriving 08:13 by the live times, 07:57 and 08:11 by the timetable.
+  const LIVE_PLAN = {
+    ...PLAN,
+    trips: [
+      {
+        ...PLAN.trips[0]!,
+        departure: "2026-09-14T07:59:00+02:00",
+        arrival: "2026-09-14T08:13:00+02:00",
+      },
+      ...PLAN.trips.slice(1),
+    ],
+  };
+  const answer = async (msg: WsMessage & { datetime?: string; arrive_by?: boolean }) =>
+    msg.datetime
+      ? { ...LIVE_PLAN, planned_for: `${msg.datetime}:00+02:00`, arrive_by: !!msg.arrive_by }
+      : LIVE_PLAN;
+  const ORIGIN = Number(WESTBAHNHOF);
+  const DESTINATION = Number(PRATERSTERN);
+
+  const pager = (el: CardElement): HTMLButtonElement[] => [
+    ...root(el).querySelectorAll<HTMLButtonElement>(".pager .page"),
+  ];
+  const inert = (el: CardElement): (string | null)[] =>
+    pager(el).map((b) => b.getAttribute("aria-disabled"));
+  const radios = (el: CardElement): HTMLInputElement[] => [
+    ...root(el).querySelectorAll<HTMLInputElement>('.when input[type="radio"]'),
+  ];
+  const field = (el: CardElement): HTMLInputElement | null =>
+    root(el).querySelector<HTMLInputElement>('input[type="datetime-local"]');
+
+  async function mountPlanned(): Promise<{ el: CardElement; callWS: ReturnType<typeof vi.fn> }> {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(answer);
+    const el = await mount(h, {});
+    await settle(el);
+    return { el, callWS };
+  }
+
+  async function pickMode(el: CardElement, index: number): Promise<void> {
+    radios(el)[index]!.checked = true;
+    radios(el)[index]!.dispatchEvent(new Event("change"));
+    await settle(el, ADHOC_DEBOUNCE_MS);
+    await settle(el);
+  }
+
+  it("names both steps, and leaves nothing earlier to step to from Jetzt", async () => {
+    const { el, callWS } = await mountPlanned();
+    expect(root(el).querySelector(".pager")?.getAttribute("aria-label")).toBe(
+      "Frühere oder spätere Verbindung",
+    );
+    expect(pager(el).map((b) => b.textContent?.trim())).toEqual(["Früher", "Später"]);
+    expect(inert(el)).toEqual(["true", null]);
+    // Plenty left, or an integration too old to say: nothing about it.
+    expect(root(el).querySelector(".pager-note")).toBeNull();
+    pager(el)[0]!.click();
+    await settle(el, 1000);
+    expect(planCalls(callWS)).toHaveLength(1);
+  });
+
+  // Whitespace folded: numbers and units are held together by no-break spaces.
+  const shown = (node: Element | null): string | undefined =>
+    node?.textContent?.replace(/\s+/g, " ").trim();
+  const note = (el: CardElement) => shown(root(el).querySelector("#wl-pager-note"));
+  const why = (el: CardElement) => shown(root(el).querySelector("#wl-pager-why"));
+  const status = (el: CardElement) => shown(root(el).querySelector('.wrap > [role="status"]'));
+  const RULE = { requests_max: 10, requests_refill_s: 60 };
+  const WHY =
+    "Bis zu 10 Abfragen am Stück, dann eine pro Minute. So schont die Karte den Routenplaner der Wiener Linien.";
+
+  type Budget = { requests_left: number; requests_next_in: number | null; stale?: boolean };
+
+  /** `answer`, with the budget each plan request is answered with in turn;
+   *  the last one again for any further request. A plan for a time leaves
+   *  the minute after it, as the planner's do, so each "Später" asks
+   *  something new. */
+  async function mountBudget(
+    budgets: Budget[],
+  ): Promise<{ el: CardElement; callWS: ReturnType<typeof vi.fn> }> {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async (msg) => {
+      const base = await answer(msg);
+      const at = (msg as { datetime?: string }).datetime?.slice(11);
+      return {
+        ...base,
+        ...(at ? { trips: [trip(later(at, 1), later(at, 15))] } : {}),
+        ...RULE,
+        ...(budgets.length > 1 ? budgets.shift() : budgets[0]),
+      };
+    });
+    const el = await mount(h, {});
+    await settle(el);
+    return { el, callWS };
+  }
+
+  it("says how many fresh plans are left once few are, and when the next comes back", async () => {
+    const { el, callWS } = await mountBudget([
+      { requests_left: 4, requests_next_in: 60 },
+      { requests_left: 2, requests_next_in: 40 },
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 20 },
+    ]);
+    expect(note(el)).toBeUndefined();
+    expect(why(el)).toBeUndefined();
+
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Noch 2 Abfragen, +1 in 40 s");
+    expect(why(el)).toBe(WHY);
+    expect(pager(el).map((b) => b.getAttribute("aria-describedby"))).toEqual([
+      "wl-pager-note wl-pager-why",
+      "wl-pager-note wl-pager-why",
+    ]);
+    expect(status(el)).toMatch(/\. Noch 2 Abfragen, \+1 in 40 s\.$/);
+
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Noch 1 Abfrage, +1 in 30 s");
+
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Nächste Abfrage in 20 s");
+    // Später needs a fresh plan; Früher retraces, which doesn't.
+    expect(inert(el)).toEqual([null, "true"]);
+    await settle(el, 1_000);
+    expect(note(el)).toBe("Nächste Abfrage in 19 s");
+
+    // A press says why nothing happens instead of asking.
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(4);
+    expect(status(el)).toBe("Gerade zu viele Verbindungsabfragen. Nächste Abfrage in 19 s.");
+
+    // One a minute comes back, until there's room again.
+    await settle(el, 19_000);
+    expect(note(el)).toBe("Noch 1 Abfrage, +1 in 60 s");
+    expect(inert(el)).toEqual([null, null]);
+    await settle(el, 60_000);
+    expect(note(el)).toBe("Noch 2 Abfragen, +1 in 60 s");
+    await settle(el, 60_000);
+    expect(note(el)).toBeUndefined();
+    expect(why(el)).toBeUndefined();
+  });
+
+  it("keeps the rule behind an ⓘ that a mouse opens on hover", async () => {
+    const opened: HTMLElement[] = [];
+    const proto = HTMLElement.prototype as unknown as Record<string, unknown>;
+    const saved = proto["showPopover"];
+    proto["showPopover"] = function (this: HTMLElement) {
+      opened.push(this);
+    };
+    try {
+      const { el } = await mountBudget([{ requests_left: 2, requests_next_in: 40 }]);
+      pager(el)[1]!.click();
+      await settle(el);
+      const button = root(el).querySelector<HTMLButtonElement>(".tip-button")!;
+      expect(button.getAttribute("aria-label")).toBe("Mehr zum Limit");
+      expect(button.getAttribute("popovertarget")).toBe("wl-pager-why");
+      const bubble = root(el).querySelector<HTMLElement>("#wl-pager-why")!;
+      expect(bubble.getAttribute("popover")).toBe("auto");
+      expect(why(el)).toBe(WHY);
+      // Nothing under the steps any more: the rule is only in the bubble.
+      expect(root(el).querySelector(".pager-why")).toBeNull();
+
+      const tip = root(el).querySelector<HTMLElement>(".tip")!;
+      tip.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "touch" }));
+      expect(opened).toHaveLength(0);
+      tip.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+      expect(opened).toEqual([bubble]);
+
+      // Open by hover, a click must not toggle it shut, also where the
+      // browser sends `click` as a plain MouseEvent with no pointerType.
+      const open = vi.spyOn(bubble, "matches").mockReturnValue(true);
+      const hovering = new MouseEvent("click", { cancelable: true, bubbles: true });
+      button.dispatchEvent(hovering);
+      expect(hovering.defaultPrevented).toBe(true);
+      // Once the mouse has left, a click (a key press, say) toggles as usual.
+      tip.dispatchEvent(new PointerEvent("pointerleave", { pointerType: "mouse" }));
+      const after = new MouseEvent("click", { cancelable: true, bubbles: true });
+      button.dispatchEvent(after);
+      expect(after.defaultPrevented).toBe(false);
+      open.mockRestore();
+    } finally {
+      proto["showPopover"] = saved;
+    }
+  });
+
+  it("steps both ways through the answers it already has while the wait runs", async () => {
+    const { el, callWS } = await mountBudget([
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 45 },
+    ]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(note(el)).toBe("Nächste Abfrage in 45 s");
+    expect(inert(el)).toEqual([null, "true"]);
+
+    // Back to Jetzt, which the backend still has ...
+    pager(el)[0]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(3);
+    expect(planCalls(callWS).at(-1)).not.toHaveProperty("datetime");
+    // ... and forward again to the step it has too.
+    expect(inert(el)).toEqual(["true", null]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(4);
+    expect(planCalls(callWS).at(-1)).toMatchObject({ datetime: "2026-09-14T07:58" });
+    // Past it, a fresh plan: that waits.
+    expect(inert(el)).toEqual([null, "true"]);
+  });
+
+  it("explains the rule beside a short stale note, and under a refusal", async () => {
+    const { el } = await mountBudget([
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 45, stale: true },
+    ]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(why(el)).toBe(WHY);
+    // The rule is in a closed toggletip, so the note still has to say that
+    // the plan on screen is an older one, and from when. Only that: the
+    // countdown beside the steps already says there were too many requests.
+    const stale = root(el).querySelector(".stale-note")?.textContent ?? "";
+    expect(stale).toMatch(/Älterer Stand von \d{2}:\d{2}/);
+    expect(stale).not.toContain("zu viele");
+
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => {
+      throw { code: "rate_limited", translation_placeholders: { retry_after: "30" } };
+    });
+    const refused = await mount(h, {});
+    await settle(refused);
+    // No rule from the backend yet, so nothing to explain it with.
+    expect(why(refused)).toBeUndefined();
+
+    const { h: h2 } = adhocHass(async (msg) => {
+      if (msg.type === "wiener_linien_austria/plan" && (msg as { datetime?: string }).datetime) {
+        throw { code: "rate_limited", translation_placeholders: { retry_after: "30" } };
+      }
+      return { ...(await answer(msg)), ...RULE, requests_left: 1, requests_next_in: 30 };
+    });
+    const stepped = await mount(h2, {});
+    await settle(stepped);
+    pager(stepped)[1]!.click();
+    await settle(stepped);
+    expect(text(stepped)).toContain("Neuer Versuch in 30 s");
+    expect(note(stepped)).toBeUndefined();
+    expect(why(stepped)).toBe(WHY);
+  });
+
+  it("leaves the time out of the stale note for a plan that carries none", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => ({
+      ...PLAN,
+      ...RULE,
+      fetched_at: null,
+      stale: true,
+      retry_after: 45,
+      requests_left: 0,
+      requests_next_in: 45,
+    }));
+    const el = await mount(h, {});
+    await settle(el);
+    expect(root(el).querySelector(".stale-note")?.textContent?.trim()).toBe("Etwas älterer Stand");
+  });
+
+  it("keeps the stale note short once the countdown has run out", async () => {
+    const { el, callWS } = await mountBudget([
+      { requests_left: 1, requests_next_in: 30 },
+      { requests_left: 0, requests_next_in: 20, stale: true },
+    ]);
+    pager(el)[1]!.click();
+    await settle(el);
+    const stale = () => root(el).querySelector(".stale-note")?.textContent?.trim();
+    expect(note(el)).toBe("Nächste Abfrage in 20 s");
+    expect(stale()).toBe("Älterer Stand von 07:49");
+
+    // A request is back, but the plan for a chosen time isn't asked for
+    // again for minutes: it is still the older one, and "gerade zu viele
+    // Verbindungsabfragen" would no longer be true.
+    await settle(el, 21_000);
+    expect(planCalls(callWS)).toHaveLength(2);
+    expect(note(el)).toBe("Noch 1 Abfrage, +1 in 59 s");
+    expect(stale()).toBe("Älterer Stand von 07:49");
+  });
+
+  it("says the whole reason in the stale note without a budget from the backend", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h } = adhocHass(async () => ({ ...PLAN, stale: true, retry_after: 45 }));
+    const el = await mount(h, {});
+    await settle(el);
+    expect(note(el)).toBeUndefined();
+    expect(root(el).querySelector(".stale-note")?.textContent?.trim()).toBe(
+      "Gerade zu viele Verbindungsabfragen, darum ein etwas älterer Stand.",
+    );
+  });
+
+  it("asks Später, at once, for the minute after the timetabled departure", async () => {
+    const { el, callWS } = await mountPlanned();
+    pager(el)[1]!.click();
+    await el.updateComplete;
+    // Out before any timer runs, and by the timetable's 07:57, not the
+    // live 07:59: that would skip a train planned for 07:58.
+    expect(planCalls(callWS).at(-1)).toEqual({
+      type: "wiener_linien_austria/plan",
+      origin: ORIGIN,
+      destination: DESTINATION,
+      datetime: "2026-09-14T07:58",
+      arrive_by: false,
+    });
+    expect(radios(el)[1]!.checked).toBe(true);
+    expect(field(el)?.value).toBe("2026-09-14T07:58");
+    // On its way: both inert, and pressing again asks nothing more.
+    expect(inert(el)).toEqual(["true", "true"]);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(planCalls(callWS)).toHaveLength(2);
+    expect(inert(el)).toEqual([null, null]);
+  });
+
+  it("retraces Später with Früher, back to Jetzt", async () => {
+    const { el, callWS } = await mountPlanned();
+    pager(el)[1]!.click();
+    await settle(el);
+    pager(el)[0]!.click();
+    await settle(el);
+    expect(planCalls(callWS).at(-1)).toEqual({
+      type: "wiener_linien_austria/plan",
+      origin: ORIGIN,
+      destination: DESTINATION,
+    });
+    expect(radios(el)[0]!.checked).toBe(true);
+    expect(inert(el)).toEqual(["true", null]);
+  });
+
+  it("asks Früher past the search for the connection that arrives before this one", async () => {
+    const { el, callWS } = await mountPlanned();
+    await pickMode(el, 1);
+    pager(el)[0]!.click();
+    await el.updateComplete;
+    // The timetable's 08:11, not the live 08:13.
+    expect(planCalls(callWS).at(-1)).toMatchObject({
+      datetime: "2026-09-14T08:10",
+      arrive_by: true,
+    });
+    expect(radios(el)[2]!.checked).toBe(true);
+    expect(field(el)?.value).toBe("2026-09-14T08:10");
+  });
+
+  it("asks Früher before the live arrival when the train runs early", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const early = { ...LIVE_PLAN.trips[0]!, arrival: "2026-09-14T08:09:00+02:00" };
+    const { h, callWS } = adhocHass(async (msg: WsMessage & { datetime?: string }) => ({
+      ...LIVE_PLAN,
+      trips: [early, ...LIVE_PLAN.trips.slice(1)],
+      ...(msg.datetime ? { planned_for: `${msg.datetime}:00+02:00` } : {}),
+    }));
+    const el = await mount(h, {});
+    await settle(el);
+    await pickMode(el, 1);
+    pager(el)[0]!.click();
+    await el.updateComplete;
+    // Asked by the timetable's 08:11, the planner, which goes by the live
+    // 08:09, would answer with this very connection.
+    expect(planCalls(callWS).at(-1)).toMatchObject({
+      datetime: "2026-09-14T08:08",
+      arrive_by: true,
+    });
+  });
+
+  it("retraces Später out of an answer with no connection", async () => {
+    remember(WESTBAHNHOF, PRATERSTERN);
+    const { h, callWS } = adhocHass(async (msg: WsMessage & { datetime?: string }) =>
+      msg.datetime
+        ? { ...LIVE_PLAN, trips: [], planned_for: `${msg.datetime}:00+02:00` }
+        : LIVE_PLAN,
+    );
+    const el = await mount(h, {});
+    await settle(el);
+    pager(el)[1]!.click();
+    await settle(el);
+    expect(text(el)).toContain("Keine Verbindung");
+    expect(inert(el)).toEqual([null, "true"]);
+    pager(el)[0]!.click();
+    await settle(el);
+    expect(planCalls(callWS).at(-1)).toEqual({
+      type: "wiener_linien_austria/plan",
+      origin: ORIGIN,
+      destination: DESTINATION,
+    });
+    expect(radios(el)[0]!.checked).toBe(true);
+  });
+
+  it("starts the way back over once a time is set by hand", async () => {
+    const { el, callWS } = await mountPlanned();
+    pager(el)[1]!.click();
+    await settle(el);
+    field(el)!.value = "2026-09-14T09:00";
+    field(el)!.dispatchEvent(new Event("change"));
+    await settle(el, ADHOC_DEBOUNCE_MS);
+    await settle(el);
+    pager(el)[0]!.click();
+    await el.updateComplete;
+    expect(planCalls(callWS).at(-1)).toMatchObject({ arrive_by: true });
+  });
+
+  it("stays out of the way until there is a search, and on a route", async () => {
+    const { h } = adhocHass(answer);
+    const adhoc = await mount(h, {});
+    await settle(adhoc);
+    expect(root(adhoc).querySelector(".pager")).toBeNull();
+
+    const route = await mount(hass("07:57", ACTIVE), { entity: ENTITY });
+    expect(root(route).querySelector(".hero")).not.toBeNull();
+    expect(root(route).querySelector(".pager")).toBeNull();
   });
 });
 

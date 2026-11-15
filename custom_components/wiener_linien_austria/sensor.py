@@ -15,7 +15,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .alerts import get_alerts_for, line_names_from_keys
+from .alerts import get_alerts_for, get_escalators_for, line_names_from_keys
 from .const import (
     ALERTS_SEQ_KEY,
     ATTRIBUTION,
@@ -87,6 +87,7 @@ class WienerLinienStopSensor(
             "line_colors",
             "traffic_info",
             "elevator_info",
+            "escalator_info",
             "next_by_line",
             # Static structural metadata — useful to the card live, but
             # never useful in history. On hub stops these are 30+ items
@@ -94,6 +95,10 @@ class WienerLinienStopSensor(
             "lines_at_stop",
             "tracked_lines",
             "tracked_line_keys",
+            # Changes on every poll. Recorded, it made each state row carry
+            # a unique attributes row (~1,400 a day per stop, 2026-11-11);
+            # excluded, the rows share one. The card reads it live.
+            "server_time",
         }
     )
 
@@ -165,6 +170,7 @@ class WienerLinienStopSensor(
         rbls = {int(r) for r in config.get(CONF_RBLS) or []}
 
         traffic, elevator = get_alerts_for(hass, line_names, rbls)
+        escalator = get_escalators_for(hass, line_names, rbls)
 
         # Cap the list at MAX_DEPARTURES_IN_ATTRS so busy multi-line stops
         # (e.g. Stephansplatz tracking U1/U3/U4 ≈ ~40 entries) don't pay to
@@ -277,6 +283,7 @@ class WienerLinienStopSensor(
             "line_colors": line_colors,
             "traffic_info": [t.to_dict() for t in traffic],
             "elevator_info": [e.to_dict() for e in elevator],
+            "escalator_info": [e.to_dict() for e in escalator],
         }
         self.coordinator.store_attrs(attrs, current_alerts_seq)
         return attrs
@@ -368,7 +375,18 @@ class WienerLinienRouteSensor(
     _attr_attribution = ATTRIBUTION
     _attr_device_class = SensorDeviceClass.TIMESTAMP
     _unrecorded_attributes = frozenset(
-        {"trips", "line_colors", "traffic_info", "elevator_info", "last_connection"}
+        {
+            "trips",
+            "line_colors",
+            "traffic_info",
+            "elevator_info",
+            "escalator_info",
+            "last_connection",
+            # Changes on every refresh even when the connection does not, so
+            # recorded it gave each row its own attributes row (~10k in 30
+            # days on the live box, 2026-11-11). Nothing reads it from history.
+            "fetched_at",
+        }
     )
 
     def __init__(

@@ -818,7 +818,12 @@ export const cardStyles = css`
     flex-wrap: wrap;
     gap: 6px 8px;
   }
+  /* A flex item stops shrinking at its longest word, and at the narrowest
+     cell "Hauptstraße" in bold is wider than the row: let it shrink, and
+     break inside a word only when the word alone doesn't fit. */
   .alert-title {
+    min-width: 0;
+    overflow-wrap: anywhere;
     font-weight: 600;
     color: var(--primary-text-color);
   }
@@ -835,12 +840,36 @@ export const cardStyles = css`
     color: var(--secondary-text-color);
     font-weight: 400;
   }
+  /* An escalator's place follows its bold kind label in running text. */
+  .outage-where {
+    font-weight: 400;
+  }
+  /* "Geplant ab …" under the title of an outage that hasn't begun. The row
+     comes after what is out now and steps back: nothing is out yet. */
+  .alert-meta.outage-planned {
+    display: flex;
+    gap: 4px;
+    margin-top: 2px;
+  }
+  .outage-planned ha-icon {
+    --mdc-icon-size: 14px;
+  }
+  .alert.planned > ha-icon:first-child {
+    color: var(--secondary-text-color);
+  }
   /* Reason line with its category pictogram. flex-start keeps the icon on
      the first line when the reason wraps to several. */
   .lift-reason {
     display: flex;
     align-items: flex-start;
     gap: 6px;
+  }
+  /* The feed shouts some reasons as one long word
+     ("FAHRTREPPENERNEUERUNG"), wider than a narrow card: let the span
+     shrink and break inside the word. */
+  .lift-reason span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .lift-reason ha-icon {
     --mdc-icon-size: 16px;
@@ -1358,6 +1387,139 @@ export const cardStyles = css`
     /* Hollow ring at the terminus, anchoring "this is where you end up". */
     background: var(--card-background-color, var(--ha-card-background, #fff));
     box-shadow: inset 0 0 0 var(--stops-ahead-line-width) var(--stops-ahead-line);
+  }
+  /* A station the train goes through without a call. Its dot becomes a
+     short work-zone capsule on the line, striped like barrier tape in the
+     line's own colour: the line runs on through it, and the stop is
+     closed. The inner stripes take the card colour, as the terminus ring
+     does. 3px stripes stay distinct at 1x on a wall tablet. The name steps
+     back to the times' grey; the note keeps the body colour, since it is
+     what someone acts on and the grey on a light theme's tinted hero
+     measures 4.1:1. */
+  .stops-ahead-stop.skipped .stops-ahead-dot {
+    left: calc(var(--stops-ahead-dot-size) / 2 - 4px);
+    width: 8px;
+    height: 20px;
+    border-radius: 4px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--stops-ahead-line) 0 3px,
+      var(--card-background-color, var(--ha-card-background, #fff)) 3px 6px
+    );
+    box-shadow: inset 0 0 0 1.5px var(--stops-ahead-line);
+  }
+  .stops-ahead-stop.skipped .stops-ahead-name {
+    color: var(--secondary-text-color);
+  }
+  .stops-ahead-skip {
+    flex: 0 0 auto;
+    color: var(--primary-text-color);
+    font-size: 0.85em;
+    white-space: nowrap;
+  }
+  /* The note as a button, where Wiener Linien's notice says why: the text
+     itself is the control, with an ⓘ after it. No pill and no fill: among
+     the transfer chips it must still read as a remark about the stop, not
+     as another line to change to. 24px tall for a finger (the row itself
+     is only as tall as the dot). */
+  .stops-ahead-skip--more {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    min-height: 24px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: 0.85em;
+    text-align: start;
+    cursor: pointer;
+  }
+  .stops-ahead-skip--more ha-icon {
+    --mdc-icon-size: 15px;
+    flex-shrink: 0;
+    color: var(--secondary-text-color);
+  }
+  .stops-ahead-stop.notice-expanded .stops-ahead-skip--more ha-icon {
+    color: var(--primary-text-color);
+  }
+  /* With its notice open, the work-zone capsule runs the whole height of
+     the stop: the striped stretch of line is as long as the text about it,
+     and the notice needs no box or rule of its own to belong to it. The
+     text starts in the times' column, like everything else at a stop, in
+     the card's notice type, the labels in the small caps the disruption
+     facts use. */
+  .stops-ahead-stop.skipped.notice-expanded .stops-ahead-dot {
+    top: 1px;
+    bottom: 1px;
+    height: auto;
+    transform: none;
+  }
+  .stops-ahead-notice {
+    margin: 0 0 var(--ha-space-2, 8px);
+    color: var(--secondary-text-color);
+    font-size: 0.85em;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+  }
+  .stops-ahead-notice p {
+    margin: 0 0 6px;
+  }
+  .stops-ahead-notice-heading {
+    color: var(--primary-text-color);
+    font-weight: 600;
+  }
+  .stops-ahead-notice-facts {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+  }
+  /* One column: the labels differ too much in length ("Ersatz",
+     "Maßnahmen") for a shared label column in a panel this narrow. */
+  .stops-ahead-notice-facts .alert-fact {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  /* On a narrow card the note would squeeze the name down to "Neu…",
+     which no longer says which station is skipped. There it takes a line
+     of its own under the name, after any chips; the stop grows, and its
+     segments and capsule follow, as they do for open transfers. Past an
+     empty time slot (show_stop_times) it indents by that slot, 5ch of
+     the row's type in the note's smaller ch. */
+  @container wlcard (inline-size < 360px) {
+    .stops-ahead-stop.skipped .stops-ahead-row {
+      flex-wrap: wrap;
+      row-gap: 0;
+    }
+    .stops-ahead-stop.skipped .stops-ahead-skip {
+      flex-basis: 100%;
+      order: 1;
+    }
+    .stops-ahead-stop.skipped .stops-ahead-time + .stops-ahead-name + .stops-ahead-skip {
+      padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
+    }
+  }
+  /* With a time in front, a narrow row has no room left for the chips: at
+     240 px the U-Bahn chips took the name's whole width ("16:20 [U3] [S45]"
+     with no station) and pushed the +N toggle 15 px out of the row. There
+     the name keeps at least half the row, and chips that don't fit beside
+     it wrap under it, at the row's end. A row with nothing after the name
+     looks as before. */
+  @container wlcard (inline-size < 360px) {
+    .stops-ahead-stop.timed .stops-ahead-row {
+      flex-wrap: wrap;
+      row-gap: 2px;
+    }
+    .stops-ahead-stop.timed .stops-ahead-name {
+      flex: 1 0 50%;
+    }
+    .stops-ahead-stop.timed .stops-ahead-metros {
+      margin-inline-start: auto;
+    }
+    .stops-ahead-stop.timed .stops-ahead-metros + .stops-ahead-other-toggle {
+      margin-left: 0;
+    }
   }
   /* Transfer-line chips: small pill badges. U-Bahn chips sit inline
      immediately after the station name (always visible, brand-coloured).
@@ -2079,6 +2241,20 @@ export const cardStyles = css`
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
     border-radius: 6px;
+  }
+  /* In a fixed-height cell the content scrolls, and a control that stops
+     within the ring's 4px of the visible edge counts as fully in view, so
+     focus wouldn't scroll and the edge would cut its ring. The margin makes
+     focus bring the ring into view as well. */
+  .tab,
+  .alert,
+  .dep-row.expandable,
+  .hero-entry.expandable,
+  .stops-ahead-other-toggle,
+  .icon-action,
+  a,
+  button {
+    scroll-margin-block: 4px;
   }
   /* …except the round icon buttons, which would otherwise take a
      rounded-rect ring around a circular surface. */

@@ -47,12 +47,13 @@ NEARBY_STOP_LIMIT: Final = 10
 NEARBY_STOP_MAX_METERS: Final = 2000
 
 # Polling policy.
-# The conventional minimum interval circulated for the Wiener Linien OGD
-# real-time endpoint is 15 s — the WL `open-data` page documents the
-# CC-BY licence and "no API key required" but does not currently publish
-# a numeric request-rate cap, so 15 s is convention rather than written
-# rule. We enforce 30 s as a hard floor (twice the conventional minimum)
-# so two concurrent entries still leave headroom. Default is 60 s.
+# Wiener Linien's fair-use rule for the OGD real-time data, as the dataset
+# "Wiener Linien Echtzeitdaten via Datendrehscheibe Wien" states it on
+# data.gv.at (read 2026-11-14): "Das Intervall der Abfragen sollte 15
+# Sekunden nicht unterschreiten", only the stops needed for personal
+# information are to be asked for, and an IP address that breaks the rule
+# may be blocked. We enforce 30 s as a hard floor (twice that minimum) so
+# two concurrent entries still leave headroom. Default is 60 s.
 MIN_POLL_SECONDS: Final = 30
 DEFAULT_SCAN_INTERVAL: Final = 60  # seconds
 MAX_POLL_SECONDS: Final = 600
@@ -106,18 +107,22 @@ ALERTS_REFRESH_SECONDS: Final = 300
 # hass.data keys for the shared alert caches + scheduler unsub.
 TRAFFIC_INFO_KEY: Final = "traffic_info"
 ELEVATOR_INFO_KEY: Final = "elevator_info"
+ESCALATOR_INFO_KEY: Final = "escalator_info"
 ALERTS_REFRESH_UNSUB_KEY: Final = "alerts_refresh_unsub"
-# Monotonic counter bumped on every successful alerts refresh. Sensors
+# Monotonic counter bumped on every alerts refresh, failed ones included. Sensors
 # memoise their `extra_state_attributes` dict (which embeds the matched
 # alerts) and use this counter as the cache-validity tag — when alerts
 # refresh on their own ~5-min cadence (independent of the per-stop
 # coordinator tick), the sensor sees the bump and rebuilds.
 ALERTS_SEQ_KEY: Final = "alerts_seq"
-# `/trafficInfoList` feed names. Both travel as repeated `name=` params in
+# `/trafficInfoList` feed names. All travel as repeated `name=` params in
 # ONE request; the response tags each entry with a `refTrafficInfoCategoryId`
 # resolved through `data.trafficInfoCategories`. See alerts.py.
 ALERT_FEED_TRAFFIC: Final = "stoerunglang"
 ALERT_FEED_ELEVATOR: Final = "aufzugsinfo"
+# Escalator outages, in the same shape as the lift ones. They ride in the
+# same request, so they cost no request of their own.
+ALERT_FEED_ESCALATOR: Final = "fahrtreppeninfo"
 # The text the physical stop display shows — works detours, moved boarding
 # points, permanently closed stops. Scoped to individual platforms rather
 # than whole lines, so it is matched on RBL. Surfaced in the same card
@@ -201,6 +206,58 @@ LEGACY_LINE_LABELS: Final[dict[str, str]] = dict(REALTIME_LINE_LABELS.values())
 # carries no LineID.
 GTFS_LINE_LABEL_ALIASES: Final[dict[str, str]] = {
     "BB": "WLB",
+}
+
+# What an operator other than Wiener Linien calls its own stops, by LineID
+# (linien.csv, `/monitor`'s `lineId`) and DIVA. That line's trails and travel
+# times use these names, as its trains, platforms and timetables do; any
+# other line's trail through the same stop keeps the open data's name.
+# 399, the Badner Bahn: Wiener Lokalbahnen's stop posters, valid from
+# 14.12.2025 (https://www.wlb.at/fahrplan), in route order from Wien Oper,
+# with Karlsplatz served towards Wien only. The open data names four of
+# these stations "Lokalbahn" and two "Bahnhof". Checked against the posters
+# 2026-11-10; check again when the timetable changes in December.
+OPERATOR_STOP_NAMES: Final[dict[int, dict[int, str]]] = {
+    399: {
+        60200975: "Wien Oper",
+        60201094: "Resselgasse",
+        60200996: "Paulanergasse",
+        60200859: "Mayerhofgasse",
+        60200604: "Johann-Strauß-Gasse",
+        60200755: "Laurenzgasse",
+        60200689: "Kliebergasse",
+        60200849: "Matzleinsdorfer Platz",
+        60200267: "Eichenstraße",
+        60200844: "Marx-Meidlinger-Straße",
+        60200368: "Flurschützstr./Längenfeldg.",
+        60200103: "Aßmayergasse",
+        60200865: "Dörfelstraße",
+        60201015: "Bahnhof Meidling",
+        60201160: "Schedifkaplatz",
+        60201214: "Schöpfwerk",
+        60200444: "Gutheil-Schoder-Gasse",
+        60200585: "Inzersdorf Lokalbahn",
+        60200918: "Neu Erlaa",
+        60200759: "Schönbrunner Allee",
+        60205133: "Vösendorf Siebenhirten",
+        60205132: "Vösendorf Shopping City Süd",
+        60204164: "Maria Enzersdorf Südstadt",
+        60205201: "Wiener Neudorf",
+        60205200: "Griesfeld",
+        60204331: "Neu Guntramsdorf",
+        60203615: "Guntramsdorf Lokalbahn",
+        60204302: "Eigenheimsiedlung",
+        60204304: "Möllersdorf Lokalbahn",
+        60205001: "Traiskirchen Lokalbahn",
+        60205022: "Tribuswinkel Josefsthal",
+        60204536: "Pfaffstätten Rennplatz",
+        60205809: "Baden Melkergründe",
+        60206055: "Baden Landesklinikum",
+        60203142: "Leesdorf",
+        60203134: "Baden Viadukt",
+        60203121: "Baden Josefsplatz",
+        60200657: "Karlsplatz",
+    },
 }
 
 # --- A→B routing (experimental) -------------------------------------
@@ -304,6 +361,14 @@ MIN_ROUTE_ROLLOVER_SECONDS: Final = 60
 # second refresh 60 s later: 10 of 26 such refreshes in that measurement.
 # Two seconds puts every one of them past the 30 s.
 ROUTE_ROLLOVER_SPREAD_SECONDS: Final = (2.0, 30.0)
+# A connection counts as the one still ahead until this long after it
+# leaves: the sensors' "next connection", the rollover above and the route
+# card's `upcomingTrips` all turn to the following one at the same moment.
+ROUTE_DEPARTED_GRACE_SECONDS: Final = 30
+# The planner's lists keep a connection this long after it leaves, longer
+# than the grace above, so a refresh just after a departure still holds the
+# connection the entities are about to let go of.
+ROUTE_KEEP_DEPARTED_SECONDS: Final = 60
 
 # Planned S-Bahn departures on a departure board (timetable.py), from the
 # same routing server's departure monitor.
@@ -428,6 +493,78 @@ RUN_TIME_SWITCH_SPREAD: Final = timedelta(minutes=15)
 # the stop: a sample minutes old would only return the same rows.
 RUN_TIME_TOP_UP_AFTER: Final = timedelta(hours=1)
 
+# --- `/newsList`, measured 2026-11-09 ---------------------------------
+#   https://www.wienerlinien.at/ogd_realtime/newsList?name=news
+#   Compression: honoured (gzip). 166,640 B identity -> 24,547 B on the
+#   wire (6.8x). `name=news` keeps the works and service notices (category
+#   `aktuelles`, 61 that day) and leaves out the 37 elevator-service ones;
+#   the unfiltered list is 193,823 B -> 27,922 B.
+#   Conditional GET: impossible -- no ETag, no Last-Modified, and the body
+#   isn't byte-stable between two requests (`serverTime`).
+#   A notice names its lines (`relatedLines`) and platforms
+#   (`relatedStops`, RBLs) and runs `time.start` to `time.end`. A category
+#   with nothing in it answers `{"data": {"pois": []}, "message":
+#   {"messageCode": 1}}`.
+#   Open-ended notices (moved bus stops, a missing lift) end at 11:11 on
+#   some date years out ("U2: Rathaus - Kein Aufzug", 2031-12-07 11:11);
+#   a dated one ends at its real time (U6 Neue Donau, 2026-12-31 23:59).
+#   Re-probe with api-polling's probe_endpoint.py before changing any of it.
+# ----------------------------------------------------------------
+# Fetched when a card asks for a trail's run times (U-Bahn, tram or bus),
+# and kept this long: the notices are planned works, posted weeks ahead and
+# edited rarely. Four requests a day at most, and none on a day nobody
+# opens a trail. They catch works that began after a run-time sample was
+# taken, which still has the trains calling there.
+STOP_NOTICES_MAX_AGE: Final = timedelta(hours=6)
+# After a failed fetch, the next one waits this long. The trail still says
+# "no stop" meanwhile, only without the date.
+STOP_NOTICES_RETRY_AFTER: Final = timedelta(minutes=30)
+STOP_NOTICES_TIMEOUT_SECONDS: Final = 10
+# `/newsList` is on the real-time backend, so its request takes the 15 s
+# domain cooldown slot like every other one there. A taken slot is up to
+# 15 s away, longer with a departure poll queued for it too, and the trail
+# somebody has just opened doesn't wait that out. A trail's answer gives
+# the notices this long to arrive…
+STOP_NOTICES_WAIT_SECONDS: Final = 2.0
+# …and otherwise goes out with the notices held so far, valid only this
+# long, so the card asks again. By then the fetch is usually through; when
+# it isn't, that answer is short-lived the same way.
+# Until then a stop shut by works that began after the run times were
+# sampled still shows its time.
+STOP_NOTICES_ASK_AGAIN: Final = timedelta(seconds=20)
+
+# Which runs call at a skipped station after all (skipped_stops.py). A works
+# zone can close a platform at some hours only: U6 Neue Donau towards
+# Floridsdorf is shut by day but served on some weeknights from 22:00, when
+# single-track working moves both directions to the other platform; the
+# timetable says which nights, week by week. A run-time sample (one moment,
+# held a week) can't tell one departure from the next, so the station's own
+# departures decide.
+# --- Upstream capabilities, measured 2026-11-10 -------------------
+#   XML_DM_REQUEST at the station, the run times' modes, no stop
+#   sequences, 200 rows:
+#     Neue Donau  09:00  6,774 B wire / 176,167 B identity, to 18:51
+#                 17:00  7,701 B, to 07:52 the next day
+#     Praterstern 09:00 11,297 B, to 11:00
+#                 17:00 10,800 B, to 18:38
+#   Compression: honoured (gzip). Conditional GET: impossible, no ETag or
+#   Last-Modified, `cache-control: no-cache`. ~0.3 s.
+#   `dateTime` is the planned departure, to the minute.
+# ----------------------------------------------------------------
+STOP_CALLS_DEPARTURES_REQUESTED: Final = 200
+# An answer is asked again once it reaches less than this far ahead: a
+# board shows departures up to about an hour out, plus the run to the
+# station…
+STOP_CALLS_AHEAD: Final = timedelta(minutes=90)
+# …but never sooner than this after the last fetch, where 200 rows cover
+# little more than that (Praterstern at 17:00), and never later than this,
+# so a timetable change shows the same day.
+STOP_CALLS_MIN_AGE: Final = timedelta(minutes=30)
+STOP_CALLS_MAX_AGE: Final = timedelta(hours=6)
+# After a failed fetch, the next one waits this long; the trail falls back
+# to the run-time sample meanwhile.
+STOP_CALLS_RETRY_AFTER: Final = timedelta(minutes=30)
+
 # The timetable server speaks Vienna wall-clock time with no offset, no
 # matter which zone Home Assistant itself is configured in.
 ROUTING_TIME_ZONE: Final = "Europe/Vienna"
@@ -501,10 +638,9 @@ S_BAHN_TEXT_COLOR: Final = "FFFFFF"
 # Response attribution (CC-BY mandated)
 ATTRIBUTION: Final = "Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0"
 
-# Error code 316 = rate limit exceeded — observed empirically from the
-# OGD real-time endpoint when the conventional 15-second minimum
-# interval is breached (the public dataset page does not currently
-# publish the exact threshold, but 316 is what the API returns).
+# Error code 316 = "Abfragelimit erreicht" in the real-time documentation
+# (V1.6, 19.10.2026). The dataset page asks for 15 s between requests; the
+# threshold at which the API answers 316 is not published.
 ERR_RATE_LIMIT: Final = 316
 
 # Translation key for the 316 raise. Named here rather than inlined at the

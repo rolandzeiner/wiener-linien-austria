@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.util import dt as dt_util
 
 from . import static
-from .alerts import get_alerts_for
+from .alerts import get_alerts_for, get_escalators_for, outage_station_matches
 from .const import (
     CONF_ACTIVE_DAYS,
     CONF_ACTIVE_FROM,
@@ -35,6 +35,8 @@ from .const import (
     MAX_ROUTE_POLL_SECONDS,
     MIN_ROUTE_POLL_SECONDS,
     MIN_ROUTE_ROLLOVER_SECONDS,
+    ROUTE_DEPARTED_GRACE_SECONDS,
+    ROUTE_KEEP_DEPARTED_SECONDS,
     ROUTE_ROLLOVER_SPREAD_SECONDS,
     USER_AGENT,
 )
@@ -46,7 +48,7 @@ from .live import (
     async_live_trips,
     rbls_for_trips,
 )
-from .parsing import as_int
+from .parsing import as_int, parse_aware_datetime
 from .rate_limit import async_enforce_routing_cooldown, backoff_delay
 from .routing import (
     RouteOptions,
@@ -58,7 +60,7 @@ from .routing import (
     last_connection,
     parse_time_option,
     parse_trip_body,
-    rank_trips,
+    usable_trips,
     within_window,
 )
 from .static import current_catalogue, line_colors_for
@@ -78,11 +80,36 @@ LAST_CONNECTION_UNTIL = time(3, 0)
 # and the first morning trains don't arrive yet.
 LAST_CONNECTION_ARRIVE_BY = time(4, 0)
 LAST_CONNECTION_MAX_WAIT = timedelta(minutes=60)
+# A trip arriving in the last hour before `LAST_CONNECTION_ARRIVE_BY` means
+# the service runs through the night (the U-Bahn before Saturdays, Sundays and public holidays), so
+# there is no last connection to show. On a weeknight nothing without a bus
+# arrives between about 01:00 and 04:30.
+LAST_CONNECTION_THROUGH_MARGIN = timedelta(minutes=60)
 # City, regional and express buses (EFA motType 5, 6, 7). Night buses are
 # city buses to the trip planner, so leaving them out means all buses.
 LAST_CONNECTION_EXCLUDED_MEANS = ("5", "6", "7")
 
+# Home Assistant runs a coordinator on a whole second of its loop clock, up
+# to a second before the interval is over. A refresh this close to the time
+# it was pulled up to is that refresh; any earlier one was asked for.
+ROLLOVER_EARLY_SECONDS = 1.5
+
 type WienerLinienRouteConfigEntry = ConfigEntry[WienerLinienRouteCoordinator]
+
+
+def _ahead(trips: Sequence[Trip], now: datetime) -> list[Trip]:
+    """The connections still ahead of `now`, in the order given.
+
+    Ahead reaches `ROUTE_DEPARTED_GRACE_SECONDS` past the departure, the
+    time rule `RouteData.next_trip` and the route card apply to the same
+    list. Unlike `next_trip`, a cancelled connection counts.
+    """
+    return [
+        trip
+        for trip in trips
+        if trip.departure is not None
+        and (trip.departure - now).total_seconds() + ROUTE_DEPARTED_GRACE_SECONDS > 0
+    ]
 
 
 @dataclass(slots=True)
@@ -108,7 +135,7 @@ class RouteData:
         a departure gets it back from the planner, so the first entry is
         often one that has gone.
         """
-        cutoff = now - timedelta(seconds=30)
+        cutoff = now - timedelta(seconds=ROUTE_DEPARTED_GRACE_SECONDS)
         return next(
             (
                 trip
@@ -168,6 +195,12 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         # not: one request a night, never a retry loop.
         self._last_connection_day: date | None = None
         self._last_connection: Trip | None = None
+        # Set while the next refresh is one pulled up to a departure: when
+        # it is due, how many connections were ahead when it was timed, and
+        # when the configured interval asks regardless (`_await_departure`).
+        self._rollover_at: datetime | None = None
+        self._ahead_when_timed = 0
+        self._regular_due: datetime | None = None
         super().__init__(
             hass,
             _LOGGER,
@@ -224,12 +257,15 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         if data is None or not data.active or not self._timetable:
             return
         board = async_get_live_board(self.hass)
-        rbls = rbls_for_trips(
-            current_catalogue(self.hass), self._timetable, dt_util.utcnow()
-        )
+        catalogue = current_catalogue(self.hass)
+        rbls = rbls_for_trips(catalogue, self._timetable, dt_util.utcnow())
         data.trips = apply_live(
-            self._timetable, board.rows_for(rbls), self.options.min_transfer_minutes
-        )
+            self._timetable,
+            board.rows_for(rbls),
+            self.options.min_transfer_minutes,
+            catalogue=catalogue,
+            step_free=self.options.step_free,
+        )[:MAX_TRIPS_PUBLISHED]
         self.async_update_listeners()
 
     @property
@@ -249,14 +285,23 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         )
 
     async def _async_update_data(self) -> RouteData:
-        """Fetch and rank connections, or idle outside the window."""
+        """Fetch and rank connections, or idle outside the window.
+
+        A refresh pulled up to a departure that turns out to be running
+        late returns the held data, `fetched_at` included, without a
+        request (`_await_departure`).
+        """
         now = dt_util.utcnow().astimezone(self._tz)
         if not self.is_active(now):
             self._failures = 0
+            self._rollover_at = None
             self.update_interval = self.scan_interval
             self._timetable = []
             async_get_live_board(self.hass).release(self._live_owner)
             return RouteData(trips=[], active=False, fetched_at=None)
+
+        if self._await_departure():
+            return self.data
 
         await async_enforce_routing_cooldown(self.hass)
         try:
@@ -276,14 +321,19 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 translation_placeholders=err.placeholders,
             ) from err
 
-        self._timetable = trips[:MAX_TRIPS_PUBLISHED]
-        published = await async_live_trips(
-            self.hass,
-            self._live_owner,
-            self._timetable,
-            self.options.min_transfer_minutes,
-            cooldown=True,
-        )
+        # Every connection the planner offered, not just the four published:
+        # on live times one of the others can be the one that still works.
+        self._timetable = trips
+        published = (
+            await async_live_trips(
+                self.hass,
+                self._live_owner,
+                self._timetable,
+                self.options.min_transfer_minutes,
+                cooldown=True,
+                step_free=self.options.step_free,
+            )
+        )[:MAX_TRIPS_PUBLISHED]
         self._note_success(published)
         return RouteData(
             trips=published,
@@ -333,12 +383,17 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
                 _LOGGER.debug("No last connection tonight: %s", err.translation_key)
             else:
                 self._last_connection = last_connection(
-                    trips, now, arrive_by, LAST_CONNECTION_MAX_WAIT
+                    trips,
+                    now,
+                    arrive_by,
+                    LAST_CONNECTION_MAX_WAIT,
+                    LAST_CONNECTION_THROUGH_MARGIN,
                 )
         trip = self._last_connection
         if trip is None or trip.departure is None:
             return None
-        return trip if trip.departure >= now - timedelta(minutes=1) else None
+        kept_from = now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
+        return trip if trip.departure >= kept_from else None
 
     async def async_plan(
         self, when: datetime, *, arrive_by: bool = False
@@ -368,35 +423,67 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         connection don't all ask in the same second.
 
         Only a connection still ahead counts, the same rule the route card
-        uses. `rank_trips` keeps one for a minute after it leaves, and the
+        uses. `usable_trips` keeps one for a minute after it leaves, and the
         refresh just after a departure gets it back from the planner, so
         timing from it scheduled a second refresh 60 s later on every
         rollover: 24 requests an hour instead of 12 on a line every 5 minutes.
         Ahead here reaches 30 s past the departure, and the random wait is
         what keeps the rollover refresh clear of those 30 s; see the constant
         for why exactly 30 s wasn't enough.
+
+        Timed from the departure as it stood at this fetch;
+        `_await_departure` moves it when live times put it later.
         """
         self._failures = 0
         interval = self.scan_interval
         now = dt_util.utcnow()
-        departure = next(
-            (
-                trip.departure
-                for trip in trips
-                if trip.departure is not None
-                and (trip.departure - now).total_seconds() + 30 > 0
-            ),
-            None,
-        )
-        if departure is not None:
-            until = (
-                (departure - now).total_seconds()
-                + 30
-                + random.uniform(*ROUTE_ROLLOVER_SPREAD_SECONDS)
+        self._rollover_at = None
+        ahead = _ahead(trips, now)
+        if ahead:
+            rollover = timedelta(
+                seconds=max(
+                    MIN_ROUTE_ROLLOVER_SECONDS, _rollover_seconds(ahead[0], now)
+                )
             )
-            rollover = timedelta(seconds=max(MIN_ROUTE_ROLLOVER_SECONDS, until))
-            interval = min(interval, rollover)
+            if rollover < interval:
+                interval = rollover
+                self._rollover_at = now + rollover
+                self._ahead_when_timed = len(ahead)
+                self._regular_due = now + self.scan_interval
         self.update_interval = interval
+
+    def _await_departure(self) -> bool:
+        """Whether the refresh now due can wait, because nothing has left yet.
+
+        A refresh pulled up to a departure is timed from the time that
+        connection had when the plan was fetched. Every `/monitor` answer
+        since moves the published times (`_on_live_times`) but not the
+        timer, so without this a refresh for a vehicle now running later
+        arrives while it is still ahead, gets the same plan back, and times
+        another 60 s later: 7 of about 52 scheduled requests on a live
+        route with a tram every 10 minutes (measured 2026-11-15). As many
+        connections ahead as when the timer was set is taken to mean none
+        has left and the planner has nothing new to say, so the refresh
+        moves to the first one's time as it stands now, without a request. The times on
+        screen are the live ones either way.
+
+        Never past the configured interval, and only for the pulled-up
+        refresh itself: one asked for in between (`update_entity`, a
+        reload) asks the planner.
+        """
+        if self._rollover_at is None or self._regular_due is None:
+            return False
+        now = dt_util.utcnow()
+        data = self.data
+        remaining = (self._regular_due - now).total_seconds()
+        early = (self._rollover_at - now).total_seconds() > ROLLOVER_EARLY_SECONDS
+        ahead = [] if data is None or not data.active else _ahead(data.trips, now)
+        if early or remaining <= 0 or len(ahead) != self._ahead_when_timed:
+            return False
+        wait = max(1.0, min(remaining, _rollover_seconds(ahead[0], now)))
+        self._rollover_at = now + timedelta(seconds=wait)
+        self.update_interval = timedelta(seconds=wait)
+        return True
 
     def _note_failure(self) -> None:
         """Stretch the interval from the second consecutive failure on.
@@ -406,6 +493,7 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         retry shouldn't inherit that.
         """
         self._failures += 1
+        self._rollover_at = None
         if self._failures < 2:
             self.update_interval = self.scan_interval
             return
@@ -421,6 +509,16 @@ class WienerLinienRouteCoordinator(DataUpdateCoordinator[RouteData]):
         self.update_interval = timedelta(seconds=seconds)
 
 
+def _rollover_seconds(trip: Trip, now: datetime) -> float:
+    """Seconds from `now` to the refresh after `trip` leaves, spread included."""
+    assert trip.departure is not None
+    return (
+        (trip.departure - now).total_seconds()
+        + ROUTE_DEPARTED_GRACE_SECONDS
+        + random.uniform(*ROUTE_ROLLOVER_SPREAD_SECONDS)
+    )
+
+
 async def async_plan_trips(
     hass: HomeAssistant,
     options: RouteOptions,
@@ -430,14 +528,17 @@ async def async_plan_trips(
     arrive_by: bool = False,
     planned: bool = False,
 ) -> list[Trip]:
-    """Fetch, parse and rank one trip request. No cooldown, no state.
+    """Fetch, parse and filter one trip request. No cooldown, no state.
 
     The one planning path shared by route entries, the `plan_trip` action
     and the route card's ad-hoc mode (the last two via adhoc.py), plus the
     config flow's setup probe, so every caller sees the same connections
     for the same query. `planned` marks a query for a time the caller chose
     rather than "now": its connections are kept even when they left
-    already. Tests patch the fetch at `route_coordinator.async_fetch_trip_body`.
+    already. An arrive-by query loses what arrives after `when`, a planned
+    leave-at query what leaves before it (`usable_trips`). Comparing the
+    rest waits for live times (live.async_live_trips). Tests patch the
+    fetch at `route_coordinator.async_fetch_trip_body`.
     """
     body = await async_fetch_trip_body(
         async_get_clientsession(hass),
@@ -450,11 +551,16 @@ async def async_plan_trips(
         USER_AGENT,
     )
     trips = parse_trip_body(body, tz, min_transfer_minutes=options.min_transfer_minutes)
-    return rank_trips(trips, None if planned else dt_util.utcnow())
+    return usable_trips(
+        trips,
+        None if planned else dt_util.utcnow(),
+        arrive_by=when if arrive_by else None,
+        leave_at=when if planned and not arrive_by else None,
+    )
 
 
 def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[str, Any]:
-    """`trips`, `line_colors`, `traffic_info` and `elevator_info` for connections.
+    """`trips`, `line_colors` and the notices and outages for connections.
 
     Shared by the route sensor and the route card's ad-hoc answer
     (websocket.py), so both modes of the card read the same shape.
@@ -471,7 +577,8 @@ def route_trip_attributes(hass: HomeAssistant, trips: Sequence[Trip]) -> dict[st
         "trips": rendered,
         "line_colors": line_colors_for(hass, labels),
         "traffic_info": [t.to_dict() for t in traffic],
-        "elevator_info": _lift_outages(hass, trips),
+        "elevator_info": _access_outages(hass, trips, "elevator"),
+        "escalator_info": _access_outages(hass, trips, "escalator"),
     }
 
 
@@ -498,21 +605,31 @@ def add_stop_coordinates(hass: HomeAssistant, trips: list[dict[str, Any]]) -> No
                     stop["longitude"] = station.longitude
 
 
-def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, Any]]:
-    """Lift outages at the stations whose lifts these trips rely on.
+def _access_outages(
+    hass: HomeAssistant, trips: Sequence[Trip], kind: str
+) -> list[dict[str, Any]]:
+    """Outages at the stations whose lifts or escalators these trips use.
 
-    The trip names each lift by its station (DIVA); the outage feed names the
-    platforms (RBLs) it affects. The catalogue joins the two, so this is
-    station-level: an outage anywhere at a station a planned lift belongs to
-    counts, and `stop_ids` says which of the trip's stations it is about.
+    `kind` is the step kind, `elevator` or `escalator`. The trip names each
+    by its station (DIVA); the outage feed names the platforms (RBLs) it
+    affects, or only the station. The catalogue joins them, so this is
+    station-level: an outage anywhere at a station a planned lift or
+    escalator belongs to counts, and `stop_ids` says which of the trip's
+    stations it is about. An escalator outage counts only where a trip
+    takes an escalator the way the broken one runs (`ElevatorInfo.direction`).
+
+    An outage only announced for later is left out: the feeds list
+    maintenance days ahead as "außer Betrieb", and the one on this trip
+    still runs.
     """
-    stations = {
-        diva
-        for trip in trips
-        for leg in trip.legs
-        for step in (*leg.access, *leg.access_after)
-        if step.kind == "elevator" and (diva := as_int(step.stop_id)) is not None
-    }
+    # Per station, the ways the trips take one there; None is a step the
+    # planner gave no direction for.
+    stations: dict[int, set[str | None]] = {}
+    for trip in trips:
+        for leg in trip.legs:
+            for step in (*leg.access, *leg.access_after):
+                if step.kind == kind and (diva := as_int(step.stop_id)) is not None:
+                    stations.setdefault(diva, set()).add(step.level)
     catalogue = current_catalogue(hass)
     if not stations or catalogue is None:
         return []
@@ -522,21 +639,39 @@ def _lift_outages(hass: HomeAssistant, trips: Sequence[Trip]) -> list[dict[str, 
         if (station := catalogue.stations_by_diva.get(diva)) is not None
         for rbl in station.rbls
     }
-    _traffic, outages = get_alerts_for(hass, None, set(rbl_to_diva))
-    return [
-        {
-            **outage.to_dict(),
-            "stop_ids": sorted(
-                {
-                    str(rbl_to_diva[rbl])
-                    for rbl in outage.related_stops
-                    if rbl in rbl_to_diva
-                }
-            ),
+    rbls = set(rbl_to_diva)
+    outages = (
+        get_alerts_for(hass, None, rbls)[1]
+        if kind == "elevator"
+        else get_escalators_for(hass, None, rbls)
+    )
+    now = dt_util.utcnow()
+    found: list[dict[str, Any]] = []
+    for outage in outages:
+        start = parse_aware_datetime(outage.time_start)
+        if start is not None and start > now:
+            continue
+        divas = {
+            rbl_to_diva[rbl] for rbl in outage.related_stops if rbl in rbl_to_diva
+        } or {
+            # Named by station only: every one of the trip's stations that
+            # the outage matched through.
+            diva
+            for diva in stations
+            if (station := catalogue.stations_by_diva.get(diva)) is not None
+            and outage_station_matches(outage, station.name)
         }
-        for outage in outages
-        if outage.related_stops_set & rbl_to_diva.keys()
-    ]
+        # An escalator running the other way is not the one on the trip.
+        # One with no direction, or switched either way, can be.
+        if outage.direction in ("up", "down"):
+            divas = {
+                diva for diva in divas if stations[diva] & {outage.direction, None}
+            }
+        if divas:
+            found.append(
+                {**outage.to_dict(), "stop_ids": sorted(str(diva) for diva in divas)}
+            )
+    return found
 
 
 def route_device_info(entry: ConfigEntry) -> DeviceInfo:

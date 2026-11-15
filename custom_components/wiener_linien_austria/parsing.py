@@ -10,6 +10,7 @@ home keeps them from drifting apart.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 
@@ -40,3 +41,49 @@ def s_bahn_number(label: str) -> int:
     """`S45` → 45, so S2 sorts before S45; 0 when no number follows."""
     digits = label[1:]
     return int(digits) if digits.isdigit() else 0
+
+
+def parse_aware_datetime(value: Any) -> datetime | None:
+    """`2026-12-31T23:59:00.000+0100` → aware datetime; None if unreadable.
+
+    For the real-time feeds' stamps, which always carry an offset. A value
+    without one is unreadable here: guessing a zone would move the time.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def as_str_list(value: Any) -> list[str]:
+    """The non-empty strings of a list (or the keys of a mapping), stripped.
+
+    For `relatedLines` in `/trafficInfoList` and `/newsList`, which arrives
+    as a list of labels and, on some lift notices, as a mapping keyed by
+    them.
+    """
+    if isinstance(value, (list, Mapping)):
+        return [
+            item.strip() for item in value if isinstance(item, str) and item.strip()
+        ]
+    return []
+
+
+def as_int_list(value: Any) -> list[int]:
+    """The whole numbers of a list, as ints; everything else is dropped.
+
+    For `relatedStops` (RBLs), sent as numbers and now and then as digit
+    strings. A bool is not a platform number.
+    """
+    if not isinstance(value, list):
+        return []
+    found: list[int] = []
+    for item in value:
+        if isinstance(item, int) and not isinstance(item, bool):
+            found.append(item)
+        elif isinstance(item, str) and item.strip().isdigit():
+            found.append(int(item))
+    return found

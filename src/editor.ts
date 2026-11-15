@@ -151,6 +151,7 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
       joinSummary([
         cfg.show_traffic_info ? et("summary_alerts") : null,
         cfg.show_elevator_info ? et("summary_elevators") : null,
+        cfg.show_escalator_info ? et("summary_escalators") : null,
         cfg.show_delay
           ? et(cfg.show_delay_colors ? "summary_delays_colored" : "summary_delays")
           : null,
@@ -262,12 +263,14 @@ export class WienerLinienAustriaCardEditor extends MultiStopEditor<NormalisedMod
         data: {
           show_traffic_info: cfg.show_traffic_info,
           show_elevator_info: cfg.show_elevator_info,
+          show_escalator_info: cfg.show_escalator_info,
           show_delay: cfg.show_delay,
           show_delay_colors: cfg.show_delay_colors,
         },
         schema: [
           { name: "show_traffic_info", selector: { boolean: {} } },
           { name: "show_elevator_info", selector: { boolean: {} } },
+          { name: "show_escalator_info", selector: { boolean: {} } },
           { name: "show_delay", selector: { boolean: {} } },
           {
             name: "show_delay_colors",

@@ -38,30 +38,39 @@ import {
   findWienerLinienEntities,
   mergeLineColorsMaps,
   lineColorsFor,
+  missingStopIds,
 } from "./utils/entities.js";
 import { filterDepartures, shouldShowStopsAhead } from "./utils/departures.js";
 import { safeDomId, toggleInSet } from "./utils/html.js";
 import { stopMapUrl } from "./utils/map-url.js";
 import {
   iconForElevatorReason,
+  parseEscalatorNotice,
+  parseWorksNotice,
   parseTrafficNotice,
   splitLocationPath,
   trimTitleLinePrefix,
   type TrafficNotice,
+  type WorksNotice,
 } from "./utils/traffic-notice.js";
 import { mdiPathForIcon } from "./utils/mdi-paths.js";
 import { arrowStep, revealOffset, tabEdges, type TabEdges } from "./utils/tab-scroll.js";
-import { formatTime } from "./utils/time.js";
+import { formatTime, upcomingStart } from "./utils/time.js";
 import { deriveRowState } from "./utils/row-state.js";
 import {
   needsRunTimes,
   runTimeKey,
   runTimesAnswered,
   runTimesFailed,
+  skipUntilText,
   stopEta,
+  stopVerdict,
+  viennaClockAt,
   type RunTimesAnswer,
   type RunTimesState,
   type StopEta,
+  type StationNotice,
+  type StopSkip,
 } from "./utils/run-times.js";
 import { splitHeroAndRows } from "./utils/hero-group.js";
 import {
@@ -120,6 +129,15 @@ function platformLabelKey(type: string | undefined): string {
   return "platform_short_bus";
 }
 
+/** A trail's lookups by stop name: the estimated arrival, and whether the
+ *  train goes through without a call. */
+interface StopTimes {
+  eta(stopName: string): StopEta | null;
+  skip(stopName: string): StopSkip | null;
+  /** The works notice behind a skipped stop, where one explains it. */
+  notice(stopName: string): StationNotice | null;
+}
+
 // Cache `Intl.DateTimeFormat` instances by IANA timezone — building one
 // per call is surprisingly expensive (~hundreds of µs on Safari WebKit),
 // and `_isNightlineHour` is invoked from inside `_renderStopAhead` for
@@ -141,6 +159,25 @@ function _nightlineHourFormatter(tz: string): Intl.DateTimeFormat {
   }
   return fmt;
 }
+
+/** One lift or escalator outage as the card lists it. `planned` is when an
+ *  outage only announced begins, null for one that is out now. */
+interface OutageRow {
+  info: ElevatorInfoAttr;
+  kind: "elevator" | "escalator";
+  planned: number | null;
+}
+
+/** Icon and label for a broken escalator, by the way it runs. MDI has no
+ *  crossed-out escalator, so the direction is the icon: an escalator that
+ *  no longer carries people up matters more than one that no longer
+ *  carries them down. Keys written out so each is findable. */
+const ESCALATOR_LOOK = {
+  up: { icon: "mdi:escalator-up", label: "escalator_up" },
+  down: { icon: "mdi:escalator-down", label: "escalator_down" },
+  both: { icon: "mdi:escalator", label: "escalator_both" },
+  unknown: { icon: "mdi:escalator", label: "escalator" },
+} as const;
 
 @customElement("wiener-linien-austria-card")
 export class WienerLinienAustriaCard extends LitElement {
@@ -180,6 +217,7 @@ export class WienerLinienAustriaCard extends LitElement {
   // tram/bus transfers; collapsing them by default keeps the trail
   // readable, U-Bahn chips always stay inline.
   @state() private _expandedTransfers = new Set<string>();
+  @state() private _expandedNotices = new Set<string>();
   // Scheduled minutes to the stops ahead, per stop (DIVA), for
   // show_stop_times. Asked for over the run_times WebSocket command the
   // first time a trail is opened; see utils/run-times.ts. Kept across
@@ -194,15 +232,13 @@ export class WienerLinienAustriaCard extends LitElement {
   private _runTimeWants: Array<{ diva: number; line: string; direction: string }> = [];
   @state() private _debugTraffic: TrafficInfoAttr[] = [];
   @state() private _debugElevator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
+  @state() private _debugEscalator: Array<ElevatorInfoAttr & { __debug_entity?: string }> = [];
   // QR dialog open state, keyed by stop entity_id. null = closed.
   // Per-stop so that in `tabs` layout each tab keeps its own dialog.
   @state() private _qrOpenFor: string | null = null;
   @state() private _devPaletteOpen = false;
 
   private _versionCheckDone = false;
-  // One-shot flag so the "configured entity missing → fell back to first WL
-  // sensor" warning doesn't spam the console on every re-render.
-  private _fallbackWarned = false;
 
   public setConfig(config: WienerLinienCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -236,17 +272,17 @@ export class WienerLinienAustriaCard extends LitElement {
     this._config = normalised;
     // Reset per-board UI state on config swap. Expand-Set keys embed
     // entity + time_planned, so a stale key would never re-hit but
-    // also never GC. Also clears _fallbackWarned so the next
-    // misconfiguration still warns.
+    // also never GC.
     this._expandedRows = new Set();
     this._expandedTraffic = new Set();
     this._expandedElevator = new Set();
     this._expandedTransfers = new Set();
+    this._expandedNotices = new Set();
     this._qrOpenFor = null;
     this._activeTab = 0;
-    this._fallbackWarned = false;
     this._debugTraffic = [];
     this._debugElevator = [];
+    this._debugEscalator = [];
   }
 
   public getCardSize(): number {
@@ -464,15 +500,12 @@ export class WienerLinienAustriaCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    return cardShouldUpdate(changed, this.hass, () => {
-      // The memo still holds the last render's stops, resolved against the
-      // previous hass. If that render found none (entity briefly missing
-      // after an HA restart), watching them would reject every tick and
-      // willUpdate, the only other place that clears it, would never run
-      // again (#125).
-      this._resolvedStopsMemo = null;
-      return this._resolveStops().map((s) => s.entity);
-    });
+    // Watch the configured ids, not the resolved ones: a stop that is
+    // missing right now still has to wake the card when it comes back
+    // (#125), and the resolved list would never name it.
+    return cardShouldUpdate(changed, this.hass, () =>
+      (this._config?.entities ?? []).map((s) => s.entity),
+    );
   }
 
   private _lang(): string {
@@ -503,27 +536,13 @@ export class WienerLinienAustriaCard extends LitElement {
     return result;
   }
 
+  /** The configured stops whose sensor is in hass.states. A stop that
+   *  isn't (renamed sensor, removed integration entry) is left out here
+   *  and named by `missingStopIds`; the card never swaps in another
+   *  sensor for it, since a board quietly showing the wrong stop is
+   *  worse than one that says what is wrong. */
   private _computeResolvedStops(): NormalisedModernStop[] {
-    const picked = (this._config?.entities ?? []).filter((s) => this.hass?.states?.[s.entity]);
-    if (picked.length) return picked;
-    const available = findWienerLinienEntities(this.hass);
-    const first = available[0];
-    if (first) {
-      // Configured entity exists in the saved config but not in HA's
-      // current state map (renamed sensor, removed integration entry).
-      // Falling back to the first WL sensor keeps the card functional,
-      // but the user could be silently looking at the wrong stop —
-      // surface a one-shot console warning so the cause is debuggable.
-      if (!this._fallbackWarned && (this._config?.entities?.length ?? 0) > 0) {
-        this._fallbackWarned = true;
-        const requested = this._config?.entities.map((s) => s.entity).join(", ");
-        console.warn(
-          `[wiener-linien-austria-card] configured entity "${requested}" not in hass.states; falling back to "${first}"`,
-        );
-      }
-      return [{ entity: first }];
-    }
-    return [];
+    return (this._config?.entities ?? []).filter((s) => this.hass?.states?.[s.entity]);
   }
 
   private _attrs(entityId: string): WienerLinienAttrs {
@@ -541,6 +560,7 @@ export class WienerLinienAustriaCard extends LitElement {
 
     const cfg = this._config;
     const stops = this._resolveStops();
+    const missing = missingStopIds(this.hass, cfg.entities);
     const useTabs = cfg.layout === "tabs" && stops.length >= 2;
 
     const attribution = cfg.hide_attribution
@@ -554,12 +574,13 @@ export class WienerLinienAustriaCard extends LitElement {
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
           ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
+          ${this._renderMissing(missing)}
           ${
             cfg.show_traffic_info
               ? this._renderTrafficBanner(this._bannerStops(stops, useTabs))
               : nothing
           }
-          ${this._renderBody(stops, useTabs)}
+          ${stops.length || !missing.length ? this._renderBody(stops, useTabs) : nothing}
           ${this._renderFooter(attribution)}
         </div>
       </ha-card>
@@ -607,6 +628,19 @@ export class WienerLinienAustriaCard extends LitElement {
       return html`${this._renderStop(active, this._activeTab)}`;
     }
     return html`${stops.map((s) => this._renderStop(s))}`;
+  }
+
+  /** One warning per missing sensor, the way HA's own cards name an
+   *  entity they can't find (hui-warning, which isn't public API; ha-alert
+   *  is the same component family and look). ha-alert carries
+   *  role="alert", so no role on the wrapper. The id is in the text:
+   *  it is what the user has to go and look up. */
+  private _renderMissing(missing: readonly string[]): TemplateResult | typeof nothing {
+    if (!missing.length) return nothing;
+    return html`${missing.map(
+      (eid) =>
+        html`<ha-alert alert-type="warning">${this._t("entity_missing", { entity: eid })}</ha-alert>`,
+    )}`;
   }
 
   private _renderEmpty(): TemplateResult {
@@ -939,10 +973,7 @@ export class WienerLinienAustriaCard extends LitElement {
       accessibility_only: this._config!.accessibility_only,
     });
 
-    const realElevator = Array.isArray(attrs.elevator_info) ? attrs.elevator_info : [];
-    const debugElevator = this._debugElevator.filter((e) => e.__debug_entity === stopCfg.entity);
-    const elevatorInfos: ElevatorInfoAttr[] = [...realElevator, ...debugElevator];
-    const showElevator = this._config!.show_elevator_info && elevatorInfos.length > 0;
+    const outages = this._outagesFor(stopCfg, attrs);
 
     const mapUrl = stopMapUrl(title, attrs.latitude, attrs.longitude);
     // Phone-first QR target: geo: URI hands off to the user's default
@@ -1031,7 +1062,7 @@ export class WienerLinienAustriaCard extends LitElement {
             ? this._renderStopHero(stopCfg, heroGroup, heroValue, heroUnit)
             : nothing
         }
-        ${showElevator ? this._renderElevatorDetails(elevatorInfos) : nothing}
+        ${outages.length ? this._renderOutages(outages) : nothing}
         ${
           this._config!.show_departures && this._config!.max_departures > 0
             ? rows.length
@@ -1104,28 +1135,57 @@ export class WienerLinienAustriaCard extends LitElement {
     </div>`;
   }
 
-  private _renderElevatorDetails(infos: ElevatorInfoAttr[]): TemplateResult {
+  /** The lift and escalator outages a stop shows, each kind only with its
+   *  switch on: what is out now first, then what is only announced, soonest
+   *  first. Among what is out now, lifts lead, since for someone who needs
+   *  one there is no way round. */
+  private _outagesFor(stopCfg: NormalisedModernStop, attrs: WienerLinienAttrs): OutageRow[] {
+    const cfg = this._config!;
+    const now = Date.now();
+    const own = (
+      real: ElevatorInfoAttr[] | undefined,
+      debug: Array<ElevatorInfoAttr & { __debug_entity?: string }>,
+      kind: OutageRow["kind"],
+    ): OutageRow[] =>
+      [
+        ...(Array.isArray(real) ? real : []),
+        ...debug.filter((e) => e.__debug_entity === stopCfg.entity),
+      ].map((info) => ({ info, kind, planned: upcomingStart(info.time_start, now) }));
+    const rows = [
+      ...(cfg.show_elevator_info ? own(attrs.elevator_info, this._debugElevator, "elevator") : []),
+      ...(cfg.show_escalator_info
+        ? own(attrs.escalator_info, this._debugEscalator, "escalator")
+        : []),
+    ];
+    // Array.prototype.sort is stable, so among the outages that are out now
+    // (all key 0) lifts stay ahead of escalators.
+    rows.sort((a, b) => (a.planned ?? 0) - (b.planned ?? 0));
+    return rows;
+  }
+
+  private _renderOutages(rows: OutageRow[]): TemplateResult {
     return html`
       <div class="alert-list">
-        ${infos.map((e) => this._renderElevatorDetail(e))}
+        ${rows.map((row) => this._renderOutage(row))}
       </div>
     `;
   }
 
-  private _renderElevatorDetail(e: ElevatorInfoAttr): TemplateResult {
+  private _renderOutage({ info: e, kind, planned }: OutageRow): TemplateResult {
     const location = e.description || e.station || "";
-    // The feed writes the location as a path through the station; showing
-    // the segments separately makes "which lift is this" answerable at a
-    // glance. Falls back to a single segment when there's no separator.
-    const path = splitLocationPath(location);
-    const reason = e.reason || "";
-    const reasonIcon = iconForElevatorReason(reason);
-    const until = formatTime(e.time_end, this._lang());
-    const hasDetail = Boolean(reason || until);
-    const expanded = this._expandedElevator.has(e.name);
+    // An escalator's text is a sentence, not a path: the direction it runs
+    // in is the part that matters, so it leads as the icon and the label.
+    const escalator = kind === "escalator" ? parseEscalatorNotice(location) : null;
+    const look = escalator ? ESCALATOR_LOOK[e.direction ?? "unknown"] : null;
+    const kindLabel = look ? this._t(look.label) : "";
+    const detail = this._renderOutageDetail(e, escalator?.notes ?? []);
+    const hasDetail = detail !== nothing;
+    const key = `${kind}:${e.name}`;
+    const expanded = this._expandedElevator.has(key);
     const classes = {
       alert: true,
       expanded,
+      planned: planned !== null,
       "no-detail": !hasDetail,
     };
     return html`
@@ -1134,48 +1194,27 @@ export class WienerLinienAustriaCard extends LitElement {
         role=${hasDetail ? "button" : "group"}
         tabindex=${hasDetail ? "0" : "-1"}
         aria-expanded=${hasDetail ? (expanded ? "true" : "false") : nothing}
-        aria-label=${location}
-        @click=${() => hasDetail && this._toggleElevator(e.name)}
+        aria-label=${[kindLabel, escalator ? escalator.where : location].filter(Boolean).join(", ")}
+        @click=${() => hasDetail && this._toggleElevator(key)}
         @keydown=${(ev: KeyboardEvent) =>
-          this._onExpanderKeydown(ev, hasDetail, () => this._toggleElevator(e.name))}
+          this._onExpanderKeydown(ev, hasDetail, () => this._toggleElevator(key))}
       >
-        <ha-icon icon="mdi:elevator-passenger-off" aria-hidden="true"></ha-icon>
+        <ha-icon icon=${look ? look.icon : "mdi:elevator-passenger-off"} aria-hidden="true"></ha-icon>
         <div class="alert-body">
           <div class="alert-summary">
             <div class="alert-title">
-              <span lang="de" class="lift-path"
-                >${path.map(
-                  (seg, i) =>
-                    html`${
-                      i ? html`<span class="lift-path-sep" aria-hidden="true">›</span>` : nothing
-                    }<span>${seg}</span>`,
-                )}</span
-              >
+              ${escalator ? this._renderEscalatorTitle(kindLabel, escalator.where) : this._renderLiftPath(location)}
             </div>
+            ${
+              planned !== null
+                ? html`<div class="alert-meta outage-planned">
+                    <ha-icon icon="mdi:calendar-clock" aria-hidden="true"></ha-icon>
+                    <span>${this._t("outage_planned", { time: formatTime(e.time_start, this._lang()) })}</span>
+                  </div>`
+                : nothing
+            }
           </div>
-          ${
-            hasDetail
-              ? html`<div class="alert-detail">
-                <div class="alert-detail-inner">
-                  ${
-                    reason
-                      ? html`<div class="alert-desc lift-reason">
-                        <ha-icon icon=${reasonIcon} aria-hidden="true"></ha-icon>
-                        <span lang="de">${reason}</span>
-                      </div>`
-                      : nothing
-                  }
-                  ${
-                    until
-                      ? html`<div class="alert-meta">
-                        <span>${this._t("elevator_until")} ${until}</span>
-                      </div>`
-                      : nothing
-                  }
-                </div>
-              </div>`
-              : nothing
-          }
+          ${detail}
         </div>
         ${
           hasDetail
@@ -1186,8 +1225,68 @@ export class WienerLinienAustriaCard extends LitElement {
     `;
   }
 
-  private _toggleElevator(name: string): void {
-    this._expandedElevator = toggleInSet(this._expandedElevator, name);
+  /** "Rolltreppe aufwärts" in the card's language, then the feed's German
+   *  for where it runs. */
+  private _renderEscalatorTitle(kindLabel: string, where: string): TemplateResult {
+    return html`<span>${kindLabel}</span>${
+      where ? html` <span lang="de" class="outage-where">${where}</span>` : nothing
+    }`;
+  }
+
+  /** The lift feed writes the location as a path through the station;
+   *  showing the segments separately makes "which lift is this" answerable
+   *  at a glance. A location with no separator is a single segment. */
+  private _renderLiftPath(location: string): TemplateResult {
+    return html`<span lang="de" class="lift-path"
+      >${splitLocationPath(location).map(
+        (seg, i) =>
+          html`${
+            i ? html`<span class="lift-path-sep" aria-hidden="true">›</span>` : nothing
+          }<span>${seg}</span>`,
+      )}</span
+    >`;
+  }
+
+  /** What an outage row unfolds to: an escalator's extra sentences, the
+   *  reason with its icon, and when it ends. `nothing` when the feed gave
+   *  none of them, and the row then doesn't expand. */
+  private _renderOutageDetail(
+    e: ElevatorInfoAttr,
+    notes: string[],
+  ): TemplateResult | typeof nothing {
+    const reason = e.reason || "";
+    const until = formatTime(e.time_end, this._lang());
+    if (!reason && !until && !notes.length) return nothing;
+    return html`<div class="alert-detail">
+      <div class="alert-detail-inner">
+        ${
+          notes.length
+            ? html`<div class="alert-desc" lang="de">
+                ${notes.map((note) => html`<p>${note}</p>`)}
+              </div>`
+            : nothing
+        }
+        ${
+          reason
+            ? html`<div class="alert-desc lift-reason">
+                <ha-icon icon=${iconForElevatorReason(reason)} aria-hidden="true"></ha-icon>
+                <span lang="de">${reason}</span>
+              </div>`
+            : nothing
+        }
+        ${
+          until
+            ? html`<div class="alert-meta">
+                <span>${this._t("elevator_until")} ${until}</span>
+              </div>`
+            : nothing
+        }
+      </div>
+    </div>`;
+  }
+
+  private _toggleElevator(key: string): void {
+    this._expandedElevator = toggleInSet(this._expandedElevator, key);
   }
 
   // Shared Enter/Space handler for expander rows whose parent element is
@@ -1282,7 +1381,7 @@ export class WienerLinienAustriaCard extends LitElement {
     const inferred = Array.isArray(t.inferred_lines) ? t.inferred_lines : [];
     const lines = related.length ? related : inferred;
     const descSource = t.description_html || t.description || "";
-    const notice = parseTrafficNotice(descSource);
+    const notice = parseTrafficNotice(descSource, t.title, t.reason);
     const hasNotice = notice.blocks.length > 0 || notice.facts.length > 0;
     const until = formatTime(t.time_end, this._lang());
     const updatedRaw = formatTime(t.time_last_update, this._lang());
@@ -1409,11 +1508,11 @@ export class WienerLinienAustriaCard extends LitElement {
     currentLine: string,
     rowKey: string,
     entityId: string,
-    times: ((stopName: string) => StopEta | null) | null,
+    times: StopTimes | null,
   ): TemplateResult {
     const overrides = this._config!.line_colors;
     const lineColors = lineColorsFor(this.hass, entityId);
-    const etas = stops.map((s) => (times ? times(s.name) : undefined));
+    const etas = stops.map((s) => (times ? times.eta(s.name) : undefined));
     // A late departure is late at every stop, so the trail is struck through
     // as a whole: one stop without a time then keeps a slot as wide as the
     // others' two, and the names stay in a column.
@@ -1426,15 +1525,26 @@ export class WienerLinienAustriaCard extends LitElement {
         })}
       >
         ${stops.map((s, idx) =>
-          this._renderStopAhead(s, idx, rowKey, overrides, lineColors, etas[idx], struck),
+          this._renderStopAhead(
+            s,
+            idx,
+            rowKey,
+            overrides,
+            lineColors,
+            etas[idx],
+            struck,
+            times?.skip(s.name) ?? null,
+            times?.notice(s.name) ?? null,
+          ),
         )}
       </ol>
     `;
   }
 
-  /** The estimated arrival per stop of a departure's trail, or null when the
-   *  trail shows no times: the option is off, the stop or the row can't be
-   *  asked for, or the answer has no such line.
+  /** The estimated arrival per stop of a departure's trail, and the stations
+   *  it passes without a call, or null when the trail shows no times: the
+   *  option is off, the stop or the row can't be asked for, or the answer
+   *  has no such line.
    *
    *  An open trail is noted in `_runTimeWants` for `updated()` to ask about.
    *  A closed one is not, but still renders whatever is already held, so
@@ -1443,24 +1553,33 @@ export class WienerLinienAustriaCard extends LitElement {
    *  Before the first answer for the stop the lookup yields null for every
    *  stop, which renders the time column empty: the names then sit where
    *  they will once the times arrive instead of jumping aside. */
-  private _stopTimes(
-    dep: DepartureAttr,
-    entityId: string,
-    open: boolean,
-  ): ((stopName: string) => StopEta | null) | null {
+  private _stopTimes(dep: DepartureAttr, entityId: string, open: boolean): StopTimes | null {
     if (!this._config!.show_stop_times) return null;
     const attrs = this.hass?.states[entityId]?.attributes as WienerLinienAttrs | undefined;
     const diva = attrs?.diva;
-    const { line, direction } = dep;
+    const { line } = dep;
+    // The route's direction where the feed's code contradicts the platform:
+    // the run times are keyed by the timetable's.
+    const direction = dep.route_direction ?? dep.direction;
     if (typeof diva !== "number" || !line) return null;
     // The command takes the two direction codes /monitor uses and nothing else.
     if (direction !== "H" && direction !== "R") return null;
     if (open) this._runTimeWants.push({ diva, line, direction });
     const held = this._runTimes.get(diva);
-    const minutes = held?.runTimes[runTimeKey(line, direction)];
+    const key = runTimeKey(line, direction);
+    const minutes = held?.runTimes[key];
     if (held && !minutes) return null;
+    const skipped = held?.noStop[key];
+    const calling = held?.calling[key];
     const now = Date.now();
-    return (stopName) => stopEta(dep, minutes?.[stopName], now);
+    const verdict = (stopName: string) =>
+      stopVerdict(dep, minutes?.[stopName], skipped?.[stopName], calling?.[stopName], now);
+    const notices = held?.notices[key];
+    return {
+      eta: (stopName) => stopEta(dep, verdict(stopName).minutes, now),
+      skip: (stopName) => verdict(stopName).skip,
+      notice: (stopName) => notices?.[stopName] ?? null,
+    };
   }
 
   /** Ask for the run times the open trails need and the card doesn't hold. */
@@ -1992,6 +2111,10 @@ export class WienerLinienAustriaCard extends LitElement {
     // The trail's departure runs late and delays are shown: a time is the
     // timetable's arrival struck through, then the expected one.
     struck = false,
+    // The timetable has the train going through here without a call.
+    skip: StopSkip | null = null,
+    // Wiener Linien's notice saying why, where one does.
+    stationNotice: StationNotice | null = null,
   ): TemplateResult {
     // Inline lines (always shown next to the station name): U-Bahn and
     // S-Bahn at any time, plus night lines (N-prefix + digit) WHEN
@@ -2002,8 +2125,12 @@ export class WienerLinienAustriaCard extends LitElement {
     // `stops_ahead_modes` filters BEFORE the split, so hiding a category
     // removes it from the inline chips and the +N panel alike — a user who
     // switches off "Metro" means the U-chips, which are the inline half.
+    //
+    // A station the train goes through gets none: nobody changes there.
     const allowedModes = this._config!.stops_ahead_modes;
-    const allLines = (s.lines ?? []).filter((l) => allowedModes.includes(transferModeOf(l)));
+    const allLines = skip
+      ? []
+      : (s.lines ?? []).filter((l) => allowedModes.includes(transferModeOf(l)));
     const nightActive = this._isNightlineHour();
     const inlineLines: string[] = [];
     const otherLines: string[] = [];
@@ -2016,11 +2143,30 @@ export class WienerLinienAustriaCard extends LitElement {
     }
     const transferKey = this._transferKey(rowKey, idx);
     const transfersExpanded = this._expandedTransfers.has(transferKey);
+    // The notice unfolds under a skipped stop. Its key is the transfers'
+    // key: a skipped stop has no transfers to open, so the two never meet.
+    const works = skip && stationNotice?.text ? parseWorksNotice(stationNotice.text) : null;
+    const hasNotice = !!works && (works.paras.length > 0 || works.facts.length > 0);
+    const noticeOpen = hasNotice && this._expandedNotices.has(transferKey);
+    const noticeId = `wl-stop-notice-${transferKey.replace(/[^\w-]/g, "_")}`;
     const stopClasses = {
       "stops-ahead-stop": true,
       terminus: !!s.is_terminus,
+      skipped: !!skip,
       "transfers-expanded": transfersExpanded,
+      "notice-expanded": noticeOpen,
+      // A time slot in front of the name; set below, once it is known.
+      timed: false,
     };
+    const skipLabel = skip
+      ? skip.next
+        ? this._t("stop_skipped_until_time", { time: viennaClockAt(skip.next) })
+        : skip.until
+          ? this._t("stop_skipped_until", {
+              date: skipUntilText(skip.until, this._lang(), Date.now()),
+            })
+          : this._t("stop_skipped")
+      : "";
 
     const metroChips = inlineLines.length
       ? html`<span class="stops-ahead-metros">
@@ -2113,6 +2259,7 @@ export class WienerLinienAustriaCard extends LitElement {
           >${eta.clock}</time
         >`
       : nothing;
+    stopClasses.timed = eta !== undefined;
     const time =
       eta === undefined
         ? nothing
@@ -2162,10 +2309,58 @@ export class WienerLinienAustriaCard extends LitElement {
           <span class="stops-ahead-dot" aria-hidden="true"></span>
           ${time}
           <span class="stops-ahead-name">${deText(s.name)}</span>
+          ${
+            !skip
+              ? nothing
+              : hasNotice
+                ? html`<button
+                    type="button"
+                    class="stops-ahead-skip stops-ahead-skip--more"
+                    aria-expanded=${noticeOpen ? "true" : "false"}
+                    aria-controls=${noticeId}
+                    @click=${(ev: MouseEvent) => {
+                      ev.stopPropagation();
+                      this._expandedNotices = toggleInSet(this._expandedNotices, transferKey);
+                    }}
+                    @keydown=${(ev: KeyboardEvent) => ev.stopPropagation()}
+                  >
+                    <span>${skipLabel}</span>
+                    <span class="sr-only">, ${this._t("stop_notice")}</span>
+                    <ha-icon icon="mdi:information-outline" aria-hidden="true"></ha-icon>
+                  </button>`
+                : html`<span class="stops-ahead-skip">${skipLabel}</span>`
+          }
           ${metroChips} ${otherToggle}
         </div>
         ${otherPanel}
+        ${noticeOpen && works ? this._renderStopNotice(works, noticeId) : nothing}
       </li>
+    `;
+  }
+
+  /** Wiener Linien's works notice under a station the line goes through:
+   *  what is being done, then its labelled parts (Zeitraum, Maßnahmen,
+   *  Ersatz, Hinweis). German whatever the dashboard's language, as the
+   *  feed has no other; plain text bindings, never markup. */
+  private _renderStopNotice(works: WorksNotice, id: string): TemplateResult {
+    return html`
+      <div class="stops-ahead-notice" id=${id} lang="de">
+        <p class="sr-only" lang=${this._lang()}>${this._t("stop_notice")}</p>
+        ${works.heading ? html`<p class="stops-ahead-notice-heading">${works.heading}</p>` : nothing}
+        ${works.paras.map((para) => html`<p>${para}</p>`)}
+        ${
+          works.facts.length
+            ? html`<dl class="stops-ahead-notice-facts">
+                ${works.facts.map(
+                  (fact) => html`<div class="alert-fact">
+                    <dt>${fact.label}</dt>
+                    <dd>${fact.value}</dd>
+                  </div>`,
+                )}
+              </dl>`
+            : nothing
+        }
+      </div>
     `;
   }
 
@@ -2323,6 +2518,7 @@ export class WienerLinienAustriaCard extends LitElement {
         <span class="dev-strip-label">${this._t("devmode_title")}</span>
         <button type="button" @click=${this._devTestTraffic}>${this._t("devmode_traffic_btn")}</button>
         <button type="button" @click=${this._devTestElevator}>${this._t("devmode_elevator_btn")}</button>
+        <button type="button" @click=${this._devTestEscalator}>${this._t("devmode_escalator_btn")}</button>
         <button
           type="button"
           aria-expanded=${this._devPaletteOpen ? "true" : "false"}
@@ -2626,9 +2822,62 @@ export class WienerLinienAustriaCard extends LitElement {
     ];
   };
 
+  /** Escalator outages as the feed words them (2026-11-14): one up, one
+   *  switched either way with its extra sentence, and one only announced. */
+  private _devEscalatorVariant = 0;
+  private _devTestEscalator = (): void => {
+    const pick = this._randomFrom(this._resolveStops());
+    if (!pick) return;
+    const station = this._attrs(pick.entity).stop_name || pick.entity;
+    const now = Date.now();
+    const hour = 60 * 60_000;
+    const shapes: ReadonlyArray<{
+      direction: NonNullable<ElevatorInfoAttr["direction"]>;
+      description: string;
+      reason: string;
+      startIn: number;
+    }> = [
+      {
+        direction: "up",
+        description: `Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang ${station}.`,
+        reason: "An der Instandsetzung wird bereits gearbeitet.",
+        startIn: -hour,
+      },
+      {
+        direction: "both",
+        description: `Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.`,
+        reason: "FAHRTREPPENERNEUERUNG Voraussichtlich bis 21.12.2026 außer Betrieb!",
+        startIn: -hour,
+      },
+      {
+        direction: "down",
+        description: "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß zum Bahnsteig.",
+        reason: "Geplante Wartung wird durchgeführt.",
+        startIn: 30 * hour,
+      },
+    ];
+    const shape = shapes[this._devEscalatorVariant % shapes.length]!;
+    this._devEscalatorVariant += 1;
+    this._debugEscalator = [
+      ...this._debugEscalator,
+      {
+        __debug_entity: pick.entity,
+        name: `DEBUG-F-${now}`,
+        station,
+        direction: shape.direction,
+        description: shape.description,
+        reason: shape.reason,
+        status: "außer Betrieb",
+        time_start: new Date(now + shape.startIn).toISOString(),
+        time_end: new Date(now + shape.startIn + 4 * hour).toISOString(),
+      },
+    ];
+  };
+
   private _devClear = (): void => {
     this._debugTraffic = [];
     this._debugElevator = [];
+    this._debugEscalator = [];
     this._devPaletteOpen = false;
   };
 

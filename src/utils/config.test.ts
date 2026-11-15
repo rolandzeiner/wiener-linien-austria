@@ -29,6 +29,7 @@ describe("normaliseRetroConfig — defaults", () => {
     expect(c.size).toBe("regular");
     expect(c.style).toBe("classic");
     expect(c.flicker).toBe(false);
+    expect(c.bloom).toBe(false);
     expect(c.wheelchair_race).toBe(false);
     expect(c.accessibility_only).toBe(false);
     expect(c.message_ticker).toBe(false);
@@ -111,6 +112,11 @@ describe("normaliseRetroConfig — defaults", () => {
     );
   });
 
+  it("turns bloom on only for a literal true", () => {
+    expect(normaliseRetroConfig(retro({ bloom: true })).bloom).toBe(true);
+    expect(normaliseRetroConfig(retro({ bloom: "yes" as never })).bloom).toBe(false);
+  });
+
   it("agrees with the other two cards on how a non-boolean is read", () => {
     // The concrete cross-card inconsistency finding 6 was about.
     const retroVal = normaliseRetroConfig(retro({ show_platform: 0 as never })).show_platform;
@@ -171,6 +177,7 @@ describe("normaliseModernConfig — defaults", () => {
     expect(c.show_cooling).toBe(false);
     expect(c.show_traffic_info).toBe(true);
     expect(c.show_elevator_info).toBe(true);
+    expect(c.show_escalator_info).toBe(false);
     expect(c.show_delay).toBe(true);
     expect(c.show_delay_colors).toBe(true);
     expect(c.show_type_icon).toBe(false);

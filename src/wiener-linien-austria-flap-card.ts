@@ -35,6 +35,7 @@ import {
   allDisconnected,
   findWienerLinienEntities,
   mergeLineColorsMaps,
+  missingStopIds,
 } from "./utils/entities.js";
 import {
   normaliseFlapConfig,
@@ -197,9 +198,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   private _marchTimer: ReturnType<typeof setInterval> | null = null;
 
   private _versionCheckDone = false;
-  // One-shot guard so the "configured entity gone → fell back" warning
-  // doesn't spam on every re-render after an entity is removed.
-  private _fallbackWarned = false;
 
   public setConfig(config: WienerLinienFlapCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -314,8 +312,13 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
   protected override shouldUpdate(changed: PropertyValues): boolean {
     if (!this._config) return false;
-    // Multi-stop: re-render when any configured stop's state changed.
-    return cardShouldUpdate(changed, this.hass, () => this._resolveStopEids());
+    // Multi-stop: re-render when any configured stop's state changed. The
+    // configured ids, not the resolved ones, so a missing stop still wakes
+    // the card when its sensor comes back.
+    return cardShouldUpdate(changed, this.hass, () => {
+      const configured = (this._config?.entities ?? []).map((s) => s.entity);
+      return configured.length ? configured : this._resolveStopEids();
+    });
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -478,10 +481,11 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     );
   }
 
-  /** Configured stop entity ids that actually exist in hass.states.
-   *  When `entities` is empty (fresh card from the picker), fall back
-   *  to the first auto-discovered WL sensor so the preview is
-   *  populated. */
+  /** Configured stop entity ids that actually exist in hass.states; the
+   *  ones that don't are named by `missingStopIds` and never replaced
+   *  by another sensor. When `entities` is empty (fresh card from the
+   *  picker), the first auto-discovered WL sensor stands in so the
+   *  preview is populated. */
   private _resolveStopEids(): string[] {
     const stops = this._config?.entities ?? [];
     const states = this.hass?.states;
@@ -489,12 +493,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (out.length === 0 && stops.length === 0) {
       const first = findWienerLinienEntities(this.hass)[0];
       if (first) out.push(first);
-    }
-    if (out.length === 0 && stops.length > 0 && !this._fallbackWarned) {
-      this._fallbackWarned = true;
-      console.warn(
-        `[wiener-linien-austria-flap-card] none of the configured entities exist in hass.states (${stops.map((s) => s.entity).join(", ")})`,
-      );
     }
     return out;
   }
@@ -560,6 +558,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     if (!this._config) return nothing;
     const cfg = this._config;
     const eids = this._resolveStopEids();
+    const missing = missingStopIds(this.hass, cfg.entities);
     const rows = this._gatherRows();
     // Card-wide metadata sourced from the FIRST stop: WL-orange band
     // station name and server_time for the header chips.
@@ -662,8 +661,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
               : nothing
           }
           <div class="flap-panel">
+            ${missing.map(
+              (eid) =>
+                html`<ha-alert alert-type="warning" class="flap-missing"
+                  >${this._t("entity_missing", { entity: eid })}</ha-alert
+                >`,
+            )}
             ${this._renderBoard(
               eids,
+              missing.length > 0,
               rows,
               hasAnyPlatform,
               platformLabel,
@@ -736,16 +742,20 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
   private _renderBoard(
     eids: string[],
+    anyMissing: boolean,
     rows: DepartureAttr[],
     hasAnyPlatform: boolean,
     platformLabel: string,
     showAccessibility: boolean,
     hideLineColumn: boolean,
     lineColors: Record<string, LineColorPair>,
-  ): TemplateResult {
+  ): TemplateResult | typeof nothing {
     const maxDestLen = this._maxDestLen(rows);
     const maxLineLen = this._maxLineLen(rows);
     if (eids.length === 0) {
+      // Every configured stop is missing: the warnings above the board
+      // already say so, and "no stop selected" would contradict them.
+      if (anyMissing) return nothing;
       return html`<div class="flap-empty">${this._t("no_entity")}</div>`;
     }
     if (rows.length === 0) {
@@ -1706,6 +1716,12 @@ export class WienerLinienAustriaFlapCard extends LitElement {
 
     /* Empty state — body cream so the board stays one cohesive
        cream-on-dark material when no departures are flowing. */
+    /* The warning keeps HA's own colours on purpose: it is a config
+       error, not a flap tile. */
+    .flap-missing {
+      display: block;
+      margin: 2px 0 8px;
+    }
     .flap-empty {
       text-align: center;
       padding: 24px 0;

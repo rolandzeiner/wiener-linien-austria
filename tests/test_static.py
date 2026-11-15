@@ -44,6 +44,7 @@ from custom_components.wiener_linien_austria.static import (
     _parse_haltestellen,
     _parse_route_colors,
     _parse_trip_patterns,
+    _terminus_key,
     async_get_catalogue,
     async_load_catalogue,
     async_refresh_catalogue,
@@ -51,7 +52,10 @@ from custom_components.wiener_linien_austria.static import (
     canonical_line_key,
     canonical_line_label,
     catalogue_is_stale,
+    direction_at_platform,
     stops_ahead_for_match,
+    trail_name,
+    vehicle_reaches,
 )
 from tests.conftest import make_response_cm
 
@@ -727,6 +731,49 @@ def test_trip_pattern_index_round_trips_colors_through_store() -> None:
     assert restored.trip_patterns.text_colors_by_line == fg
 
 
+def _short_turn_catalogue(*, diversion: bool = False) -> StaticCatalogue:
+    """U1 from Reumannplatz: on to Oberlaa, or turning at Alaudagasse."""
+    stations = {
+        1: Station(1, "Reumannplatz", "Wien", 16.37, 48.17, [11, 21]),
+        2: Station(2, "Keplerplatz", "Wien", 16.37, 48.16, [12, 22]),
+        3: Station(3, "Alaudagasse", "Wien", 16.38, 48.15, [13, 23]),
+        4: Station(4, "Oberlaa", "Wien", 16.40, 48.14, [14, 24]),
+        5: Station(5, "Ersatzhalt", "Wien", 16.39, 48.15, [15]),
+    }
+    patterns = [
+        TripPattern(301, 1, 1, (11, 12, 13, 14)),
+        TripPattern(301, 2, 1, (11, 12, 13)),
+        TripPattern(301, 3, 2, (24, 23, 22, 21)),
+    ]
+    if diversion:
+        patterns.append(TripPattern(301, 4, 1, (11, 15, 14)))
+    return StaticCatalogue(
+        stations_by_diva=stations,
+        last_fetched="2026-11-10T00:00:00+00:00",
+        trip_patterns=TripPatternIndex(
+            patterns_by_line={301: patterns}, lines_by_label={"U1": 301}
+        ),
+    )
+
+
+def test_vehicle_reaches_a_stop_only_when_every_route_for_its_terminus_does() -> None:
+    catalogue = _short_turn_catalogue()
+    # Both kinds of train call at Alaudagasse; only one goes on to Oberlaa.
+    assert vehicle_reaches(catalogue, "U1", 11, "Oberlaa", "H", 3)
+    assert vehicle_reaches(catalogue, "U1", 11, "Alaudagasse", "H", 3)
+    assert vehicle_reaches(catalogue, "U1", 11, "Oberlaa", "H", 4)
+    assert not vehicle_reaches(catalogue, "U1", 11, "Alaudagasse", "H", 4)
+    # A stop behind the platform, a terminus no route has, an unknown line.
+    assert not vehicle_reaches(catalogue, "U1", 13, "Oberlaa", "H", 2)
+    assert not vehicle_reaches(catalogue, "U1", 11, "Leopoldau", "H", 3)
+    assert not vehicle_reaches(catalogue, "U1", 11, "", "H", 3)
+    assert not vehicle_reaches(catalogue, "U99", 11, "Oberlaa", "H", 3)
+    # One route to Oberlaa leaves Alaudagasse out, so not every train calls.
+    diverted = _short_turn_catalogue(diversion=True)
+    assert not vehicle_reaches(diverted, "U1", 11, "Oberlaa", "H", 3)
+    assert vehicle_reaches(diverted, "U1", 11, "Oberlaa", "H", 4)
+
+
 def test_stops_ahead_for_match_returns_tail_after_current_rbl() -> None:
     """From Stephansplatz on U1/H, the next stops are Praterstern + Leopoldau."""
     catalogue = _u1_catalogue()
@@ -777,6 +824,265 @@ def test_stops_ahead_for_match_terminus_substring_picks_branch() -> None:
     result = stops_ahead_for_match(catalogue, "U1", [4111, 4118], "Leopoldau S+U")
     assert result is not None
     assert result[-1]["name"] == "Leopoldau"
+
+
+# Tram 6 from Eichenstraße towards Geiereckstraße, cut down: the trams run
+# Matzleinsdorfer Platz, Knöllgasse, Quellenplatz; the route data also keeps
+# detours via Hauptbahnhof and Quartier Belvedere that end at the same stop.
+_SIX = {
+    399: (1, "Eichenstraße"),
+    400: (2, "Matzleinsdorfer Platz"),
+    401: (3, "Knöllgasse"),
+    402: (4, "Quellenplatz"),
+    403: (5, "Geiereckstraße"),
+    500: (6, "Hauptbahnhof"),
+    501: (7, "Quartier Belvedere"),
+    502: (8, "Columbusplatz"),
+    600: (9, "Döblinger Friedhof"),
+    601: (10, "Döblinger Friedhof, Felix-Dahn-Str."),
+}
+_REGULAR = (399, 400, 401, 402, 403)
+_DETOUR = (399, 400, 500, 501, 502, 402, 403)
+
+
+def _six_catalogue(*patterns: tuple[int, tuple[int, ...]]) -> StaticCatalogue:
+    stations = {
+        diva: Station(diva, name, "Wien", 16.35, 48.18, [rbl])
+        for rbl, (diva, name) in _SIX.items()
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            106: [TripPattern(106, pid, 1, stops) for pid, stops in patterns]
+        },
+        lines_by_label={"6": 106},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def _names(result: list[dict[str, object]] | None) -> list[object]:
+    assert result is not None
+    return [stop["name"] for stop in result]
+
+
+def test_stops_ahead_takes_the_route_most_patterns_share() -> None:
+    """The longest variant to the terminus was a detour the trams don't take."""
+    catalogue = _six_catalogue(
+        (1, _REGULAR),
+        (14, (399, 400, 401, 402)),  # a short run to Quellenplatz
+        (92, _REGULAR),
+        (132, _DETOUR),
+    )
+
+    result = stops_ahead_for_match(
+        catalogue, "6", [399], "Geiereckstraße", live_direction="H"
+    )
+
+    assert _names(result) == [
+        "Matzleinsdorfer Platz",
+        "Knöllgasse",
+        "Quellenplatz",
+        "Geiereckstraße",
+    ]
+
+
+def test_stops_ahead_follows_the_timetable_where_detours_outnumber() -> None:
+    """Three detour variants, one regular route: the shared route is the
+    detour, and only the stops the timetable has the line calling at say
+    otherwise."""
+    catalogue = _six_catalogue(
+        (1, _REGULAR), (10, _DETOUR), (11, _DETOUR), (12, _DETOUR)
+    )
+
+    guessed = stops_ahead_for_match(catalogue, "6", [399], "Geiereckstraße")
+    served = stops_ahead_for_match(
+        catalogue, "6", [399], "Geiereckstraße", served={2, 3, 4, 5}
+    )
+
+    assert "Quartier Belvedere" in _names(guessed)
+    assert _names(served) == [
+        "Matzleinsdorfer Platz",
+        "Knöllgasse",
+        "Quellenplatz",
+        "Geiereckstraße",
+    ]
+
+
+def test_terminus_key_reads_strasse_and_str_as_one() -> None:
+    """ "Straße" casefolds to "strasse", which the key has to shorten too:
+    the 40A's two spellings didn't compare equal, and the exact match the
+    test below relies on never happened."""
+    assert _terminus_key("Döblinger Friedhof/Felix-Dahn-Straße") == _terminus_key(
+        "Döblinger Friedhof, Felix-Dahn-Str."
+    )
+    assert _terminus_key("Felix-Dahn-Strasse") == _terminus_key("Felix-Dahn-Str.")
+    assert _terminus_key("Neustiftgasse") != _terminus_key("Neustift")
+
+
+@pytest.mark.parametrize(
+    ("towards", "terminus"),
+    [
+        # The live feed's spelling of the 40A's terminus.
+        ("Döblinger Friedhof/Felix-Dahn-Straße", "Döblinger Friedhof, Felix-Dahn-Str."),
+        ("Döblinger Friedhof", "Döblinger Friedhof"),
+    ],
+)
+def test_stops_ahead_prefers_the_terminus_spelt_alike(
+    towards: str, terminus: str
+) -> None:
+    """A partial name match no longer wins over the whole name in another
+    spelling: the two stops are 200 m apart."""
+    catalogue = _six_catalogue(
+        (1, (399, 400, 600)), (2, (399, 400, 601)), (3, (399, 400, 601))
+    )
+
+    result = stops_ahead_for_match(catalogue, "6", [399], towards)
+
+    assert _names(result)[-1] == terminus
+
+
+@pytest.mark.parametrize(
+    ("rbl", "direction"),
+    [
+        (399, "H"),  # only Direction 1 patterns leave it
+        (403, None),  # a terminus every pattern ends at, never leaves from
+        (999, None),  # no route passes it
+    ],
+)
+def test_direction_at_platform(rbl: int, direction: str | None) -> None:
+    catalogue = _six_catalogue((1, _REGULAR), (2, (500, 501, 502)))
+
+    assert direction_at_platform(catalogue, "6", rbl) == direction
+
+
+def test_direction_at_platform_both_ways_says_nothing() -> None:
+    catalogue = _six_catalogue((1, _REGULAR))
+    assert catalogue.trip_patterns is not None
+    catalogue.trip_patterns.patterns_by_line[106].append(
+        TripPattern(106, 2, 2, (403, 402, 401, 400, 399))
+    )
+
+    # Left both ways; 399 only ends the reverse route, so it stays H.
+    assert direction_at_platform(catalogue, "6", 400) is None
+    assert direction_at_platform(catalogue, "6", 399) == "H"
+    assert direction_at_platform(catalogue, "9", 400) is None
+
+
+def _badner_bahn() -> StaticCatalogue:
+    """The Badner Bahn's names as the open data has them: two stations
+    called "Lokalbahn" and one "Bahnhof", the town in `municipality`."""
+    stations = {
+        1: Station(1, "Eichenstraße", "Wien", 16.34, 48.18, [427]),
+        2: Station(2, "Bahnhof", "Wiener Neudorf", 16.32, 48.08, [10]),
+        3: Station(3, "Lokalbahn", "Guntramsdorf", 16.31, 48.05, [11]),
+        4: Station(4, "Lokalbahn", "Traiskirchen", 16.29, 48.01, [12]),
+        5: Station(5, "Josefsplatz", "Baden bei Wien", 16.23, 48.01, [13]),
+        6: Station(6, "Berggasse", "Wien", 16.36, 48.22, [14]),
+        7: Station(7, "Berggasse", "Wien", 16.30, 48.15, [15]),
+        8: Station(8, "Bahnhof", "Wiener Neudorf", 16.32, 48.08, [16]),
+    }
+    index = TripPatternIndex(
+        patterns_by_line={399: [TripPattern(399, 1, 1, (427, 10, 11, 12, 13))]},
+        lines_by_label={"WLB": 399},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def test_stops_sharing_a_name_outside_vienna_carry_their_town() -> None:
+    catalogue = _badner_bahn()
+
+    assert catalogue.stop_label(3) == "Guntramsdorf Lokalbahn"
+    assert catalogue.stop_label(4) == "Traiskirchen Lokalbahn"
+    assert catalogue.stop_label(2) == "Wiener Neudorf Bahnhof"
+    # A name no other stop has, Vienna's own namesakes, and a stop of
+    # another catalogue row: as the open data spells them.
+    assert catalogue.stop_label(5) == "Josefsplatz"
+    assert catalogue.stop_label(6) == "Berggasse"
+    assert catalogue.stop_label(99) is None
+    assert catalogue.index_by_rbl()[11] == (3, "Guntramsdorf Lokalbahn")
+    # The stop picker keeps the open data's name.
+    assert catalogue.stations_by_diva[3].name == "Lokalbahn"
+
+
+def test_a_stop_added_after_the_catalogue_was_built_reads_by_its_name() -> None:
+    catalogue = _badner_bahn()
+    catalogue.stations_by_diva[50] = Station(
+        50, "Lokalbahn", "Möllersdorf", 16.3, 48.0, []
+    )
+
+    assert catalogue.stop_label(50) == "Lokalbahn"
+
+
+def test_the_trail_names_each_stop_and_ends_a_short_run_at_its_town() -> None:
+    catalogue = _badner_bahn()
+
+    full = stops_ahead_for_match(catalogue, "WLB", [427], "Baden Josefspl.")
+    short = stops_ahead_for_match(catalogue, "WLB", [427], "Wiener Neudorf")
+
+    assert _names(full) == [
+        "Wiener Neudorf Bahnhof",
+        "Guntramsdorf Lokalbahn",
+        "Traiskirchen Lokalbahn",
+        "Josefsplatz",
+    ]
+    assert _names(short) == ["Wiener Neudorf Bahnhof"]
+
+
+def _shared_stations() -> StaticCatalogue:
+    """The Badner Bahn (LineID 399) and tram 62 through Bahnhof Meidling,
+    with the open data's names and DIVAs."""
+    stations = {
+        60200865: Station(60200865, "Dörfelstraße", "Wien", 16.33, 48.17, [1]),
+        60201015: Station(60201015, "Bhf. Meidling", "Wien", 16.33, 48.17, [2]),
+        60201160: Station(
+            60201160, "Bhf. Meidling, Schedifkaplatz", "Wien", 16.33, 48.17, [3]
+        ),
+        60205201: Station(60205201, "Bahnhof", "Wiener Neudorf", 16.32, 48.08, [4]),
+        60205022: Station(60205022, "Bahnhof", "Tribuswinkel", 16.27, 47.99, [5]),
+        70000001: Station(70000001, "Wienerbergbrücke", "Wien", 16.33, 48.16, [6]),
+    }
+    index = TripPatternIndex(
+        patterns_by_line={
+            399: [TripPattern(399, 1, 1, (1, 2, 3, 4, 5))],
+            162: [TripPattern(162, 1, 1, (1, 2, 6))],
+        },
+        lines_by_label={"WLB": 399, "62": 162},
+    )
+    return StaticCatalogue(
+        stations_by_diva=stations, last_fetched="t", trip_patterns=index
+    )
+
+
+def test_an_operators_own_line_uses_its_stop_names() -> None:
+    catalogue = _shared_stations()
+
+    assert trail_name(catalogue, 399, 60201015) == "Bahnhof Meidling"
+    assert trail_name(catalogue, 399, 60205022) == "Tribuswinkel Josefsthal"
+    # Another line at the same stop, and no line: the open data's name.
+    assert trail_name(catalogue, 162, 60201015) == "Bhf. Meidling"
+    assert trail_name(catalogue, None, 60201015) == "Bhf. Meidling"
+    # The open data's label where the operator has no name of its own.
+    assert trail_name(catalogue, 399, 70000001) == "Wienerbergbrücke"
+
+
+def test_a_badner_bahn_trail_reads_like_its_trains() -> None:
+    catalogue = _shared_stations()
+
+    full = stops_ahead_for_match(catalogue, "WLB", [1], "Baden Josefspl.")
+    short = stops_ahead_for_match(catalogue, "WLB", [1], "Wiener Neudorf")
+    tram = stops_ahead_for_match(catalogue, "62", [1], "Wienerbergbrücke")
+
+    assert _names(full) == [
+        "Bahnhof Meidling",
+        "Schedifkaplatz",
+        "Wiener Neudorf",
+        "Tribuswinkel Josefsthal",
+    ]
+    assert _names(short)[-1] == "Wiener Neudorf"
+    assert _names(tram) == ["Bhf. Meidling", "Wienerbergbrücke"]
 
 
 def test_stops_ahead_short_turn_truncates_tail_at_towards() -> None:

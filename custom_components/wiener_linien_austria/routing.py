@@ -32,6 +32,7 @@ EFA server already has. Measured and decided 2026-09-14.
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta, tzinfo
@@ -60,6 +61,7 @@ from .const import (
     DEFAULT_WALK_SPEED,
     EXCLUDABLE_MEANS,
     MAX_CHANGES_ANY,
+    ROUTE_KEEP_DEPARTED_SECONDS,
     ROUTE_TYPES,
     ROUTING_REQUEST_TIMEOUT_SECONDS,
     ROUTING_TIME_ZONE,
@@ -473,9 +475,9 @@ async def async_fetch_trip_body(
     """GET one request from the routing server and return the decoded JSON body.
 
     A trip request by default; timetable.py passes the departure-monitor
-    endpoint, which answers in the same envelope. Raises `RoutingError` for every failure so callers map one exception
-    type onto their own surface (UpdateFailed for the coordinator,
-    HomeAssistantError for the action).
+    endpoint, which answers in the same envelope. Raises `RoutingError` for
+    every failure so callers map one exception type onto their own surface
+    (UpdateFailed for the coordinator, HomeAssistantError for the action).
     """
     try:
         return await fetch_routing(
@@ -821,9 +823,8 @@ def assess_transfers(
             arrival = previous.destination.effective
             departure = leg.origin.effective
             if arrival is not None and departure is not None:
-                gap = round((departure - arrival).total_seconds() / 60)
                 total_walk = previous.walk_after_minutes + walk
-                slack = gap - total_walk
+                slack = transfer_slack(arrival, departure, total_walk)
                 risk: RiskLevel
                 if slack < 0:
                     risk = "at_risk"
@@ -851,6 +852,7 @@ def last_connection(
     now: datetime,
     arrive_by: datetime,
     max_wait: timedelta,
+    through_margin: timedelta,
 ) -> Trip | None:
     """The latest usable trip from an arrive-by query for the small hours.
 
@@ -859,6 +861,13 @@ def last_connection(
     00:50 S45, then 41 to 01:16, then U6 at 04:43, arriving 04:59). Those
     are dropped: any wait between two rides longer than `max_wait`, or an
     arrival after `arrive_by`. Of the rest, the one leaving last still ahead.
+
+    None when a usable trip arrives within `through_margin` of `arrive_by`:
+    the service then runs through the night and there is no last connection.
+    On the nights before Saturdays, Sundays and public holidays the U-Bahn
+    does (verified 2026-11-14, a Saturday: Westbahnhof to Praterstern every
+    15 minutes, the latest arriving 03:59), and the latest trip the server
+    finds is just the one before the query's own deadline.
     """
     usable = [
         trip
@@ -866,10 +875,15 @@ def last_connection(
         if not trip.cancelled
         and trip.departure is not None
         and trip.arrival is not None
-        and trip.departure >= now - timedelta(minutes=1)
+        and trip.departure >= now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
         and trip.arrival <= arrive_by
         and _longest_wait(trip) <= max_wait
     ]
+    if any(
+        trip.arrival is not None and trip.arrival > arrive_by - through_margin
+        for trip in usable
+    ):
+        return None
     return max(usable, key=lambda trip: trip.departure or now, default=None)
 
 
@@ -883,28 +897,100 @@ def _longest_wait(trip: Trip) -> timedelta:
     return longest
 
 
-def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
-    """Keep the useful connections, soonest first.
+def transfer_slack(arrival: datetime, departure: datetime, walk_minutes: int) -> int:
+    """Minutes to spare on a change; below zero the walk no longer fits.
 
-    1. Drop cancelled connections, and those that have already left `now`.
-       A query for a chosen time passes `now=None`: someone planning
-       tomorrow's trip, or checking what they could have caught, wants
-       every connection the server found for that time.
+    The gap between arriving and leaving, rounded to whole minutes the way
+    the server's own stamps are, less the walk. `assess_transfers` grades
+    by it and live.py moves a missed change onto a later vehicle by it, so
+    a change counts as missed by one rule everywhere.
+    """
+    return round((departure - arrival).total_seconds() / 60) - walk_minutes
+
+
+def usable_trips(
+    trips: Iterable[Trip],
+    now: datetime | None,
+    *,
+    arrive_by: datetime | None = None,
+    leave_at: datetime | None = None,
+) -> list[Trip]:
+    """The connections a query can offer, in `order_trips` order.
+
+    Drops cancelled connections, those without times, and those that have
+    already left `now`. A query for a chosen time passes `now=None`:
+    someone planning tomorrow's trip, or checking what they could have
+    caught, wants every connection the server found for that time. For an
+    arrive-by query it also drops those the server times to arrive after
+    `arrive_by`: asked to arrive by 08:00 it offered one arriving at 08:22
+    too (verified 2026-11-10). For a leave-at query it drops those that
+    leave before `leave_at`, to the minute: asked to leave at 13:02 it
+    offered a tram at 12:50 too, and at 12:47 a U3 at 12:46 (verified
+    2026-11-10). By the timetable, since that is the time the query asks
+    about, and the one the route card's "Später" steps by: judged by its
+    live time, a late train would answer the step that was meant to leave
+    it behind.
+
+    Nothing is compared here. That waits for live times (`best_trips`,
+    called from live.py): a connection that looks dominated on the
+    timetable can be the one that still works once a delay is known.
+    """
+    leave_from = leave_at.replace(second=0, microsecond=0) if leave_at else None
+    return order_trips(
+        (
+            trip
+            for trip in trips
+            if not trip.cancelled
+            and trip.departure is not None
+            and trip.arrival is not None
+            and (
+                now is None
+                or trip.departure
+                >= now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
+            )
+            and (arrive_by is None or trip.arrival <= arrive_by)
+            and (leave_from is None or _timetabled_departure(trip) >= leave_from)
+        ),
+        arrive_by=arrive_by,
+    )
+
+
+def _timetabled_departure(trip: Trip) -> datetime:
+    """When a connection leaves by the timetable, its live time if unknown."""
+    planned = trip.legs[0].origin.planned if trip.legs else None
+    departure = planned or trip.departure
+    assert departure is not None  # usable_trips checks trip.departure first
+    return departure
+
+
+def best_trips(
+    trips: Iterable[Trip], *, arrive_by: datetime | None = None
+) -> list[Trip]:
+    """Keep the useful connections, best first.
+
+    1. Drop cancelled connections, those without times, and repeats: the
+       same rides in the same order, which two connections moved onto the
+       same later vehicles can turn into.
     2. Drop dominated ones: B is dominated when some A departs no earlier,
        arrives no later, changes no more often and is no riskier — and is
        strictly better on at least one of those. Departure counts in the
        leaving-later direction, so the next few connections in time all
        survive; only a strictly worse alternative to one of them goes.
-    3. Order by departure, then arrival.
+    3. Order them with `order_trips`.
     """
-    candidates = [
-        trip
-        for trip in trips
-        if not trip.cancelled
-        and trip.departure is not None
-        and trip.arrival is not None
-        and (now is None or trip.departure >= now - timedelta(minutes=1))
-    ]
+    candidates: list[Trip] = []
+    seen: set[tuple[Any, ...]] = set()
+    for trip in trips:
+        rides = _rides(trip)
+        if (
+            trip.cancelled
+            or trip.departure is None
+            or trip.arrival is None
+            or rides in seen
+        ):
+            continue
+        seen.add(rides)
+        candidates.append(trip)
 
     def criteria(trip: Trip) -> tuple[float, float, int, int]:
         assert trip.departure is not None
@@ -928,8 +1014,54 @@ def rank_trips(trips: Iterable[Trip], now: datetime | None) -> list[Trip]:
             for other_key, other in scored
         )
     ]
-    survivors.sort(key=lambda trip: (trip.departure, trip.arrival))
-    return survivors
+    return order_trips(survivors, arrive_by=arrive_by)
+
+
+def order_trips(
+    trips: Iterable[Trip], *, arrive_by: datetime | None = None
+) -> list[Trip]:
+    """Connections best first: the first one is the one to take.
+
+    Leaving now or at a chosen time, the soonest departure comes first.
+    Arriving by a chosen time, the latest departure does: it still makes
+    it without leaving earlier than needed. Ties go to the sooner arrival.
+
+    Either way, a connection that no longer works goes behind every one
+    that does: one with a change that no longer fits (`at_risk`), whose
+    arrival counts on a vehicle it can no longer catch, and one that a
+    delay makes arrive after `arrive_by`.
+    """
+
+    def key(trip: Trip) -> tuple[bool, bool, float, float]:
+        departure, arrival = trip.departure, trip.arrival
+        misses = trip.risk == "at_risk" or (
+            arrive_by is not None and arrival is not None and arrival > arrive_by
+        )
+        leaves = departure.timestamp() if departure is not None else 0.0
+        arrives = arrival.timestamp() if arrival is not None else math.inf
+        return (
+            misses,
+            departure is None,
+            -leaves if arrive_by is not None else leaves,
+            arrives,
+        )
+
+    return sorted(trips, key=key)
+
+
+def _rides(trip: Trip) -> tuple[Any, ...]:
+    """The vehicles a connection uses: line, direction, where and when."""
+    return tuple(
+        (
+            leg.line,
+            leg.direction,
+            leg.origin.stop_id,
+            leg.origin.planned,
+            leg.destination.stop_id,
+        )
+        for leg in trip.legs
+        if not leg.walk
+    )
 
 
 # ---------------------------------------------------------------------------

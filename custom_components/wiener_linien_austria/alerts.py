@@ -1,10 +1,11 @@
-"""Traffic disruptions and elevator status from the Wiener Linien `/trafficInfoList` endpoint.
+"""Disruptions, lift and escalator outages from `/trafficInfoList`.
 
-Both user-visible alert types are surfaced by the same endpoint, just via the
+The user-visible alert types are surfaced by the same endpoint, just via the
 `name=` filter:
 
 - `stoerunglang` — line/route disruptions (scope: city-wide)
 - `aufzugsinfo` — elevator out-of-service notices (scope: per station + per RBL)
+- `fahrtreppeninfo` — escalator out-of-service notices, in the same shape
 
 All names travel in ONE request. `name=` may be repeated (Schnittstellen-
 dokumentation V1.5 §4.2.1), and the response tags every entry with a
@@ -21,19 +22,21 @@ than a few times an hour and aggregating across all entries keeps the
 integration's outbound request rate trivial. Each sensor filters the cached
 lists by its own (lines, RBLs) at attribute-read time.
 
-A third user-visible feed, `stoerungkurz` (the stop display's own short
+A further user-visible feed, `stoerungkurz` (the stop display's own short
 text, scoped to platforms), rides along in the same request — see
-`_parse_traffic_short`. One further category exists and is deliberately not
-requested yet: `fahrtreppeninfo` (escalator outages; parses with the same
-shape as `aufzugsinfo`). It would ride along for zero extra requests, but it
-needs sensor attributes, translations and card rendering to be useful, so it
-is its own change.
+`_parse_traffic_short`.
+
+Lift and escalator notices are not all current outages: both feeds also
+announce maintenance windows days ahead (2026-11-14: a lift "außer Betrieb"
+from 16.11. 20:45 to 00:45, an escalator for a night ten days out). They
+keep their `time_start`, and the card says "planned" until it has passed.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
@@ -48,14 +51,17 @@ from .api import (
 )
 from .const import (
     ALERT_FEED_ELEVATOR,
+    ALERT_FEED_ESCALATOR,
     ALERT_FEED_TRAFFIC,
     ALERT_FEED_TRAFFIC_SHORT,
     ALERTS_SEQ_KEY,
     DOMAIN,
     ELEVATOR_INFO_KEY,
+    ESCALATOR_INFO_KEY,
     TRAFFIC_INFO_KEY,
     USER_AGENT,
 )
+from .parsing import as_int_list, as_str_list
 from .rate_limit import async_enforce_domain_cooldown
 from .static import (
     StaticCatalogue,
@@ -102,6 +108,12 @@ class TrafficInfo:
     time_last_update: str | None = None  # when the alert was last edited
     category: str = ALERT_FEED_TRAFFIC
     related_stops: list[int] = field(default_factory=list)  # RBLs (short feed)
+    # The operator's own cause, since API V1.6: `reasonName` in German
+    # ("Rettungseinsatz", "Falschparker") and the coarser English
+    # `alertCause` ("accident"). None where the feed says "undefined" or
+    # "unknown", which it does on every short notice and some long ones.
+    reason: str | None = None
+    cause: str | None = None
     # Tracked lines calling at the matched platform, for a short notice that
     # names no lines of its own. Never set on the shared cache — only on the
     # per-sensor copy `get_alerts_for` hands out, because which lines count
@@ -143,12 +155,14 @@ class TrafficInfo:
             "time_last_update": self.time_last_update,
             "status": self.status,
             "category": self.category,
+            "reason": self.reason,
+            "cause": self.cause,
         }
 
 
 @dataclass(slots=True)
 class ElevatorInfo:
-    """One elevator outage."""
+    """One lift outage, or one escalator outage: the feeds share a shape."""
 
     name: str
     station: str
@@ -159,6 +173,16 @@ class ElevatorInfo:
     related_stops: list[int]  # RBLs where this elevator applies
     time_start: str | None
     time_end: str | None
+    # Which trains it serves, as the feed words it: "U6 Siebenhirten",
+    # "U1 beide Richtungen".
+    towards: str | None = None
+    # The lift's own number at its station ("JS 02"), since API V1.6.
+    # Escalators carry none.
+    elevator_id: str | None = None
+    # Which way a broken escalator runs: "up", "down", or "both" for one
+    # switched to suit the crowd. None for a lift, and where the text
+    # doesn't say (`_escalator_direction`).
+    direction: str | None = None
     # Pre-computed frozensets — see `TrafficInfo.related_lines_set` for
     # the rationale. Both the line and stop list participate in the
     # `get_alerts_for` matcher's intersection per attribute read.
@@ -185,6 +209,9 @@ class ElevatorInfo:
             "related_stops": list(self.related_stops),
             "time_start": self.time_start,
             "time_end": self.time_end,
+            "towards": self.towards,
+            "elevator_id": self.elevator_id,
+            "direction": self.direction,
         }
 
 
@@ -210,6 +237,7 @@ _REQUESTED_FEEDS: Final[tuple[str, ...]] = (
     ALERT_FEED_TRAFFIC,
     ALERT_FEED_TRAFFIC_SHORT,
     ALERT_FEED_ELEVATOR,
+    ALERT_FEED_ESCALATOR,
 )
 
 
@@ -302,7 +330,7 @@ def _split_by_category(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
 
 
 async def async_refresh_alerts(hass: HomeAssistant) -> bool:
-    """Refresh the traffic (long + short) and elevator alerts into hass.data.
+    """Refresh the traffic, lift and escalator alerts into hass.data.
 
     Safe to call whenever; a failed fetch keeps the previous cache. Returns
     False only for a failed fetch, which is what the periodic tick backs
@@ -326,7 +354,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
         return True
     domain_data = hass.data[DOMAIN]
 
-    # Fetch/parse failure → leave both caches exactly as they were. Only an
+    # Fetch/parse failure → leave the caches exactly as they were. Only an
     # actual successful 200 (possibly empty) overwrites — a legitimately
     # empty list must clear stale resolved entries. All feeds travel in one
     # request, so they succeed or fail together.
@@ -349,9 +377,13 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
         domain_data[ELEVATOR_INFO_KEY] = [
             _parse_elevator(x) for x in result[ALERT_FEED_ELEVATOR]
         ]
+        domain_data[ESCALATOR_INFO_KEY] = [
+            _parse_elevator(x) for x in result[ALERT_FEED_ESCALATOR]
+        ]
     else:
         domain_data.setdefault(TRAFFIC_INFO_KEY, [])
         domain_data.setdefault(ELEVATOR_INFO_KEY, [])
+        domain_data.setdefault(ESCALATOR_INFO_KEY, [])
 
     # Bump even on the failure path: the sensor cache treats "alerts seq
     # advanced" as "rebuild," and that's the cheapest signal we have. A
@@ -360,9 +392,10 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
     domain_data[ALERTS_SEQ_KEY] = int(domain_data.get(ALERTS_SEQ_KEY, 0)) + 1
 
     _LOGGER.debug(
-        "Alerts refreshed: %d traffic, %d elevator (failed=%s)",
+        "Alerts refreshed: %d traffic, %d elevator, %d escalator (failed=%s)",
         len(domain_data.get(TRAFFIC_INFO_KEY, [])),
         len(domain_data.get(ELEVATOR_INFO_KEY, [])),
+        len(domain_data.get(ESCALATOR_INFO_KEY, [])),
         failed,
     )
     return not failed
@@ -376,7 +409,7 @@ async def async_refresh_alerts(hass: HomeAssistant) -> bool:
 def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
     """Parse one trafficInfos entry for name=stoerunglang."""
     time = raw.get("time") or {}
-    related_lines = _as_str_list(raw.get("relatedLines"))
+    related_lines = as_str_list(raw.get("relatedLines"))
     attrs = raw.get("attributes") or {}
     line_types_raw = attrs.get("relatedLineTypes") or {}
     line_types: dict[str, str] = (
@@ -401,6 +434,8 @@ def _parse_traffic(raw: dict[str, Any]) -> TrafficInfo:
         time_created=_str_or_none(time.get("created")),
         time_last_update=_str_or_none(time.get("lastUpdate")),
         status=str(raw.get("status") or ""),
+        reason=_named_cause(raw.get("reasonName")),
+        cause=_named_cause(raw.get("alertCause")),
     )
 
 
@@ -434,8 +469,8 @@ def _parse_traffic_short(raw: dict[str, Any]) -> TrafficInfo:
         name=str(raw.get("name") or ""),
         title=title,
         description=description,
-        related_lines=_as_str_list(raw.get("relatedLines")),
-        related_stops=_as_int_list(raw.get("relatedStops")),
+        related_lines=as_str_list(raw.get("relatedLines")),
+        related_stops=as_int_list(raw.get("relatedStops")),
         time_start=_str_or_none(time.get("start")),
         time_end=_str_or_none(time.get("end")),
         # No upstream status on this feed. "active" is the honest value:
@@ -565,23 +600,32 @@ def _absorb_short(target: TrafficInfo, other: TrafficInfo) -> None:
 
 
 def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
-    """Parse one trafficInfos entry for name=aufzugsinfo.
+    """Parse one trafficInfos entry for name=aufzugsinfo or fahrtreppeninfo.
 
     Shape is less regular than stoerunglang — pulls fallbacks from
-    `attributes` when top-level fields are absent.
+    `attributes` when top-level fields are absent. An escalator's
+    description is a sentence or two with stray line breaks ("Diese Anlage
+    wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt
+    …\n\n"); the breaks between sentences are kept, the padding is not.
     """
     attrs = raw.get("attributes") or {}
     time = raw.get("time") or {}
 
-    related_lines = _as_str_list(raw.get("relatedLines")) or _as_str_list(
+    related_lines = as_str_list(raw.get("relatedLines")) or as_str_list(
         attrs.get("relatedLines")
     )
-    related_stops = _as_int_list(raw.get("relatedStops")) or _as_int_list(
+    related_stops = as_int_list(raw.get("relatedStops")) or as_int_list(
         attrs.get("relatedStops")
     )
 
     station = str(attrs.get("station") or raw.get("title") or "").strip()
-    description = str(raw.get("description") or attrs.get("location") or "").strip()
+    description = "\n".join(
+        line
+        for part in str(
+            raw.get("description") or attrs.get("location") or ""
+        ).splitlines()
+        if (line := _collapse_ws(part))
+    )
     reason = str(attrs.get("reason") or "").strip()
     status = str(attrs.get("status") or "").strip()
 
@@ -595,29 +639,43 @@ def _parse_elevator(raw: dict[str, Any]) -> ElevatorInfo:
         related_stops=related_stops,
         time_start=_str_or_none(time.get("start")),
         time_end=_str_or_none(time.get("end")),
+        towards=_str_or_none(attrs.get("towards")),
+        elevator_id=_str_or_none(raw.get("elevatorId")),
+        direction=_escalator_direction(description),
     )
 
 
-def _as_str_list(val: Any) -> list[str]:
-    """Coerce to a list of non-empty stripped strings."""
-    if isinstance(val, list):
-        return [str(x).strip() for x in val if isinstance(x, str) and x.strip()]
-    if isinstance(val, dict):
-        return [str(k).strip() for k in val if isinstance(k, str) and k.strip()]
-    return []
+# "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig …", "… in
+# Abwärtsrichtung …", "… in Auf/Abwärtsrichtung …": the template all 12
+# described escalators followed on 2026-11-14, the phrase sometimes after
+# the origin ("fährt vom Zwischengeschoß N-3 in Aufwärtsrichtung in das …").
+# The feed has no field for the direction, so it is read here once, for the
+# cards, the route's outage match and anyone reading the attribute.
+_ESCALATOR_DIRECTION_RE: Final = re.compile(
+    r"\bin\s+(auf/ab|auf|ab)wärtsrichtung\b", re.IGNORECASE
+)
+_ESCALATOR_DIRECTIONS: Final = {"auf": "up", "ab": "down", "auf/ab": "both"}
 
 
-def _as_int_list(val: Any) -> list[int]:
-    """Coerce to a list of ints, dropping non-numeric entries."""
-    if not isinstance(val, list):
-        return []
-    out: list[int] = []
-    for item in val:
-        try:
-            out.append(int(item))
-        except (ValueError, TypeError):
-            continue
-    return out
+def _escalator_direction(description: str) -> str | None:
+    """Which way the escalator a notice describes runs, if its text says."""
+    match = _ESCALATOR_DIRECTION_RE.search(description)
+    return _ESCALATOR_DIRECTIONS[match.group(1).lower()] if match else None
+
+
+# What the feed writes where it has no cause: `reasonName` "undefined",
+# `alertCause` "undefined alert cause" or "unknown" (ids 0 and 255).
+_NO_CAUSE: Final = frozenset({"undefined", "undefined alert cause", "unknown"})
+
+
+def _named_cause(val: Any) -> str | None:
+    """A `reasonName` / `alertCause` that names a cause, else None.
+
+    Told by the wording, not the id: the documentation lists no ids, and a
+    notice was seen with a real reason beside the category "unknown".
+    """
+    text = _str_or_none(val)
+    return None if text is None or text.casefold() in _NO_CAUSE else text
 
 
 def _str_or_none(val: Any) -> str | None:
@@ -690,15 +748,13 @@ def get_alerts_for(
       its DIVA. The tracked lines found there go out as `inferred_lines`
       so the card can badge a notice that otherwise names nothing. When
       the catalogue isn't loaded or doesn't know the platform, the entry
-      matches on RBL alone as before — a missing schedule must not hide
+      matches on RBL alone — a missing schedule must not hide
       notices.
 
       Every matched short entry also gets `location` set to its platform's
       station name, since upstream publishes none for this feed. Both
       additions land on a copy; the shared cache is never touched.
-    - Elevator: match if any `related_stops` overlaps `rbls`. If `rbls` is
-      empty/None, return []. An elevator outage with no `related_stops` is
-      only surfaced when it also matches on `related_lines`.
+    - Elevator: see `_match_outages`.
     """
     domain_data = hass.data.get(DOMAIN, {})
     all_traffic: list[TrafficInfo] = domain_data.get(TRAFFIC_INFO_KEY, []) or []
@@ -726,18 +782,85 @@ def get_alerts_for(
                     continue
         matched_traffic.append(_with_stop_context(t, hit, catalogue, inferred))
 
-    matched_elevator: list[ElevatorInfo] = []
-    if rbls:
-        for e in all_elevator:
-            stop_hit = bool(e.related_stops_set & rbls)
-            if stop_hit:
-                matched_elevator.append(e)
-                continue
-            # No explicit RBL match — fall back to line match if present.
-            if not e.related_stops and lines and e.related_lines_set & lines:
-                matched_elevator.append(e)
+    return matched_traffic, _match_outages(all_elevator, lines, rbls, catalogue)
 
-    return matched_traffic, matched_elevator
+
+def get_escalators_for(
+    hass: HomeAssistant,
+    lines: set[str] | None,
+    rbls: set[int] | None,
+) -> list[ElevatorInfo]:
+    """Escalator outages relevant to a given stop, matched like the lifts."""
+    all_escalator: list[ElevatorInfo] = (
+        hass.data.get(DOMAIN, {}).get(ESCALATOR_INFO_KEY, []) or []
+    )
+    return _match_outages(all_escalator, lines, rbls, current_catalogue(hass))
+
+
+def _match_outages(
+    outages: list[ElevatorInfo],
+    lines: set[str] | None,
+    rbls: set[int] | None,
+    catalogue: StaticCatalogue | None,
+) -> list[ElevatorInfo]:
+    """The lift or escalator outages at the platforms `rbls`.
+
+    Match if any `related_stops` overlaps `rbls`; with no `rbls`, nothing.
+
+    Some outages name no platforms, only a station and its lines (2026-11-14:
+    a lift at "Bahnhof Meidling" on the U6, an escalator at "Karlsplatz" on
+    the U1). Those show where their station is this stop's own, which is as
+    wide as a platform match: `rbls` holds every platform of the station.
+    Matched on the line alone, the Meidling lift was on every U6 stop. The
+    line is no help beside the station either: the Eichenstraße escalator
+    names "Unterflurstrassenbahn", which no tracked line is called. The
+    station is compared by name, the catalogue's "Bhf. Meidling" against
+    the feed's "Bahnhof Meidling" (`_station_key`). Without a catalogue,
+    or with one that knows none of these platforms, there is no name to
+    compare, and the line decides: a missing catalogue must not hide an
+    outage.
+    """
+    if not rbls:
+        return []
+    own_stations: set[str] | None = None
+    if catalogue is not None:
+        index = catalogue.index_by_rbl()
+        own_stations = {
+            _station_key(entry[1])
+            for rbl in rbls
+            if (entry := index.get(rbl)) is not None
+        }
+    return [
+        outage
+        for outage in outages
+        if outage.related_stops_set & rbls
+        or (
+            not outage.related_stops
+            and (
+                _station_key(outage.station) in own_stations
+                if own_stations
+                else bool(lines and outage.related_lines_set & lines)
+            )
+        )
+    ]
+
+
+def outage_station_matches(outage: ElevatorInfo, station_name: str) -> bool:
+    """Whether an outage names `station_name` (a catalogue name) as its station."""
+    return _station_key(outage.station) == _station_key(station_name)
+
+
+def _station_key(name: str) -> str:
+    """A station name as the outage feeds and the catalogue both spell it.
+
+    The catalogue abbreviates ("Bhf. Meidling") and marks interchanges
+    ("Karlsplatz U", "Praterstern S U"); the feeds write "Bahnhof Meidling",
+    "Karlsplatz", "Praterstern".
+    """
+    words = name.casefold().replace("bahnhof", "bhf").replace(".", " ").split()
+    while words and words[-1] in {"s", "u"}:
+        words.pop()
+    return " ".join(words)
 
 
 def _lines_at_platforms(

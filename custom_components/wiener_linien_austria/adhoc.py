@@ -20,7 +20,8 @@ upstream notices:
   per HA user (`ADHOC_USER_BURST`, `ADHOC_USER_BUDGET_PER_HOUR`) and one for
   the whole instance (`ADHOC_BURST`, `ADHOC_BUDGET_PER_HOUR`). The per-user
   bucket runs out first, so one noisy tab or script can't spend everybody's
-  share. Calls without a user (automations) share one bucket.
+  share. Calls without a user (automations) share one bucket. `budget` says
+  how much of it a user has left, so the card can warn before it runs out.
 - **Stale answer.** With the budget spent, a caller that allows it gets the
   last plan for the same query if it is at most `ADHOC_STALE_MAX_SECONDS`
   old, marked `stale`, instead of an error. Otherwise `AdhocRateLimited`.
@@ -55,7 +56,7 @@ from typing import Final
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, ROUTE_KEEP_DEPARTED_SECONDS
 from .live import (
     ADHOC_LEASE_SECONDS,
     apply_live,
@@ -87,15 +88,39 @@ ADHOC_CACHE_MAX_ENTRIES: Final = 32
 # makes 30-60. 120 leaves room for a busy
 # household and still caps a runaway client at a rate the upstream won't
 # notice.
+#
+# The bursts are sized for someone paging through connections: opening the
+# card and picking a time cost one each, then every Später or Früher past
+# the cache another. Five ran out four presses in, and paging is short and
+# deliberate, so ten per user, twenty for two people at once. The hourly
+# rates are what bound the steady load the upstream sees, and stay put: a
+# spent burst refills in ten minutes.
 ADHOC_BUDGET_PER_HOUR: Final = 120
-ADHOC_BURST: Final = 10
+ADHOC_BURST: Final = 20
 # Per HA user: one viewer's refresh rate plus room to pick a few pairs, so a
 # single user can never spend more than half the instance's budget.
 ADHOC_USER_BUDGET_PER_HOUR: Final = 60
-ADHOC_USER_BURST: Final = 5
+ADHOC_USER_BURST: Final = 10
 
 # Bucket for calls that carry no user, e.g. `plan_trip` from an automation.
 _NO_USER: Final = ""
+
+
+@dataclass(slots=True, frozen=True)
+class AdhocBudget:
+    """How many fresh plans a caller may ask for before having to wait.
+
+    `left` counts requests both buckets allow right now; a cached answer
+    costs none, so it is a floor. `next_in` is the seconds until `left` grows
+    by one, or None when it is already as high as it goes. `capacity` is
+    that height, and `refill_seconds` how often one comes back once spent,
+    by the slower bucket: together the rule the card spells out.
+    """
+
+    left: int
+    next_in: int | None
+    capacity: int
+    refill_seconds: int
 
 
 class AdhocRateLimited(Exception):
@@ -112,13 +137,15 @@ class AdhocPlan:
     """Ranked connections and when the upstream produced them.
 
     `stale` marks a plan served past its TTL because the budget was spent;
-    `retry_after` then says when a fresh one can be had.
+    `retry_after` then says when a fresh one can be had. `arrive_by` is the
+    deadline of an arrive-by query, which live times are ranked against.
     """
 
     trips: tuple[Trip, ...]
     fetched_at: datetime
     stale: bool = False
     retry_after: int | None = None
+    arrive_by: datetime | None = None
 
 
 class _TokenBucket:
@@ -132,15 +159,36 @@ class _TokenBucket:
         self._tokens = float(burst)
         self._refilled_at = now
 
-    def wait(self, now: float) -> int:
-        """Seconds until a token is available; 0 when one is now."""
+    @property
+    def burst(self) -> int:
+        """The most tokens the bucket holds."""
+        return int(self._burst)
+
+    @property
+    def seconds_per_token(self) -> int:
+        """How often a token comes back."""
+        return math.ceil(1 / self._rate)
+
+    def available(self, now: float) -> int:
+        """Whole tokens there are now."""
+        self._refill(now)
+        return math.floor(self._tokens)
+
+    def wait(self, now: float, need: int = 1) -> int:
+        """Seconds until `need` tokens are there; 0 when they are now.
+
+        `need` must not exceed `burst`, which the bucket never holds more of.
+        """
+        self._refill(now)
+        if self._tokens >= need:
+            return 0
+        return math.ceil((need - self._tokens) / self._rate)
+
+    def _refill(self, now: float) -> None:
         self._tokens = min(
             self._burst, self._tokens + (now - self._refilled_at) * self._rate
         )
         self._refilled_at = now
-        if self._tokens >= 1:
-            return 0
-        return math.ceil((1 - self._tokens) / self._rate)
 
     def take(self) -> None:
         """Spend one token. Call only right after `wait` returned 0."""
@@ -233,6 +281,8 @@ class AdhocPlanner:
             key[0].min_transfer_minutes,
             cooldown=False,
             lease_seconds=ADHOC_LEASE_SECONDS,
+            arrive_by=plan.arrive_by,
+            step_free=key[0].step_free,
         )
         return replace(plan, trips=tuple(trips))
 
@@ -243,14 +293,16 @@ class AdhocPlanner:
         No request: whatever the shared `/monitor` answer holds is used.
         """
         board = async_get_live_board(self._hass)
-        rbls = rbls_for_trips(
-            current_catalogue(self._hass), plan.trips, dt_util.utcnow()
-        )
+        catalogue = current_catalogue(self._hass)
+        rbls = rbls_for_trips(catalogue, plan.trips, dt_util.utcnow())
         board.lease(_lease_owner(key), rbls, ADHOC_LEASE_SECONDS)
-        if not rbls:
-            return plan
         trips = apply_live(
-            plan.trips, board.rows_for(rbls), key[0].min_transfer_minutes
+            plan.trips,
+            board.rows_for(rbls),
+            key[0].min_transfer_minutes,
+            catalogue=catalogue,
+            arrive_by=plan.arrive_by,
+            step_free=key[0].step_free,
         )
         return replace(plan, trips=tuple(trips))
 
@@ -270,7 +322,11 @@ class AdhocPlanner:
                 raise
             # Nothing left tonight is an answer, and worth caching.
             trips = []
-        plan = AdhocPlan(trips=tuple(trips), fetched_at=dt_util.utcnow())
+        plan = AdhocPlan(
+            trips=tuple(trips),
+            fetched_at=dt_util.utcnow(),
+            arrive_by=at if key[2] else None,
+        )
         if generation == self._generation:
             self._store(key, plan)
         return plan
@@ -319,10 +375,10 @@ class AdhocPlanner:
     def _drop_departed(plan: AdhocPlan, now: datetime) -> AdhocPlan:
         """Serve a cached plan without connections that left since.
 
-        Same one-minute grace as `rank_trips`. Returns `plan` itself when
+        Same one-minute grace as `usable_trips`. Returns `plan` itself when
         nothing left, so callers sharing a plan keep sharing the object.
         """
-        cutoff = now - timedelta(minutes=1)
+        cutoff = now - timedelta(seconds=ROUTE_KEEP_DEPARTED_SECONDS)
         kept = tuple(
             trip
             for trip in plan.trips
@@ -335,13 +391,7 @@ class AdhocPlanner:
 
         Returns 0 on success, else the seconds until both have one again.
         """
-        user_key = user_id or _NO_USER
-        user_bucket = self._user_buckets.get(user_key)
-        if user_bucket is None:
-            user_bucket = _TokenBucket(
-                ADHOC_USER_BURST, ADHOC_USER_BUDGET_PER_HOUR, loop_now
-            )
-            self._user_buckets[user_key] = user_bucket
+        user_bucket = self._user_bucket(user_id, loop_now)
         retry_after = max(user_bucket.wait(loop_now), self._bucket.wait(loop_now))
         if retry_after:
             _LOGGER.debug("Routing budget spent; next token in %d s", retry_after)
@@ -349,6 +399,33 @@ class AdhocPlanner:
         user_bucket.take()
         self._bucket.take()
         return 0
+
+    @callback
+    def budget(self, user_id: str | None) -> AdhocBudget:
+        """What `user_id` has left of both buckets. Spends nothing."""
+        loop_now = self._hass.loop.time()
+        buckets = (self._user_bucket(user_id, loop_now), self._bucket)
+        left = min(bucket.available(loop_now) for bucket in buckets)
+        capacity = min(bucket.burst for bucket in buckets)
+        return AdhocBudget(
+            left=left,
+            next_in=None
+            if left >= capacity
+            else max(bucket.wait(loop_now, left + 1) for bucket in buckets),
+            capacity=capacity,
+            refill_seconds=max(bucket.seconds_per_token for bucket in buckets),
+        )
+
+    def _user_bucket(self, user_id: str | None, loop_now: float) -> _TokenBucket:
+        """`user_id`'s bucket, full the first time it is asked for."""
+        user_key = user_id or _NO_USER
+        bucket = self._user_buckets.get(user_key)
+        if bucket is None:
+            bucket = _TokenBucket(
+                ADHOC_USER_BURST, ADHOC_USER_BUDGET_PER_HOUR, loop_now
+            )
+            self._user_buckets[user_key] = bucket
+        return bucket
 
     async def _async_tz(self) -> tzinfo:
         if self._tz is None:

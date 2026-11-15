@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+from dataclasses import replace
 from datetime import datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -21,11 +22,13 @@ from custom_components.wiener_linien_austria.routing import (
     Trip,
     assess_transfers,
     async_fetch_trip_body,
+    best_trips,
     build_trip_params,
+    order_trips,
     parse_time_option,
     parse_trip_body,
-    rank_trips,
     route_type_option,
+    usable_trips,
     within_window,
 )
 
@@ -286,8 +289,9 @@ def test_rank_drops_departed_cancelled_and_dominated() -> None:
     # Same departure, later arrival, one more change: dominated by `fast`.
     slow = Trip(legs=[_leg(_at(8, 5), _at(8, 15)), _leg(_at(8, 18), _at(8, 25))])
     later = Trip(legs=[_leg(_at(8, 10), _at(8, 26))])
-    ranked = rank_trips([later, slow, gone, cancelled, fast], now)
-    assert ranked == [fast, later]
+    usable = usable_trips([later, slow, gone, cancelled, fast], now)
+    assert usable == [fast, slow, later]
+    assert best_trips(usable) == [fast, later]
 
 
 def test_rank_keeps_a_safer_alternative() -> None:
@@ -299,7 +303,80 @@ def test_rank_keeps_a_safer_alternative() -> None:
     safe.transfers = assess_transfers(safe.legs, 2)
     assert risky.risk == "tight"
     assert safe.risk == "ok"
-    assert rank_trips([risky, safe], now) == [risky, safe]
+    assert best_trips(usable_trips([risky, safe], now)) == [risky, safe]
+
+
+def test_order_puts_a_missed_change_behind_working_connections() -> None:
+    """Soonest first on effective times; a change that no longer fits goes last."""
+    # Planned first, but live it leaves after the next connection.
+    late = Trip(
+        legs=[
+            replace(
+                _leg(_at(8, 0), _at(8, 20)), origin=_stop("A", _at(8, 0), _at(8, 12))
+            )
+        ]
+    )
+    on_time = Trip(legs=[_leg(_at(8, 5), _at(8, 25))])
+    slower = Trip(legs=[_leg(_at(8, 5), _at(8, 30))])
+    # Leaves first of all, but its change no longer fits.
+    broken = Trip(legs=[_leg(_at(8, 1), _at(8, 10)), _leg(_at(8, 9), _at(8, 18))])
+    broken.transfers = assess_transfers(broken.legs, 2)
+    assert broken.risk == "at_risk"
+    assert order_trips([late, broken, slower, on_time]) == [
+        on_time,
+        slower,
+        late,
+        broken,
+    ]
+    assert best_trips([broken, on_time]) == [on_time, broken]
+
+
+def test_arrive_by_drops_late_answers_and_puts_the_latest_departure_first() -> None:
+    by = _at(8, 0)
+    early = Trip(legs=[_leg(_at(7, 0), _at(7, 30))])
+    middle = Trip(legs=[_leg(_at(7, 15), _at(7, 40))])
+    latest = Trip(legs=[_leg(_at(7, 30), _at(7, 55))])
+    # The planner pads an arrive-by answer with one that misses the time.
+    after = Trip(legs=[_leg(_at(7, 45), _at(8, 10))])
+    assert usable_trips([early, after, latest, middle], None, arrive_by=by) == [
+        latest,
+        middle,
+        early,
+    ]
+    # A delay that makes the best one arrive late sends it behind the rest.
+    delayed = Trip(legs=[_leg(_at(7, 30), _at(7, 55), end_rt=_at(8, 3))])
+    assert order_trips([delayed, middle, early], arrive_by=by) == [
+        middle,
+        early,
+        delayed,
+    ]
+
+
+def test_leave_at_drops_what_leaves_before_the_time_by_the_timetable() -> None:
+    at = _at(13, 2)
+    # The planner pads a leave-at answer with connections from before it.
+    tram = Trip(legs=[_leg(_at(12, 50), _at(13, 18))])
+    a_minute_early = Trip(legs=[_leg(_at(13, 1), _at(13, 20))])
+    # Planned 13:01, live 13:05: still the 13:01, so a step past it stays past.
+    late = Trip(
+        legs=[
+            replace(
+                _leg(_at(13, 1), _at(13, 22)), origin=_stop("A", _at(13, 1), _at(13, 5))
+            )
+        ]
+    )
+    on_time = Trip(legs=[_leg(_at(13, 2), _at(13, 25))])
+    later = Trip(legs=[_leg(_at(13, 12), _at(13, 33))])
+    trips = [later, tram, late, on_time, a_minute_early]
+    # To the minute: 13:02:40 still keeps the 13:02.
+    leave_at = at + timedelta(seconds=40)
+    assert usable_trips(trips, None, leave_at=leave_at) == [on_time, later]
+
+
+def test_best_keeps_one_of_two_connections_on_the_same_vehicles() -> None:
+    first = Trip(legs=[_leg(_at(8, 5), _at(8, 20))])
+    again = Trip(legs=[_leg(_at(8, 5), _at(8, 20))])
+    assert len(best_trips([first, again])) == 1
 
 
 def test_trip_without_legs_has_no_times() -> None:
@@ -307,7 +384,8 @@ def test_trip_without_legs_has_no_times() -> None:
     assert empty.departure is None
     assert empty.arrival is None
     assert empty.duration_minutes is None
-    assert rank_trips([empty], _at(8, 0)) == []
+    assert usable_trips([empty], _at(8, 0)) == []
+    assert best_trips([empty]) == []
 
 
 # ---------------------------------------------------------------------------

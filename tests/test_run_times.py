@@ -31,6 +31,7 @@ from custom_components.wiener_linien_austria.const import (
     RUN_TIME_MAX_AGE,
     RUN_TIME_SWITCH_SPREAD,
     RUN_TIME_TOP_UP_AFTER,
+    STOP_NOTICES_ASK_AGAIN,
     TIMETABLE_RETRY_AFTER,
     USER_AGENT,
 )
@@ -46,7 +47,11 @@ from custom_components.wiener_linien_austria.run_times import (
     regime_at,
     regime_ends,
 )
-from custom_components.wiener_linien_austria.static import StaticCatalogue, Station
+from custom_components.wiener_linien_austria.static import (
+    StaticCatalogue,
+    Station,
+    TripPattern,
+)
 from custom_components.wiener_linien_austria.timetable import (
     build_departure_params,
     parse_departure_body,
@@ -59,6 +64,7 @@ VIENNA = ZoneInfo("Europe/Vienna")
 PRATERSTERN = 60201040
 MEIDLING = 60201015
 VORGARTENSTRASSE = 60201433
+DONAUINSEL = 60200234
 LEOPOLDAU = 60200769
 WESTBAHNHOF = 60201468
 KRIEAU = 60201893
@@ -70,6 +76,7 @@ NIGHT = datetime(2026, 10, 8, 21, 0, tzinfo=VIENNA)
 
 _MODULE = "custom_components.wiener_linien_austria.run_times"
 _FETCH = f"{_MODULE}.async_fetch_trip_body"
+_STOPS = "custom_components.wiener_linien_austria.skipped_stops"
 
 
 def _captured() -> dict[str, Any]:
@@ -123,6 +130,28 @@ def no_spread() -> Generator[None]:
     """
     with patch(f"{_MODULE}.random.random", return_value=0.0):
         yield
+
+
+@pytest.fixture(autouse=True)
+def news_fetch() -> Generator[AsyncMock]:
+    """`/newsList`, asked with every trail's run times: no notices."""
+    with patch(
+        f"{_STOPS}.fetch_news",
+        new_callable=AsyncMock,
+        return_value={"data": {"pois": []}, "message": {"messageCode": 1}},
+    ) as mock:
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def calls_fetch() -> Generator[AsyncMock]:
+    """A skipped station's own departures: an answer without any."""
+    with patch(
+        f"{_STOPS}.async_fetch_trip_body",
+        new_callable=AsyncMock,
+        return_value={"departureList": []},
+    ) as mock:
+        yield mock
 
 
 @pytest.fixture
@@ -334,6 +363,34 @@ async def test_first_ask_fetches_one_sample_for_the_whole_stop(
     assert len(answer.pairs) == 10
     assert answer.fetched_at == DAY
     assert answer.valid_until == datetime(2026, 10, 8, 19, 0, tzinfo=VIENNA)
+
+
+async def test_the_stops_served_are_read_from_the_samples_held(
+    hass: HomeAssistant,
+    board: MockConfigEntry,
+    dm_fetch: AsyncMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """What a departure board picks its trails' route by: no request."""
+    registry = async_get_run_times(hass)
+    assert registry.served(PRATERSTERN) == {}
+
+    freezer.move_to(DAY)
+    answer = await registry.async_get(PRATERSTERN)
+    served = registry.served(PRATERSTERN)
+
+    assert served[("U1", "H")] == frozenset(answer.pairs[("U1", "H")])
+    assert LEOPOLDAU in served[("U1", "H")]
+    assert set(served) == set(answer.pairs)
+    assert registry.served(MEIDLING) == {}
+    assert dm_fetch.await_count == 1
+
+    # A sample nobody renewed stops steering the route after its week.
+    freezer.move_to(DAY + RUN_TIME_MAX_AGE - timedelta(minutes=1))
+    assert registry.served(PRATERSTERN) == served
+    freezer.move_to(DAY + RUN_TIME_MAX_AGE)
+    assert registry.served(PRATERSTERN) == {}
+    assert dm_fetch.await_count == 1
 
 
 async def test_answers_outlive_the_switch_by_a_random_spread(
@@ -858,11 +915,323 @@ async def test_command_answers_by_the_names_the_trail_prints(
     )
     assert result["attribution"] == ATTRIBUTION
     assert dm_fetch.await_args.args[2] == USER_AGENT
+    # The catalogue's routes skip nothing, so no notices are asked for.
+    assert result["no_stop"] == {}
 
     # A second trail at the same stop is answered from the sample.
     again = await _ask(client, diva=PRATERSTERN, line="5", direction="H")
     assert again["result"]["run_times"] == result["run_times"]
     assert dm_fetch.await_count == 1
+
+
+async def test_command_answers_before_the_notices_and_asks_to_be_asked_again(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+    news_fetch: AsyncMock,
+) -> None:
+    _name_stops(
+        mock_static_catalogue,
+        {VORGARTENSTRASSE: "Vorgartenstraße", LEOPOLDAU: "Leopoldau"},
+    )
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+    free = asyncio.Event()
+
+    async def slot(_hass: HomeAssistant) -> None:
+        await free.wait()
+
+    with (
+        patch(f"{_STOPS}.async_enforce_domain_cooldown", side_effect=slot),
+        patch(f"{_STOPS}.STOP_NOTICES_WAIT_SECONDS", 0),
+    ):
+        # The real-time slot is taken: the times go out, the notices follow.
+        result = (await _ask(client, diva=PRATERSTERN, line="U1", direction="H"))[
+            "result"
+        ]
+        assert result["run_times"]["U1|H"] == {"Vorgartenstraße": 1, "Leopoldau": 14.4}
+        assert news_fetch.await_count == 0
+        assert (
+            datetime.fromisoformat(result["valid_until"])
+            == DAY + STOP_NOTICES_ASK_AGAIN
+        )
+
+        free.set()
+        await hass.async_block_till_done(wait_background_tasks=True)
+        result = (await _ask(client, diva=PRATERSTERN, line="U1", direction="H"))[
+            "result"
+        ]
+    assert news_fetch.await_count == 1
+    assert datetime.fromisoformat(result["valid_until"]) == datetime(
+        2026, 10, 8, 19, 0, tzinfo=VIENNA
+    )
+
+
+def _messestrasse(catalogue: StaticCatalogue) -> int:
+    """A U1 route from Praterstern over a station between Vorgartenstraße
+    (1 min) and Donauinsel (3 min), which the capture's U1 runs call at back
+    to back. Returns its DIVA."""
+    skipped = 60299999
+    _name_stops(
+        catalogue,
+        {VORGARTENSTRASSE: "Vorgartenstraße", DONAUINSEL: "Donauinsel"},
+    )
+    catalogue.stations_by_diva[skipped] = Station(
+        diva=skipped,
+        name="Messestraße",
+        municipality="Wien",
+        longitude=16.4,
+        latitude=48.22,
+        rbls=[93],
+    )
+    index = catalogue.index_by_rbl()
+    for rbl, diva, name in (
+        (91, PRATERSTERN, "Praterstern"),
+        (92, VORGARTENSTRASSE, "Vorgartenstraße"),
+        (93, skipped, "Messestraße"),
+        (94, DONAUINSEL, "Donauinsel"),
+    ):
+        index[rbl] = (diva, name)
+    patterns = catalogue.trip_patterns
+    assert patterns is not None
+    patterns.patterns_by_line[patterns.lines_by_label["U1"]].append(
+        TripPattern(line_id=1, pattern_id=104, direction=1, stops=(91, 92, 93, 94))
+    )
+    return skipped
+
+
+def _messestrasse_news() -> dict[str, Any]:
+    return {
+        "data": {
+            "pois": [
+                {
+                    "title": "U1: Messestraße, kein Halt Richtung Oberlaa",
+                    "description": "<h2>Bahnsteigsanierung</h2><p>Kein Halt.</p>",
+                    "relatedLines": ["U1"],
+                    "relatedStops": [93],
+                    "time": {
+                        "start": "2026-09-14T04:00:00.000+0200",
+                        "end": "2026-12-31T23:59:00.000+0100",
+                    },
+                }
+            ]
+        },
+        "message": {"messageCode": 1},
+    }
+
+
+def _leaving(clock: str, line: str = "U1", direction: str = "H") -> dict[str, Any]:
+    hour, minute = clock.split(":")
+    return {
+        "dateTime": {
+            "year": "2026",
+            "month": "10",
+            "day": "8",
+            "hour": hour,
+            "minute": minute,
+        },
+        "servingLine": {"number": line, "liErgRiProj": {"direction": direction}},
+    }
+
+
+async def test_command_names_the_stations_a_trail_passes_without_a_call(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+    news_fetch: AsyncMock,
+    calls_fetch: AsyncMock,
+) -> None:
+    skipped = _messestrasse(mock_static_catalogue)
+    news_fetch.return_value = _messestrasse_news()
+    # The station's own departures: one U1 towards Leopoldau calls there
+    # after all, at 12:41; a U2 at 13:10 shows how far the answer reaches.
+    calls_fetch.return_value = {
+        "departureList": [
+            _leaving("12:41"),
+            _leaving("12:44", direction="R"),
+            _leaving("13:10", line="U2"),
+        ]
+    }
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+    again = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert response["success"], response
+    result = response["result"]
+    assert result["no_stop"] == {"U1|H": {"Messestraße": "2026-12-31T23:59:00+01:00"}}
+    assert result["notices"] == {
+        "U1|H": {
+            "Messestraße": {
+                "title": "U1: Messestraße, kein Halt Richtung Oberlaa",
+                "text": "<h2>Bahnsteigsanierung</h2><p>Kein Halt.</p>",
+            }
+        }
+    }
+    assert result["calling"] == {
+        "U1|H": {
+            "Messestraße": {
+                "between": [1, 3],
+                "calls": ["2026-10-08T12:41:00+02:00"],
+                "from": "2026-10-08T12:41:00+02:00",
+                "until": "2026-10-08T13:10:00+02:00",
+            }
+        }
+    }
+    # Reaching only to 13:10, the departures are asked for again half an
+    # hour on, and so is the card.
+    assert datetime.fromisoformat(result["valid_until"]) == DAY + timedelta(minutes=30)
+    assert again["result"]["no_stop"] == result["no_stop"]
+    assert news_fetch.await_count == 1
+    assert calls_fetch.await_count == 1
+    assert calls_fetch.await_args.args[1][3] == ("name_dm", str(skipped))
+
+
+async def test_command_marks_a_station_a_notice_shuts_after_the_sample(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+    news_fetch: AsyncMock,
+    calls_fetch: AsyncMock,
+) -> None:
+    """The sample still has the trains calling; the notice and the station's
+    departures say they no longer do."""
+    skipped = _messestrasse(mock_static_catalogue)
+    dm_fetch.return_value = _body(
+        _run(
+            "U1",
+            "H",
+            [
+                _point(str(VORGARTENSTRASSE), 31),
+                _point(str(skipped), 32),
+                _point(str(DONAUINSEL), 33),
+            ],
+            minute=30,
+        )
+    )
+    news_fetch.return_value = _messestrasse_news()
+    calls_fetch.return_value = {"departureList": [_leaving("12:40", direction="R")]}
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    result = response["result"]
+    assert result["run_times"]["U1|H"]["Messestraße"] == 2
+    assert result["no_stop"] == {"U1|H": {"Messestraße": "2026-12-31T23:59:00+01:00"}}
+    assert result["calling"]["U1|H"]["Messestraße"]["calls"] == []
+
+
+async def test_command_falls_back_to_the_sample_without_the_departures(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+    calls_fetch: AsyncMock,
+) -> None:
+    _messestrasse(mock_static_catalogue)
+    calls_fetch.side_effect = RoutingError("api_timeout", {"seconds": "20"})
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    result = response["result"]
+    assert result["no_stop"] == {"U1|H": {"Messestraße": None}}
+    assert result["calling"] == {}
+    # The card asks again once a new attempt is allowed.
+    assert datetime.fromisoformat(result["valid_until"]) == DAY + timedelta(minutes=30)
+
+
+async def test_command_times_a_stop_the_timetable_knows_by_another_id(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+) -> None:
+    """N6 ends at Enkplatz on its route and at a stop the station list lacks
+    in the timetable."""
+    enkplatz, grillgasse = 60200425, 60201987
+    _name_stops(
+        mock_static_catalogue,
+        {VORGARTENSTRASSE: "Vorgartenstraße", enkplatz: "Enkplatz"},
+    )
+    index = mock_static_catalogue.index_by_rbl()
+    for rbl, diva, name in (
+        (91, PRATERSTERN, "Praterstern"),
+        (92, VORGARTENSTRASSE, "Vorgartenstraße"),
+        (96, enkplatz, "Enkplatz"),
+    ):
+        index[rbl] = (diva, name)
+    patterns = mock_static_catalogue.trip_patterns
+    assert patterns is not None
+    patterns.patterns_by_line[patterns.lines_by_label["U1"]].append(
+        TripPattern(line_id=1, pattern_id=105, direction=1, stops=(91, 92, 96))
+    )
+    dm_fetch.return_value = _body(
+        _run(
+            "U1",
+            "H",
+            [_point(str(VORGARTENSTRASSE), 32), _point(str(grillgasse), 35)],
+            minute=30,
+        )
+    )
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert response["result"]["run_times"]["U1|H"] == {
+        "Vorgartenstraße": 2,
+        "Enkplatz": 5,
+    }
+
+
+async def test_command_names_an_operators_stops_its_own_way(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+) -> None:
+    """Travel times join the trail by the names it prints, the operator's
+    where a line has its own (the Badner Bahn's in production)."""
+    _name_stops(mock_static_catalogue, {VORGARTENSTRASSE: "Vorgartenstraße"})
+    patterns = mock_static_catalogue.trip_patterns
+    assert patterns is not None
+    u1 = patterns.lines_by_label["U1"]
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    with patch.dict(
+        "custom_components.wiener_linien_austria.static.OPERATOR_STOP_NAMES",
+        {u1: {VORGARTENSTRASSE: "Vorgartenstraße (Messe)"}},
+    ):
+        response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert "Vorgartenstraße (Messe)" in response["result"]["run_times"]["U1|H"]
+    assert "Vorgartenstraße" not in response["result"]["run_times"]["U1|H"]
 
 
 async def test_command_passes_the_line_on_for_a_top_up(

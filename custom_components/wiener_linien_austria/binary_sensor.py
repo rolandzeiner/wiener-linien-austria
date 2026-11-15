@@ -155,20 +155,18 @@ class WienerLinienStaleBinarySensor(
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the inputs behind `is_on`, so a user can see why.
+        """Return the inputs behind `is_on` that only move when it might.
 
-        Small and fixed-size, unlike the stop sensor's payload — no
-        recorder exclusion needed.
+        Only values that change on a real event belong here. This entity
+        used to carry `server_time` and `seconds_since_server_time` too;
+        both move on every poll, and since HA writes a state whenever an
+        attribute changes, every coordinator push became a state change
+        and a fresh recorder row: ~1,400 a day per stop on a sensor that
+        reads `off` all day (measured on the live box, 2026-11-11). The
+        payload's age stays readable live as the stop sensor's
+        `server_time` attribute.
         """
-        parsed = self.coordinator.server_time_parsed
-        age = (
-            round((dt_util.utcnow() - parsed).total_seconds())
-            if parsed is not None
-            else None
-        )
         return {
-            "server_time": self.coordinator.server_time,
-            "seconds_since_server_time": age,
             "stale_after_seconds": self._threshold_seconds,
             "last_update_success": self.coordinator.last_update_success,
         }
@@ -195,10 +193,9 @@ class WienerLinienStaleBinarySensor(
 
         Cadence is the entry's own scan interval, so the worst-case
         detection lag is one interval past the threshold. Writes happen
-        only on a transition — `seconds_since_server_time` changes on
-        every evaluation, and writing unconditionally would push a state
-        change (and a recorder row) every interval, forever, on an entity
-        whose whole point is to be boring.
+        only on a transition: writing unconditionally would refresh
+        `last_reported` every interval, forever, on an entity whose whole
+        point is to be boring.
         """
         await super().async_added_to_hass()
         self._last_is_on = self.is_on
@@ -255,6 +252,12 @@ class WienerLinienRouteRiskBinarySensor(
     The trip planner sends no live times, but live.py applies the departure
     boards' ones to U-Bahn, tram and bus rides, so a late vehicle can turn it
     on. S-Bahn and train rides are graded on the timetable.
+
+    "Best" is the first connection ahead in `order_trips` order, which puts
+    every connection whose changes still fit before one whose change
+    doesn't. So it turns on only when no connection ahead in the list
+    works on current times; while one does, it is the next connection the
+    other route sensors show.
     """
 
     _attr_has_entity_name = True

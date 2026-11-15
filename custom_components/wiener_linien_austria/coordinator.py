@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -33,6 +33,7 @@ from .const import (
     STALE_DEPARTURE_MAX_AGE,
 )
 from .parsing import as_int
+from .run_times import async_get_run_times
 from .s_bahn_network import current_lines_at_diva as current_s_bahn_lines
 from .s_bahn_network import merge_transfer_lines
 from .static import (
@@ -41,6 +42,7 @@ from .static import (
     async_get_catalogue,
     canonical_line_key,
     current_catalogue,
+    direction_at_platform,
     is_s_bahn_label,
     stops_ahead_for_match,
 )
@@ -88,6 +90,12 @@ class Departure:
     # matches the row (replacement service, short-turn variant, etc.). The
     # card treats None and missing-key as identical: render no chevron.
     stops_ahead: list[dict[str, Any]] | None = None
+    # The direction the route data has this platform in, where it differs
+    # from `direction`, the feed's code (`static.direction_at_platform`).
+    # The trail follows it, and the card asks for travel times by it;
+    # `direction` stays as the feed says, which line selections and card
+    # filters were made with.
+    route_direction: str | None = None
     # A planned S-Bahn row from the timetable (timetable.py), not a live
     # `/monitor` row. The cards mark these so a planned time isn't read as
     # a live one.
@@ -111,6 +119,8 @@ class Departure:
         }
         if self.stops_ahead is not None:
             out["stops_ahead"] = self.stops_ahead
+        if self.route_direction is not None:
+            out["route_direction"] = self.route_direction
         if self.timetable:
             out["timetable"] = True
         return out
@@ -245,6 +255,8 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
     async def _async_setup(self) -> None:
         """Load the cached static catalogue and pluck this stop's coords.
 
+        Also reads the stored run-time samples (see `_parse_slice`).
+
         Auto-called by `async_config_entry_first_refresh()` per HA core
         contract — do NOT invoke from `async_setup_entry`. Failure is
         non-fatal: coords stay None and the sensor falls back to a
@@ -252,6 +264,9 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         usually already in hass storage from the config flow, so this is a
         memory read, not a network call.
         """
+        # The run-time samples guide which route the trails show; reading
+        # them now saves the first polls after a restart from guessing.
+        await async_get_run_times(self.hass).async_load()
         try:
             catalogue = await async_get_catalogue(self.hass)
         except CATALOGUE_LOAD_ERRORS as err:
@@ -450,6 +465,7 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
             entry_rbls=self._rbls,
             warned_lines=self._stops_ahead_warned_lines,
             s_bahn_lines_at_diva=current_s_bahn_lines(self.hass),
+            served=async_get_run_times(self.hass).served(self._diva),
         )
         self._note_stale_departures(data)
         self._last_monitor = data
@@ -625,6 +641,7 @@ def _parse_monitor_body(
     entry_rbls: list[int] | None = None,
     warned_lines: set[str] | None = None,
     s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
+    served: Mapping[tuple[str, str], Collection[int]] | None = None,
 ) -> MonitorData:
     """Parse a successful /monitor response into a MonitorData.
 
@@ -638,6 +655,10 @@ def _parse_monitor_body(
     rather than spamming on every poll.
 
     `s_bahn_lines_at_diva` adds the S-Bahn to the trails' transfer lines.
+
+    `served`, per line and direction, is the stops the timetable has the
+    line calling at from this stop (`RunTimes.served`): the trail shows the
+    route that agrees with it.
     """
     departures: list[Departure] = []
     stale_dropped = 0
@@ -688,17 +709,32 @@ def _parse_monitor_body(
     # (older payloads, hand-built test fixtures) falls through to
     # include-all.
     rbl_filter: set[int] | None = set(entry_rbls) if entry_rbls else None
+    # One departure per platform, line, terminus and planned time: the
+    # Badner Bahn's feed lists each Oper-bound train twice at a platform,
+    # live and as a timetable-only row. The live one stays.
+    seen: dict[tuple[int, str, str, str], int] = {}
+    # One route choice per platform, line, terminus and direction: every
+    # row of the same run pattern gets the same trail, and at a hub the
+    # choice (`static._shared_route` over all the line's route variants)
+    # was repeated for each of some forty rows on every poll. The rows
+    # share the list; nothing changes it after this.
+    trails: dict[
+        tuple[int | None, str, str, str | None], list[dict[str, Any]] | None
+    ] = {}
 
     for monitor in monitors:
-        if rbl_filter is not None:
-            monitor_rbl = as_int(
-                (monitor.get("locationStop") or {})
-                .get("properties", {})
-                .get("attributes", {})
-                .get("rbl")
-            )
-            if monitor_rbl is not None and monitor_rbl not in rbl_filter:
-                continue
+        monitor_rbl = as_int(
+            (monitor.get("locationStop") or {})
+            .get("properties", {})
+            .get("attributes", {})
+            .get("rbl")
+        )
+        if (
+            rbl_filter is not None
+            and monitor_rbl is not None
+            and monitor_rbl not in rbl_filter
+        ):
+            continue
         for line in monitor.get("lines") or []:
             line_name = str(line.get("name") or "").strip()
             if not line_name:
@@ -725,6 +761,14 @@ def _parse_monitor_body(
                 pattern_catalogue,
             ):
                 continue
+            route_direction = (
+                direction_at_platform(
+                    pattern_catalogue, line_name, monitor_rbl, line_id
+                )
+                if pattern_catalogue is not None and monitor_rbl is not None
+                else None
+            )
+            trail_direction = route_direction or direction
 
             for entry in (line.get("departures") or {}).get("departure") or []:
                 dep_time = entry.get("departureTime") or {}
@@ -747,17 +791,35 @@ def _parse_monitor_body(
                 vehicle_towards = str(vehicle.get("towards") or "").strip()
                 resolved_towards = vehicle_towards or line_towards
                 stops_ahead: list[dict[str, Any]] | None = None
-                if pattern_catalogue is not None and entry_rbls:
+                trail_key = (monitor_rbl, line_name, resolved_towards, trail_direction)
+                if trail_key in trails:
+                    stops_ahead = trails[trail_key]
+                elif pattern_catalogue is not None and entry_rbls:
                     try:
-                        stops_ahead = stops_ahead_for_match(
-                            pattern_catalogue,
-                            line_name,
+                        # The row's own platform first: the board's other
+                        # platforms carry other routes. All of them where
+                        # no route passes that one.
+                        for platforms in (
+                            [monitor_rbl] if monitor_rbl is not None else None,
                             entry_rbls,
-                            resolved_towards,
-                            live_direction=direction,
-                            line_id=line_id,
-                            s_bahn_lines_at_diva=s_bahn_lines_at_diva,
-                        )
+                        ):
+                            if not platforms:
+                                continue
+                            stops_ahead = stops_ahead_for_match(
+                                pattern_catalogue,
+                                line_name,
+                                platforms,
+                                resolved_towards,
+                                live_direction=trail_direction,
+                                line_id=line_id,
+                                s_bahn_lines_at_diva=s_bahn_lines_at_diva,
+                                served=(served or {}).get(
+                                    (line_name, trail_direction or "")
+                                ),
+                            )
+                            if stops_ahead is not None:
+                                break
+                        trails[trail_key] = stops_ahead
                     except Exception:
                         # Fail-soft: a single matcher hiccup must not poison
                         # the rest of the parse. `except Exception` (not
@@ -786,23 +848,34 @@ def _parse_monitor_body(
                                 exc_info=True,
                             )
                         stops_ahead = None
-                departures.append(
-                    Departure(
-                        line=line_name,
-                        towards=resolved_towards,
-                        direction=direction,
-                        type=line_type,
-                        countdown=countdown,
-                        time_planned=dep_time.get("timePlanned"),
-                        time_real=dep_time.get("timeReal"),
-                        realtime=realtime,
-                        barrier_free=barrier_free,
-                        traffic_jam=traffic_jam,
-                        platform=platform,
-                        cooling=cooling,
-                        stops_ahead=stops_ahead,
-                    )
+                departure = Departure(
+                    line=line_name,
+                    towards=resolved_towards,
+                    direction=direction,
+                    type=line_type,
+                    countdown=countdown,
+                    time_planned=dep_time.get("timePlanned"),
+                    time_real=dep_time.get("timeReal"),
+                    realtime=realtime,
+                    barrier_free=barrier_free,
+                    traffic_jam=traffic_jam,
+                    platform=platform,
+                    cooling=cooling,
+                    stops_ahead=stops_ahead,
+                    route_direction=(
+                        route_direction if route_direction != direction else None
+                    ),
                 )
+                planned = departure.time_planned
+                if monitor_rbl is not None and planned:
+                    key = (monitor_rbl, line_name, resolved_towards, planned)
+                    if key in seen:
+                        held = departures[seen[key]]
+                        if held.time_real is None and departure.time_real:
+                            departures[seen[key]] = departure
+                        continue
+                    seen[key] = len(departures)
+                departures.append(departure)
 
     departures.sort(key=_departure_sort_key)
     return MonitorData(

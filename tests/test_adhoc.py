@@ -291,6 +291,53 @@ async def test_one_user_cannot_spend_everyones_budget(
     await planner.async_plan(_query(99), user_id="phone")
 
 
+async def test_budget_says_what_a_user_has_left(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+    # Nothing spent yet: as many as a user may have, and none to wait for.
+    # One comes back a minute: the user's 60/h, the slower of the two rates.
+    assert planner.budget("tablet") == adhoc.AdhocBudget(
+        left=adhoc.ADHOC_USER_BURST,
+        next_in=None,
+        capacity=adhoc.ADHOC_USER_BURST,
+        refill_seconds=60,
+    )
+
+    await planner.async_plan(_query(0), user_id="tablet")
+    budget = planner.budget("tablet")
+    assert budget.left == adhoc.ADHOC_USER_BURST - 1
+    # 60/h gives one back every 60 s.
+    assert budget.next_in is not None
+    assert 0 < budget.next_in <= 60
+    # A cached answer costs nothing.
+    await planner.async_plan(_query(0), user_id="tablet")
+    assert planner.budget("tablet").left == adhoc.ADHOC_USER_BURST - 1
+    # Each user counts their own share.
+    assert planner.budget("phone").left == adhoc.ADHOC_USER_BURST
+
+    for n in range(1, adhoc.ADHOC_USER_BURST):
+        await planner.async_plan(_query(n), user_id="tablet")
+    spent = planner.budget("tablet")
+    assert spent.left == 0
+    # Exactly when the next request would be let through.
+    with pytest.raises(adhoc.AdhocRateLimited) as err:
+        await planner.async_plan(_query(99), user_id="tablet")
+    assert spent.next_in == err.value.retry_after
+
+
+async def test_budget_is_capped_by_the_whole_instance(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    await _load_route(hass)
+    planner = adhoc.async_get_planner(hass)
+    for n in range(adhoc.ADHOC_BURST - 2):
+        await planner.async_plan(_query(n), user_id=f"user{n}")
+    # A new user has a full share of their own, but only two left overall.
+    assert planner.budget("someone_new").left == 2
+
+
 async def test_instance_budget_caps_all_users_together(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
@@ -499,9 +546,16 @@ async def test_plan_budget_runs_out_and_says_when(
     client = await _connect(hass, hass_ws_client, freezer)
     hass.data[DOMAIN].pop(adhoc.ADHOC_PLANNER_KEY, None)
     with patch.object(adhoc, "ADHOC_BURST", 1):
-        assert (
-            await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)
-        )["success"]
+        first = await _plan(
+            client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ
+        )
+        assert first["success"]
+        # The answer says the budget is spent, when the next one is free,
+        # and the rule: one in a row here, then one every 60 s per user.
+        assert first["result"]["requests_left"] == 0
+        assert 0 < first["result"]["requests_next_in"] <= 30
+        assert first["result"]["requests_max"] == 1
+        assert first["result"]["requests_refill_s"] == 60
         # A cache hit costs nothing ...
         assert (
             await _plan(client, origin=STEPHANSPLATZ, destination=SCHWARZENBERGPLATZ)
@@ -606,6 +660,26 @@ async def test_plan_at_a_chosen_time(
     # "Now" plans don't carry a time.
     response = await _plan(client, **ends)
     assert response["result"]["planned_for"] is None
+
+
+async def test_a_plan_to_leave_at_a_time_offers_nothing_that_leaves_before_it(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+) -> None:
+    """The captured answer leaves at 07:57, 08:00, 08:03 and 08:05."""
+    client = await _connect(hass, hass_ws_client, freezer)
+    ends = {"origin": STEPHANSPLATZ, "destination": SCHWARZENBERGPLATZ}
+
+    leave = await _plan(client, **ends, datetime="2026-09-14T08:01")
+    assert [t["departure"][11:16] for t in leave["result"]["trips"]] == [
+        "08:03",
+        "08:05",
+    ]
+    # Arriving by a time isn't about when it leaves.
+    arrive = await _plan(client, **ends, datetime="2026-09-14T08:20", arrive_by=True)
+    assert len(arrive["result"]["trips"]) == 4
 
 
 async def test_a_plan_for_a_chosen_time_keeps_connections_that_left(

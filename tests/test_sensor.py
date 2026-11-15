@@ -245,6 +245,9 @@ async def test_attributes_carry_attribution_and_identity(hass: HomeAssistant) ->
     assert attrs["diva"] == 60201012
     assert attrs["stop_name"] == "Stephansplatz"
     assert attrs["server_time"] == "2026-04-20T14:40:00+0200"
+    # Live for the card, but kept out of history: it changes on every poll
+    # and would otherwise give each recorded state its own attributes row.
+    assert "server_time" in WienerLinienStopSensor._unrecorded_attributes
     # lat/lon must round-trip from coordinator → attributes; otherwise the
     # card's "show on map" link silently breaks.
     assert attrs["latitude"] == 48.2085

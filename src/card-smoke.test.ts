@@ -33,6 +33,7 @@ import "./wiener-linien-austria-flap-card.js";
 
 import type { HomeAssistant } from "./types.js";
 import { sorted } from "./utils.js";
+import { formatTime } from "./utils/time.js";
 
 interface CardElement extends HTMLElement {
   hass: HomeAssistant | undefined;
@@ -293,6 +294,195 @@ function unavailableHass(): HomeAssistant {
   };
   return hass;
 }
+
+describe("missing sensor", () => {
+  const OTHER = "sensor.praterstern_abfahrten";
+
+  /** The configured stop is gone (renamed sensor, removed entry) while
+   *  another Wiener Linien sensor still exists: the state in which the
+   *  cards used to swap in that other stop without saying so. */
+  function otherStopHass(): HomeAssistant {
+    const h = busyHass();
+    const stop = h.states[ENTITY]!;
+    const [first] = stop.attributes.departures as Array<Record<string, unknown>>;
+    delete h.states[ENTITY];
+    h.states[OTHER] = {
+      ...stop,
+      entity_id: OTHER,
+      attributes: {
+        ...stop.attributes,
+        stop_name: "Praterstern",
+        // What findWienerLinienEntities keys on; the busy fixture leaves it
+        // out because nothing else reads it.
+        next_by_line: {},
+        lines_at_stop: ["71"],
+        departures: [{ ...first, line: "71", towards: "Zentralfriedhof" }],
+      },
+    };
+    return h;
+  }
+
+  const warning = (el: CardElement) =>
+    [...shadow(el).querySelectorAll('ha-alert[alert-type="warning"]')].map(
+      (a) => a.textContent ?? "",
+    );
+  const rendered = (el: CardElement) => (shadow(el).textContent ?? "").replace(/\s+/g, "");
+
+  it.each([
+    [MODERN, { type: `custom:${MODERN}`, entities: [{ entity: ENTITY }] }, "71"],
+    [RETRO, { type: `custom:${RETRO}`, entity: ENTITY }, "71"],
+    [FLAP, { type: `custom:${FLAP}`, entities: [{ entity: ENTITY }] }, "7711"],
+  ])("%s names the missing sensor instead of showing another stop", async (tag, config, other) => {
+    const el = await mount(tag, otherStopHass(), config);
+    const alerts = warning(el);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toContain(`Sensor ${ENTITY} existiert nicht mehr`);
+    // Neither the other stop's board nor the "nothing picked" prompt,
+    // which would contradict the warning.
+    expect(rendered(el)).not.toContain(other);
+    expect(rendered(el)).not.toContain("KeineHaltestelleausgewählt");
+  });
+
+  it.each([
+    [MODERN, "U3"],
+    [FLAP, "UU33"],
+  ])("%s keeps the stops it has and warns about each one it hasn't", async (tag, expected) => {
+    const h = busyHass();
+    const el = await mount(tag, h, {
+      type: `custom:${tag}`,
+      entities: [{ entity: ENTITY }, { entity: OTHER }, { entity: "sensor.gone_abfahrten" }],
+    });
+    expect(warning(el)).toEqual([
+      expect.stringContaining(OTHER),
+      expect.stringContaining("sensor.gone_abfahrten"),
+    ]);
+    expect(rendered(el)).toContain(expected);
+  });
+
+  it.each([
+    [RETRO, { type: `custom:${RETRO}` }, "71"],
+    // The flap card reads its rows from the configured stops, so the
+    // auto-picked sensor fills only the station band.
+    [FLAP, { type: `custom:${FLAP}` }, "Praterstern"],
+  ])("%s still shows the first sensor while nothing is picked", async (tag, config, expected) => {
+    // The picker's stub state, not a missing sensor: the preview has to
+    // show something, and there is no id to warn about.
+    const el = await mount(tag, otherStopHass(), config);
+    expect(warning(el)).toHaveLength(0);
+    expect(rendered(el)).toContain(expected);
+  });
+
+  it.each(CARDS)("%s drops the warning once the sensor is back", async (tag, config, expected) => {
+    const el = await mount(tag, otherStopHass(), config);
+    expect(warning(el)).toHaveLength(1);
+    el.hass = busyHass();
+    await el.updateComplete;
+    expect(warning(el)).toHaveLength(0);
+    expect(rendered(el)).toContain(expected);
+  });
+});
+
+describe("lift and escalator outages", () => {
+  // The escalator texts and the lift announced for a later night are from
+  // the live feed on 2026-11-14.
+  const LIFT = {
+    name: "ftazS_711",
+    station: "Keplerplatz",
+    description: "U1 Mittelbahnsteig - Ausgang Keplerplatz",
+    reason: "An der Instandsetzung wird bereits gearbeitet.",
+  };
+  const LIFT_PLANNED = {
+    name: "ftazS_37",
+    station: "Josefstädter Straße",
+    description: "U6 Bahnsteig Richtung Siebenhirten - Ausgang Neulerchenfelder Straße",
+    reason: "An der Instandsetzung wird bereits gearbeitet.",
+    time_start: "2099-11-16T20:45:00.000+0100",
+    time_end: "2099-11-17T00:45:00.000+0100",
+  };
+  const ESCALATOR_UP = {
+    name: "ftazS_759",
+    station: "Enkplatz",
+    direction: "up",
+    description:
+      "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße.",
+    reason: "An der Instandsetzung wird bereits gearbeitet.",
+  };
+  const ESCALATOR_BOTH = {
+    name: "ftazS_760",
+    station: "Enkplatz",
+    direction: "both",
+    description:
+      "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
+    reason: "",
+  };
+
+  function outageHass(): HomeAssistant {
+    const hass = busyHass();
+    Object.assign(hass.states[ENTITY]!.attributes, {
+      elevator_info: [LIFT_PLANNED, LIFT],
+      escalator_info: [ESCALATOR_UP, ESCALATOR_BOTH],
+    });
+    return hass;
+  }
+  const titles = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".alert-title")].map((t) =>
+      (t.textContent ?? "").replace(/\s+/g, " ").trim(),
+    );
+  const icons = (el: CardElement): Array<string | null> =>
+    [...shadow(el).querySelectorAll(".alert > ha-icon:first-child")].map((i) =>
+      i.getAttribute("icon"),
+    );
+
+  it("leaves escalators out until their switch is on", async () => {
+    const el = await mount(MODERN, outageHass(), CARDS[0]![1]);
+    expect(icons(el)).toEqual(["mdi:elevator-passenger-off", "mdi:elevator-passenger-off"]);
+  });
+
+  it("lists escalators after the lifts, with the direction as icon and label", async () => {
+    const el = await mount(MODERN, outageHass(), {
+      ...CARDS[0]![1],
+      show_escalator_info: true,
+    });
+    expect(titles(el)).toEqual([
+      "U1 Mittelbahnsteig›Ausgang Keplerplatz",
+      "Rolltreppe aufwärts vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße",
+      "Rolltreppe auf- und abwärts vom Bahnsteig in das Zwischengeschoß",
+      "U6 Bahnsteig Richtung Siebenhirten›Ausgang Neulerchenfelder Straße",
+    ]);
+    expect(icons(el)).toEqual([
+      "mdi:elevator-passenger-off",
+      "mdi:escalator-up",
+      "mdi:escalator",
+      "mdi:elevator-passenger-off",
+    ]);
+    // The feed's other sentence is in the detail, not lost.
+    expect(shadow(el).querySelector(".alert-detail .alert-desc p")?.textContent).toBe(
+      "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.",
+    );
+  });
+
+  it("says an announced outage is planned, and puts it last", async () => {
+    const el = await mount(MODERN, outageHass(), CARDS[0]![1]);
+    const rows = [...shadow(el).querySelectorAll(".alert")];
+    expect(rows.map((row) => row.classList.contains("planned"))).toEqual([false, true]);
+    // The card prints the start in the viewer's own time zone, so the
+    // expected text is built the same way: 20:45 here, 19:45 on a UTC runner.
+    expect(rows[1]!.querySelector(".outage-planned")?.textContent?.trim()).toBe(
+      `Geplant ab ${formatTime(LIFT_PLANNED.time_start, "de")}`,
+    );
+    expect(formatTime(LIFT_PLANNED.time_start, "de")).toMatch(/^\d{2}\.11\., \d{2}:45$/);
+    expect(rows[0]!.querySelector(".outage-planned")).toBeNull();
+  });
+
+  it("shows escalators alone when the lifts are switched off", async () => {
+    const el = await mount(MODERN, outageHass(), {
+      ...CARDS[0]![1],
+      show_elevator_info: false,
+      show_escalator_info: true,
+    });
+    expect(icons(el)).toEqual(["mdi:escalator-up", "mdi:escalator"]);
+  });
+});
 
 describe("lost connection", () => {
   // An outage used to read as "Keine Abfahrten verfügbar", which is what an
@@ -914,12 +1104,20 @@ function timesHass(callWS: CallWS, timeReal?: string): HomeAssistant {
   return { ...hass, callWS };
 }
 
-function runTimesAnswer(runTimes: Record<string, Record<string, number>>): unknown {
+function runTimesAnswer(
+  runTimes: Record<string, Record<string, number>>,
+  noStop?: Record<string, Record<string, string | null>>,
+  calling?: Record<string, Record<string, unknown>>,
+  notices?: Record<string, Record<string, { title: string; text: string }>>,
+): unknown {
   return {
     diva: 60200959,
     fetched_at: "2026-09-09T14:30:00+00:00",
     valid_until: "2099-01-01T00:00:00+00:00",
     run_times: runTimes,
+    ...(noStop ? { no_stop: noStop } : {}),
+    ...(calling ? { calling } : {}),
+    ...(notices ? { notices } : {}),
   };
 }
 
@@ -994,6 +1192,24 @@ describe("show_stop_times", () => {
     expect(time?.getAttribute("title")).toBe("Voraussichtliche Ankunft 16:40");
   });
 
+  it("asks by the route's direction where the feed's code contradicts the platform", async () => {
+    // The Badner Bahn's live rows: H on the platform its trains leave R from.
+    const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|R": U3 }));
+    const hass = timesHass(callWS);
+    (
+      hass.states[ENTITY]!.attributes as { departures: Array<{ route_direction?: string }> }
+    ).departures[0]!.route_direction = "R";
+    const el = await mount(MODERN, hass, {
+      type: `custom:${MODERN}`,
+      entities: [{ entity: ENTITY }],
+      show_stop_times: true,
+    });
+    await openTrail(el);
+
+    expect(callWS).toHaveBeenCalledWith(expect.objectContaining({ direction: "R" }));
+    expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
+  });
+
   it("answers later renders and reopened trails from what it holds", async () => {
     const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
     const el = await mountTimes(callWS);
@@ -1059,6 +1275,185 @@ describe("show_stop_times", () => {
     await openTrail(el);
     expect(callWS).not.toHaveBeenCalled();
     expect(stopTimes(el)).toEqual([]);
+  });
+});
+
+describe("show_stop_times on a station the train goes through", () => {
+  // The timetable has no call at Neubaugasse: its run times skip it.
+  const U3 = { Zieglergasse: 2, Simmering: 6 };
+  const skipped = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".stops-ahead-stop.skipped .stops-ahead-name")].map(
+      (n) => n.textContent?.trim() ?? "",
+    );
+  const notes = (el: CardElement): string[] =>
+    [...shadow(el).querySelectorAll(".stops-ahead-skip")].map((n) => n.textContent?.trim() ?? "");
+
+  it("says the train doesn't stop there, and until when where a notice says", async () => {
+    const callWS = vi
+      .fn()
+      .mockResolvedValue(
+        runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: "2099-12-31T23:59:00+01:00" } }),
+      );
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(skipped(el)).toEqual(["Neubaugasse"]);
+    // Another year than this one, so the date carries it.
+    expect(notes(el)).toEqual(["Kein Halt bis 31.12.2099"]);
+    // No time there; the slot stays so the names keep their column.
+    expect(stopTimes(el)).toEqual(["16:40", "", "16:44"]);
+    // Nobody changes where the train doesn't stop: the 13A behind +1 goes,
+    // and with it the row's button, so the note is read as it stands.
+    const row = shadow(el).querySelector(".stops-ahead-stop.skipped .stops-ahead-row");
+    expect(row?.getAttribute("role")).toBeNull();
+    expect(row?.querySelector(".stops-ahead-other-toggle, .stops-ahead-line-chip")).toBeNull();
+  });
+
+  describe("with Wiener Linien's notice", () => {
+    // Neue Donau's notice as `/newsList` sent it on 2026-11-14, shortened.
+    const TEXT = [
+      "<h2>Bahnsteigsanierung</h2>\r\n<p>Wegen Sanierung des Bahnsteigs h&auml;lt die Linie U6",
+      "die Station Neue Donau U nur in Richtung Siebenhirten U ein.</p>\r\n",
+      '<p><span style="text-decoration: underline;"><strong>Zeitraum:</strong></span><br />',
+      "Montag, 14. September 2026 bis Ende 2026.</p>\r\n",
+      '<p><span style="text-decoration: underline;"><strong>Ersatz:</strong></span><br />',
+      "Fahren Sie weiter bis Floridsdorf U.</p><script>alert(1)</script>",
+    ].join(" ");
+    const answer = (text: string): unknown =>
+      runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: null } }, undefined, {
+        "U3|H": { Neubaugasse: { title: "U3: Neubaugasse, kein Halt", text } },
+      });
+    const noteButton = (el: CardElement): HTMLButtonElement | null =>
+      shadow(el).querySelector<HTMLButtonElement>("button.stops-ahead-skip--more");
+    const panel = (el: CardElement): HTMLElement | null =>
+      shadow(el).querySelector<HTMLElement>(".stops-ahead-notice");
+
+    it("turns the note into a button that unfolds the notice under the stop", async () => {
+      const el = await mountTimes(vi.fn().mockResolvedValue(answer(TEXT)));
+      await openTrail(el);
+
+      const button = noteButton(el)!;
+      expect(button.textContent?.replace(/\s+/g, " ").trim()).toBe(
+        "Kein Halt , Hinweis der Wiener Linien",
+      );
+      expect(button.getAttribute("aria-expanded")).toBe("false");
+      expect(panel(el)).toBeNull();
+
+      button.click();
+      await el.updateComplete;
+
+      expect(button.getAttribute("aria-expanded")).toBe("true");
+      const open = panel(el)!;
+      expect(button.getAttribute("aria-controls")).toBe(open.id);
+      expect(open.getAttribute("lang")).toBe("de");
+      expect(open.querySelector(".stops-ahead-notice-heading")?.textContent).toBe(
+        "Bahnsteigsanierung",
+      );
+      expect(
+        [...open.querySelectorAll(".alert-fact")].map((fact) => [
+          fact.querySelector("dt")?.textContent,
+          fact.querySelector("dd")?.textContent,
+        ]),
+      ).toEqual([
+        ["Zeitraum", "Montag, 14. September 2026 bis Ende 2026."],
+        ["Ersatz", "Fahren Sie weiter bis Floridsdorf U."],
+      ]);
+      // The feed's text is read as text: entities decoded, no markup kept.
+      expect(open.textContent).toContain("hält die Linie U6");
+      expect(open.querySelector("script, strong, h2")).toBeNull();
+      expect(open.textContent).not.toContain("alert(1)");
+      // The trail's own row stays shut: the tap was for the note.
+      expect(shadow(el).querySelector(".stops-ahead")).not.toBeNull();
+
+      button.click();
+      await el.updateComplete;
+      expect(panel(el)).toBeNull();
+    });
+
+    it("leaves the note as plain text where the notice has nothing to show", async () => {
+      const el = await mountTimes(vi.fn().mockResolvedValue(answer("")));
+      await openTrail(el);
+
+      expect(noteButton(el)).toBeNull();
+      expect(notes(el)).toEqual(["Kein Halt"]);
+    });
+  });
+
+  it("says no stop without a date where no notice gives one", async () => {
+    const callWS = vi
+      .fn()
+      .mockResolvedValue(runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: null } }));
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(notes(el)).toEqual(["Kein Halt"]);
+  });
+
+  describe("where some runs call there after all", () => {
+    // The trail's departure is planned 16:38: Zieglergasse 16:40, Simmering
+    // 16:44. Neubaugasse's own departures cover the afternoon.
+    const station = (calls: string[]): Record<string, Record<string, unknown>> => ({
+      "U3|H": {
+        Neubaugasse: {
+          between: [2, 6],
+          calls,
+          from: "2026-09-09T16:00:00+02:00",
+          until: "2026-09-09T20:00:00+02:00",
+        },
+      },
+    });
+    const noStop = { "U3|H": { Neubaugasse: "2099-12-31T23:59:00+01:00" } };
+
+    it("shows the time for a run that calls there", async () => {
+      const callWS = vi
+        .fn()
+        .mockResolvedValue(
+          runTimesAnswer({ "U3|H": U3 }, noStop, station(["2026-09-09T16:42:00+02:00"])),
+        );
+      const el = await mountTimes(callWS);
+      await openTrail(el);
+
+      expect(skipped(el)).toEqual([]);
+      expect(stopTimes(el)).toEqual(["16:40", "16:42", "16:44"]);
+    });
+
+    it("says until when for a run that goes through, by the next that stops", async () => {
+      const callWS = vi
+        .fn()
+        .mockResolvedValue(
+          runTimesAnswer({ "U3|H": U3 }, noStop, station(["2026-09-09T16:50:00+02:00"])),
+        );
+      const el = await mountTimes(callWS);
+      await openTrail(el);
+
+      expect(skipped(el)).toEqual(["Neubaugasse"]);
+      expect(notes(el)).toEqual(["Kein Halt bis 16:50 Uhr"]);
+    });
+
+    it("says no stop alone, without the date, once the runs that stop are past", async () => {
+      const callWS = vi
+        .fn()
+        .mockResolvedValue(
+          runTimesAnswer({ "U3|H": U3 }, noStop, station(["2026-09-09T16:20:00+02:00"])),
+        );
+      const el = await mountTimes(callWS);
+      await openTrail(el);
+
+      expect(notes(el)).toEqual(["Kein Halt"]);
+    });
+  });
+
+  it("drops the note once the stop is back", async () => {
+    const callWS = vi
+      .fn()
+      .mockResolvedValue(
+        runTimesAnswer({ "U3|H": U3 }, { "U3|H": { Neubaugasse: "2020-01-01T00:00:00+01:00" } }),
+      );
+    const el = await mountTimes(callWS);
+    await openTrail(el);
+
+    expect(skipped(el)).toEqual([]);
+    expect(notes(el)).toEqual([]);
   });
 });
 
@@ -1579,7 +1974,7 @@ describe("modern card dev mode", () => {
   it("injects a test disruption and lift outage, and opens the colour palette", async () => {
     const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
     const root = shadow(el);
-    const [traffic, elevator, colours] =
+    const [traffic, elevator, escalator, colours] =
       root.querySelectorAll<HTMLButtonElement>(".dev-strip button");
     const alerts = (): number => root.querySelectorAll(".alert-title").length;
     const before = alerts();
@@ -1591,6 +1986,11 @@ describe("modern card dev mode", () => {
     elevator!.click();
     await el.updateComplete;
     expect(root.querySelectorAll(".lift-path")).toHaveLength(1);
+
+    // The escalator shows only with its own switch on, which is off here.
+    escalator!.click();
+    await el.updateComplete;
+    expect(root.querySelectorAll(".outage-where")).toHaveLength(0);
 
     colours!.click();
     await el.updateComplete;

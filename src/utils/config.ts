@@ -311,6 +311,7 @@ export interface NormalisedModernConfigValidated {
   show_cooling: boolean;
   show_traffic_info: boolean;
   show_elevator_info: boolean;
+  show_escalator_info: boolean;
   show_delay: boolean;
   show_delay_colors: boolean;
   show_type_icon: boolean;
@@ -362,6 +363,7 @@ const MODERN_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "show_cooling",
   "show_traffic_info",
   "show_elevator_info",
+  "show_escalator_info",
   "show_delay",
   "show_delay_colors",
   "show_type_icon",
@@ -388,6 +390,7 @@ const MODERN_DEFAULTS: Omit<
   show_cooling: false,
   show_traffic_info: true,
   show_elevator_info: true,
+  show_escalator_info: false,
   show_delay: true,
   show_delay_colors: true,
   show_type_icon: false,
@@ -504,6 +507,7 @@ export function normaliseModernConfig(raw: Record<string, unknown>): NormalisedM
     show_cooling: asBool(raw.show_cooling, MODERN_DEFAULTS.show_cooling),
     show_traffic_info: asBool(raw.show_traffic_info, MODERN_DEFAULTS.show_traffic_info),
     show_elevator_info: asBool(raw.show_elevator_info, MODERN_DEFAULTS.show_elevator_info),
+    show_escalator_info: asBool(raw.show_escalator_info, MODERN_DEFAULTS.show_escalator_info),
     show_delay: showDelay,
     show_delay_colors:
       showDelay && asBool(raw.show_delay_colors, MODERN_DEFAULTS.show_delay_colors),
@@ -549,6 +553,7 @@ export interface NormalisedRetroConfigValidated {
   size: RetroSize;
   style: RetroStyle;
   flicker: boolean;
+  bloom: boolean;
   wheelchair_race: boolean;
   accessibility_only: boolean;
   message_ticker: boolean;
@@ -586,6 +591,7 @@ const RETRO_VALIDATED_KEYS: ReadonlySet<string> = new Set([
   "size",
   "style",
   "flicker",
+  "bloom",
   "wheelchair_race",
   "accessibility_only",
   "message_ticker",
@@ -650,6 +656,7 @@ export function normaliseRetroConfig(raw: WienerLinienRetroCardConfig): Normalis
     size: oneOf(RETRO_SIZES, raw.size, CARD_DEFAULTS.size.retro),
     style: oneOf(RETRO_STYLES, raw.style, "classic"),
     flicker: raw.flicker === true,
+    bloom: raw.bloom === true,
     wheelchair_race: raw.wheelchair_race === true,
     accessibility_only: raw.accessibility_only === true,
     message_ticker: raw.message_ticker === true,

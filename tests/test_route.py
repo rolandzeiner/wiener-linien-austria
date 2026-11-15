@@ -6,6 +6,7 @@ import copy
 import json
 import re
 from collections.abc import Generator
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -70,6 +71,7 @@ from custom_components.wiener_linien_austria.routing import (
     RoutingError,
     parse_trip_body,
 )
+from custom_components.wiener_linien_austria.sensor import WienerLinienRouteSensor
 from custom_components.wiener_linien_austria.static import (
     CATALOGUE_KEY,
     StaticCatalogue,
@@ -182,6 +184,9 @@ async def test_sensors_name_the_next_connection_not_one_that_left(
     assert hass.states.get(risk).attributes["risk"] == ahead.risk
     # The card filters the list itself and still gets all of it.
     assert len(state.attributes["trips"]) == 4
+    # Live, but kept out of history: it moves on every refresh.
+    assert "fetched_at" in state.attributes
+    assert "fetched_at" in WienerLinienRouteSensor._unrecorded_attributes
 
     # A live-time update writes the state too, with no refresh in between.
     # Ahead reaches 30 s past the departure, as on the card.
@@ -422,6 +427,110 @@ async def test_no_second_refresh_after_a_rollover(
     assert fetch.await_count == 2
 
 
+def _running_late(coordinator: WienerLinienRouteCoordinator, estimated: str) -> None:
+    """Move the first published connection's departure, as a `/monitor` answer does."""
+    trips = coordinator.data.trips
+    first = trips[0]
+    leg = first.legs[0]
+    origin = replace(leg.origin, estimated=dt_util.parse_datetime(estimated))
+    coordinator.data.trips = [
+        replace(first, legs=[replace(leg, origin=origin), *first.legs[1:]]),
+        *trips[1:],
+    ]
+
+
+async def test_a_late_departure_moves_the_rollover_without_a_request(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
+) -> None:
+    # Timed at 07:55 for the 07:57 connection: refresh at 07:57:40. Live
+    # times then put it at 07:58:30, so at 07:57:40 it is still ahead and
+    # the planner would only repeat itself.
+    freezer.move_to("2026-09-14 05:55:00+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+    held = coordinator.data
+    _running_late(coordinator, "2026-09-14 05:58:30+00:00")
+
+    freezer.move_to("2026-09-14 05:57:40+00:00")
+    await coordinator.async_refresh()
+    assert fetch.await_count == 1
+    assert coordinator.data is held
+    assert coordinator.last_update_success
+    # 50 s to the departure as it stands now, 30 s after it, 10 s of spread.
+    assert coordinator.update_interval == timedelta(seconds=90)
+
+    # Once it has left, the planner is asked as before.
+    freezer.move_to("2026-09-14 05:59:10+00:00")
+    await coordinator.async_refresh()
+    assert fetch.await_count == 2
+
+
+async def test_a_refresh_asked_for_before_the_rollover_asks_the_planner(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
+) -> None:
+    freezer.move_to("2026-09-14 05:55:00+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+
+    # `update_entity` a minute in: nothing has left, but somebody asked.
+    freezer.move_to("2026-09-14 05:56:00+00:00")
+    await coordinator.async_refresh()
+    assert fetch.await_count == 2
+
+
+async def test_a_moved_rollover_never_passes_the_scan_interval(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
+) -> None:
+    freezer.move_to("2026-09-14 05:55:00+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+    _running_late(coordinator, "2026-09-14 06:10:00+00:00")
+
+    # 160 s of the 300 s interval are gone: the wait is what is left of it.
+    freezer.move_to("2026-09-14 05:57:40+00:00")
+    await coordinator.async_refresh()
+    assert fetch.await_count == 1
+    assert coordinator.update_interval == timedelta(seconds=140)
+
+    freezer.move_to("2026-09-14 06:00:00+00:00")
+    await coordinator.async_refresh()
+    assert fetch.await_count == 2
+
+
+async def test_a_failed_refresh_is_not_held_back_next_time(
+    hass: HomeAssistant,
+    freezer: FrozenDateTimeFactory,
+    fetch: AsyncMock,
+    pinned_spread: None,
+) -> None:
+    freezer.move_to("2026-09-14 05:55:00+00:00")
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    coordinator: WienerLinienRouteCoordinator = entry.runtime_data
+
+    freezer.move_to("2026-09-14 05:58:30+00:00")
+    fetch.side_effect = ApiTimeoutError(20)
+    await coordinator.async_refresh()
+    assert fetch.await_count == 2
+    # The retry asks, whatever the held list looks like by then.
+    _running_late(coordinator, "2026-09-14 06:10:00+00:00")
+    freezer.tick(coordinator.update_interval or timedelta(0))
+    await coordinator.async_refresh()
+    assert fetch.await_count == 3
+
+
 async def test_distant_departure_keeps_the_scan_interval(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
@@ -450,7 +559,7 @@ async def test_a_connection_that_left_does_not_time_the_rollover(
     pinned_spread: None,
 ) -> None:
     # 07:57:30: the 07:57 connection left 30 s ago but is still in the list
-    # (rank_trips keeps it for a minute). The refresh waits for the 08:00 one
+    # (usable_trips keeps it for a minute). The refresh waits for the 08:00 one
     # rather than coming back in 60 s, which doubled the trip requests on a
     # frequent line.
     freezer.move_to("2026-09-14 05:57:30+00:00")
@@ -574,16 +683,24 @@ async def test_plan_trip_returns_connections(
 ) -> None:
     entry = route_entry()
     await async_setup_entry_and_wait(hass, entry)
+    by = {"datetime": "2026-09-14T08:30:00+02:00", "arrive_by": True}
     response = await hass.services.async_call(
         DOMAIN,
         "plan_trip",
-        {"config_entry_id": entry.entry_id, "arrive_by": True},
+        {"config_entry_id": entry.entry_id, **by},
         blocking=True,
         return_response=True,
     )
     assert response is not None
     assert response["origin"] == "Westbahnhof"
     assert len(response["trips"]) == 4
+    # Arriving by a time, the latest departure that makes it comes first.
+    assert [trip["departure"][11:16] for trip in response["trips"]] == [
+        "08:05",
+        "08:03",
+        "08:00",
+        "07:57",
+    ]
     assert dict(fetch.call_args.args[1])["itdTripDateTimeDepArr"] == "arr"
     # The same shape as the sensor's trips, so no catalogue means no coordinates.
     assert "latitude" not in response["trips"][0]["legs"][0]["origin"]
@@ -604,7 +721,7 @@ async def test_plan_trip_returns_connections(
     response = await hass.services.async_call(
         DOMAIN,
         "plan_trip",
-        {"config_entry_id": entry.entry_id, "arrive_by": True},
+        {"config_entry_id": entry.entry_id, **by},
         blocking=True,
         return_response=True,
     )
@@ -737,7 +854,12 @@ async def test_plan_trip_between_two_stops_by_name(
         DOMAIN,
         "plan_trip",
         # As a voice assistant hands it over: lower case, no accents needed.
-        {"origin": "stephansplatz", "destination": "60200123", "arrive_by": True},
+        {
+            "origin": "stephansplatz",
+            "destination": "60200123",
+            "datetime": "2026-09-14T08:30:00+02:00",
+            "arrive_by": True,
+        },
         blocking=True,
         return_response=True,
     )

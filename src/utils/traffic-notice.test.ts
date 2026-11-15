@@ -7,7 +7,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   iconForElevatorReason,
+  parseEscalatorNotice,
   parseTrafficNotice,
+  parseWorksNotice,
   splitLocationPath,
   trimTitleLinePrefix,
 } from "./traffic-notice.js";
@@ -191,6 +193,180 @@ describe("reason pictograms — substring landmines", () => {
 
   it("falls back to the neutral pictogram for an unknown reason", () => {
     expect(iconFor("etwas völlig anderes")).toBe("mdi:information-outline");
+  });
+});
+
+describe("parseTrafficNotice — the cause from the title", () => {
+  // Both from the live feed on 2026-11-14.
+  const FOLLOW_UP = "Nach einer Fahrtbehinderung kommt es zu unterschiedlichen Intervallen.";
+
+  it("takes the cause from the title when the text names none", () => {
+    const { facts } = parseTrafficNotice(FOLLOW_UP, "25: Rettungseinsatz");
+    expect(facts).toEqual([{ label: "Grund", value: "Rettungseinsatz", icon: "mdi:ambulance" }]);
+  });
+
+  it("knows a wrongly parked car", () => {
+    const { facts } = parseTrafficNotice(FOLLOW_UP, "60: Falschparker");
+    expect(facts).toEqual([{ label: "Grund", value: "Falschparker", icon: "mdi:tow-truck" }]);
+  });
+
+  it("reads a title naming several lines", () => {
+    const { facts } = parseTrafficNotice(FOLLOW_UP, "25, 26, 27: Gleisbauarbeiten");
+    expect(facts[0]).toMatchObject({ value: "Gleisbauarbeiten", icon: "mdi:excavator" });
+  });
+
+  it("keeps the cause the text gives, in either form", () => {
+    expect(parseTrafficNotice(TEMPLATED, "U1: Rettungseinsatz").facts).toEqual(
+      parseTrafficNotice(TEMPLATED).facts,
+    );
+    expect(parseTrafficNotice(PROSE, "U1: Polizeieinsatz").facts).toEqual(
+      parseTrafficNotice(PROSE).facts,
+    );
+  });
+
+  it("leaves a title alone that names an effect, not a cause", () => {
+    expect(parseTrafficNotice(FOLLOW_UP, "U1: Verspätungen").facts).toEqual([]);
+    expect(parseTrafficNotice(FOLLOW_UP, "Rettungseinsatz").facts).toEqual([]);
+  });
+
+  it("leaves a stop-display title alone, which is the notice's whole text", () => {
+    const title = "Gleisbauarbeiten\nBetrieb ab Knöllgasse";
+    expect(parseTrafficNotice(title, title).facts).toEqual([]);
+  });
+
+  it("leaves a sentence alone that merely contains a cause", () => {
+    const title = "13A: Umleitung über die Neubaugasse wegen einer Baustelle in der Kirchengasse";
+    expect(parseTrafficNotice(FOLLOW_UP, title).facts).toEqual([]);
+  });
+
+  it("prefers the feed's own reason over the title", () => {
+    // 2026-11-14: the title is the line's, the reason field the operator's.
+    expect(parseTrafficNotice(FOLLOW_UP, "60: Fahrtbehinderung", "Falschparker").facts).toEqual([
+      { label: "Grund", value: "Falschparker", icon: "mdi:tow-truck" },
+    ]);
+    // A reason the icon table doesn't know still shows.
+    expect(parseTrafficNotice(FOLLOW_UP, "U1: Verspätungen", "Fahrgastwechsel").facts).toEqual([
+      { label: "Grund", value: "Fahrgastwechsel", icon: "mdi:information-outline" },
+    ]);
+    expect(parseTrafficNotice(FOLLOW_UP, "3A: Umleitung", "Netzänderung").facts[0]?.icon).toBe(
+      "mdi:transit-detour",
+    );
+  });
+
+  it("keeps the text's fuller cause over the reason field", () => {
+    expect(parseTrafficNotice(TEMPLATED, "D: Gleisschaden", "Gleisschaden").facts).toEqual(
+      parseTrafficNotice(TEMPLATED).facts,
+    );
+  });
+
+  it("adds nothing to a notice without a text", () => {
+    expect(parseTrafficNotice("", "25: Rettungseinsatz")).toEqual({ blocks: [], facts: [] });
+  });
+});
+
+describe("parseEscalatorNotice", () => {
+  // All from the live feed on 2026-11-14.
+  it("takes the direction's words out of the place", () => {
+    expect(
+      parseEscalatorNotice(
+        "Fahrtreppe fährt in Aufwärtsrichtung vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße.",
+      ),
+    ).toEqual({
+      where: "vom Bahnsteig an die Oberfläche Ausgang Simmeringer Hauptstraße",
+      notes: [],
+    });
+    expect(
+      parseEscalatorNotice(
+        "Fahrtreppe fährt in Abwärtsrichtung vom Zwischengeschoß/Passage zum U1 Bahnsteig.",
+      ),
+    ).toMatchObject({ where: "vom Zwischengeschoß/Passage zum U1 Bahnsteig" });
+  });
+
+  it("finds the direction's words after the origin", () => {
+    expect(
+      parseEscalatorNotice(
+        "Fahrtreppe fährt vom Zwischengeschoß N-3 in Aufwärtsrichtung in das Zwischengeschoß N-1 (Stationswart).",
+      ),
+    ).toMatchObject({
+      where: "vom Zwischengeschoß N-3 in das Zwischengeschoß N-1 (Stationswart)",
+    });
+  });
+
+  it("keeps the extra sentence of an escalator switched either way", () => {
+    expect(
+      parseEscalatorNotice(
+        "Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet.\nFahrtreppe fährt in Auf/Abwärtsrichtung vom Bahnsteig in das Zwischengeschoß.",
+      ),
+    ).toEqual({
+      where: "vom Bahnsteig in das Zwischengeschoß",
+      notes: ["Diese Anlage wird betriebsabhängig auf- oder abwärts geschaltet."],
+    });
+  });
+
+  it("keeps a text whole that doesn't follow the template", () => {
+    expect(parseEscalatorNotice("Fahrtreppe beim Ausgang Ost")).toEqual({
+      where: "Fahrtreppe beim Ausgang Ost",
+      notes: [],
+    });
+    expect(parseEscalatorNotice("")).toEqual({ where: "", notes: [] });
+    expect(parseEscalatorNotice(undefined)).toEqual({ where: "", notes: [] });
+  });
+});
+
+describe("parseWorksNotice", () => {
+  it("lays out a notice with labels on their own lines", () => {
+    // U6 Neue Donau, `/newsList`, 2026-11-14.
+    const raw =
+      "<h2>Bahnsteigsanierung</h2>\r\n<p>Wegen Sanierung des Bahnsteigs h&auml;lt die Linie U6 die Station Neue Donau U nur in Richtung Siebenhirten U ein.<br />Sie erreichen die Station Neue Donau mit der U6 von Floridsdorf.</p>\r\n" +
+      '<p><span style="text-decoration: underline;"><strong>Zeitraum:</strong></span><br />Montag, 14. September 2026 bis Ende 2026.</p>\r\n' +
+      '<p><span style="text-decoration: underline;"><strong>Ma&szlig;nahmen:</strong></span><br />Die Station Neue Donau U wird in Richtung Floridsdorf U durchfahren.</p>';
+    expect(parseWorksNotice(raw)).toEqual({
+      heading: "Bahnsteigsanierung",
+      paras: [
+        "Wegen Sanierung des Bahnsteigs hält die Linie U6 die Station Neue Donau U nur in Richtung Siebenhirten U ein.",
+        "Sie erreichen die Station Neue Donau mit der U6 von Floridsdorf.",
+      ],
+      facts: [
+        { label: "Zeitraum", value: "Montag, 14. September 2026 bis Ende 2026." },
+        {
+          label: "Maßnahmen",
+          value: "Die Station Neue Donau U wird in Richtung Floridsdorf U durchfahren.",
+        },
+      ],
+    });
+  });
+
+  it("reads a label and its text on one line", () => {
+    // N31 Stammersdorf, the bus-stop notices' shape.
+    const raw =
+      "<p>Haltestellenauflassung der Linie N31 in Richtung Schwedenplatz U</p><p>Haltestelle: Stammersdorf<br />Dauer: Ab 30. September 2026, etwa 13:00 Uhr<br />Grund: Rohrleitungsarbeiten</p>";
+    expect(parseWorksNotice(raw)).toEqual({
+      heading: "",
+      paras: ["Haltestellenauflassung der Linie N31 in Richtung Schwedenplatz U"],
+      facts: [
+        { label: "Haltestelle", value: "Stammersdorf" },
+        { label: "Dauer", value: "Ab 30. September 2026, etwa 13:00 Uhr" },
+        { label: "Grund", value: "Rohrleitungsarbeiten" },
+      ],
+    });
+  });
+
+  it("keeps a text off the template as paragraphs, and a sentence with a colon whole", () => {
+    expect(
+      parseWorksNotice(
+        "<p>Die Station wird bis auf Weiteres ohne Halt durchfahren: bitte ausweichen.</p>",
+      ),
+    ).toEqual({
+      heading: "",
+      paras: ["Die Station wird bis auf Weiteres ohne Halt durchfahren: bitte ausweichen."],
+      facts: [],
+    });
+    expect(parseWorksNotice("")).toEqual({ heading: "", paras: [], facts: [] });
+    expect(parseWorksNotice(undefined)).toEqual({ heading: "", paras: [], facts: [] });
+  });
+
+  it("drops a label with nothing under it", () => {
+    expect(parseWorksNotice("<p>Sperre.</p><p>Hinweis:</p>").facts).toEqual([]);
   });
 });
 

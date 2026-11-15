@@ -34,9 +34,10 @@ import io
 import json
 import logging
 import re
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from itertools import pairwise
 from typing import Any, Final, NamedTuple
 
 import aiohttp
@@ -52,6 +53,7 @@ from .const import (
     GTFS_LINE_LABEL_ALIASES,
     LEGACY_LINE_LABELS,
     MAX_STOPS_AHEAD,
+    OPERATOR_STOP_NAMES,
     REALTIME_LINE_LABELS,
     S_BAHN_COLORS,
     S_BAHN_DEFAULT_COLOR,
@@ -343,25 +345,43 @@ class StaticCatalogue:
     stations_by_diva: dict[int, Station]
     last_fetched: str  # ISO 8601 UTC
     trip_patterns: TripPatternIndex | None = None
-    # Reverse index: RBL → (DIVA, station name). Built eagerly in
+    # Reverse index: RBL → (DIVA, stop label, see `stop_label`). Built eagerly in
     # `__post_init__` so concurrent first-access from two coroutines
     # can't both trigger a rebuild (lazy initialisation was a benign
     # but wasteful race). Survives every poll and only rebuilds when a
     # new catalogue is fetched (which replaces the whole instance).
-    # Tens of thousands of `_diva_for_rbl` / `_station_name_for_rbl`
+    # Tens of thousands of `_diva_for_rbl` / `_trail_name_for_rbl`
     # calls per coordinator tick collapse to dict lookups.
     _rbl_index: dict[int, tuple[int, str]] = field(
         default_factory=dict, repr=False, compare=False
     )
+    _labels: dict[int, str] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        """Build the RBL→(DIVA, name) index once at construction."""
+        """Build the stop labels and the RBL→(DIVA, label) index once."""
+        if not self._labels:
+            self._labels = _stop_labels(self.stations_by_diva)
         if not self._rbl_index:
             self._rbl_index = {
-                rbl: (diva, station.name)
+                rbl: (diva, self._labels[diva])
                 for diva, station in self.stations_by_diva.items()
                 for rbl in station.rbls
             }
+
+    def stop_label(self, diva: int) -> str | None:
+        """A stop's name as trails, travel times and notices print it.
+
+        The station name, with its town in front where stops outside
+        Vienna share a name: the Badner Bahn passes four stations called
+        just "Lokalbahn" in the open data (Neu-Guntramsdorf, Guntramsdorf,
+        Möllersdorf, Traiskirchen) and two called "Bahnhof", and the
+        timetable names them "Traiskirchen Lokalbahn" and "Wiener
+        Neudorf". The stop picker and entity names keep `Station.name`.
+        """
+        label = self._labels.get(diva)
+        if label is None and (station := self.stations_by_diva.get(diva)):
+            return station.name
+        return label
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
         """Return stations whose name contains the query (case-insensitive)."""
@@ -376,8 +396,53 @@ class StaticCatalogue:
         return results[:limit]
 
     def index_by_rbl(self) -> dict[int, tuple[int, str]]:
-        """Return the eager RBL → (DIVA, station name) reverse index."""
+        """Return the eager RBL → (DIVA, stop label) reverse index."""
         return self._rbl_index
+
+
+def trail_name(
+    catalogue: StaticCatalogue, line_id: int | None, diva: int
+) -> str | None:
+    """A stop's name on a trail of the line `line_id`.
+
+    The operator's own where it isn't Wiener Linien (`OPERATOR_STOP_NAMES`:
+    the Badner Bahn's "Schedifkaplatz", "Tribuswinkel Josefsthal"), else
+    the stop label. Trails, travel times and skipped stations all name a
+    stop through this, so the card can join them by name.
+    """
+    if line_id is not None:
+        own = OPERATOR_STOP_NAMES.get(line_id, {}).get(diva)
+        if own is not None:
+            return own
+    return catalogue.stop_label(diva)
+
+
+def _trail_name_for_rbl(
+    catalogue: StaticCatalogue, line_id: int | None, rbl: int
+) -> str | None:
+    diva = _diva_for_rbl(catalogue, rbl)
+    return trail_name(catalogue, line_id, diva) if diva is not None else None
+
+
+def _stop_labels(stations: Mapping[int, Station]) -> dict[int, str]:
+    """DIVA → `StaticCatalogue.stop_label`."""
+    uses: dict[str, int] = {}
+    for station in stations.values():
+        uses[station.name] = uses.get(station.name, 0) + 1
+    labels: dict[int, str] = {}
+    for diva, station in stations.items():
+        town = station.municipality
+        shared = uses[station.name] > 1
+        if (
+            shared
+            and town
+            and town != "Wien"
+            and town.casefold() not in station.name.casefold()
+        ):
+            labels[diva] = f"{town} {station.name}"
+        else:
+            labels[diva] = station.name
+    return labels
 
 
 # What `async_get_catalogue` can raise when neither the cache nor the network
@@ -1210,8 +1275,13 @@ def stops_ahead_for_match(
     live_direction: str | None = None,
     line_id: int | None = None,
     s_bahn_lines_at_diva: Mapping[int, Sequence[str]] | None = None,
+    served: Collection[int] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Resolve the next-stops list for a live monitor row.
+
+    `served` is the stops (DIVAs) the timetable has this line calling at
+    from here, where a run-time sample is held: the route that agrees with
+    it wins over the static data's own guess (`_shared_route`).
 
     `s_bahn_lines_at_diva` (s_bahn_network.py) adds the S-Bahn lines at each
     stop to its transfer lines, after the U-Bahn.
@@ -1229,8 +1299,8 @@ def stops_ahead_for_match(
     Linien convention: H=1, R=2) BEFORE the RBL-containment match. Without
     this filter, an entry that tracks both platforms at one DIVA (e.g.
     Taubstummengasse RBLs [4107 north, 4122 south]) would match patterns
-    in both directions and the longest-tail tiebreaker could pick the
-    wrong one for branching termini.
+    in both directions and the route picked among them (`_shared_route`)
+    could be the wrong one for branching termini.
 
     Returns None when no pattern matched (unknown line, replacement service,
     short-turn variant not in the schedule), an empty list when the matched
@@ -1276,54 +1346,40 @@ def stops_ahead_for_match(
     if not matching:
         return None
 
-    # Tiebreaker: prefer the pattern whose terminus station name matches
-    # `towards` (case-insensitive substring, both directions). Falls back
-    # to the longest-tail pattern when no terminus matches — produces the
-    # most informative list and is correct on a single-pattern line.
+    # Prefer the patterns whose terminus station name matches `towards`
+    # (case-insensitive substring, both directions); among them, or among
+    # all when none matches, the route most of the line's patterns share
+    # (`_shared_route`).
     needle = (towards or "").strip().casefold()
-    best: TripPattern | None = None
-    best_tail_len = -1
+    by_terminus: list[TripPattern] = []
     if needle:
+        # An exact match first: "Döblinger Friedhof/Felix-Dahn-Straße" is
+        # the 40A's terminus "Döblinger Friedhof, Felix-Dahn-Str.", and the
+        # substring test alone would settle for "Döblinger Friedhof", a stop
+        # 200 m away where only a few runs end.
+        wanted = _terminus_key(needle)
+        partial: list[TripPattern] = []
         for pattern in matching:
-            terminus_rbl = pattern.stops[-1]
-            terminus_name = _station_name_for_rbl(catalogue, terminus_rbl)
+            terminus_name = _trail_name_for_rbl(
+                catalogue, resolved_line_id, pattern.stops[-1]
+            )
             if not terminus_name:
                 continue
-            if needle in terminus_name.casefold() or terminus_name.casefold() in needle:
-                # Among matching-by-terminus patterns, prefer the one with
-                # the longest remaining tail from our RBL — handles cases
-                # where one branch's pattern is a prefix of another.
-                idx = _first_index_in_pattern(pattern, rbl_set)
-                tail_len = len(pattern.stops) - idx - 1 if idx >= 0 else -1
-                if tail_len > best_tail_len:
-                    best = pattern
-                    best_tail_len = tail_len
-    if best is None:
-        # No terminus match. Two cases to handle:
-        #
-        # 1) The caller had a terminus name but we couldn't disambiguate
-        #    by it (typo, casing variant, branching name not in any
-        #    pattern's terminus). Falling through to "longest tail" is
-        #    fine because a name was at least supplied — best-effort.
-        #
-        # 2) `towards` was empty (replacement-service row, malformed
-        #    monitor payload) AND multiple patterns / both directions
-        #    matched the RBL set. Picking the longest tail produces a
-        #    deterministic-but-arbitrary direction; surfacing arbitrary
-        #    "next 8 stops" as truth is worse than no panel. Return None
-        #    so the row renders without a chevron.
-        if not needle and len(matching) > 1:
-            distinct_dirs = {p.direction for p in matching}
-            if len(distinct_dirs) > 1:
-                return None
-        for pattern in matching:
-            idx = _first_index_in_pattern(pattern, rbl_set)
-            tail_len = len(pattern.stops) - idx - 1 if idx >= 0 else -1
-            if tail_len > best_tail_len:
-                best = pattern
-                best_tail_len = tail_len
-    if best is None:
+            terminus = _terminus_key(terminus_name)
+            if terminus == wanted:
+                by_terminus.append(pattern)
+            elif wanted in terminus or terminus in wanted:
+                partial.append(pattern)
+        by_terminus = by_terminus or partial
+    # `towards` empty (replacement-service row, malformed monitor payload)
+    # with patterns in both directions matching the RBL set: any pick would
+    # be an arbitrary direction, and surfacing arbitrary "next stops" as
+    # truth is worse than no panel. With a name that just matches no
+    # terminus (typo, a branch name no pattern ends at), a best effort is
+    # fine.
+    if not needle and len({p.direction for p in matching}) > 1:
         return None
+    best = _shared_route(catalogue, by_terminus or matching, matching, rbl_set, served)
 
     start_idx = _first_index_in_pattern(best, rbl_set)
     if start_idx < 0:
@@ -1354,7 +1410,7 @@ def stops_ahead_for_match(
         primary = primary.strip()
         if primary:
             for i, rbl in enumerate(tail):
-                name = _station_name_for_rbl(catalogue, rbl) or ""
+                name = _trail_name_for_rbl(catalogue, best.line_id, rbl) or ""
                 if not name:
                     continue
                 if primary in name.casefold():
@@ -1375,7 +1431,7 @@ def stops_ahead_for_match(
     full: list[dict[str, Any]] = []
     last_idx = len(tail) - 1
     for i, rbl in enumerate(tail):
-        name = _station_name_for_rbl(catalogue, rbl) or ""
+        name = _trail_name_for_rbl(catalogue, best.line_id, rbl) or ""
         diva = _diva_for_rbl(catalogue, rbl)
         if diva is None or not name:
             # An unknown RBL would render as an empty bullet; skip it
@@ -1400,6 +1456,187 @@ def stops_ahead_for_match(
     return full
 
 
+_TERMINUS_SEPARATORS: Final = re.compile(r"\s*[/,]\s*|\s+")
+
+
+def _terminus_key(name: str) -> str:
+    """A stop name as two spellings of the same terminus compare.
+
+    The live feed and the station list write the same stop differently:
+    "/" or ", " between its parts, "Straße" or "Str.".
+    """
+    # casefold() has already turned "ß" into "ss" by the time this compares.
+    key = name.casefold().replace("strasse", "str").replace("str.", "str")
+    return _TERMINUS_SEPARATORS.sub(" ", key).strip()
+
+
+def vehicle_reaches(
+    catalogue: StaticCatalogue,
+    line_label: str,
+    board_rbl: int,
+    towards: str,
+    live_direction: str | None,
+    alight_diva: int,
+) -> bool:
+    """Whether a live vehicle leaving `board_rbl` for `towards` calls at `alight_diva`.
+
+    live.py moves a missed connection onto a later vehicle by this, so a
+    wrong yes is the costly answer: it would send someone onto a
+    short-working that turns before their stop (half the U1 trains at
+    Reumannplatz end at Alaudagasse). Unlike `stops_ahead_for_match`, which
+    has to show some trail and so settles for the likeliest route, this
+    asks every route of the line that leaves the platform that way, cut
+    where `towards` names a stop on it, and says yes only when all of them
+    reach `alight_diva`. A `towards` no route has a stop for is a no.
+
+    `fahrwegverlaeufe` keeps every variant a line has run, diversions
+    included (three of tram 11's routes to Otto-Probst-Platz skip
+    Reumannplatz), so for many tram and bus lines this says no. That is
+    the safe answer: the caller then keeps to vehicles going where the
+    planned one goes. On the U-Bahn, where the variants are the
+    short-workings themselves, it says yes where it should (checked
+    against the 2026-11-10 data: U1 to Alaudagasse and to Oberlaa both
+    reach Alaudagasse from Reumannplatz).
+    """
+    patterns = catalogue.trip_patterns
+    wanted = _terminus_key(towards or "")
+    if patterns is None or not wanted:
+        return False
+    line_id = patterns.lines_by_label.get(line_label)
+    if line_id is None:
+        return False
+    candidates = [
+        pattern
+        for pattern in patterns.patterns_by_line.get(line_id, ())
+        if board_rbl in pattern.stops[:-1]
+    ]
+    # H="hin" is CSV Direction 1, R="retour" 2; lines that buck the
+    # convention fall back to every route through the platform.
+    if live_direction in ("H", "R"):
+        target = 1 if live_direction == "H" else 2
+        candidates = [p for p in candidates if p.direction == target] or candidates
+    runs: list[list[int | None]] = []
+    for pattern in candidates:
+        tail = pattern.stops[pattern.stops.index(board_rbl) + 1 :]
+        divas = [_diva_for_rbl(catalogue, rbl) for rbl in tail]
+        names = [
+            _terminus_key(_trail_name_for_rbl(catalogue, line_id, rbl) or "")
+            for rbl in tail
+        ]
+        # Where a vehicle for `towards` ends on this route: the stop named
+        # like it, spelled the same before one that only contains it.
+        end = next((i for i, name in enumerate(names) if name == wanted), None)
+        if end is None:
+            end = next(
+                (
+                    i
+                    for i, name in enumerate(names)
+                    if name and (wanted in name or name in wanted)
+                ),
+                None,
+            )
+        if end is not None:
+            runs.append(divas[: end + 1])
+    return bool(runs) and all(alight_diva in run for run in runs)
+
+
+def direction_at_platform(
+    catalogue: StaticCatalogue,
+    line_label: str,
+    rbl: int,
+    line_id: int | None = None,
+) -> str | None:
+    """The one direction ("H" or "R") a line's routes leave a platform in.
+
+    None when its routes pass the platform both ways (a terminus loop, a
+    single-track section) or none passes it. A live row's direction code
+    can contradict it: the Badner Bahn's live rows carry H on the
+    platform its Oper-bound trains use and R on the Baden-bound one, the
+    reverse of its route data and timetable (1,237 live rows at 173
+    platforms on 2026-11-10: every contradiction was one of those). The
+    platform is where the train is, so the trail goes by it.
+    """
+    patterns = catalogue.trip_patterns
+    if patterns is None:
+        return None
+    resolved = line_id if line_id in patterns.patterns_by_line else None
+    if resolved is None:
+        resolved = patterns.lines_by_label.get(line_label)
+    if resolved is None:
+        return None
+    directions = {
+        pattern.direction
+        for pattern in patterns.patterns_by_line.get(resolved, ())
+        if rbl in pattern.stops[:-1]
+    }
+    if directions == {1}:
+        return "H"
+    if directions == {2}:
+        return "R"
+    return None
+
+
+def _shared_route(
+    catalogue: StaticCatalogue,
+    candidates: Sequence[TripPattern],
+    matching: Sequence[TripPattern],
+    rbl_set: set[int],
+    served: Collection[int] | None = None,
+) -> TripPattern:
+    """The candidate pattern that runs where most of the line's patterns do.
+
+    `fahrwegverlaeufe` lists every variant a line has run: diversions,
+    depot runs, loops. Several end at the same terminus, and the longest
+    of them, which this used to pick, is often a rare one: tram 6 from
+    Eichenstraße to Geiereckstraße came out via Hauptbahnhof and Quartier
+    Belvedere (pattern 132) instead of Knöllgasse and Quellenplatz, where
+    the trams run; 30 to Stammersdorf via Am Spitz and Nordbrücke. The
+    trail then named stations the vehicle never serves, without a time.
+
+    Each step from a station to the next counts the `matching` patterns
+    (this line, this way, through the board) that take it, by station, not
+    platform. A candidate scores the mean over the steps after the board,
+    so the regular route outscores a detour of any length. Ties go to the
+    longer tail (a branch that is a prefix of another), then to the lower
+    pattern id. Checked on 2026-11-10 against 1,114 runs in the timetable
+    at 16 stops: every trail stop served on 94% of them, against 81% for
+    the longest tail.
+
+    Where the static data keeps more variants of a diversion than of the
+    regular route (49 from Volkstheater via Westbahnhof, 40 from
+    Schottentor via Michelbeuern), only the timetable knows better. With
+    `served`, the stops a run-time sample has the line calling at, a
+    candidate first scores its stops served less those not, and the shared
+    route only breaks ties.
+    """
+    tails = {
+        id(pattern): [
+            _diva_for_rbl(catalogue, rbl)
+            for rbl in pattern.stops[_first_index_in_pattern(pattern, rbl_set) + 1 :]
+        ]
+        for pattern in matching
+    }
+    steps: dict[tuple[int | None, int | None], int] = {}
+    for tail in tails.values():
+        for step in set(pairwise(tail)):
+            steps[step] = steps.get(step, 0) + 1
+
+    def rank(pattern: TripPattern) -> tuple[int, float, int, int]:
+        tail = tails.get(id(pattern), [])
+        agrees = (
+            sum(1 if diva in served else -1 for diva in tail if diva is not None)
+            if served
+            else 0
+        )
+        taken = list(pairwise(tail))
+        shared = (
+            sum(steps.get(step, 0) for step in taken) / len(taken) if taken else 0.0
+        )
+        return agrees, shared, len(tail), -pattern.pattern_id
+
+    return max(candidates, key=rank)
+
+
 def _first_index_in_pattern(pattern: TripPattern, rbl_set: set[int]) -> int:
     """Index of the first matching RBL in `pattern.stops`, or -1."""
     return next(
@@ -1422,12 +1659,6 @@ def _mot_by_label(
         for label, line_id in lines_by_label.items()
         if (mot := means_by_line.get(line_id))
     }
-
-
-def _station_name_for_rbl(catalogue: StaticCatalogue, rbl: int) -> str | None:
-    """Station name for an RBL, or None. O(1) via the catalogue's index."""
-    entry = catalogue.index_by_rbl().get(rbl)
-    return entry[1] if entry is not None else None
 
 
 def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:
