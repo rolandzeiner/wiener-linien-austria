@@ -2464,9 +2464,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       background: var(--leg-colour);
       --mdc-icon-size: 14px;
     }
-    .node--vehicle ha-icon {
-      display: block;
-    }
 
     /* The time takes its stop's weight: bold where you board and where you
        end up, regular where you only get off. */
@@ -2613,9 +2610,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .map-link:hover {
       color: var(--primary-text-color);
     }
-    .map-link ha-icon {
-      display: block;
-    }
 
     .access-line {
       display: flex;
@@ -2726,7 +2720,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .transfer-at ha-icon {
       --mdc-icon-size: 16px;
-      display: block;
     }
     .catchable {
       margin-top: 2px;
@@ -2756,7 +2749,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       cursor: pointer;
     }
     .replan ha-icon {
-      display: block;
       --mdc-icon-size: 16px;
     }
     .replan[disabled] {
@@ -2790,6 +2782,19 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .replan-back ha-icon {
       --mdc-icon-size: 18px;
       color: var(--primary-color);
+    }
+
+    /* Every icon on the strand is a flex box of exactly its glyph's size.
+       HA's ha-icon is an inline box around an inline-flex ha-svg-icon with
+       vertical-align: middle, so as a block, or as a flex item (which
+       blockifies it), it gets a text line box: taller than the glyph, with
+       the glyph about 2px below its centre. That sat the vehicle icons low
+       in their discs and the pins and chevrons low beside their text. */
+    .strand ha-icon {
+      display: flex;
+      flex: none;
+      width: var(--mdc-icon-size, 24px);
+      height: var(--mdc-icon-size, 24px);
     }
 
     /* Transfer grade. Enough buffer is a quiet line with a green check; a

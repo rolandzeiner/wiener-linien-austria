@@ -835,9 +835,6 @@ border: none;
 background: var(--leg-colour);
 --mdc-icon-size: 14px;
 }
-.node--vehicle ha-icon {
-display: block;
-}
 .stop-name {
 font-weight: 700;
 color: var(--primary-text-color);
@@ -962,9 +959,6 @@ inset: -4px;
 .map-link:hover {
 color: var(--primary-text-color);
 }
-.map-link ha-icon {
-display: block;
-}
 .access-line {
 display: flex;
 flex-wrap: wrap;
@@ -1070,7 +1064,6 @@ gap: 4px;
 }
 .transfer-at ha-icon {
 --mdc-icon-size: 16px;
-display: block;
 }
 .catchable {
 margin-top: 2px;
@@ -1093,7 +1086,6 @@ font-weight: 700;
 cursor: pointer;
 }
 .replan ha-icon {
-display: block;
 --mdc-icon-size: 16px;
 }
 .replan[disabled] {
@@ -1124,6 +1116,12 @@ cursor: pointer;
 .replan-back ha-icon {
 --mdc-icon-size: 18px;
 color: var(--primary-color);
+}
+.strand ha-icon {
+display: flex;
+flex: none;
+width: var(--mdc-icon-size, 24px);
+height: var(--mdc-icon-size, 24px);
 }
 .risk {
 display: inline-flex;
