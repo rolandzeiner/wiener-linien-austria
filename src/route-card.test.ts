@@ -249,7 +249,9 @@ describe("live state and frequency", () => {
     };
     const el = await mount(hass("x", { ...ACTIVE, trips: [onTime] }), { entity: ENTITY });
     const first = root(el).querySelector(".strand .leg")!;
-    expect(first.querySelector(".stop .live-mark")).not.toBeNull();
+    // On the ride line, not in the time gutter: it's the ride that is live.
+    expect(first.querySelector(".ride .live-mark")).not.toBeNull();
+    expect(first.querySelector(".gutter .live-mark")).toBeNull();
     expect(first.querySelector(".stop .delay")).toBeNull();
     expect(first.querySelector(".stop")?.textContent).toContain("Echtzeit");
     expect(first.querySelector(".ride-frequency")?.textContent?.trim()).toBe("alle 3 min");
@@ -630,8 +632,9 @@ describe("map links", () => {
   it("puts the platform with the ride's direction, not the stop name", async () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), { entity: ENTITY });
     const leg = root(el).querySelector(".strand .leg")!;
-    expect(leg.querySelector(".stop .platform")).toBeNull();
+    expect(leg.querySelector(".stop-name")?.textContent).toBe("Westbahnhof");
     expect(leg.querySelector(".ride .towards > .platform")?.textContent).toBe("Gleis 1");
+    expect(leg.querySelector(".ride .towards")?.textContent).toBe("Richtung Simmering, Gleis 1");
   });
 
   it("shows no pins when turned off", async () => {
@@ -682,8 +685,10 @@ describe("rendering", () => {
     const legRow = root(el).querySelector(".strand .leg")!;
     expect(legRow.querySelector(".ride .towards")?.textContent).toContain("Richtung Simmering");
     expect(legRow.querySelector(".ride-detail .stops-toggle")).not.toBeNull();
-    expect(root(el).querySelector(".transfer-at")?.textContent).toBe("Umstieg");
-    expect(t).toContain("4 min Fußweg");
+    // A change reads as one line, its buffer beside it.
+    expect(root(el).querySelector(".transfer-at")?.textContent?.trim()).toBe(
+      "Umstieg, 4 min Fußweg",
+    );
     expect(t).toContain("Knapp: 0 min Puffer");
     expect(t).toContain("U3: Verspätungen");
     expect(t).toContain("Datenquelle: Wiener Linien");
@@ -699,13 +704,34 @@ describe("rendering", () => {
     const risks = [...root(el).querySelectorAll(".risk")].map((r) => r.getAttribute("data-risk"));
     expect(risks).toContain("tight");
 
-    // The ride before a change hands over to the dotted walk; the last ride
-    // runs on into the destination node.
-    const legs = [...root(el).querySelectorAll(".strand > .leg")];
-    expect(legs.map((leg) => leg.classList.contains("leg--before-transfer"))).toEqual([
-      true,
-      false,
-    ]);
+    // The ride before a change ends in an arrival row that hands over to the
+    // dotted walk, and the next ride's boarding row picks it up. The last
+    // ride runs on into the destination row, which carries its colour.
+    const legs = [...root(el).querySelectorAll<HTMLElement>(".strand > .leg")];
+    expect(legs.map((leg) => !!leg.querySelector(".stop--arrive"))).toEqual([true, false]);
+    expect(
+      legs.map((leg) =>
+        leg.querySelector(".stop--board")!.classList.contains("stop--after-change"),
+      ),
+    ).toEqual([false, true]);
+    const end = root(el).querySelector<HTMLElement>(".strand > .stop--end")!;
+    const lastColour = legs[1]!.style.getPropertyValue("--leg-colour");
+    expect(lastColour).not.toBe("");
+    expect(end.style.getPropertyValue("--leg-colour")).toBe(lastColour);
+
+    // Where you board, the vehicle is the node on the rail; the badge line
+    // carries no second mode icon. The ride's own minutes sit in the gutter.
+    const board = legs[0]!.querySelector(".stop--board")!;
+    expect(board.querySelector(".node--vehicle ha-icon")?.getAttribute("icon")).toBe(
+      "mdi:subway-variant",
+    );
+    expect(legs[0]!.querySelector(".ride .type-icon")).toBeNull();
+    expect(legs[0]!.querySelector(".ride-detail .ride-duration")?.textContent?.trim()).toBe(
+      "7 min",
+    );
+    // Times sit in the gutter, the stop name on its own.
+    expect(board.querySelector(".gutter time")).not.toBeNull();
+    expect(board.querySelector(".stop-name time")).toBeNull();
   });
 
   it("says when the connections were last updated, in Vienna time", async () => {
@@ -1022,7 +1048,7 @@ describe("ad-hoc mode", () => {
       { type: "wiener_linien_austria/plan", origin: 60201468, destination: 60201040 },
     ]);
     expect(text(el)).toContain("Abfahrt in");
-    expect(root(el).querySelector(".transfer-at")?.textContent).toBe("Umstieg");
+    expect(root(el).querySelector(".transfer-at")?.textContent?.trim()).toMatch(/^Umstieg\b/);
     expect(text(el)).toContain("Zuletzt aktualisiert 07:49");
     // A plan that wasn't asked for right now isn't announced.
     expect(root(el).querySelector('p[role="status"]')?.textContent).toBe("");
