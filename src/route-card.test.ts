@@ -614,18 +614,22 @@ describe("map links", () => {
       entity: ENTITY,
     });
     const [ride, lastRide] = [...root(el).querySelectorAll(".strand .leg")];
-    const arrival = ride!.querySelector(".stop--arrive")!;
+    const change = ride!.nextElementSibling!;
+    const arrival = change.querySelector(".stop--arrive")!;
     expect(arrival.querySelector(".stop-name")?.textContent).toBe("Stephansplatz");
     expect(arrival.querySelector(".sr-only")?.textContent).toBe("Ankunft");
     // A late arrival reads like a late departure: planned struck, new time red.
     expect(arrival.querySelector("s.time-planned")?.textContent).toBe("08:04");
     expect(arrival.querySelector(".time-late")?.textContent).toBe("08:06");
     expect(arrival.querySelector(".node")).not.toBeNull();
-    // It comes after the stops in between, and before the change.
-    expect(ride!.lastElementChild).toBe(arrival);
-    expect(ride!.nextElementSibling?.classList.contains("transfer")).toBe(true);
+    // It follows the ride and opens the change, one item holding both so the
+    // dotted walk runs from its ring to the next boarding node in one piece.
+    expect(change.classList.contains("change")).toBe(true);
+    expect(change.firstElementChild).toBe(arrival);
+    expect(arrival.nextElementSibling?.classList.contains("transfer")).toBe(true);
+    expect(change.nextElementSibling).toBe(lastRide);
     // The last ride has no arrival row; the destination row is its end.
-    expect(lastRide!.querySelector(".stop--arrive")).toBeNull();
+    expect(lastRide!.nextElementSibling?.classList.contains("stop--end")).toBe(true);
     expect(root(el).querySelector(".stop--end .stop-name")?.textContent).toBe("Praterstern");
   });
 
@@ -704,17 +708,18 @@ describe("rendering", () => {
     const risks = [...root(el).querySelectorAll(".risk")].map((r) => r.getAttribute("data-risk"));
     expect(risks).toContain("tight");
 
-    // The ride before a change ends in an arrival row that hands over to the
-    // dotted walk, and the next ride's boarding row picks it up. The last
-    // ride runs on into the destination row, which carries its colour.
-    const legs = [...root(el).querySelectorAll<HTMLElement>(".strand > .leg")];
-    expect(legs.map((leg) => !!leg.querySelector(".stop--arrive"))).toEqual([true, false]);
+    // Ride, then the arrival and the change as one item in the arriving
+    // ride's colour, then the next ride; the last ride runs on into the
+    // destination row, which carries its colour.
+    const items = [...root(el).querySelectorAll<HTMLElement>(".strand > li")];
     expect(
-      legs.map((leg) =>
-        leg.querySelector(".stop--board")!.classList.contains("stop--after-change"),
-      ),
-    ).toEqual([false, true]);
-    const end = root(el).querySelector<HTMLElement>(".strand > .stop--end")!;
+      items.map((li) => ["leg", "change", "stop--end"].find((c) => li.classList.contains(c))),
+    ).toEqual(["leg", "change", "leg", "stop--end"]);
+    expect(items[1]!.style.getPropertyValue("--leg-colour")).toBe(
+      items[0]!.style.getPropertyValue("--leg-colour"),
+    );
+    const legs = [items[0]!, items[2]!];
+    const end = items[3]!;
     const lastColour = legs[1]!.style.getPropertyValue("--leg-colour");
     expect(lastColour).not.toBe("");
     expect(end.style.getPropertyValue("--leg-colour")).toBe(lastColour);

@@ -1683,28 +1683,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       <ol class="strand">
         ${legs.map((leg, i) => {
           const colour = this._lineStyle(leg.line ?? "", attrs).background;
-          const transfer: RouteTransferAttr | undefined = trip.transfers[i];
+          const next = legs[i + 1];
           return html`
             ${this._renderLeg(
               leg,
               colour,
               i === 0,
               attrs,
-              legs[i + 1],
               i === 0 ? walkAccess(trip, "start") : undefined,
               scope,
             )}
-            ${
-              transfer && i < legs.length - 1
-                ? this._renderTransfer(
-                    transfer,
-                    attrs,
-                    catchableDeparture(leg, transfer, legs[i + 1]!),
-                    leg.destination,
-                    legs[i + 1]!.origin,
-                  )
-                : nothing
-            }
+            ${next ? this._renderChange(leg, next, colour, trip.transfers[i], attrs) : nothing}
           `;
         })}
         ${
@@ -1740,7 +1729,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     colour: string,
     first: boolean,
     attrs: RouteAttrs,
-    nextLeg: RouteLegAttr | undefined,
     accessBefore?: RouteAccessStepAttr[],
     scope = "",
   ): TemplateResult {
@@ -1759,7 +1747,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     const platform = this._platformText(leg);
     return html`
       <li class="leg" style=${styleMap({ "--leg-colour": colour })}>
-        <div class=${first ? "row stop stop--board" : "row stop stop--board stop--after-change"}>
+        <div class="row stop stop--board">
           <span class="gutter">${this._renderStopTime(leg.origin)}</span>
           ${
             icon
@@ -1844,22 +1832,42 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             </ol>`
             : nothing
         }
+      </li>
+    `;
+  }
+
+  /** Getting off and changing, as one item of the strand: the arrival row,
+   *  then the change. One item so the walk is one dotted line from the
+   *  arrival ring down to the next boarding node. Drawn in pieces, a dotted
+   *  border spaces its dots per piece, and every join showed as a gap. */
+  private _renderChange(
+    leg: RouteLegAttr,
+    nextLeg: RouteLegAttr,
+    colour: string,
+    transfer: RouteTransferAttr | undefined,
+    attrs: RouteAttrs,
+  ): TemplateResult {
+    return html`
+      <li class="change" style=${styleMap({ "--leg-colour": colour })}>
+        <div class="row stop stop--arrive">
+          <span class="gutter"
+            ><span class="sr-only">${this._t("arrival")}</span>${this._renderStopTime(
+              leg.destination,
+            )}</span
+          >
+          <span class="node" aria-hidden="true"></span>
+          <span class="body"><span class="stop-name">${leg.destination.name}</span></span>
+          ${sameStop(leg.destination, nextLeg.origin) ? nothing : this._renderMapLink(leg.destination)}
+        </div>
         ${
-          nextLeg
-            ? html`<div class="row stop stop--arrive">
-              <span class="gutter"
-                ><span class="sr-only">${this._t("arrival")}</span>${this._renderStopTime(
-                  leg.destination,
-                )}</span
-              >
-              <span class="node" aria-hidden="true"></span>
-              <span class="body"><span class="stop-name">${leg.destination.name}</span></span>
-              ${
-                sameStop(leg.destination, nextLeg.origin)
-                  ? nothing
-                  : this._renderMapLink(leg.destination)
-              }
-            </div>`
+          transfer
+            ? this._renderTransfer(
+                transfer,
+                attrs,
+                catchableDeparture(leg, transfer, nextLeg),
+                leg.destination,
+                nextLeg.origin,
+              )
             : nothing
         }
       </li>
@@ -1974,7 +1982,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   ): TemplateResult {
     const walking = transfer.walk_minutes > 0;
     return html`
-      <li class="row transfer" data-risk=${transfer.risk}>
+      <div class="row transfer" data-risk=${transfer.risk}>
         <span class="gutter"></span>
         <span class="rail" aria-hidden="true"></span>
         <span class="body">
@@ -1995,7 +2003,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
           }
         </span>
         ${this._renderReplan(transfer, arrival, boarding)}
-      </li>
+      </div>
     `;
   }
 
@@ -2397,7 +2405,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .transfer:has(> .replan) .body > * {
       grid-column: 3;
     }
-    /* Rail pieces: solid in the line colour on a ride, dotted on a change. */
+    /* Rail pieces in the line colour: each ride row paints its own. */
     .row::before {
       content: "";
       position: absolute;
@@ -2414,23 +2422,35 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .stop--end::before {
       bottom: calc(100% - var(--node-centre));
     }
-    .transfer::before,
-    .stop--arrive::after,
-    .stop--after-change::after {
+    .transfer::before {
+      content: none;
+    }
+    /* The walk between two rides: one dotted line from the arrival ring
+       down into the next boarding node, which covers its end. One piece,
+       because a dotted border spaces its dots per element and the joins
+       between pieces showed as gaps. */
+    .change {
+      position: relative;
+      list-style: none;
+    }
+    .change::before {
       content: "";
       position: absolute;
       inset-inline-start: calc(var(--rail-x) - 1px);
-      width: 0;
-      background: none;
+      top: var(--node-centre);
+      bottom: calc(-1 * var(--node-centre));
       border-inline-start: 2px dotted var(--secondary-text-color);
     }
-    .stop--arrive::after {
-      top: var(--node-centre);
-      bottom: 0;
+    /* Before a change, a late arrival's planned time hangs into the change's
+       empty time column instead of adding a line to the arrival row, so the
+       change sits centred between the two stops. */
+    .stop--arrive:has(+ .transfer) .time-change {
+      position: relative;
     }
-    .stop--after-change::after {
-      top: 0;
-      height: var(--node-centre);
+    .stop--arrive:has(+ .transfer) .time-planned {
+      position: absolute;
+      top: 100%;
+      inset-inline-end: 0;
     }
 
     .node {
@@ -2702,7 +2722,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
        stairs, the next catchable departure when the change won't hold. */
     .transfer {
       align-items: center;
-      padding-block: 4px 10px;
+      padding-block: 8px;
       font-size: 0.85rem;
       line-height: 1.35;
       color: var(--secondary-text-color);
@@ -3425,7 +3445,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     /* In the narrowest cells a gutter left of the rail costs the names
        too much width. The rail moves back to the edge and the time sits
        before the name, in a fixed column so the names still line up; the
-       lines under a stop start under the time. */
+       lines under a stop start under the time. A change's lines stay in
+       the name column, leaving the time column free for a late arrival's
+       planned time to hang into. */
     @container (max-width: 300px) {
       .strand {
         --gutter: 2.6rem;
@@ -3455,8 +3477,13 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       }
       .body > .stop-name,
       .ride-detail-body,
-      .leg-stop-name {
+      .leg-stop-name,
+      .transfer .body > * {
         grid-column: 3 / -1;
+      }
+      .stop--arrive:has(+ .transfer) .time-planned {
+        inset-inline-end: auto;
+        inset-inline-start: 0;
       }
       .body > .stop-name {
         grid-column: 3;
