@@ -1071,7 +1071,7 @@ display: inline-flex;
 align-items: center;
 gap: 4px;
 min-height: 24px;
-margin-inline-start: -6px;
+margin-inline: auto -6px;
 padding: 0 6px;
 border: none;
 border-radius: var(--wl-radius-sm);

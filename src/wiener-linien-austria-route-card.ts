@@ -2752,16 +2752,19 @@ export class WienerLinienAustriaRouteCard extends LitElement {
        borderless text-and-icon shape as "6 Stationen" and "Weitere
        Verbindungen", because it does the same kind of thing. A border and a
        tint made the one pressable item in the row heavier than the red badge
-       warning the change won't hold. It ends the change's first line, after
-       the buffer; 24px meets WCAG 2.5.8's target size without a box. The
-       -6px margin takes back its padding, so the gap before its icon
-       matches the line's other gaps. */
+       warning the change won't hold. It sits on the change's first line,
+       level with "Umstieg", pushed to the trailing edge: on the usual card
+       widths that is close by, and it keeps the right side of the strand
+       from looking empty. Wrapped on a narrow card, it takes a line of its
+       own, still at the trailing edge. 24px meets WCAG 2.5.8's target size
+       without a box; the -6px end margin takes back its padding, so its
+       text ends on the card's content edge. */
     .replan {
       display: inline-flex;
       align-items: center;
       gap: 4px;
       min-height: 24px;
-      margin-inline-start: -6px;
+      margin-inline: auto -6px;
       padding: 0 6px;
       border: none;
       border-radius: var(--wl-radius-sm);

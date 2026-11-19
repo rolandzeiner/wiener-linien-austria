@@ -2206,7 +2206,8 @@ describe("searching again from a change", () => {
     const { el, callWS } = await jumped();
     const button = chip(el)!;
     expect(button.getAttribute("aria-label")).toBe("Andere Verbindung ab Stephansplatz suchen");
-    // It ends the change's first line, after the buffer, not the card's edge.
+    // On the change's first line, level with "Umstieg" (the CSS pushes it to
+    // the trailing edge of that line).
     expect(button.parentElement?.classList.contains("transfer-head")).toBe(true);
 
     button.click();
