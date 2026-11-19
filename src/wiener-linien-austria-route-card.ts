@@ -1672,9 +1672,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  and one stops list opening both. The best connection passes none, so its
    *  open lists keep their keys across refreshes as before.
    *
-   *  Every row of the strand is the same four-column grid: time gutter,
-   *  rail, text, trailing pin. Times line up in one column and every stop
-   *  name starts on one edge, whatever a row carries before it. */
+   *  Every row of the strand is the same three-column grid: time gutter,
+   *  rail, text. Times line up in one column and every stop name starts on
+   *  one edge, whatever a row carries before it. */
   private _renderStrand(trip: RouteTripAttr, attrs: RouteAttrs, scope = ""): TemplateResult {
     const legs = transitLegs(trip);
     const last = legs[legs.length - 1];
@@ -1703,10 +1703,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
                 <span class="gutter">${this._renderStopTime(last.destination)}</span>
                 <span class="node node--end" aria-hidden="true"></span>
                 <span class="body">
-                  <span class="stop-name">${last.destination.name}</span>
+                  ${this._renderStopName(last.destination, true)}
                   ${this._renderAccessLine(walkAccess(trip, "end"), attrs)}
                 </span>
-                ${this._renderMapLink(last.destination)}
               </li>
             `
             : nothing
@@ -1760,7 +1759,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               : html`<span class="node node--start" aria-hidden="true"></span>`
           }
           <span class="body">
-            <span class="stop-name">${leg.origin.name}</span>
+            ${this._renderStopName(leg.origin, true)}
             ${first ? this._renderAccessLine(accessBefore, attrs) : nothing}
             <span class="ride">
               ${this._renderBadge(leg, attrs)}
@@ -1782,7 +1781,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               }
             </span>
           </span>
-          ${this._renderMapLink(leg.origin)}
         </div>
         <div class="row ride-detail">
           <span class="gutter ride-duration"
@@ -1856,8 +1854,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
             )}</span
           >
           <span class="node" aria-hidden="true"></span>
-          <span class="body"><span class="stop-name">${leg.destination.name}</span></span>
-          ${sameStop(leg.destination, nextLeg.origin) ? nothing : this._renderMapLink(leg.destination)}
+          <span class="body"
+            >${this._renderStopName(leg.destination, !sameStop(leg.destination, nextLeg.origin))}</span
+          >
         </div>
         ${
           transfer
@@ -1874,7 +1873,19 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
-  /** A pin at the end of a stop's row that opens the stop on the city map, or searches
+  /** A stop's name, with its map pin right after it when `pin` is set. The
+   *  pin is held to the name's last word so it can't wrap onto a line of its
+   *  own. In a trailing column it lined up, but on a wide card it ended up
+   *  far from the name it belongs to. */
+  private _renderStopName(stop: RouteStopAttr, pin: boolean): TemplateResult {
+    const link = pin ? this._renderMapLink(stop) : nothing;
+    const name = stop.name ?? "";
+    if (link === nothing) return html`<span class="stop-name">${name}</span>`;
+    const cut = name.lastIndexOf(" ") + 1;
+    return html`<span class="stop-name">${name.slice(0, cut)}<span class="stop-name-end">${name.slice(cut)}${link}</span></span>`;
+  }
+
+  /** A pin after a stop's name that opens the stop on the city map, or searches
    *  for it by name where the catalogue gave no coordinates. The label says
    *  which of the two it does. Boarding stops and the destination get one, and
    *  an arrival only where the next ride leaves from a different stop (the
@@ -1991,7 +2002,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               <ha-icon icon=${walking ? "mdi:walk" : "mdi:swap-horizontal"} aria-hidden="true"></ha-icon>
               ${this._t("transfer")}${walking ? `, ${this._t("walk", { n: transfer.walk_minutes })}` : ""}
             </span>
-            ${this._renderRisk(transfer)}
+            ${this._renderRisk(transfer)} ${this._renderReplan(transfer, arrival, boarding)}
           </span>
           ${this._renderAccessLine(transfer.access, attrs)}
           ${
@@ -2002,7 +2013,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               : nothing
           }
         </span>
-        ${this._renderReplan(transfer, arrival, boarding)}
       </div>
     `;
   }
@@ -2325,9 +2335,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--secondary-text-color);
     }
 
-    /* The strand: one four-column grid per row — time gutter, rail, text,
-       trailing pin — so every time sits in one right-aligned column and
-       every stop name starts on one edge. Each row paints its own piece of
+    /* The strand: one three-column grid per row (time gutter, rail, text),
+       so every time sits in one right-aligned column and every stop name
+       starts on one edge. Nothing is pushed to the card's far edge: on a
+       wide card a pin or an action out there lost its row. Each row paints its own piece of
        rail, so a row that wraps never leaves a gap or an overhang. The rail
        is decorative: every fact it shows is also written out as text. */
     .strand {
@@ -2347,7 +2358,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .row {
       position: relative;
       display: grid;
-      grid-template-columns: var(--gutter) var(--rail) minmax(0, 1fr) auto;
+      grid-template-columns: var(--gutter) var(--rail) minmax(0, 1fr);
       column-gap: var(--col-gap);
       align-items: start;
       line-height: var(--line);
@@ -2370,16 +2381,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       justify-self: center;
     }
     /* The text's own lines are grid items, so the name shares row 1 with
-       the time, node and pin, and every line under it runs on under the
-       pin column instead of wrapping short of it. */
+       the time and node, and a boarding stop's time column spans its
+       subtitle too. */
     .row > .body {
       display: contents;
     }
     .row > .gutter,
     .row > .node,
     .row > .rail,
-    .row > .leg-stop-dot,
-    .row > .map-link {
+    .row > .leg-stop-dot {
       grid-row: 1;
     }
     .stop > .gutter {
@@ -2393,17 +2403,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .body > .stop-name {
       grid-column: 3;
       grid-row: 1;
-    }
-    .row > .map-link,
-    .row > .replan {
-      grid-column: 4;
-    }
-    .transfer > .replan {
-      grid-row: 1 / span 3;
-      align-self: center;
-    }
-    .transfer:has(> .replan) .body > * {
-      grid-column: 3;
     }
     /* Rail pieces in the line colour: each ride row paints its own. */
     .row::before {
@@ -2565,9 +2564,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .ride-meta {
       line-height: 32px;
     }
-    .ride-frequency {
-      margin-inline-start: auto;
-    }
 
     /* A delay stacks in the gutter: the expected time in red, the planned
        one struck through under it. The strike and the second time carry
@@ -2611,13 +2607,18 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--wl-rt);
     }
 
-    /* An icon in the quiet text colour, no box, at the row's trailing edge
-       where the pins form one column. The ::before reaches the 24px target
-       (WCAG 2.5.8) around the 16px icon without taking up layout space. */
+    /* The pin right after the name, held to its last word so it never
+       wraps onto a line of its own. An icon in the quiet text colour, no
+       box; the ::before reaches the 24px target (WCAG 2.5.8) around the
+       16px icon without taking up layout space. */
+    .stop-name-end {
+      white-space: nowrap;
+    }
     .map-link {
       position: relative;
       display: inline-flex;
-      margin-top: calc(var(--node-centre) - 8px);
+      vertical-align: -2px;
+      margin-inline-start: 4px;
       border-radius: var(--wl-radius-sm);
       color: var(--secondary-text-color);
       --mdc-icon-size: 16px;
@@ -2751,13 +2752,16 @@ export class WienerLinienAustriaRouteCard extends LitElement {
        borderless text-and-icon shape as "6 Stationen" and "Weitere
        Verbindungen", because it does the same kind of thing. A border and a
        tint made the one pressable item in the row heavier than the red badge
-       warning the change won't hold. It sits in the trailing column with the
-       map pins, and 32px clears WCAG 2.5.8's target size without a box. */
+       warning the change won't hold. It ends the change's first line, after
+       the buffer; 24px meets WCAG 2.5.8's target size without a box. The
+       -6px margin takes back its padding, so the gap before its icon
+       matches the line's other gaps. */
     .replan {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      min-height: 32px;
+      min-height: 24px;
+      margin-inline-start: -6px;
       padding: 0 6px;
       border: none;
       border-radius: var(--wl-radius-sm);
@@ -3454,7 +3458,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         --rail-x: calc(var(--rail) / 2);
       }
       .row {
-        grid-template-columns: var(--rail) var(--gutter) minmax(0, 1fr) auto;
+        grid-template-columns: var(--rail) var(--gutter) minmax(0, 1fr);
       }
       .row > .node,
       .row > .rail,

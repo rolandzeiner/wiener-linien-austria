@@ -380,10 +380,9 @@ if(super(e),e.type!==Fe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
                 <span class="gutter">${this._renderStopTime(i.destination)}</span>
                 <span class="node node--end" aria-hidden="true"></span>
                 <span class="body">
-                  <span class="stop-name">${i.destination.name}</span>
+                  ${this._renderStopName(i.destination,!0)}
                   ${this._renderAccessLine(Tt(e,`end`),t)}
                 </span>
-                ${this._renderMapLink(i.destination)}
               </li>
             `:O}
       </ol>
@@ -398,7 +397,7 @@ if(super(e),e.type!==Fe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
                   ><ha-icon icon=${o}></ha-icon
                 ></span>`:E`<span class="node node--start" aria-hidden="true"></span>`}
           <span class="body">
-            <span class="stop-name">${e.origin.name}</span>
+            ${this._renderStopName(e.origin,!0)}
             ${n?this._renderAccessLine(i,r):O}
             <span class="ride">
               ${this._renderBadge(e,r)}
@@ -412,7 +411,6 @@ if(super(e),e.type!==Fe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
                     ><span class="sr-only">${this._t(`low_floor`)}</span>`:O}
             </span>
           </span>
-          ${this._renderMapLink(e.origin)}
         </div>
         <div class="row ride-detail">
           <span class="gutter ride-duration"
@@ -460,12 +458,13 @@ if(super(e),e.type!==Fe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
             ><span class="sr-only">${this._t(`arrival`)}</span>${this._renderStopTime(e.destination)}</span
           >
           <span class="node" aria-hidden="true"></span>
-          <span class="body"><span class="stop-name">${e.destination.name}</span></span>
-          ${bt(e.destination,t.origin)?O:this._renderMapLink(e.destination)}
+          <span class="body"
+            >${this._renderStopName(e.destination,!bt(e.destination,t.origin))}</span
+          >
         </div>
         ${r?this._renderTransfer(r,i,yt(e,r,t),e.destination,t.origin):O}
       </li>
-    `}_renderMapLink(e){if(this._config?.show_map_pins===!1)return O;let t=xn(e.name,e.latitude,e.longitude);if(!t)return O;let n=this._t(typeof e.latitude==`number`&&typeof e.longitude==`number`?`open_in_city_map`:`find_on_map`);return E`<a
+    `}_renderStopName(e,t){let n=t?this._renderMapLink(e):O,r=e.name??``;if(n===O)return E`<span class="stop-name">${r}</span>`;let i=r.lastIndexOf(` `)+1;return E`<span class="stop-name">${r.slice(0,i)}<span class="stop-name-end">${r.slice(i)}${n}</span></span>`}_renderMapLink(e){if(this._config?.show_map_pins===!1)return O;let t=xn(e.name,e.latitude,e.longitude);if(!t)return O;let n=this._t(typeof e.latitude==`number`&&typeof e.longitude==`number`?`open_in_city_map`:`find_on_map`);return E`<a
       class="map-link"
       href=${t}
       target="_blank"
@@ -497,14 +496,13 @@ if(super(e),e.type!==Fe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
               <ha-icon icon=${a?`mdi:walk`:`mdi:swap-horizontal`} aria-hidden="true"></ha-icon>
               ${this._t(`transfer`)}${a?`, ${this._t(`walk`,{n:e.walk_minutes})}`:``}
             </span>
-            ${this._renderRisk(e)}
+            ${this._renderRisk(e)} ${this._renderReplan(e,r,i)}
           </span>
           ${this._renderAccessLine(e.access,t)}
           ${n?E`<span class="catchable">
                 ${this._t(`next_catchable`,{time:U(n)})}
               </span>`:O}
         </span>
-        ${this._renderReplan(e,r,i)}
       </div>
     `}_renderReplan(e,t,n){if(!t||!n)return O;let r=Vt(t,e.walk_minutes,this._now);return r===null||!this._canReplanFrom(n)?O:E`<button
       type="button"
@@ -721,7 +719,7 @@ list-style: none;
 .row {
 position: relative;
 display: grid;
-grid-template-columns: var(--gutter) var(--rail) minmax(0, 1fr) auto;
+grid-template-columns: var(--gutter) var(--rail) minmax(0, 1fr);
 column-gap: var(--col-gap);
 align-items: start;
 line-height: var(--line);
@@ -749,8 +747,7 @@ display: contents;
 .row > .gutter,
 .row > .node,
 .row > .rail,
-.row > .leg-stop-dot,
-.row > .map-link {
+.row > .leg-stop-dot {
 grid-row: 1;
 }
 .stop > .gutter {
@@ -764,17 +761,6 @@ overflow-wrap: anywhere;
 .body > .stop-name {
 grid-column: 3;
 grid-row: 1;
-}
-.row > .map-link,
-.row > .replan {
-grid-column: 4;
-}
-.transfer > .replan {
-grid-row: 1 / span 3;
-align-self: center;
-}
-.transfer:has(> .replan) .body > * {
-grid-column: 3;
 }
 .row::before {
 content: "";
@@ -917,9 +903,6 @@ min-width: 0;
 .ride-meta {
 line-height: 32px;
 }
-.ride-frequency {
-margin-inline-start: auto;
-}
 .time-change {
 display: flex;
 flex-direction: column;
@@ -952,10 +935,14 @@ width: var(--mdc-icon-size);
 height: var(--mdc-icon-size);
 color: var(--wl-rt);
 }
+.stop-name-end {
+white-space: nowrap;
+}
 .map-link {
 position: relative;
 display: inline-flex;
-margin-top: calc(var(--node-centre) - 8px);
+vertical-align: -2px;
+margin-inline-start: 4px;
 border-radius: var(--wl-radius-sm);
 color: var(--secondary-text-color);
 --mdc-icon-size: 16px;
@@ -1083,7 +1070,8 @@ color: var(--primary-text-color);
 display: inline-flex;
 align-items: center;
 gap: 4px;
-min-height: 32px;
+min-height: 24px;
+margin-inline-start: -6px;
 padding: 0 6px;
 border: none;
 border-radius: var(--wl-radius-sm);
@@ -1715,7 +1703,7 @@ text-align: start;
 --rail-x: calc(var(--rail) / 2);
 }
 .row {
-grid-template-columns: var(--rail) var(--gutter) minmax(0, 1fr) auto;
+grid-template-columns: var(--rail) var(--gutter) minmax(0, 1fr);
 }
 .row > .node,
 .row > .rail,

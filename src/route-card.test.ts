@@ -641,6 +641,17 @@ describe("map links", () => {
     expect(leg.querySelector(".ride .towards")?.textContent).toBe("Richtung Simmering, Gleis 1");
   });
 
+  it("holds each pin to its stop name's last word", async () => {
+    const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), { entity: ENTITY });
+    const name = root(el).querySelector(".strand .stop--board .stop-name")!;
+    // The name reads as it is; the pin sits inside it, glued to "Westbahnhof".
+    expect(name.textContent).toBe("Westbahnhof");
+    expect(name.querySelector(".stop-name-end")?.textContent).toBe("Westbahnhof");
+    expect(name.querySelector(".stop-name-end > a.map-link")).not.toBeNull();
+    const end = root(el).querySelector(".strand .stop--end .stop-name")!;
+    expect(end.querySelector(".stop-name-end > a.map-link")).not.toBeNull();
+  });
+
   it("shows no pins when turned off", async () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), {
       entity: ENTITY,
@@ -2195,6 +2206,8 @@ describe("searching again from a change", () => {
     const { el, callWS } = await jumped();
     const button = chip(el)!;
     expect(button.getAttribute("aria-label")).toBe("Andere Verbindung ab Stephansplatz suchen");
+    // It ends the change's first line, after the buffer, not the card's edge.
+    expect(button.parentElement?.classList.contains("transfer-head")).toBe(true);
 
     button.click();
     await settle(el, ADHOC_DEBOUNCE_MS);
