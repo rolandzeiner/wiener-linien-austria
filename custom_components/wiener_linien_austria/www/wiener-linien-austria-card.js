@@ -1045,9 +1045,13 @@ padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
 }
 }
 @container wlcard (inline-size < 360px) {
-.stops-ahead-stop.timed .stops-ahead-row {
+.stops-ahead-row {
 flex-wrap: wrap;
 row-gap: 2px;
+}
+.stops-ahead-row > .stops-ahead-metros {
+flex-shrink: 1;
+min-width: 0;
 }
 .stops-ahead-stop.timed .stops-ahead-name {
 flex: 1 0 50%;
@@ -1497,6 +1501,10 @@ grid-row: 1;
 grid-column: 2;
 grid-row: 2;
 justify-self: start;
+}
+.dep-row > .row-end {
+flex-wrap: wrap;
+min-width: 0;
 }
 }
 @container wlcard (inline-size < 420px) {

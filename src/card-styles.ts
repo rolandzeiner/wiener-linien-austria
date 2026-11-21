@@ -1498,16 +1498,25 @@ export const cardStyles = css`
       padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
     }
   }
-  /* With a time in front, a narrow row has no room left for the chips: at
-     240 px the U-Bahn chips took the name's whole width ("16:20 [U3] [S45]"
-     with no station) and pushed the +N toggle 15 px out of the row. There
-     the name keeps at least half the row, and chips that don't fit beside
-     it wrap under it, at the row's end. A row with nothing after the name
-     looks as before. */
+  /* A narrow row has no room for a long run of chips beside the name: at
+     240 px Bhf. Meidling's five S-Bahn chips push the +N toggle 57 px out
+     of the row. Chips that don't fit beside the name wrap under it, and a
+     run wider than the row wraps in itself. A row they fit in is
+     unaffected.
+     With a time in front there is less room still: the U-Bahn chips take
+     the name's whole width ("16:20 [U3] [S45]" with no station). There the
+     name keeps at least half the row and the chips sit at the row's end. */
   @container wlcard (inline-size < 360px) {
-    .stops-ahead-stop.timed .stops-ahead-row {
+    .stops-ahead-row {
       flex-wrap: wrap;
       row-gap: 2px;
+    }
+    /* The child selector lifts this over the base .stops-ahead-metros
+       rule, which comes later in the file: a container query adds no
+       specificity. */
+    .stops-ahead-row > .stops-ahead-metros {
+      flex-shrink: 1;
+      min-width: 0;
     }
     .stops-ahead-stop.timed .stops-ahead-name {
       flex: 1 0 50%;
@@ -2068,6 +2077,13 @@ export const cardStyles = css`
       grid-column: 2;
       grid-row: 2;
       justify-self: start;
+    }
+    /* With the platform, the wheelchair and the snowflake all switched on,
+       that second line is wider than the direction's column and would push
+       the chevron past the row. It may wrap instead. */
+    .dep-row > .row-end {
+      flex-wrap: wrap;
+      min-width: 0;
     }
   }
 
