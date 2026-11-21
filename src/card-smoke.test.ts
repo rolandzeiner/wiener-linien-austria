@@ -336,7 +336,7 @@ describe("missing sensor", () => {
     const el = await mount(tag, otherStopHass(), config);
     const alerts = warning(el);
     expect(alerts).toHaveLength(1);
-    expect(alerts[0]).toContain(`Sensor ${ENTITY} existiert nicht mehr`);
+    expect(alerts[0]).toContain(`Entität nicht verfügbar: ${ENTITY}`);
     // Neither the other stop's board nor the "nothing picked" prompt,
     // which would contradict the warning.
     expect(rendered(el)).not.toContain(other);

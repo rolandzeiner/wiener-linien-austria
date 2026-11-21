@@ -915,7 +915,7 @@ describe("rendering", () => {
     // the user has to go and fix the config, so the alert names the id.
     const el = await mount({ states: {}, language: "de" }, { entity: ENTITY });
     const alert = root(el).querySelector('ha-alert[alert-type="warning"]');
-    expect(alert?.textContent).toContain(`Sensor ${ENTITY} existiert nicht mehr`);
+    expect(alert?.textContent).toContain(`Entität nicht verfügbar: ${ENTITY}`);
     expect(root(el).querySelector('[role="status"]')).toBeNull();
   });
 
