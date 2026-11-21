@@ -670,8 +670,9 @@ async def async_fetch_monitor_body(
 ) -> dict[str, Any]:
     """GET `/monitor` for `rbls`; raise unless it answered OK.
 
-    A failed request raises a `WienerLinienApiError`, a non-OK `messageCode`
-    a `ValueError`. Tests patch this at `live.async_fetch_monitor_body`.
+    A failed request raises a `WienerLinienApiError`, a `messageCode` other
+    than 1 (a missing one included) a `ValueError`. Tests patch this at
+    `live.async_fetch_monitor_body`.
     """
     body = await fetch_monitor(
         session,
@@ -680,7 +681,7 @@ async def async_fetch_monitor_body(
         timeout_seconds=LIVE_REQUEST_TIMEOUT_SECONDS,
     )
     code = as_int(as_mapping(body.get("message")).get("messageCode"))
-    if code is not None and code != 1:
+    if code != 1:
         raise ValueError(f"monitor answered messageCode {code}")
     return body
 

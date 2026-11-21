@@ -301,7 +301,20 @@ class MonitorBatchGroup:
                 translation_key=RATE_LIMIT_TRANSLATION_KEY,
             )
 
-        if code is not None and code != 1:
+        if code is None:
+            # Every real answer carries the code, an empty board included.
+            # Read as data, a body without it would empty every board, reset
+            # the backoff and end an outage in progress.
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="api_invalid_response",
+                translation_placeholders={
+                    "status": "2xx",
+                    "error": "no messageCode in the answer",
+                },
+            )
+
+        if code != 1:
             # Named message where the code is documented, raw code
             # and value otherwise. Both shapes carry `code` and
             # `value` so an unrecognised code still says something

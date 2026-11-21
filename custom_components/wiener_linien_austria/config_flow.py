@@ -184,7 +184,7 @@ async def _probe_monitor_lines(
         return []
 
     message = body.get("message") or {}
-    if message.get("messageCode") not in (1, None):
+    if message.get("messageCode") != 1:
         return []
 
     seen: set[str] = set()

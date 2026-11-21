@@ -228,6 +228,30 @@ async def test_fetch_non_dict_body(hass: HomeAssistant) -> None:
 async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -> None:
     """messageCode not in {1, 316} → UpdateFailed(api_upstream_error)."""
     group, coordinator = _group_with_member(hass)
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"data": {"monitors": []}}, {"message": {"value": "OK"}}],
+    ids=["empty", "data-only", "no-code"],
+)
+async def test_fetch_body_without_the_envelope_is_a_failure(
+    hass: HomeAssistant, body: dict
+) -> None:
+    """A 200 without `messageCode` says nothing about departures.
+
+    Every real answer carries it, an empty board included. Read as data,
+    such a body would empty every board, reset the backoff and end an
+    outage in progress, for as long as the upstream sends it.
+    """
+    group, _ = _group_with_member(hass)
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(_ok_response(body)))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
+    assert exc.value.translation_key == "api_invalid_response"
+    assert "messageCode" in exc.value.translation_placeholders["error"]
+
+
     bad = dict(monitor_fixture)
     bad["message"] = {"value": "Something else", "messageCode": 500}
     with (

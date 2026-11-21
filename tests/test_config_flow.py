@@ -7,6 +7,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -1252,10 +1253,24 @@ async def test_probe_returns_empty_on_a_non_dict_body(hass: HomeAssistant) -> No
         assert await _probe_monitor_lines(hass, [4111]) == []
 
 
-async def test_probe_returns_empty_on_an_error_message_code(
-    hass: HomeAssistant,
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"message": {"messageCode": 316}, "data": {"monitors": []}},
+        {
+            "data": {
+                "monitors": [
+                    {"lines": [{"name": "U1", "towards": "Oberlaa", "direction": "R"}]}
+                ]
+            }
+        },
+    ],
+    ids=["rate-limit", "no-envelope"],
+)
+async def test_probe_returns_empty_on_anything_but_message_code_1(
+    hass: HomeAssistant, body: dict[str, Any]
 ) -> None:
-    """Anything but messageCode 1 (or absent) means the payload is not data.
+    """Anything but messageCode 1 means the payload is not data.
 
     Code 316 is the rate limit; treating its body as a stop with no lines
     would silently offer the user an empty picker.
@@ -1263,9 +1278,7 @@ async def test_probe_returns_empty_on_an_error_message_code(
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_clientsession"
     ) as session:
-        session.return_value.get.return_value = _probe_response(
-            {"message": {"messageCode": 316}, "data": {"monitors": []}}
-        )
+        session.return_value.get.return_value = _probe_response(body)
         assert await _probe_monitor_lines(hass, [4111]) == []
 
 

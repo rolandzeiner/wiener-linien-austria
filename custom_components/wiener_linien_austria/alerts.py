@@ -282,7 +282,9 @@ async def _fetch_info_lists(
         _LOGGER.debug("Failed to refresh %s alerts: %s", names, err)
         return _FETCH_FAILED
     message = body.get("message") or {}
-    if message.get("messageCode") not in (1, None):
+    # Code 1 or no answer. A body without the code says nothing about
+    # disruptions, and read as "none" it would clear every notice.
+    if message.get("messageCode") != 1:
         _LOGGER.debug(
             "trafficInfoList?name=%s returned non-OK messageCode %s",
             names,
