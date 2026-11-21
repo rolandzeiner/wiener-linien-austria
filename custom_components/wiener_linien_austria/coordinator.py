@@ -433,7 +433,12 @@ class WienerLinienAustriaCoordinator(DataUpdateCoordinator[MonitorData]):
         """
         self._invalidate_attrs_cache()
         self._note_poll(ok=True)
+        recovered = not self.last_update_success
         self.async_set_updated_data(self._parse_slice(result))
+        if recovered:
+            # The failure was logged as an error (`async_set_update_error`);
+            # a pushed update records its end at debug only.
+            _LOGGER.info("Fetching %s data recovered for %s", DOMAIN, self._entry.title)
 
     def batch_set_error(self, err: UpdateFailed) -> None:
         """Propagate a batch fetch failure to this entry's coordinator state."""

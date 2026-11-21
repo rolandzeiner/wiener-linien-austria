@@ -8,6 +8,7 @@ a missing RBL yields empty-not-error).
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -36,6 +37,8 @@ from custom_components.wiener_linien_austria.coordinator import (
 from custom_components.wiener_linien_austria.rate_limit import backoff_delay
 
 from .conftest import make_entry, make_response_cm
+
+COORDINATOR_LOGGER = "custom_components.wiener_linien_austria.coordinator"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -548,6 +551,32 @@ async def test_timer_tick_isolates_a_failing_member_on_the_error_path(
 
     # B is still reached despite A raising.
     assert b.last_update_success is False
+
+
+async def test_an_outage_is_logged_once_and_its_end_once(
+    hass: HomeAssistant, monitor_fixture, caplog: pytest.LogCaptureFixture
+) -> None:
+    """One error when the polls start failing, one info line when they work.
+
+    Home Assistant logs a pushed update at debug only, so the member says
+    it is back itself.
+    """
+    _, coordinator = _group_with_member(hass)
+    failure = UpdateFailed(translation_domain=DOMAIN, translation_key="api_timeout")
+    good = BatchResult(
+        body=monitor_fixture, server_time=monitor_fixture["message"]["serverTime"]
+    )
+    caplog.set_level(logging.INFO, logger=COORDINATOR_LOGGER)
+
+    coordinator.batch_apply(good)
+    coordinator.batch_set_error(failure)
+    coordinator.batch_set_error(failure)
+    coordinator.batch_apply(good)
+    coordinator.batch_apply(good)
+
+    records = [r for r in caplog.records if r.name == COORDINATOR_LOGGER]
+    assert [r.levelno for r in records] == [logging.ERROR, logging.INFO]
+    assert "recovered for Stephansplatz" in records[1].getMessage()
 
 
 async def test_timer_tick_no_members_noop(hass: HomeAssistant) -> None:
