@@ -171,7 +171,6 @@ async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) 
     assert refreshed.data[CONF_SCAN_INTERVAL] == 120
 
 
-async def test_reconfigure_preselects_canonical_line_keys(
 async def test_reconfigure_after_options_save_wins(
     hass: HomeAssistant, mock_fetch
 ) -> None:
@@ -238,6 +237,7 @@ async def test_reconfigure_does_not_depend_on_the_unique_id(
     assert entry.data[CONF_LINES] == ["U1|R"]
 
 
+async def test_reconfigure_preselects_canonical_line_keys(
     hass: HomeAssistant, mock_fetch
 ) -> None:
     """A key saved as "LB|H" pre-ticks the picker's "WLB|H" option.
@@ -416,6 +416,17 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
                 "entry_id": entry.entry_id,
             },
         )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "stop_gone"
+
+
+async def test_reconfigure_aborts_on_a_stop_entry_without_its_diva(
+    hass: HomeAssistant,
+) -> None:
+    """A hand-edited stop entry ends in `stop_gone`, not an unknown error."""
+    entry = make_entry({CONF_DIVA: "not-a-number"})
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "stop_gone"
 
@@ -860,6 +871,41 @@ async def test_typed_text_with_one_match_skips_the_shortlist(
     )
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "select_lines"
+
+
+async def test_picking_from_the_shortlist_goes_to_lines(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """A stop picked from the matches is the stop the entry is made for."""
+    result = await _start_stop_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    assert result["step_id"] == "select_stop"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "60201468"}
+    )
+    assert result["step_id"] == "select_lines"
+    assert result["description_placeholders"]["stop_name"] == "Taubstummengasse"
+
+
+@pytest.mark.parametrize("value", ["60201012", "not-a-number"])
+async def test_shortlist_rejects_a_stop_it_did_not_offer(
+    hass: HomeAssistant, value: str
+) -> None:
+    """Only the matches can be picked: Stephansplatz isn't one for "gasse".
+
+    The selector refuses such a value before the step sees it, so the step
+    is called directly: this is its own guard against stale flow state.
+    """
+    result = await _start_stop_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    flow = hass.config_entries.flow._progress[result["flow_id"]]
+    result = await flow.async_step_select_stop({CONF_DIVA: value})
+    assert result["step_id"] == "select_stop"
+    assert result["errors"] == {CONF_DIVA: "invalid_stop"}
 
 
 async def test_search_again_returns_to_step_one(hass: HomeAssistant) -> None:

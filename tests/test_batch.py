@@ -228,9 +228,6 @@ async def test_fetch_non_dict_body(hass: HomeAssistant) -> None:
     assert "list" in exc.value.translation_placeholders["error"]
 
 
-async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -> None:
-    """messageCode not in {1, 316} → UpdateFailed(api_upstream_error)."""
-    group, coordinator = _group_with_member(hass)
 @pytest.mark.parametrize(
     "body",
     [{}, {"data": {"monitors": []}}, {"message": {"value": "OK"}}],
@@ -255,6 +252,9 @@ async def test_fetch_body_without_the_envelope_is_a_failure(
     assert "messageCode" in exc.value.translation_placeholders["error"]
 
 
+async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -> None:
+    """messageCode not in {1, 316} → UpdateFailed(api_upstream_error)."""
+    group, coordinator = _group_with_member(hass)
     bad = dict(monitor_fixture)
     bad["message"] = {"value": "Something else", "messageCode": 500}
     with (
@@ -628,6 +628,39 @@ async def test_backoff_widens_then_resets(hass: HomeAssistant) -> None:
     # A success restores the normal cadence.
     group._note_success()
     assert group._current_interval == timedelta(seconds=base)
+
+
+def test_backoff_swaps_the_running_timer(hass: HomeAssistant) -> None:
+    """The widened cadence replaces the timer that is running, not a field.
+
+    One failure and a success leave it alone; from the second failure the
+    old timer is cancelled and a slower one armed, and the first success
+    puts the configured one back.
+    """
+    group, _ = _group_with_member(hass, interval=60)
+    timers = [MagicMock(), MagicMock(), MagicMock()]
+    with patch(
+        "custom_components.wiener_linien_austria.batch.async_track_time_interval",
+        side_effect=timers,
+    ) as track:
+        group.start()
+        group._note_failure()
+        group._note_success()
+        assert track.call_count == 1
+
+        group._note_failure()
+        group._note_failure()
+        assert track.call_count == 2
+        timers[0].assert_called_once_with()
+        assert track.call_args.args[2] >= timedelta(seconds=108)
+
+        group._note_success()
+        assert track.call_count == 3
+        timers[1].assert_called_once_with()
+        assert track.call_args.args[2] == timedelta(seconds=60)
+
+        group.stop()
+        timers[2].assert_called_once_with()
 
 
 @pytest.mark.parametrize("base", [30, 60, 300, 1800])
