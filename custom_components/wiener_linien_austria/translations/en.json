@@ -28,7 +28,7 @@
       },
       "select_lines": {
         "title": "Lines at {stop_name}",
-        "description": "Found {line_count} lines currently serving this stop. Pick the ones you want to track.",
+        "description": "This stop has {line_count} lines and directions. Pick the ones you want to track.",
         "data": {
           "lines": "Lines to track",
           "scan_interval": "Update interval (seconds)"
@@ -100,7 +100,7 @@
     "step": {
       "init": {
         "title": "Wiener Linien Austria options",
-        "description": "Change the polling interval. Line selection is changed via Reconfigure.",
+        "description": "Change how often this entry updates. Everything else is under Reconfigure.",
         "data": {
           "scan_interval": "Update interval (seconds)"
         }
@@ -142,7 +142,7 @@
       "message": "Wiener Linien API returned an unexpected response (status {status}): {error}"
     },
     "api_rate_limited": {
-      "message": "Wiener Linien API rate limit hit (error 316). Back off and retry."
+      "message": "Wiener Linien API rate limit hit (error 316). Polling slows down until it answers again."
     },
     "api_upstream_error": {
       "message": "Wiener Linien API reported error code {code}: {value}"
