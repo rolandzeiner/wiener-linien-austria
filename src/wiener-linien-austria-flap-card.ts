@@ -136,6 +136,13 @@ function padCountdown(countdown: number | undefined | null): string {
   return String(cd <= 0 ? 0 : cd).padStart(2, " ");
 }
 
+/** A station name with a zero-width space after each slash, so a double
+ *  name ("Neubaugasse/Neustiftgasse") can break there. A browser breaks
+ *  after a hyphen by itself, but not after a slash between letters. */
+function breakableStationName(name: string): string {
+  return name.replaceAll("/", "/\u200B");
+}
+
 // Dedupe by `type` so a double-load (cache-bust race, HMR) doesn't
 // surface the card twice in the picker.
 {
@@ -656,7 +663,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
                 role="group"
                 style=${styleMap(headerStyle)}
               >
-                <div class="flap-header__station">${stationName}</div>
+                <div class="flap-header__station">${breakableStationName(stationName)}</div>
               </div>`
               : nothing
           }
@@ -1255,10 +1262,19 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       letter-spacing: 0.02em;
       box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
     }
+    /* A name wider than the band takes a second line instead of running
+       out of it at both ends: at the space or after the slash of a double
+       name where it has one (see breakableStationName), inside a word only
+       as the last resort. Two lines at this line height stay within the
+       band's 50px. */
     .flap-header__station {
+      min-width: 0;
       text-align: center;
       font-size: 22px;
+      line-height: 1.1;
       letter-spacing: 0.04em;
+      overflow-wrap: anywhere;
+      text-wrap: balance;
     }
     /* CC-BY data-source credit — last child INSIDE the dark panel,
        so the panel surface extends all the way to the bottom of the

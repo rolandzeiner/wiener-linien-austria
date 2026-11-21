@@ -868,6 +868,17 @@ async function mountTrail(modes?: unknown): Promise<CardElement> {
   });
 }
 
+describe("the flap board's station band", () => {
+  it("lets a double name break after its slash", async () => {
+    const hass = busyHass();
+    hass.states[ENTITY]!.attributes.stop_name = "Neubaugasse/Neustiftgasse";
+    const el = await mount(FLAP, hass, { ...CARDS[2]![1], show_station_name: true });
+    expect(shadow(el).querySelector(".flap-header__station")?.textContent).toBe(
+      "Neubaugasse/\u200BNeustiftgasse",
+    );
+  });
+});
+
 describe("the departure list's role", () => {
   it("is a list while its rows are plain rows", async () => {
     const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
