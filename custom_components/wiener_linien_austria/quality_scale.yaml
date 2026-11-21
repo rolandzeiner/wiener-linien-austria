@@ -32,8 +32,12 @@ rules:
     status: exempt
     comment: This integration does not have any triggers.
   entity-event-setup:
-    status: exempt
-    comment: Coordinator pattern; entities don't subscribe to events directly.
+    status: done
+    comment: >-
+      Two binary sensors keep a timer of their own beside the coordinator
+      (the stale re-check, the time-to-leave change). Both arm it in
+      async_added_to_hass and drop it through async_on_remove or
+      async_will_remove_from_hass.
   entity-unique-id:
     status: done
   has-entity-name:
@@ -74,7 +78,12 @@ rules:
     status: done
   log-when-unavailable:
     status: done
-    comment: DataUpdateCoordinator logs UpdateFailed warnings once and an info message on recovery.
+    comment: >-
+      A failing poll is logged once as an error and its end once at info.
+      Route entries get both from DataUpdateCoordinator. Board entries are
+      pushed by the shared batch group: async_set_update_error logs the
+      failure once, and the coordinator logs the recovery itself in
+      batch_apply, because async_set_updated_data records it at debug only.
   parallel-updates:
     status: done
   reauthentication-flow:
@@ -127,7 +136,7 @@ rules:
     status: done
   docs-supported-devices:
     status: exempt
-    comment: Cloud API; no physical devices. Flip to `todo` for device integrations.
+    comment: Cloud API; no physical devices.
   docs-supported-functions:
     status: done
   docs-troubleshooting:
@@ -139,13 +148,17 @@ rules:
     comment: Single device per config entry; no runtime device discovery.
   entity-category:
     status: exempt
-    comment: All entities are primary data. Flip if you add diagnostic/config entities.
+    comment: >-
+      No config or diagnostic entities. binary_sensor.<stop>_stale reports a
+      problem, but it stands in for the stop sensor's availability (see
+      entity-unavailable) and automations are built on it, so it stays
+      beside the sensor instead of under Diagnostic.
   entity-device-class:
     status: done
     comment: Stop sensor uses SensorDeviceClass.DURATION with UnitOfTime.MINUTES.
   entity-disabled-by-default:
     status: exempt
-    comment: No non-essential entities. Flip if you add rarely-used ones.
+    comment: No non-essential entities.
   entity-translations:
     status: done
   exception-translations:
@@ -156,7 +169,11 @@ rules:
     status: done
   repair-issues:
     status: done
-    comment: Coordinator has raise/clear helpers; raise real issues when degraded conditions occur.
+    comment: >-
+      Three issues, each raised once and cleared on recovery: rate_limited
+      per entry (error 316), upstream_unavailable domain-wide after ten
+      minutes of server-side failures (outage.py), catalogue_unavailable
+      when the line picker had to do without the stop catalogue.
   stale-devices:
     status: exempt
     comment: See dynamic-devices.
@@ -167,7 +184,7 @@ rules:
     comment: Only aiohttp (async) used.
   inject-websession:
     status: done
-    comment: async_get_clientsession(hass) in coordinator and config flow.
+    comment: Every request takes async_get_clientsession(hass); api.py never creates a session.
   strict-typing:
     status: done
     comment: py.typed marker present; CI runs mypy --strict.
