@@ -172,6 +172,10 @@ export const cardStyles = css`
     flex: 1 1 auto;
     min-block-size: 0;
     overflow-y: auto;
+    /* Room for a focus ring (2px at a 2px offset) when focus scrolls a
+       control into view. The controls' own scroll-margin does the same,
+       but not for one inside an open trail, whose panel clips as well. */
+    scroll-padding-block: 4px;
   }
 
   .wrap {
@@ -1292,13 +1296,10 @@ export const cardStyles = css`
     gap: var(--ha-space-2, 8px);
     min-height: var(--stops-ahead-dot-size);
   }
-  /* Pointer cursor on intermediate stops the user can actually click —
-     the row gets role=button only when the stop has transfer-to-
-     other-lines (otherLines length above zero) and is therefore an
-     expand/collapse affordance for the +N transfer panel. Stops with
-     U-Bahn-only inline chips (no toggle) stay text-cursor since
-     there is nothing to click. */
-  .stops-ahead-row[role="button"] {
+  /* A stop with transfers to other lines: a click anywhere on its row
+     opens them, as the +N button does. Stops with U-Bahn chips only (no
+     +N) keep the text cursor, since there is nothing to click. */
+  .stops-ahead-row.expandable {
     cursor: pointer;
   }
   .stops-ahead-dot {
@@ -2219,13 +2220,20 @@ export const cardStyles = css`
   .alert:focus-visible,
   .dep-row.expandable:focus-visible,
   .hero-entry.expandable:focus-visible,
-  .stops-ahead-other-toggle:focus-visible,
+  .qr-panel-body:focus-visible,
   .icon-action:focus-visible,
   a:focus-visible,
   button:focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
     border-radius: 6px;
+  }
+  /* A tab fills the strip's height and the QR surface its panel, and both
+     parents clip (the strip scrolls sideways, the panel animates its
+     height): a ring outside the box would be cut off, so it sits inside. */
+  .tab:focus-visible,
+  .qr-panel-body:focus-visible {
+    outline-offset: -2px;
   }
   /* In a fixed-height cell the content scrolls, and a control that stops
      within the ring's 4px of the visible edge counts as fully in view, so
@@ -2235,7 +2243,6 @@ export const cardStyles = css`
   .alert,
   .dep-row.expandable,
   .hero-entry.expandable,
-  .stops-ahead-other-toggle,
   .icon-action,
   a,
   button {

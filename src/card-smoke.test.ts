@@ -868,6 +868,26 @@ async function mountTrail(modes?: unknown): Promise<CardElement> {
   });
 }
 
+describe("the departure list's role", () => {
+  it("is a list while its rows are plain rows", async () => {
+    const el = await mount(MODERN, busyHass(), CARDS[0]![1]);
+    expect(shadow(el).querySelector(".dep-list")?.getAttribute("role")).toBe("list");
+  });
+
+  // A row with a trail is a button, which a list may not hold.
+  it("is a labelled group once a row is a button", async () => {
+    const hass = busyHass();
+    for (const d of hass.states[ENTITY]!.attributes.departures as Array<Record<string, unknown>>) {
+      d["stops_ahead"] = [{ name: "Zieglergasse" }, { name: "Neubaugasse", is_terminus: true }];
+    }
+    const el = await mount(MODERN, hass, CARDS[0]![1]);
+    const list = shadow(el).querySelector(".dep-list");
+    expect(list?.querySelector('li[role="button"]')).not.toBeNull();
+    expect(list?.getAttribute("role")).toBe("group");
+    expect(list?.getAttribute("aria-label")).toBe("Kommende Abfahrten");
+  });
+});
+
 describe("stops_ahead_modes", () => {
   it("chips every category when the key is absent", async () => {
     const { inline, total } = trailChips(await mountTrail());
@@ -944,23 +964,36 @@ describe("stops_ahead_modes", () => {
   it("opens the +N panel from anywhere on the stop's row", async () => {
     const el = await mountTrail(["tram", "bus"]);
     const stopRow = shadow(el).querySelector<HTMLElement>(".stops-ahead-row")!;
-    expect(stopRow.getAttribute("role")).toBe("button");
     stopRow.click();
     await el.updateComplete;
     expect(shadow(el).querySelector(".stops-ahead-others")).not.toBeNull();
-    expect(stopRow.getAttribute("aria-expanded")).toBe("true");
+    expect(stopRow.querySelector(".stops-ahead-other-toggle")?.getAttribute("aria-expanded")).toBe(
+      "true",
+    );
   });
 
-  // A key on the toggle must stay there: the stop's row toggles the same
-  // panel on Enter and Space, and a second toggle would undo the first.
-  it("keeps Enter and Space on the +N toggle from reaching the stop's row", async () => {
+  // Folded shut, the trail is still in the DOM: without `inert` its buttons
+  // take focus where nobody sees them.
+  it("keeps a closed trail's buttons out of the tab order", async () => {
     const el = await mountTrail(["tram", "bus"]);
-    const toggle = shadow(el).querySelector<HTMLElement>(".stops-ahead-other-toggle")!;
-    for (const key of ["Enter", " "]) {
-      toggle.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, composed: true }));
-      await el.updateComplete;
-      expect(shadow(el).querySelector(".stops-ahead-others")).toBeNull();
-    }
+    const root = shadow(el);
+    const panel = root.querySelector<HTMLElement>(".hero-detail, .dep-row-detail")!;
+    expect(panel.querySelector("button")).not.toBeNull();
+    expect(panel.hasAttribute("inert")).toBe(true);
+    root.querySelector<HTMLElement>("[aria-controls]")!.click();
+    await el.updateComplete;
+    expect(panel.hasAttribute("inert")).toBe(false);
+  });
+
+  // The +N button is the control. A row that is a button too holds a button
+  // inside a button and gives every stop two tab stops for one action.
+  it("leaves the +N button as the stop row's only control", async () => {
+    const el = await mountTrail(["tram", "bus"]);
+    const stopRow = shadow(el).querySelector<HTMLElement>(".stops-ahead-row.expandable")!;
+    expect(stopRow.getAttribute("role")).toBeNull();
+    expect(stopRow.getAttribute("tabindex")).toBeNull();
+    expect(stopRow.getAttribute("aria-label")).toBeNull();
+    expect(stopRow.querySelectorAll("button")).toHaveLength(1);
   });
 
   // The stop itself is not a transfer — hiding every category must not empty
@@ -1223,14 +1256,20 @@ describe("show_stop_times", () => {
     expect(stopTimes(el)).toEqual(["16:40", "16:41", ""]);
   });
 
-  it("reads the time out on a stop whose row is a button", async () => {
-    // The row's label replaces its content for a screen reader.
+  it("leaves the time readable on a stop with a +N button", async () => {
+    // The row has no label of its own, which would replace its content for
+    // a screen reader: the time is read as it stands, the button says what
+    // it opens.
     const callWS = vi.fn().mockResolvedValue(runTimesAnswer({ "U3|H": U3 }));
     const el = await mountTimes(callWS);
     await openTrail(el);
-    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
-    expect(row?.getAttribute("aria-label")).toBe(
-      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:41",
+    const row = shadow(el).querySelector(".stops-ahead-row.expandable");
+    expect(row?.getAttribute("aria-label")).toBeNull();
+    expect(row?.querySelector("time")?.getAttribute("title")).toBe(
+      "Voraussichtliche Ankunft 16:41",
+    );
+    expect(row?.querySelector("button")?.getAttribute("aria-label")).toBe(
+      "1 weitere Linien bei Neubaugasse anzeigen",
     );
   });
 
@@ -1496,9 +1535,9 @@ describe("show_stop_times on a late departure", () => {
       "geplant 16:40, 2 min später",
       "geplant 16:41, 2 min später",
     ]);
-    const row = shadow(el).querySelector('.stops-ahead-row[role="button"]');
-    expect(row?.getAttribute("aria-label")).toBe(
-      "1 weitere Linien bei Neubaugasse anzeigen · Voraussichtliche Ankunft 16:43, geplant 16:41, 2 min später",
+    const row = shadow(el).querySelector(".stops-ahead-row.expandable");
+    expect(row?.querySelector("time")?.getAttribute("title")).toBe(
+      "Voraussichtliche Ankunft 16:43, geplant 16:41, 2 min später",
     );
   });
 
