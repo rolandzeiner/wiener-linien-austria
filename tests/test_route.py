@@ -1173,6 +1173,98 @@ async def test_route_reconfigure_keeps_the_ends(
     assert entry.unique_id == "route_60201468_60201040"
 
 
+async def test_route_reconfigure_after_options_save_wins(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """Configure saves 600 s, Reconfigure saves 240 s: the route polls every 240 s."""
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_SCAN_INTERVAL: 600}
+    )
+    await hass.async_block_till_done()
+    assert entry.runtime_data.scan_interval == timedelta(seconds=600)
+
+    result = await entry.start_reconfigure_flow(hass)
+    with (
+        patch(PROBE, new_callable=AsyncMock, return_value=None),
+        patch.object(
+            hass.config_entries, "async_reload", wraps=hass.config_entries.async_reload
+        ) as reload,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], OPTIONS_INPUT
+        )
+        await hass.async_block_till_done()
+    assert result["reason"] == "reconfigure_successful"
+    assert reload.call_count == 1
+    assert entry.options == {}
+    assert entry.runtime_data.scan_interval == timedelta(seconds=240)
+
+
+async def test_route_reconfigure_can_empty_every_optional_field(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """A window, its days and the excluded means all come off again.
+
+    The frontend sends an emptied multi-select as `[]` and leaves an
+    emptied time field out, so the lists are schema defaults and the two
+    times are suggestions.
+    """
+    entry = route_entry(
+        **{
+            CONF_EXCLUDED_MEANS: ["bus"],
+            CONF_STEP_FREE: True,
+            CONF_ACTIVE_DAYS: ["mon"],
+            CONF_ACTIVE_FROM: "06:30:00",
+            CONF_ACTIVE_TO: "09:00:00",
+        }
+    )
+    await async_setup_entry_and_wait(hass, entry)
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(PROBE, new_callable=AsyncMock, return_value=None):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                **OPTIONS_INPUT,
+                CONF_EXCLUDED_MEANS: [],
+                CONF_STEP_FREE: False,
+                CONF_ACTIVE_DAYS: [],
+            },
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_EXCLUDED_MEANS] == []
+    assert entry.data[CONF_STEP_FREE] is False
+    assert entry.data[CONF_ACTIVE_DAYS] == []
+    assert CONF_ACTIVE_FROM not in entry.data
+    assert CONF_ACTIVE_TO not in entry.data
+
+
+async def test_route_form_keeps_an_emptied_window_after_an_error(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """The form shown again after an error holds what was sent, not what is stored.
+
+    With the stored window put back as a suggestion, a second submit would
+    save the window the user had just removed.
+    """
+    entry = route_entry(**{CONF_ACTIVE_FROM: "06:30:00", CONF_ACTIVE_TO: "09:00:00"})
+    await async_setup_entry_and_wait(hass, entry)
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(PROBE, new_callable=AsyncMock, return_value="cannot_connect_routing"):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], OPTIONS_INPUT
+        )
+    assert result["errors"] == {"base": "cannot_connect_routing"}
+    suggested = {
+        str(key): (key.description or {}).get("suggested_value")
+        for key in result["data_schema"].schema
+        if str(key) in (CONF_ACTIVE_FROM, CONF_ACTIVE_TO)
+    }
+    assert suggested == {CONF_ACTIVE_FROM: None, CONF_ACTIVE_TO: None}
+
+
 async def test_route_saved_in_upper_case_still_plans_and_preselects(
     hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
 ) -> None:
