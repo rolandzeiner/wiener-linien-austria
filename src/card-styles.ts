@@ -85,6 +85,22 @@ export const cardStyles = css`
     --wl-warning: var(--warning-color, #ffa000);
     --wl-error:   var(--error-color,   #db4437);
     --wl-info:    var(--info-color,    #1565c0);
+    /* The state colours as words. HA's own values are made for icons and
+       fills: as text on a stock light card the warning amber measures
+       2.0:1, the success green 3.3:1 and the error red 4.3:1 (4.0:1 on the
+       dark card), all short of the 4.5:1 text needs. Mixed with the body
+       text colour they keep their hue and darken on a light theme, lighten
+       on a dark one. Measured on HA's stock cards and on the tinted hero:
+       amber 5.3:1 light and 10.4:1 dark, red 6.6:1 and 5.5:1, green 5.2:1
+       and 6.9:1. Icons, fills and tints keep the plain tokens. */
+    --wl-warning-text: color-mix(in srgb, var(--wl-warning) 50%, var(--primary-text-color));
+    --wl-error-text:   color-mix(in srgb, var(--wl-error) 70%, var(--primary-text-color));
+    --wl-rt-text:      color-mix(in srgb, var(--wl-rt) 70%, var(--primary-text-color));
+    /* The quiet grey for a tinted surface (the hero, a notice, a pill). On
+       the card's own ground the theme's secondary colour reaches 4.8:1; on
+       those tints it measures 3.3 to 4.4:1. Stepped 30% towards the body
+       colour it holds 5:1 or more there, in light and dark. */
+    --wl-quiet-on-tint: color-mix(in srgb, var(--secondary-text-color) 70%, var(--primary-text-color));
     /* ISA / ISO 7001 accessibility blue (Pantone 285 C). Kept on its
        own token — separate from --wl-info — so the wheelchair pill
        always renders in the standards-correct colour, while themes can
@@ -470,6 +486,14 @@ export const cardStyles = css`
      drives the tint and the big-number colour; the row beside lists
      the next departure's line, direction, platform, and a realtime
      pill if applicable. */
+  /* Everything inside these reads the theme's secondary colour for its
+     quiet text; on their tints that is --wl-quiet-on-tint (see :host). */
+  .hero,
+  .alert,
+  .row-platform,
+  .stops-ahead-other-toggle {
+    --secondary-text-color: var(--wl-quiet-on-tint);
+  }
   .hero {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -1339,7 +1363,7 @@ export const cardStyles = css`
     text-decoration-thickness: 1.5px;
   }
   .stops-ahead-time.late {
-    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    color: var(--wl-error-text);
     font-weight: 600;
   }
   /* The slot of a stop without a time on a struck-through trail: as wide
@@ -1663,7 +1687,7 @@ export const cardStyles = css`
     display: flex;
   }
   .delay {
-    color: var(--wl-warning);
+    color: var(--wl-warning-text);
     font-size: 0.85rem;
     font-weight: 500;
     white-space: nowrap;
@@ -1727,8 +1751,8 @@ export const cardStyles = css`
      both at Jetzt otherwise paint the same hue. Only this list surface
      resolves per row; the hero and header keep the station accent. */
   .countdown.now   { color: var(--wl-accent-text); }
-  .countdown.late  { color: var(--wl-error); }
-  .countdown.early { color: var(--wl-rt); }
+  .countdown.late  { color: var(--wl-error-text); }
+  .countdown.early { color: var(--wl-rt-text); }
 
   /* Estimated departure time (show_departure_time). In a row it stacks
      under the countdown in the same grid cell, right-aligned with it, so
@@ -1772,7 +1796,7 @@ export const cardStyles = css`
     text-decoration-thickness: 1.5px;
   }
   .dep-time-clock.late {
-    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    color: var(--wl-error-text);
     font-weight: 600;
   }
   /* On a narrow card the hero's struck time gives its room back; the

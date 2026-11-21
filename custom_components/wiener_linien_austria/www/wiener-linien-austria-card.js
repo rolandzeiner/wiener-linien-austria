@@ -76,6 +76,10 @@ var(--stops-ahead-dot-size) / 2 - var(--stops-ahead-line-width) / 2
 --wl-warning: var(--warning-color, #ffa000);
 --wl-error:   var(--error-color,   #db4437);
 --wl-info:    var(--info-color,    #1565c0);
+--wl-warning-text: color-mix(in srgb, var(--wl-warning) 50%, var(--primary-text-color));
+--wl-error-text:   color-mix(in srgb, var(--wl-error) 70%, var(--primary-text-color));
+--wl-rt-text:      color-mix(in srgb, var(--wl-rt) 70%, var(--primary-text-color));
+--wl-quiet-on-tint: color-mix(in srgb, var(--secondary-text-color) 70%, var(--primary-text-color));
 --wl-a11y:    #0072CE;
 --wl-cooling: #3276AE;
 --wl-radius-sm: var(--ha-border-radius-sm, 4px);
@@ -352,6 +356,12 @@ align-items: center;
 justify-content: center;
 width: var(--mdc-icon-size);
 height: var(--mdc-icon-size);
+}
+.hero,
+.alert,
+.row-platform,
+.stops-ahead-other-toggle {
+--secondary-text-color: var(--wl-quiet-on-tint);
 }
 .hero {
 display: grid;
@@ -921,7 +931,7 @@ gap: var(--ha-space-1, 4px);
 text-decoration-thickness: 1.5px;
 }
 .stops-ahead-time.late {
-color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+color: var(--wl-error-text);
 font-weight: 600;
 }
 .stops-ahead-time--pair {
@@ -1177,7 +1187,7 @@ flex-shrink: 0;
 display: flex;
 }
 .delay {
-color: var(--wl-warning);
+color: var(--wl-warning-text);
 font-size: 0.85rem;
 font-weight: 500;
 white-space: nowrap;
@@ -1223,8 +1233,8 @@ color: var(--secondary-text-color);
 white-space: nowrap;
 }
 .countdown.now   { color: var(--wl-accent-text); }
-.countdown.late  { color: var(--wl-error); }
-.countdown.early { color: var(--wl-rt); }
+.countdown.late  { color: var(--wl-error-text); }
+.countdown.early { color: var(--wl-rt-text); }
 .row-time {
 display: flex;
 flex-direction: column;
@@ -1255,7 +1265,7 @@ color: var(--primary-text-color);
 text-decoration-thickness: 1.5px;
 }
 .dep-time-clock.late {
-color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+color: var(--wl-error-text);
 font-weight: 600;
 }
 @container wlcard (inline-size < 360px) {
