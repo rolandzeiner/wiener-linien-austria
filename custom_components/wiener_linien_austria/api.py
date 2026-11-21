@@ -76,6 +76,17 @@ Measured against the live API on 2026-09-07:
 freshness probes. If you are tempted to reintroduce any of this, re-run
 those probes first — and note that a content hash would detect change but
 save no bytes, because the body has to be downloaded either way.
+
+No `Retry-After`
+----------------
+
+A `Retry-After` on a 429 or 503 is not read either. Wiener Linien signal
+their rate limit in the body (`messageCode` 316 on a 200, which batch.py
+answers by slowing down at once), and every recurring request backs off
+from its second failure in a row, up to `BACKOFF_CAP_SECONDS`. Whether the
+edge sends the header at all is unmeasured: neither status can be provoked
+politely. Honouring it would take one wait shared by a dozen call sites on
+two backends, to save the few requests an outage costs before the cap.
 """
 
 from __future__ import annotations
