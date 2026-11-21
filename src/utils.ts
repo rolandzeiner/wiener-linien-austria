@@ -68,8 +68,9 @@ export function isFixedHeight(
 /**
  * The cards' shouldUpdate past the config guard. `hass` is reassigned on
  * every state change anywhere in HA, so a change to it alone renders only
- * when the language switched or one of `entityIds()` changed; HA state
- * objects are immutable, so identity is enough. Any other change renders:
+ * when the language or the theme's polarity switched or one of `entityIds()`
+ * changed; HA state objects are immutable, so identity is enough. Any other
+ * change renders:
  * the card's own state, its config, and `layout`, which Lit reflects inside
  * update(), so a false in that cycle would leave the attribute stale.
  * `entityIds` runs only for a lone hass change.
@@ -85,6 +86,9 @@ export function cardShouldUpdate(
   // A language switch changes no entity state; without this the card keeps
   // the old language until its sensor next updates.
   if (prev.language !== hass.language) return true;
+  // Nor does a switch between a light and a dark theme, and the flap board's
+  // skin and the modern card's line colours as text are picked by it.
+  if (prev.themes?.darkMode !== hass.themes?.darkMode) return true;
   return entityIds().some((eid) => prev.states[eid] !== hass.states[eid]);
 }
 

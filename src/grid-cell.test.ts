@@ -117,6 +117,12 @@ describe("cardShouldUpdate", () => {
     expect(cardShouldUpdate(changes({ hass: prev }), hass(prev.states, "en"), ids)).toBe(true);
   });
 
+  it("renders when the theme switches between light and dark", () => {
+    const themed = (darkMode: boolean) => ({ ...prev, themes: { darkMode } }) as HomeAssistant;
+    expect(cardShouldUpdate(changes({ hass: themed(false) }), themed(true), ids)).toBe(true);
+    expect(cardShouldUpdate(changes({ hass: themed(true) }), themed(true), ids)).toBe(false);
+  });
+
   it("renders on the first hass and when hass goes away", () => {
     expect(cardShouldUpdate(changes({ hass: undefined }), prev, ids)).toBe(true);
     expect(cardShouldUpdate(changes({ hass: prev }), undefined, ids)).toBe(true);
