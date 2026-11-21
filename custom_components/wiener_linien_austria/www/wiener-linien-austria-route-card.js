@@ -576,7 +576,6 @@ if(super(e),e.type!==Fe.ATTRIBUTE||e.name!==`style`||e.strings?.length>2)throw E
         </div>
       </li>
     `}_toggleAlternative(e){let t=new Set(this._openAlternatives);t.delete(e)||t.add(e),this._openAlternatives=t}static{this.styles=o`:host {
-color-scheme: light dark;
 display: block;
 container-type: inline-size;
 --wl-rt: var(--success-color, #43a047);

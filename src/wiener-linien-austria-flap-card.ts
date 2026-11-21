@@ -1121,14 +1121,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     :host {
       display: block;
+      /* The query container for the @container rule further down. Without
+         one that rule matches nothing, and the header strip keeps its
+         labels on a board too narrow for them. */
+      container-type: inline-size;
       /* Stacking context for the housing shadow + tile drop-shadows
          so they only compete with each other, not the surrounding
          HA dashboard chrome. */
       isolation: isolate;
-      /* Tells the browser this card supports both light and dark
-         schemes so form controls / scrollbars match whichever
-         palette the .flap--light class below selects. */
-      color-scheme: light dark;
       /* Solari palette — exposed as custom properties so the
          .flap--light block below can flip the board theme in one
          place. Default values = dark mode. */
@@ -1213,9 +1213,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        rule below so the override actually wins; .flap is declared
        later in source so equal specificity would lose to it. */
     .flap.flap--light {
+      color-scheme: light;
       box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
     }
     .flap {
+      /* The board's scrollbar follows the board's skin, which HA's theme
+         picks: dark here, light in the rule above. Both at once would hand
+         the choice to the browser's own preference. */
+      color-scheme: dark;
       background: var(--flap-housing);
       border-radius: 10px;
       padding: 6px;

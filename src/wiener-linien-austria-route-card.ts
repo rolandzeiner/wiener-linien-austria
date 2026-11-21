@@ -2171,7 +2171,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   static override styles = css`
     :host {
-      color-scheme: light dark;
       display: block;
       container-type: inline-size;
 

@@ -20,10 +20,6 @@ import { css } from "lit";
 // cannot hold them, and www/fonts/NOTICE.md for provenance + licence.
 export const cardStyles = css`
   :host {
-    /* color-scheme enables light-dark() and steers forced-colors
-       palette selection (WCAG 1.4.11). HA's active theme drives the
-       resolution; the card just opts in. */
-    color-scheme: light dark;
     display: block;
     container-type: inline-size;
     container-name: wlcard;
@@ -140,9 +136,6 @@ export const cardStyles = css`
     --wl-pad-y:     var(--ha-space-3, 12px);
     --wl-row-gap:   var(--ha-space-3, 12px);
     --wl-tile-size: 40px;
-    --wl-slot-radius: var(--ha-border-radius-md, 8px);
-    --wl-slot-gap: 6px;
-    --wl-slot-min-h: 44px;
     --wl-metric-size: 2.25rem;
   }
 
@@ -2032,16 +2025,10 @@ export const cardStyles = css`
     max-width: 280px;
   }
 
-  /* Container density ladder. One token tweak per breakpoint cascades
-     through every component above. */
+  /* Width steps. The card is its own query container (wlcard on :host),
+     and a container never matches its own query: a :host rule in one of
+     these blocks is dead, so a token retuned per step goes on ha-card. */
   @container wlcard (inline-size < 360px) {
-    :host {
-      --wl-pad-x: 12px;
-      --wl-pad-y: 12px;
-      --wl-tile-size: 36px;
-      --wl-slot-min-h: 40px;
-      --wl-metric-size: 2rem;
-    }
     .tabs {
       padding: 0 8px;
     }
@@ -2110,12 +2097,6 @@ export const cardStyles = css`
   }
 
   @container wlcard (inline-size > 480px) {
-    :host {
-      --wl-pad-x: 20px;
-      --wl-pad-y: 16px;
-      --wl-tile-size: 44px;
-      --wl-metric-size: 2.5rem;
-    }
     .icon-tile ha-icon {
       --mdc-icon-size: 24px;
     }

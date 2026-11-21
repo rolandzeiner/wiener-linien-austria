@@ -1361,8 +1361,8 @@ initial-value: transparent;
 }
 :host {
 display: block;
+container-type: inline-size;
 isolation: isolate;
-color-scheme: light dark;
 --flap-housing: #1a1612;
 --flap-bg: #0d0b08;
 --flap-cream-hi: #f3eacd;
@@ -1404,9 +1404,11 @@ overflow-y: auto;
 --flap-quiet-fg: rgba(0, 0, 0, 0.6);
 }
 .flap.flap--light {
+color-scheme: light;
 box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
 }
 .flap {
+color-scheme: dark;
 background: var(--flap-housing);
 border-radius: 10px;
 padding: 6px;
