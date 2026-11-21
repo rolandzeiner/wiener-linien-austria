@@ -97,6 +97,8 @@ import {
 // minute stale while costing nothing measurable.
 const TICK_MS = 15_000;
 const MAX_NOTICES = 2;
+/** How many of a stop name's last letters its map pin is held to. */
+const PIN_HELD_LETTERS = 3;
 
 type AdhocPhase = "idle" | "loading" | "ready" | "error" | "paused";
 
@@ -320,16 +322,20 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return isFixedHeight(this.layout, this._config, undefined);
   }
 
-  /** Sections-view sizing, per the HA custom-card docs: half the 12-column
-   *  section by default (a multiple of 3, as the docs recommend), never
-   *  narrower than the pickers and strand stay readable at. `rows` is left out
-   *  on purpose — the docs' way to say "size to content", which this card
-   *  needs because opening the alternatives or a stop list grows it. A size
-   *  set in the dashboard's layout tab lands in `grid_options` and wins over
-   *  these defaults. min_rows 3 is the smallest cell that still shows the
-   *  next departure under the heading (measured at four columns). */
+  /** Sections-view sizing. A whole section by default, as the three boards
+   *  take: a phone shows one section across its width, where half of it is
+   *  about 175px and the strand has no room for a stop's name beside its
+   *  time. Never narrower than half a section, the narrowest the strand was
+   *  measured to hold a name unbroken at (about 245px on a desktop section;
+   *  at five columns every name breaks inside the word, at four the change
+   *  chips stand on end). `rows` is left out on purpose, the HA docs' way to
+   *  say "size to content", which this card needs because opening the
+   *  alternatives or a stop list grows it. A size set in the dashboard's
+   *  layout tab lands in `grid_options` and wins over these defaults.
+   *  min_rows 3 is the smallest cell that still shows the next departure
+   *  under the heading (measured at six columns). */
   public getGridOptions(): { columns: number; min_columns: number; min_rows: number } {
-    return { columns: 6, min_columns: 4, min_rows: 3 };
+    return { columns: 12, min_columns: 6, min_rows: 3 };
   }
 
   public static getConfigElement(): LovelaceCardEditor {
@@ -1874,14 +1880,17 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   /** A stop's name, with its map pin right after it when `pin` is set. The
-   *  pin is held to the name's last word so it can't wrap onto a line of its
-   *  own. In a trailing column it lined up, but on a wide card it ended up
-   *  far from the name it belongs to. */
+   *  pin is held to the name's last letters so it can't wrap onto a line of
+   *  its own. In a trailing column it lined up, but on a wide card it ended
+   *  up far from the name it belongs to. Held to the whole last word, a word
+   *  wider than a narrow card's name column ("Nordwestbahnstraße") can't
+   *  break and pushes the pin out of the card; the letters before the held
+   *  ones may break (see .stop-name), and a word that fits never does. */
   private _renderStopName(stop: RouteStopAttr, pin: boolean): TemplateResult {
     const link = pin ? this._renderMapLink(stop) : nothing;
     const name = stop.name ?? "";
     if (link === nothing) return html`<span class="stop-name">${name}</span>`;
-    const cut = name.lastIndexOf(" ") + 1;
+    const cut = Math.max(name.lastIndexOf(" ") + 1, name.length - PIN_HELD_LETTERS);
     return html`<span class="stop-name">${name.slice(0, cut)}<span class="stop-name-end">${name.slice(cut)}${link}</span></span>`;
   }
 
@@ -2488,6 +2497,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     .stop-name {
       font-weight: 700;
       color: var(--primary-text-color);
+      /* A name longer than a narrow card's column breaks inside the word
+         instead of running out of the card. Never where the word fits. */
+      overflow-wrap: anywhere;
     }
     .stop--board .gutter time,
     .stop--end .gutter time {
@@ -2606,7 +2618,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--wl-rt);
     }
 
-    /* The pin right after the name, held to its last word so it never
+    /* The pin right after the name, held to its last letters so it never
        wraps onto a line of its own. An icon in the quiet text colour, no
        box; the ::before reaches the 24px target (WCAG 2.5.8) around the
        16px icon without taking up layout space. */
@@ -3513,6 +3525,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;
       border-radius: 6px;
+    }
+    /* In a fixed-height cell the content scrolls, and a control that stops
+       within the ring's 4px of the visible edge counts as fully in view, so
+       focus wouldn't scroll and the edge would cut its ring. The margin makes
+       focus bring the ring into view as well. */
+    .map-link,
+    input,
+    button {
+      scroll-margin-block: 4px;
     }
 
     @media (forced-colors: active) {

@@ -195,7 +195,7 @@ describe("registration + config", () => {
       getGridOptions(): Record<string, unknown>;
     };
     // No `rows`: the HA docs' way to let the card size itself.
-    expect(el.getGridOptions()).toEqual({ columns: 6, min_columns: 4, min_rows: 3 });
+    expect(el.getGridOptions()).toEqual({ columns: 12, min_columns: 6, min_rows: 3 });
   });
 
   it("throws for configs Lovelace should show as an error card", () => {
@@ -641,12 +641,13 @@ describe("map links", () => {
     expect(leg.querySelector(".ride .towards")?.textContent).toBe("Richtung Simmering, Gleis 1");
   });
 
-  it("holds each pin to its stop name's last word", async () => {
+  it("holds each pin to its stop name's last letters", async () => {
     const el = await mount(hass("2026-09-14T05:50:00+00:00", ACTIVE), { entity: ENTITY });
     const name = root(el).querySelector(".strand .stop--board .stop-name")!;
-    // The name reads as it is; the pin sits inside it, glued to "Westbahnhof".
+    // The name reads as it is; the pin sits inside it, glued to its end. Not
+    // to the whole word: one wider than a narrow card must be able to break.
     expect(name.textContent).toBe("Westbahnhof");
-    expect(name.querySelector(".stop-name-end")?.textContent).toBe("Westbahnhof");
+    expect(name.querySelector(".stop-name-end")?.textContent).toBe("hof");
     expect(name.querySelector(".stop-name-end > a.map-link")).not.toBeNull();
     const end = root(el).querySelector(".strand .stop--end .stop-name")!;
     expect(end.querySelector(".stop-name-end > a.map-link")).not.toBeNull();
