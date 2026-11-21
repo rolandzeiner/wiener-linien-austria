@@ -28,7 +28,7 @@
       },
       "select_lines": {
         "title": "Linien an {stop_name}",
-        "description": "{line_count} Linien bedienen diese Haltestelle aktuell. Wähle die Linien aus, die du verfolgen möchtest.",
+        "description": "An dieser Haltestelle halten {line_count} Linien und Richtungen. Wähle aus, welche du verfolgen möchtest.",
         "data": {
           "lines": "Linien verfolgen",
           "scan_interval": "Aktualisierungsintervall (Sekunden)"
@@ -100,7 +100,7 @@
     "step": {
       "init": {
         "title": "Wiener Linien Austria Optionen",
-        "description": "Intervall anpassen. Linienauswahl wird über „Neu konfigurieren“ geändert.",
+        "description": "Aktualisierungsintervall anpassen. Alles andere steht unter „Neu konfigurieren“.",
         "data": {
           "scan_interval": "Aktualisierungsintervall (Sekunden)"
         }
@@ -142,7 +142,7 @@
       "message": "Wiener-Linien-API lieferte unerwartete Antwort (Status {status}): {error}"
     },
     "api_rate_limited": {
-      "message": "Wiener-Linien-API-Rate-Limit erreicht (Fehler 316). Warten und erneut versuchen."
+      "message": "Wiener-Linien-API-Rate-Limit erreicht (Fehler 316). Die Abfragen werden verlangsamt, bis sie wieder antwortet."
     },
     "api_upstream_error": {
       "message": "Wiener-Linien-API meldete Fehlercode {code}: {value}"

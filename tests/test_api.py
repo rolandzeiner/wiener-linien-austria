@@ -23,6 +23,7 @@ from custom_components.wiener_linien_austria.api import (
     ApiTimeoutError,
     WienerLinienApiError,
     fetch_monitor,
+    fetch_news,
     fetch_routing,
     fetch_traffic_info,
     get_json,
@@ -209,6 +210,11 @@ async def test_endpoint_helpers_build_the_documented_requests() -> None:
     args, kwargs = session.get.call_args
     assert args == (f"{api.API_BASE_URL}{api.TRAFFIC_INFO_ENDPOINT}",)
     assert kwargs["params"] == [("name", "stoerunglang"), ("name", "aufzugsinfo")]
+
+    await fetch_news(session, user_agent=UA, timeout_seconds=5)
+    args, kwargs = session.get.call_args
+    assert args == (f"{api.API_BASE_URL}{api.NEWS_ENDPOINT}",)
+    assert kwargs["params"] == [("name", "news")]
 
     resp = _json_resp({})
     session = _session(resp)

@@ -20,10 +20,6 @@ import { css } from "lit";
 // cannot hold them, and www/fonts/NOTICE.md for provenance + licence.
 export const cardStyles = css`
   :host {
-    /* color-scheme enables light-dark() and steers forced-colors
-       palette selection (WCAG 1.4.11). HA's active theme drives the
-       resolution; the card just opts in. */
-    color-scheme: light dark;
     display: block;
     container-type: inline-size;
     container-name: wlcard;
@@ -89,6 +85,22 @@ export const cardStyles = css`
     --wl-warning: var(--warning-color, #ffa000);
     --wl-error:   var(--error-color,   #db4437);
     --wl-info:    var(--info-color,    #1565c0);
+    /* The state colours as words. HA's own values are made for icons and
+       fills: as text on a stock light card the warning amber measures
+       2.0:1, the success green 3.3:1 and the error red 4.3:1 (4.0:1 on the
+       dark card), all short of the 4.5:1 text needs. Mixed with the body
+       text colour they keep their hue and darken on a light theme, lighten
+       on a dark one. Measured on HA's stock cards and on the tinted hero:
+       amber 5.3:1 light and 10.4:1 dark, red 6.6:1 and 5.5:1, green 5.2:1
+       and 6.9:1. Icons, fills and tints keep the plain tokens. */
+    --wl-warning-text: color-mix(in srgb, var(--wl-warning) 50%, var(--primary-text-color));
+    --wl-error-text:   color-mix(in srgb, var(--wl-error) 70%, var(--primary-text-color));
+    --wl-rt-text:      color-mix(in srgb, var(--wl-rt) 70%, var(--primary-text-color));
+    /* The quiet grey for a tinted surface (the hero, a notice, a pill). On
+       the card's own ground the theme's secondary colour reaches 4.8:1; on
+       those tints it measures 3.3 to 4.4:1. Stepped 30% towards the body
+       colour it holds 5:1 or more there, in light and dark. */
+    --wl-quiet-on-tint: color-mix(in srgb, var(--secondary-text-color) 70%, var(--primary-text-color));
     /* ISA / ISO 7001 accessibility blue (Pantone 285 C). Kept on its
        own token — separate from --wl-info — so the wheelchair pill
        always renders in the standards-correct colour, while themes can
@@ -140,9 +152,6 @@ export const cardStyles = css`
     --wl-pad-y:     var(--ha-space-3, 12px);
     --wl-row-gap:   var(--ha-space-3, 12px);
     --wl-tile-size: 40px;
-    --wl-slot-radius: var(--ha-border-radius-md, 8px);
-    --wl-slot-gap: 6px;
-    --wl-slot-min-h: 44px;
     --wl-metric-size: 2.25rem;
   }
 
@@ -179,6 +188,10 @@ export const cardStyles = css`
     flex: 1 1 auto;
     min-block-size: 0;
     overflow-y: auto;
+    /* Room for a focus ring (2px at a 2px offset) when focus scrolls a
+       control into view. The controls' own scroll-margin does the same,
+       but not for one inside an open trail, whose panel clips as well. */
+    scroll-padding-block: 4px;
   }
 
   .wrap {
@@ -473,6 +486,14 @@ export const cardStyles = css`
      drives the tint and the big-number colour; the row beside lists
      the next departure's line, direction, platform, and a realtime
      pill if applicable. */
+  /* Everything inside these reads the theme's secondary colour for its
+     quiet text; on their tints that is --wl-quiet-on-tint (see :host). */
+  .hero,
+  .alert,
+  .row-platform,
+  .stops-ahead-other-toggle {
+    --secondary-text-color: var(--wl-quiet-on-tint);
+  }
   .hero {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -1299,13 +1320,10 @@ export const cardStyles = css`
     gap: var(--ha-space-2, 8px);
     min-height: var(--stops-ahead-dot-size);
   }
-  /* Pointer cursor on intermediate stops the user can actually click —
-     the row gets role=button only when the stop has transfer-to-
-     other-lines (otherLines length above zero) and is therefore an
-     expand/collapse affordance for the +N transfer panel. Stops with
-     U-Bahn-only inline chips (no toggle) stay text-cursor since
-     there is nothing to click. */
-  .stops-ahead-row[role="button"] {
+  /* A stop with transfers to other lines: a click anywhere on its row
+     opens them, as the +N button does. Stops with U-Bahn chips only (no
+     +N) keep the text cursor, since there is nothing to click. */
+  .stops-ahead-row.expandable {
     cursor: pointer;
   }
   .stops-ahead-dot {
@@ -1345,7 +1363,7 @@ export const cardStyles = css`
     text-decoration-thickness: 1.5px;
   }
   .stops-ahead-time.late {
-    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    color: var(--wl-error-text);
     font-weight: 600;
   }
   /* The slot of a stop without a time on a struck-through trail: as wide
@@ -1495,21 +1513,34 @@ export const cardStyles = css`
     .stops-ahead-stop.skipped .stops-ahead-skip {
       flex-basis: 100%;
       order: 1;
+      /* The indent below is padding: without this it comes on top of the
+         100 % and the note's box runs that far past the row (41 px at
+         324 px, measured on the box 2026-11-15). */
+      box-sizing: border-box;
     }
     .stops-ahead-stop.skipped .stops-ahead-time + .stops-ahead-name + .stops-ahead-skip {
       padding-inline-start: calc(5ch / 0.85 + var(--ha-space-2, 8px));
     }
   }
-  /* With a time in front, a narrow row has no room left for the chips: at
-     240 px the U-Bahn chips took the name's whole width ("16:20 [U3] [S45]"
-     with no station) and pushed the +N toggle 15 px out of the row. There
-     the name keeps at least half the row, and chips that don't fit beside
-     it wrap under it, at the row's end. A row with nothing after the name
-     looks as before. */
+  /* A narrow row has no room for a long run of chips beside the name: at
+     240 px Bhf. Meidling's five S-Bahn chips push the +N toggle 57 px out
+     of the row. Chips that don't fit beside the name wrap under it, and a
+     run wider than the row wraps in itself. A row they fit in is
+     unaffected.
+     With a time in front there is less room still: the U-Bahn chips take
+     the name's whole width ("16:20 [U3] [S45]" with no station). There the
+     name keeps at least half the row and the chips sit at the row's end. */
   @container wlcard (inline-size < 360px) {
-    .stops-ahead-stop.timed .stops-ahead-row {
+    .stops-ahead-row {
       flex-wrap: wrap;
       row-gap: 2px;
+    }
+    /* The child selector lifts this over the base .stops-ahead-metros
+       rule, which comes later in the file: a container query adds no
+       specificity. */
+    .stops-ahead-row > .stops-ahead-metros {
+      flex-shrink: 1;
+      min-width: 0;
     }
     .stops-ahead-stop.timed .stops-ahead-name {
       flex: 1 0 50%;
@@ -1656,7 +1687,7 @@ export const cardStyles = css`
     display: flex;
   }
   .delay {
-    color: var(--wl-warning);
+    color: var(--wl-warning-text);
     font-size: 0.85rem;
     font-weight: 500;
     white-space: nowrap;
@@ -1720,8 +1751,8 @@ export const cardStyles = css`
      both at Jetzt otherwise paint the same hue. Only this list surface
      resolves per row; the hero and header keep the station accent. */
   .countdown.now   { color: var(--wl-accent-text); }
-  .countdown.late  { color: var(--wl-error); }
-  .countdown.early { color: var(--wl-rt); }
+  .countdown.late  { color: var(--wl-error-text); }
+  .countdown.early { color: var(--wl-rt-text); }
 
   /* Estimated departure time (show_departure_time). In a row it stacks
      under the countdown in the same grid cell, right-aligned with it, so
@@ -1765,7 +1796,7 @@ export const cardStyles = css`
     text-decoration-thickness: 1.5px;
   }
   .dep-time-clock.late {
-    color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
+    color: var(--wl-error-text);
     font-weight: 600;
   }
   /* On a narrow card the hero's struck time gives its room back; the
@@ -2028,16 +2059,10 @@ export const cardStyles = css`
     max-width: 280px;
   }
 
-  /* Container density ladder. One token tweak per breakpoint cascades
-     through every component above. */
+  /* Width steps. The card is its own query container (wlcard on :host),
+     and a container never matches its own query: a :host rule in one of
+     these blocks is dead, so a token retuned per step goes on ha-card. */
   @container wlcard (inline-size < 360px) {
-    :host {
-      --wl-pad-x: 12px;
-      --wl-pad-y: 12px;
-      --wl-tile-size: 36px;
-      --wl-slot-min-h: 40px;
-      --wl-metric-size: 2rem;
-    }
     .tabs {
       padding: 0 8px;
     }
@@ -2077,6 +2102,13 @@ export const cardStyles = css`
       grid-row: 2;
       justify-self: start;
     }
+    /* With the platform, the wheelchair and the snowflake all switched on,
+       that second line is wider than the direction's column and would push
+       the chevron past the row. It may wrap instead. */
+    .dep-row > .row-end {
+      flex-wrap: wrap;
+      min-width: 0;
+    }
   }
 
   /* Narrow cards (sidebar dashboards, mobile portrait) — the hero
@@ -2106,12 +2138,6 @@ export const cardStyles = css`
   }
 
   @container wlcard (inline-size > 480px) {
-    :host {
-      --wl-pad-x: 20px;
-      --wl-pad-y: 16px;
-      --wl-tile-size: 44px;
-      --wl-metric-size: 2.5rem;
-    }
     .icon-tile ha-icon {
       --mdc-icon-size: 24px;
     }
@@ -2234,13 +2260,20 @@ export const cardStyles = css`
   .alert:focus-visible,
   .dep-row.expandable:focus-visible,
   .hero-entry.expandable:focus-visible,
-  .stops-ahead-other-toggle:focus-visible,
+  .qr-panel-body:focus-visible,
   .icon-action:focus-visible,
   a:focus-visible,
   button:focus-visible {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
     border-radius: 6px;
+  }
+  /* A tab fills the strip's height and the QR surface its panel, and both
+     parents clip (the strip scrolls sideways, the panel animates its
+     height): a ring outside the box would be cut off, so it sits inside. */
+  .tab:focus-visible,
+  .qr-panel-body:focus-visible {
+    outline-offset: -2px;
   }
   /* In a fixed-height cell the content scrolls, and a control that stops
      within the ring's 4px of the visible edge counts as fully in view, so
@@ -2250,7 +2283,6 @@ export const cardStyles = css`
   .alert,
   .dep-row.expandable,
   .hero-entry.expandable,
-  .stops-ahead-other-toggle,
   .icon-action,
   a,
   button {

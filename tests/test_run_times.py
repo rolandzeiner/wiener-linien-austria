@@ -847,6 +847,50 @@ async def test_a_removed_board_takes_its_samples_with_it(
     assert list(storage[STORE_KEY]["data"]["stops"]) == [str(PRATERSTERN)]
 
 
+async def test_removing_a_board_drops_its_samples_without_another_request(
+    hass: HomeAssistant,
+    board: MockConfigEntry,
+    dm_fetch: AsyncMock,
+    freezer: FrozenDateTimeFactory,
+    storage: dict[str, Any],
+) -> None:
+    """A save prunes too, but only a card asking for run times saves."""
+    other = make_entry({CONF_DIVA: MEIDLING}, unique_id=f"diva_{MEIDLING}")
+    other.add_to_hass(hass)
+    freezer.move_to(DAY)
+    await async_get_run_times(hass).async_get(MEIDLING)
+    assert str(MEIDLING) in storage[STORE_KEY]["data"]["stops"]
+
+    await hass.config_entries.async_remove(other.entry_id)
+    await hass.async_block_till_done()
+
+    assert str(MEIDLING) not in storage[STORE_KEY]["data"]["stops"]
+    assert dm_fetch.await_count == 1
+
+
+async def test_a_save_with_no_board_left_removes_the_file(
+    hass: HomeAssistant,
+    board: MockConfigEntry,
+    dm_fetch: AsyncMock,
+    freezer: FrozenDateTimeFactory,
+    storage: dict[str, Any],
+) -> None:
+    """A request still on the wire when the last entry goes must not bring
+    the file back."""
+    freezer.move_to(DAY)
+    registry = async_get_run_times(hass)
+    await registry.async_get(PRATERSTERN)
+    assert STORE_KEY in storage
+
+    await hass.config_entries.async_remove(board.entry_id)
+    await hass.async_block_till_done()
+    assert STORE_KEY not in storage
+    # The request that was still running lands now.
+    await registry._async_save()
+
+    assert STORE_KEY not in storage
+
+
 # ---------------------------------------------------------------------------
 # WebSocket command
 # ---------------------------------------------------------------------------

@@ -510,11 +510,11 @@ Pick a route you've set up (see *Routes* under *Setup*), and the card shows what
 What the card shows:
 
 - Minutes until the best connection leaves, with its departure and arrival time. For a trip at a chosen time, the departure time and day instead.
-- Each ride as a segment in its line's colour, with platform, direction and number of stops. Before a change, the ride ends with its arrival time where you get off.
-- A map pin after each boarding stop and the destination that opens the stop in Vienna's city map. Where you get off at a different stop from the one you change to, that stop gets a pin too. For a stop the city map can't place, such as an S-Bahn-only station, the pin searches OpenStreetMap.
+- Each ride as a segment in its line's colour, starting at an icon of the vehicle, with direction, platform, number of stops and how many minutes the ride takes. The times sit in a column of their own beside the line, so the stop names line up. Before a change, the ride ends with its arrival time where you get off.
+- A map pin after the name of each boarding stop and the destination that opens the stop in Vienna's city map. Where you get off at a different stop from the one you change to, that stop gets a pin too. For a stop the city map can't place, such as an S-Bahn-only station, the pin searches OpenStreetMap.
 - Tap the number of stops to see every stop of the ride with its time. Live delays move these times too.
-- A live icon next to a U-Bahn, tram or bus departure with a live time. A late one also shows its planned time struck through and the expected time in red, for example ~~09:22~~ 09:25. A line running every 5 minutes or more often shows *every 3 min*; a less frequent one shows its next two departures. S-Bahn and train rides stay on the timetable.
-- For every change, the walking time and a grade, written out as well as coloured: enough time, tight, or at risk when the current times say the change no longer fits.
+- A live icon on each U-Bahn, tram or bus ride with a live time. A late one shows the expected time in red, with the planned time struck through below it. A line running every 5 minutes or more often shows *every 3 min*; a less frequent one shows its next two departures. S-Bahn and train rides stay on the timetable.
+- For every change, the walking time and a grade in words: enough time, with a check, or tight and at risk on a coloured label. At risk means the current times say the change no longer fits.
 - Disruptions on the lines the trip uses.
 - On a step-free trip, each lift on the way to the platform, at a change and at the destination, for example *Lift down*. A lift with an outage says *out of service*, and a warning names the station, the lift and the reason, so you can tell an exit you don't use from the one on your way. Rides planned with a low-floor vehicle show a wheelchair icon.
 - Up to three later connections, folded away. Tap one to see its rides, stops and changes.

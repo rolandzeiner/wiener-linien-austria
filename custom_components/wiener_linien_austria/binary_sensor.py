@@ -79,6 +79,10 @@ class WienerLinienStaleBinarySensor(
     _attr_attribution = ATTRIBUTION
     _attr_device_class = BinarySensorDeviceClass.PROBLEM
     _attr_entity_registry_enabled_default = True
+    # The threshold is the entry's scan interval times three: the setting,
+    # not something that happened. `last_update_success` stays recorded; it
+    # says which of the two causes turned the flag on.
+    _unrecorded_attributes = frozenset({"stale_after_seconds"})
 
     def __init__(
         self,
@@ -319,6 +323,15 @@ class WienerLinienRouteLeaveBinarySensor(
     _attr_has_entity_name = True
     _attr_translation_key = "route_leave_now"
     _attr_attribution = ATTRIBUTION
+    # `leave_at` and `departure` follow the live times, which move by
+    # seconds on most `/monitor` answers. Recorded, 1,110 of the 1,307 rows
+    # this entity wrote in three days changed nothing else, and each
+    # carried an attributes row of its own: 7,971 rows and 1.4 MB in 30
+    # days for a flag with two states (live box, 2026-11-15). Excluded, the
+    # rows share one attributes row per connection's lines. The row itself
+    # is still written, because the live attributes did change.
+    # `leave_minutes` is the setting.
+    _unrecorded_attributes = frozenset({"leave_at", "departure", "leave_minutes"})
 
     def __init__(
         self,

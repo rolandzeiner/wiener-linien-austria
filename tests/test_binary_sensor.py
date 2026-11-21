@@ -375,3 +375,17 @@ async def test_a_healthy_poll_does_not_write_the_flag_again(
     after = hass.states.get(entity_id)
     assert after.state == STATE_OFF
     assert after.last_updated == before.last_updated
+
+
+async def test_history_keeps_the_cause_not_the_threshold(hass: HomeAssistant) -> None:
+    """`stale_after_seconds` is the setting: live, but not recorded."""
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    server_time = _fresh(12)
+    data = MonitorData(departures=[], server_time=server_time)
+    coordinator = _make_coordinator(hass, entry, data, server_time=server_time)
+    attrs = WienerLinienStaleBinarySensor(coordinator, entry).extra_state_attributes
+    assert "stale_after_seconds" in attrs
+    assert set(attrs) - WienerLinienStaleBinarySensor._unrecorded_attributes == {
+        "last_update_success"
+    }

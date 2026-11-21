@@ -17,9 +17,9 @@ here.
 Every failure falls in one of three classes, and only the first may claim the
 fault is upstream's:
 
-- **outage** — a 5xx, a 2xx whose body isn't a JSON object, or the API's own
-  "database unavailable" code (311). The server provably answered, and
-  answered broken.
+- **outage** — a 5xx, a 2xx whose body isn't a JSON object with a
+  `messageCode`, or the API's own "database unavailable" code (311). The
+  server provably answered, and answered broken.
 - **inconclusive** — a timeout or a connection error. That can just as well
   be the user's own network, so it neither starts nor stops the clock.
 - **answered** — everything else (4xx, rate limit, unknown stop, rejected

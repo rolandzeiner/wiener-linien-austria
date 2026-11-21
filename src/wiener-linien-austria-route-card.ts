@@ -97,6 +97,8 @@ import {
 // minute stale while costing nothing measurable.
 const TICK_MS = 15_000;
 const MAX_NOTICES = 2;
+/** How many of a stop name's last letters its map pin is held to. */
+const PIN_HELD_LETTERS = 3;
 
 type AdhocPhase = "idle" | "loading" | "ready" | "error" | "paused";
 
@@ -320,16 +322,20 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return isFixedHeight(this.layout, this._config, undefined);
   }
 
-  /** Sections-view sizing, per the HA custom-card docs: half the 12-column
-   *  section by default (a multiple of 3, as the docs recommend), never
-   *  narrower than the pickers and strand stay readable at. `rows` is left out
-   *  on purpose — the docs' way to say "size to content", which this card
-   *  needs because opening the alternatives or a stop list grows it. A size
-   *  set in the dashboard's layout tab lands in `grid_options` and wins over
-   *  these defaults. min_rows 3 is the smallest cell that still shows the
-   *  next departure under the heading (measured at four columns). */
+  /** Sections-view sizing. A whole section by default, as the three boards
+   *  take: a phone shows one section across its width, where half of it is
+   *  about 175px and the strand has no room for a stop's name beside its
+   *  time. Never narrower than half a section, the narrowest the strand was
+   *  measured to hold a name unbroken at (about 245px on a desktop section;
+   *  at five columns every name breaks inside the word, at four the change
+   *  chips stand on end). `rows` is left out on purpose, the HA docs' way to
+   *  say "size to content", which this card needs because opening the
+   *  alternatives or a stop list grows it. A size set in the dashboard's
+   *  layout tab lands in `grid_options` and wins over these defaults.
+   *  min_rows 3 is the smallest cell that still shows the next departure
+   *  under the heading (measured at six columns). */
   public getGridOptions(): { columns: number; min_columns: number; min_rows: number } {
-    return { columns: 6, min_columns: 4, min_rows: 3 };
+    return { columns: 12, min_columns: 6, min_rows: 3 };
   }
 
   public static getConfigElement(): LovelaceCardEditor {
@@ -1670,48 +1676,42 @@ export class WienerLinienAustriaRouteCard extends LitElement {
    *  connections often share their first ride and differ only at the change,
    *  and a shared ride would otherwise mean duplicate ids in one shadow root
    *  and one stops list opening both. The best connection passes none, so its
-   *  open lists keep their keys across refreshes as before. */
+   *  open lists keep their keys across refreshes as before.
+   *
+   *  Every row of the strand is the same three-column grid: time gutter,
+   *  rail, text. Times line up in one column and every stop name starts on
+   *  one edge, whatever a row carries before it. */
   private _renderStrand(trip: RouteTripAttr, attrs: RouteAttrs, scope = ""): TemplateResult {
     const legs = transitLegs(trip);
     const last = legs[legs.length - 1];
+    const lastColour = last ? this._lineStyle(last.line ?? "", attrs).background : "";
     return html`
       <ol class="strand">
         ${legs.map((leg, i) => {
           const colour = this._lineStyle(leg.line ?? "", attrs).background;
-          const transfer: RouteTransferAttr | undefined = trip.transfers[i];
+          const next = legs[i + 1];
           return html`
             ${this._renderLeg(
               leg,
               colour,
               i === 0,
               attrs,
-              !!transfer && i < legs.length - 1,
-              legs[i + 1],
               i === 0 ? walkAccess(trip, "start") : undefined,
               scope,
             )}
-            ${
-              transfer && i < legs.length - 1
-                ? this._renderTransfer(
-                    transfer,
-                    attrs,
-                    catchableDeparture(leg, transfer, legs[i + 1]!),
-                    leg.destination,
-                    legs[i + 1]!.origin,
-                  )
-                : nothing
-            }
+            ${next ? this._renderChange(leg, next, colour, trip.transfers[i], attrs) : nothing}
           `;
         })}
         ${
           last
             ? html`
-              <li class="stop stop--end">
+              <li class="row stop stop--end" style=${styleMap({ "--leg-colour": lastColour })}>
+                <span class="gutter">${this._renderStopTime(last.destination)}</span>
                 <span class="node node--end" aria-hidden="true"></span>
-                ${this._renderStopTime(last.destination)}
-                <span class="stop-name">${last.destination.name}</span>
-                ${this._renderMapLink(last.destination)}
-                ${this._renderAccess(walkAccess(trip, "end"), attrs)}
+                <span class="body">
+                  ${this._renderStopName(last.destination, true)}
+                  ${this._renderAccessLine(walkAccess(trip, "end"), attrs)}
+                </span>
               </li>
             `
             : nothing
@@ -1720,17 +1720,25 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
+  /** Lifts and stairs as one quiet line under a stop or a change. */
+  private _renderAccessLine(
+    steps: RouteAccessStepAttr[] | undefined,
+    attrs: RouteAttrs,
+  ): TemplateResult | typeof nothing {
+    const access = this._renderAccess(steps, attrs);
+    return access === nothing ? nothing : html`<span class="access-line">${access}</span>`;
+  }
+
   private _renderLeg(
     leg: RouteLegAttr,
     colour: string,
     first: boolean,
     attrs: RouteAttrs,
-    beforeTransfer: boolean,
-    nextLeg: RouteLegAttr | undefined,
     accessBefore?: RouteAccessStepAttr[],
     scope = "",
   ): TemplateResult {
     const icon = legTypeIcon(leg.type, leg.line);
+    const palette = this._lineStyle(leg.line ?? "", attrs);
     const stops =
       leg.stop_count === 1 ? this._t("stops_one") : this._t("stops_many", { n: leg.stop_count });
     const between = leg.stops ?? [];
@@ -1743,60 +1751,68 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     // direction, and one stop serves several lines from different platforms.
     const platform = this._platformText(leg);
     return html`
-      <li
-        class=${beforeTransfer ? "leg leg--before-transfer" : "leg"}
-        style=${styleMap({ "--leg-colour": colour })}
-      >
-        <div class="stop">
-          <span class=${first ? "node node--start" : "node"} aria-hidden="true"></span>
-          ${this._renderStopTime(leg.origin)}
-          ${this._renderLiveMark(leg)}
-          <span class="stop-name">${leg.origin.name}</span>
-          ${this._renderMapLink(leg.origin)}
-          ${first ? this._renderAccess(accessBefore, attrs) : nothing}
-        </div>
-        <div class="ride">
-          ${this._renderBadge(leg, attrs)}
+      <li class="leg" style=${styleMap({ "--leg-colour": colour })}>
+        <div class="row stop stop--board">
+          <span class="gutter">${this._renderStopTime(leg.origin)}</span>
           ${
             icon
-              ? html`<ha-icon class="type-icon" icon=${icon} aria-hidden="true"></ha-icon>`
-              : nothing
-          }
-          ${
-            leg.low_floor && attrs.step_free
-              ? html`<ha-icon
-                  class="type-icon"
-                  icon="mdi:wheelchair-accessibility"
+              ? html`<span
+                  class="node node--vehicle"
+                  style=${styleMap({ color: palette.color ?? "#fff" })}
                   aria-hidden="true"
-                ></ha-icon
-                ><span class="sr-only">${this._t("low_floor")}</span>`
-              : nothing
+                  ><ha-icon icon=${icon}></ha-icon
+                ></span>`
+              : html`<span class="node node--start" aria-hidden="true"></span>`
           }
-          <span class="towards"
-            >${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}${
-              platform ? html` <span class="platform">${platform}</span>` : nothing
-            }</span
-          >
+          <span class="body">
+            ${this._renderStopName(leg.origin, true)}
+            ${first ? this._renderAccessLine(accessBefore, attrs) : nothing}
+            <span class="ride">
+              ${this._renderBadge(leg, attrs)}
+              <span class="towards"
+                >${leg.towards ? this._t("towards", { towards: leg.towards }) : ""}${
+                  platform
+                    ? html`${leg.towards ? ", " : ""}<span class="platform">${platform}</span>`
+                    : nothing
+                }</span
+              >${this._renderLiveMark(leg)}${
+                leg.low_floor && attrs.step_free
+                  ? html`<ha-icon
+                      class="type-icon"
+                      icon="mdi:wheelchair-accessibility"
+                      aria-hidden="true"
+                    ></ha-icon
+                    ><span class="sr-only">${this._t("low_floor")}</span>`
+                  : nothing
+              }
+            </span>
+          </span>
         </div>
-        <div class="ride-detail">
-          ${
-            between.length
-              ? html`<button
-                type="button"
-                class="stops-toggle"
-                aria-expanded=${open ? "true" : "false"}
-                aria-controls=${listId}
-                @click=${() => this._toggleRide(key)}
-              >
-                ${stops}
-                <ha-icon
-                  icon=${open ? "mdi:chevron-up" : "mdi:chevron-down"}
-                  aria-hidden="true"
-                ></ha-icon>
-              </button>`
-              : html`<span class="ride-meta">${stops}</span>`
-          }
-          ${this._renderFrequency(leg)}
+        <div class="row ride-detail">
+          <span class="gutter ride-duration"
+            >${leg.duration_minutes !== null ? this._t("minutes", { n: leg.duration_minutes }) : ""}</span
+          >
+          <span class="rail" aria-hidden="true"></span>
+          <span class="ride-detail-body">
+            ${
+              between.length
+                ? html`<button
+                  type="button"
+                  class="stops-toggle"
+                  aria-expanded=${open ? "true" : "false"}
+                  aria-controls=${listId}
+                  @click=${() => this._toggleRide(key)}
+                >
+                  ${stops}
+                  <ha-icon
+                    icon=${open ? "mdi:chevron-up" : "mdi:chevron-down"}
+                    aria-hidden="true"
+                  ></ha-icon>
+                </button>`
+                : html`<span class="ride-meta">${stops}</span>`
+            }
+            ${this._renderFrequency(leg)}
+          </span>
         </div>
         ${
           between.length
@@ -1807,37 +1823,78 @@ export class WienerLinienAustriaRouteCard extends LitElement {
               ?hidden=${!open}
             >
               ${between.map(
-                (stop) => html`<li class="leg-stop">
-                  <span class="leg-stop-dot" aria-hidden="true"></span>
-                  <time class=${late ? "time-late" : ""} datetime=${stop.time ?? ""}
-                    >${late ? roundedClock(stop.time) : clockOf(stop.time)}</time
+                (stop) => html`<li class="row leg-stop">
+                  <span class="gutter"
+                    ><time class=${late ? "time-late" : ""} datetime=${stop.time ?? ""}
+                      >${late ? roundedClock(stop.time) : clockOf(stop.time)}</time
+                    ></span
                   >
+                  <span class="leg-stop-dot" aria-hidden="true"></span>
                   <span class="leg-stop-name">${stop.name}</span>
                 </li>`,
               )}
             </ol>`
             : nothing
         }
+      </li>
+    `;
+  }
+
+  /** Getting off and changing, as one item of the strand: the arrival row,
+   *  then the change. One item so the walk is one dotted line from the
+   *  arrival ring down to the next boarding node. Drawn in pieces, a dotted
+   *  border spaces its dots per piece, and every join showed as a gap. */
+  private _renderChange(
+    leg: RouteLegAttr,
+    nextLeg: RouteLegAttr,
+    colour: string,
+    transfer: RouteTransferAttr | undefined,
+    attrs: RouteAttrs,
+  ): TemplateResult {
+    return html`
+      <li class="change" style=${styleMap({ "--leg-colour": colour })}>
+        <div class="row stop stop--arrive">
+          <span class="gutter"
+            ><span class="sr-only">${this._t("arrival")}</span>${this._renderStopTime(
+              leg.destination,
+            )}</span
+          >
+          <span class="node" aria-hidden="true"></span>
+          <span class="body"
+            >${this._renderStopName(leg.destination, !sameStop(leg.destination, nextLeg.origin))}</span
+          >
+        </div>
         ${
-          nextLeg
-            ? html`<div class="stop stop--arrive">
-              <span class="node" aria-hidden="true"></span>
-              <span class="sr-only">${this._t("arrival")}</span>
-              ${this._renderStopTime(leg.destination)}
-              <span class="stop-name">${leg.destination.name}</span>
-              ${
-                sameStop(leg.destination, nextLeg.origin)
-                  ? nothing
-                  : this._renderMapLink(leg.destination)
-              }
-            </div>`
+          transfer
+            ? this._renderTransfer(
+                transfer,
+                attrs,
+                catchableDeparture(leg, transfer, nextLeg),
+                leg.destination,
+                nextLeg.origin,
+              )
             : nothing
         }
       </li>
     `;
   }
 
-  /** A pin after a stop name that opens the stop on the city map, or searches
+  /** A stop's name, with its map pin right after it when `pin` is set. The
+   *  pin is held to the name's last letters so it can't wrap onto a line of
+   *  its own. In a trailing column it lined up, but on a wide card it ended
+   *  up far from the name it belongs to. Held to the whole last word, a word
+   *  wider than a narrow card's name column ("Nordwestbahnstraße") can't
+   *  break and pushes the pin out of the card; the letters before the held
+   *  ones may break (see .stop-name), and a word that fits never does. */
+  private _renderStopName(stop: RouteStopAttr, pin: boolean): TemplateResult {
+    const link = pin ? this._renderMapLink(stop) : nothing;
+    const name = stop.name ?? "";
+    if (link === nothing) return html`<span class="stop-name">${name}</span>`;
+    const cut = Math.max(name.lastIndexOf(" ") + 1, name.length - PIN_HELD_LETTERS);
+    return html`<span class="stop-name">${name.slice(0, cut)}<span class="stop-name-end">${name.slice(cut)}${link}</span></span>`;
+  }
+
+  /** A pin after a stop's name that opens the stop on the city map, or searches
    *  for it by name where the catalogue gave no coordinates. The label says
    *  which of the two it does. Boarding stops and the destination get one, and
    *  an arrival only where the next ride leaves from a different stop (the
@@ -1870,9 +1927,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   /** A stop's time. Running late, it reads the way DB Navigator and Google
-   *  Maps show it: the planned time struck through, then the expected time
-   *  in red. The strike and the second time carry the delay, not the colour
-   *  alone, and screen readers hear "geplant 09:22, 3 min später". */
+   *  Maps show it: the expected time in red, the planned one struck through
+   *  (stacked under it in the time column; the alternatives' summary keeps
+   *  them side by side). The strike and the second time carry the delay, not
+   *  the colour alone, and screen readers hear "geplant 09:22, 3 min später". */
   private _renderStopTime(stop: RouteStopAttr): TemplateResult {
     const shown = stop.estimated ?? stop.planned;
     const delayed = delayedClock(stop);
@@ -1886,9 +1944,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     </span>`;
   }
 
-  /** A small live icon after the time of every ride with a live time, late or
-   *  not. Leaving it off a late ride made that ride look like the one on the
-   *  timetable when the ride before it carried the icon. */
+  /** A small live icon at the end of the ride line of every ride with a live
+   *  time, late or not. Leaving it off a late ride made that ride look like
+   *  the one on the timetable when the ride before it carried the icon. */
   private _renderLiveMark(leg: RouteLegAttr): TemplateResult | typeof nothing {
     if (!leg.realtime) return nothing;
     return html`<ha-icon class="live-mark" icon="mdi:access-point" aria-hidden="true"></ha-icon
@@ -1920,6 +1978,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
   }
 
+  /** Enough buffer reads as a quiet line with a check; only a tight change
+   *  or one that no longer fits gets the solid chip. A chip on every change
+   *  said "look here" about the ones that need no looking at. */
   private _renderRisk(transfer: RouteTransferAttr): TemplateResult {
     return html`
       <span class="risk" data-risk=${transfer.risk}>
@@ -1929,6 +1990,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     `;
   }
 
+  /** A change in one line, as a timetable writes it: "Umstieg, 4 min
+   *  Fußweg" and how much buffer is left. Lifts and stairs follow on a
+   *  quieter line of their own. */
   private _renderTransfer(
     transfer: RouteTransferAttr,
     attrs: RouteAttrs,
@@ -1936,29 +2000,29 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     arrival?: RouteStopAttr,
     boarding?: RouteStopAttr,
   ): TemplateResult {
+    const walking = transfer.walk_minutes > 0;
     return html`
-      <li class="transfer" data-risk=${transfer.risk}>
-        <span class="node node--transfer" aria-hidden="true"></span>
-        <span class="transfer-at">${this._t("transfer")}</span>
-        ${
-          transfer.walk_minutes > 0
-            ? html`<span class="walk">
-              <ha-icon icon="mdi:walk" aria-hidden="true"></ha-icon>
-              ${this._t("walk", { n: transfer.walk_minutes })}
-            </span>`
-            : nothing
-        }
-        ${this._renderAccess(transfer.access, attrs)}
-        ${this._renderRisk(transfer)}
-        ${
-          catchable
-            ? html`<span class="catchable">
-              ${this._t("next_catchable", { time: roundedClock(catchable) })}
-            </span>`
-            : nothing
-        }
-        ${this._renderReplan(transfer, arrival, boarding)}
-      </li>
+      <div class="row transfer" data-risk=${transfer.risk}>
+        <span class="gutter"></span>
+        <span class="rail" aria-hidden="true"></span>
+        <span class="body">
+          <span class="transfer-head">
+            <span class="transfer-at">
+              <ha-icon icon=${walking ? "mdi:walk" : "mdi:swap-horizontal"} aria-hidden="true"></ha-icon>
+              ${this._t("transfer")}${walking ? `, ${this._t("walk", { n: transfer.walk_minutes })}` : ""}
+            </span>
+            ${this._renderRisk(transfer)} ${this._renderReplan(transfer, arrival, boarding)}
+          </span>
+          ${this._renderAccessLine(transfer.access, attrs)}
+          ${
+            catchable
+              ? html`<span class="catchable">
+                ${this._t("next_catchable", { time: roundedClock(catchable) })}
+              </span>`
+              : nothing
+          }
+        </span>
+      </div>
     `;
   }
 
@@ -2116,7 +2180,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
   static override styles = css`
     :host {
-      color-scheme: light dark;
       display: block;
       container-type: inline-size;
 
@@ -2133,13 +2196,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
          tint or a red text colour read as decoration, not as an alarm. */
       --wl-alarm: color-mix(in srgb, var(--wl-error) 88%, #000);
       --wl-on-alarm: #fff;
-      /* The two calmer transfer grades take the same solid shape, so the
-         three read as one set: a fresh green for enough buffer (white text
-         4.7:1) and anthracite for a tight change (10:1). Fixed values, not
-         theme tokens: the theme's success green needs so much darkening to
-         carry white text that it turns olive, and a tint of it or of the
-         warning amber looked muddy on the dark card. */
-      --wl-ok: #16853f;
+      /* A tight change takes the alarm's solid shape in anthracite (white
+         text 10:1). A fixed value, not a theme token: a tint of the warning
+         amber looked muddy on the dark card. Enough buffer gets no chip at
+         all (see .risk). */
       --wl-tight: #3d434a;
       --wl-radius-sm: var(--ha-border-radius-sm, 4px);
       --wl-radius-md: var(--ha-border-radius-md, 8px);
@@ -2150,13 +2210,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
 
       --strand-width: 4px;
       --node-size: 12px;
-      --node-top: 5px;
-      /* Where a stop's node is centred, measured from the top of its row.
-         Every rail segment starts or ends here, so nodes sit exactly on the
-         joins instead of the segments guessing at a shared offset. */
-      --node-centre: calc(var(--node-top) + var(--node-size) / 2);
-      --stop-row: 22px;
-      --strand-x: 6px;
       --leg-colour: var(--primary-color);
     }
 
@@ -2290,145 +2343,186 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--secondary-text-color);
     }
 
-    /* The strand. Each ride leg paints its own segment in the line colour
-       via --leg-colour; transfers and the end stop sit on nodes. The rail is
-       decorative: every fact it shows is also written out as text. */
+    /* The strand: one three-column grid per row (time gutter, rail, text),
+       so every time sits in one right-aligned column and every stop name
+       starts on one edge. Nothing is pushed to the card's far edge: on a
+       wide card a pin or an action out there lost its row. Each row paints its own piece of
+       rail, so a row that wraps never leaves a gap or an overhang. The rail
+       is decorative: every fact it shows is also written out as text. */
     .strand {
+      --gutter: 3rem;
+      --rail: 22px;
+      --col-gap: 8px;
+      --line: 1.375rem;
+      --node-centre: calc(var(--line) / 2);
+      --rail-x: calc(var(--gutter) + var(--col-gap) + var(--rail) / 2);
       list-style: none;
       margin: 0;
       padding: 0;
     }
-    .leg,
-    .transfer,
-    .stop--end {
-      position: relative;
-      padding-inline-start: calc(var(--strand-x) * 2 + var(--node-size));
+    .leg {
+      list-style: none;
     }
-    /* A ride runs from its boarding node down into the next stop's node. */
-    .leg::before {
+    .row {
+      position: relative;
+      display: grid;
+      grid-template-columns: var(--gutter) var(--rail) minmax(0, 1fr);
+      column-gap: var(--col-gap);
+      align-items: start;
+      line-height: var(--line);
+    }
+    .row > .gutter {
+      grid-column: 1;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-start;
+      gap: 4px;
+      text-align: end;
+      font-variant-numeric: tabular-nums;
+      color: var(--primary-text-color);
+      white-space: nowrap;
+    }
+    .row > .node,
+    .row > .rail,
+    .row > .leg-stop-dot {
+      grid-column: 2;
+      justify-self: center;
+    }
+    /* The text's own lines are grid items, so the name shares row 1 with
+       the time and node, and a boarding stop's time column spans its
+       subtitle too. */
+    .row > .body {
+      display: contents;
+    }
+    .row > .gutter,
+    .row > .node,
+    .row > .rail,
+    .row > .leg-stop-dot {
+      grid-row: 1;
+    }
+    .stop > .gutter {
+      grid-row: 1 / span 2;
+    }
+    .body > * {
+      grid-column: 3 / -1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    .body > .stop-name {
+      grid-column: 3;
+      grid-row: 1;
+    }
+    /* Rail pieces in the line colour: each ride row paints its own. */
+    .row::before {
       content: "";
       position: absolute;
-      inset-inline-start: calc(var(--strand-x) + var(--node-size) / 2 - var(--strand-width) / 2);
-      top: var(--node-centre);
-      bottom: calc(-1 * var(--node-centre));
+      inset-inline-start: calc(var(--rail-x) - var(--strand-width) / 2);
+      top: 0;
+      bottom: 0;
       width: var(--strand-width);
-      border-radius: 2px;
       background: var(--leg-colour);
     }
-    /* Before a change the ride ends in its arrival node, and the dotted walk
-       picks up from that node. Both assume the arrival row is one line high,
-       as its time and stop name are on any card wider than a phone. */
-    .leg--before-transfer::before {
-      bottom: calc(var(--stop-row) - var(--node-centre));
+    .stop--board::before {
+      top: var(--node-centre);
     }
-    /* The walk spans the whole transfer row and reaches down into the next
-       ride's boarding node, which covers the end of it. */
+    .stop--arrive::before,
+    .stop--end::before {
+      bottom: calc(100% - var(--node-centre));
+    }
     .transfer::before {
+      content: none;
+    }
+    /* The walk between two rides: one dotted line from the arrival ring
+       down into the next boarding node, which covers its end. One piece,
+       because a dotted border spaces its dots per element and the joins
+       between pieces showed as gaps. */
+    .change {
+      position: relative;
+      list-style: none;
+    }
+    .change::before {
       content: "";
       position: absolute;
-      inset-inline-start: calc(var(--strand-x) + var(--node-size) / 2 - 1px);
-      top: calc(var(--node-centre) - var(--stop-row));
+      inset-inline-start: calc(var(--rail-x) - 1px);
+      top: var(--node-centre);
       bottom: calc(-1 * var(--node-centre));
       border-inline-start: 2px dotted var(--secondary-text-color);
     }
-    .node {
+    /* Before a change, a late arrival's planned time hangs into the change's
+       empty time column instead of adding a line to the arrival row, so the
+       change sits centred between the two stops. */
+    .stop--arrive:has(+ .transfer) .time-change {
+      position: relative;
+    }
+    .stop--arrive:has(+ .transfer) .time-planned {
       position: absolute;
-      inset-inline-start: var(--strand-x);
-      top: var(--node-top);
+      top: 100%;
+      inset-inline-end: 0;
+    }
+
+    .node {
+      position: relative;
+      z-index: 1;
       width: var(--node-size);
       height: var(--node-size);
+      margin-top: calc(var(--node-centre) - var(--node-size) / 2);
       box-sizing: border-box;
       border-radius: 50%;
       background: var(--card-background-color, var(--ha-card-background, #fff));
       border: 3px solid var(--leg-colour);
-      z-index: 1;
     }
     .node--start {
       background: var(--leg-colour);
-    }
-    .node--transfer {
-      top: 50%;
-      transform: translateY(-50%);
-      border-color: var(--secondary-text-color);
     }
     .node--end {
       border-color: var(--primary-text-color);
       background: var(--primary-text-color);
     }
-
-    .stop {
+    /* Where you board, the vehicle itself sits on the rail, in the line's
+       colour: the rail starts from it, and the ride needs no second icon. */
+    .node--vehicle {
       display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: 2px 8px;
-      min-height: var(--stop-row);
+      align-items: center;
+      justify-content: center;
+      width: var(--rail);
+      height: var(--rail);
+      margin-top: calc(var(--node-centre) - var(--rail) / 2);
+      border: none;
+      background: var(--leg-colour);
+      --mdc-icon-size: 14px;
     }
-    .stop time {
+
+    /* The time takes its stop's weight: bold where you board and where you
+       end up, regular where you only get off. */
+    .stop-name {
       font-weight: 700;
       color: var(--primary-text-color);
+      /* A name longer than a narrow card's column breaks inside the word
+         instead of running out of the card. Never where the word fits. */
+      overflow-wrap: anywhere;
     }
-    /* Where a ride is left: quieter than a boarding stop, which is what you
-       act on. Its node sits on the rail, backed out of the row's indent. */
-    .stop--arrive {
-      position: relative;
+    .stop--board .gutter time,
+    .stop--end .gutter time {
+      font-weight: 700;
     }
-    .stop--arrive .node {
-      inset-inline-start: calc(var(--strand-x) - (var(--strand-x) * 2 + var(--node-size)));
-    }
-    .stop--arrive time {
-      font-weight: 600;
-    }
-    .stop--arrive .stop-name {
+    .stop--arrive .stop-name,
+    .stop--arrive .gutter time {
       font-weight: 400;
     }
-    .stop-name {
-      font-weight: 600;
-      color: var(--primary-text-color);
+    .stop--board,
+    .stop--end {
+      padding-block: 0 2px;
     }
-    /* The map pin after a stop name: an icon in the quiet text colour, no box.
-       The 16px icon keeps the row at its height; the ::before reaches the
-       24px target (WCAG 2.5.8) around it without taking up layout space. */
-    /* On the text baseline, not centred: the row is taller than its line of
-       text, so centring sat the pin below the name. The pin's tip on the
-       baseline reads as marking the word. */
-    .map-link {
-      position: relative;
-      display: inline-flex;
-      align-self: baseline;
-      margin-inline-start: -4px;
-      border-radius: var(--wl-radius-sm);
-      color: var(--secondary-text-color);
-      --mdc-icon-size: 16px;
-    }
-    .map-link::before {
-      content: "";
-      position: absolute;
-      inset: -4px;
-    }
-    .map-link:hover {
-      color: var(--primary-text-color);
-    }
-    .map-link ha-icon {
-      display: block;
-    }
-    /* Inside the direction text, so the two share one baseline. A real space
-       separates them for screen readers; the margin tops it up to the gap. */
-    .towards .platform {
-      margin-inline-start: 4px;
-    }
-    .platform {
-      font-size: 0.8rem;
-      color: var(--secondary-text-color);
-    }
-    /* A ride reads in two lines: what you board (badge, direction), then
-       the quieter detail (stop list, how often it runs). */
+
+    /* The ride is the boarding stop's subtitle: badge, direction, platform. */
     .ride {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 4px 8px;
-      padding-block: 6px 2px;
+      gap: 2px 6px;
+      margin-top: 2px;
       font-size: 0.9rem;
+      line-height: 1.35;
       color: var(--secondary-text-color);
     }
     .line-badge {
@@ -2442,91 +2536,134 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: #fff;
       forced-color-adjust: none;
     }
+    .ride .line-badge {
+      min-width: 2em;
+      padding: 1px 6px;
+      border-radius: var(--wl-radius-sm);
+      font-size: 0.8rem;
+      line-height: 1.35;
+    }
     .type-icon {
-      --mdc-icon-size: 18px;
+      --mdc-icon-size: 16px;
     }
     .towards {
       color: var(--primary-text-color);
     }
+    .platform {
+      color: var(--secondary-text-color);
+    }
+
+    /* Under the ride: its duration in the gutter, the stop list and how
+       often it runs beside it. */
     .ride-detail {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 2px 12px;
-      padding-block: 0 12px;
+      align-items: first baseline;
+      padding-block: 0 10px;
       font-size: 0.85rem;
       color: var(--secondary-text-color);
     }
-    .ride-frequency {
-      margin-inline-start: auto;
+    .ride-detail > .gutter {
+      color: var(--secondary-text-color);
     }
-    /* A delay is a plain number beside the time it moves. */
+    .ride-detail-body {
+      display: flex;
+      grid-column: 3 / -1;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0 12px;
+      min-width: 0;
+    }
+    .ride-meta {
+      line-height: 32px;
+    }
+
+    /* A delay stacks in the gutter: the expected time in red, the planned
+       one struck through under it. The strike and the second time carry
+       the delay, not the colour alone. */
     .time-change {
-      display: inline-flex;
-      align-items: baseline;
-      gap: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
     }
     .time-planned {
+      order: 2;
+      font-size: 0.8rem;
+      line-height: 1.2;
       font-weight: 400;
       color: var(--secondary-text-color);
       text-decoration-thickness: 1.5px;
       font-variant-numeric: tabular-nums;
     }
-    /* A late time is red type, not a chip, so the row keeps its height. The
-       theme's error red with 15% of the body text mixed in: barely visible
-       as a shift, but enough to lift it to 4.5:1 on a dark card (the raw
-       token measures 4.0:1 there) and past 5:1 on a light one. */
-    /* Two classes, so it outranks ".stop time", which sets every stop time
-       to body text and would otherwise paint a late time white again. */
+    .alt-times .time-planned {
+      font-size: inherit;
+      line-height: inherit;
+    }
+    /* A late time is red type, not a chip. The theme's error red with 15% of
+       the body text mixed in: barely visible as a shift, but enough to lift
+       it to 4.5:1 on a dark card (the raw token measures 4.0:1 there) and
+       past 5:1 on a light one. */
     .time-change .time-late,
     .alt-times .time-late,
     .leg-stop .time-late {
       color: color-mix(in srgb, var(--wl-error) 85%, var(--primary-text-color));
       font-weight: 700;
     }
-    /* Centred on the TIME's optical centre, not on the row.
-       align-self: center centred it against the .stop box instead, which
-       min-height: var(--stop-row) makes taller than its line of text — so
-       the text sat baseline-aligned near the top while the icon centred in
-       the whole 22px, and the icon read low. Same trap the map pin above
-       and the .access row below each document.
-       So: explicit width/height for a box of exactly the glyph (no
-       line-height or descender space in it), bottom edge on the text
-       baseline, then down by the difference between that box's centre and
-       the cap-height centre of the text. 0.35em is half a cap height, which
-       keeps this correct if the row's font-size ever changes. */
+    /* On the ride line: it's the ride that is tracked live. The gutter
+       keeps nothing but times. */
     .live-mark {
       --mdc-icon-size: 16px;
       display: flex;
-      align-self: baseline;
+      flex: none;
       width: var(--mdc-icon-size);
       height: var(--mdc-icon-size);
-      transform: translateY(calc(var(--mdc-icon-size) / 2 - 0.35em));
       color: var(--wl-rt);
     }
-    /* The label's text carries the box's baseline, so on the baseline-aligned
-       stop rows it lines up with the stop name. Centring every item instead
-       handed the baseline to the icon's bottom edge: the label rode 3-4px
-       high and pushed the whole end row, name and pin, down off its node. */
+
+    /* The pin right after the name, held to its last letters so it never
+       wraps onto a line of its own. An icon in the quiet text colour, no
+       box; the ::before reaches the 24px target (WCAG 2.5.8) around the
+       16px icon without taking up layout space. */
+    .stop-name-end {
+      white-space: nowrap;
+    }
+    .map-link {
+      position: relative;
+      display: inline-flex;
+      vertical-align: -2px;
+      margin-inline-start: 4px;
+      border-radius: var(--wl-radius-sm);
+      color: var(--secondary-text-color);
+      --mdc-icon-size: 16px;
+    }
+    .map-link::before {
+      content: "";
+      position: absolute;
+      inset: -4px;
+    }
+    .map-link:hover {
+      color: var(--primary-text-color);
+    }
+
+    .access-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2px 10px;
+      margin-top: 2px;
+      line-height: 1.35;
+    }
     .access {
       display: inline-flex;
-      align-items: baseline;
+      align-items: center;
       gap: 2px;
       font-size: 0.8rem;
+      font-weight: 400;
       color: var(--secondary-text-color);
     }
-    /* Flex box of exactly the glyph's size: an inline ha-icon sits on the
-       text baseline and reserves descender space, which drops the glyph
-       below the label's centre. Same fix as the modern card's buttons. */
     .access ha-icon {
       --mdc-icon-size: 16px;
       display: flex;
-      align-self: center;
       width: var(--mdc-icon-size);
       height: var(--mdc-icon-size);
     }
-    /* The slope glyphs draw their solid wedge in the lower half of the
-       24-unit box (y 13 to 22), so centred they still read low. */
     .access ha-icon.access-icon--ramp {
       transform: translateY(-2px);
     }
@@ -2535,10 +2672,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       border-radius: var(--wl-radius-sm);
       background: var(--wl-alarm);
       color: var(--wl-on-alarm);
-      font-weight: 600;
+      font-weight: 700;
     }
-    /* Stops along a ride: the departure board's stops-ahead dots, sat on
-       this ride's own rail so they read as stations the line passes. */
+
     .stops-toggle {
       display: inline-flex;
       align-items: center;
@@ -2557,16 +2693,9 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 18px;
     }
     .leg-stops {
-      --stops-ahead-dot-size: 8px;
       list-style: none;
       margin: 0;
-      /* Padding, not margin: a bottom margin collapses through the ride's
-         <li>, which ends the ride's box early and leaves a gap before the
-         dotted transfer walk (or the end node) picks the line up. */
-      padding: 0 0 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      padding: 0;
       font-size: 0.85rem;
       color: var(--secondary-text-color);
     }
@@ -2574,73 +2703,79 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       display: none;
     }
     .leg-stop {
-      position: relative;
-      display: flex;
-      align-items: baseline;
-      gap: 8px;
+      align-items: center;
+      padding-block: 3px;
+      line-height: 1.3;
     }
-    .leg-stop time {
-      font-variant-numeric: tabular-nums;
+    .leg-stop:last-child {
+      padding-block-end: 12px;
+    }
+    .leg-stop > .gutter {
+      color: var(--secondary-text-color);
     }
     .leg-stop-name {
+      grid-column: 3 / -1;
+      min-width: 0;
+      overflow-wrap: anywhere;
       color: var(--primary-text-color);
     }
-    /* Centred on the rail: back out of the row's indent to the strand. */
     .leg-stop-dot {
-      position: absolute;
-      inset-inline-start: calc(
-        var(--strand-x) + var(--node-size) / 2 - var(--stops-ahead-dot-size) / 2 -
-          (var(--strand-x) * 2 + var(--node-size))
-      );
-      top: 50%;
-      width: var(--stops-ahead-dot-size);
-      height: var(--stops-ahead-dot-size);
+      position: relative;
+      z-index: 1;
+      width: 8px;
+      height: 8px;
       box-sizing: border-box;
-      transform: translateY(-50%);
       border-radius: 50%;
       background: var(--card-background-color, var(--ha-card-background, #fff));
       border: 2px solid var(--leg-colour);
-      z-index: 1;
     }
 
+    /* A change: one line saying what it takes, a quieter one for lifts and
+       stairs, the next catchable departure when the change won't hold. */
     .transfer {
+      align-items: center;
+      padding-block: 8px;
+      font-size: 0.85rem;
+      line-height: 1.35;
+      color: var(--secondary-text-color);
+    }
+    .transfer-head {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 4px 8px;
-      padding-block: 8px;
-      font-size: 0.85rem;
-      color: var(--secondary-text-color);
+      gap: 4px 10px;
     }
-    .catchable {
-      font-weight: 600;
-      color: var(--primary-text-color);
-    }
-    .walk {
+    .transfer-at {
       display: inline-flex;
       align-items: center;
-      gap: 2px;
+      gap: 4px;
     }
-    .walk ha-icon {
+    .transfer-at ha-icon {
       --mdc-icon-size: 16px;
     }
+    .catchable {
+      margin-top: 2px;
+      font-weight: 700;
+      color: var(--primary-text-color);
+    }
 
-    /* "Search from here" belongs to the strand's disclosure family — the same
+    /* "Search from here" belongs to the strand's disclosure family: the same
        borderless text-and-icon shape as "6 Stationen" and "Weitere
-       Verbindungen", because it does the same kind of thing. It carried a
-       border and a tint first, which made the one pressable item in the row
-       heavier than the red badge warning the change won't hold.
-
-       Pushed to the trailing edge, where it lines up with the ride meta
-       ("alle 3 min") above and below it. Three changes then put three of
-       these in one column instead of three blocks against the rail. */
+       Verbindungen", because it does the same kind of thing. A border and a
+       tint made the one pressable item in the row heavier than the red badge
+       warning the change won't hold. It sits on the change's first line,
+       level with "Umstieg", pushed to the trailing edge: on the usual card
+       widths that is close by, and it keeps the right side of the strand
+       from looking empty. Wrapped on a narrow card, it takes a line of its
+       own, still at the trailing edge. 24px meets WCAG 2.5.8's target size
+       without a box; the -6px end margin takes back its padding, so its
+       text ends on the card's content edge. */
     .replan {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      /* Clears WCAG 2.5.8's target size without drawing a box to do it. */
-      min-height: 32px;
-      margin-inline-start: auto;
+      min-height: 24px;
+      margin-inline: auto -6px;
       padding: 0 6px;
       border: none;
       border-radius: var(--wl-radius-sm);
@@ -2648,11 +2783,10 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       color: var(--primary-color);
       font: inherit;
       font-size: 0.8rem;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
     }
     .replan ha-icon {
-      display: block;
       --mdc-icon-size: 16px;
     }
     .replan[disabled] {
@@ -2664,7 +2798,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         background: color-mix(in srgb, var(--primary-color) 12%, transparent);
       }
     }
-
     /* The way back out of a jump. Above the connection rather than beside the
        pickers: the From field already shows where we ended up, so this is a
        property of the answer on screen, not of the form. */
@@ -2688,35 +2821,49 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       --mdc-icon-size: 18px;
       color: var(--primary-color);
     }
-    .stop--end {
+
+    /* Every icon on the strand is a flex box of exactly its glyph's size.
+       HA's ha-icon is an inline box around an inline-flex ha-svg-icon with
+       vertical-align: middle, so as a block, or as a flex item (which
+       blockifies it), it gets a text line box: taller than the glyph, with
+       the glyph about 2px below its centre. That sat the vehicle icons low
+       in their discs and the pins and chevrons low beside their text. */
+    .strand ha-icon {
       display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: 2px 8px;
+      flex: none;
+      width: var(--mdc-icon-size, 24px);
+      height: var(--mdc-icon-size, 24px);
     }
 
-    /* Transfer grade: a solid chip with white text, green for enough buffer,
-       anthracite for tight, the alarm red for a change that no longer fits.
-       The words carry the grade; the colour only backs them up. */
+    /* Transfer grade. Enough buffer is a quiet line with a green check; a
+       tight change and one that no longer fits keep the solid chip, so the
+       only filled boxes on the strand are the ones asking for attention. */
     .risk {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      padding: 4px 8px;
-      border-radius: var(--wl-radius-sm);
-      background: var(--wl-ok);
-      color: var(--wl-on-alarm);
       font-size: 0.8rem;
-      font-weight: 600;
-      /* The inherited line box carries the font's tall ascender, which sat
-         the words visibly below the icon's centre. */
       line-height: 1;
+      color: var(--secondary-text-color);
     }
+    /* The inherited line box carries the font's tall ascender, which sat
+       the words below the icon's centre. */
     .risk > span {
       text-box: trim-both cap alphabetic;
     }
     .risk ha-icon {
       display: block;
+      --mdc-icon-size: 16px;
+    }
+    .risk[data-risk="ok"] ha-icon {
+      color: var(--wl-rt);
+    }
+    .risk[data-risk="tight"],
+    .risk[data-risk="at_risk"] {
+      padding: 4px 8px;
+      border-radius: var(--wl-radius-sm);
+      font-weight: 700;
+      color: var(--wl-on-alarm);
     }
     .risk[data-risk="tight"] {
       background: var(--wl-tight);
@@ -2726,10 +2873,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .risk[data-risk="at_risk"] {
       background: var(--wl-alarm);
-      color: var(--wl-on-alarm);
-    }
-    .risk ha-icon {
-      --mdc-icon-size: 16px;
     }
 
     .notices {
@@ -3317,6 +3460,53 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         text-align: start;
       }
     }
+    /* In the narrowest cells a gutter left of the rail costs the names
+       too much width. The rail moves back to the edge and the time sits
+       before the name, in a fixed column so the names still line up; the
+       lines under a stop start under the time. A change's lines stay in
+       the name column, leaving the time column free for a late arrival's
+       planned time to hang into. */
+    @container (max-width: 300px) {
+      .strand {
+        --gutter: 2.6rem;
+        --rail-x: calc(var(--rail) / 2);
+      }
+      .row {
+        grid-template-columns: var(--rail) var(--gutter) minmax(0, 1fr);
+      }
+      .row > .node,
+      .row > .rail,
+      .row > .leg-stop-dot {
+        grid-column: 1;
+      }
+      .row > .gutter {
+        grid-column: 2;
+        justify-content: flex-start;
+        text-align: start;
+      }
+      .stop > .gutter {
+        grid-row: 1;
+      }
+      .time-change {
+        align-items: flex-start;
+      }
+      .body > * {
+        grid-column: 2 / -1;
+      }
+      .body > .stop-name,
+      .ride-detail-body,
+      .leg-stop-name,
+      .transfer .body > * {
+        grid-column: 3 / -1;
+      }
+      .stop--arrive:has(+ .transfer) .time-planned {
+        inset-inline-end: auto;
+        inset-inline-start: 0;
+      }
+      .body > .stop-name {
+        grid-column: 3;
+      }
+    }
     /* Too narrow to sit between the steps in two lines: under them. */
     @container (max-width: 300px) {
       .pager-note {
@@ -3335,6 +3525,15 @@ export class WienerLinienAustriaRouteCard extends LitElement {
       outline: 2px solid var(--primary-color);
       outline-offset: 2px;
       border-radius: 6px;
+    }
+    /* In a fixed-height cell the content scrolls, and a control that stops
+       within the ring's 4px of the visible edge counts as fully in view, so
+       focus wouldn't scroll and the edge would cut its ring. The margin makes
+       focus bring the ring into view as well. */
+    .map-link,
+    input,
+    button {
+      scroll-margin-block: 4px;
     }
 
     @media (forced-colors: active) {
@@ -3360,7 +3559,7 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         outline: 1px dashed Highlight;
         outline-offset: -2px;
       }
-      .leg::before,
+      .row::before,
       .leg-stop-dot,
       .node {
         forced-color-adjust: none;

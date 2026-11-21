@@ -43,13 +43,18 @@ function cardClass(tag: string): typeof ReactiveElement {
   return cls;
 }
 
-/** Top-level rules of the card's stylesheets as selector → declarations,
- *  comments dropped and whitespace collapsed. */
-function rules(tag: string): Map<string, string> {
-  const css = cardClass(tag)
+/** The card's stylesheets as one text, comments dropped. */
+function cssOf(tag: string): string {
+  return cardClass(tag)
     .elementStyles.map((s) => (s as CSSResult).cssText)
     .join("\n")
     .replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+/** Top-level rules of the card's stylesheets as selector → declarations,
+ *  whitespace collapsed. */
+function rules(tag: string): Map<string, string> {
+  const css = cssOf(tag);
   const out = new Map<string, string>();
   for (const m of css.matchAll(/(?<=^|[{}])\s*([^{}@]+?)\s*\{([^{}]*)\}/g)) {
     const selector = m[1]!.replace(/\s+/g, " ").trim();
@@ -74,6 +79,38 @@ describe.each(CARDS)("%s in a grid cell", (tag) => {
     expect(r.get(":host")).toMatch(/display:\s*block/);
     expect(r.get(":host")).not.toMatch(/block-size|(?<![-\w])height:\s*100%/);
     expect(r.get("ha-card") ?? "").not.toMatch(/block-size|(?<![-\w])height:\s*100%/);
+  });
+});
+
+describe.each(CARDS)("%s and the things CSS accepts without a word", (tag) => {
+  // The card is its own query container, and a container never matches its
+  // own query: a :host rule inside one of its @container blocks is dead,
+  // with no error and a green build.
+  it("retunes nothing on :host inside a container query", () => {
+    const css = cssOf(tag);
+    for (let at = css.indexOf("@container"); at >= 0; at = css.indexOf("@container", at + 1)) {
+      let depth = 0;
+      let end = css.indexOf("{", at);
+      for (; end < css.length; end++) {
+        if (css[end] === "{") depth++;
+        else if (css[end] === "}" && --depth === 0) break;
+      }
+      expect(css.slice(at, end)).not.toContain(":host");
+    }
+  });
+
+  // A container query with no container in the card matches nothing, or
+  // whatever HA happens to wrap the card in.
+  it("declares a container for its container queries", () => {
+    const css = cssOf(tag);
+    const declared = /container-type:\s*(inline-)?size/.test(css);
+    expect(declared || !css.includes("@container")).toBe(true);
+  });
+
+  // Declaring both schemes swaps the one inherited from HA's theme for the
+  // browser's own preference. Pinning one, as the flap board does, is fine.
+  it("leaves the colour scheme to HA's theme", () => {
+    expect(cssOf(tag)).not.toMatch(/color-scheme:\s*(light\s+dark|dark\s+light)/);
   });
 });
 
@@ -115,6 +152,12 @@ describe("cardShouldUpdate", () => {
       true,
     );
     expect(cardShouldUpdate(changes({ hass: prev }), hass(prev.states, "en"), ids)).toBe(true);
+  });
+
+  it("renders when the theme switches between light and dark", () => {
+    const themed = (darkMode: boolean) => ({ ...prev, themes: { darkMode } }) as HomeAssistant;
+    expect(cardShouldUpdate(changes({ hass: themed(false) }), themed(true), ids)).toBe(true);
+    expect(cardShouldUpdate(changes({ hass: themed(true) }), themed(true), ids)).toBe(false);
   });
 
   it("renders on the first hass and when hass goes away", () => {

@@ -12,10 +12,14 @@ import logging
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 
 from custom_components.wiener_linien_austria.const import (
     ALERTS_REFRESH_UNSUB_KEY,
+    BATCH_REGISTRY_KEY,
+    CONF_DIVA,
+    CONF_RBLS,
     DOMAIN,
     DOMAIN_LAST_CALL_KEY,
     ELEVATOR_INFO_KEY,
@@ -179,3 +183,37 @@ async def test_setup_uses_no_deprecated_ha_api(
     await hass.async_block_till_done()
 
     assert "Detected that custom integration" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("data", "message"),
+    [
+        ({CONF_RBLS: []}, "no valid RBL stop IDs"),
+        ({CONF_RBLS: ["x", None]}, "no valid RBL stop IDs"),
+        ({CONF_DIVA: "not-a-number"}, "no valid DIVA stop number"),
+    ],
+    ids=["no-rbls", "bad-rbls", "bad-diva"],
+)
+async def test_a_stop_entry_without_its_ids_is_a_setup_error(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    data: dict,
+    message: str,
+) -> None:
+    """A hand-edited entry fails setup for good, with a message that says why.
+
+    No retry (nothing upstream will repair it), no request, and no batch
+    group left polling for an entry that never loaded.
+    """
+    entry = _make_entry(data)
+    entry.add_to_hass(hass)
+    with patch(
+        "custom_components.wiener_linien_austria.batch.fetch_monitor",
+        new_callable=AsyncMock,
+    ) as fetch:
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert message in caplog.text
+    fetch.assert_not_awaited()
+    assert not hass.data.get(DOMAIN, {}).get(BATCH_REGISTRY_KEY)

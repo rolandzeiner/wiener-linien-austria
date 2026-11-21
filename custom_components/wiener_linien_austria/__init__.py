@@ -23,8 +23,10 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
+from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
+from . import run_times, s_bahn_network, static
 from .adhoc import ADHOC_PLANNER_KEY, AdhocPlanner
 from .alerts import async_refresh_alerts
 from .batch import MonitorBatchGroup
@@ -63,7 +65,7 @@ from .rate_limit import (
     backoff_delay,
 )
 from .route_coordinator import WienerLinienRouteCoordinator
-from .run_times import RUN_TIMES_KEY
+from .run_times import RUN_TIMES_KEY, async_get_run_times
 from .s_bahn_network import (
     S_BAHN_NETWORK_KEY,
     S_BAHN_NETWORK_TASK_KEY,
@@ -653,11 +655,35 @@ async def async_remove_entry(
         if e.entry_id != entry.entry_id
     ]
     if remaining:
+        # The removed stop's run-time samples have no reader left.
+        await async_get_run_times(hass).async_prune()
         return
     # Nothing is left to report an outage for.
     async_clear_outage(hass)
+    await _async_remove_stores(hass)
     registration = JSModuleRegistration(hass)
     await registration.async_unregister()
+
+
+async def _async_remove_stores(hass: HomeAssistant) -> None:
+    """Delete the three `.storage` files once no entry is left to read them.
+
+    The stop catalogue, the S-Bahn network and the run-time samples are
+    caches of public timetable data, 3.1 MB together on the live box
+    (2026-11-15, the catalogue alone 3.0 MB). They are kept across unloads
+    and restarts on purpose; before this they also outlived the
+    integration, and the catalogue is read back at any age, so a setup
+    months later would have started from it.
+    """
+    for version, key in (
+        (static.STORE_VERSION, static.STORE_KEY),
+        (s_bahn_network.STORE_VERSION, s_bahn_network.STORE_KEY),
+        (run_times.STORE_VERSION, run_times.STORE_KEY),
+    ):
+        try:
+            await Store[dict[str, Any]](hass, version, key).async_remove()
+        except OSError as err:
+            _LOGGER.warning("Could not remove the stored %s (%s)", key, err)
 
 
 async def async_migrate_entry(

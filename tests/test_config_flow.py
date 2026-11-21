@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
+import pytest
 from homeassistant import config_entries
 from homeassistant.const import CONF_SCAN_INTERVAL
 from homeassistant.core import HomeAssistant
@@ -35,7 +37,7 @@ from custom_components.wiener_linien_austria.stops import (
     nearest_stations,
     stop_options,
 )
-from tests.conftest import make_response_cm
+from tests.conftest import async_setup_entry_and_wait, make_entry, make_response_cm
 
 DEFAULT_LINES = ["U1|H", "U1|R"]
 
@@ -167,6 +169,72 @@ async def test_reconfigure_preserves_unique_id(hass: HomeAssistant, mock_fetch) 
     assert refreshed.unique_id == original_unique_id
     assert refreshed.data[CONF_LINES] == ["U1|H"]
     assert refreshed.data[CONF_SCAN_INTERVAL] == 120
+
+
+async def test_reconfigure_after_options_save_wins(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Configure saves 180 s, Reconfigure saves 30 s: the stop polls every 30 s.
+
+    Both forms show the interval and every reader merges data and options,
+    so an interval left in the options would shadow each later reconfigure.
+    Read from the running coordinator, with one reload per save.
+    """
+    await _complete_flow(hass)
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_SCAN_INTERVAL: 180}
+    )
+    await hass.async_block_till_done()
+    assert entry.runtime_data.scan_interval == timedelta(seconds=180)
+
+    flow = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_RECONFIGURE,
+            "entry_id": entry.entry_id,
+        },
+    )
+    offered = next(
+        key.default()
+        for key in flow["data_schema"].schema
+        if str(key) == CONF_SCAN_INTERVAL
+    )
+    assert offered == 180
+    with patch.object(
+        hass.config_entries, "async_reload", wraps=hass.config_entries.async_reload
+    ) as reload:
+        result = await hass.config_entries.flow.async_configure(
+            flow["flow_id"], {CONF_LINES: ["U1|H"], CONF_SCAN_INTERVAL: 30}
+        )
+        await hass.async_block_till_done()
+    assert result["reason"] == "reconfigure_successful"
+    assert reload.call_count == 1
+    assert CONF_SCAN_INTERVAL not in entry.options
+    assert entry.runtime_data.scan_interval == timedelta(seconds=30)
+
+
+async def test_reconfigure_does_not_depend_on_the_unique_id(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Reconfigure reads the stop from the entry, so its unique_id can't differ.
+
+    The form changes lines and interval only. An entry whose unique_id
+    doesn't follow today's formula still reconfigures, and keeps its id.
+    """
+    entry = make_entry(unique_id="60201012")
+    await async_setup_entry_and_wait(hass, entry)
+
+    flow = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {CONF_LINES: ["U1|R"], CONF_SCAN_INTERVAL: 60}
+    )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.unique_id == "60201012"
+    assert entry.data[CONF_LINES] == ["U1|R"]
 
 
 async def test_reconfigure_preselects_canonical_line_keys(
@@ -348,6 +416,17 @@ async def test_reconfigure_aborts_when_stop_removed_from_catalogue(
                 "entry_id": entry.entry_id,
             },
         )
+    assert result["type"] == FlowResultType.ABORT
+    assert result["reason"] == "stop_gone"
+
+
+async def test_reconfigure_aborts_on_a_stop_entry_without_its_diva(
+    hass: HomeAssistant,
+) -> None:
+    """A hand-edited stop entry ends in `stop_gone`, not an unknown error."""
+    entry = make_entry({CONF_DIVA: "not-a-number"})
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
     assert result["type"] == FlowResultType.ABORT
     assert result["reason"] == "stop_gone"
 
@@ -794,6 +873,41 @@ async def test_typed_text_with_one_match_skips_the_shortlist(
     assert result["step_id"] == "select_lines"
 
 
+async def test_picking_from_the_shortlist_goes_to_lines(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """A stop picked from the matches is the stop the entry is made for."""
+    result = await _start_stop_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    assert result["step_id"] == "select_stop"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "60201468"}
+    )
+    assert result["step_id"] == "select_lines"
+    assert result["description_placeholders"]["stop_name"] == "Taubstummengasse"
+
+
+@pytest.mark.parametrize("value", ["60201012", "not-a-number"])
+async def test_shortlist_rejects_a_stop_it_did_not_offer(
+    hass: HomeAssistant, value: str
+) -> None:
+    """Only the matches can be picked: Stephansplatz isn't one for "gasse".
+
+    The selector refuses such a value before the step sees it, so the step
+    is called directly: this is its own guard against stale flow state.
+    """
+    result = await _start_stop_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_DIVA: "gasse"}
+    )
+    flow = hass.config_entries.flow._progress[result["flow_id"]]
+    result = await flow.async_step_select_stop({CONF_DIVA: value})
+    assert result["step_id"] == "select_stop"
+    assert result["errors"] == {CONF_DIVA: "invalid_stop"}
+
+
 async def test_search_again_returns_to_step_one(hass: HomeAssistant) -> None:
     """The shortlist keeps its escape hatch back to the picker."""
     result = await _start_stop_flow(hass)
@@ -1185,10 +1299,24 @@ async def test_probe_returns_empty_on_a_non_dict_body(hass: HomeAssistant) -> No
         assert await _probe_monitor_lines(hass, [4111]) == []
 
 
-async def test_probe_returns_empty_on_an_error_message_code(
-    hass: HomeAssistant,
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"message": {"messageCode": 316}, "data": {"monitors": []}},
+        {
+            "data": {
+                "monitors": [
+                    {"lines": [{"name": "U1", "towards": "Oberlaa", "direction": "R"}]}
+                ]
+            }
+        },
+    ],
+    ids=["rate-limit", "no-envelope"],
+)
+async def test_probe_returns_empty_on_anything_but_message_code_1(
+    hass: HomeAssistant, body: dict[str, Any]
 ) -> None:
-    """Anything but messageCode 1 (or absent) means the payload is not data.
+    """Anything but messageCode 1 means the payload is not data.
 
     Code 316 is the rate limit; treating its body as a stop with no lines
     would silently offer the user an empty picker.
@@ -1196,9 +1324,7 @@ async def test_probe_returns_empty_on_an_error_message_code(
     with patch(
         "custom_components.wiener_linien_austria.config_flow.async_get_clientsession"
     ) as session:
-        session.return_value.get.return_value = _probe_response(
-            {"message": {"messageCode": 316}, "data": {"monitors": []}}
-        )
+        session.return_value.get.return_value = _probe_response(body)
         assert await _probe_monitor_lines(hass, [4111]) == []
 
 

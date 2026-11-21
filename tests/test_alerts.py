@@ -634,6 +634,26 @@ async def test_fetch_info_lists_non_ok_message_code_returns_failed(
     assert isinstance(result, _FetchFailed)
 
 
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"data": {"trafficInfos": []}}, {"message": {"value": "OK"}, "data": {}}],
+    ids=["empty", "data-only", "no-code"],
+)
+async def test_fetch_info_lists_without_the_envelope_returns_failed(
+    hass: HomeAssistant, body: dict[str, Any]
+) -> None:
+    """A body without `messageCode` is no answer, so the cache survives.
+
+    Read as "no disruptions" it would clear every notice on the boards.
+    """
+    with patch(
+        "custom_components.wiener_linien_austria.alerts.async_get_clientsession",
+        return_value=_mock_session(_json_response(body)),
+    ):
+        result = await _fetch_info_lists(hass)
+    assert isinstance(result, _FetchFailed)
+
+
 async def test_fetch_info_lists_non_dict_body_returns_failed(
     hass: HomeAssistant,
 ) -> None:

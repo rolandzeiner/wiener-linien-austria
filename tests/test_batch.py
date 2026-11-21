@@ -8,6 +8,7 @@ a missing RBL yields empty-not-error).
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -36,6 +37,8 @@ from custom_components.wiener_linien_austria.coordinator import (
 from custom_components.wiener_linien_austria.rate_limit import backoff_delay
 
 from .conftest import make_entry, make_response_cm
+
+COORDINATOR_LOGGER = "custom_components.wiener_linien_austria.coordinator"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -223,6 +226,30 @@ async def test_fetch_non_dict_body(hass: HomeAssistant) -> None:
         await group.async_fetch()
     assert exc.value.translation_key == "api_invalid_response"
     assert "list" in exc.value.translation_placeholders["error"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{}, {"data": {"monitors": []}}, {"message": {"value": "OK"}}],
+    ids=["empty", "data-only", "no-code"],
+)
+async def test_fetch_body_without_the_envelope_is_a_failure(
+    hass: HomeAssistant, body: dict
+) -> None:
+    """A 200 without `messageCode` says nothing about departures.
+
+    Every real answer carries it, an empty board included. Read as data,
+    such a body would empty every board, reset the backoff and end an
+    outage in progress, for as long as the upstream sends it.
+    """
+    group, _ = _group_with_member(hass)
+    with (
+        _patch_get(group, MagicMock(return_value=make_response_cm(_ok_response(body)))),
+        pytest.raises(UpdateFailed) as exc,
+    ):
+        await group.async_fetch()
+    assert exc.value.translation_key == "api_invalid_response"
+    assert "messageCode" in exc.value.translation_placeholders["error"]
 
 
 async def test_fetch_upstream_error_code(hass: HomeAssistant, monitor_fixture) -> None:
@@ -526,6 +553,32 @@ async def test_timer_tick_isolates_a_failing_member_on_the_error_path(
     assert b.last_update_success is False
 
 
+async def test_an_outage_is_logged_once_and_its_end_once(
+    hass: HomeAssistant, monitor_fixture, caplog: pytest.LogCaptureFixture
+) -> None:
+    """One error when the polls start failing, one info line when they work.
+
+    Home Assistant logs a pushed update at debug only, so the member says
+    it is back itself.
+    """
+    _, coordinator = _group_with_member(hass)
+    failure = UpdateFailed(translation_domain=DOMAIN, translation_key="api_timeout")
+    good = BatchResult(
+        body=monitor_fixture, server_time=monitor_fixture["message"]["serverTime"]
+    )
+    caplog.set_level(logging.INFO, logger=COORDINATOR_LOGGER)
+
+    coordinator.batch_apply(good)
+    coordinator.batch_set_error(failure)
+    coordinator.batch_set_error(failure)
+    coordinator.batch_apply(good)
+    coordinator.batch_apply(good)
+
+    records = [r for r in caplog.records if r.name == COORDINATOR_LOGGER]
+    assert [r.levelno for r in records] == [logging.ERROR, logging.INFO]
+    assert "recovered for Stephansplatz" in records[1].getMessage()
+
+
 async def test_timer_tick_no_members_noop(hass: HomeAssistant) -> None:
     """A tick with no members returns without touching the network."""
     group = MonitorBatchGroup(hass, 60)
@@ -575,6 +628,39 @@ async def test_backoff_widens_then_resets(hass: HomeAssistant) -> None:
     # A success restores the normal cadence.
     group._note_success()
     assert group._current_interval == timedelta(seconds=base)
+
+
+def test_backoff_swaps_the_running_timer(hass: HomeAssistant) -> None:
+    """The widened cadence replaces the timer that is running, not a field.
+
+    One failure and a success leave it alone; from the second failure the
+    old timer is cancelled and a slower one armed, and the first success
+    puts the configured one back.
+    """
+    group, _ = _group_with_member(hass, interval=60)
+    timers = [MagicMock(), MagicMock(), MagicMock()]
+    with patch(
+        "custom_components.wiener_linien_austria.batch.async_track_time_interval",
+        side_effect=timers,
+    ) as track:
+        group.start()
+        group._note_failure()
+        group._note_success()
+        assert track.call_count == 1
+
+        group._note_failure()
+        group._note_failure()
+        assert track.call_count == 2
+        timers[0].assert_called_once_with()
+        assert track.call_args.args[2] >= timedelta(seconds=108)
+
+        group._note_success()
+        assert track.call_count == 3
+        timers[1].assert_called_once_with()
+        assert track.call_args.args[2] == timedelta(seconds=60)
+
+        group.stop()
+        timers[2].assert_called_once_with()
 
 
 @pytest.mark.parametrize("base", [30, 60, 300, 1800])

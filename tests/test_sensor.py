@@ -937,3 +937,24 @@ async def test_line_colors_refresh_lands_on_the_next_tick_not_the_next_read(
     # would leave this cache stale indefinitely.
     coordinator.batch_apply(BatchResult(body={}, server_time=None))
     assert sensor.extra_state_attributes["line_colors"] == {"U1": {"bg": "FFFFFF"}}
+
+
+async def test_history_keeps_what_happened_not_the_setup(hass: HomeAssistant) -> None:
+    """The recorder stores the stop's events and leaves out everything else.
+
+    Pinned as a whole set, so a new attribute has to be put on one side or
+    the other. Whatever is left out is still on the live state.
+    """
+    entry = _make_entry()
+    entry.add_to_hass(hass)
+    data = MonitorData(departures=_make_departures(), server_time=None)
+    sensor = WienerLinienStopSensor(_make_coordinator(hass, entry, data), entry)
+    attrs = sensor.extra_state_attributes
+    assert set(attrs) - WienerLinienStopSensor._unrecorded_attributes == {
+        "stale_departures",
+        "stale_since",
+        "connection_lost_since",
+    }
+    assert {"diva", "stop_name", "latitude", "longitude"} <= set(attrs)
+    # Nothing is listed that the entity no longer has.
+    assert WienerLinienStopSensor._unrecorded_attributes <= set(attrs)

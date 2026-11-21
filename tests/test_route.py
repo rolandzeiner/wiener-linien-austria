@@ -32,6 +32,10 @@ from custom_components.wiener_linien_austria.api import (
     ApiTimeoutError,
     WienerLinienApiError,
 )
+from custom_components.wiener_linien_austria.binary_sensor import (
+    WienerLinienRouteLeaveBinarySensor,
+    WienerLinienRouteRiskBinarySensor,
+)
 from custom_components.wiener_linien_austria.config_flow import _probe_route
 from custom_components.wiener_linien_austria.const import (
     CONF_ACTIVE_DAYS,
@@ -98,7 +102,7 @@ ROLLOVER_SPREAD = (
 
 
 def _entity_id(hass: HomeAssistant, entry: MockConfigEntry, suffix: str) -> str:
-    platform = "binary_sensor" if suffix == "route_at_risk" else "sensor"
+    platform = "sensor" if suffix == "route" else "binary_sensor"
     entity_id = er.async_get(hass).async_get_entity_id(
         platform, DOMAIN, f"{entry.entry_id}_{suffix}"
     )
@@ -150,6 +154,50 @@ async def test_route_entry_sets_up_sensor_and_risk(
     params = dict(fetch.call_args.args[1])
     assert params["name_origin"] == "60201468"
     assert params["itdTime"] == "0750"
+
+
+async def test_route_history_keeps_the_outcome_not_the_times(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """What the recorder stores for a route's three entities, as whole sets.
+
+    Left out: what differs for every connection (`arrival`, `leave_at`,
+    `departure`, which gave each row an attributes row of its own), what
+    only the card reads, and the route's settings. All of it stays on the
+    live state.
+    """
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    # What Home Assistant adds to every state.
+    core = {"friendly_name", "device_class", "attribution"}
+
+    def recorded(suffix: str, entity: type) -> set[str]:
+        state = hass.states.get(_entity_id(hass, entry, suffix))
+        assert state is not None
+        unrecorded: frozenset[str] = entity._unrecorded_attributes
+        # Nothing is listed that the entity no longer has.
+        assert unrecorded <= set(state.attributes)
+        return set(state.attributes) - unrecorded - core
+
+    assert recorded("route", WienerLinienRouteSensor) == {
+        "active",
+        "duration_minutes",
+        "interchanges",
+        "risk",
+    }
+    assert recorded("route_leave_now", WienerLinienRouteLeaveBinarySensor) == {"lines"}
+    assert recorded("route_at_risk", WienerLinienRouteRiskBinarySensor) == {
+        "risk",
+        "transfer_at",
+        "slack_minutes",
+    }
+    live = hass.states.get(_entity_id(hass, entry, "route")).attributes
+    assert live["origin"] == "Westbahnhof"
+    assert live["arrival"] is not None
+    assert live["active_window"] == entry.runtime_data.active_window
+    leave = hass.states.get(_entity_id(hass, entry, "route_leave_now")).attributes
+    assert leave["leave_at"] is not None
+    assert leave["departure"] is not None
 
 
 async def test_sensors_name_the_next_connection_not_one_that_left(
@@ -1123,6 +1171,98 @@ async def test_route_reconfigure_keeps_the_ends(
     assert entry.data[CONF_MIN_TRANSFER_MINUTES] == 5
     assert entry.data[CONF_ORIGIN_DIVA] == 60201468
     assert entry.unique_id == "route_60201468_60201040"
+
+
+async def test_route_reconfigure_after_options_save_wins(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """Configure saves 600 s, Reconfigure saves 240 s: the route polls every 240 s."""
+    entry = route_entry()
+    await async_setup_entry_and_wait(hass, entry)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_SCAN_INTERVAL: 600}
+    )
+    await hass.async_block_till_done()
+    assert entry.runtime_data.scan_interval == timedelta(seconds=600)
+
+    result = await entry.start_reconfigure_flow(hass)
+    with (
+        patch(PROBE, new_callable=AsyncMock, return_value=None),
+        patch.object(
+            hass.config_entries, "async_reload", wraps=hass.config_entries.async_reload
+        ) as reload,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], OPTIONS_INPUT
+        )
+        await hass.async_block_till_done()
+    assert result["reason"] == "reconfigure_successful"
+    assert reload.call_count == 1
+    assert entry.options == {}
+    assert entry.runtime_data.scan_interval == timedelta(seconds=240)
+
+
+async def test_route_reconfigure_can_empty_every_optional_field(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """A window, its days and the excluded means all come off again.
+
+    The frontend sends an emptied multi-select as `[]` and leaves an
+    emptied time field out, so the lists are schema defaults and the two
+    times are suggestions.
+    """
+    entry = route_entry(
+        **{
+            CONF_EXCLUDED_MEANS: ["bus"],
+            CONF_STEP_FREE: True,
+            CONF_ACTIVE_DAYS: ["mon"],
+            CONF_ACTIVE_FROM: "06:30:00",
+            CONF_ACTIVE_TO: "09:00:00",
+        }
+    )
+    await async_setup_entry_and_wait(hass, entry)
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(PROBE, new_callable=AsyncMock, return_value=None):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                **OPTIONS_INPUT,
+                CONF_EXCLUDED_MEANS: [],
+                CONF_STEP_FREE: False,
+                CONF_ACTIVE_DAYS: [],
+            },
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_EXCLUDED_MEANS] == []
+    assert entry.data[CONF_STEP_FREE] is False
+    assert entry.data[CONF_ACTIVE_DAYS] == []
+    assert CONF_ACTIVE_FROM not in entry.data
+    assert CONF_ACTIVE_TO not in entry.data
+
+
+async def test_route_form_keeps_an_emptied_window_after_an_error(
+    hass: HomeAssistant, frozen: FrozenDateTimeFactory, fetch: AsyncMock
+) -> None:
+    """The form shown again after an error holds what was sent, not what is stored.
+
+    With the stored window put back as a suggestion, a second submit would
+    save the window the user had just removed.
+    """
+    entry = route_entry(**{CONF_ACTIVE_FROM: "06:30:00", CONF_ACTIVE_TO: "09:00:00"})
+    await async_setup_entry_and_wait(hass, entry)
+    result = await entry.start_reconfigure_flow(hass)
+    with patch(PROBE, new_callable=AsyncMock, return_value="cannot_connect_routing"):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], OPTIONS_INPUT
+        )
+    assert result["errors"] == {"base": "cannot_connect_routing"}
+    suggested = {
+        str(key): (key.description or {}).get("suggested_value")
+        for key in result["data_schema"].schema
+        if str(key) in (CONF_ACTIVE_FROM, CONF_ACTIVE_TO)
+    }
+    assert suggested == {CONF_ACTIVE_FROM: None, CONF_ACTIVE_TO: None}
 
 
 async def test_route_saved_in_upper_case_still_plans_and_preselects(

@@ -1081,7 +1081,18 @@ export class WienerLinienAustriaCard extends LitElement {
                     </div>`
                     : nothing
                 }
-                <ul class="dep-list" role="list" aria-label=${this._t("departures_list")}>
+                <ul
+                  class="dep-list"
+                  role=${
+                    // A row with a trail is a button, and a list may hold
+                    // nothing but list items: with one in it, the rows are a
+                    // labelled group of buttons, each followed by its panel.
+                    rows.some((d) => shouldShowStopsAhead(this._config!.show_stops_ahead, d))
+                      ? "group"
+                      : "list"
+                  }
+                  aria-label=${this._t("departures_list")}
+                >
                   ${rows.map((d, i) => this._renderRow(d, stopCfg.entity, i))}
                 </ul>`
               : this._renderEmptyState(stopCfg.entity, attrs, staleDropped)
@@ -1856,16 +1867,21 @@ export class WienerLinienAustriaCard extends LitElement {
         )}
       </div>
     `;
+    // A closed panel is folded to no height, not removed, so its +N and
+    // notice buttons would stay in the tab order: focus would land on
+    // controls nobody can see and scroll the card to them. `inert` takes
+    // them out, for the keyboard and for assistive tech alike.
     return variant === "hero"
       ? html`<div
           class=${cls}
           id=${panelId}
           role="region"
           aria-hidden=${hidden}
+          ?inert=${!expanded}
         >
           ${body}
         </div>`
-      : html`<li class=${cls} id=${panelId} role="region" aria-hidden=${hidden}>
+      : html`<li class=${cls} id=${panelId} role="region" aria-hidden=${hidden} ?inert=${!expanded}>
           ${body}
         </li>`;
   }
@@ -2194,11 +2210,6 @@ export class WienerLinienAustriaCard extends LitElement {
             ev.stopPropagation();
             this._toggleTransfers(transferKey);
           }}
-          @keydown=${(ev: KeyboardEvent) => {
-            if (ev.key === "Enter" || ev.key === " ") {
-              ev.stopPropagation();
-            }
-          }}
         >
           <span class="stops-ahead-other-count">+${otherLines.length}</span>
           <ha-icon icon="mdi:chevron-down" aria-hidden="true"></ha-icon>
@@ -2218,33 +2229,18 @@ export class WienerLinienAustriaCard extends LitElement {
           </div>`
         : nothing;
 
-    // When the stop has transfer-to-other-lines (`otherLines`), the WHOLE
-    // row becomes clickable + keyboard-activatable so tapping the stop
-    // name has the same effect as tapping the +N toggle button. Cleaner
-    // hit target on touch and matches user expectation that the entire
-    // row is the affordance, not just the small button on the right.
-    // The toggle button still has its own click handler (with
-    // stopPropagation) so its dedicated label + ARIA stay intact for
-    // screen readers.
-    const rowInteractive = otherLines.length > 0;
-    // The label replaces the row's content for assistive tech, so the time
-    // has to be in it or it is only ever seen.
+    // When the stop has transfers to other lines (`otherLines`), a click
+    // anywhere on its row opens them: a larger target on touch than the
+    // small +N button. The button stays the one control for the keyboard
+    // and for assistive tech. The row itself takes no button role: it holds
+    // that button (and the notice one), and as a button it would be a second
+    // tab stop per stop for the same action.
+    const rowClickable = otherLines.length > 0;
     const lateLabel = eta?.planned
       ? this._t("stop_time_late", { time: eta.planned.clock, n: eta.planned.late })
       : "";
     const etaLabel = eta
       ? [`${this._t("stop_time_title")} ${eta.clock}`, lateLabel].filter(Boolean).join(", ")
-      : "";
-    const rowAriaLabel = rowInteractive
-      ? [
-          this._t(transfersExpanded ? "stops_ahead_other_hide" : "stops_ahead_other_show", {
-            count: otherLines.length,
-            stop: s.name,
-          }),
-          etaLabel,
-        ]
-          .filter(Boolean)
-          .join(" · ")
       : "";
     // Late is the strike and the second time, and red only on top of that
     // (show_delay_colors), the way the row's countdown treats the colour.
@@ -2281,27 +2277,12 @@ export class WienerLinienAustriaCard extends LitElement {
     return html`
       <li class=${classMap(stopClasses)}>
         <div
-          class="stops-ahead-row"
-          role=${rowInteractive ? "button" : nothing}
-          tabindex=${rowInteractive ? "0" : nothing}
-          aria-expanded=${rowInteractive ? (transfersExpanded ? "true" : "false") : nothing}
-          aria-label=${rowInteractive ? rowAriaLabel : nothing}
+          class=${classMap({ "stops-ahead-row": true, expandable: rowClickable })}
           @click=${
-            rowInteractive
+            rowClickable
               ? (ev: MouseEvent) => {
                   ev.stopPropagation();
                   this._toggleTransfers(transferKey);
-                }
-              : nothing
-          }
-          @keydown=${
-            rowInteractive
-              ? (ev: KeyboardEvent) => {
-                  if (ev.key === "Enter" || ev.key === " ") {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    this._toggleTransfers(transferKey);
-                  }
                 }
               : nothing
           }
@@ -2322,7 +2303,6 @@ export class WienerLinienAustriaCard extends LitElement {
                       ev.stopPropagation();
                       this._expandedNotices = toggleInSet(this._expandedNotices, transferKey);
                     }}
-                    @keydown=${(ev: KeyboardEvent) => ev.stopPropagation()}
                   >
                     <span>${skipLabel}</span>
                     <span class="sr-only">, ${this._t("stop_notice")}</span>

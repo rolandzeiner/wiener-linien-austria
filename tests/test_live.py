@@ -627,6 +627,8 @@ async def test_monitor_request_shape_and_refusals() -> None:
         await REAL_MONITOR_FETCH(
             _session({"message": {"messageCode": 316}}), [1], "UA/1"
         )
+    with pytest.raises(ValueError, match="messageCode None"):
+        await REAL_MONITOR_FETCH(_session({"data": {"monitors": []}}), [1], "UA/1")
     with pytest.raises(ApiResponseShapeError, match="expected an object"):
         await REAL_MONITOR_FETCH(_session([]), [1], "UA/1")
 

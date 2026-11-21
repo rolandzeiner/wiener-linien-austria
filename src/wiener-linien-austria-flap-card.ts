@@ -136,6 +136,13 @@ function padCountdown(countdown: number | undefined | null): string {
   return String(cd <= 0 ? 0 : cd).padStart(2, " ");
 }
 
+/** A station name with a zero-width space after each slash, so a double
+ *  name ("Neubaugasse/Neustiftgasse") can break there. A browser breaks
+ *  after a hyphen by itself, but not after a slash between letters. */
+function breakableStationName(name: string): string {
+  return name.replaceAll("/", "/\u200B");
+}
+
 // Dedupe by `type` so a double-load (cache-bust race, HMR) doesn't
 // surface the card twice in the picker.
 {
@@ -656,7 +663,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
                 role="group"
                 style=${styleMap(headerStyle)}
               >
-                <div class="flap-header__station">${stationName}</div>
+                <div class="flap-header__station">${breakableStationName(stationName)}</div>
               </div>`
               : nothing
           }
@@ -1121,14 +1128,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     :host {
       display: block;
+      /* The query container for the @container rule further down. Without
+         one that rule matches nothing, and the header strip keeps its
+         labels on a board too narrow for them. */
+      container-type: inline-size;
       /* Stacking context for the housing shadow + tile drop-shadows
          so they only compete with each other, not the surrounding
          HA dashboard chrome. */
       isolation: isolate;
-      /* Tells the browser this card supports both light and dark
-         schemes so form controls / scrollbars match whichever
-         palette the .flap--light class below selects. */
-      color-scheme: light dark;
       /* Solari palette — exposed as custom properties so the
          .flap--light block below can flip the board theme in one
          place. Default values = dark mode. */
@@ -1213,9 +1220,14 @@ export class WienerLinienAustriaFlapCard extends LitElement {
        rule below so the override actually wins; .flap is declared
        later in source so equal specificity would lose to it. */
     .flap.flap--light {
+      color-scheme: light;
       box-shadow: 0 6px 22px rgba(0, 0, 0, 0.18);
     }
     .flap {
+      /* The board's scrollbar follows the board's skin, which HA's theme
+         picks: dark here, light in the rule above. Both at once would hand
+         the choice to the browser's own preference. */
+      color-scheme: dark;
       background: var(--flap-housing);
       border-radius: 10px;
       padding: 6px;
@@ -1250,10 +1262,19 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       letter-spacing: 0.02em;
       box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.18);
     }
+    /* A name wider than the band takes a second line instead of running
+       out of it at both ends: at the space or after the slash of a double
+       name where it has one (see breakableStationName), inside a word only
+       as the last resort. Two lines at this line height stay within the
+       band's 50px. */
     .flap-header__station {
+      min-width: 0;
       text-align: center;
       font-size: 22px;
+      line-height: 1.1;
       letter-spacing: 0.04em;
+      overflow-wrap: anywhere;
+      text-wrap: balance;
     }
     /* CC-BY data-source credit — last child INSIDE the dark panel,
        so the panel surface extends all the way to the bottom of the

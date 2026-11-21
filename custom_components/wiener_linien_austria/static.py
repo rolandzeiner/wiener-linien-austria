@@ -965,16 +965,18 @@ async def _fetch_and_build(
 async def _download_text(
     session: aiohttp.ClientSession,
     url: str,
-    timeout: float,
+    timeout_seconds: float,
 ) -> str:
     """GET a CSV URL and return its body. Raises WienerLinienApiError."""
-    return await get_text(session, url, user_agent=USER_AGENT, timeout_seconds=timeout)
+    return await get_text(
+        session, url, user_agent=USER_AGENT, timeout_seconds=timeout_seconds
+    )
 
 
 async def _download_or_fail_soft(
     session: aiohttp.ClientSession,
     url: str,
-    timeout: float,
+    timeout_seconds: float,
 ) -> tuple[str | None, bool]:
     """Like `_download_text` but never raises.
 
@@ -982,7 +984,7 @@ async def _download_or_fail_soft(
     True so the caller can carry the prior index forward instead.
     """
     try:
-        return (await _download_text(session, url, timeout), False)
+        return (await _download_text(session, url, timeout_seconds), False)
     except WienerLinienApiError as err:
         _LOGGER.warning("Optional static CSV fetch failed (%s): %s", url, err)
         return (None, True)
@@ -1669,8 +1671,10 @@ def _diva_for_rbl(catalogue: StaticCatalogue, rbl: int) -> int | None:
 
 def _catalogue_to_store(catalogue: StaticCatalogue) -> dict[str, Any]:
     """Serialise a StaticCatalogue for Store-backed persistence."""
+    # No `version` key of its own: one was written from v0.1.0 on and never
+    # read (the Store envelope carries the version). An older file still has
+    # it; `_catalogue_from_store` ignores it.
     payload: dict[str, Any] = {
-        "version": 1,
         "last_fetched": catalogue.last_fetched,
         "stations": [
             {

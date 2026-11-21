@@ -184,7 +184,7 @@ async def _probe_monitor_lines(
         return []
 
     message = body.get("message") or {}
-    if message.get("messageCode") not in (1, None):
+    if message.get("messageCode") != 1:
         return []
 
     seen: set[str] = set()
@@ -597,11 +597,12 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_SCAN_INTERVAL: interval,
                 }
                 if self._reconfigure_entry is not None:
-                    await self.async_set_unique_id(f"diva_{station.diva}")
-                    self._abort_if_unique_id_mismatch()
+                    # No unique_id check: the stop was read from this entry,
+                    # so it can't belong to another one. `options={}` because
+                    # the options flow stores the interval too, and every
+                    # reader lets the options win over the data.
                     return self.async_update_and_abort(
-                        self._reconfigure_entry,
-                        data=data,
+                        self._reconfigure_entry, data=data, options={}
                     )
                 await self.async_set_unique_id(f"diva_{station.diva}")
                 self._abort_if_unique_id_configured(reload_on_update=False)
@@ -806,7 +807,10 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
             if self._reconfigure_entry is not None
             else {}
         )
-        defaults = {**existing, **(user_input or {})}
+        # After an error the form holds what was sent, and only that: an
+        # emptied time field is a missing key, which the stored window must
+        # not fill in again.
+        defaults = existing if user_input is None else user_input
         schema = vol.Schema(
             {
                 vol.Required(
