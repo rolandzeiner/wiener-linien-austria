@@ -59,14 +59,6 @@ select = [
 # ASCII-fying prose that reads better with them.
 allowed-confusables = ["×", "–"]
 
-ignore = [
-    # `_download_text` / `_download_or_fail_soft` take an
-    # `aiohttp.ClientTimeout` that is handed straight to the session, not
-    # the seconds-float the rule assumes should have been an
-    # `asyncio.timeout` at the call site. The rule's premise doesn't hold.
-    "ASYNC109",
-]
-
 # Deliberately NOT selected, so nobody has to re-derive this:
 #   S    (bandit)       572 hits, almost all `assert` in tests. Per-file-ignore
 #                       gymnastics for zero security value — this component has

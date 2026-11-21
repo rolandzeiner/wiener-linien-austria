@@ -965,16 +965,18 @@ async def _fetch_and_build(
 async def _download_text(
     session: aiohttp.ClientSession,
     url: str,
-    timeout: float,
+    timeout_seconds: float,
 ) -> str:
     """GET a CSV URL and return its body. Raises WienerLinienApiError."""
-    return await get_text(session, url, user_agent=USER_AGENT, timeout_seconds=timeout)
+    return await get_text(
+        session, url, user_agent=USER_AGENT, timeout_seconds=timeout_seconds
+    )
 
 
 async def _download_or_fail_soft(
     session: aiohttp.ClientSession,
     url: str,
-    timeout: float,
+    timeout_seconds: float,
 ) -> tuple[str | None, bool]:
     """Like `_download_text` but never raises.
 
@@ -982,7 +984,7 @@ async def _download_or_fail_soft(
     True so the caller can carry the prior index forward instead.
     """
     try:
-        return (await _download_text(session, url, timeout), False)
+        return (await _download_text(session, url, timeout_seconds), False)
     except WienerLinienApiError as err:
         _LOGGER.warning("Optional static CSV fetch failed (%s): %s", url, err)
         return (None, True)
