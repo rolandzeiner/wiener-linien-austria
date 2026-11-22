@@ -63,6 +63,7 @@ from .const import (
 )
 from .rate_limit import async_enforce_domain_cooldown
 from .s_bahn_network import merge_transfer_lines
+from .stop_corrections import STOP_NAME_FIXES, STOP_SPLITS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1026,6 +1027,8 @@ def _parse_all(
     """
     stations = _parse_haltestellen(halte_text)
     _merge_haltepunkte(stations, punkte_text)
+    # Before the trip patterns, which list each stop's lines by its platforms.
+    _correct_stops(stations)
 
     trip_patterns: TripPatternIndex | None = None
     trip_pattern_error: Exception | None = None
@@ -1094,6 +1097,35 @@ def _merge_haltepunkte(stations: dict[int, Station], csv_text: str) -> None:
         station = stations.get(diva)
         if station is not None:
             station.rbls.append(rbl)
+
+
+def _correct_stops(stations: dict[int, Station]) -> set[int]:
+    """Apply `stop_corrections` in place; returns the stops whose platforms moved."""
+    for diva, (listed, own) in STOP_NAME_FIXES.items():
+        if (station := stations.get(diva)) is not None and station.name == listed:
+            station.name = own
+    moved: set[int] = set()
+    for split in STOP_SPLITS:
+        source = stations.get(split.listed_under)
+        if source is None:
+            continue
+        rbls = [rbl for rbl in source.rbls if rbl in split.rbls]
+        if not rbls:
+            continue
+        source.rbls = [rbl for rbl in source.rbls if rbl not in split.rbls]
+        target = stations.setdefault(
+            split.diva,
+            Station(
+                diva=split.diva,
+                name=split.name,
+                municipality=source.municipality,
+                longitude=split.longitude,
+                latitude=split.latitude,
+            ),
+        )
+        target.rbls.extend(rbls)
+        moved |= {source.diva, target.diva}
+    return moved
 
 
 def _parse_trip_patterns(
@@ -1798,6 +1830,12 @@ def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
             rbls=[int(r) for r in row.get("rbls", [])],
         )
     trip_patterns = _trip_patterns_from_store(data.get("trip_patterns"))
+    # A cache written before a correction gets it here, without a download.
+    moved = _correct_stops(stations)
+    if trip_patterns is not None:
+        for diva in moved:
+            lines = trip_patterns.lines_at_rbls(stations[diva].rbls)
+            trip_patterns.lines_at_diva[diva] = lines or ()
     return StaticCatalogue(
         stations_by_diva=stations,
         last_fetched=data["last_fetched"],

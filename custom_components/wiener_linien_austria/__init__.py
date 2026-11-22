@@ -81,6 +81,7 @@ from .static import (
     catalogue_is_stale,
     current_catalogue,
 )
+from .stop_corrections import entry_corrections
 from .websocket import STOPS_CACHE_KEY, async_setup_websocket
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -696,6 +697,9 @@ async def async_migrate_entry(
     across /monitor polls on branching termini (e.g. U1/R alternates
     between Oberlaa and Alaudagasse), so it must not participate in the
     saved selection key — it survived only as a now-meaningless label.
+
+    v2.1 → v2.2: entries saved under a stop the open data gets wrong take its
+    corrected name and platforms (stop_corrections.py).
     """
     if entry.version > 2:
         return False
@@ -726,4 +730,8 @@ async def async_migrate_entry(
             )
         else:
             hass.config_entries.async_update_entry(entry, version=2)
+    if entry.minor_version < 2:
+        hass.config_entries.async_update_entry(
+            entry, minor_version=2, **entry_corrections(hass, entry)
+        )
     return True

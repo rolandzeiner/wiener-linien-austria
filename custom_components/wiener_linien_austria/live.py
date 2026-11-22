@@ -66,6 +66,7 @@ from .routing import (
     transfer_slack,
 )
 from .static import StaticCatalogue, current_catalogue, vehicle_reaches
+from .stop_corrections import corrected_diva
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,6 +134,7 @@ def parse_monitor_rows(body: Mapping[str, Any]) -> dict[int, list[LiveRow]]:
         diva = str(properties.get("name") or "").strip()
         if rbl is None or not diva:
             continue
+        diva = corrected_diva(rbl, diva)
         rows = by_rbl.setdefault(rbl, [])
         for line in monitor.get("lines") or []:
             if not isinstance(line, Mapping):

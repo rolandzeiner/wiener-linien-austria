@@ -217,6 +217,7 @@ The cards' strings live in `src/localize/languages/{de,en}.json`, one namespace 
 | `live.py`, `run_times.py`, `timetable.py`, `s_bahn_network.py` | Live times for planned connections, run times to the stops ahead, planned S-Bahn departures, and which S-Bahn lines call where. |
 | `alerts.py`, `outage.py`, `rate_limit.py`, `parsing.py` | Disruptions and lift status; sustained-outage detection; the domain-wide rate limit and backoff; the coercions the parsers share. |
 | `static.py` | The OGD stop catalogue, DIVA → RBL mapping and line trip patterns, cached in `.storage`. |
+| `stop_corrections.py` | Stops the open data lists under a wrong name or ID, and the fix for entries saved with them. |
 | `config_flow.py`, `services.py`, `diagnostics.py`, `card_registration.py` | The setup and options flows, the `plan_trip` action, diagnostics, and the Lovelace resource registration for the four bundles. |
 | `src/wiener-linien-austria-*.ts`, `src/card-styles.ts` | The four cards; the modern card's styles. |
 | `src/editor.ts`, `src/retro-editor.ts`, `src/flap-editor.ts`, `src/route-editor.ts`, `src/editor/` | The editors and what they share. |
