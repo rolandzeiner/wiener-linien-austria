@@ -4,10 +4,10 @@
 // If they drift, the WebSocket version check sees a mismatch, shows
 // a reload banner, the reload re-serves the same JS, and the banner
 // loops forever.
-export const CARD_VERSION = "2.5.0";
-export const RETRO_CARD_VERSION = "2.5.0";
-export const FLAP_CARD_VERSION = "2.5.0";
-export const ROUTE_CARD_VERSION = "2.5.0";
+export const CARD_VERSION = "2.6.0";
+export const RETRO_CARD_VERSION = "2.6.0";
+export const FLAP_CARD_VERSION = "2.6.0";
+export const ROUTE_CARD_VERSION = "2.6.0";
 
 /** The integration's domain; the version banner asks `<DOMAIN>/card_version`. */
 export const DOMAIN = "wiener_linien_austria";
