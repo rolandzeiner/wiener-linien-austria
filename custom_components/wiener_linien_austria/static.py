@@ -63,7 +63,7 @@ from .const import (
 )
 from .rate_limit import async_enforce_domain_cooldown
 from .s_bahn_network import merge_transfer_lines
-from .stop_corrections import STOP_NAME_FIXES, STOP_SPLITS
+from .stop_corrections import STOP_NAME_FIXES, STOP_POSITION_FIXES, STOP_SPLITS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -1104,6 +1104,10 @@ def _correct_stops(stations: dict[int, Station]) -> set[int]:
     for diva, (listed, own) in STOP_NAME_FIXES.items():
         if (station := stations.get(diva)) is not None and station.name == listed:
             station.name = own
+    for diva, (wrong, right) in STOP_POSITION_FIXES.items():
+        station = stations.get(diva)
+        if station is not None and (station.longitude, station.latitude) == wrong:
+            station.longitude, station.latitude = right
     moved: set[int] = set()
     for split in STOP_SPLITS:
         source = stations.get(split.listed_under)

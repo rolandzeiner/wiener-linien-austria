@@ -56,6 +56,18 @@ STOP_NAME_FIXES: Final[dict[int, tuple[str, str]]] = {
     60200283: ("Erdbergstraße, Schlachthausgasse", "Wällischgasse"),
 }
 
+# DIVA → (the station list's position, the stop's own), as (longitude, latitude).
+# The list puts these three 78 to 117 km west of Vienna, so they were never a
+# nearby stop and their map links pointed there. Own positions from the trip
+# planner's stop list, which GTFS agrees with to 5 m.
+STOP_POSITION_FIXES: Final[
+    dict[int, tuple[tuple[float, float], tuple[float, float]]]
+] = {
+    60201954: ((15.3863442, 48.4036711), (16.423629, 48.263450)),
+    60201955: ((15.0677477, 48.7235788), (16.486520, 48.256878)),
+    60201956: ((15.5786106, 48.6945799), (16.452815, 48.268635)),
+}
+
 # Position from GTFS `stops.txt`, between the stop's two platforms.
 STOP_SPLITS: Final[tuple[StopSplit, ...]] = (
     StopSplit(

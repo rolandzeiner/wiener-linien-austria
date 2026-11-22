@@ -39,7 +39,11 @@ from custom_components.wiener_linien_austria.static import (
     _parse_trip_patterns,
     stops_ahead_for_match,
 )
-from custom_components.wiener_linien_austria.stops import match_stops, stop_options
+from custom_components.wiener_linien_austria.stops import (
+    match_stops,
+    nearest_stations,
+    stop_options,
+)
 
 MAURER_LANGE_GASSE = 60200855
 VALENTINGASSE = 60201936
@@ -443,3 +447,48 @@ async def test_other_entries_only_get_the_version(
     assert await async_migrate_entry(hass, entry) is True
     assert entry.minor_version == 2
     assert (entry.title, dict(entry.data)) == ("Valentingasse", data)
+
+
+@pytest.mark.parametrize(
+    ("row", "position"),
+    [
+        (
+            "60201954;Leopoldine-Padaurek-Straße ;Wien;49000001;15.3863442;48.4036711",
+            (16.423629, 48.263450),
+        ),
+        (
+            "60201955;Halblehenweg;Wien;49000001;15.0677477;48.7235788",
+            (16.486520, 48.256878),
+        ),
+        (
+            "60201956;Wassermanngasse;Wien;49000001;15.5786106;48.6945799",
+            (16.452815, 48.268635),
+        ),
+    ],
+)
+def test_stop_listed_far_outside_vienna_is_put_back(
+    row: str, position: tuple[float, float]
+) -> None:
+    diva = int(row.split(";")[0])
+    halte = f"{HALTESTELLEN}{row}\n"
+    punkte = f"{HALTEPUNKTE}9901;{diva};;Wien;49000001;15.0;48.5\n"
+    fresh = StaticCatalogue(
+        _parse_all(halte, punkte, None, None, None).stations, FETCHED
+    )
+    stations = _parse_haltestellen(halte)
+    _merge_haltepunkte(stations, punkte)
+    cached = _catalogue_from_store(
+        _catalogue_to_store(StaticCatalogue(stations, FETCHED))
+    )
+
+    for catalogue in (fresh, cached):
+        station = catalogue.stations_by_diva[diva]
+        assert (station.longitude, station.latitude) == position
+        near = nearest_stations(catalogue, position[1], position[0], limit=1)
+        assert [stop.diva for stop, _ in near] == [diva]
+
+
+def test_position_fix_steps_aside_once_upstream_moves_the_stop() -> None:
+    halte = HALTESTELLEN + "60201955;Halblehenweg;Wien;49000001;16.4866;48.2569\n"
+    station = _parse_all(halte, HALTEPUNKTE, None, None, None).stations[60201955]
+    assert (station.longitude, station.latitude) == (16.4866, 48.2569)
