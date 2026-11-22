@@ -1372,9 +1372,15 @@ export class WienerLinienAustriaRetroCard extends LitElement {
     /* A cell with a set row count: the board fills the cell, and scrolls
        when the cell is shorter than the rows it shows. min_rows keeps the
        default config from ever needing it. */
+    ha-card.fixed-height {
+      display: flex;
+      flex-direction: column;
+    }
+    /* The height the version banner above it leaves, not the card's. */
     ha-card.fixed-height > div {
       box-sizing: border-box;
-      block-size: 100%;
+      flex: 1 1 auto;
+      min-block-size: 0;
       overflow-y: auto;
     }
     .retro {

@@ -235,6 +235,22 @@ describe("fixed-height class", () => {
   });
 });
 
+describe.each(CARDS)("%s with the version banner above its content", (tag) => {
+  // The banner is the first child of ha-card. A scroller as tall as the card
+  // would end a banner's height below it, where ha-card clips.
+  it("gives the scroller the height the banner leaves", () => {
+    const r = rules(tag);
+    expect(r.get("ha-card.fixed-height")).toMatch(/flex-direction:\s*column/);
+    const scroller = [...r]
+      .filter(([selector]) => selector.startsWith("ha-card.fixed-height >"))
+      .map(([, declarations]) => declarations)
+      .join(";");
+    expect(scroller).toMatch(/flex:\s*1 1 auto/);
+    expect(scroller).toMatch(/min-block-size:\s*0/);
+    expect(scroller).not.toMatch(/(?<![-\w])block-size:\s*100%/);
+  });
+});
+
 describe("edit-dialog preview", () => {
   it.each(CARDS)("%s puts the version banner first in the card, not in the editor", async (tag) => {
     const el = document.createElement(tag) as ReactiveElement & {

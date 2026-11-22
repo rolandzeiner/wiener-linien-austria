@@ -1467,9 +1467,14 @@ block-size: 100%;
 :host([layout="panel"]) ha-card {
 block-size: 100%;
 }
+ha-card.fixed-height {
+display: flex;
+flex-direction: column;
+}
 ha-card.fixed-height > div {
 box-sizing: border-box;
-block-size: 100%;
+flex: 1 1 auto;
+min-block-size: 0;
 overflow-y: auto;
 }
 .retro {
