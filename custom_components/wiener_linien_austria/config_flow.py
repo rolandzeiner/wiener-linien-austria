@@ -976,8 +976,8 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         station = catalogue.stations_by_diva.get(diva)
         if station is None:
             return self.async_abort(reason="stop_gone")
-        # A board that kept platforms since split off as a stop of their own
-        # still offers their lines, or saving would drop them from the selection.
+        # A board that kept platforms since moved to another stop (split or
+        # merged) still offers their lines, or saving would drop them.
         if kept := split_off_platforms(diva, data.get(CONF_RBLS) or []):
             own = [rbl for rbl in station.rbls if rbl not in kept]
             station = replace(station, rbls=[*own, *kept])

@@ -191,7 +191,7 @@ UNKNOWN, OTHER_UNKNOWN = 60201987, 60201988
 
 
 def test_a_route_end_the_timetable_calls_by_another_id_takes_its_time() -> None:
-    # N6: the route ends at Enkplatz, the timetable at Enkplatz/Grillgasse.
+    # The route ends at one ID, the timetable at one the catalogue lacks.
     sample = {HANDELSKAI: 10.0, NEUE_DONAU: 12.0, UNKNOWN: 13.0}
 
     found = stand_ins(_catalogue(), WESTBAHNHOF, "U6", "H", sample)

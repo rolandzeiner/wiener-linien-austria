@@ -6,7 +6,7 @@ API. We use five of them:
 - `haltestellen.csv`     — one row per station (DIVA, name, coordinates).
 - `haltepunkte.csv`      — one row per physical platform (RBL = StopID, parent
   DIVA, coordinates). Bridges stop names to the RBL list the monitor endpoint
-  needs.
+  needs. Both files are corrected by `stop_corrections` as they load.
 - `linien.csv`           — line catalogue (LineID → "U1", MeansOfTransport).
   Resolves the live `/monitor` line label to the numeric LineID used in the
   trip-pattern CSV, and exposes the canonical vehicle type per line.
@@ -239,8 +239,9 @@ class TripPatternIndex:
     `lines_at_diva` powers the per-stop changeover badges: for every
     DIVA, the sorted set of line labels (e.g. "U1", "13A", "71") of every
     line whose schedule passes through that station. Built at parse time
-    by walking every pattern's RBLs, resolving each to its parent DIVA via
-    the haltepunkte index, and aggregating the line labels.
+    by walking every pattern's RBLs, resolving each to its corrected stop
+    (`_correct_stops`; redone on a cache load for stops whose platforms
+    moved), and aggregating the line labels.
     `colors_by_line` / `text_colors_by_line` map a line label ("U1") to its
     Wiener-Linien-published `route_color` / `route_text_color` as 6-digit
     uppercase hex (no `#`). Sourced from GTFS `routes.txt`. Empty when the
@@ -261,9 +262,10 @@ class TripPatternIndex:
     label_for_line: dict[int, str] = field(default_factory=dict, repr=False)
     # RBL → labels of every line whose schedule calls at that platform, plus
     # the label → MoT map used to sort them. Built lazily by `lines_at_rbls`:
-    # only the stop-display notice matcher reads them, so building on every
-    # construction would tax each store load for nothing. Not persisted —
-    # both derive from the fields above.
+    # most loads never need them (notices, the line picker and a cache that
+    # still needs corrections do), so building on every construction would tax
+    # each store load for nothing. Not persisted — both derive from the fields
+    # above.
     _labels_by_rbl: dict[int, frozenset[str]] | None = field(
         default=None, repr=False, compare=False
     )
@@ -298,8 +300,7 @@ class TripPatternIndex:
         platform no U3 train ever calls at. Sorted like `lines_at_diva`.
 
         Returns None when none of `rbls` appears in any pattern: "the
-        schedule doesn't know this platform" is not "no line calls here",
-        and callers fall back to their pre-index behaviour on it.
+        schedule doesn't know this platform" is not "no line calls here".
         """
         by_rbl = self._ensure_labels_by_rbl()
         known = False
@@ -388,7 +389,8 @@ class StaticCatalogue:
         """Return trackable stations whose name contains the query.
 
         Case-insensitive. A stop without platforms is never offered: it has
-        nothing to track, and a merged stop leaves one under the same name.
+        nothing to track, and a merged stop stays in the list without any,
+        often under the name of the stop it joined.
         """
         needle = query.strip().casefold()
         if not needle:

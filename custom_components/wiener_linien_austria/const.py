@@ -693,14 +693,12 @@ LINE_TYPE_S_BAHN: Final = "ptTrainS"
 # "R" = Rückfahrt (return). Used as keys in CONF_LINES ("U1|H").
 Direction = Literal["H", "R"]
 
-# Lovelace cards — this integration ships FOUR (modern, retro, flap, route).
-# Each JS file carries a `const CARD_VERSION` that must match the
-# corresponding Python constant below byte-for-byte, else the reload
-# banner loops. All four version in lockstep with the integration
-# (mirrored in src/const.ts; tests/test_card_version.py checks each
-# constant here AND each literal there against manifest.json). Each card
-# still ships an independent WS probe so a mismatch on one bundle doesn't
-# show a banner on the others.
+# Lovelace cards — this integration ships FOUR (modern, retro, flap, route),
+# versioned in lockstep with it. Each bundle's constant (src/const.ts) must
+# equal CARD_VERSION, which all four banners ask for;
+# tests/test_card_version.py checks each against manifest.json. The other three
+# constants answer the per-card commands, which only bundles older than the
+# shared banner ask.
 CARD_VERSION: Final = INTEGRATION_VERSION
 CARD_URL: Final = "/wiener-linien-austria/wiener-linien-austria-card.js"
 CARD_FILENAME: Final = "wiener-linien-austria-card.js"

@@ -210,7 +210,7 @@ def test_trail_is_not_cut_a_stop_before_schlachthausgasse() -> None:
     ("rbl", "diva"), [(1621, MAURER_LANGE_GASSE), (3862, VALENTINGASSE)]
 )
 def test_live_rows_carry_the_trip_planners_stop_id(rbl: int, diva: int) -> None:
-    """The planner boards N60 at 60201936; live times join on that ID."""
+    """Each platform's rows take the ID the planner boards at."""
     body = {
         "data": {
             "monitors": [

@@ -430,6 +430,9 @@ def build_trip_params(
     `itdDate` / `itdTime` in its own zone. A list of pairs rather than a
     dict because `exclMOT_<code>` may repeat the checkbox shape once per
     excluded mode.
+
+    The options keep the station list's DIVAs. The server is asked with its
+    own (`stop_corrections.planner_diva`): it doesn't plan from all the list's.
     """
     params: list[tuple[str, str]] = [
         ("outputFormat", "JSON"),

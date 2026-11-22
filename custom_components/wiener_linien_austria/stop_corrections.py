@@ -1,26 +1,22 @@
 """Corrections to stops the open data gets wrong, and to entries saved with them.
 
-`haltestellen.csv` and `haltepunkte.csv` don't agree with GTFS and the trip
-planner on which stop some platforms belong to (issue #132, where the 60's
-Maurer Lange Gasse was listed as "Valentingasse"). Two shapes:
+`haltestellen.csv` and `haltepunkte.csv` disagree with GTFS and the trip
+planner on some stops (issue #132):
 
-- A stop whose platforms are filed under a neighbour, mostly because the list
-  lacks its ID. Boards and routes found it only under the neighbour's name.
-- Half of a stop filed under a second ID the planner doesn't know. A board at
-  the stop missed that half's departures, and a route from the second ID
-  failed.
+- `STOP_SPLITS`: platforms filed under a neighbour because the list lacks
+  their stop, or half of a stop filed under a second ID the planner doesn't
+  know. `whole`: every platform of the listed ID moves.
+- `STOP_NAME_FIXES`, `STOP_POSITION_FIXES`: a wrong name or position.
+- `PLANNER_ALIASES`: no error, a stop of its own that the timetable counts as
+  part of a bigger one.
 
-A third shape is no error in the list, only a different ID: a stop of its own
-that the trip planner counts as part of a bigger one (`PLANNER_ALIASES`).
+The corrections to the list apply only while the open data still has the
+error. The ID translations don't check it: compare them again when the
+timetable changes (last compared with GTFS, the trip planner and `/monitor` on
+2026-11-22).
 
-Found by matching every timetabled platform and line in GTFS to the list, and
-live `/monitor` departures to the timetable where lines were running. Checked
-2026-11-22; the timetable changes in December.
-
-Each correction to the list applies only while the open data still has the
-error, so it steps aside when Wiener Linien fixes the files. Once a release
-carries a minor version of the config entry, a correction added later needs
-the next one, for `entry_corrections` to reach saved entries.
+A correction added after a release needs the next minor version (the flow's
+`MINOR_VERSION` and the gate in `async_migrate_entry`) to reach saved entries.
 """
 
 from __future__ import annotations
@@ -56,7 +52,8 @@ class StopSplit(NamedTuple):
     longitude: float
     latitude: float
     rbls: tuple[int, ...]
-    # The lines that call at them, to tell which stop a saved board meant.
+    # For a split that isn't whole: the lines that call at them, to tell which
+    # stop a saved board meant. A merge moves every board.
     lines: frozenset[str] = frozenset()
     # Those of `lines` that also call at a platform staying behind. A board
     # tracking one can't move without losing departures.
@@ -72,9 +69,9 @@ STOP_NAME_FIXES: Final[dict[int, tuple[str, str]]] = {
 }
 
 # DIVA → (the station list's position, the stop's own), as (longitude, latitude).
-# The list puts these three 78 to 117 km west of Vienna, so they were never a
-# nearby stop and their map links pointed there. Own positions from the trip
-# planner's stop list, which GTFS agrees with to 5 m.
+# The list puts these three 78 to 117 km from where they are, too far west to be
+# a nearby stop or a usable map link. Own positions from the trip planner's
+# stop list, within 1 m of the middle of their GTFS platforms.
 STOP_POSITION_FIXES: Final[
     dict[int, tuple[tuple[float, float], tuple[float, float]]]
 ] = {
@@ -83,8 +80,8 @@ STOP_POSITION_FIXES: Final[
     60201956: ((15.5786106, 48.6945799), (16.452815, 48.268635)),
 }
 
-# Name and position of a stop the list lacks from the trip planner's stop list,
-# spelled as the station list spells names; of one it has, from the list.
+# A stop the list lacks takes name and position from the trip planner's stop
+# list, the name spelled the station list's way. One it has repeats the list's.
 STOP_SPLITS: Final[tuple[StopSplit, ...]] = (
     StopSplit(
         listed_under=60200855,
@@ -135,7 +132,8 @@ STOP_SPLITS: Final[tuple[StopSplit, ...]] = (
         lines=frozenset({"N75"}),
         shared=frozenset({"N75"}),
     ),
-    # 60201742 is the Heizwerkstraße that vehicles call at.
+    # Both platforms of the listed "Heizwerkstraße" 60200228 are Deutschstraße's.
+    # The real Heizwerkstraße is 60201742, which the list has as well.
     StopSplit(
         listed_under=60200228,
         diva=60201975,
@@ -194,10 +192,13 @@ STOP_SPLITS: Final[tuple[StopSplit, ...]] = (
     ),
 )
 
-# Stops of their own that GTFS and the trip planner count as part of another:
-# listed DIVA → the planner's, which rejects the listed one. The vehicles call
-# at both in turn and `/monitor` reports both, so merging them would list each
-# vehicle twice on one board. Only the trip request takes the planner's ID.
+# Stops of their own whose calls GTFS and the trip planner count as a bigger
+# stop's: listed DIVA → that stop's. Asked with the listed one, the planner
+# rejects it or finds no connection. Not merged: on some routes a vehicle calls
+# at both, and one board would list it twice (Gottschalkgasse, which shares no
+# route with Enkplatz's own platforms, stays apart for its name). The trip
+# request and skip detection take the planner's ID, live rows and trail times
+# only for `LIVE_ALIASES`.
 PLANNER_ALIASES: Final[dict[int, int]] = {
     60201974: 60200094,  # Atzgersdorf S, Knotzenbachgasse → Atzgersdorf
     60201757: 60200425,  # Enkplatz, Gottschalkgasse → Enkplatz
@@ -207,8 +208,9 @@ PLANNER_ALIASES: Final[dict[int, int]] = {
     60202501: 60200949,  # Oberlaa, Laaer-Berg-Straße → Oberlaa
 }
 
-# Of those, where no vehicle calls twice under the planner's ID (the trams'
-# other stop is Enkplatz, Grillgasse), so a live row there is the planned call.
+# Aliases where a call under the planner's ID can only be the listed stop's for
+# the lines there (the trams' other Enkplatz stop, Grillgasse, has an ID of its
+# own), so their live rows and trail times join on the planner's ID.
 LIVE_ALIASES: Final[frozenset[int]] = frozenset({60201757})
 
 _MERGED: Final[dict[int, StopSplit]] = {
@@ -223,7 +225,7 @@ def merged_diva(diva: int) -> int:
 
 
 def planner_diva(diva: int) -> int:
-    """The ID to ask the trip planner with for a stop of the list."""
+    """The planner's ID for a listed stop: to ask with, and in its answers."""
     return PLANNER_ALIASES.get(diva, merged_diva(diva))
 
 
@@ -233,7 +235,11 @@ def live_alias_stops(diva: int) -> list[int]:
 
 
 def corrected_diva(rbl: int, diva: str) -> str:
-    """The trip planner's ID for the stop of a `/monitor` row's platform."""
+    """The DIVA a `/monitor` row joins a planned ride on.
+
+    Its own stop's where the open data misfiles the platform, the planner's
+    for `LIVE_ALIASES`, else the one `/monitor` sends.
+    """
     for split in STOP_SPLITS:
         if rbl in split.rbls and diva == str(split.listed_under):
             return str(split.diva)
@@ -244,7 +250,7 @@ def corrected_diva(rbl: int, diva: str) -> str:
 
 
 def split_off_platforms(diva: int, rbls: Iterable[Any]) -> list[int]:
-    """Those of a board's saved platforms that are now a stop of their own."""
+    """Those of a board's saved platforms that are now filed under another stop."""
     saved = {as_int(rbl) for rbl in rbls}
     return [
         rbl
@@ -257,7 +263,7 @@ def split_off_platforms(diva: int, rbls: Iterable[Any]) -> list[int]:
 
 @callback
 def entry_corrections(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
-    """What `async_update_entry` has to change on an entry saved before the fix."""
+    """What `async_update_entry` changes on an entry saved with uncorrected stops."""
     if entry.data.get(CONF_ENTRY_TYPE) == ENTRY_TYPE_ROUTE:
         return _route_corrections(entry)
     return _board_corrections(hass, entry)
@@ -266,11 +272,14 @@ def entry_corrections(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]
 def _board_corrections(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any]:
     """A board follows the lines it tracks, and loses none of their departures.
 
-    A board at a stop that was merged whole moves with it. One at a stop that
-    was split moves if every line it tracks calls at the new stop alone, gives
-    those platforms up if none calls there, and keeps all of them otherwise.
-    A board never moves onto a stop that is set up already. A board at a stop
-    that took another's platforms gets them.
+    - At a merged stop it moves to the stop it joined, with the platforms it
+      had. A board already at that stop gets them too.
+    - At a split stop it moves if it tracks only lines that call at the new
+      stop alone, gives those platforms up if it tracks none that call there,
+      and keeps them otherwise, also when it tracks all lines (no selection).
+    - It never moves onto a stop that is set up already, and then keeps them.
+
+    A title changes only while it is still the stop's name.
     """
     data = dict(entry.data)
     diva = as_int(data.get(CONF_DIVA))
@@ -313,7 +322,10 @@ def _board_corrections(hass: HomeAssistant, entry: ConfigEntry) -> dict[str, Any
 
 
 def _route_corrections(entry: ConfigEntry) -> dict[str, Any]:
-    """A route keeps its stop IDs, which are what it was planned with."""
+    """A route keeps its stop IDs, its identity, and takes the corrected names.
+
+    `planner_diva` translates the IDs on each request.
+    """
     data = dict(entry.data)
     for diva_key, name_key in (
         (CONF_ORIGIN_DIVA, CONF_ORIGIN_NAME),

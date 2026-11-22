@@ -4,7 +4,7 @@ The setup dialog (config_flow.py) and the route card's ad-hoc mode
 (websocket.py) offer the same list and accept the same stops: only a stop
 with platforms can be tracked or planned from, since `/monitor` is queried
 per RBL. The `plan_trip` action accepts the same stops, by name as well
-(`match_stops`).
+(`match_stops`). A merged stop's old ID is accepted too, never offered.
 """
 
 from __future__ import annotations
@@ -107,15 +107,13 @@ def _line_suffix(catalogue: StaticCatalogue, station: Station, limit: int = 4) -
 def _unique_stop_labels(catalogue: StaticCatalogue) -> dict[int, str]:
     """Map every trackable DIVA to a label no other stop shares.
 
-    Vienna has a dozen stop names that repeat across two DIVAs inside the
-    same municipality — "Schottenring (Wien)" is both the U2/U4 hub and a
-    nightline-only stop. Rendering both as the same string leaves the user
-    picking blind, so colliding names get the lines that serve them
-    appended ("Schottenring (Wien) · U2, U4, 1, 2, …").
+    A few stop names repeat across two DIVAs inside the same municipality —
+    "Märzstraße (Wien)" is both a tram and a bus stop. Rendering both as the
+    same string leaves the user picking blind, so colliding names get the
+    lines that serve them appended ("Märzstraße (Wien) · 10, 44, 46, 52, …").
 
-    A handful of collisions are served by an identical line set
-    (Lafitegasse, both 54A). Those get the DIVA appended as well — ugly,
-    but a label that can't be told apart is worse than an ugly one.
+    Any that still read the same get the DIVA appended as well — ugly, but
+    a label that can't be told apart is worse than an ugly one.
     """
     groups: dict[str, list[Station]] = {}
     for station in catalogue.stations_by_diva.values():
@@ -144,8 +142,8 @@ def trackable_station(catalogue: StaticCatalogue, value: Any) -> Station | None:
     `plan` command and `plan_trip` pass values from outside any picker, so
     anything may arrive here. It also re-checks `rbls`, which keeps the
     resolution honest if the catalogue was refreshed between rendering the
-    form and submitting it. The DIVA of a merged stop resolves to the stop it
-    joined: scripts and the route card's last pick still hold it.
+    form and submitting it. A merged stop's old DIVA, which scripts and the
+    route card's last pick may still hold, resolves to the stop it joined.
     """
     try:
         diva = int(value)
@@ -219,8 +217,8 @@ def match_stops(catalogue: StaticCatalogue, query: str) -> list[Station]:
        ("Hauptbahnhof Süd").
     5. The closest name by spelling, at `FUZZY_STOP_CUTOFF` or above.
 
-    A few names repeat within one municipality ("Schottenring" is the U2/U4
-    hub and a nightline-only stop nearby). Those resolve to the busiest of
+    A few names repeat within one municipality ("Märzstraße" is a tram stop
+    and a bus stop nearby). Those resolve to the busiest of
     them instead of asking, since the trip planner walks between the two
     anyway. The same name in different municipalities, or different names
     matched equally well, returns them all, busiest first, capped at

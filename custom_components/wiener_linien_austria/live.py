@@ -3,7 +3,8 @@
 The trip planner sends no live times (every leg had `rtTime == time` in
 probes on 2026-09-14 and 2026-09-15), but `/monitor` does, and its planned
 times match the trip planner's to the minute. So a ride is matched on
-boarding stop (DIVA) + line + direction (`mode.diva.dir` ↔ `/monitor`
+boarding stop (DIVA, `/monitor`'s put through
+`stop_corrections.corrected_diva`) + line + direction (`mode.diva.dir` ↔ `/monitor`
 `direction`, verified for U-Bahn, tram and bus) + planned minute, and takes
 its live departure from there. S-Bahn and ÖBB rides aren't in `/monitor` and
 stay on the timetable.
@@ -101,6 +102,7 @@ MAX_NEXT_DEPARTURES: Final = 2
 class LiveRow:
     """One departure from a `/monitor` answer."""
 
+    # The feed's, after `stop_corrections.corrected_diva`.
     diva: str
     line: str
     direction: str
@@ -177,7 +179,8 @@ def rbls_for_trips(
     """The RBLs whose `/monitor` rows can give these trips live times.
 
     One boarding stop per Wiener Linien ride that leaves within the
-    horizon. A station's RBLs are narrowed to those its line stops at, when
+    horizon, with the listed stops whose rows count as calls there
+    (`live_alias_stops`). Their RBLs are narrowed to those its line stops at, when
     the trip patterns know the line, so a change at Karlsplatz doesn't put
     every platform of the station into the shared request.
     """

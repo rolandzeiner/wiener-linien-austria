@@ -1,6 +1,7 @@
 """Platforms the open data files under another stop, network-wide (issue #132).
 
-The fixture holds the upstream rows of every affected stop, verbatim.
+The fixture holds the upstream rows of the split and alias stops, verbatim; of
+the route data one row per line, platform and direction.
 """
 
 from __future__ import annotations
@@ -259,7 +260,8 @@ def test_live_times_at_enkplatz_come_from_the_platform_boarded(
     [
         # Wolkersbergenstraße, Franz-Boos-Gasse, Ober St. Veit U.
         pytest.param(453, 1, (8113, 5242, 5243), 60201988, {60200956: 9.0}, id="53A"),
-        # Boarded at the bigger stop: Aspern Nord, Mayrederbrücke, the next.
+        # Boarded at the bigger stop: Aspern Nord, Mayrederbrücke, then 3605,
+        # standing in for any next stop.
         pytest.param(
             125, 1, (2874, 2870, 3605), 60200910, {60202502: 3.0}, id="at the board"
         ),
@@ -290,7 +292,7 @@ def test_a_stop_the_planner_counts_as_another_never_reads_kein_halt(
 @pytest.mark.parametrize("split", STOP_SPLITS, ids=SPLIT_IDS)
 @pytest.mark.parametrize("taken", [False, True], ids=["free", "taken"])
 def test_no_saved_board_loses_a_departure(split: StopSplit, taken: bool) -> None:
-    """Every possible line selection at every affected stop."""
+    """Every combination of lines at every stop a split takes platforms from."""
     source = _listed().stations_by_diva[split.listed_under]
     here = {call for call in _calls() if call[0] in source.rbls}
     lines = sorted({line for _, line, _ in here})
@@ -312,7 +314,7 @@ def test_no_saved_board_loses_a_departure(split: StopSplit, taken: bool) -> None
             )
             changes = entry_corrections(hass, entry)
             kept = changes.get("data", entry.data)[CONF_RBLS]
-            # No selection tracks every line.
+            # An empty selection tracks every line.
             before = {call for call in here if not chosen or call[1] in chosen}
             assert all(rbl in kept for rbl, _, _ in before), chosen
             if taken:

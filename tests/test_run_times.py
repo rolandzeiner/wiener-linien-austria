@@ -1211,8 +1211,8 @@ async def test_command_times_a_stop_the_timetable_knows_by_another_id(
     mock_static_catalogue: StaticCatalogue,
     dm_fetch: AsyncMock,
 ) -> None:
-    """N6 ends at Enkplatz on its route and at a stop the station list lacks
-    in the timetable."""
+    """A route's last stop takes the time of a call under an ID the catalogue
+    lacks."""
     enkplatz, grillgasse = 60200425, 60201987
     _name_stops(
         mock_static_catalogue,
@@ -1258,7 +1258,10 @@ async def test_command_times_a_stop_the_planner_counts_as_a_bigger_one(
     mock_static_catalogue: StaticCatalogue,
     dm_fetch: AsyncMock,
 ) -> None:
-    """Tram 11 calls at Gottschalkgasse, which the timetable lists as Enkplatz."""
+    """As tram 11 at Gottschalkgasse, whose call the timetable lists as Enkplatz's.
+
+    U1 stands in for the tram.
+    """
     enkplatz, gottschalkgasse = 60200425, 60201757
     _name_stops(
         mock_static_catalogue,
