@@ -31,6 +31,7 @@ from custom_components.wiener_linien_austria.const import (
     DOMAIN,
     ENTRY_TYPE_ROUTE,
 )
+from custom_components.wiener_linien_austria.live import rbls_for_trips
 from custom_components.wiener_linien_austria.routing import (
     RouteOptions,
     build_trip_params,
@@ -45,6 +46,8 @@ from custom_components.wiener_linien_austria.static import (
     _parse_trip_patterns,
 )
 from custom_components.wiener_linien_austria.stop_corrections import (
+    LIVE_ALIASES,
+    PLANNER_ALIASES,
     STOP_SPLITS,
     StopSplit,
     corrected_diva,
@@ -203,6 +206,51 @@ def test_planner_is_asked_with_the_id_it_knows(split: StopSplit) -> None:
 
 def test_planner_gets_other_stops_unchanged() -> None:
     assert planner_diva(60201468) == 60201468
+
+
+# --- Stops the planner counts as part of another --------------------
+
+
+@pytest.mark.parametrize(("listed", "planned"), PLANNER_ALIASES.items())
+def test_alias_stays_a_stop_and_is_planned_as_the_bigger_one(
+    listed: int, planned: int
+) -> None:
+    catalogue = _corrected()
+    station = catalogue.stations_by_diva[listed]
+    when = datetime(2026, 11, 24, 10, tzinfo=UTC)
+    start = dict(build_trip_params(RouteOptions.from_config(listed, 1, {}), when))
+    end = dict(build_trip_params(RouteOptions.from_config(1, listed, {}), when))
+
+    assert start["name_origin"] == end["name_destination"] == str(planned)
+    assert trackable_station(catalogue, listed) is station
+    assert station.rbls == _listed().stations_by_diva[listed].rbls
+    assert planned in catalogue.stations_by_diva
+
+
+@pytest.mark.parametrize(("listed", "planned"), PLANNER_ALIASES.items())
+def test_only_a_live_alias_joins_on_the_planners_id(listed: int, planned: int) -> None:
+    rbl = _listed().stations_by_diva[listed].rbls[0]
+    expected = planned if listed in LIVE_ALIASES else listed
+    assert corrected_diva(rbl, str(listed)) == str(expected)
+
+
+@pytest.mark.parametrize(
+    ("stop_id", "line", "rbls"),
+    [
+        pytest.param(str(ENKPLATZ), "11", {2584}, id="Gottschalkgasse's platform"),
+        pytest.param(str(ENKPLATZ), "76A", {2606}, id="Enkplatz's own"),
+        pytest.param(None, "11", set(), id="no stop"),
+        pytest.param("1", "11", set(), id="unknown stop"),
+    ],
+)
+def test_live_times_at_enkplatz_come_from_the_platform_boarded(
+    stop_id: str | None, line: str, rbls: set[int]
+) -> None:
+    now = datetime(2026, 11, 24, 10, tzinfo=UTC)
+    leg = MagicMock(walk=False, wiener_linien=True, line=line)
+    leg.origin.planned, leg.origin.stop_id = now, stop_id
+
+    assert rbls_for_trips(_corrected(), [MagicMock(legs=[leg])], now) == rbls
 
 
 # --- Saved entries --------------------------------------------------

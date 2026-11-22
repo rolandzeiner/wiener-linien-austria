@@ -66,7 +66,7 @@ from .routing import (
     transfer_slack,
 )
 from .static import StaticCatalogue, current_catalogue, vehicle_reaches
-from .stop_corrections import corrected_diva
+from .stop_corrections import corrected_diva, live_alias_stops
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -197,10 +197,16 @@ def rbls_for_trips(
             ):
                 continue
             diva = as_int(leg.origin.stop_id)
-            station = catalogue.stations_by_diva.get(diva) if diva is not None else None
-            if station is None or not station.rbls:
+            if diva is None:
                 continue
-            station_rbls = set(station.rbls)
+            station_rbls = {
+                rbl
+                for stop in (diva, *live_alias_stops(diva))
+                if (station := catalogue.stations_by_diva.get(stop)) is not None
+                for rbl in station.rbls
+            }
+            if not station_rbls:
+                continue
             line_id = patterns.lines_by_label.get(leg.line) if patterns else None
             if patterns is not None and line_id is not None:
                 on_line = {

@@ -10,6 +10,9 @@ Maurer Lange Gasse was listed as "Valentingasse"). Two shapes:
   the stop missed that half's departures, and a route from the second ID
   failed.
 
+A third shape is no error in the list, only a different ID: a stop of its own
+that the trip planner counts as part of a bigger one (`PLANNER_ALIASES`).
+
 Found by matching every timetabled platform and line in GTFS to the list, and
 live `/monitor` departures to the timetable where lines were running. Checked
 2026-11-22; the timetable changes in December.
@@ -191,6 +194,23 @@ STOP_SPLITS: Final[tuple[StopSplit, ...]] = (
     ),
 )
 
+# Stops of their own that GTFS and the trip planner count as part of another:
+# listed DIVA → the planner's, which rejects the listed one. The vehicles call
+# at both in turn and `/monitor` reports both, so merging them would list each
+# vehicle twice on one board. Only the trip request takes the planner's ID.
+PLANNER_ALIASES: Final[dict[int, int]] = {
+    60201974: 60200094,  # Atzgersdorf S, Knotzenbachgasse → Atzgersdorf
+    60201757: 60200425,  # Enkplatz, Gottschalkgasse → Enkplatz
+    60201785: 60200956,  # Ober St. Veit, Franz-Boos-Gasse → Ober St. Veit
+    60201964: 60200910,  # Aspern Nord, Mayrederbrücke → Aspern Nord
+    60202502: 60201894,  # Stadion U, Handelskai → Stadion
+    60202501: 60200949,  # Oberlaa, Laaer-Berg-Straße → Oberlaa
+}
+
+# Of those, where no vehicle calls twice under the planner's ID (the trams'
+# other stop is Enkplatz, Grillgasse), so a live row there is the planned call.
+LIVE_ALIASES: Final[frozenset[int]] = frozenset({60201757})
+
 _MERGED: Final[dict[int, StopSplit]] = {
     split.listed_under: split for split in STOP_SPLITS if split.whole
 }
@@ -204,7 +224,12 @@ def merged_diva(diva: int) -> int:
 
 def planner_diva(diva: int) -> int:
     """The ID to ask the trip planner with for a stop of the list."""
-    return merged_diva(diva)
+    return PLANNER_ALIASES.get(diva, merged_diva(diva))
+
+
+def live_alias_stops(diva: int) -> list[int]:
+    """The listed stops whose live rows are calls at the planner's `diva`."""
+    return [listed for listed in LIVE_ALIASES if PLANNER_ALIASES[listed] == diva]
 
 
 def corrected_diva(rbl: int, diva: str) -> str:
@@ -212,6 +237,9 @@ def corrected_diva(rbl: int, diva: str) -> str:
     for split in STOP_SPLITS:
         if rbl in split.rbls and diva == str(split.listed_under):
             return str(split.diva)
+    listed = as_int(diva)
+    if listed is not None and listed in LIVE_ALIASES:
+        return str(PLANNER_ALIASES[listed])
     return diva
 
 
