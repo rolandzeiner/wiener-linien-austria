@@ -98,7 +98,7 @@ On Home Assistant older than 2026.11, use HACS instead: search for **Wiener Lini
 | Field | Description |
 |---|---|
 | **Stop** | The stop to follow. Each stop is its own entry; add the integration again for another one. |
-| **Lines to track** | The lines this stop's sensor reports. Lines that aren't running right now, such as NightLines during the day, can still be picked. At a stop the S-Bahn serves, its lines are listed too, marked *timetable only*. |
+| **Lines to track** | The lines this stop's sensor reports. Lines that aren't running right now, such as NightLines during the day, can still be picked, apart from on-demand buses, which are listed only while they run. At a stop the S-Bahn serves, its lines are listed too, marked *timetable only*. |
 | **Update interval (seconds)** | How often the board refreshes. Default 60, from 30 to 600. |
 
 To change the tracked lines later, select **Reconfigure** on the entry.
@@ -564,7 +564,7 @@ Five live endpoints and five static files, each on its own schedule:
 |---|---|---|
 | Live departures | `/monitor?stopId=…` | One request per interval group, default 60 s (30–600 s) |
 | Disruption, stop, lift and escalator notices | `/trafficInfoList` (`stoerunglang`, `stoerungkurz`, `aufzugsinfo` and `fahrtreppeninfo` in one request) | Every 5 min, shared by all entries. From the second failed request in a row the wait doubles, up to about 30 min, until it answers again |
-| Stop list | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, counted from the last download, cached in Home Assistant's storage |
+| Stop list | `wienerlinien-ogd-haltestellen.csv` + `-haltepunkte.csv` | Weekly, counted from the last download, cached in Home Assistant's storage. Known errors in it are corrected locally, without a request |
 | Line list and trip patterns | `wienerlinien-ogd-linien.csv` + `-fahrwegverlaeufe.csv` | Weekly, cached. Used for the stops-ahead trail |
 | Line colours | `gtfs/routes.txt` | Weekly, cached. Used for `line_colors` |
 | Planned S-Bahn departures | `ogd_routing/XML_DM_REQUEST` | Only for stops with an S-Bahn line picked: the next 60 trains with their stops, fetched again after 2 h or once your picked lines have fewer than 6 trains left, never more often than every 5 min. After a failed request the wait doubles, up to 30 min, until it answers again. Counted down locally in between, and shares the routes' 15 s cooldown slot |
@@ -603,7 +603,7 @@ With `show_stop_times` on, opening a trail asks the timetable once for the whole
 
 Nothing here runs on the clock except the switch between the two parts of the day. An answer stays valid for up to 15 minutes past it, picked at random, so installs with a trail open at 06:00 or 19:00 don't all ask at once. The request skips the cooldown, because someone is waiting for the times. A failed one is retried no sooner than 5 minutes later, doubling up to 30.
 
-The trail lists the stations of the line's route, and the timetable lists only the ones a train calls at. A station between two calls the timetable makes one after the other is one the train goes through. So is a station the timetable still had the trains calling at when the travel times were fetched, if a Wiener Linien works notice in force (`/newsList`, kept for 6 hours) now names that platform and that line without naming the stations either side.
+The trail lists the stations of the line's route, and the timetable lists only the ones a train calls at. A station between two calls the timetable makes one after the other is one the train goes through, unless the timetable counts it as part of a bigger stop, as it does Franz-Boos-Gasse with Ober St. Veit. So is a station the timetable still had the trains calling at when the travel times were fetched, if a Wiener Linien works notice in force (`/newsList`, kept for 6 hours) now names that platform and that line without naming the stations either side.
 
 Works don't always close a station all day. U6 Neue Donau towards Floridsdorf was shut by day in late 2026 but served on some weeknights from 22:00, when the line ran single-track; the timetable said which nights, week by week. Travel times fetched once a week can't tell one departure from the next, so for such a station the card asks for that station's own next 200 departures, a few kilobytes, and decides per departure. A train of the line leaving there between the calls either side means a stop, and the trail shows its time. If there isn't one, it reads "Kein Halt". If those departures can't be fetched, or don't reach as far as the departure, the travel times decide as before.
 
@@ -613,7 +613,7 @@ Where no train of the line stops there in the time those departures cover, "Kein
 
 The same notice, where it says the line doesn't stop there, unfolds under the station when you tap the ⓘ after "Kein Halt": what is being done, for how long, and what to take instead, in Wiener Linien's own words (German only, as the feed has no other). It arrives with the trail's travel times, so it costs no request of its own. A notice about something else at that platform, such as a missing lift, is not shown there.
 
-A stop the timetable knows by an id the station list doesn't have takes the time of the call where the route has it: N6's last call is "Enkplatz/Grillgasse" in the timetable and Enkplatz on its route.
+A stop the timetable knows by an ID the station list doesn't have takes the time of the call where the route has it.
 
 The Badner Bahn's trails use Wiener Lokalbahnen's own stop names, as its trains, platforms and timetables print them: "Schedifkaplatz" and "Tribuswinkel Josefsthal", where Wiener Linien's open data has "Bhf. Meidling, Schedifkaplatz" and just "Bahnhof". Other lines through the same stops keep Wiener Linien's names.
 
@@ -740,6 +740,9 @@ template:
 - **Live times on routes come from the departure boards.** The trip planner sends none, so a ride gets its live time from `/monitor`, which lists about the next hour. Rides more than about an hour away stay on the timetable. `/monitor` has no arrival times, so a ride's arrival moves by its departure delay.
 - **The route card's last pick stays on that device.** It's saved in the browser, not in Home Assistant, so a phone and a wall tablet each remember their own. Two route cards without a route on the same device share that pick.
 - **New stops can take a week to appear.** The stop list refreshes weekly.
+- **The stop list is corrected by hand.** Wiener Linien's open data files some platforms under the wrong stop, gives a few stops a wrong name and places three outside Vienna. The integration corrects the cases found by comparing the list with the timetable in November 2026. It can't spot a new error by itself: if a stop has the wrong name or misses departures, please [open an issue](https://github.com/rolandzeiner/wiener-linien-austria/issues).
+- **Six stops count as part of a bigger one in the timetable.** They are Atzgersdorf Knotzenbachgasse, Enkplatz Gottschalkgasse, Ober St. Veit Franz-Boos-Gasse, Aspern Nord Mayrederbrücke, Stadion Handelskai and Oberlaa Laaer-Berg-Straße. Each has its own departure board, but a route from or to one is planned for the bigger stop, so it can board at that stop's other platform. Their own boards have no arrival times on the trail, and on other boards' trails all but Gottschalkgasse show no time.
+- **A route to a stop that only a night bus serves can need that bus to run.** Setup plans the route once before saving it, so from or to Valentingasse, where the N60 runs on weekend nights, it can only be added then.
 - **Arrival times on the trail are estimates.** They add the timetable's travel time to the departure's live time, so a delay the vehicle picks up further down the line isn't in them. They're usually within a minute or two; the far end of a long tram or bus line can be off by a few minutes, because its timetable changes through the day. A line the timetable doesn't list at your stop shows no times.
 - **The stops ahead are best effort.** Short-turn services may show the full scheduled path. Replacement buses (SEV) and unscheduled detours have no trail, so their row doesn't expand.
 
@@ -775,7 +778,7 @@ Every sensor, every diagnostics download and the cards' footer carry:
 
 > Datenquelle: Wiener Linien (data.wien.gv.at), CC BY 4.0
 
-In full: Wiener Linien GmbH & Co KG. The departure, stop, line and trip-planner data come from [Wiener Linien open data](https://www.wienerlinien.at/open-data), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), whose only condition is attribution. If you build your own card or dashboard on this data, keep the credit visible.
+In full: Wiener Linien GmbH & Co KG. The departure, stop, line and trip-planner data come from [Wiener Linien open data](https://www.wienerlinien.at/open-data), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), which asks for credit and for a note of any changes. The integration changes some stop names, IDs, platform assignments and positions to correct errors in the stop list (see *Known limitations*). If you build your own card or dashboard on this data, keep the credit visible.
 
 The cards' fonts *WL Sans*, *WL Sans Condensed* and *WL Mono* are subsets of [TeX Gyre](https://www.gust.org.pl/projects/e-foundry/tex-gyre) Heros, Heros Cn and Cursor by Bogusław Jackowski and Janusz M. Nowacki for GUST. They ship under the [GUST Font License](https://github.com/rolandzeiner/wiener-linien-austria/blob/main/custom_components/wiener_linien_austria/www/fonts/GUST-FONT-LICENSE.txt) (LPPL 1.3c or later) and were renamed, as the licence asks of derivatives. Their origin, the exact subset and how to rebuild them are in [NOTICE.md](https://github.com/rolandzeiner/wiener-linien-austria/blob/main/custom_components/wiener_linien_austria/www/fonts/NOTICE.md).
 

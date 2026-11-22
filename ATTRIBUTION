@@ -11,6 +11,12 @@ All live departure, stop, and disruption data is © Wiener Linien GmbH & Co KG
 and published under the Creative Commons Attribution 4.0 International license
 (CC BY 4.0): https://creativecommons.org/licenses/by/4.0/
 
+Changes to the data
+-------------------
+The integration corrects errors in the open-data stop list: some stop names,
+stop IDs, platform assignments and positions. Every change is listed in
+custom_components/wiener_linien_austria/stop_corrections.py.
+
 Required attribution string
 ---------------------------
 This integration emits the following attribution on every sensor (via the
