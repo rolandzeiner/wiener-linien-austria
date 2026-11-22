@@ -236,7 +236,7 @@ describe("fixed-height class", () => {
 });
 
 describe("edit-dialog preview", () => {
-  it.each(CARDS)("%s shows the version banner on the dashboard, not in the editor", async (tag) => {
+  it.each(CARDS)("%s puts the version banner first in the card, not in the editor", async (tag) => {
     const el = document.createElement(tag) as ReactiveElement & {
       preview: boolean;
       hass?: unknown;
@@ -254,16 +254,13 @@ describe("edit-dialog preview", () => {
         : { type: `custom:${tag}`, entity: "sensor.wl_stop" },
     );
     document.body.append(el);
-    // The mismatch the version check sets when the browser holds old JS.
-    (el as unknown as { _versionMismatch: string })._versionMismatch = "9.9.9";
-    el.requestUpdate();
     await el.updateComplete;
-    const banner = () => el.shadowRoot?.querySelector('[role="alert"]');
-    expect(banner()?.textContent).toContain("9.9.9");
+    const card = () => el.shadowRoot?.querySelector("ha-card");
+    expect(card()?.firstElementChild?.localName).toBe("rz-version-banner-r1");
 
     el.preview = true;
     await el.updateComplete;
-    expect(banner()).toBeNull();
+    expect(card()?.querySelector("rz-version-banner-r1")).toBeNull();
     el.remove();
   });
 });

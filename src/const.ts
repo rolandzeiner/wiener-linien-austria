@@ -9,6 +9,9 @@ export const RETRO_CARD_VERSION = "2.5.0";
 export const FLAP_CARD_VERSION = "2.5.0";
 export const ROUTE_CARD_VERSION = "2.5.0";
 
+/** The integration's domain; the version banner asks `<DOMAIN>/card_version`. */
+export const DOMAIN = "wiener_linien_austria";
+
 // CC-BY credit shown in a card footer until the sensor reports its own
 // `attribution` attribute (fresh card, sensor not up yet). Same text as
 // ATTRIBUTION in const.py.

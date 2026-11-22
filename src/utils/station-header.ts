@@ -7,7 +7,7 @@
 // cream/dark cabinet), and neither root's CSS can bleed into the other.
 // So the markup + amenity-ordering logic lives here once.
 //
-// Conventions mirror shared-render.ts: pure functions, no `this`. Each
+// Pure functions, no `this`. Each
 // card passes its flat-key translate callback (`t`) and HA language, so
 // this module owns no hidden state. Icon primitives are reused from
 // retro-station-icons.ts; the clock/date formatters from time.ts.

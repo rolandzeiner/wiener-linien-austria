@@ -760,44 +760,6 @@ export const cardStyles = css`
     height: 16px;
   }
 
-  /* Version banner — accent surface that uses warning tokens. The
-     button is rendered bare by renderVersionBanner (shared-render.ts);
-     the .banner > button selector below tints it to match. */
-  .banner {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
-    border-radius: var(--wl-radius-md);
-    background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
-    color: var(--primary-text-color);
-    font-size: 0.85rem;
-  }
-  .banner > span {
-    flex: 1;
-  }
-  .banner > button {
-    height: 32px;
-    padding: 0 14px;
-    border: none;
-    border-radius: 999px;
-    background: var(--wl-warning);
-    color: var(--text-primary-color, #fff);
-    font-family: inherit;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 1px 2px color-mix(in srgb, #000 12%, transparent);
-    transition: filter var(--ha-animation-duration-fast, 150ms) ease, transform 0.06s ease;
-    forced-color-adjust: none;
-  }
-  .banner > button:hover {
-    filter: brightness(1.08);
-  }
-  .banner > button:active {
-    transform: translateY(1px);
-  }
-
   /* Alerts: traffic + elevator items use the same expandable surface. */
   .alert-list {
     display: flex;

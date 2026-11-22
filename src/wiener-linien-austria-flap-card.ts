@@ -12,11 +12,11 @@ import { classMap } from "lit/directives/class-map.js";
 import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { ATTRIBUTION_FALLBACK, FLAP_CARD_VERSION } from "./const.js";
+import { ATTRIBUTION_FALLBACK, DOMAIN, FLAP_CARD_VERSION } from "./const.js";
 import { cardShouldUpdate, isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
-import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
+import { versionBanner } from "./version-banner.js";
 import "./flap-editor.js";
 import type {
   DepartureAttr,
@@ -187,7 +187,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   @property({ type: Boolean }) public preview = false;
 
   @state() private _config?: NormalisedFlapConfig;
-  @state() private _versionMismatch: string | null = null;
   // Marching-flap state. Each text field on the board is keyed by an
   // opaque id like row0-line / row0-dest / row1-cd.
   //   _displayed[key]   — the string currently painted on screen.
@@ -203,8 +202,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   @state() private _target: Record<string, string> = {};
   @state() private _justFlipped: Record<string, Record<number, string>> = {};
   private _marchTimer: ReturnType<typeof setInterval> | null = null;
-
-  private _versionCheckDone = false;
 
   public setConfig(config: WienerLinienFlapCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -290,13 +287,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   public override connectedCallback(): void {
     super.connectedCallback();
     registerWlFonts();
-    // Only flip _versionCheckDone after we've actually had hass available
-    // to probe — without this, a connect before hass is assigned would
-    // mark "done" and never run the check.
-    if (!this._versionCheckDone && this.hass?.callWS) {
-      this._versionCheckDone = true;
-      void this._checkCardVersion();
-    }
     // Re-arm the march after a detach/reattach (HA rebuilds the dashboard
     // on load). `disconnectedCallback` cleared the timer, and
     // `_diffFlipField` only re-arms when a value CHANGES — so reconnecting
@@ -479,15 +469,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
   }
 
-  private async _checkCardVersion(): Promise<void> {
-    // checkCardVersionWS never rejects, so there is nothing to catch here.
-    this._versionMismatch = await checkCardVersionWS(
-      this.hass,
-      "wiener_linien_austria/flap_card_version",
-      FLAP_CARD_VERSION,
-    );
-  }
-
   /** Configured stop entity ids that actually exist in hass.states; the
    *  ones that don't are named by `missingStopIds` and never replaced
    *  by another sensor. When `entities` is empty (fresh card from the
@@ -560,6 +541,18 @@ export class WienerLinienAustriaFlapCard extends LitElement {
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
+
+  // The portfolio's version banner (src/version-banner.ts), first in the
+  // ha-card. All four cards ask the one card_version command; the per-card
+  // commands stay in the integration for browsers still on an older bundle.
+  private _versionBanner(): TemplateResult | typeof nothing {
+    return versionBanner(this.hass, {
+      domain: DOMAIN,
+      version: FLAP_CARD_VERSION,
+      name: "Wiener Linien Austria",
+      preview: this.preview,
+    });
+  }
 
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
@@ -653,8 +646,8 @@ export class WienerLinienAustriaFlapCard extends LitElement {
         class=${this._fixedHeight ? "fixed-height" : ""}
         style="padding:0;overflow:hidden;"
       >
+        ${this._versionBanner()}
         <div class=${classMap(classes)}>
-          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k), "flap-banner")}
           ${stationHeaderStrip}
           ${
             cfg.show_station_name
@@ -1786,33 +1779,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
     .flap--size-small .flap-row {
       min-height: 30px;
-    }
-
-    /* Banner (version-mismatch handshake) — quieter cream-on-housing
-       than the LED card's amber banner, so it doesn't shout against
-       the warm palette. */
-    .flap-banner {
-      background: #ffa000;
-      color: #1a1410;
-      padding: 6px 10px;
-      margin-bottom: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-family: "Work Sans", sans-serif;
-      border-radius: 4px;
-      font-size: 12px;
-    }
-    .flap-banner button {
-      background: #1a1410;
-      color: #ffa000;
-      border: none;
-      border-radius: 3px;
-      padding: 3px 10px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
     }
 
     /* Accessibility — visible focus ring for keyboard users. */
