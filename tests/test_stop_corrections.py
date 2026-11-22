@@ -43,10 +43,12 @@ from custom_components.wiener_linien_austria.stops import match_stops, stop_opti
 
 MAURER_LANGE_GASSE = 60200855
 VALENTINGASSE = 60201936
+WAELLISCHGASSE = 60200283
 
 # The upstream rows as served on 2026-11-22.
 HALTESTELLEN = (
     "DIVA;PlatformText;Municipality;MunicipalityID;Longitude;Latitude\n"
+    "60200283;Erdbergstraße, Schlachthausgasse;Wien;49000001;16.4079712;48.1952909\n"
     "60200852;Maurer Berg;Wien;49000001;16.2622735;48.1445225\n"
     "60200854;Maurer Hauptplatz;Wien;49000001;16.2688401;48.1505522\n"
     "60200855;Valentingasse;Wien;49000001;16.2681844;48.1474715\n"
@@ -59,6 +61,7 @@ HALTEPUNKTE = (
     "1629;60200854;Maurer Hauptplatz;Wien;49000001;16.2691545;48.1510976\n"
     "1641;60200852;Maurer Berg;Wien;49000001;16.2619860;48.1445825\n"
     "1676;60200852;Maurer Berg;Wien;49000001;16.2621567;48.1442528\n"
+    "2503;60200283;Wällischgasse;Wien;49000001;16.4073514;48.1957041\n"
     "3862;60200855;Valentingasse;Wien;49000001;16.2629113;48.1481728\n"
     "3863;60200855;Valentingasse;Wien;49000001;16.2629113;48.1480709\n"
 )
@@ -97,6 +100,7 @@ def _assert_corrected(catalogue: StaticCatalogue) -> None:
     assert (tram.name, tram.rbls) == ("Maurer Lange Gasse", [1621, 1628])
     assert (bus.name, bus.rbls) == ("Valentingasse", [3862, 3863])
     assert bus.municipality == "Wien"
+    assert catalogue.stations_by_diva[WAELLISCHGASSE].name == "Wällischgasse"
     assert catalogue.trip_patterns is not None
     assert catalogue.trip_patterns.lines_at_diva[MAURER_LANGE_GASSE] == ("60",)
     assert catalogue.trip_patterns.lines_at_diva[VALENTINGASSE] == ("N60",)
@@ -145,6 +149,7 @@ def test_corrections_step_aside_once_upstream_fixes_its_list() -> None:
     [
         ("Maurer Lange Gasse", MAURER_LANGE_GASSE),
         ("Valentingasse", VALENTINGASSE),
+        ("Wällischgasse", WAELLISCHGASSE),
     ],
 )
 def test_each_stop_is_found_by_its_own_name(query: str, diva: int) -> None:
@@ -175,6 +180,26 @@ def test_trail_names_the_stop_the_line_calls_at(line: str, name: str) -> None:
     trail = stops_ahead_for_match(_catalogue(), line, [1620], "Maurer Berg", "H")
     assert trail is not None
     assert [stop["name"] for stop in trail] == [name, "Maurer Berg"]
+
+
+def test_trail_is_not_cut_a_stop_before_schlachthausgasse() -> None:
+    """The list's name for Wällischgasse contains N75's terminus, one stop on."""
+    halte = HALTESTELLEN + (
+        "60200765;Lechnerstraße;Wien;49000001;16.4048361;48.1966322\n"
+        "60201199;Schlachthausgasse;Wien;49000001;16.4074502;48.1940334\n"
+    )
+    punkte = HALTEPUNKTE + (
+        "258;60200765;Lechnerstraße;Wien;49000001;16.4048361;48.1965903\n"
+        "1503;60201199;Schlachthausgasse U;Wien;49000001;16.4067046;48.1944646\n"
+    )
+    linien = LINIEN + "575;N75;775;1;ptBusNight\n"
+    fahr = FAHRWEGVERLAEUFE + "575;3;13;258;1\n575;3;14;2503;1\n575;3;15;1503;1\n"
+    parsed = _parse_all(halte, punkte, linien, fahr, None)
+    catalogue = StaticCatalogue(parsed.stations, FETCHED, parsed.trip_patterns)
+
+    trail = stops_ahead_for_match(catalogue, "N75", [258], "Schlachthausgasse", "H")
+    assert trail is not None
+    assert [stop["name"] for stop in trail] == ["Wällischgasse", "Schlachthausgasse"]
 
 
 @pytest.mark.parametrize(

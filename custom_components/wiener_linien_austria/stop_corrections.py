@@ -4,7 +4,8 @@
 that stop's night bus platforms under it. The GTFS feed, the trip planner and
 `/monitor` all call 60200855 "Maurer Lange Gasse", the 60's stop. Valentingasse
 is 60201936 in GTFS and the trip planner, 400 m west, an ID the station list
-doesn't have at all (issue #132).
+doesn't have at all (issue #132). 60200283 is Wällischgasse in the same three
+sources, and "Erdbergstraße, Schlachthausgasse" in the station list only.
 Checked 2026-11-22.
 
 Each correction applies only while the open data still has the error, so it
@@ -52,6 +53,7 @@ class StopSplit(NamedTuple):
 # DIVA → (the station list's name, the stop's own).
 STOP_NAME_FIXES: Final[dict[int, tuple[str, str]]] = {
     60200855: ("Valentingasse", "Maurer Lange Gasse"),
+    60200283: ("Erdbergstraße, Schlachthausgasse", "Wällischgasse"),
 }
 
 # Position from GTFS `stops.txt`, between the stop's two platforms.
