@@ -36,6 +36,7 @@ from custom_components.wiener_linien_austria.routing import (
     RouteOptions,
     build_trip_params,
 )
+from custom_components.wiener_linien_austria.skipped_stops import skipped_stations
 from custom_components.wiener_linien_austria.static import (
     StaticCatalogue,
     _catalogue_from_store,
@@ -251,6 +252,36 @@ def test_live_times_at_enkplatz_come_from_the_platform_boarded(
     leg.origin.planned, leg.origin.stop_id = now, stop_id
 
     assert rbls_for_trips(_corrected(), [MagicMock(legs=[leg])], now) == rbls
+
+
+@pytest.mark.parametrize(
+    ("line_id", "direction", "stops", "board", "minutes"),
+    [
+        # Wolkersbergenstraße, Franz-Boos-Gasse, Ober St. Veit U.
+        pytest.param(453, 1, (8113, 5242, 5243), 60201988, {60200956: 9.0}, id="53A"),
+        # Boarded at the bigger stop: Aspern Nord, Mayrederbrücke, the next.
+        pytest.param(
+            125, 1, (2874, 2870, 3605), 60200910, {60202502: 3.0}, id="at the board"
+        ),
+    ],
+)
+def test_a_stop_the_planner_counts_as_another_never_reads_kein_halt(
+    line_id: int,
+    direction: int,
+    stops: tuple[int, ...],
+    board: int,
+    minutes: dict[int, float],
+) -> None:
+    """The timetable calls there under the bigger stop's ID, once or twice."""
+    linien = "LineID;LineText;SortingHelp;Realtime;MeansOfTransport\n"
+    linien += f"{line_id};X;1;1;ptBusCity\n"
+    fahr = "LineID;PatternID;StopSeqCount;StopID;Direction\n" + "".join(
+        f"{line_id};1;{at};{rbl};{direction}\n" for at, rbl in enumerate(stops)
+    )
+    parsed = _parse_all(HALTE, PUNKTE, linien, fahr, None)
+    catalogue = StaticCatalogue(parsed.stations, FETCHED, parsed.trip_patterns)
+
+    assert skipped_stations(catalogue, board, "X", "H", minutes) == {}
 
 
 # --- Saved entries --------------------------------------------------

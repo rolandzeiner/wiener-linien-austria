@@ -89,6 +89,7 @@ from .skipped_stops import (
     stand_ins,
 )
 from .static import StaticCatalogue, trail_name
+from .stop_corrections import live_alias_stops
 from .stops import stop_options, trackable_station
 
 # Error codes the card maps onto its own copy. Stable: the card matches them.
@@ -366,9 +367,12 @@ async def _websocket_run_times(
         named: dict[str, float] = {}
         line_id = patterns.lines_by_label.get(label) if patterns is not None else None
         for stop_diva, minutes in minutes_by_diva.items():
-            stop = trail_name(catalogue, line_id, stop_diva)
-            if stop is not None:
-                named.setdefault(stop, minutes)
+            # Also under the name of a stop whose one call the timetable lists
+            # as the bigger stop's: Gottschalkgasse's, as Enkplatz's.
+            for listed in (stop_diva, *live_alias_stops(stop_diva)):
+                stop = trail_name(catalogue, line_id, listed)
+                if stop is not None:
+                    named.setdefault(stop, minutes)
         # A stop the timetable knows by an id the catalogue lacks.
         for name, minutes in stand_ins(
             catalogue, diva, label, way, minutes_by_diva

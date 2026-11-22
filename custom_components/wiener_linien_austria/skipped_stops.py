@@ -71,6 +71,7 @@ from .rate_limit import async_enforce_domain_cooldown
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .run_times import RUN_TIME_EXCLUDED_MOTS
 from .static import StaticCatalogue, trail_name
+from .stop_corrections import planner_diva
 from .timetable import LineCalls, build_departure_params, parse_line_calls
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,6 +119,10 @@ def skipped_stations(
     Siebensterngasse), a route the trains take the other way round (tram 1
     on the Ring during works), and a stop the timetable knows by another
     DIVA, which it lists at a time between the two.
+
+    Nor is a stop the planner counts as part of a bigger one that has a call
+    (`stop_corrections.planner_diva`): the sample keeps one time per DIVA,
+    so the two calls there read as one, with nothing between.
     """
     calls = {**minutes, board_diva: 0.0}
     line_id = _line_id(catalogue, line)
@@ -131,6 +136,7 @@ def skipped_stations(
             if (
                 entry is None
                 or entry[0] in calls
+                or planner_diva(entry[0]) in calls
                 or before is None
                 or after is None
                 or not _back_to_back(calls, before, after)

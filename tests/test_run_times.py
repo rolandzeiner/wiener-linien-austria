@@ -1250,6 +1250,32 @@ async def test_command_times_a_stop_the_timetable_knows_by_another_id(
     }
 
 
+async def test_command_times_a_stop_the_planner_counts_as_a_bigger_one(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+) -> None:
+    """Tram 11 calls at Gottschalkgasse, which the timetable lists as Enkplatz."""
+    enkplatz, gottschalkgasse = 60200425, 60201757
+    _name_stops(
+        mock_static_catalogue,
+        {enkplatz: "Enkplatz", gottschalkgasse: "Enkplatz, Gottschalkg."},
+    )
+    dm_fetch.return_value = _body(
+        _run("U1", "H", [_point(str(enkplatz), 32)], minute=30)
+    )
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert response["result"]["run_times"]["U1|H"]["Enkplatz, Gottschalkg."] == 2
+
+
 async def test_command_names_an_operators_stops_its_own_way(
     hass: HomeAssistant,
     hass_ws_client: WebSocketGenerator,
