@@ -20,6 +20,7 @@ from homeassistant.util.location import distance
 
 from .const import NEARBY_STOP_LIMIT, NEARBY_STOP_MAX_METERS
 from .static import StaticCatalogue, Station
+from .stop_corrections import merged_diva
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -143,7 +144,8 @@ def trackable_station(catalogue: StaticCatalogue, value: Any) -> Station | None:
     `plan` command and `plan_trip` pass values from outside any picker, so
     anything may arrive here. It also re-checks `rbls`, which keeps the
     resolution honest if the catalogue was refreshed between rendering the
-    form and submitting it.
+    form and submitting it. The DIVA of a merged stop resolves to the stop it
+    joined: scripts and the route card's last pick still hold it.
     """
     try:
         diva = int(value)
@@ -153,6 +155,8 @@ def trackable_station(catalogue: StaticCatalogue, value: Any) -> Station | None:
         _LOGGER.debug("Failed to parse diva %r", value)
         return None
     station = catalogue.stations_by_diva.get(diva)
+    if station is None or not station.rbls:
+        station = catalogue.stations_by_diva.get(merged_diva(diva))
     if station is None or not station.rbls:
         return None
     return station

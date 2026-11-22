@@ -211,9 +211,15 @@ def test_search_is_case_insensitive_and_prefers_prefix() -> None:
             municipality="Wien",
             longitude=0,
             latitude=0,
+            rbls=[11],
         ),
         2: Station(
-            diva=2, name="Westbahnhof", municipality="Wien", longitude=0, latitude=0
+            diva=2,
+            name="Westbahnhof",
+            municipality="Wien",
+            longitude=0,
+            latitude=0,
+            rbls=[22],
         ),
     }
     catalogue = StaticCatalogue(stations_by_diva=stations, last_fetched="t")

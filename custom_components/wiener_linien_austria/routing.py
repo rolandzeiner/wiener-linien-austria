@@ -69,6 +69,7 @@ from .const import (
     WEEKDAYS,
 )
 from .parsing import as_mapping, as_text
+from .stop_corrections import planner_diva
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -434,9 +435,9 @@ def build_trip_params(
         ("outputFormat", "JSON"),
         ("language", "en" if language.startswith("en") else "de"),
         ("type_origin", "stopID"),
-        ("name_origin", str(options.origin_diva)),
+        ("name_origin", str(planner_diva(options.origin_diva))),
         ("type_destination", "stopID"),
-        ("name_destination", str(options.destination_diva)),
+        ("name_destination", str(planner_diva(options.destination_diva))),
         ("itdDate", when.strftime("%Y%m%d")),
         ("itdTime", when.strftime("%H%M")),
         ("itdTripDateTimeDepArr", "arr" if arrive_by else "dep"),

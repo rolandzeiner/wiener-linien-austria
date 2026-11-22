@@ -385,12 +385,18 @@ class StaticCatalogue:
         return label
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
-        """Return stations whose name contains the query (case-insensitive)."""
+        """Return trackable stations whose name contains the query.
+
+        Case-insensitive. A stop without platforms is never offered: it has
+        nothing to track, and a merged stop leaves one under the same name.
+        """
         needle = query.strip().casefold()
         if not needle:
             return []
         results = [
-            s for s in self.stations_by_diva.values() if needle in s.name.casefold()
+            s
+            for s in self.stations_by_diva.values()
+            if s.rbls and needle in s.name.casefold()
         ]
         # Prefer name-starts-with matches, then lexicographic.
         results.sort(key=lambda s: (not s.name.casefold().startswith(needle), s.name))
@@ -1838,8 +1844,10 @@ def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
     moved = _correct_stops(stations)
     if trip_patterns is not None:
         for diva in moved:
-            lines = trip_patterns.lines_at_rbls(stations[diva].rbls)
-            trip_patterns.lines_at_diva[diva] = lines or ()
+            if lines := trip_patterns.lines_at_rbls(stations[diva].rbls):
+                trip_patterns.lines_at_diva[diva] = lines
+            else:
+                trip_patterns.lines_at_diva.pop(diva, None)
     return StaticCatalogue(
         stations_by_diva=stations,
         last_fetched=data["last_fetched"],
