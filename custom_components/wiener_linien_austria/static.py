@@ -6,7 +6,7 @@ API. We use five of them:
 - `haltestellen.csv`     — one row per station (DIVA, name, coordinates).
 - `haltepunkte.csv`      — one row per physical platform (RBL = StopID, parent
   DIVA, coordinates). Bridges stop names to the RBL list the monitor endpoint
-  needs.
+  needs. Both files are corrected by `stop_corrections` as they load.
 - `linien.csv`           — line catalogue (LineID → "U1", MeansOfTransport).
   Resolves the live `/monitor` line label to the numeric LineID used in the
   trip-pattern CSV, and exposes the canonical vehicle type per line.
@@ -63,6 +63,7 @@ from .const import (
 )
 from .rate_limit import async_enforce_domain_cooldown
 from .s_bahn_network import merge_transfer_lines
+from .stop_corrections import STOP_NAME_FIXES, STOP_POSITION_FIXES, STOP_SPLITS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -238,8 +239,9 @@ class TripPatternIndex:
     `lines_at_diva` powers the per-stop changeover badges: for every
     DIVA, the sorted set of line labels (e.g. "U1", "13A", "71") of every
     line whose schedule passes through that station. Built at parse time
-    by walking every pattern's RBLs, resolving each to its parent DIVA via
-    the haltepunkte index, and aggregating the line labels.
+    by walking every pattern's RBLs, resolving each to its corrected stop
+    (`_correct_stops`; redone on a cache load for stops whose platforms
+    moved), and aggregating the line labels.
     `colors_by_line` / `text_colors_by_line` map a line label ("U1") to its
     Wiener-Linien-published `route_color` / `route_text_color` as 6-digit
     uppercase hex (no `#`). Sourced from GTFS `routes.txt`. Empty when the
@@ -260,9 +262,10 @@ class TripPatternIndex:
     label_for_line: dict[int, str] = field(default_factory=dict, repr=False)
     # RBL → labels of every line whose schedule calls at that platform, plus
     # the label → MoT map used to sort them. Built lazily by `lines_at_rbls`:
-    # only the stop-display notice matcher reads them, so building on every
-    # construction would tax each store load for nothing. Not persisted —
-    # both derive from the fields above.
+    # most loads never need them (notices, the line picker and a cache that
+    # still needs corrections do), so building on every construction would tax
+    # each store load for nothing. Not persisted — both derive from the fields
+    # above.
     _labels_by_rbl: dict[int, frozenset[str]] | None = field(
         default=None, repr=False, compare=False
     )
@@ -297,8 +300,7 @@ class TripPatternIndex:
         platform no U3 train ever calls at. Sorted like `lines_at_diva`.
 
         Returns None when none of `rbls` appears in any pattern: "the
-        schedule doesn't know this platform" is not "no line calls here",
-        and callers fall back to their pre-index behaviour on it.
+        schedule doesn't know this platform" is not "no line calls here".
         """
         by_rbl = self._ensure_labels_by_rbl()
         known = False
@@ -384,12 +386,19 @@ class StaticCatalogue:
         return label
 
     def search(self, query: str, limit: int = 20) -> list[Station]:
-        """Return stations whose name contains the query (case-insensitive)."""
+        """Return trackable stations whose name contains the query.
+
+        Case-insensitive. A stop without platforms is never offered: it has
+        nothing to track, and a merged stop stays in the list without any,
+        often under the name of the stop it joined.
+        """
         needle = query.strip().casefold()
         if not needle:
             return []
         results = [
-            s for s in self.stations_by_diva.values() if needle in s.name.casefold()
+            s
+            for s in self.stations_by_diva.values()
+            if s.rbls and needle in s.name.casefold()
         ]
         # Prefer name-starts-with matches, then lexicographic.
         results.sort(key=lambda s: (not s.name.casefold().startswith(needle), s.name))
@@ -1026,6 +1035,8 @@ def _parse_all(
     """
     stations = _parse_haltestellen(halte_text)
     _merge_haltepunkte(stations, punkte_text)
+    # Before the trip patterns, which list each stop's lines by its platforms.
+    _correct_stops(stations)
 
     trip_patterns: TripPatternIndex | None = None
     trip_pattern_error: Exception | None = None
@@ -1094,6 +1105,39 @@ def _merge_haltepunkte(stations: dict[int, Station], csv_text: str) -> None:
         station = stations.get(diva)
         if station is not None:
             station.rbls.append(rbl)
+
+
+def _correct_stops(stations: dict[int, Station]) -> set[int]:
+    """Apply `stop_corrections` in place; returns the stops whose platforms moved."""
+    for diva, (listed, own) in STOP_NAME_FIXES.items():
+        if (station := stations.get(diva)) is not None and station.name == listed:
+            station.name = own
+    for diva, (wrong, right) in STOP_POSITION_FIXES.items():
+        station = stations.get(diva)
+        if station is not None and (station.longitude, station.latitude) == wrong:
+            station.longitude, station.latitude = right
+    moved: set[int] = set()
+    for split in STOP_SPLITS:
+        source = stations.get(split.listed_under)
+        if source is None:
+            continue
+        rbls = [rbl for rbl in source.rbls if rbl in split.rbls]
+        if not rbls:
+            continue
+        source.rbls = [rbl for rbl in source.rbls if rbl not in split.rbls]
+        target = stations.setdefault(
+            split.diva,
+            Station(
+                diva=split.diva,
+                name=split.name,
+                municipality=source.municipality,
+                longitude=split.longitude,
+                latitude=split.latitude,
+            ),
+        )
+        target.rbls.extend(rbls)
+        moved |= {source.diva, target.diva}
+    return moved
 
 
 def _parse_trip_patterns(
@@ -1798,6 +1842,14 @@ def _catalogue_from_store(data: dict[str, Any]) -> StaticCatalogue:
             rbls=[int(r) for r in row.get("rbls", [])],
         )
     trip_patterns = _trip_patterns_from_store(data.get("trip_patterns"))
+    # A cache written before a correction gets it here, without a download.
+    moved = _correct_stops(stations)
+    if trip_patterns is not None:
+        for diva in moved:
+            if lines := trip_patterns.lines_at_rbls(stations[diva].rbls):
+                trip_patterns.lines_at_diva[diva] = lines
+            else:
+                trip_patterns.lines_at_diva.pop(diva, None)
     return StaticCatalogue(
         stations_by_diva=stations,
         last_fetched=data["last_fetched"],

@@ -89,6 +89,7 @@ from .skipped_stops import (
     stand_ins,
 )
 from .static import StaticCatalogue, trail_name
+from .stop_corrections import live_alias_stops
 from .stops import stop_options, trackable_station
 
 # Error codes the card maps onto its own copy. Stable: the card matches them.
@@ -215,7 +216,8 @@ async def _websocket_plan(
 
     stations = []
     for diva in (msg["origin"], msg["destination"]):
-        # Same rule as the setup picker: only stops it offers are accepted.
+        # Same rule as the setup picker (`trackable_station`): a stop it
+        # offers, or the old ID of one merged into it.
         station = trackable_station(catalogue, diva)
         if station is None:
             connection.send_error(
@@ -357,18 +359,20 @@ async def _websocket_run_times(
         return
 
     # Keyed by the stop's trail name (`static.trail_name`), the one thing a
-    # trail entry carries. Both sides read it from the same catalogue row,
-    # so the join is exact; a DIVA the catalogue doesn't know has no trail
-    # entry to join either.
+    # trail entry carries. Where the timetable's DIVA isn't the trail's,
+    # `live_alias_stops` and `stand_ins` supply the trail's stop.
     run_times: dict[str, dict[str, float]] = {}
     patterns = catalogue.trip_patterns
     for (label, way), minutes_by_diva in answer.pairs.items():
         named: dict[str, float] = {}
         line_id = patterns.lines_by_label.get(label) if patterns is not None else None
         for stop_diva, minutes in minutes_by_diva.items():
-            stop = trail_name(catalogue, line_id, stop_diva)
-            if stop is not None:
-                named.setdefault(stop, minutes)
+            # A `LIVE_ALIASES` stop has its one call under the bigger stop's
+            # DIVA (Gottschalkgasse under Enkplatz's), so it takes that time.
+            for listed in (stop_diva, *live_alias_stops(stop_diva)):
+                stop = trail_name(catalogue, line_id, listed)
+                if stop is not None:
+                    named.setdefault(stop, minutes)
         # A stop the timetable knows by an id the catalogue lacks.
         for name, minutes in stand_ins(
             catalogue, diva, label, way, minutes_by_diva

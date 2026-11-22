@@ -12,9 +12,9 @@ A skipped station is one with no run time whose neighbours on the route
 are two calls in a row in the timetable (see `skipped_stations`). That
 keeps the end of a short run, a variant of the route the sampled trains
 didn't take and a stop the timetable knows by another id from reading as
-skips. The last of those gets the other id's run time instead
-(`stand_ins`): N6 ends at Enkplatz on its route and at "Enkplatz/Grillgasse"
-in the timetable, an id the station list doesn't have.
+skips. The last of those gets the other id's run time where the station
+list lacks that id (`stand_ins`) or the stop is one of
+`stop_corrections.LIVE_ALIASES`.
 
 A run-time sample is one moment held for a week, and a works zone can close
 a platform at some hours only: Neue Donau is served towards Floridsdorf on
@@ -71,6 +71,7 @@ from .rate_limit import async_enforce_domain_cooldown
 from .routing import RoutingError, async_fetch_trip_body, async_routing_zone
 from .run_times import RUN_TIME_EXCLUDED_MOTS
 from .static import StaticCatalogue, trail_name
+from .stop_corrections import planner_diva
 from .timetable import LineCalls, build_departure_params, parse_line_calls
 
 _LOGGER = logging.getLogger(__name__)
@@ -118,6 +119,11 @@ def skipped_stations(
     Siebensterngasse), a route the trains take the other way round (tram 1
     on the Ring during works), and a stop the timetable knows by another
     DIVA, which it lists at a time between the two.
+
+    A stop the planner counts as part of a bigger one
+    (`stop_corrections.planner_diva`) is no skip either while that one has a
+    call: the timetable puts both stops' calls under the bigger one's DIVA,
+    and the sample keeps one time per DIVA, so this one can't have its own.
     """
     calls = {**minutes, board_diva: 0.0}
     line_id = _line_id(catalogue, line)
@@ -131,6 +137,7 @@ def skipped_stations(
             if (
                 entry is None
                 or entry[0] in calls
+                or planner_diva(entry[0]) in calls
                 or before is None
                 or after is None
                 or not _back_to_back(calls, before, after)
@@ -157,9 +164,7 @@ def stand_ins(
 ) -> dict[str, float]:
     """Route stations the timetable calls at under an id the catalogue lacks.
 
-    N6 ends at Enkplatz (60200425) on its route; the timetable's last call
-    is "Enkplatz/Grillgasse", 60201987, which the open-data station list
-    doesn't have, so the trail's last stop had no time. A station without a
+    For an id `stop_corrections` doesn't cover. A station without a
     call of its own takes such a call's minutes when that call is the next
     one after the route's station before it, alone in its minute, and the
     route's station after it, if there is one, is the call right after.

@@ -22,12 +22,12 @@ import { LitElement, css, html, nothing, type PropertyValues, type TemplateResul
 import { customElement, property, state } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
 
-import { ATTRIBUTION_FALLBACK, ROUTE_CARD_VERSION } from "./const.js";
+import { ATTRIBUTION_FALLBACK, DOMAIN, ROUTE_CARD_VERSION } from "./const.js";
 import { cardShouldUpdate, isFixedHeight } from "./utils.js";
 import { registerWlFonts } from "./font-face.js";
 import { pickerText, translate } from "./localize/localize.js";
 import "./route-editor.js";
-import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
+import { versionBanner } from "./version-banner.js";
 import "./stop-combobox.js";
 import type { StopComboboxStrings } from "./stop-combobox.js";
 import type {
@@ -204,7 +204,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   @property({ type: Boolean }) public preview = false;
 
   @state() private _config?: NormalisedRouteConfig;
-  @state() private _versionMismatch: string | null = null;
   @state() private _now = Date.now();
   @state() private _alternativesOpen = false;
   /** Rides whose stops are open, by `rideKey`, prefixed with the
@@ -254,7 +253,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   private _tipHovered = false;
 
   private _tick: ReturnType<typeof setInterval> | null = null;
-  private _versionCheckDone = false;
   private _adhocStarted = false;
   private _planKey = "";
   private _planSeq = 0;
@@ -354,10 +352,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     this._tick = setInterval(() => {
       this._now = Date.now();
     }, TICK_MS);
-    if (!this._versionCheckDone && this.hass?.callWS) {
-      this._versionCheckDone = true;
-      void this._checkCardVersion();
-    }
     this._lastInteraction = Date.now();
     document.addEventListener("visibilitychange", this._onVisibilityChange);
     this._startAdhoc();
@@ -377,10 +371,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   }
 
   protected override updated(changed: PropertyValues): void {
-    if (changed.has("hass") && !this._versionCheckDone && this.hass?.callWS) {
-      this._versionCheckDone = true;
-      void this._checkCardVersion();
-    }
     if (changed.has("hass")) this._startAdhoc();
   }
 
@@ -984,15 +974,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     return { icon: spec.icon, title: this._t(spec.title), ...(detail ? { detail } : {}) };
   }
 
-  private async _checkCardVersion(): Promise<void> {
-    // checkCardVersionWS never rejects, so there is nothing to catch here.
-    this._versionMismatch = await checkCardVersionWS(
-      this.hass,
-      "wiener_linien_austria/route_card_version",
-      ROUTE_CARD_VERSION,
-    );
-  }
-
   private _t(key: string, replacements?: Record<string, string | number>): string {
     return translate(`route.${key}`, { hassLanguage: this.hass?.language }, replacements);
   }
@@ -1012,6 +993,18 @@ export class WienerLinienAustriaRouteCard extends LitElement {
   // ------------------------------------------------------------------
   // Render
   // ------------------------------------------------------------------
+
+  // The portfolio's version banner (src/version-banner.ts), first in the
+  // ha-card. All four cards ask the one card_version command; the per-card
+  // commands stay in the integration for browsers still on an older bundle.
+  private _versionBanner(): TemplateResult | typeof nothing {
+    return versionBanner(this.hass, {
+      domain: DOMAIN,
+      version: ROUTE_CARD_VERSION,
+      name: "Wiener Linien Austria",
+      preview: this.preview,
+    });
+  }
 
   protected override render(): TemplateResult | typeof nothing {
     const cfg = this._config;
@@ -1036,8 +1029,8 @@ export class WienerLinienAustriaRouteCard extends LitElement {
         @pointerdown=${this._onCardActivity}
         @keydown=${this._onCardActivity}
       >
+        ${this._versionBanner()}
         <div class="wrap">
-          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
           <div class="header">
             <h2 class="heading">
               <ha-icon icon="mdi:map-marker-path" aria-hidden="true"></ha-icon>
@@ -3415,36 +3408,6 @@ export class WienerLinienAustriaRouteCard extends LitElement {
     }
     .paused > button {
       min-height: 44px;
-      padding: 0 14px;
-      border: 1px solid var(--primary-text-color);
-      border-radius: 999px;
-      background: transparent;
-      color: var(--primary-text-color);
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    /* At the narrowest cell the button goes under the text instead of
-       past the card's edge. */
-    .banner {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      border-radius: var(--wl-radius-md);
-      background: color-mix(in srgb, var(--wl-warning) 16%, transparent);
-      color: var(--primary-text-color);
-      font-size: 0.85rem;
-    }
-    .banner > span {
-      flex: 1 1 8rem;
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
-    .banner > button {
-      min-height: 32px;
       padding: 0 14px;
       border: 1px solid var(--primary-text-color);
       border-radius: 999px;

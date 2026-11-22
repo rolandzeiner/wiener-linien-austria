@@ -5,10 +5,10 @@ import { keyed } from "lit/directives/keyed.js";
 import { styleMap } from "lit/directives/style-map.js";
 import type { HomeAssistant, LovelaceCardEditor, WindowWithCustomCards } from "./types.js";
 
-import { RETRO_CARD_VERSION } from "./const.js";
+import { DOMAIN, RETRO_CARD_VERSION } from "./const.js";
 import { cardShouldUpdate, deText, isFixedHeight } from "./utils.js";
 import { pickerText, translate } from "./localize/localize.js";
-import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
+import { versionBanner } from "./version-banner.js";
 import type {
   DepartureAttr,
   RetroSize,
@@ -126,7 +126,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   @property({ type: Boolean }) public preview = false;
 
   @state() private _config?: NormalisedRetroConfig;
-  @state() private _versionMismatch: string | null = null;
   @state() private _raceState: RaceState = "idle";
   // Currently displayed countdown digit (3, 2, or 1) — null when not in
   // the countdown phase. Reactive so the digit overlay re-renders.
@@ -152,7 +151,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // updated() to arm/clear the via timer as a post-render side effect.
   private _anyViaInRows = false;
 
-  private _versionCheckDone = false;
   // The auto-picked sensor of a card with no stop configured, cached
   // across hass ticks: _resolveEntity runs from both shouldUpdate and
   // render, and finding that sensor iterates hass.states.
@@ -310,10 +308,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           console.warn("[wiener-linien-austria-retro-card] document.fonts.ready rejected", err);
         });
     }
-    if (!this._versionCheckDone && this.hass?.callWS) {
-      this._versionCheckDone = true;
-      void this._checkCardVersion();
-    }
     // HA rebuilds the dashboard on load — the card gets detached and
     // re-attached mid-race. Re-arm transitions against wall-clock time.
     // Bail if the user toggled `wheelchair_race` off while the card was
@@ -444,15 +438,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
 
   private _t(key: string, replacements?: Record<string, string | number>): string {
     return translate(`retro.${key}`, { hassLanguage: this.hass?.language }, replacements);
-  }
-
-  private async _checkCardVersion(): Promise<void> {
-    // checkCardVersionWS never rejects, so there is nothing to catch here.
-    this._versionMismatch = await checkCardVersionWS(
-      this.hass,
-      "wiener_linien_austria/retro_card_version",
-      RETRO_CARD_VERSION,
-    );
   }
 
   /** The configured sensor when it is in hass.states, null when it isn't:
@@ -950,6 +935,18 @@ export class WienerLinienAustriaRetroCard extends LitElement {
   // Render
   // ------------------------------------------------------------------
 
+  // The portfolio's version banner (src/version-banner.ts), first in the
+  // ha-card. All four cards ask the one card_version command; the per-card
+  // commands stay in the integration for browsers still on an older bundle.
+  private _versionBanner(): TemplateResult | typeof nothing {
+    return versionBanner(this.hass, {
+      domain: DOMAIN,
+      version: RETRO_CARD_VERSION,
+      name: "Wiener Linien Austria",
+      preview: this.preview,
+    });
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     const cfg = this._config;
@@ -1038,6 +1035,7 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         class=${this._fixedHeight ? "fixed-height" : ""}
         style="padding:0;overflow:hidden;"
       >
+        ${this._versionBanner()}
         <div
           class=${classMap(retroClasses)}
           role=${interactiveAttrs.role ?? nothing}
@@ -1045,7 +1043,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
           aria-label=${interactiveAttrs["aria-label"] ?? nothing}
           @click=${this._handleCardClick}
           @keydown=${clickable ? this._handleCardKeydown : nothing}>
-          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k), "retro-banner")}
           ${stationHeader}
           ${stationPanel}
           <div class="retro-led">
@@ -1373,11 +1370,17 @@ export class WienerLinienAustriaRetroCard extends LitElement {
       block-size: 100%;
     }
     /* A cell with a set row count: the board fills the cell, and scrolls
-       when the cell is shorter than the rows it shows. min_rows keeps the
-       default config from ever needing it. */
+       when the cell is shorter than the rows it shows. Without the version
+       banner, min_rows keeps the default config from ever needing it. */
+    ha-card.fixed-height {
+      display: flex;
+      flex-direction: column;
+    }
+    /* The height the version banner above it leaves, not the card's. */
     ha-card.fixed-height > div {
       box-sizing: border-box;
-      block-size: 100%;
+      flex: 1 1 auto;
+      min-block-size: 0;
       overflow-y: auto;
     }
     .retro {
@@ -2494,31 +2497,6 @@ export class WienerLinienAustriaRetroCard extends LitElement {
         display: none;
       }
     }
-    .retro-banner {
-      background: #ffa000;
-      color: #000;
-      padding: 6px 10px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-family: sans-serif;
-      border-radius: 4px;
-      letter-spacing: normal;
-      font-size: 0.75em;
-    }
-    .retro-banner button {
-      background: #000;
-      color: #ffa000;
-      border: none;
-      border-radius: 3px;
-      padding: 3px 10px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: sans-serif;
-    }
-
     /* Accessibility: visible focus ring for keyboard users. */
     a:focus-visible,
     button:focus-visible {

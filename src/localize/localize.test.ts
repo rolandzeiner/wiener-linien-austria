@@ -20,7 +20,6 @@ import editorI18n from "../editor/editor-i18n.ts?raw";
 import stationHeader from "../utils/station-header.ts?raw";
 import retroView from "../utils/retro-view.ts?raw";
 import stationIcons from "../utils/retro-station-icons.ts?raw";
-import sharedRender from "../shared-render.ts?raw";
 import routeUtils from "../utils/route.ts?raw";
 import { sorted } from "../utils.js";
 
@@ -66,7 +65,6 @@ const SOURCES: Record<string, string> = {
   stationHeader,
   retroView,
   stationIcons,
-  sharedRender,
   routeUtils,
 };
 const ALL_SOURCE = Object.values(SOURCES).join("\n");

@@ -69,6 +69,7 @@ from .const import (
     WEEKDAYS,
 )
 from .parsing import as_mapping, as_text
+from .stop_corrections import planner_diva
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -429,14 +430,17 @@ def build_trip_params(
     `itdDate` / `itdTime` in its own zone. A list of pairs rather than a
     dict because `exclMOT_<code>` may repeat the checkbox shape once per
     excluded mode.
+
+    The options keep the station list's DIVAs. The server is asked with its
+    own (`stop_corrections.planner_diva`): it doesn't plan from all the list's.
     """
     params: list[tuple[str, str]] = [
         ("outputFormat", "JSON"),
         ("language", "en" if language.startswith("en") else "de"),
         ("type_origin", "stopID"),
-        ("name_origin", str(options.origin_diva)),
+        ("name_origin", str(planner_diva(options.origin_diva))),
         ("type_destination", "stopID"),
-        ("name_destination", str(options.destination_diva)),
+        ("name_destination", str(planner_diva(options.destination_diva))),
         ("itdDate", when.strftime("%Y%m%d")),
         ("itdTime", when.strftime("%H%M")),
         ("itdTripDateTimeDepArr", "arr" if arrive_by else "dep"),

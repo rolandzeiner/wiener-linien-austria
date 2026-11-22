@@ -146,6 +146,7 @@ def make_entry(
         options={},
         title="Stephansplatz",
         version=2,
+        minor_version=2,
         unique_id=unique_id,
     )
 
@@ -231,6 +232,7 @@ def route_entry(**overrides: Any) -> MockConfigEntry:
         data={**ROUTE_DATA, **overrides},
         title="Westbahnhof → Praterstern",
         version=2,
+        minor_version=2,
         unique_id="route_60201468_60201040",
     )
 

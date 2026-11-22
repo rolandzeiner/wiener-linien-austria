@@ -1211,8 +1211,8 @@ async def test_command_times_a_stop_the_timetable_knows_by_another_id(
     mock_static_catalogue: StaticCatalogue,
     dm_fetch: AsyncMock,
 ) -> None:
-    """N6 ends at Enkplatz on its route and at a stop the station list lacks
-    in the timetable."""
+    """A route's last stop takes the time of a call under an ID the catalogue
+    lacks."""
     enkplatz, grillgasse = 60200425, 60201987
     _name_stops(
         mock_static_catalogue,
@@ -1248,6 +1248,35 @@ async def test_command_times_a_stop_the_timetable_knows_by_another_id(
         "Vorgartenstraße": 2,
         "Enkplatz": 5,
     }
+
+
+async def test_command_times_a_stop_the_planner_counts_as_a_bigger_one(
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
+    mock_fetch: AsyncMock,
+    mock_static_catalogue: StaticCatalogue,
+    dm_fetch: AsyncMock,
+) -> None:
+    """As tram 11 at Gottschalkgasse, whose call the timetable lists as Enkplatz's.
+
+    U1 stands in for the tram.
+    """
+    enkplatz, gottschalkgasse = 60200425, 60201757
+    _name_stops(
+        mock_static_catalogue,
+        {enkplatz: "Enkplatz", gottschalkgasse: "Enkplatz, Gottschalkg."},
+    )
+    dm_fetch.return_value = _body(
+        _run("U1", "H", [_point(str(enkplatz), 32)], minute=30)
+    )
+    client = await _connect(
+        hass, hass_ws_client, freezer, make_entry({CONF_DIVA: PRATERSTERN})
+    )
+
+    response = await _ask(client, diva=PRATERSTERN, line="U1", direction="H")
+
+    assert response["result"]["run_times"]["U1|H"]["Enkplatz, Gottschalkg."] == 2
 
 
 async def test_command_names_an_operators_stops_its_own_way(

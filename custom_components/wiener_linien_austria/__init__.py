@@ -81,6 +81,7 @@ from .static import (
     catalogue_is_stale,
     current_catalogue,
 )
+from .stop_corrections import entry_corrections
 from .websocket import STOPS_CACHE_KEY, async_setup_websocket
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -99,7 +100,7 @@ async def _websocket_card_version(
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Return the modern card version so the frontend can detect mismatches."""
+    """Return the version all four cards' banners compare their own with."""
     connection.send_result(msg["id"], {"version": CARD_VERSION})
 
 
@@ -110,7 +111,7 @@ async def _websocket_retro_card_version(
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Return the retro card version so its frontend can detect mismatches."""
+    """Return the retro card version, for bundles older than the shared banner."""
     connection.send_result(msg["id"], {"version": RETRO_CARD_VERSION})
 
 
@@ -121,7 +122,7 @@ async def _websocket_flap_card_version(
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Return the flap card version so its frontend can detect mismatches."""
+    """Return the flap card version, for bundles older than the shared banner."""
     connection.send_result(msg["id"], {"version": FLAP_CARD_VERSION})
 
 
@@ -132,16 +133,17 @@ async def _websocket_route_card_version(
     connection: ActiveConnection,
     msg: dict[str, Any],
 ) -> None:
-    """Return the route card version so its frontend can detect mismatches."""
+    """Return the route card version, for bundles older than the shared banner."""
     connection.send_result(msg["id"], {"version": ROUTE_CARD_VERSION})
 
 
 async def async_setup(hass: HomeAssistant, config: dict[str, Any]) -> bool:
     """Set up the Wiener Linien Austria component.
 
-    Process-scoped concerns only: register the WebSocket commands (the
-    four card-version probes plus the route card's `stops` / `plan`, see
-    websocket.py), the `plan_trip` action and the Lovelace JS resources.
+    Process-scoped concerns only: register the WebSocket commands
+    (`card_version`, the three per-card ones older bundles ask, plus the
+    route card's `stops` / `plan`, see websocket.py), the `plan_trip` action
+    and the Lovelace JS resources.
     Domain-wide *timers* are booted from the FIRST `async_setup_entry` and
     torn down by the LAST `async_unload_entry` — see `_ensure_domain_timers`
     and the unload cleanup tuple. Putting the timers here would leak across
@@ -696,6 +698,10 @@ async def async_migrate_entry(
     across /monitor polls on branching termini (e.g. U1/R alternates
     between Oberlaa and Alaudagasse), so it must not participate in the
     saved selection key — it survived only as a now-meaningless label.
+
+    v2.1 → v2.2: a board saved under a stop the open data gets wrong takes the
+    corrected name and platforms or moves to the stop it meant (new DIVA and
+    unique_id), and a route takes the corrected names (stop_corrections.py).
     """
     if entry.version > 2:
         return False
@@ -726,4 +732,8 @@ async def async_migrate_entry(
             )
         else:
             hass.config_entries.async_update_entry(entry, version=2)
+    if entry.minor_version < 2:
+        hass.config_entries.async_update_entry(
+            entry, minor_version=2, **entry_corrections(hass, entry)
+        )
     return True

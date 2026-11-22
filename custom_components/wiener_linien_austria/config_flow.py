@@ -33,6 +33,7 @@ typing, and free text that step 2 can still resolve.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 
 import voluptuous as vol
@@ -118,6 +119,7 @@ from .static import (
     canonical_line_key,
     is_s_bahn_label,
 )
+from .stop_corrections import split_off_platforms
 from .stops import stop_options, trackable_station
 from .timetable import async_probe_picker_rows
 
@@ -240,7 +242,9 @@ def _static_lines_for_station(
     tpi = catalogue.trip_patterns
     if tpi is None:
         return []
-    diva_labels = tpi.lines_at_diva.get(station.diva, ())
+    # By platform, not DIVA: on reconfigure a board can hold platforms that
+    # are a stop of their own by now (`split_off_platforms`).
+    diva_labels = tpi.lines_at_rbls(station.rbls)
     if not diva_labels:
         return []
     # Reuse the catalogue's cached RBL → (DIVA, name) reverse index —
@@ -327,7 +331,8 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
     # v2: CONF_LINES stores `{line}|{direction}` pairs (was triples) —
     # line.towards is unstable across polls on branching termini.
     VERSION = 2
-    MINOR_VERSION = 1
+    # v2.2: boards and routes follow `stop_corrections`.
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         """Init in-flight selections."""
@@ -971,6 +976,11 @@ class WienerLinienAustriaConfigFlow(ConfigFlow, domain=DOMAIN):
         station = catalogue.stations_by_diva.get(diva)
         if station is None:
             return self.async_abort(reason="stop_gone")
+        # A board that kept platforms since moved to another stop (split or
+        # merged) still offers their lines, or saving would drop them.
+        if kept := split_off_platforms(diva, data.get(CONF_RBLS) or []):
+            own = [rbl for rbl in station.rbls if rbl not in kept]
+            station = replace(station, rbls=[*own, *kept])
         self._selected_station = station
         return await self.async_step_select_lines(user_input)
 

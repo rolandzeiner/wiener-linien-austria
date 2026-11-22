@@ -6,9 +6,8 @@ and aliases the card consts to it). The tests below derive expected values
 from `INTEGRATION_VERSION`, which itself derives from the manifest — so a
 manifest-only bump still trips CI when `src/const.ts` is forgotten.
 
-If these drift, HA's frontend WebSocket check sees a mismatch, shows a
-reload banner, the reload re-serves the same mismatched JS, and the
-banner reappears — infinite loop for every user on an old card.
+If these drift, that card shows the update banner to every user, and
+reloading can't clear it.
 
 Wiener Linien ships *four* card variants (modern + retro + flap + route),
 each with its own constant. The test asserts all four separately so a

@@ -30,8 +30,8 @@ export interface HassEntityRegistryEntry {
 
 /** Minimal HA shape — only the fields these cards touch. `language` is
  *  the user-profile locale; `localize` is HA's own UI translation
- *  lookup the editors reuse for built-in field names; `callWS` powers
- *  the card-version probe; `themes.darkMode` is reserved for future
+ *  lookup the editors reuse for built-in field names; `callWS` carries
+ *  the WebSocket calls, the version banner's among them; `themes.darkMode` is reserved for future
  *  adaptive-logo work; `entities` is the registry map the 2026.6 card
  *  picker's `getEntitySuggestion` hook consults for platform gating.
  *  Anything beyond these lives untyped and is read with a cast at the

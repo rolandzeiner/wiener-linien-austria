@@ -7,9 +7,9 @@ import type { HomeAssistant, LovelaceCardEditor, WindowWithCustomCards } from ".
 
 import { cardStyles } from "./card-styles.js";
 import { registerWlFonts } from "./font-face.js";
-import { ATTRIBUTION_FALLBACK, CARD_VERSION, NIGHTLINE_BG } from "./const.js";
+import { ATTRIBUTION_FALLBACK, CARD_VERSION, DOMAIN, NIGHTLINE_BG } from "./const.js";
 import { pickerText, translate } from "./localize/localize.js";
-import { checkCardVersionWS, renderVersionBanner } from "./shared-render.js";
+import { versionBanner } from "./version-banner.js";
 import { cardShouldUpdate, deText, isFixedHeight } from "./utils.js";
 import {
   LINE_TYPE_METRO,
@@ -201,7 +201,6 @@ export class WienerLinienAustriaCard extends LitElement {
   @state() private _tabEdges: TabEdges = { start: false, end: false };
   private _tabResize: ResizeObserver | null = null;
   private _observedTabs: HTMLElement | null = null;
-  @state() private _versionMismatch: string | null = null;
   @state() private _expandedTraffic = new Set<string>();
   @state() private _expandedElevator = new Set<string>();
   // Per-row expanded state for the stops_ahead collapsible. Keyed by
@@ -237,8 +236,6 @@ export class WienerLinienAustriaCard extends LitElement {
   // Per-stop so that in `tabs` layout each tab keeps its own dialog.
   @state() private _qrOpenFor: string | null = null;
   @state() private _devPaletteOpen = false;
-
-  private _versionCheckDone = false;
 
   public setConfig(config: WienerLinienCardConfig): void {
     if (!config || typeof config !== "object") {
@@ -330,13 +327,6 @@ export class WienerLinienAustriaCard extends LitElement {
   public override connectedCallback(): void {
     super.connectedCallback();
     registerWlFonts();
-    // One-shot WS version probe — per-instance, but cheap (HA caches the
-    // command registration). Gated by _versionCheckDone so re-adding the
-    // card in edit mode doesn't hammer the backend.
-    if (!this._versionCheckDone && this.hass?.callWS) {
-      this._versionCheckDone = true;
-      void this._checkCardVersion();
-    }
   }
 
   protected override willUpdate(changed: PropertyValues): void {
@@ -516,15 +506,6 @@ export class WienerLinienAustriaCard extends LitElement {
     return translate(`modern.${key}`, { hassLanguage: this.hass?.language }, replacements);
   }
 
-  private async _checkCardVersion(): Promise<void> {
-    // checkCardVersionWS never rejects, so there is nothing to catch here.
-    this._versionMismatch = await checkCardVersionWS(
-      this.hass,
-      "wiener_linien_austria/card_version",
-      CARD_VERSION,
-    );
-  }
-
   // ------------------------------------------------------------------
   // Resolution helpers
   // ------------------------------------------------------------------
@@ -553,6 +534,18 @@ export class WienerLinienAustriaCard extends LitElement {
   // Render
   // ------------------------------------------------------------------
 
+  // The portfolio's version banner (src/version-banner.ts), first in the
+  // ha-card. All four cards ask the one card_version command; the per-card
+  // commands stay in the integration for browsers still on an older bundle.
+  private _versionBanner(): TemplateResult | typeof nothing {
+    return versionBanner(this.hass, {
+      domain: DOMAIN,
+      version: CARD_VERSION,
+      name: "Wiener Linien Austria",
+      preview: this.preview,
+    });
+  }
+
   protected override render(): TemplateResult | typeof nothing {
     if (!this._config) return nothing;
     if (!this.hass) return html`<ha-card><div class="wrap"></div></ha-card>`;
@@ -571,9 +564,9 @@ export class WienerLinienAustriaCard extends LitElement {
 
     return html`
       <ha-card class=${fixed ? "fixed-height" : ""}>
+        ${this._versionBanner()}
         ${useTabs ? this._renderTabs(stops, this._activeTab) : nothing}
         <div class="wrap">
-          ${renderVersionBanner(this.preview ? null : this._versionMismatch, (k) => this._t(k))}
           ${this._renderMissing(missing)}
           ${
             cfg.show_traffic_info
@@ -2465,9 +2458,6 @@ export class WienerLinienAustriaCard extends LitElement {
       </div>
     `;
   }
-
-  // Banner is rendered via the shared `renderVersionBanner` helper —
-  // see shared-render.ts. Cache-wipe + reload also lives there.
 
   // ------------------------------------------------------------------
   // Dev-mode panel — opt-in via `?wl_debug=1` query string or a sticky
