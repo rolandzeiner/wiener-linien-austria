@@ -1467,7 +1467,7 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     }
 
     /* ====================================================================
-       Tile — the unit cell. Each character is its own perspective
+       Tile — the unit cell. A flipping character is its own perspective
        container so the leaf can rotate without coupling to neighbours.
        drop-shadow renders outside the layout box (overflow:visible on
        the tile keeps it unclipped) — that 1.5 px below the tile is
@@ -1478,7 +1478,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       display: inline-block;
       width: 32px;
       height: 44px;
-      perspective: 220px;
       overflow: visible;
       filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.5));
       /* When opts.tileBg / opts.tileFg are set, --tile-bg / --tile-fg
@@ -1493,6 +1492,15 @@ export class WienerLinienAustriaFlapCard extends LitElement {
     .flap-tile--wide {
       width: 38px;
     }
+    /* 3D only while a tile flips: the leaf exists only then, and the
+       halves never rotate. With perspective on every tile and
+       backface-visibility on every half, a board of ~150 tiles was a
+       stack of compositing layers redrawn on every frame: +16 points
+       of CPU per frame on a Galaxy Tab A8 wall tablet, 0 without
+       (2026-11-27). flap-tile-layers.test.ts keeps it that way. */
+    .flap-tile--flipping {
+      perspective: 220px;
+    }
     .flap-tile__half {
       position: absolute;
       left: 0;
@@ -1502,7 +1510,6 @@ export class WienerLinienAustriaFlapCard extends LitElement {
       display: flex;
       justify-content: center;
       color: var(--flap-ink);
-      backface-visibility: hidden;
     }
     .flap-tile__half--top {
       top: 0;

@@ -1704,13 +1704,15 @@ position: relative;
 display: inline-block;
 width: 32px;
 height: 44px;
-perspective: 220px;
 overflow: visible;
 filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.5));
 transition: --tile-bg 320ms ease;
 }
 .flap-tile--wide {
 width: 38px;
+}
+.flap-tile--flipping {
+perspective: 220px;
 }
 .flap-tile__half {
 position: absolute;
@@ -1721,7 +1723,6 @@ overflow: hidden;
 display: flex;
 justify-content: center;
 color: var(--flap-ink);
-backface-visibility: hidden;
 }
 .flap-tile__half--top {
 top: 0;
